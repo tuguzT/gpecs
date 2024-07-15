@@ -1,0 +1,8 @@
+[package]
+name = "gpecs_task_graph"
+description = "Task graph for (probably) ECS on GPU"
+version = "0.0.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+
+[dependencies]

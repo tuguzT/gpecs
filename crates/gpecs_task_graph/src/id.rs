@@ -1,5 +1,6 @@
 macro_rules! id {
-    ($vis:vis $name:ident, $type:ty $(,)?) => {
+    ($(#[$outer:meta])* $vis:vis $name:ident ($type:ty) $(;)?) => {
+        $(#[$outer])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[repr(transparent)]
         $vis struct $name($type);
@@ -42,8 +43,11 @@ macro_rules! id {
             }
         }
     };
-    ($vis:vis $name:ident $(,)?) => {
-        $crate::id::id!($vis $name, u32);
+    ($(#[$outer:meta])* $vis:vis $name:ident $(;)?) => {
+        $crate::id::id!(
+            $(#[$outer])*
+            $vis $name(u32)
+        );
     };
 }
 
@@ -73,7 +77,7 @@ mod tests {
 
     #[test]
     fn same_size() {
-        id!(pub SameSizeId, u64);
+        id!(pub SameSizeId(u64));
 
         assert_eq!(size_of::<SameSizeId>(), size_of::<u64>());
     }

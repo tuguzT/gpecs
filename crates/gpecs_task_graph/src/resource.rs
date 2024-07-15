@@ -1,7 +1,7 @@
-use crate::id;
+use crate::id::new_id_type;
 
-id! {
-    /// Some id.
+new_id_type! {
+    /// Identifier of a resource accessed by some task.
     pub ResourceId;
 }
 

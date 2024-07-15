@@ -1,4 +1,4 @@
-macro_rules! id {
+macro_rules! new_id_type {
     ($(#[$outer:meta])* $vis:vis $name:ident ($type:ty) $(;)?) => {
         $(#[$outer])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,14 +44,14 @@ macro_rules! id {
         }
     };
     ($(#[$outer:meta])* $vis:vis $name:ident $(;)?) => {
-        $crate::id::id!(
+        $crate::id::new_id_type!(
             $(#[$outer])*
             $vis $name(u32)
         );
     };
 }
 
-pub(crate) use id;
+pub(crate) use new_id_type;
 
 #[cfg(test)]
 mod tests {
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn new() {
-        id!(pub SomeId);
+        new_id_type!(pub SomeId);
         let id = SomeId::new(42);
 
         assert!(!id.is_empty());
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn empty() {
-        id!(pub SomeId);
+        new_id_type!(pub SomeId);
         let id = SomeId::empty();
 
         assert!(id.is_empty());
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn same_size() {
-        id!(pub SameSizeId(u64));
+        new_id_type!(pub SameSizeId(u64));
 
         assert_eq!(size_of::<SameSizeId>(), size_of::<u64>());
     }

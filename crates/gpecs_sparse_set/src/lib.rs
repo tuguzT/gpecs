@@ -5,7 +5,10 @@
 #![forbid(unsafe_code)]
 // TODO `#![no_std]` with `alloc` enabled
 
-use std::{collections::TryReserveError, mem::replace};
+extern crate alloc;
+
+use alloc::collections::TryReserveError;
+use core::mem::replace;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct SparseSet<T> {
@@ -178,16 +181,63 @@ impl<T> SparseSet<T> {
         }
     }
 
+    pub fn swap(&mut self, first_key: usize, second_key: usize) {
+        let Self { dense, sparse } = self;
+
+        let first_index = sparse.get(first_key).cloned();
+        let second_index = sparse.get(second_key).cloned();
+        let (Some(first_index), Some(second_index)) = (first_index, second_index) else {
+            return;
+        };
+
+        // Cannot safely take 2 mutable references from the same dense vector, so...
+        // 1. Validate indices to the dense vector, returns if any of them is out of bounds
+        if first_index >= dense.len() || second_index >= dense.len() {
+            return;
+        }
+        // (as I remember, from the current point of execution index checks can be optimized away)
+        // 2. Swap entries by valid indices
+        dense.swap(first_index, second_index);
+        // 3. Restore keys of swapped entries (these keys point to the sparse vector)
+        let temp = dense[first_index].key;
+        dense[first_index].key = dense[second_index].key;
+        dense[second_index].key = temp;
+    }
+
+    pub fn swap_remove(&mut self, key: usize) -> Option<T> {
+        let Self { dense, sparse } = self;
+
+        let entry_index = sparse.get_mut(key).cloned()?;
+        if entry_index >= dense.len() {
+            return None;
+        }
+
+        let entry = dense.swap_remove(entry_index);
+        debug_assert_eq!(key, entry.key);
+
+        let SparseSetEntry { key, value } = entry;
+        dense[entry_index].key = key;
+        Some(value)
+    }
+
     pub fn remove(&mut self, key: usize) -> Option<T> {
         let Self { dense, sparse } = self;
 
         let entry_index = sparse.get_mut(key).cloned()?;
-        if entry_index < dense.len() {
-            let value = dense.swap_remove(entry_index).value;
-            dense.get_mut(entry_index)?.key = key;
-            return Some(value);
+        if entry_index >= dense.len() {
+            return None;
         }
-        None
+
+        for entry in dense.iter_mut().skip(entry_index + 1) {
+            let sparse_index = entry.key;
+            sparse[sparse_index] -= 1;
+        }
+
+        let entry = dense.remove(entry_index);
+        debug_assert_eq!(key, entry.key);
+
+        let SparseSetEntry { value, .. } = entry;
+        Some(value)
     }
 
     pub fn get(&self, key: usize) -> Option<&T> {

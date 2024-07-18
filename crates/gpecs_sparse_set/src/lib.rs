@@ -184,6 +184,10 @@ impl<T> SparseSet<T> {
     pub fn swap(&mut self, first_key: usize, second_key: usize) {
         let Self { dense, sparse } = self;
 
+        if first_key == second_key {
+            return;
+        }
+
         let first_index = sparse.get(first_key).cloned();
         let second_index = sparse.get(second_key).cloned();
         let (Some(first_index), Some(second_index)) = (first_index, second_index) else {

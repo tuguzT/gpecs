@@ -9,11 +9,12 @@ extern crate alloc;
 
 use alloc::collections::TryReserveError;
 use core::mem::replace;
+use nonmax::NonMaxUsize;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct SparseSet<T> {
     dense: Vec<SparseSetEntry<T>>,
-    sparse: Vec<usize>,
+    sparse: Vec<Option<NonMaxUsize>>,
 }
 
 impl<T> SparseSet<T> {
@@ -164,21 +165,21 @@ impl<T> SparseSet<T> {
         let Self { dense, sparse } = self;
 
         if sparse.len() <= key {
-            sparse.resize(key + 1, usize::MAX);
+            sparse.resize(key + 1, None);
         }
 
-        let entry_index = sparse.get_mut(key)?;
-        match dense.get_mut(*entry_index) {
-            Some(entry) => {
-                let value = replace(&mut entry.value, value);
-                Some(value)
-            }
-            None => {
-                dense.push(SparseSetEntry { key, value });
-                *entry_index = dense.len() - 1;
-                None
-            }
+        if let Some(entry_index) = sparse.get(key).cloned().flatten().map(usize::from) {
+            let entry_value = dense
+                .get_mut(entry_index)
+                .expect("index from sparse should be in bounds of dense")
+                .value_mut();
+            let value = replace(entry_value, value);
+            return Some(value);
         }
+
+        dense.push(SparseSetEntry { key, value });
+        sparse[key] = (dense.len() - 1).try_into().ok();
+        None
     }
 
     pub fn swap(&mut self, first_key: usize, second_key: usize) {
@@ -188,21 +189,21 @@ impl<T> SparseSet<T> {
             return;
         }
 
-        let first_index = sparse.get(first_key).cloned();
-        let second_index = sparse.get(second_key).cloned();
+        let first_index = sparse.get(first_key).cloned().flatten().map(usize::from);
+        let second_index = sparse.get(second_key).cloned().flatten().map(usize::from);
         let (Some(first_index), Some(second_index)) = (first_index, second_index) else {
             return;
         };
 
-        // Cannot safely take 2 mutable references from the same dense vector, so...
-        // 1. Validate indices to the dense vector, returns if any of them is out of bounds
+        // Cannot safely take 2 mutable references from the same dense, so...
+        // 1. Validate indices to the dense, returns if any of them is out of bounds
         if first_index >= dense.len() || second_index >= dense.len() {
             return;
         }
-        // (as I remember, from the current point of execution index checks can be optimized away)
+        // (as I remember, from the current point of execution, dense index checks could be optimized away)
         // 2. Swap entries by valid indices
         dense.swap(first_index, second_index);
-        // 3. Restore keys of swapped entries (these keys point to the sparse vector)
+        // 3. Restore keys of swapped entries (these keys point to the sparse)
         let temp = dense[first_index].key;
         dense[first_index].key = dense[second_index].key;
         dense[second_index].key = temp;
@@ -211,7 +212,7 @@ impl<T> SparseSet<T> {
     pub fn swap_remove(&mut self, key: usize) -> Option<T> {
         let Self { dense, sparse } = self;
 
-        let entry_index = sparse.get_mut(key).cloned()?;
+        let entry_index = sparse.get_mut(key).cloned().flatten().map(usize::from)?;
         if entry_index >= dense.len() {
             return None;
         }
@@ -221,35 +222,37 @@ impl<T> SparseSet<T> {
 
         let SparseSetEntry { value, .. } = entry;
         sparse[dense.len()] = sparse[key];
-        sparse[key] = usize::MAX;
+        sparse[key] = None;
         Some(value)
     }
 
     pub fn remove(&mut self, key: usize) -> Option<T> {
         let Self { dense, sparse } = self;
 
-        let entry_index = sparse.get_mut(key).cloned()?;
+        let entry_index = sparse.get_mut(key).cloned().flatten().map(usize::from)?;
         if entry_index >= dense.len() {
             return None;
         }
 
         for entry in dense.iter_mut().skip(entry_index + 1) {
             let sparse_index = entry.key;
-            sparse[sparse_index] -= 1;
+            sparse[sparse_index] = sparse[sparse_index]
+                .map(usize::from)
+                .and_then(|index| (index - 1).try_into().ok());
         }
 
         let entry = dense.remove(entry_index);
         debug_assert_eq!(key, entry.key);
 
         let SparseSetEntry { value, .. } = entry;
-        sparse[key] = usize::MAX;
+        sparse[key] = None;
         Some(value)
     }
 
     pub fn get(&self, key: usize) -> Option<&T> {
         let Self { dense, sparse } = self;
 
-        let entry_index = sparse.get(key).cloned()?;
+        let entry_index = sparse.get(key).cloned().flatten().map(usize::from)?;
         let entry = dense.get(entry_index)?;
         debug_assert_eq!(key, entry.key);
 
@@ -260,7 +263,7 @@ impl<T> SparseSet<T> {
     pub fn get_mut(&mut self, key: usize) -> Option<&mut T> {
         let Self { dense, sparse } = self;
 
-        let entry_index = sparse.get(key).cloned()?;
+        let entry_index = sparse.get(key).cloned().flatten().map(usize::from)?;
         let entry = dense.get_mut(entry_index)?;
         debug_assert_eq!(key, entry.key);
 
@@ -271,7 +274,7 @@ impl<T> SparseSet<T> {
     pub fn contains(&self, key: usize) -> bool {
         let Self { dense, sparse } = self;
 
-        let Some(entry_index) = sparse.get(key).cloned() else {
+        let Some(entry_index) = sparse.get(key).cloned().flatten().map(usize::from) else {
             return false;
         };
         entry_index < dense.len()

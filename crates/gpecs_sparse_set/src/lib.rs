@@ -9,25 +9,73 @@ extern crate alloc;
 
 use alloc::collections::TryReserveError;
 use core::mem::replace;
-use nonmax::NonMaxUsize;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub enum Slot {
+    Occupied { dense_index: usize },
+    Free { next_free: usize },
+}
+
+impl Slot {
+    pub fn is_occupied(&self) -> bool {
+        matches!(self, Self::Occupied { .. })
+    }
+
+    pub fn is_free(&self) -> bool {
+        matches!(self, Self::Free { .. })
+    }
+
+    pub fn dense_index(&self) -> Option<usize> {
+        match self {
+            Self::Occupied { dense_index } => Some(*dense_index),
+            Self::Free { .. } => None,
+        }
+    }
+
+    pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
+        match self {
+            Self::Occupied { dense_index } => Some(dense_index),
+            Self::Free { .. } => None,
+        }
+    }
+
+    pub fn next_free(&self) -> Option<usize> {
+        match self {
+            Self::Occupied { .. } => None,
+            Self::Free { next_free } => Some(*next_free),
+        }
+    }
+
+    pub fn next_free_mut(&mut self) -> Option<&mut usize> {
+        match self {
+            Self::Occupied { .. } => None,
+            Self::Free { next_free } => Some(next_free),
+        }
+    }
+}
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct SparseSet<T> {
-    dense: Vec<SparseSetEntry<T>>,
-    sparse: Vec<Option<NonMaxUsize>>,
+    dense: Vec<Entry<T>>,
+    sparse: Vec<Slot>,
+    first_free: usize,
 }
 
 impl<T> SparseSet<T> {
     pub const fn new() -> Self {
-        let dense = Vec::new();
-        let sparse = Vec::new();
-        Self { dense, sparse }
+        Self {
+            dense: Vec::new(),
+            sparse: Vec::new(),
+            first_free: 0,
+        }
     }
 
     pub fn with_capacity(dense: usize, sparse: usize) -> Self {
-        let dense = Vec::with_capacity(dense);
-        let sparse = Vec::with_capacity(sparse);
-        Self { dense, sparse }
+        Self {
+            dense: Vec::with_capacity(dense),
+            sparse: Vec::with_capacity(sparse),
+            first_free: 0,
+        }
     }
 
     #[inline]
@@ -55,7 +103,7 @@ impl<T> SparseSet<T> {
     }
 
     pub fn capacity(&self) -> usize {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
         usize::min(dense.capacity(), sparse.capacity())
     }
 
@@ -70,7 +118,7 @@ impl<T> SparseSet<T> {
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
         dense.reserve(additional);
         sparse.reserve(additional);
     }
@@ -86,7 +134,7 @@ impl<T> SparseSet<T> {
     }
 
     pub fn reserve_exact(&mut self, additional: usize) {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
         dense.reserve_exact(additional);
         sparse.reserve_exact(additional);
     }
@@ -102,7 +150,7 @@ impl<T> SparseSet<T> {
     }
 
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
         dense.try_reserve(additional)?;
         sparse.try_reserve(additional)?;
         Ok(())
@@ -119,7 +167,7 @@ impl<T> SparseSet<T> {
     }
 
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
         dense.try_reserve_exact(additional)?;
         sparse.try_reserve_exact(additional)?;
         Ok(())
@@ -136,7 +184,7 @@ impl<T> SparseSet<T> {
     }
 
     pub fn shrink_to_fit(&mut self) {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
         dense.shrink_to_fit();
         sparse.shrink_to_fit();
     }
@@ -151,57 +199,153 @@ impl<T> SparseSet<T> {
         sparse.shrink_to_fit();
     }
 
-    pub fn as_slice(&self) -> &[SparseSetEntry<T>] {
+    pub fn as_slice(&self) -> &[Entry<T>] {
         let Self { dense, .. } = self;
         dense.as_slice()
     }
 
-    pub fn as_mut_slice(&mut self) -> &mut [SparseSetEntry<T>] {
+    pub fn as_mut_slice(&mut self) -> &mut [Entry<T>] {
         let Self { dense, .. } = self;
         dense.as_mut_slice()
     }
 
     pub fn insert(&mut self, key: usize, value: T) -> Option<T> {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense,
+            sparse,
+            first_free,
+        } = self;
 
-        if sparse.len() <= key {
-            sparse.resize(key + 1, None);
+        if key >= sparse.len() {
+            let mut next_free = sparse.len();
+            let generator = || {
+                next_free = if next_free < key {
+                    next_free + 1
+                } else {
+                    *first_free
+                };
+                Slot::Free { next_free }
+            };
+            sparse.resize_with(key + 1, generator);
         }
 
-        if let Some(entry_index) = sparse.get(key).cloned().flatten().map(usize::from) {
-            let entry_value = dense
-                .get_mut(entry_index)
-                .expect("index from sparse should be in bounds of dense")
-                .value_mut();
-            let value = replace(entry_value, value);
-            return Some(value);
-        }
+        match sparse[key] {
+            Slot::Occupied { dense_index } => {
+                let entry_value = dense
+                    .get_mut(dense_index)
+                    .expect("index from sparse should be in bounds of dense")
+                    .value_mut();
+                let value = replace(entry_value, value);
+                Some(value)
+            }
+            Slot::Free { next_free } => {
+                let entry = Entry { key, value };
+                let slot = Slot::Occupied {
+                    dense_index: dense.len(),
+                };
+                dense.push(entry);
+                sparse[key] = slot;
 
-        dense.push(SparseSetEntry { key, value });
-        sparse[key] = (dense.len() - 1).try_into().ok();
-        None
+                let (left, right) = sparse.split_at_mut(key);
+                let mut left_free_slots = left
+                    .iter_mut()
+                    .enumerate()
+                    .skip(*first_free)
+                    .rev()
+                    .filter(|(_, slot)| slot.is_free());
+                let mut right_free_slots = right
+                    .iter_mut()
+                    .enumerate()
+                    .map(|(idx, slot)| (idx + key, slot))
+                    .skip(1)
+                    .filter(|(_, slot)| slot.is_free());
+                match (left_free_slots.next(), right_free_slots.next()) {
+                    (Some((_, Slot::Free { next_free: left })), Some((_, Slot::Free { .. }))) => {
+                        *left = next_free;
+                    }
+                    (Some((_, Slot::Free { next_free: left })), None) => {
+                        *left = next_free;
+                    }
+                    (None, Some((_, Slot::Free { .. }))) => {
+                        *first_free = next_free;
+                        if let Some((_, Slot::Free { next_free })) = right_free_slots.last() {
+                            *next_free = *first_free;
+                        }
+                    }
+                    (None, None) => {
+                        *first_free = sparse.len();
+                    }
+                    _ => unreachable!("found slot should be free"),
+                }
+
+                None
+            }
+        }
     }
 
     pub fn push(&mut self, value: T) -> usize {
-        let Self { sparse, .. } = self;
+        let Self {
+            sparse,
+            dense,
+            first_free,
+        } = self;
 
-        let key = sparse
-            .iter()
-            .position(Option::is_none)
-            .unwrap_or(sparse.len());
-        self.insert(key, value);
+        if *first_free < sparse.len() {
+            let key = *first_free;
+            let entry = Entry { key, value };
+            let slot = Slot::Occupied {
+                dense_index: dense.len(),
+            };
+
+            let next_free = sparse[*first_free]
+                .next_free()
+                .expect("first free should point to free slot");
+            let next_next_free = sparse
+                .get_mut(next_free)
+                .expect("next free should point to valid slot")
+                .next_free_mut()
+                .expect("next free should point to free slot");
+            if *next_next_free == *first_free {
+                *next_next_free = next_free;
+            }
+
+            dense.push(entry);
+            sparse[*first_free] = slot;
+            *first_free = if *first_free == next_free {
+                sparse.len()
+            } else {
+                let result = next_free;
+                if let Some(Slot::Free { next_free }) = sparse[*first_free..]
+                    .iter_mut()
+                    .rfind(|slot| slot.is_free())
+                {
+                    *next_free = result;
+                }
+                result
+            };
+            return key;
+        }
+
+        let key = *first_free;
+        let entry = Entry { key, value };
+        let slot = Slot::Occupied {
+            dense_index: dense.len(),
+        };
+        dense.push(entry);
+        sparse.push(slot);
+        *first_free = sparse.len();
         key
     }
 
     pub fn swap(&mut self, first_key: usize, second_key: usize) {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
 
         if first_key == second_key {
             return;
         }
 
-        let first_index = sparse.get(first_key).cloned().flatten().map(usize::from);
-        let second_index = sparse.get(second_key).cloned().flatten().map(usize::from);
+        let first_index = sparse.get(first_key).and_then(Slot::dense_index);
+        let second_index = sparse.get(second_key).and_then(Slot::dense_index);
         let (Some(first_index), Some(second_index)) = (first_index, second_index) else {
             return;
         };
@@ -221,92 +365,221 @@ impl<T> SparseSet<T> {
     }
 
     pub fn swap_remove(&mut self, key: usize) -> Option<T> {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense,
+            sparse,
+            first_free,
+        } = self;
 
-        let entry_index = sparse.get_mut(key).cloned().flatten().map(usize::from)?;
-        if entry_index >= dense.len() {
-            return None;
+        let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
+        if dense_index >= dense.len() {
+            panic!("index from sparse should be in bounds of dense");
         }
 
-        let entry = dense.swap_remove(entry_index);
+        let entry = dense.swap_remove(dense_index);
         debug_assert_eq!(key, entry.key);
 
-        let SparseSetEntry { value, .. } = entry;
-        sparse[dense.len()] = sparse[key];
-        sparse[key] = None;
+        if let Some(entry) = dense.get(dense_index) {
+            let slot = sparse
+                .get_mut(entry.key)
+                .expect("key from dense should point to valid sparse slot");
+            let Slot::Occupied { dense_index: to_sw } = slot else {
+                panic!("key from dense should point to occupied sparse slot");
+            };
+            debug_assert_eq!(*to_sw, entry.key);
+            *to_sw = dense_index;
+        }
+
+        let next_free = match sparse.get_mut(*first_free) {
+            Some(Slot::Free { next_free }) if *next_free == *first_free => {
+                let result = *next_free;
+                *next_free = key;
+                *first_free = usize::min(key, *first_free);
+                result
+            }
+            Some(Slot::Free { .. }) => {
+                let (left, right) = sparse.split_at_mut(key);
+                let mut left_free_slots = left
+                    .iter_mut()
+                    .enumerate()
+                    .skip(*first_free)
+                    .rev()
+                    .filter(|(_, slot)| slot.is_free());
+                let mut right_free_slots = right
+                    .iter_mut()
+                    .enumerate()
+                    .map(|(idx, slot)| (idx + key, slot))
+                    .skip(1)
+                    .filter(|(_, slot)| slot.is_free());
+                match (left_free_slots.next(), right_free_slots.next()) {
+                    (
+                        Some((_, Slot::Free { next_free: left })),
+                        Some((right_index, Slot::Free { .. })),
+                    ) => {
+                        *left = key;
+                        right_index
+                    }
+                    (None, Some((right_index, Slot::Free { .. }))) => {
+                        *first_free = key;
+                        if let Some((_, Slot::Free { next_free })) = right_free_slots.last() {
+                            *next_free = *first_free;
+                        }
+                        right_index
+                    }
+                    (Some((_, Slot::Free { next_free: left })), None) => {
+                        *left = key;
+                        *first_free
+                    }
+                    _ => unreachable!("found slot should be free"),
+                }
+            }
+            Some(Slot::Occupied { .. }) => panic!("first free should point to free slot"),
+            None => {
+                *first_free = key;
+                key
+            }
+        };
+        sparse[key] = Slot::Free { next_free };
+
+        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn remove(&mut self, key: usize) -> Option<T> {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense,
+            sparse,
+            first_free,
+        } = self;
 
-        let entry_index = sparse.get_mut(key).cloned().flatten().map(usize::from)?;
-        if entry_index >= dense.len() {
-            return None;
+        let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
+        if dense_index >= dense.len() {
+            panic!("index from sparse should be in bounds of dense");
         }
 
-        for entry in dense.iter_mut().skip(entry_index + 1) {
+        for entry in dense.iter_mut().skip(dense_index + 1) {
             let sparse_index = entry.key;
-            sparse[sparse_index] = sparse[sparse_index]
-                .map(usize::from)
-                .and_then(|index| (index - 1).try_into().ok());
+            if let Some(Slot::Occupied { dense_index }) = sparse.get_mut(sparse_index) {
+                *dense_index -= 1;
+            }
         }
 
-        let entry = dense.remove(entry_index);
+        let entry = dense.remove(dense_index);
         debug_assert_eq!(key, entry.key);
 
-        let SparseSetEntry { value, .. } = entry;
-        sparse[key] = None;
+        let next_free = match sparse.get_mut(*first_free) {
+            Some(Slot::Free { next_free }) if *next_free == *first_free => {
+                let result = *next_free;
+                *next_free = key;
+                *first_free = usize::min(key, *first_free);
+                result
+            }
+            Some(Slot::Free { .. }) => {
+                let (left, right) = sparse.split_at_mut(key);
+                let mut left_free_slots = left
+                    .iter_mut()
+                    .enumerate()
+                    .skip(*first_free)
+                    .rev()
+                    .filter(|(_, slot)| slot.is_free());
+                let mut right_free_slots = right
+                    .iter_mut()
+                    .enumerate()
+                    .map(|(idx, slot)| (idx + key, slot))
+                    .skip(1)
+                    .filter(|(_, slot)| slot.is_free());
+                match (left_free_slots.next(), right_free_slots.next()) {
+                    (
+                        Some((_, Slot::Free { next_free: left })),
+                        Some((right_index, Slot::Free { .. })),
+                    ) => {
+                        *left = key;
+                        right_index
+                    }
+                    (None, Some((right_index, Slot::Free { .. }))) => {
+                        *first_free = key;
+                        if let Some((_, Slot::Free { next_free })) = right_free_slots.last() {
+                            *next_free = *first_free;
+                        }
+                        right_index
+                    }
+                    (Some((_, Slot::Free { next_free: left })), None) => {
+                        *left = key;
+                        *first_free
+                    }
+                    _ => unreachable!("found slot should be free"),
+                }
+            }
+            Some(Slot::Occupied { .. }) => panic!("first free should point to free slot"),
+            None => {
+                *first_free = key;
+                key
+            }
+        };
+        sparse[key] = Slot::Free { next_free };
+
+        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn get(&self, key: usize) -> Option<&T> {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
 
-        let entry_index = sparse.get(key).cloned().flatten().map(usize::from)?;
-        let entry = dense.get(entry_index)?;
+        let slot = sparse.get(key).copied()?;
+        let dense_index = slot.dense_index()?;
+        let entry = dense.get(dense_index)?;
         debug_assert_eq!(key, entry.key);
 
-        let SparseSetEntry { value, .. } = entry;
+        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn get_mut(&mut self, key: usize) -> Option<&mut T> {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
 
-        let entry_index = sparse.get(key).cloned().flatten().map(usize::from)?;
-        let entry = dense.get_mut(entry_index)?;
+        let slot = sparse.get(key).copied()?;
+        let dense_index = slot.dense_index()?;
+        let entry = dense.get_mut(dense_index)?;
         debug_assert_eq!(key, entry.key);
 
-        let SparseSetEntry { value, .. } = entry;
+        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn contains(&self, key: usize) -> bool {
-        let Self { dense, sparse } = self;
+        let Self { dense, sparse, .. } = self;
 
-        let Some(entry_index) = sparse.get(key).cloned().flatten().map(usize::from) else {
+        let Some(slot) = sparse.get(key).copied() else {
             return false;
         };
-        entry_index < dense.len()
+        let Slot::Occupied { dense_index } = slot else {
+            return false;
+        };
+        dense_index < dense.len()
     }
 
     pub fn clear(&mut self) {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense,
+            sparse,
+            first_free,
+        } = self;
+
         dense.clear();
         sparse.clear();
+        *first_free = 0;
     }
 }
 
 // TODO FromIterator, IntoIterator, Extend
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct SparseSetEntry<T> {
+pub struct Entry<T> {
     key: usize,
     value: T,
 }
 
-impl<T> SparseSetEntry<T> {
+impl<T> Entry<T> {
     pub const fn key(&self) -> usize {
         let &Self { key, .. } = self;
         key
@@ -335,13 +608,86 @@ impl<T> SparseSetEntry<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Not;
+    use core::{fmt::Debug, ops::Not};
 
-    use crate::SparseSet;
+    use crate::{Slot, SparseSet};
+
+    fn debug_invariants<T>(sparse_set: &SparseSet<T>, message: impl AsRef<str>)
+    where
+        T: Debug,
+    {
+        let message = message.as_ref();
+        let message = if message.is_empty() {
+            "Validating sparse set"
+        } else {
+            message
+        };
+        println!("{message}:\n{sparse_set:#?}\n");
+
+        assert_invariants(sparse_set);
+    }
+
+    fn assert_invariants<T>(sparse_set: &SparseSet<T>) {
+        let SparseSet {
+            dense,
+            sparse,
+            first_free,
+        } = sparse_set;
+
+        let mut last_free = None::<usize>;
+        let mut first_free_reached = false;
+        for (key, slot) in sparse.iter().copied().enumerate() {
+            match slot {
+                Slot::Occupied { dense_index } => {
+                    let entry = dense
+                        .get(dense_index)
+                        .expect("index from sparse should be in bounds of dense");
+                    assert_eq!(
+                        entry.key, key,
+                        "key from dense should be equal to sparse index",
+                    );
+                }
+                Slot::Free { next_free } => {
+                    if !first_free_reached {
+                        assert_eq!(
+                            *first_free, key,
+                            "first free should point to the first free slot",
+                        );
+                        first_free_reached = true;
+                    }
+                    if key < next_free && sparse[(key + 1)..next_free].iter().any(Slot::is_free) {
+                        panic!("there are free slots between current free slot and next free slot");
+                    }
+                    let Slot::Free { .. } = sparse[next_free] else {
+                        panic!("next free should point to free slot");
+                    };
+                    last_free = Some(key);
+                }
+            }
+        }
+        if let Some(last_free) = last_free {
+            let last_free_slot = sparse[last_free];
+            let next_free = last_free_slot
+                .next_free()
+                .expect("last free should point to free slot");
+            assert_eq!(
+                *first_free, next_free,
+                "last free slot should point to first free",
+            );
+        } else {
+            assert_eq!(
+                *first_free,
+                sparse.len(),
+                "first free should point to the end of sparse if no free slots were found",
+            );
+        }
+    }
 
     #[test]
     fn empty() {
         let sparse_set = SparseSet::<i32>::new();
+        debug_invariants(&sparse_set, "Empty");
+
         assert!(sparse_set.is_empty());
         assert!(sparse_set.as_slice().is_empty());
     }
@@ -349,6 +695,8 @@ mod tests {
     #[test]
     fn with_capacity() {
         let sparse_set = SparseSet::<i32>::with_capacity_all(10);
+        debug_invariants(&sparse_set, "Empty with capacity");
+
         assert!(sparse_set.is_empty());
         assert!(sparse_set.as_slice().is_empty());
         assert_eq!(sparse_set.capacity_dense(), 10);
@@ -358,100 +706,222 @@ mod tests {
     #[test]
     fn empty_insert_one() {
         let mut sparse_set = SparseSet::new();
-        let inserted = sparse_set.insert(0, 42);
-        assert_eq!(inserted, None);
+        debug_invariants(&sparse_set, "Empty");
+
+        let (key, value) = (0, 42);
+        let previous = sparse_set.insert(key, value);
+        assert_eq!(previous, None);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
 
         assert_eq!(sparse_set.len(), 1);
-        assert_eq!(sparse_set.get(0), Some(&42));
-        assert!(sparse_set.contains(0));
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
     }
 
     #[test]
     fn with_capacity_insert_one() {
         let mut sparse_set = SparseSet::with_capacity_all(10);
-        let inserted = sparse_set.insert(0, 42);
-        assert_eq!(inserted, None);
+        debug_invariants(&sparse_set, "Empty with capacity");
+
+        let (key, value) = (0, 42);
+        let previous = sparse_set.insert(key, value);
+        assert_eq!(previous, None);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
 
         assert_eq!(sparse_set.len(), 1);
-        assert_eq!(sparse_set.get(0), Some(&42));
-        assert!(sparse_set.contains(0));
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
     }
 
     #[test]
     fn empty_insert_one_mutate() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, 42);
-        *sparse_set.get_mut(0).unwrap() = 43;
+        debug_invariants(&sparse_set, "Empty");
+
+        let (key, value) = (0, 42);
+        sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        let value = 43;
+        *sparse_set.get_mut(key).unwrap() = value;
+        debug_invariants(&sparse_set, format!("Changed key {key} to value {value}"));
 
         assert_eq!(sparse_set.len(), 1);
-        assert_eq!(sparse_set.get(0), Some(&43));
-        assert!(sparse_set.contains(0));
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
     }
 
     #[test]
     fn with_capacity_insert_one_mutate() {
         let mut sparse_set = SparseSet::with_capacity_all(10);
-        sparse_set.insert(0, 42);
-        *sparse_set.get_mut(0).unwrap() = 43;
+        debug_invariants(&sparse_set, "Empty with capacity");
+
+        let (key, value) = (0, 42);
+        sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        let value = 43;
+        *sparse_set.get_mut(key).unwrap() = value;
+        debug_invariants(&sparse_set, format!("Changed key {key} to value {value}"));
 
         assert_eq!(sparse_set.len(), 1);
-        assert_eq!(sparse_set.get(0), Some(&43));
-        assert!(sparse_set.contains(0));
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+    }
+
+    #[test]
+    fn empty_insert_far() {
+        let mut sparse_set = SparseSet::new();
+        debug_invariants(&sparse_set, "Empty");
+
+        let (key, value) = (3, 42);
+        sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let (key, value) = (1, 69);
+        sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+    }
+
+    #[test]
+    fn empty_insert_far_remove() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(3, 42);
+        sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
+
+        let key = 3;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 42);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
+
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 69);
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
     }
 
     #[test]
     fn empty_push() {
         let mut sparse_set = SparseSet::new();
+        debug_invariants(&sparse_set, "Empty");
 
-        let key = sparse_set.push(42);
+        let value = 42;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
         assert_eq!(key, 0);
-        assert_eq!(sparse_set.get(key), Some(&42));
+        assert_eq!(sparse_set.get(key), Some(&value));
 
-        let key = sparse_set.push(69);
+        let value = 69;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
         assert_eq!(key, 1);
-        assert_eq!(sparse_set.get(key), Some(&69));
+        assert_eq!(sparse_set.get(key), Some(&value));
     }
 
     #[test]
     fn one_item_remove_one() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
+        debug_invariants(&sparse_set, "Inserted one value");
 
-        let removed = sparse_set.remove(0);
-        assert_eq!(removed, Some(42));
+        let key = 0;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
+        assert_eq!(value, 42);
         assert_eq!(sparse_set.len(), 0);
-        assert_eq!(sparse_set.get(0), None);
-        assert!(sparse_set.contains(0).not());
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
     }
 
     #[test]
     fn one_item_swap_remove_one() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
+        debug_invariants(&sparse_set, "Inserted one value");
 
-        let removed = sparse_set.swap_remove(0);
-        assert_eq!(removed, Some(42));
+        let key = 0;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
+        assert_eq!(value, 42);
         assert_eq!(sparse_set.len(), 0);
-        assert_eq!(sparse_set.get(0), None);
-        assert!(sparse_set.contains(0).not());
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
     }
 
     #[test]
     fn one_item_swap() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
+        debug_invariants(&sparse_set, "Inserted one value");
 
         sparse_set.swap(0, 0);
+        debug_invariants(&sparse_set, "Swapped first with self");
+
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert!(sparse_set.contains(0));
 
         sparse_set.swap(0, 1);
+        debug_invariants(&sparse_set, "Swapped first with non-existent key");
+
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert!(sparse_set.contains(0));
+    }
+
+    #[test]
+    fn one_item_remove_push() {
+        let mut sparse_set = SparseSet::new();
+
+        let value = 42;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        let removed = sparse_set.remove(key);
+        assert_eq!(removed, Some(value));
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
+    }
+
+    #[test]
+    fn one_item_swap_remove_push() {
+        let mut sparse_set = SparseSet::new();
+
+        let value = 42;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        let removed = sparse_set.swap_remove(key);
+        assert_eq!(removed, Some(value));
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
     }
 
     #[test]
@@ -459,13 +929,15 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), Some(&69));
 
-        let inserted = sparse_set.insert(0, 34);
-        assert_eq!(inserted, Some(42));
+        let previous = sparse_set.insert(0, 34);
+        assert_eq!(previous, Some(42));
+        debug_invariants(&sparse_set, "Replaced key 0 of value 42 to value 34");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&34));
@@ -479,13 +951,15 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), Some(&69));
 
-        let inserted = sparse_set.insert(1, 34);
-        assert_eq!(inserted, Some(69));
+        let previous = sparse_set.insert(1, 34);
+        assert_eq!(previous, Some(69));
+        debug_invariants(&sparse_set, "Replaced key 1 of value 69 to value 34");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -499,6 +973,7 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -506,6 +981,7 @@ mod tests {
 
         let removed = sparse_set.remove(0);
         assert_eq!(removed, Some(42));
+        debug_invariants(&sparse_set, "Removed key 0 of value 42");
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), None);
@@ -519,6 +995,7 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -526,6 +1003,7 @@ mod tests {
 
         let removed = sparse_set.swap_remove(0);
         assert_eq!(removed, Some(42));
+        debug_invariants(&sparse_set, "Removed key 0 of value 42");
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), None);
@@ -539,6 +1017,7 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -546,6 +1025,7 @@ mod tests {
 
         let removed = sparse_set.remove(1);
         assert_eq!(removed, Some(69));
+        debug_invariants(&sparse_set, "Removed key 1 of value 69");
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -559,6 +1039,7 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -566,6 +1047,7 @@ mod tests {
 
         let removed = sparse_set.swap_remove(1);
         assert_eq!(removed, Some(69));
+        debug_invariants(&sparse_set, "Removed key 1 of value 69");
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -579,12 +1061,21 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
-        let removed = sparse_set.remove(0);
-        assert_eq!(removed, Some(42));
-        assert_eq!(sparse_set.get(0), None);
+        let key = 0;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
-        sparse_set.insert(0, 34);
+        assert_eq!(value, 42);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
+
+        let value = 34;
+        let previous = sparse_set.insert(key, value);
+        assert_eq!(previous, None);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), Some(&69));
         assert!(sparse_set.contains(0));
@@ -596,12 +1087,21 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
-        let removed = sparse_set.swap_remove(0);
-        assert_eq!(removed, Some(42));
-        assert_eq!(sparse_set.get(0), None);
+        let key = 0;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
-        sparse_set.insert(0, 34);
+        assert_eq!(value, 42);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
+
+        let value = 34;
+        let previous = sparse_set.insert(key, value);
+        assert_eq!(previous, None);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), Some(&69));
         assert!(sparse_set.contains(0));
@@ -613,18 +1113,25 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
         sparse_set.insert(1, 69);
+        debug_invariants(&sparse_set, "Inserted two values");
 
         sparse_set.swap(0, 0);
+        debug_invariants(&sparse_set, "Swapped first with self");
+
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), Some(&69));
 
         sparse_set.swap(0, 1);
+        debug_invariants(&sparse_set, "Swapped first with second");
+
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&69));
         assert_eq!(sparse_set.get(1), Some(&42));
 
         sparse_set.swap(1, 1);
+        debug_invariants(&sparse_set, "Swapped second with self");
+
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&69));
         assert_eq!(sparse_set.get(1), Some(&42));
@@ -635,18 +1142,47 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.push(42);
         sparse_set.push(69);
+        debug_invariants(&sparse_set, "Pushed two values");
 
-        let removed = sparse_set.remove(0);
-        assert_eq!(removed, Some(42));
+        let key = 0;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
+        assert_eq!(value, 42);
         assert_eq!(sparse_set.len(), 1);
-        assert_eq!(sparse_set.get(0), None);
+        assert_eq!(sparse_set.get(key), None);
 
-        let key = sparse_set.push(34);
+        let value = 34;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
         assert_eq!(key, 0);
-
         assert_eq!(sparse_set.len(), 2);
-        assert_eq!(sparse_set.get(0), Some(&34));
+        assert_eq!(sparse_set.get(key), Some(&value));
+    }
+
+    #[test]
+    fn two_items_swap_remove_first_push() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.push(42);
+        sparse_set.push(69);
+        debug_invariants(&sparse_set, "Pushed two values");
+
+        let key = 0;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 42);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), None);
+
+        let value = 34;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 0);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
     }
 
     #[test]
@@ -654,18 +1190,143 @@ mod tests {
         let mut sparse_set = SparseSet::new();
         sparse_set.push(42);
         sparse_set.push(69);
+        debug_invariants(&sparse_set, "Pushed two values");
 
-        let removed = sparse_set.remove(1);
-        assert_eq!(removed, Some(69));
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
+        assert_eq!(value, 69);
         assert_eq!(sparse_set.len(), 1);
-        assert_eq!(sparse_set.get(1), None);
+        assert_eq!(sparse_set.get(key), None);
 
-        let key = sparse_set.push(34);
+        let value = 34;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
         assert_eq!(key, 1);
-
         assert_eq!(sparse_set.len(), 2);
-        assert_eq!(sparse_set.get(1), Some(&34));
+        assert_eq!(sparse_set.get(key), Some(&value));
+    }
+
+    #[test]
+    fn two_items_swap_remove_second_push() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.push(42);
+        sparse_set.push(69);
+        debug_invariants(&sparse_set, "Pushed two values");
+
+        let key = 1;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 69);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), None);
+
+        let value = 34;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 1);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
+    }
+
+    #[test]
+    fn two_items_remove_all_push() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.push(42);
+        sparse_set.push(69);
+        debug_invariants(&sparse_set, "Pushed two values");
+
+        let key = 0;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 42);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), None);
+
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 69);
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.get(key), None);
+
+        let value = 34;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 0);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), Some(&value));
+
+        let value = 228;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 1);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
+
+        let value = 0;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 2);
+        assert_eq!(sparse_set.len(), 3);
+        assert_eq!(sparse_set.get(key), Some(&value));
+    }
+
+    #[test]
+    fn two_items_swap_remove_all_push() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.push(42);
+        sparse_set.push(69);
+        debug_invariants(&sparse_set, "Pushed two values");
+
+        let key = 0;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 42);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), None);
+
+        let key = 1;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 69);
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.get(key), None);
+
+        let value = 34;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 0);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), Some(&value));
+
+        let value = 228;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 1);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
+
+        let value = 0;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 2);
+        assert_eq!(sparse_set.len(), 3);
+        assert_eq!(sparse_set.get(key), Some(&value));
     }
 
     #[test]
@@ -674,10 +1335,13 @@ mod tests {
         sparse_set.insert(0, 34);
         sparse_set.insert(1, 42);
         sparse_set.insert(2, 69);
+        debug_invariants(&sparse_set, "Inserted three values");
 
-        let removed = sparse_set.remove(1);
-        assert_eq!(removed, Some(42));
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
+        assert_eq!(value, 42);
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), None);
@@ -693,10 +1357,13 @@ mod tests {
         sparse_set.insert(0, 34);
         sparse_set.insert(1, 42);
         sparse_set.insert(2, 69);
+        debug_invariants(&sparse_set, "Inserted three values");
 
-        let removed = sparse_set.swap_remove(1);
-        assert_eq!(removed, Some(42));
+        let key = 1;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
+        assert_eq!(value, 42);
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), None);
@@ -712,21 +1379,281 @@ mod tests {
         sparse_set.push(34);
         sparse_set.push(42);
         sparse_set.push(69);
+        debug_invariants(&sparse_set, "Inserted three values");
 
-        let removed = sparse_set.remove(1);
-        assert_eq!(removed, Some(42));
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
 
+        assert_eq!(value, 42);
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), None);
         assert_eq!(sparse_set.get(2), Some(&69));
 
-        let key = sparse_set.push(228);
-        assert_eq!(key, 1);
+        let value = 228;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
 
+        assert_eq!(key, 1);
         assert_eq!(sparse_set.len(), 3);
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), Some(&228));
         assert_eq!(sparse_set.get(2), Some(&69));
+    }
+
+    #[test]
+    fn three_items_swap_remove_middle_push() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.push(34);
+        sparse_set.push(42);
+        sparse_set.push(69);
+        debug_invariants(&sparse_set, "Inserted three values");
+
+        let key = 1;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+
+        assert_eq!(value, 42);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(0), Some(&34));
+        assert_eq!(sparse_set.get(1), None);
+        assert_eq!(sparse_set.get(2), Some(&69));
+
+        let value = 228;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 1);
+        assert_eq!(sparse_set.len(), 3);
+        assert_eq!(sparse_set.get(0), Some(&34));
+        assert_eq!(sparse_set.get(1), Some(&228));
+        assert_eq!(sparse_set.get(2), Some(&69));
+    }
+
+    #[test]
+    fn five_items_remove_insert() {
+        let mut sparse_set = SparseSet::new();
+        assert_eq!(sparse_set.push(34), 0);
+        assert_eq!(sparse_set.push(42), 1);
+        assert_eq!(sparse_set.push(69), 2);
+        assert_eq!(sparse_set.push(228), 3);
+        assert_eq!(sparse_set.push(666), 4);
+        debug_invariants(&sparse_set, "Inserted five values");
+
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 42);
+
+        let key = 3;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 228);
+
+        let key = 4;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 666);
+
+        let key = 2;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 69);
+
+        let key = 3;
+        let value = 0;
+        let previous = sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let key = 2;
+        let value = 1;
+        let previous = sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let key = 4;
+        let value = 10;
+        let previous = sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+    }
+
+    #[test]
+    fn five_items_swap_remove_insert() {
+        let mut sparse_set = SparseSet::new();
+        assert_eq!(sparse_set.push(34), 0);
+        assert_eq!(sparse_set.push(42), 1);
+        assert_eq!(sparse_set.push(69), 2);
+        assert_eq!(sparse_set.push(228), 3);
+        assert_eq!(sparse_set.push(666), 4);
+        debug_invariants(&sparse_set, "Inserted five values");
+
+        let key = 1;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 42);
+
+        let key = 3;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 228);
+
+        let key = 4;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 666);
+
+        let key = 2;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 69);
+
+        let key = 3;
+        let value = 0;
+        let previous = sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let key = 2;
+        let value = 1;
+        let previous = sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let key = 4;
+        let value = 10;
+        let previous = sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+    }
+
+    #[test]
+    fn five_items_remove_push() {
+        let mut sparse_set = SparseSet::new();
+        assert_eq!(sparse_set.push(34), 0);
+        assert_eq!(sparse_set.push(42), 1);
+        assert_eq!(sparse_set.push(69), 2);
+        assert_eq!(sparse_set.push(228), 3);
+        assert_eq!(sparse_set.push(666), 4);
+        debug_invariants(&sparse_set, "Inserted five values");
+
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 42);
+
+        let key = 3;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 228);
+
+        let key = 4;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 666);
+
+        let key = 2;
+        let value = sparse_set.remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 69);
+
+        let value = 0;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 1);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let value = 1;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let value = 10;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 3);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+    }
+
+    #[test]
+    fn five_items_swap_remove_push() {
+        let mut sparse_set = SparseSet::new();
+        assert_eq!(sparse_set.push(34), 0);
+        assert_eq!(sparse_set.push(42), 1);
+        assert_eq!(sparse_set.push(69), 2);
+        assert_eq!(sparse_set.push(228), 3);
+        assert_eq!(sparse_set.push(666), 4);
+        debug_invariants(&sparse_set, "Inserted five values");
+
+        let key = 1;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 42);
+
+        let key = 3;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 228);
+
+        let key = 4;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 666);
+
+        let key = 2;
+        let value = sparse_set.swap_remove(key).unwrap();
+        debug_invariants(&sparse_set, format!("Removed key {key} of value {value}"));
+        assert_eq!(value, 69);
+
+        let value = 0;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 1);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let value = 1;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let value = 10;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 3);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
     }
 }

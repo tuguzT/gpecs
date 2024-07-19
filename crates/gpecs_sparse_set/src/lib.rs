@@ -182,6 +182,17 @@ impl<T> SparseSet<T> {
         None
     }
 
+    pub fn push(&mut self, value: T) -> usize {
+        let Self { sparse, .. } = self;
+
+        let key = sparse
+            .iter()
+            .position(Option::is_none)
+            .unwrap_or(sparse.len());
+        self.insert(key, value);
+        key
+    }
+
     pub fn swap(&mut self, first_key: usize, second_key: usize) {
         let Self { dense, sparse } = self;
 
@@ -386,6 +397,19 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&43));
         assert!(sparse_set.contains(0));
+    }
+
+    #[test]
+    fn empty_push() {
+        let mut sparse_set = SparseSet::new();
+
+        let key = sparse_set.push(42);
+        assert_eq!(key, 0);
+        assert_eq!(sparse_set.get(key), Some(&42));
+
+        let key = sparse_set.push(69);
+        assert_eq!(key, 1);
+        assert_eq!(sparse_set.get(key), Some(&69));
     }
 
     #[test]
@@ -607,6 +631,44 @@ mod tests {
     }
 
     #[test]
+    fn two_items_remove_first_push() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.push(42);
+        sparse_set.push(69);
+
+        let removed = sparse_set.remove(0);
+        assert_eq!(removed, Some(42));
+
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(0), None);
+
+        let key = sparse_set.push(34);
+        assert_eq!(key, 0);
+
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(0), Some(&34));
+    }
+
+    #[test]
+    fn two_items_remove_second_push() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.push(42);
+        sparse_set.push(69);
+
+        let removed = sparse_set.remove(1);
+        assert_eq!(removed, Some(69));
+
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(1), None);
+
+        let key = sparse_set.push(34);
+        assert_eq!(key, 1);
+
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(1), Some(&34));
+    }
+
+    #[test]
     fn three_items_remove_middle() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 34);
@@ -642,5 +704,29 @@ mod tests {
         assert!(sparse_set.contains(0));
         assert!(sparse_set.contains(1).not());
         assert!(sparse_set.contains(2));
+    }
+
+    #[test]
+    fn three_items_remove_middle_push() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.push(34);
+        sparse_set.push(42);
+        sparse_set.push(69);
+
+        let removed = sparse_set.remove(1);
+        assert_eq!(removed, Some(42));
+
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(0), Some(&34));
+        assert_eq!(sparse_set.get(1), None);
+        assert_eq!(sparse_set.get(2), Some(&69));
+
+        let key = sparse_set.push(228);
+        assert_eq!(key, 1);
+
+        assert_eq!(sparse_set.len(), 3);
+        assert_eq!(sparse_set.get(0), Some(&34));
+        assert_eq!(sparse_set.get(1), Some(&228));
+        assert_eq!(sparse_set.get(2), Some(&69));
     }
 }

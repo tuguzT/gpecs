@@ -59,6 +59,7 @@ pub struct SparseSet<T> {
     dense: Vec<Entry<T>>,
     sparse: Vec<Slot>,
     first_free: usize,
+    last_free: usize,
 }
 
 impl<T> SparseSet<T> {
@@ -67,6 +68,7 @@ impl<T> SparseSet<T> {
             dense: Vec::new(),
             sparse: Vec::new(),
             first_free: 0,
+            last_free: 0,
         }
     }
 
@@ -75,6 +77,7 @@ impl<T> SparseSet<T> {
             dense: Vec::with_capacity(dense),
             sparse: Vec::with_capacity(sparse),
             first_free: 0,
+            last_free: 0,
         }
     }
 
@@ -214,6 +217,7 @@ impl<T> SparseSet<T> {
             dense,
             sparse,
             first_free,
+            last_free,
         } = self;
 
         if key >= sparse.len() {
@@ -247,33 +251,36 @@ impl<T> SparseSet<T> {
                 sparse[key] = slot;
 
                 let (left, right) = sparse.split_at_mut(key);
-                let mut left_free_slots = left
+                let left_free_slot = left
                     .iter_mut()
                     .enumerate()
                     .skip(*first_free)
-                    .rev()
-                    .filter(|(_, slot)| slot.is_free());
-                let mut right_free_slots = right
+                    .rfind(|(_, slot)| slot.is_free());
+                let right_free_slot = right
                     .iter_mut()
                     .enumerate()
                     .map(|(idx, slot)| (idx + key, slot))
                     .skip(1)
-                    .filter(|(_, slot)| slot.is_free());
-                match (left_free_slots.next(), right_free_slots.next()) {
+                    .find(|(_, slot)| slot.is_free());
+                match (left_free_slot, right_free_slot) {
                     (Some((_, Slot::Free { next_free: left })), Some((_, Slot::Free { .. }))) => {
                         *left = next_free;
                     }
-                    (Some((_, Slot::Free { next_free: left })), None) => {
+                    (Some((left_index, Slot::Free { next_free: left })), None) => {
+                        *last_free = left_index;
                         *left = next_free;
                     }
                     (None, Some((_, Slot::Free { .. }))) => {
                         *first_free = next_free;
-                        if let Some((_, Slot::Free { next_free })) = right_free_slots.last() {
-                            *next_free = *first_free;
+                        if let Some(to_first_free) = sparse[*last_free].next_free_mut() {
+                            *to_first_free = *first_free;
+                        } else {
+                            panic!("last free should point to free slot");
                         }
                     }
                     (None, None) => {
                         *first_free = sparse.len();
+                        *last_free = sparse.len();
                     }
                     _ => unreachable!("found slot should be free"),
                 }
@@ -288,6 +295,7 @@ impl<T> SparseSet<T> {
             sparse,
             dense,
             first_free,
+            last_free,
         } = self;
 
         if *first_free < sparse.len() {
@@ -311,18 +319,17 @@ impl<T> SparseSet<T> {
 
             dense.push(entry);
             sparse[*first_free] = slot;
-            *first_free = if *first_free == next_free {
-                sparse.len()
+            if *first_free == next_free {
+                *first_free = sparse.len();
+                *last_free = sparse.len();
             } else {
-                let result = next_free;
-                if let Some(Slot::Free { next_free }) = sparse[*first_free..]
-                    .iter_mut()
-                    .rfind(|slot| slot.is_free())
-                {
-                    *next_free = result;
+                if let Some(to_first_free) = sparse[*last_free].next_free_mut() {
+                    *to_first_free = next_free;
+                } else {
+                    panic!("last free should point to free slot");
                 }
-                result
-            };
+                *first_free = next_free;
+            }
             return key;
         }
 
@@ -334,6 +341,7 @@ impl<T> SparseSet<T> {
         dense.push(entry);
         sparse.push(slot);
         *first_free = sparse.len();
+        *last_free = sparse.len();
         key
     }
 
@@ -369,6 +377,7 @@ impl<T> SparseSet<T> {
             dense,
             sparse,
             first_free,
+            last_free,
         } = self;
 
         let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
@@ -395,23 +404,23 @@ impl<T> SparseSet<T> {
                 let result = *next_free;
                 *next_free = key;
                 *first_free = usize::min(key, *first_free);
+                *last_free = usize::max(key, *last_free);
                 result
             }
             Some(Slot::Free { .. }) => {
                 let (left, right) = sparse.split_at_mut(key);
-                let mut left_free_slots = left
+                let left_free_slot = left
                     .iter_mut()
                     .enumerate()
                     .skip(*first_free)
-                    .rev()
-                    .filter(|(_, slot)| slot.is_free());
-                let mut right_free_slots = right
+                    .rfind(|(_, slot)| slot.is_free());
+                let right_free_slot = right
                     .iter_mut()
                     .enumerate()
                     .map(|(idx, slot)| (idx + key, slot))
                     .skip(1)
-                    .filter(|(_, slot)| slot.is_free());
-                match (left_free_slots.next(), right_free_slots.next()) {
+                    .find(|(_, slot)| slot.is_free());
+                match (left_free_slot, right_free_slot) {
                     (
                         Some((_, Slot::Free { next_free: left })),
                         Some((right_index, Slot::Free { .. })),
@@ -421,13 +430,16 @@ impl<T> SparseSet<T> {
                     }
                     (None, Some((right_index, Slot::Free { .. }))) => {
                         *first_free = key;
-                        if let Some((_, Slot::Free { next_free })) = right_free_slots.last() {
-                            *next_free = *first_free;
+                        if let Some(to_first_free) = sparse[*last_free].next_free_mut() {
+                            *to_first_free = *first_free;
+                        } else {
+                            panic!("last free should point to free slot");
                         }
                         right_index
                     }
                     (Some((_, Slot::Free { next_free: left })), None) => {
                         *left = key;
+                        *last_free = key;
                         *first_free
                     }
                     _ => unreachable!("found slot should be free"),
@@ -436,6 +448,7 @@ impl<T> SparseSet<T> {
             Some(Slot::Occupied { .. }) => panic!("first free should point to free slot"),
             None => {
                 *first_free = key;
+                *last_free = key;
                 key
             }
         };
@@ -450,6 +463,7 @@ impl<T> SparseSet<T> {
             dense,
             sparse,
             first_free,
+            last_free,
         } = self;
 
         let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
@@ -472,23 +486,23 @@ impl<T> SparseSet<T> {
                 let result = *next_free;
                 *next_free = key;
                 *first_free = usize::min(key, *first_free);
+                *last_free = usize::max(key, *last_free);
                 result
             }
             Some(Slot::Free { .. }) => {
                 let (left, right) = sparse.split_at_mut(key);
-                let mut left_free_slots = left
+                let left_free_slot = left
                     .iter_mut()
                     .enumerate()
                     .skip(*first_free)
-                    .rev()
-                    .filter(|(_, slot)| slot.is_free());
-                let mut right_free_slots = right
+                    .rfind(|(_, slot)| slot.is_free());
+                let right_free_slot = right
                     .iter_mut()
                     .enumerate()
                     .map(|(idx, slot)| (idx + key, slot))
                     .skip(1)
-                    .filter(|(_, slot)| slot.is_free());
-                match (left_free_slots.next(), right_free_slots.next()) {
+                    .find(|(_, slot)| slot.is_free());
+                match (left_free_slot, right_free_slot) {
                     (
                         Some((_, Slot::Free { next_free: left })),
                         Some((right_index, Slot::Free { .. })),
@@ -498,13 +512,16 @@ impl<T> SparseSet<T> {
                     }
                     (None, Some((right_index, Slot::Free { .. }))) => {
                         *first_free = key;
-                        if let Some((_, Slot::Free { next_free })) = right_free_slots.last() {
-                            *next_free = *first_free;
+                        if let Some(to_first_free) = sparse[*last_free].next_free_mut() {
+                            *to_first_free = *first_free;
+                        } else {
+                            panic!("last free should point to free slot");
                         }
                         right_index
                     }
                     (Some((_, Slot::Free { next_free: left })), None) => {
                         *left = key;
+                        *last_free = key;
                         *first_free
                     }
                     _ => unreachable!("found slot should be free"),
@@ -513,6 +530,7 @@ impl<T> SparseSet<T> {
             Some(Slot::Occupied { .. }) => panic!("first free should point to free slot"),
             None => {
                 *first_free = key;
+                *last_free = key;
                 key
             }
         };
@@ -563,11 +581,13 @@ impl<T> SparseSet<T> {
             dense,
             sparse,
             first_free,
+            last_free,
         } = self;
 
         dense.clear();
         sparse.clear();
         *first_free = 0;
+        *last_free = 0;
     }
 }
 
@@ -632,10 +652,11 @@ mod tests {
             dense,
             sparse,
             first_free,
+            last_free,
         } = sparse_set;
 
-        let mut last_free = None::<usize>;
-        let mut first_free_reached = false;
+        let mut calculated_first_free = None;
+        let mut calculated_last_free = None;
         for (key, slot) in sparse.iter().copied().enumerate() {
             match slot {
                 Slot::Occupied { dense_index } => {
@@ -648,38 +669,63 @@ mod tests {
                     );
                 }
                 Slot::Free { next_free } => {
-                    if !first_free_reached {
+                    if calculated_first_free.is_none() {
                         assert_eq!(
                             *first_free, key,
                             "first free should point to the first free slot",
                         );
-                        first_free_reached = true;
+                        calculated_first_free = Some(key);
                     }
+
+                    // TODO check `prev_free` of the current free slot
+
                     if key < next_free && sparse[(key + 1)..next_free].iter().any(Slot::is_free) {
-                        panic!("there are free slots between current free slot and next free slot");
+                        panic!("there should be no free slots between the current free slot and next free slot");
                     }
                     let Slot::Free { .. } = sparse[next_free] else {
                         panic!("next free should point to free slot");
                     };
-                    last_free = Some(key);
+
+                    calculated_last_free = Some(key);
                 }
             }
         }
-        if let Some(last_free) = last_free {
-            let last_free_slot = sparse[last_free];
-            let next_free = last_free_slot
-                .next_free()
-                .expect("last free should point to free slot");
-            assert_eq!(
-                *first_free, next_free,
-                "last free slot should point to first free",
-            );
-        } else {
-            assert_eq!(
-                *first_free,
-                sparse.len(),
-                "first free should point to the end of sparse if no free slots were found",
-            );
+
+        match (calculated_first_free, calculated_last_free) {
+            (Some(calculated_first_free), Some(calculated_last_free)) => {
+                assert_eq!(
+                    calculated_first_free, *first_free,
+                    "first free should point to the first free slot",
+                );
+                let Slot::Free { .. } = sparse[calculated_first_free] else {
+                    panic!("first free should point to free slot")
+                };
+                // TODO assert equality of first free slot's `prev_free` and `last_free`
+
+                assert_eq!(
+                    calculated_last_free, *last_free,
+                    "last free should point to the last free slot",
+                );
+                let Slot::Free { next_free, .. } = sparse[calculated_last_free] else {
+                    panic!("last free should point to free slot");
+                };
+                assert_eq!(
+                    next_free, *first_free,
+                    "last free slot should point to first free",
+                );
+            }
+            (None, None) => {
+                let sparse_len = sparse.len();
+                assert_eq!(
+                    *first_free, sparse_len,
+                    "first free should point to the end of sparse if no free slots were found",
+                );
+                assert_eq!(
+                    *last_free, sparse_len,
+                    "last free should point to the end of sparse if no free slots were found",
+                );
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -786,6 +832,29 @@ mod tests {
         sparse_set.insert(key, value);
         debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
 
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+    }
+
+    #[test]
+    fn empty_insert_far_push() {
+        let mut sparse_set = SparseSet::new();
+        debug_invariants(&sparse_set, "Empty");
+
+        let (key, value) = (4, 42);
+        sparse_set.insert(key, value);
+        debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
+
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let value = 69;
+        let key = sparse_set.push(value);
+        debug_invariants(&sparse_set, format!("Pushed value {value}"));
+
+        assert_eq!(key, 0);
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(key), Some(&value));
         assert!(sparse_set.contains(key));

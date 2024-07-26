@@ -10,6 +10,39 @@ extern crate alloc;
 use alloc::collections::TryReserveError;
 use core::mem::replace;
 
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub struct Entry<T> {
+    key: usize,
+    value: T,
+}
+
+impl<T> Entry<T> {
+    pub const fn key(&self) -> usize {
+        let &Self { key, .. } = self;
+        key
+    }
+
+    pub const fn value(&self) -> &T {
+        let Self { value, .. } = self;
+        value
+    }
+
+    pub fn value_mut(&mut self) -> &mut T {
+        let Self { value, .. } = self;
+        value
+    }
+
+    pub fn into_key(self) -> usize {
+        let Self { key, .. } = self;
+        key
+    }
+
+    pub fn into_value(self) -> T {
+        let Self { value, .. } = self;
+        value
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum Slot {
     Occupied { dense_index: usize },
@@ -221,7 +254,15 @@ impl<T> SparseSet<T> {
         } = self;
 
         if key >= sparse.len() {
-            let mut next_free = sparse.len();
+            let sparse_len = sparse.len();
+            if let Some(last_slot) = sparse.get_mut(*last_free) {
+                let Slot::Free { next_free } = last_slot else {
+                    panic!("last free should point to free slot");
+                };
+                *next_free = sparse_len;
+            }
+
+            let mut next_free = sparse_len;
             let generator = || {
                 next_free = if next_free < key {
                     next_free + 1
@@ -593,39 +634,6 @@ impl<T> SparseSet<T> {
 
 // TODO FromIterator, IntoIterator, Extend
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct Entry<T> {
-    key: usize,
-    value: T,
-}
-
-impl<T> Entry<T> {
-    pub const fn key(&self) -> usize {
-        let &Self { key, .. } = self;
-        key
-    }
-
-    pub const fn value(&self) -> &T {
-        let Self { value, .. } = self;
-        value
-    }
-
-    pub fn value_mut(&mut self) -> &mut T {
-        let Self { value, .. } = self;
-        value
-    }
-
-    pub fn into_key(self) -> usize {
-        let Self { key, .. } = self;
-        key
-    }
-
-    pub fn into_value(self) -> T {
-        let Self { value, .. } = self;
-        value
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use core::{fmt::Debug, ops::Not};
@@ -686,6 +694,15 @@ mod tests {
                         panic!("next free should point to free slot");
                     };
 
+                    if let Some(prev_free_slot) = calculated_last_free.map(|key| sparse[key]) {
+                        let Slot::Free { next_free } = prev_free_slot else {
+                            panic!("next free should point to free slot");
+                        };
+                        assert_eq!(
+                            next_free, key,
+                            "next free of previous free slot should point to the current free slot",
+                        );
+                    }
                     calculated_last_free = Some(key);
                 }
             }
@@ -828,7 +845,7 @@ mod tests {
         assert_eq!(sparse_set.get(key), Some(&value));
         assert!(sparse_set.contains(key));
 
-        let (key, value) = (1, 69);
+        let (key, value) = (6, 69);
         sparse_set.insert(key, value);
         debug_invariants(&sparse_set, format!("Inserted key {key} of value {value}"));
 

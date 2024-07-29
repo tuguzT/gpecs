@@ -8,7 +8,22 @@
 extern crate alloc;
 
 use alloc::collections::TryReserveError;
-use core::mem::replace;
+use core::mem::{replace, swap};
+
+fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
+    let (first, second) = (usize::min(a, b), usize::max(a, b));
+
+    let [first, .., second] = slice.get_mut(first..=second)? else {
+        return None;
+    };
+
+    let pair = if a < b {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    Some(pair)
+}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Entry<T> {
@@ -258,18 +273,11 @@ impl<T> SparseSet<T> {
             return;
         };
 
-        // Cannot safely take 2 mutable references from the same dense, so...
-        // 1. Validate indices to the dense, returns if any of them is out of bounds
-        if first_index >= dense.len() || second_index >= dense.len() {
-            return;
-        }
-        // (as I remember, from the current point of execution, dense index checks could be optimized away)
-        // 2. Swap entries by valid indices
-        dense.swap(first_index, second_index);
-        // 3. Restore keys of swapped entries (these keys point to the sparse)
-        let temp = dense[first_index].key;
-        dense[first_index].key = dense[second_index].key;
-        dense[second_index].key = temp;
+        let (first_entry, second_entry) = get_pair_mut(dense, first_index, second_index)
+            .expect("indices from sparse should be in bounds of dense and differ from each other");
+        let first_value = first_entry.value_mut();
+        let second_value = second_entry.value_mut();
+        swap(first_value, second_value);
     }
 
     pub fn swap_remove(&mut self, key: usize) -> Option<T> {

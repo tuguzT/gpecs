@@ -26,93 +26,65 @@ fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut 
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct Entry<T> {
-    key: usize,
-    value: T,
-}
-
-impl<T> Entry<T> {
-    pub const fn key(&self) -> usize {
-        let &Self { key, .. } = self;
-        key
-    }
-
-    pub const fn value(&self) -> &T {
-        let Self { value, .. } = self;
-        value
-    }
-
-    pub fn value_mut(&mut self) -> &mut T {
-        let Self { value, .. } = self;
-        value
-    }
-
-    pub fn into_key(self) -> usize {
-        let Self { key, .. } = self;
-        key
-    }
-
-    pub fn into_value(self) -> T {
-        let Self { value, .. } = self;
-        value
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub enum Slot {
+pub enum SparseEntry {
     Occupied { dense_index: usize },
-    Free,
+    Vacant,
 }
 
-impl Slot {
+impl SparseEntry {
     pub const fn occupied(dense_index: usize) -> Self {
         Self::Occupied { dense_index }
     }
 
-    pub const fn free() -> Self {
-        Self::Free
+    pub const fn vacant() -> Self {
+        Self::Vacant
     }
 
     pub const fn is_occupied(&self) -> bool {
         matches!(self, Self::Occupied { .. })
     }
 
-    pub const fn is_free(&self) -> bool {
-        matches!(self, Self::Free)
+    pub const fn is_vacant(&self) -> bool {
+        matches!(self, Self::Vacant)
     }
 
     pub fn dense_index(&self) -> Option<usize> {
         match self {
             Self::Occupied { dense_index } => Some(*dense_index),
-            Self::Free => None,
+            Self::Vacant => None,
         }
     }
 
     pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
         match self {
             Self::Occupied { dense_index } => Some(dense_index),
-            Self::Free => None,
+            Self::Vacant => None,
         }
     }
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct SparseSet<T> {
-    dense: Vec<Entry<T>>,
-    sparse: Vec<Slot>,
+    dense_keys: Vec<usize>,
+    dense_values: Vec<T>,
+    sparse: Vec<SparseEntry>,
 }
 
 impl<T> SparseSet<T> {
     pub const fn new() -> Self {
-        let dense = Vec::new();
-        let sparse = Vec::new();
-        Self { dense, sparse }
+        Self {
+            dense_keys: Vec::new(),
+            dense_values: Vec::new(),
+            sparse: Vec::new(),
+        }
     }
 
     pub fn with_capacity(dense: usize, sparse: usize) -> Self {
-        let dense = Vec::with_capacity(dense);
-        let sparse = Vec::with_capacity(sparse);
-        Self { dense, sparse }
+        Self {
+            dense_keys: Vec::with_capacity(dense),
+            dense_values: Vec::with_capacity(dense),
+            sparse: Vec::with_capacity(sparse),
+        }
     }
 
     #[inline(always)]
@@ -131,22 +103,41 @@ impl<T> SparseSet<T> {
     }
 
     pub fn len(&self) -> usize {
-        let Self { dense, .. } = self;
-        dense.len()
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        dense_keys.len()
     }
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    pub fn sparse_len(&self) -> usize {
+        let Self { sparse, .. } = self;
+        sparse.len()
+    }
+
     pub fn capacity(&self) -> usize {
-        let Self { dense, sparse } = self;
-        usize::min(dense.capacity(), sparse.capacity())
+        let dense_capacity = self.dense_capacity();
+        let sparse_capacity = self.sparse_capacity();
+
+        usize::min(dense_capacity, sparse_capacity)
     }
 
     pub fn dense_capacity(&self) -> usize {
-        let Self { dense, .. } = self;
-        dense.capacity()
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        debug_assert_eq!(dense_keys.capacity(), dense_values.capacity());
+        dense_keys.capacity()
     }
 
     pub fn sparse_capacity(&self) -> usize {
@@ -155,14 +146,26 @@ impl<T> SparseSet<T> {
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        let Self { dense, sparse } = self;
-        dense.reserve(additional);
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        dense_keys.reserve(additional);
+        dense_values.reserve(additional);
         sparse.reserve(additional);
     }
 
     pub fn dense_reserve(&mut self, additional: usize) {
-        let Self { dense, .. } = self;
-        dense.reserve(additional);
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        dense_keys.reserve(additional);
+        dense_values.reserve(additional);
     }
 
     pub fn sparse_reserve(&mut self, additional: usize) {
@@ -171,14 +174,26 @@ impl<T> SparseSet<T> {
     }
 
     pub fn reserve_exact(&mut self, additional: usize) {
-        let Self { dense, sparse } = self;
-        dense.reserve_exact(additional);
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        dense_keys.reserve_exact(additional);
+        dense_values.reserve_exact(additional);
         sparse.reserve_exact(additional);
     }
 
     pub fn dense_reserve_exact(&mut self, additional: usize) {
-        let Self { dense, .. } = self;
-        dense.reserve_exact(additional);
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        dense_keys.reserve_exact(additional);
+        dense_values.reserve_exact(additional);
     }
 
     pub fn sparse_reserve_exact(&mut self, additional: usize) {
@@ -187,15 +202,28 @@ impl<T> SparseSet<T> {
     }
 
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let Self { dense, sparse } = self;
-        dense.try_reserve(additional)?;
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        dense_keys.try_reserve(additional)?;
+        dense_values.try_reserve(additional)?;
         sparse.try_reserve(additional)?;
         Ok(())
     }
 
     pub fn dense_try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let Self { dense, .. } = self;
-        dense.try_reserve(additional)
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        dense_keys.try_reserve(additional)?;
+        dense_values.try_reserve(additional)?;
+        Ok(())
     }
 
     pub fn sparse_try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
@@ -204,15 +232,28 @@ impl<T> SparseSet<T> {
     }
 
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let Self { dense, sparse } = self;
-        dense.try_reserve_exact(additional)?;
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        dense_keys.try_reserve_exact(additional)?;
+        dense_values.try_reserve_exact(additional)?;
         sparse.try_reserve_exact(additional)?;
         Ok(())
     }
 
     pub fn dense_try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let Self { dense, .. } = self;
-        dense.try_reserve_exact(additional)
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        dense_keys.try_reserve_exact(additional)?;
+        dense_values.try_reserve_exact(additional)?;
+        Ok(())
     }
 
     pub fn sparse_try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
@@ -221,14 +262,26 @@ impl<T> SparseSet<T> {
     }
 
     pub fn shrink_to_fit(&mut self) {
-        let Self { dense, sparse } = self;
-        dense.shrink_to_fit();
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        dense_keys.shrink_to_fit();
+        dense_values.shrink_to_fit();
         sparse.shrink_to_fit();
     }
 
     pub fn dense_shrink_to_fit(&mut self) {
-        let Self { dense, .. } = self;
-        dense.shrink_to_fit();
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        dense_keys.shrink_to_fit();
+        dense_values.shrink_to_fit();
     }
 
     pub fn sparse_shrink_to_fit(&mut self) {
@@ -237,14 +290,26 @@ impl<T> SparseSet<T> {
     }
 
     pub fn shrink_to(&mut self, min_capacity: usize) {
-        let Self { dense, sparse } = self;
-        dense.shrink_to(min_capacity);
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        dense_keys.shrink_to(min_capacity);
+        dense_values.shrink_to(min_capacity);
         sparse.shrink_to(min_capacity);
     }
 
     pub fn dense_shrink_to(&mut self, min_capacity: usize) {
-        let Self { dense, .. } = self;
-        dense.shrink_to(min_capacity);
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        dense_keys.shrink_to(min_capacity);
+        dense_values.shrink_to(min_capacity);
     }
 
     pub fn sparse_shrink_to(&mut self, min_capacity: usize) {
@@ -252,145 +317,195 @@ impl<T> SparseSet<T> {
         sparse.shrink_to(min_capacity);
     }
 
+    pub fn as_slice(&self) -> &[T] {
+        let Self { dense_values, .. } = self;
+        dense_values.as_slice()
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        let Self { dense_values, .. } = self;
+        dense_values.as_mut_slice()
+    }
+
+    pub fn as_keys_slice(&self) -> &[usize] {
+        let Self { dense_keys, .. } = self;
+        dense_keys.as_slice()
+    }
+
     pub fn insert(&mut self, key: usize, value: T) -> Option<T> {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
 
         if key >= sparse.len() {
-            sparse.resize(key + 1, Slot::Free);
+            sparse.resize(key + 1, SparseEntry::Vacant);
         }
 
-        if let Slot::Occupied { dense_index } = sparse[key] {
-            let entry_value = dense
+        if let SparseEntry::Occupied { dense_index } = sparse[key] {
+            let entry_value = dense_values
                 .get_mut(dense_index)
-                .expect("index from sparse should be in bounds of dense")
-                .value_mut();
+                .expect("index from sparse should be in bounds of dense");
             let value = replace(entry_value, value);
             return Some(value);
         }
 
-        let entry = Entry { key, value };
-        let slot = Slot::occupied(dense.len());
-        dense.push(entry);
-        sparse[key] = slot;
+        dense_keys.push(key);
+        dense_values.push(value);
+        sparse[key] = SparseEntry::occupied(dense_keys.len() - 1);
 
         None
     }
 
     pub fn swap(&mut self, first_key: usize, second_key: usize) {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense_values,
+            sparse,
+            ..
+        } = self;
 
         if first_key == second_key {
             return;
         }
 
-        let first_index = sparse.get(first_key).and_then(Slot::dense_index);
-        let second_index = sparse.get(second_key).and_then(Slot::dense_index);
+        let first_index = sparse.get(first_key).and_then(SparseEntry::dense_index);
+        let second_index = sparse.get(second_key).and_then(SparseEntry::dense_index);
         let (Some(first_index), Some(second_index)) = (first_index, second_index) else {
             return;
         };
 
-        let (first_entry, second_entry) = get_pair_mut(dense, first_index, second_index)
+        let (first_value, second_value) = get_pair_mut(dense_values, first_index, second_index)
             .expect("indices from sparse should be in bounds of dense and differ from each other");
-        let first_value = first_entry.value_mut();
-        let second_value = second_entry.value_mut();
         swap(first_value, second_value);
     }
 
     pub fn swap_remove(&mut self, key: usize) -> Option<T> {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
 
-        let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
+        let dense_index = sparse.get(key).and_then(SparseEntry::dense_index)?;
         assert!(
-            dense_index < dense.len(),
+            dense_index < dense_keys.len(),
             "index from sparse should be in bounds of dense",
         );
 
-        let entry = dense.swap_remove(dense_index);
-        debug_assert_eq!(key, entry.key);
+        let value = dense_values.swap_remove(dense_index);
+        let dense_key = dense_keys.swap_remove(dense_index);
+        debug_assert_eq!(key, dense_key);
 
-        sparse[dense.len()] = sparse[key];
-        sparse[key] = Slot::Free;
+        sparse[dense_keys.len()] = sparse[key];
+        sparse[key] = SparseEntry::Vacant;
 
-        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn remove(&mut self, key: usize) -> Option<T> {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
 
-        let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
+        let dense_index = sparse.get(key).and_then(SparseEntry::dense_index)?;
         assert!(
-            dense_index < dense.len(),
+            dense_index < dense_keys.len(),
             "index from sparse should be in bounds of dense",
         );
 
-        let entry = dense.remove(dense_index);
-        debug_assert_eq!(key, entry.key);
+        let value = dense_values.remove(dense_index);
+        let dense_key = dense_keys.remove(dense_index);
+        debug_assert_eq!(key, dense_key);
 
-        for entry in dense.iter_mut().skip(dense_index) {
-            let sparse_index = entry.key;
-            let slot = sparse
+        for sparse_index in dense_keys.iter().copied().skip(dense_index) {
+            let sparse_entry = sparse
                 .get_mut(sparse_index)
                 .expect("key from dense should be in bounds of sparse");
-            let dense_index = slot
+            let dense_index = sparse_entry
                 .dense_index_mut()
-                .expect("current slot should be occupied");
+                .expect("current sparse entry should be occupied");
             *dense_index -= 1;
         }
-        sparse[key] = Slot::Free;
+        sparse[key] = SparseEntry::Vacant;
 
-        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn get(&self, key: usize) -> Option<&T> {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
 
-        let slot = sparse.get(key).copied()?;
-        let dense_index = slot.dense_index()?;
-        let entry = dense
+        let sparse_entry = sparse.get(key).copied()?;
+        let dense_index = sparse_entry.dense_index()?;
+
+        let value = dense_values
             .get(dense_index)
             .expect("index from sparse should be in bounds of dense");
-        debug_assert_eq!(key, entry.key);
+        let dense_key = dense_keys
+            .get(dense_index)
+            .copied()
+            .expect("index from sparse should be in bounds of dense");
+        debug_assert_eq!(key, dense_key);
 
-        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn get_mut(&mut self, key: usize) -> Option<&mut T> {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
 
-        let slot = sparse.get(key).copied()?;
-        let dense_index = slot.dense_index()?;
-        let entry = dense
+        let sparse_entry = sparse.get(key).copied()?;
+        let dense_index = sparse_entry.dense_index()?;
+
+        let value = dense_values
             .get_mut(dense_index)
             .expect("index from sparse should be in bounds of dense");
-        debug_assert_eq!(key, entry.key);
+        let dense_key = dense_keys
+            .get(dense_index)
+            .copied()
+            .expect("index from sparse should be in bounds of dense");
+        debug_assert_eq!(key, dense_key);
 
-        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn contains(&self, key: usize) -> bool {
-        let Self { dense, sparse } = self;
+        let Self {
+            dense_keys, sparse, ..
+        } = self;
 
-        let Some(slot) = sparse.get(key).copied() else {
+        let Some(sparse_entry) = sparse.get(key).copied() else {
             return false;
         };
-        let Slot::Occupied { dense_index } = slot else {
+        let SparseEntry::Occupied { dense_index } = sparse_entry else {
             return false;
         };
 
         debug_assert!(
-            dense_index < dense.len(),
+            dense_index < dense_keys.len(),
             "index from sparse should be in bounds of dense",
         );
         true
     }
 
     pub fn clear(&mut self) {
-        let Self { dense, sparse } = self;
-        dense.clear();
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        dense_keys.clear();
+        dense_values.clear();
         sparse.clear();
     }
 }

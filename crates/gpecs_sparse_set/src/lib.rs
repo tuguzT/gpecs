@@ -511,6 +511,10 @@ impl<T> SparseSet<T> {
         dense_values.clear();
         sparse.clear();
     }
+
+    // TODO operations from `Vec<T>` and `HashMap<K, V>` if possible
+    // TODO Entry API
+    // TODO `iter`, `iter_mut`, `keys`, `values`, `values_mut`
 }
 
 impl<T> Index<usize> for SparseSet<T> {
@@ -533,7 +537,19 @@ impl<T> IndexMut<usize> for SparseSet<T> {
     }
 }
 
-// TODO FromIterator, IntoIterator, Extend
+impl<T> AsRef<[T]> for SparseSet<T> {
+    fn as_ref(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+impl<T> AsMut<[T]> for SparseSet<T> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self.as_mut_slice()
+    }
+}
+
+// TODO `FromIterator`, `IntoIterator`, `Extend`
 
 #[cfg(test)]
 mod tests {

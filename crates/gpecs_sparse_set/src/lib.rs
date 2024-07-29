@@ -405,8 +405,8 @@ mod tests {
     #[test]
     fn empty_insert_one() {
         let mut sparse_set = SparseSet::new();
-        let inserted = sparse_set.insert(0, 42);
-        assert_eq!(inserted, None);
+        let previous = sparse_set.insert(0, 42);
+        assert_eq!(previous, None);
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -416,8 +416,8 @@ mod tests {
     #[test]
     fn with_capacity_insert_one() {
         let mut sparse_set = SparseSet::with_capacity_all(10);
-        let inserted = sparse_set.insert(0, 42);
-        assert_eq!(inserted, None);
+        let previous = sparse_set.insert(0, 42);
+        assert_eq!(previous, None);
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -444,6 +444,48 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&43));
         assert!(sparse_set.contains(0));
+    }
+
+    #[test]
+    fn empty_insert_far() {
+        let mut sparse_set = SparseSet::new();
+
+        let (key, value) = (3, 42);
+        sparse_set.insert(key, value);
+
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let (key, value) = (6, 69);
+        sparse_set.insert(key, value);
+
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+    }
+
+    #[test]
+    fn empty_insert_far_remove() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(3, 42);
+        sparse_set.insert(1, 69);
+
+        let key = 3;
+        let value = sparse_set.remove(key).unwrap();
+
+        assert_eq!(value, 42);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
+
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+
+        assert_eq!(value, 69);
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains(key).not());
     }
 
     #[test]
@@ -498,8 +540,8 @@ mod tests {
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), Some(&69));
 
-        let inserted = sparse_set.insert(0, 34);
-        assert_eq!(inserted, Some(42));
+        let previous = sparse_set.insert(0, 34);
+        assert_eq!(previous, Some(42));
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&34));
@@ -518,8 +560,8 @@ mod tests {
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), Some(&69));
 
-        let inserted = sparse_set.insert(1, 34);
-        assert_eq!(inserted, Some(69));
+        let previous = sparse_set.insert(1, 34);
+        assert_eq!(previous, Some(69));
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
@@ -700,5 +742,105 @@ mod tests {
         assert!(sparse_set.contains(0));
         assert!(sparse_set.contains(1).not());
         assert!(sparse_set.contains(2));
+    }
+
+    #[test]
+    fn five_items_remove_insert() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(0, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(2, 69);
+        sparse_set.insert(3, 228);
+        sparse_set.insert(4, 666);
+
+        let key = 1;
+        let value = sparse_set.remove(key).unwrap();
+        assert_eq!(value, 42);
+
+        let key = 3;
+        let value = sparse_set.remove(key).unwrap();
+        assert_eq!(value, 228);
+
+        let key = 4;
+        let value = sparse_set.remove(key).unwrap();
+        assert_eq!(value, 666);
+
+        let key = 2;
+        let value = sparse_set.remove(key).unwrap();
+        assert_eq!(value, 69);
+
+        let key = 3;
+        let value = 0;
+        let previous = sparse_set.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let key = 2;
+        let value = 1;
+        let previous = sparse_set.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let key = 4;
+        let value = 10;
+        let previous = sparse_set.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+    }
+
+    #[test]
+    fn five_items_swap_remove_insert() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(0, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(2, 69);
+        sparse_set.insert(3, 228);
+        sparse_set.insert(4, 666);
+
+        let key = 1;
+        let value = sparse_set.swap_remove(key).unwrap();
+        assert_eq!(value, 42);
+
+        let key = 3;
+        let value = sparse_set.swap_remove(key).unwrap();
+        assert_eq!(value, 228);
+
+        let key = 4;
+        let value = sparse_set.swap_remove(key).unwrap();
+        assert_eq!(value, 666);
+
+        let key = 2;
+        let value = sparse_set.swap_remove(key).unwrap();
+        assert_eq!(value, 69);
+
+        let key = 3;
+        let value = 0;
+        let previous = sparse_set.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let key = 2;
+        let value = 1;
+        let previous = sparse_set.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
+
+        let key = 4;
+        let value = 10;
+        let previous = sparse_set.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains(key));
     }
 }

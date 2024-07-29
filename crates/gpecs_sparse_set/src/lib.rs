@@ -3,12 +3,15 @@
 #![warn(clippy::all)]
 // TODO `#![warn(missing_docs)]` after implementation & tests
 #![forbid(unsafe_code)]
-// TODO `#![no_std]` with `alloc` enabled
+#![cfg_attr(not(test), no_std)]
 
 extern crate alloc;
 
-use alloc::collections::TryReserveError;
-use core::mem::{replace, swap};
+use alloc::{collections::TryReserveError, vec::Vec};
+use core::{
+    mem::{replace, swap},
+    ops::{Index, IndexMut},
+};
 
 fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
     let (first, second) = (usize::min(a, b), usize::max(a, b));
@@ -510,6 +513,26 @@ impl<T> SparseSet<T> {
     }
 }
 
+impl<T> Index<usize> for SparseSet<T> {
+    type Output = T;
+
+    fn index(&self, key: usize) -> &Self::Output {
+        match self.get(key) {
+            Some(value) => value,
+            None => panic!("key {key} not found"),
+        }
+    }
+}
+
+impl<T> IndexMut<usize> for SparseSet<T> {
+    fn index_mut(&mut self, key: usize) -> &mut Self::Output {
+        match self.get_mut(key) {
+            Some(value) => value,
+            None => panic!("key {key} not found"),
+        }
+    }
+}
+
 // TODO FromIterator, IntoIterator, Extend
 
 #[cfg(test)]
@@ -558,7 +581,7 @@ mod tests {
     fn empty_insert_one_mutate() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
-        *sparse_set.get_mut(0).unwrap() = 43;
+        sparse_set[0] = 43;
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&43));
@@ -569,7 +592,7 @@ mod tests {
     fn with_capacity_insert_one_mutate() {
         let mut sparse_set = SparseSet::with_capacity_all(10);
         sparse_set.insert(0, 42);
-        *sparse_set.get_mut(0).unwrap() = 43;
+        sparse_set[0] = 43;
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&43));

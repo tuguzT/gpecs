@@ -284,9 +284,10 @@ impl<T> SparseSet<T> {
         let Self { dense, sparse } = self;
 
         let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
-        if dense_index >= dense.len() {
-            panic!("index from sparse should be in bounds of dense");
-        }
+        assert!(
+            dense_index < dense.len(),
+            "index from sparse should be in bounds of dense",
+        );
 
         let entry = dense.swap_remove(dense_index);
         debug_assert_eq!(key, entry.key);
@@ -302,9 +303,10 @@ impl<T> SparseSet<T> {
         let Self { dense, sparse } = self;
 
         let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
-        if dense_index >= dense.len() {
-            panic!("index from sparse should be in bounds of dense");
-        }
+        assert!(
+            dense_index < dense.len(),
+            "index from sparse should be in bounds of dense",
+        );
 
         for entry in dense.iter_mut().skip(dense_index + 1) {
             let sparse_index = entry.key;
@@ -363,7 +365,12 @@ impl<T> SparseSet<T> {
         let Slot::Occupied { dense_index } = slot else {
             return false;
         };
-        dense_index < dense.len()
+
+        debug_assert!(
+            dense_index < dense.len(),
+            "index from sparse should be in bounds of dense",
+        );
+        true
     }
 
     pub fn clear(&mut self) {

@@ -116,12 +116,12 @@ impl<T> SparseSet<T> {
     }
 
     #[inline(always)]
-    pub fn with_capacity_dense(dense: usize) -> Self {
+    pub fn with_dense_capacity(dense: usize) -> Self {
         Self::with_capacity(dense, 0)
     }
 
     #[inline(always)]
-    pub fn with_capacity_sparse(sparse: usize) -> Self {
+    pub fn with_sparse_capacity(sparse: usize) -> Self {
         Self::with_capacity(0, sparse)
     }
 
@@ -144,12 +144,12 @@ impl<T> SparseSet<T> {
         usize::min(dense.capacity(), sparse.capacity())
     }
 
-    pub fn capacity_dense(&self) -> usize {
+    pub fn dense_capacity(&self) -> usize {
         let Self { dense, .. } = self;
         dense.capacity()
     }
 
-    pub fn capacity_sparse(&self) -> usize {
+    pub fn sparse_capacity(&self) -> usize {
         let Self { sparse, .. } = self;
         sparse.capacity()
     }
@@ -160,12 +160,12 @@ impl<T> SparseSet<T> {
         sparse.reserve(additional);
     }
 
-    pub fn reserve_dense(&mut self, additional: usize) {
+    pub fn dense_reserve(&mut self, additional: usize) {
         let Self { dense, .. } = self;
         dense.reserve(additional);
     }
 
-    pub fn reserve_sparse(&mut self, additional: usize) {
+    pub fn sparse_reserve(&mut self, additional: usize) {
         let Self { sparse, .. } = self;
         sparse.reserve(additional);
     }
@@ -176,12 +176,12 @@ impl<T> SparseSet<T> {
         sparse.reserve_exact(additional);
     }
 
-    pub fn reserve_dense_exact(&mut self, additional: usize) {
+    pub fn dense_reserve_exact(&mut self, additional: usize) {
         let Self { dense, .. } = self;
         dense.reserve_exact(additional);
     }
 
-    pub fn reserve_sparse_exact(&mut self, additional: usize) {
+    pub fn sparse_reserve_exact(&mut self, additional: usize) {
         let Self { sparse, .. } = self;
         sparse.reserve_exact(additional);
     }
@@ -193,12 +193,12 @@ impl<T> SparseSet<T> {
         Ok(())
     }
 
-    pub fn try_reserve_dense(&mut self, additional: usize) -> Result<(), TryReserveError> {
+    pub fn dense_try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let Self { dense, .. } = self;
         dense.try_reserve(additional)
     }
 
-    pub fn try_reserve_sparse(&mut self, additional: usize) -> Result<(), TryReserveError> {
+    pub fn sparse_try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let Self { sparse, .. } = self;
         sparse.try_reserve(additional)
     }
@@ -210,12 +210,12 @@ impl<T> SparseSet<T> {
         Ok(())
     }
 
-    pub fn try_reserve_dense_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
+    pub fn dense_try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let Self { dense, .. } = self;
         dense.try_reserve_exact(additional)
     }
 
-    pub fn try_reserve_sparse_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
+    pub fn sparse_try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let Self { sparse, .. } = self;
         sparse.try_reserve_exact(additional)
     }
@@ -226,14 +226,30 @@ impl<T> SparseSet<T> {
         sparse.shrink_to_fit();
     }
 
-    pub fn shrink_to_fit_dense(&mut self) {
+    pub fn dense_shrink_to_fit(&mut self) {
         let Self { dense, .. } = self;
         dense.shrink_to_fit();
     }
 
-    pub fn shrink_to_fit_sparse(&mut self) {
+    pub fn sparse_shrink_to_fit(&mut self) {
         let Self { sparse, .. } = self;
         sparse.shrink_to_fit();
+    }
+
+    pub fn shrink_to(&mut self, min_capacity: usize) {
+        let Self { dense, sparse } = self;
+        dense.shrink_to(min_capacity);
+        sparse.shrink_to(min_capacity);
+    }
+
+    pub fn dense_shrink_to(&mut self, min_capacity: usize) {
+        let Self { dense, .. } = self;
+        dense.shrink_to(min_capacity);
+    }
+
+    pub fn sparse_shrink_to(&mut self, min_capacity: usize) {
+        let Self { sparse, .. } = self;
+        sparse.shrink_to(min_capacity);
     }
 
     pub fn insert(&mut self, key: usize, value: T) -> Option<T> {
@@ -308,7 +324,10 @@ impl<T> SparseSet<T> {
             "index from sparse should be in bounds of dense",
         );
 
-        for entry in dense.iter_mut().skip(dense_index + 1) {
+        let entry = dense.remove(dense_index);
+        debug_assert_eq!(key, entry.key);
+
+        for entry in dense.iter_mut().skip(dense_index) {
             let sparse_index = entry.key;
             let slot = sparse
                 .get_mut(sparse_index)
@@ -318,10 +337,6 @@ impl<T> SparseSet<T> {
                 .expect("current slot should be occupied");
             *dense_index -= 1;
         }
-
-        let entry = dense.remove(dense_index);
-        debug_assert_eq!(key, entry.key);
-
         sparse[key] = Slot::Free;
 
         let Entry { value, .. } = entry;
@@ -398,8 +413,8 @@ mod tests {
     fn with_capacity() {
         let sparse_set = SparseSet::<i32>::with_capacity_all(10);
         assert!(sparse_set.is_empty());
-        assert_eq!(sparse_set.capacity_dense(), 10);
-        assert_eq!(sparse_set.capacity_sparse(), 10);
+        assert_eq!(sparse_set.dense_capacity(), 10);
+        assert_eq!(sparse_set.sparse_capacity(), 10);
     }
 
     #[test]

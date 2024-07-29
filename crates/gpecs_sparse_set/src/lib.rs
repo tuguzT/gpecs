@@ -9,12 +9,82 @@ extern crate alloc;
 
 use alloc::collections::TryReserveError;
 use core::mem::replace;
-use nonmax::NonMaxUsize;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub struct Entry<T> {
+    key: usize,
+    value: T,
+}
+
+impl<T> Entry<T> {
+    pub const fn key(&self) -> usize {
+        let &Self { key, .. } = self;
+        key
+    }
+
+    pub const fn value(&self) -> &T {
+        let Self { value, .. } = self;
+        value
+    }
+
+    pub fn value_mut(&mut self) -> &mut T {
+        let Self { value, .. } = self;
+        value
+    }
+
+    pub fn into_key(self) -> usize {
+        let Self { key, .. } = self;
+        key
+    }
+
+    pub fn into_value(self) -> T {
+        let Self { value, .. } = self;
+        value
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub enum Slot {
+    Occupied { dense_index: usize },
+    Free,
+}
+
+impl Slot {
+    pub const fn occupied(dense_index: usize) -> Self {
+        Self::Occupied { dense_index }
+    }
+
+    pub const fn free() -> Self {
+        Self::Free
+    }
+
+    pub const fn is_occupied(&self) -> bool {
+        matches!(self, Self::Occupied { .. })
+    }
+
+    pub const fn is_free(&self) -> bool {
+        matches!(self, Self::Free)
+    }
+
+    pub fn dense_index(&self) -> Option<usize> {
+        match self {
+            Self::Occupied { dense_index } => Some(*dense_index),
+            Self::Free => None,
+        }
+    }
+
+    pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
+        match self {
+            Self::Occupied { dense_index } => Some(dense_index),
+            Self::Free => None,
+        }
+    }
+}
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct SparseSet<T> {
-    dense: Vec<SparseSetEntry<T>>,
-    sparse: Vec<Option<NonMaxUsize>>,
+    dense: Vec<Entry<T>>,
+    sparse: Vec<Slot>,
 }
 
 impl<T> SparseSet<T> {
@@ -30,17 +100,17 @@ impl<T> SparseSet<T> {
         Self { dense, sparse }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn with_capacity_dense(dense: usize) -> Self {
         Self::with_capacity(dense, 0)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn with_capacity_sparse(sparse: usize) -> Self {
         Self::with_capacity(0, sparse)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn with_capacity_all(capacity: usize) -> Self {
         Self::with_capacity(capacity, capacity)
     }
@@ -151,34 +221,27 @@ impl<T> SparseSet<T> {
         sparse.shrink_to_fit();
     }
 
-    pub fn as_slice(&self) -> &[SparseSetEntry<T>] {
-        let Self { dense, .. } = self;
-        dense.as_slice()
-    }
-
-    pub fn as_mut_slice(&mut self) -> &mut [SparseSetEntry<T>] {
-        let Self { dense, .. } = self;
-        dense.as_mut_slice()
-    }
-
     pub fn insert(&mut self, key: usize, value: T) -> Option<T> {
         let Self { dense, sparse } = self;
 
-        if sparse.len() <= key {
-            sparse.resize(key + 1, None);
+        if key >= sparse.len() {
+            sparse.resize(key + 1, Slot::Free);
         }
 
-        if let Some(entry_index) = sparse.get(key).cloned().flatten().map(usize::from) {
+        if let Slot::Occupied { dense_index } = sparse[key] {
             let entry_value = dense
-                .get_mut(entry_index)
+                .get_mut(dense_index)
                 .expect("index from sparse should be in bounds of dense")
                 .value_mut();
             let value = replace(entry_value, value);
             return Some(value);
         }
 
-        dense.push(SparseSetEntry { key, value });
-        sparse[key] = (dense.len() - 1).try_into().ok();
+        let entry = Entry { key, value };
+        let slot = Slot::occupied(dense.len());
+        dense.push(entry);
+        sparse[key] = slot;
+
         None
     }
 
@@ -189,8 +252,8 @@ impl<T> SparseSet<T> {
             return;
         }
 
-        let first_index = sparse.get(first_key).cloned().flatten().map(usize::from);
-        let second_index = sparse.get(second_key).cloned().flatten().map(usize::from);
+        let first_index = sparse.get(first_key).and_then(Slot::dense_index);
+        let second_index = sparse.get(second_key).and_then(Slot::dense_index);
         let (Some(first_index), Some(second_index)) = (first_index, second_index) else {
             return;
         };
@@ -212,72 +275,87 @@ impl<T> SparseSet<T> {
     pub fn swap_remove(&mut self, key: usize) -> Option<T> {
         let Self { dense, sparse } = self;
 
-        let entry_index = sparse.get_mut(key).cloned().flatten().map(usize::from)?;
-        if entry_index >= dense.len() {
-            return None;
+        let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
+        if dense_index >= dense.len() {
+            panic!("index from sparse should be in bounds of dense");
         }
 
-        let entry = dense.swap_remove(entry_index);
+        let entry = dense.swap_remove(dense_index);
         debug_assert_eq!(key, entry.key);
 
-        let SparseSetEntry { value, .. } = entry;
         sparse[dense.len()] = sparse[key];
-        sparse[key] = None;
+        sparse[key] = Slot::Free;
+
+        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn remove(&mut self, key: usize) -> Option<T> {
         let Self { dense, sparse } = self;
 
-        let entry_index = sparse.get_mut(key).cloned().flatten().map(usize::from)?;
-        if entry_index >= dense.len() {
-            return None;
+        let dense_index = sparse.get(key).and_then(Slot::dense_index)?;
+        if dense_index >= dense.len() {
+            panic!("index from sparse should be in bounds of dense");
         }
 
-        for entry in dense.iter_mut().skip(entry_index + 1) {
+        for entry in dense.iter_mut().skip(dense_index + 1) {
             let sparse_index = entry.key;
-            sparse[sparse_index] = sparse[sparse_index]
-                .map(usize::from)
-                .and_then(|index| (index - 1).try_into().ok());
+            let slot = sparse
+                .get_mut(sparse_index)
+                .expect("key from dense should be in bounds of sparse");
+            let dense_index = slot
+                .dense_index_mut()
+                .expect("current slot should be occupied");
+            *dense_index -= 1;
         }
 
-        let entry = dense.remove(entry_index);
+        let entry = dense.remove(dense_index);
         debug_assert_eq!(key, entry.key);
 
-        let SparseSetEntry { value, .. } = entry;
-        sparse[key] = None;
+        sparse[key] = Slot::Free;
+
+        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn get(&self, key: usize) -> Option<&T> {
         let Self { dense, sparse } = self;
 
-        let entry_index = sparse.get(key).cloned().flatten().map(usize::from)?;
-        let entry = dense.get(entry_index)?;
+        let slot = sparse.get(key).copied()?;
+        let dense_index = slot.dense_index()?;
+        let entry = dense
+            .get(dense_index)
+            .expect("index from sparse should be in bounds of dense");
         debug_assert_eq!(key, entry.key);
 
-        let SparseSetEntry { value, .. } = entry;
+        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn get_mut(&mut self, key: usize) -> Option<&mut T> {
         let Self { dense, sparse } = self;
 
-        let entry_index = sparse.get(key).cloned().flatten().map(usize::from)?;
-        let entry = dense.get_mut(entry_index)?;
+        let slot = sparse.get(key).copied()?;
+        let dense_index = slot.dense_index()?;
+        let entry = dense
+            .get_mut(dense_index)
+            .expect("index from sparse should be in bounds of dense");
         debug_assert_eq!(key, entry.key);
 
-        let SparseSetEntry { value, .. } = entry;
+        let Entry { value, .. } = entry;
         Some(value)
     }
 
     pub fn contains(&self, key: usize) -> bool {
         let Self { dense, sparse } = self;
 
-        let Some(entry_index) = sparse.get(key).cloned().flatten().map(usize::from) else {
+        let Some(slot) = sparse.get(key).copied() else {
             return false;
         };
-        entry_index < dense.len()
+        let Slot::Occupied { dense_index } = slot else {
+            return false;
+        };
+        dense_index < dense.len()
     }
 
     pub fn clear(&mut self) {
@@ -289,39 +367,6 @@ impl<T> SparseSet<T> {
 
 // TODO FromIterator, IntoIterator, Extend
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct SparseSetEntry<T> {
-    key: usize,
-    value: T,
-}
-
-impl<T> SparseSetEntry<T> {
-    pub const fn key(&self) -> usize {
-        let &Self { key, .. } = self;
-        key
-    }
-
-    pub const fn value(&self) -> &T {
-        let Self { value, .. } = self;
-        value
-    }
-
-    pub fn value_mut(&mut self) -> &mut T {
-        let Self { value, .. } = self;
-        value
-    }
-
-    pub fn into_key(self) -> usize {
-        let Self { key, .. } = self;
-        key
-    }
-
-    pub fn into_value(self) -> T {
-        let Self { value, .. } = self;
-        value
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::ops::Not;
@@ -332,14 +377,12 @@ mod tests {
     fn empty() {
         let sparse_set = SparseSet::<i32>::new();
         assert!(sparse_set.is_empty());
-        assert!(sparse_set.as_slice().is_empty());
     }
 
     #[test]
     fn with_capacity() {
         let sparse_set = SparseSet::<i32>::with_capacity_all(10);
         assert!(sparse_set.is_empty());
-        assert!(sparse_set.as_slice().is_empty());
         assert_eq!(sparse_set.capacity_dense(), 10);
         assert_eq!(sparse_set.capacity_sparse(), 10);
     }

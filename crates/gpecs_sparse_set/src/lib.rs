@@ -550,16 +550,25 @@ impl<T> SparseSet<T> {
         IntoKeys { keys, phantom }
     }
 
-    pub fn values(&self) {
-        todo!()
+    pub fn values(&self) -> Values<'_, T> {
+        let Self { dense_values, .. } = self;
+
+        let values = dense_values.iter();
+        Values { values }
     }
 
-    pub fn values_mut(&mut self) {
-        todo!()
+    pub fn values_mut(&mut self) -> ValuesMut<'_, T> {
+        let Self { dense_values, .. } = self;
+
+        let values = dense_values.iter_mut();
+        ValuesMut { values }
     }
 
-    pub fn into_values(self) {
-        todo!()
+    pub fn into_values(self) -> IntoValues<T> {
+        let Self { dense_values, .. } = self;
+
+        let values = dense_values.into_iter();
+        IntoValues { values }
     }
 
     pub fn iter(&self) {
@@ -940,6 +949,463 @@ impl<T> ExactSizeIterator for IntoKeys<T> {
 
 impl<T> FusedIterator for IntoKeys<T> {}
 
+#[derive(Default, Clone)]
+pub struct Values<'a, T> {
+    values: slice::Iter<'a, T>,
+}
+
+impl<'a, T> Values<'a, T> {
+    pub fn as_slice(&self) -> &'a [T] {
+        let Self { values } = self;
+        values.as_slice()
+    }
+}
+
+impl<'a, T> Debug for Values<'a, T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let values = &self.as_slice();
+        f.debug_tuple("Values").field(values).finish()
+    }
+}
+
+impl<'a, T> AsRef<[T]> for Values<'a, T> {
+    fn as_ref(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+impl<'a, T> Iterator for Values<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { values } = self;
+        values.size_hint()
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { values } = self;
+        values.count()
+    }
+
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { values } = self;
+        values.last()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.nth(n)
+    }
+
+    fn for_each<F>(self, f: F)
+    where
+        Self: Sized,
+        F: FnMut(Self::Item),
+    {
+        let Self { values } = self;
+        values.for_each(f)
+    }
+
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self { values } = self;
+        values.fold(init, f)
+    }
+
+    fn all<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.all(f)
+    }
+
+    fn any<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.any(f)
+    }
+
+    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
+    where
+        Self: Sized,
+        P: FnMut(&Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.find(predicate)
+    }
+
+    fn find_map<B, F>(&mut self, f: F) -> Option<B>
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> Option<B>,
+    {
+        let Self { values } = self;
+        values.find_map(f)
+    }
+
+    fn position<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.position(predicate)
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for Values<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.next_back()
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.nth_back(n)
+    }
+}
+
+impl<'a, T> ExactSizeIterator for Values<'a, T> {
+    fn len(&self) -> usize {
+        let Self { values } = self;
+        values.len()
+    }
+}
+
+impl<'a, T> FusedIterator for Values<'a, T> {}
+
+#[derive(Default)]
+pub struct ValuesMut<'a, T> {
+    values: slice::IterMut<'a, T>,
+}
+
+impl<'a, T> ValuesMut<'a, T> {
+    pub fn into_slice(self) -> &'a [T] {
+        let Self { values } = self;
+        values.into_slice()
+    }
+
+    pub fn as_slice(&self) -> &[T] {
+        let Self { values } = self;
+        values.as_slice()
+    }
+}
+
+impl<'a, T> Debug for ValuesMut<'a, T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let values = &self.as_slice();
+        f.debug_tuple("ValuesMut").field(values).finish()
+    }
+}
+
+impl<'a, T> AsRef<[T]> for ValuesMut<'a, T> {
+    fn as_ref(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+impl<'a, T> Iterator for ValuesMut<'a, T> {
+    type Item = &'a mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { values } = self;
+        values.size_hint()
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { values } = self;
+        values.count()
+    }
+
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { values } = self;
+        values.last()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.nth(n)
+    }
+
+    fn for_each<F>(self, f: F)
+    where
+        Self: Sized,
+        F: FnMut(Self::Item),
+    {
+        let Self { values } = self;
+        values.for_each(f)
+    }
+
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self { values } = self;
+        values.fold(init, f)
+    }
+
+    fn all<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.all(f)
+    }
+
+    fn any<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.any(f)
+    }
+
+    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
+    where
+        Self: Sized,
+        P: FnMut(&Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.find(predicate)
+    }
+
+    fn find_map<B, F>(&mut self, f: F) -> Option<B>
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> Option<B>,
+    {
+        let Self { values } = self;
+        values.find_map(f)
+    }
+
+    fn position<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.position(predicate)
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for ValuesMut<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.next_back()
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.nth_back(n)
+    }
+}
+
+impl<'a, T> ExactSizeIterator for ValuesMut<'a, T> {
+    fn len(&self) -> usize {
+        let Self { values } = self;
+        values.len()
+    }
+}
+
+impl<'a, T> FusedIterator for ValuesMut<'a, T> {}
+
+#[derive(Default, Clone)]
+pub struct IntoValues<T> {
+    values: vec::IntoIter<T>,
+}
+
+impl<T> IntoValues<T> {
+    pub fn as_slice(&self) -> &[T] {
+        let Self { values } = self;
+        values.as_slice()
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        let Self { values } = self;
+        values.as_mut_slice()
+    }
+}
+
+impl<T> Debug for IntoValues<T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let values = &self.as_slice();
+        f.debug_tuple("IntoValues").field(values).finish()
+    }
+}
+
+impl<T> AsRef<[T]> for IntoValues<T> {
+    fn as_ref(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+impl<T> AsMut<[T]> for IntoValues<T> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self.as_mut_slice()
+    }
+}
+
+impl<T> Iterator for IntoValues<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { values } = self;
+        values.size_hint()
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { values } = self;
+        values.count()
+    }
+
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { values } = self;
+        values.last()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.nth(n)
+    }
+
+    fn for_each<F>(self, f: F)
+    where
+        Self: Sized,
+        F: FnMut(Self::Item),
+    {
+        let Self { values } = self;
+        values.for_each(f)
+    }
+
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self { values } = self;
+        values.fold(init, f)
+    }
+
+    fn all<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.all(f)
+    }
+
+    fn any<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.any(f)
+    }
+
+    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
+    where
+        Self: Sized,
+        P: FnMut(&Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.find(predicate)
+    }
+
+    fn find_map<B, F>(&mut self, f: F) -> Option<B>
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> Option<B>,
+    {
+        let Self { values } = self;
+        values.find_map(f)
+    }
+
+    fn position<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.position(predicate)
+    }
+}
+
+impl<T> DoubleEndedIterator for IntoValues<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.next_back()
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { values } = self;
+        values.nth_back(n)
+    }
+}
+
+impl<T> ExactSizeIterator for IntoValues<T> {
+    fn len(&self) -> usize {
+        let Self { values } = self;
+        values.len()
+    }
+}
+
+impl<T> FusedIterator for IntoValues<T> {}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Not;
@@ -963,8 +1429,8 @@ mod tests {
     #[test]
     fn empty_keys() {
         let sparse_set = SparseSet::<i32>::new();
-        let keys = sparse_set.keys();
 
+        let keys = sparse_set.keys();
         assert_eq!(keys.len(), 0);
         assert_eq!(keys.as_slice(), &[]);
     }
@@ -972,10 +1438,37 @@ mod tests {
     #[test]
     fn empty_into_keys() {
         let sparse_set = SparseSet::<i32>::new();
-        let keys = sparse_set.into_keys();
 
+        let keys = sparse_set.into_keys();
         assert_eq!(keys.len(), 0);
         assert_eq!(keys.as_slice(), &[]);
+    }
+
+    #[test]
+    fn empty_values() {
+        let sparse_set = SparseSet::<i32>::new();
+
+        let values = sparse_set.values();
+        assert_eq!(values.len(), 0);
+        assert_eq!(values.as_slice(), &[]);
+    }
+
+    #[test]
+    fn empty_values_mut() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        let values_mut = sparse_set.values_mut();
+
+        assert_eq!(values_mut.len(), 0);
+        assert_eq!(values_mut.into_slice(), &mut []);
+    }
+
+    #[test]
+    fn empty_into_values() {
+        let sparse_set = SparseSet::<i32>::new();
+
+        let values = sparse_set.into_values();
+        assert_eq!(values.len(), 0);
+        assert_eq!(values.as_slice(), &[]);
     }
 
     #[test]
@@ -1124,6 +1617,36 @@ mod tests {
         let keys = sparse_set.into_keys();
         assert_eq!(keys.len(), 1);
         assert_eq!(keys.as_slice(), &[0]);
+    }
+
+    #[test]
+    fn one_item_values() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(0, 42);
+
+        let values = sparse_set.values();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values.as_slice(), &[42]);
+    }
+
+    #[test]
+    fn one_item_values_mut() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(0, 42);
+
+        let values_mut = sparse_set.values_mut();
+        assert_eq!(values_mut.len(), 1);
+        assert_eq!(values_mut.into_slice(), &mut [42]);
+    }
+
+    #[test]
+    fn one_item_into_values() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(0, 42);
+
+        let values = sparse_set.into_values();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values.as_slice(), &[42]);
     }
 
     #[test]
@@ -1362,6 +1885,42 @@ mod tests {
         let keys = sparse_set.into_keys();
         assert_eq!(keys.len(), 3);
         assert_eq!(keys.as_slice(), &[2, 1, 5]);
+    }
+
+    #[test]
+    fn three_items_values() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let values = sparse_set.values();
+        assert_eq!(values.len(), 3);
+        assert_eq!(values.as_slice(), &[34, 42, 69]);
+    }
+
+    #[test]
+    fn three_items_values_mut() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let values_mut = sparse_set.values_mut();
+        assert_eq!(values_mut.len(), 3);
+        assert_eq!(values_mut.into_slice(), &mut [34, 42, 69]);
+    }
+
+    #[test]
+    fn three_items_into_values() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let values = sparse_set.into_values();
+        assert_eq!(values.len(), 3);
+        assert_eq!(values.as_slice(), &[34, 42, 69]);
     }
 
     #[test]

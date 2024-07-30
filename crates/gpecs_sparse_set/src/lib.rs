@@ -7,10 +7,18 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
+use alloc::{
+    boxed::Box,
+    collections::TryReserveError,
+    vec::{self, Vec},
+};
 use core::{
+    fmt::{self, Debug},
+    iter::FusedIterator,
+    marker::PhantomData,
     mem::{replace, swap},
     ops::{Index, IndexMut},
+    slice,
 };
 
 fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
@@ -51,7 +59,7 @@ impl SparseEntry {
         matches!(self, Self::Vacant)
     }
 
-    pub fn dense_index(&self) -> Option<usize> {
+    pub const fn dense_index(&self) -> Option<usize> {
         match self {
             Self::Occupied { dense_index } => Some(*dense_index),
             Self::Vacant => None,
@@ -525,7 +533,42 @@ impl<T> SparseSet<T> {
 
     // TODO operations from `Vec<T>` and `HashMap<K, V>` if possible
     // TODO Entry API
-    // TODO `iter`, `iter_mut`, `keys`, `values`, `values_mut`
+
+    pub fn keys(&self) -> Keys<'_, T> {
+        let Self { dense_keys, .. } = self;
+
+        let keys = dense_keys.iter();
+        let phantom = PhantomData;
+        Keys { keys, phantom }
+    }
+
+    pub fn into_keys(self) -> IntoKeys<T> {
+        let Self { dense_keys, .. } = self;
+
+        let keys = dense_keys.into_iter();
+        let phantom = PhantomData;
+        IntoKeys { keys, phantom }
+    }
+
+    pub fn values(&self) {
+        todo!()
+    }
+
+    pub fn values_mut(&mut self) {
+        todo!()
+    }
+
+    pub fn into_values(self) {
+        todo!()
+    }
+
+    pub fn iter(&self) {
+        todo!()
+    }
+
+    pub fn iter_mut(&mut self) {
+        todo!()
+    }
 }
 
 impl<T> Index<usize> for SparseSet<T> {
@@ -562,6 +605,341 @@ impl<T> AsMut<[T]> for SparseSet<T> {
 
 // TODO `FromIterator`, `IntoIterator`, `Extend`
 
+pub struct Keys<'a, T> {
+    keys: slice::Iter<'a, usize>,
+    phantom: PhantomData<&'a T>,
+}
+
+impl<'a, T> Keys<'a, T> {
+    pub fn as_slice(&self) -> &'a [usize] {
+        let Self { keys, .. } = self;
+        keys.as_slice()
+    }
+}
+
+impl<'a, T> Debug for Keys<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let keys = &self.as_slice();
+        f.debug_tuple("Keys").field(keys).finish()
+    }
+}
+
+impl<'a, T> Default for Keys<'a, T> {
+    fn default() -> Self {
+        let keys = Default::default();
+        let phantom = Default::default();
+        Self { keys, phantom }
+    }
+}
+
+impl<'a, T> Clone for Keys<'a, T> {
+    fn clone(&self) -> Self {
+        let Self { keys, phantom } = self;
+
+        let keys = keys.clone();
+        let phantom = *phantom;
+        Self { keys, phantom }
+    }
+}
+
+impl<'a, T> AsRef<[usize]> for Keys<'a, T> {
+    fn as_ref(&self) -> &[usize] {
+        self.as_slice()
+    }
+}
+
+impl<'a, T> Iterator for Keys<'a, T> {
+    type Item = &'a usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { keys, .. } = self;
+        keys.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { keys, .. } = self;
+        keys.size_hint()
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { keys, .. } = self;
+        keys.count()
+    }
+
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { keys, .. } = self;
+        keys.last()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { keys, .. } = self;
+        keys.nth(n)
+    }
+
+    fn for_each<F>(self, f: F)
+    where
+        Self: Sized,
+        F: FnMut(Self::Item),
+    {
+        let Self { keys, .. } = self;
+        keys.for_each(f)
+    }
+
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self { keys, .. } = self;
+        keys.fold(init, f)
+    }
+
+    fn all<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.all(f)
+    }
+
+    fn any<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.any(f)
+    }
+
+    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
+    where
+        Self: Sized,
+        P: FnMut(&Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.find(predicate)
+    }
+
+    fn find_map<B, F>(&mut self, f: F) -> Option<B>
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> Option<B>,
+    {
+        let Self { keys, .. } = self;
+        keys.find_map(f)
+    }
+
+    fn position<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.position(predicate)
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for Keys<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { keys, .. } = self;
+        keys.next_back()
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { keys, .. } = self;
+        keys.nth_back(n)
+    }
+}
+
+impl<'a, T> ExactSizeIterator for Keys<'a, T> {
+    fn len(&self) -> usize {
+        let Self { keys, .. } = self;
+        keys.len()
+    }
+}
+
+impl<'a, T> FusedIterator for Keys<'a, T> {}
+
+pub struct IntoKeys<T> {
+    keys: vec::IntoIter<usize>,
+    phantom: PhantomData<T>,
+}
+
+impl<T> IntoKeys<T> {
+    pub fn as_slice(&self) -> &[usize] {
+        let Self { keys, .. } = self;
+        keys.as_slice()
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [usize] {
+        let Self { keys, .. } = self;
+        keys.as_mut_slice()
+    }
+}
+
+impl<T> Debug for IntoKeys<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let keys = &self.as_slice();
+        f.debug_tuple("IntoKeys").field(keys).finish()
+    }
+}
+
+impl<T> Default for IntoKeys<T> {
+    fn default() -> Self {
+        let keys = Default::default();
+        let phantom = Default::default();
+        Self { keys, phantom }
+    }
+}
+
+impl<T> Clone for IntoKeys<T> {
+    fn clone(&self) -> Self {
+        let Self { keys, phantom } = self;
+
+        let keys = keys.clone();
+        let phantom = *phantom;
+        Self { keys, phantom }
+    }
+}
+
+impl<T> AsRef<[usize]> for IntoKeys<T> {
+    fn as_ref(&self) -> &[usize] {
+        self.as_slice()
+    }
+}
+
+impl<T> AsMut<[usize]> for IntoKeys<T> {
+    fn as_mut(&mut self) -> &mut [usize] {
+        self.as_mut_slice()
+    }
+}
+
+impl<T> Iterator for IntoKeys<T> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { keys, .. } = self;
+        keys.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { keys, .. } = self;
+        keys.size_hint()
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { keys, .. } = self;
+        keys.count()
+    }
+
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { keys, .. } = self;
+        keys.last()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { keys, .. } = self;
+        keys.nth(n)
+    }
+
+    fn for_each<F>(self, f: F)
+    where
+        Self: Sized,
+        F: FnMut(Self::Item),
+    {
+        let Self { keys, .. } = self;
+        keys.for_each(f)
+    }
+
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self { keys, .. } = self;
+        keys.fold(init, f)
+    }
+
+    fn all<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.all(f)
+    }
+
+    fn any<F>(&mut self, f: F) -> bool
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.any(f)
+    }
+
+    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
+    where
+        Self: Sized,
+        P: FnMut(&Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.find(predicate)
+    }
+
+    fn find_map<B, F>(&mut self, f: F) -> Option<B>
+    where
+        Self: Sized,
+        F: FnMut(Self::Item) -> Option<B>,
+    {
+        let Self { keys, .. } = self;
+        keys.find_map(f)
+    }
+
+    fn position<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.position(predicate)
+    }
+}
+
+impl<T> DoubleEndedIterator for IntoKeys<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { keys, .. } = self;
+        keys.next_back()
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { keys, .. } = self;
+        keys.nth_back(n)
+    }
+}
+
+impl<T> ExactSizeIterator for IntoKeys<T> {
+    fn len(&self) -> usize {
+        let Self { keys, .. } = self;
+        keys.len()
+    }
+}
+
+impl<T> FusedIterator for IntoKeys<T> {}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Not;
@@ -580,6 +958,24 @@ mod tests {
         assert!(sparse_set.is_empty());
         assert_eq!(sparse_set.dense_capacity(), 10);
         assert_eq!(sparse_set.sparse_capacity(), 10);
+    }
+
+    #[test]
+    fn empty_keys() {
+        let sparse_set = SparseSet::<i32>::new();
+        let keys = sparse_set.keys();
+
+        assert_eq!(keys.len(), 0);
+        assert_eq!(keys.as_slice(), &[]);
+    }
+
+    #[test]
+    fn empty_into_keys() {
+        let sparse_set = SparseSet::<i32>::new();
+        let keys = sparse_set.into_keys();
+
+        assert_eq!(keys.len(), 0);
+        assert_eq!(keys.as_slice(), &[]);
     }
 
     #[test]
@@ -708,6 +1104,26 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert!(sparse_set.contains_key(0));
+    }
+
+    #[test]
+    fn one_item_keys() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(0, 42);
+
+        let keys = sparse_set.keys();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys.as_slice(), &[0]);
+    }
+
+    #[test]
+    fn one_item_into_keys() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(0, 42);
+
+        let keys = sparse_set.into_keys();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys.as_slice(), &[0]);
     }
 
     #[test]
@@ -922,6 +1338,30 @@ mod tests {
         assert!(sparse_set.contains_key(0));
         assert!(sparse_set.contains_key(1).not());
         assert!(sparse_set.contains_key(2));
+    }
+
+    #[test]
+    fn three_items_keys() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let keys = sparse_set.keys();
+        assert_eq!(keys.len(), 3);
+        assert_eq!(keys.as_slice(), &[2, 1, 5]);
+    }
+
+    #[test]
+    fn three_items_into_keys() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let keys = sparse_set.into_keys();
+        assert_eq!(keys.len(), 3);
+        assert_eq!(keys.as_slice(), &[2, 1, 5]);
     }
 
     #[test]

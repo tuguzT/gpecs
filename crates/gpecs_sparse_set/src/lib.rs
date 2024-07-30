@@ -7,7 +7,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::TryReserveError, vec::Vec};
+use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
     mem::{replace, swap},
     ops::{Index, IndexMut},
@@ -330,9 +330,19 @@ impl<T> SparseSet<T> {
         dense_values.as_mut_slice()
     }
 
-    pub fn as_keys_slice(&self) -> &[usize] {
-        let Self { dense_keys, .. } = self;
-        dense_keys.as_slice()
+    pub fn into_boxed_slice(self) -> Box<[T]> {
+        let Self { dense_values, .. } = self;
+        dense_values.into_boxed_slice()
+    }
+
+    pub fn as_ptr(&self) -> *const T {
+        let Self { dense_values, .. } = self;
+        dense_values.as_ptr()
+    }
+
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        let Self { dense_values, .. } = self;
+        dense_values.as_mut_ptr()
     }
 
     pub fn insert(&mut self, key: usize, value: T) -> Option<T> {
@@ -346,6 +356,7 @@ impl<T> SparseSet<T> {
             sparse.resize(key + 1, SparseEntry::Vacant);
         }
 
+        let sparse = sparse.as_mut_slice();
         if let SparseEntry::Occupied { dense_index } = sparse[key] {
             let entry_value = dense_values
                 .get_mut(dense_index)
@@ -481,7 +492,7 @@ impl<T> SparseSet<T> {
         Some(value)
     }
 
-    pub fn contains(&self, key: usize) -> bool {
+    pub fn contains_key(&self, key: usize) -> bool {
         let Self {
             dense_keys, sparse, ..
         } = self;
@@ -579,7 +590,7 @@ mod tests {
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
-        assert!(sparse_set.contains(0));
+        assert!(sparse_set.contains_key(0));
     }
 
     #[test]
@@ -590,7 +601,7 @@ mod tests {
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
-        assert!(sparse_set.contains(0));
+        assert!(sparse_set.contains_key(0));
     }
 
     #[test]
@@ -601,7 +612,7 @@ mod tests {
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&43));
-        assert!(sparse_set.contains(0));
+        assert!(sparse_set.contains_key(0));
     }
 
     #[test]
@@ -612,7 +623,7 @@ mod tests {
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&43));
-        assert!(sparse_set.contains(0));
+        assert!(sparse_set.contains_key(0));
     }
 
     #[test]
@@ -624,14 +635,14 @@ mod tests {
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(key), Some(&value));
-        assert!(sparse_set.contains(key));
+        assert!(sparse_set.contains_key(key));
 
         let (key, value) = (6, 69);
         sparse_set.insert(key, value);
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(key), Some(&value));
-        assert!(sparse_set.contains(key));
+        assert!(sparse_set.contains_key(key));
     }
 
     #[test]
@@ -646,7 +657,7 @@ mod tests {
         assert_eq!(value, 42);
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(key), None);
-        assert!(sparse_set.contains(key).not());
+        assert!(sparse_set.contains_key(key).not());
 
         let key = 1;
         let value = sparse_set.remove(key).unwrap();
@@ -654,7 +665,7 @@ mod tests {
         assert_eq!(value, 69);
         assert_eq!(sparse_set.len(), 0);
         assert_eq!(sparse_set.get(key), None);
-        assert!(sparse_set.contains(key).not());
+        assert!(sparse_set.contains_key(key).not());
     }
 
     #[test]
@@ -667,7 +678,7 @@ mod tests {
 
         assert_eq!(sparse_set.len(), 0);
         assert_eq!(sparse_set.get(0), None);
-        assert!(sparse_set.contains(0).not());
+        assert!(sparse_set.contains_key(0).not());
     }
 
     #[test]
@@ -680,7 +691,7 @@ mod tests {
 
         assert_eq!(sparse_set.len(), 0);
         assert_eq!(sparse_set.get(0), None);
-        assert!(sparse_set.contains(0).not());
+        assert!(sparse_set.contains_key(0).not());
     }
 
     #[test]
@@ -691,12 +702,12 @@ mod tests {
         sparse_set.swap(0, 0);
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
-        assert!(sparse_set.contains(0));
+        assert!(sparse_set.contains_key(0));
 
         sparse_set.swap(0, 1);
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
-        assert!(sparse_set.contains(0));
+        assert!(sparse_set.contains_key(0));
     }
 
     #[test]
@@ -715,8 +726,8 @@ mod tests {
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), Some(&69));
-        assert!(sparse_set.contains(0));
-        assert!(sparse_set.contains(1));
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1));
     }
 
     #[test]
@@ -735,8 +746,8 @@ mod tests {
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), Some(&34));
-        assert!(sparse_set.contains(0));
-        assert!(sparse_set.contains(1));
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1));
     }
 
     #[test]
@@ -755,8 +766,8 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), None);
         assert_eq!(sparse_set.get(1), Some(&69));
-        assert!(sparse_set.contains(0).not());
-        assert!(sparse_set.contains(1));
+        assert!(sparse_set.contains_key(0).not());
+        assert!(sparse_set.contains_key(1));
     }
 
     #[test]
@@ -775,8 +786,8 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), None);
         assert_eq!(sparse_set.get(1), Some(&69));
-        assert!(sparse_set.contains(0).not());
-        assert!(sparse_set.contains(1));
+        assert!(sparse_set.contains_key(0).not());
+        assert!(sparse_set.contains_key(1));
     }
 
     #[test]
@@ -795,8 +806,8 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), None);
-        assert!(sparse_set.contains(0));
-        assert!(sparse_set.contains(1).not());
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1).not());
     }
 
     #[test]
@@ -815,8 +826,8 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), None);
-        assert!(sparse_set.contains(0));
-        assert!(sparse_set.contains(1).not());
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1).not());
     }
 
     #[test]
@@ -832,8 +843,8 @@ mod tests {
         sparse_set.insert(0, 34);
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), Some(&69));
-        assert!(sparse_set.contains(0));
-        assert!(sparse_set.contains(1));
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1));
     }
 
     #[test]
@@ -849,8 +860,8 @@ mod tests {
         sparse_set.insert(0, 34);
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), Some(&69));
-        assert!(sparse_set.contains(0));
-        assert!(sparse_set.contains(1));
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1));
     }
 
     #[test]
@@ -889,9 +900,9 @@ mod tests {
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), None);
         assert_eq!(sparse_set.get(2), Some(&69));
-        assert!(sparse_set.contains(0));
-        assert!(sparse_set.contains(1).not());
-        assert!(sparse_set.contains(2));
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1).not());
+        assert!(sparse_set.contains_key(2));
     }
 
     #[test]
@@ -908,9 +919,9 @@ mod tests {
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), None);
         assert_eq!(sparse_set.get(2), Some(&69));
-        assert!(sparse_set.contains(0));
-        assert!(sparse_set.contains(1).not());
-        assert!(sparse_set.contains(2));
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1).not());
+        assert!(sparse_set.contains_key(2));
     }
 
     #[test]
@@ -944,7 +955,7 @@ mod tests {
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some(&value));
-        assert!(sparse_set.contains(key));
+        assert!(sparse_set.contains_key(key));
 
         let key = 2;
         let value = 1;
@@ -952,7 +963,7 @@ mod tests {
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some(&value));
-        assert!(sparse_set.contains(key));
+        assert!(sparse_set.contains_key(key));
 
         let key = 4;
         let value = 10;
@@ -960,7 +971,7 @@ mod tests {
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some(&value));
-        assert!(sparse_set.contains(key));
+        assert!(sparse_set.contains_key(key));
     }
 
     #[test]
@@ -994,7 +1005,7 @@ mod tests {
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some(&value));
-        assert!(sparse_set.contains(key));
+        assert!(sparse_set.contains_key(key));
 
         let key = 2;
         let value = 1;
@@ -1002,7 +1013,7 @@ mod tests {
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some(&value));
-        assert!(sparse_set.contains(key));
+        assert!(sparse_set.contains_key(key));
 
         let key = 4;
         let value = 10;
@@ -1010,6 +1021,6 @@ mod tests {
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some(&value));
-        assert!(sparse_set.contains(key));
+        assert!(sparse_set.contains_key(key));
     }
 }

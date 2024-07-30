@@ -753,6 +753,15 @@ impl<'a, T> Iterator for Keys<'a, T> {
         let Self { keys, .. } = self;
         keys.position(predicate)
     }
+
+    fn rposition<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.rposition(predicate)
+    }
 }
 
 impl<'a, T> DoubleEndedIterator for Keys<'a, T> {
@@ -926,6 +935,15 @@ impl<T> Iterator for IntoKeys<T> {
         let Self { keys, .. } = self;
         keys.position(predicate)
     }
+
+    fn rposition<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { keys, .. } = self;
+        keys.rposition(predicate)
+    }
 }
 
 impl<T> DoubleEndedIterator for IntoKeys<T> {
@@ -1072,6 +1090,15 @@ impl<'a, T> Iterator for Values<'a, T> {
     {
         let Self { values } = self;
         values.position(predicate)
+    }
+
+    fn rposition<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.rposition(predicate)
     }
 }
 
@@ -1224,6 +1251,15 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
     {
         let Self { values } = self;
         values.position(predicate)
+    }
+
+    fn rposition<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.rposition(predicate)
     }
 }
 
@@ -1382,6 +1418,15 @@ impl<T> Iterator for IntoValues<T> {
     {
         let Self { values } = self;
         values.position(predicate)
+    }
+
+    fn rposition<P>(&mut self, predicate: P) -> Option<usize>
+    where
+        Self: Sized,
+        P: FnMut(Self::Item) -> bool,
+    {
+        let Self { values } = self;
+        values.rposition(predicate)
     }
 }
 

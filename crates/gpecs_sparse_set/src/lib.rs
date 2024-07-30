@@ -860,28 +860,6 @@ impl<T> Iterator for IntoKeys<T> {
         keys.count()
     }
 
-    fn last(self) -> Option<Self::Item>
-    where
-        Self: Sized,
-    {
-        let Self { keys, .. } = self;
-        keys.last()
-    }
-
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { keys, .. } = self;
-        keys.nth(n)
-    }
-
-    fn for_each<F>(self, f: F)
-    where
-        Self: Sized,
-        F: FnMut(Self::Item),
-    {
-        let Self { keys, .. } = self;
-        keys.for_each(f)
-    }
-
     fn fold<B, F>(self, init: B, f: F) -> B
     where
         Self: Sized,
@@ -890,60 +868,6 @@ impl<T> Iterator for IntoKeys<T> {
         let Self { keys, .. } = self;
         keys.fold(init, f)
     }
-
-    fn all<F>(&mut self, f: F) -> bool
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> bool,
-    {
-        let Self { keys, .. } = self;
-        keys.all(f)
-    }
-
-    fn any<F>(&mut self, f: F) -> bool
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> bool,
-    {
-        let Self { keys, .. } = self;
-        keys.any(f)
-    }
-
-    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        Self: Sized,
-        P: FnMut(&Self::Item) -> bool,
-    {
-        let Self { keys, .. } = self;
-        keys.find(predicate)
-    }
-
-    fn find_map<B, F>(&mut self, f: F) -> Option<B>
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> Option<B>,
-    {
-        let Self { keys, .. } = self;
-        keys.find_map(f)
-    }
-
-    fn position<P>(&mut self, predicate: P) -> Option<usize>
-    where
-        Self: Sized,
-        P: FnMut(Self::Item) -> bool,
-    {
-        let Self { keys, .. } = self;
-        keys.position(predicate)
-    }
-
-    fn rposition<P>(&mut self, predicate: P) -> Option<usize>
-    where
-        Self: Sized,
-        P: FnMut(Self::Item) -> bool,
-    {
-        let Self { keys, .. } = self;
-        keys.rposition(predicate)
-    }
 }
 
 impl<T> DoubleEndedIterator for IntoKeys<T> {
@@ -951,19 +875,9 @@ impl<T> DoubleEndedIterator for IntoKeys<T> {
         let Self { keys, .. } = self;
         keys.next_back()
     }
-
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { keys, .. } = self;
-        keys.nth_back(n)
-    }
 }
 
-impl<T> ExactSizeIterator for IntoKeys<T> {
-    fn len(&self) -> usize {
-        let Self { keys, .. } = self;
-        keys.len()
-    }
-}
+impl<T> ExactSizeIterator for IntoKeys<T> {}
 
 impl<T> FusedIterator for IntoKeys<T> {}
 
@@ -1344,28 +1258,6 @@ impl<T> Iterator for IntoValues<T> {
         values.count()
     }
 
-    fn last(self) -> Option<Self::Item>
-    where
-        Self: Sized,
-    {
-        let Self { values } = self;
-        values.last()
-    }
-
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { values } = self;
-        values.nth(n)
-    }
-
-    fn for_each<F>(self, f: F)
-    where
-        Self: Sized,
-        F: FnMut(Self::Item),
-    {
-        let Self { values } = self;
-        values.for_each(f)
-    }
-
     fn fold<B, F>(self, init: B, f: F) -> B
     where
         Self: Sized,
@@ -1374,60 +1266,6 @@ impl<T> Iterator for IntoValues<T> {
         let Self { values } = self;
         values.fold(init, f)
     }
-
-    fn all<F>(&mut self, f: F) -> bool
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> bool,
-    {
-        let Self { values } = self;
-        values.all(f)
-    }
-
-    fn any<F>(&mut self, f: F) -> bool
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> bool,
-    {
-        let Self { values } = self;
-        values.any(f)
-    }
-
-    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        Self: Sized,
-        P: FnMut(&Self::Item) -> bool,
-    {
-        let Self { values } = self;
-        values.find(predicate)
-    }
-
-    fn find_map<B, F>(&mut self, f: F) -> Option<B>
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> Option<B>,
-    {
-        let Self { values } = self;
-        values.find_map(f)
-    }
-
-    fn position<P>(&mut self, predicate: P) -> Option<usize>
-    where
-        Self: Sized,
-        P: FnMut(Self::Item) -> bool,
-    {
-        let Self { values } = self;
-        values.position(predicate)
-    }
-
-    fn rposition<P>(&mut self, predicate: P) -> Option<usize>
-    where
-        Self: Sized,
-        P: FnMut(Self::Item) -> bool,
-    {
-        let Self { values } = self;
-        values.rposition(predicate)
-    }
 }
 
 impl<T> DoubleEndedIterator for IntoValues<T> {
@@ -1435,19 +1273,9 @@ impl<T> DoubleEndedIterator for IntoValues<T> {
         let Self { values } = self;
         values.next_back()
     }
-
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { values } = self;
-        values.nth_back(n)
-    }
 }
 
-impl<T> ExactSizeIterator for IntoValues<T> {
-    fn len(&self) -> usize {
-        let Self { values } = self;
-        values.len()
-    }
-}
+impl<T> ExactSizeIterator for IntoValues<T> {}
 
 impl<T> FusedIterator for IntoValues<T> {}
 

@@ -655,10 +655,12 @@ impl<T> IntoIterator for SparseSet<T> {
 impl<T> FromIterator<(usize, T)> for SparseSet<T> {
     fn from_iter<I: IntoIterator<Item = (usize, T)>>(iter: I) -> Self {
         let iter = iter.into_iter();
-        let (lower, upper) = iter.size_hint();
-        let capacity = upper.unwrap_or(lower);
+        let iter_len = {
+            let (lower, upper) = iter.size_hint();
+            upper.unwrap_or(lower)
+        };
 
-        let mut me = Self::with_capacity(capacity, capacity);
+        let mut me = Self::with_capacity(iter_len, iter_len);
         for (key, value) in iter {
             me.insert(key, value);
         }
@@ -683,7 +685,39 @@ impl<T> FromIterator<T> for SparseSet<T> {
     }
 }
 
-// TODO `Extend`
+impl<T> Extend<(usize, T)> for SparseSet<T> {
+    fn extend<I: IntoIterator<Item = (usize, T)>>(&mut self, iter: I) {
+        let iter = iter.into_iter();
+        let iter_len = {
+            let (lower, upper) = iter.size_hint();
+            upper.unwrap_or(lower)
+        };
+        self.reserve(iter_len, iter_len);
+
+        for (key, value) in iter {
+            self.insert(key, value);
+        }
+    }
+}
+
+impl<T> Extend<T> for SparseSet<T> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        let iter = iter.into_iter();
+        let iter_len = {
+            let (lower, upper) = iter.size_hint();
+            upper.unwrap_or(lower)
+        };
+        self.reserve(iter_len, iter_len);
+
+        let mut maybe_vacant_keys = 0..self.sparse.len();
+        for value in iter {
+            let key = maybe_vacant_keys
+                .find(|&key| self.sparse[key].is_vacant())
+                .unwrap_or(self.sparse.len());
+            self.insert(key, value);
+        }
+    }
+}
 
 pub struct Keys<'a, T> {
     keys: slice::Iter<'a, usize>,
@@ -2701,5 +2735,34 @@ mod tests {
         assert_eq!(sparse_set.get(2), Some(&69));
         assert_eq!(sparse_set.get(3), Some(&228));
         assert_eq!(sparse_set.get(4), Some(&666));
+    }
+
+    #[test]
+    fn extend_keys_values() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let keys = [3, 0, 2, 8];
+        let values = [228, 666, 42, 69];
+        sparse_set.extend(keys.into_iter().zip(values));
+
+        assert_eq!(sparse_set.keys().as_slice(), &[2, 1, 5, 3, 0, 8]);
+        assert_eq!(sparse_set.values().as_slice(), &[42, 42, 69, 228, 666, 69]);
+    }
+
+    #[test]
+    fn extend_values() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(4, 69);
+
+        let values = [228, 666, 201];
+        sparse_set.extend(values);
+
+        assert_eq!(sparse_set.keys().as_slice(), &[2, 1, 4, 0, 3, 5]);
+        assert_eq!(sparse_set.values().as_slice(), &[34, 42, 69, 228, 666, 201]);
     }
 }

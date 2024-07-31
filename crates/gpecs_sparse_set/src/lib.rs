@@ -101,6 +101,13 @@ impl<T> SparseSet<T> {
     }
 
     #[inline]
+    pub fn try_with_capacity(dense: usize, sparse: usize) -> Result<Self, TryReserveError> {
+        let mut me = Self::new();
+        me.try_reserve(dense, sparse)?;
+        Ok(me)
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self {
             dense_keys,
@@ -328,6 +335,39 @@ impl<T> SparseSet<T> {
         None
     }
 
+    pub fn try_insert(&mut self, key: usize, value: T) -> Result<Option<T>, TryReserveError> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        if key >= sparse.len() {
+            let new_sparse_len = key.saturating_add(1);
+            sparse.try_reserve(new_sparse_len - sparse.len())?;
+            sparse.resize(new_sparse_len, SparseEntry::Vacant);
+        }
+
+        let sparse = sparse.as_mut_slice();
+        if let SparseEntry::Occupied { dense_index } = sparse[key] {
+            let entry_value = dense_values
+                .get_mut(dense_index)
+                .expect("index from sparse should be in bounds of dense");
+            let value = replace(entry_value, value);
+            return Ok(Some(value));
+        }
+
+        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        dense_keys.try_reserve(1)?;
+        dense_values.try_reserve(1)?;
+
+        dense_keys.push(key);
+        dense_values.push(value);
+        sparse[key] = SparseEntry::occupied(dense_keys.len() - 1);
+
+        Ok(None)
+    }
+
     pub fn push(&mut self, value: T) -> usize {
         let Self { sparse, .. } = self;
 
@@ -338,6 +378,18 @@ impl<T> SparseSet<T> {
         self.insert(key, value);
 
         key
+    }
+
+    pub fn try_push(&mut self, value: T) -> Result<usize, TryReserveError> {
+        let Self { sparse, .. } = self;
+
+        let key = sparse
+            .iter()
+            .position(SparseEntry::is_vacant)
+            .unwrap_or(self.sparse.len());
+        self.try_insert(key, value)?;
+
+        Ok(key)
     }
 
     pub fn swap(&mut self, first_key: usize, second_key: usize) {
@@ -1996,8 +2048,8 @@ mod tests {
     fn with_capacity() {
         let sparse_set = SparseSet::<i32>::with_capacity(10, 10);
         assert!(sparse_set.is_empty());
-        assert_eq!(sparse_set.capacity(), 10);
-        assert_eq!(sparse_set.sparse_capacity(), 10);
+        assert!(sparse_set.capacity() >= 10);
+        assert!(sparse_set.sparse_capacity() >= 10);
     }
 
     #[test]

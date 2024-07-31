@@ -631,7 +631,27 @@ impl<T> AsMut<[T]> for SparseSet<T> {
     }
 }
 
-// TODO `FromIterator`, `IntoIterator`, `Extend`
+impl<'a, T> IntoIterator for &'a SparseSet<T> {
+    type Item = (&'a usize, &'a T);
+
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut SparseSet<T> {
+    type Item = (&'a usize, &'a mut T);
+
+    type IntoIter = IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+// TODO `FromIterator`, owning `IntoIterator`, `Extend`
 
 pub struct Keys<'a, T> {
     keys: slice::Iter<'a, usize>,

@@ -579,9 +579,10 @@ impl<T> SparseSet<T> {
             ..
         } = self;
 
-        debug_assert_eq!(dense_keys.len(), dense_values.len());
         let keys = dense_keys.iter();
         let values = dense_values.iter();
+        debug_assert_eq!(keys.len(), values.len());
+
         Iter { keys, values }
     }
 
@@ -592,9 +593,10 @@ impl<T> SparseSet<T> {
             ..
         } = self;
 
-        debug_assert_eq!(dense_keys.len(), dense_values.len());
         let keys = dense_keys.iter();
         let values = dense_values.iter_mut();
+        debug_assert_eq!(keys.len(), values.len());
+
         IterMut { keys, values }
     }
 }
@@ -651,7 +653,27 @@ impl<'a, T> IntoIterator for &'a mut SparseSet<T> {
     }
 }
 
-// TODO `FromIterator`, owning `IntoIterator`, `Extend`
+impl<T> IntoIterator for SparseSet<T> {
+    type Item = (usize, T);
+
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        let keys = dense_keys.into_iter();
+        let values = dense_values.into_iter();
+        debug_assert_eq!(keys.len(), values.len());
+
+        IntoIter { keys, values }
+    }
+}
+
+// TODO `FromIterator`, `Extend`
 
 pub struct Keys<'a, T> {
     keys: slice::Iter<'a, usize>,
@@ -920,9 +942,24 @@ impl<T> ExactSizeIterator for IntoKeys<T> {}
 
 impl<T> FusedIterator for IntoKeys<T> {}
 
-#[derive(Default, Clone)]
 pub struct Values<'a, T> {
     values: slice::Iter<'a, T>,
+}
+
+impl<'a, T> Clone for Values<'a, T> {
+    fn clone(&self) -> Self {
+        let Self { values } = self;
+
+        let values = values.clone();
+        Self { values }
+    }
+}
+
+impl<'a, T> Default for Values<'a, T> {
+    fn default() -> Self {
+        let values = Default::default();
+        Self { values }
+    }
 }
 
 impl<'a, T> Values<'a, T> {
@@ -1076,9 +1113,15 @@ impl<'a, T> ExactSizeIterator for Values<'a, T> {
 
 impl<'a, T> FusedIterator for Values<'a, T> {}
 
-#[derive(Default)]
 pub struct ValuesMut<'a, T> {
     values: slice::IterMut<'a, T>,
+}
+
+impl<'a, T> Default for ValuesMut<'a, T> {
+    fn default() -> Self {
+        let values = Default::default();
+        Self { values }
+    }
 }
 
 impl<'a, T> ValuesMut<'a, T> {
@@ -1237,9 +1280,16 @@ impl<'a, T> ExactSizeIterator for ValuesMut<'a, T> {
 
 impl<'a, T> FusedIterator for ValuesMut<'a, T> {}
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct IntoValues<T> {
     values: vec::IntoIter<T>,
+}
+
+impl<T> Default for IntoValues<T> {
+    fn default() -> Self {
+        let values = Default::default();
+        Self { values }
+    }
 }
 
 impl<T> IntoValues<T> {
@@ -1320,7 +1370,7 @@ impl<T> FusedIterator for IntoValues<T> {}
 
 #[inline]
 #[track_caller]
-fn unwrap_kv<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
+fn kv_to_item<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
     match (key, value) {
         (Some(key), Some(value)) => Some((key, value)),
         (None, None) => None,
@@ -1328,10 +1378,27 @@ fn unwrap_kv<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
     }
 }
 
-#[derive(Default, Clone)]
 pub struct Iter<'a, T> {
     keys: slice::Iter<'a, usize>,
     values: slice::Iter<'a, T>,
+}
+
+impl<'a, T> Clone for Iter<'a, T> {
+    fn clone(&self) -> Self {
+        let Self { keys, values } = self;
+
+        let keys = keys.clone();
+        let values = values.clone();
+        Self { keys, values }
+    }
+}
+
+impl<'a, T> Default for Iter<'a, T> {
+    fn default() -> Self {
+        let keys = Default::default();
+        let values = Default::default();
+        Self { keys, values }
+    }
 }
 
 impl<'a, T> Iter<'a, T> {
@@ -1381,7 +1448,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
         let key = keys.next();
         let value = values.next();
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -1409,7 +1476,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
         let key = keys.last();
         let value = values.last();
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
@@ -1417,7 +1484,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
         let key = keys.nth(n);
         let value = values.nth(n);
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 
     fn for_each<F>(self, mut f: F)
@@ -1437,7 +1504,7 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
 
         let key = keys.next_back();
         let value = values.next_back();
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
@@ -1445,7 +1512,7 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
 
         let key = keys.nth_back(n);
         let value = values.nth_back(n);
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 }
 
@@ -1460,10 +1527,17 @@ impl<'a, T> ExactSizeIterator for Iter<'a, T> {
 
 impl<'a, T> FusedIterator for Iter<'a, T> {}
 
-#[derive(Default)]
 pub struct IterMut<'a, T> {
     keys: slice::Iter<'a, usize>,
     values: slice::IterMut<'a, T>,
+}
+
+impl<'a, T> Default for IterMut<'a, T> {
+    fn default() -> Self {
+        let keys = Default::default();
+        let values = Default::default();
+        Self { keys, values }
+    }
 }
 
 impl<'a, T> IterMut<'a, T> {
@@ -1528,7 +1602,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
         let key = keys.next();
         let value = values.next();
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -1556,7 +1630,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
         let key = keys.last();
         let value = values.last();
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
@@ -1564,7 +1638,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
         let key = keys.nth(n);
         let value = values.nth(n);
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 
     fn for_each<F>(self, mut f: F)
@@ -1584,7 +1658,7 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
 
         let key = keys.next_back();
         let value = values.next_back();
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
@@ -1592,7 +1666,7 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
 
         let key = keys.nth_back(n);
         let value = values.nth_back(n);
-        unwrap_kv(key, value)
+        kv_to_item(key, value)
     }
 }
 
@@ -1606,6 +1680,123 @@ impl<'a, T> ExactSizeIterator for IterMut<'a, T> {
 }
 
 impl<'a, T> FusedIterator for IterMut<'a, T> {}
+
+#[derive(Clone)]
+pub struct IntoIter<T> {
+    keys: vec::IntoIter<usize>,
+    values: vec::IntoIter<T>,
+}
+
+impl<T> Default for IntoIter<T> {
+    fn default() -> Self {
+        let keys = Default::default();
+        let values = Default::default();
+        Self { keys, values }
+    }
+}
+
+impl<T> IntoIter<T> {
+    pub fn as_keys_slice(&self) -> &[usize] {
+        let Self { keys, .. } = self;
+        keys.as_slice()
+    }
+
+    pub fn as_keys_mut_slice(&mut self) -> &mut [usize] {
+        let Self { keys, .. } = self;
+        keys.as_mut_slice()
+    }
+
+    pub fn as_values_slice(&self) -> &[T] {
+        let Self { values, .. } = self;
+        values.as_slice()
+    }
+
+    pub fn as_values_mut_slice(&mut self) -> &mut [T] {
+        let Self { values, .. } = self;
+        values.as_mut_slice()
+    }
+
+    pub fn as_slices(&self) -> (&[usize], &[T]) {
+        let Self { keys, values } = self;
+        (keys.as_slice(), values.as_slice())
+    }
+
+    pub fn as_mut_slices(&mut self) -> (&mut [usize], &mut [T]) {
+        let Self { keys, values } = self;
+        (keys.as_mut_slice(), values.as_mut_slice())
+    }
+}
+
+impl<T> Debug for IntoIter<T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { keys, values } = self;
+
+        let keys = &keys.as_slice();
+        let values = &values.as_slice();
+        f.debug_struct("IntoIter")
+            .field("keys", keys)
+            .field("values", values)
+            .finish()
+    }
+}
+
+impl<T> AsRef<[T]> for IntoIter<T> {
+    fn as_ref(&self) -> &[T] {
+        self.as_values_slice()
+    }
+}
+
+impl<T> AsMut<[T]> for IntoIter<T> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self.as_values_mut_slice()
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = (usize, T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.next();
+        let value = values.next();
+        kv_to_item(key, value)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.size_hint(), values.size_hint());
+        keys.size_hint()
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.len(), values.len());
+        keys.count()
+    }
+}
+
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.next_back();
+        let value = values.next_back();
+        kv_to_item(key, value)
+    }
+}
+
+impl<T> ExactSizeIterator for IntoIter<T> {}
+
+impl<T> FusedIterator for IntoIter<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -1690,6 +1881,16 @@ mod tests {
         assert_eq!(iter_mut.len(), 0);
         assert_eq!(iter_mut.as_keys_slice(), &[]);
         assert_eq!(iter_mut.into_values_slice(), &mut []);
+    }
+
+    #[test]
+    fn empty_into_iter() {
+        let sparse_set = SparseSet::<i32>::new();
+        let into_iter = sparse_set.into_iter();
+
+        assert_eq!(into_iter.len(), 0);
+        assert_eq!(into_iter.as_keys_slice(), &[]);
+        assert_eq!(into_iter.as_values_slice(), &[]);
     }
 
     #[test]
@@ -1890,6 +2091,17 @@ mod tests {
         assert_eq!(iter_mut.len(), 1);
         assert_eq!(iter_mut.as_keys_slice(), &[0]);
         assert_eq!(iter_mut.into_values_slice(), &mut [42]);
+    }
+
+    #[test]
+    fn one_item_into_iter() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(0, 42);
+
+        let into_iter = sparse_set.into_iter();
+        assert_eq!(into_iter.len(), 1);
+        assert_eq!(into_iter.as_keys_slice(), &[0]);
+        assert_eq!(into_iter.as_values_slice(), &[42]);
     }
 
     #[test]
@@ -2190,6 +2402,19 @@ mod tests {
         assert_eq!(iter_mut.len(), 3);
         assert_eq!(iter_mut.as_keys_slice(), &[2, 1, 5]);
         assert_eq!(iter_mut.into_values_slice(), &mut [34, 42, 69]);
+    }
+
+    #[test]
+    fn three_items_into_iter() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let into_iter = sparse_set.into_iter();
+        assert_eq!(into_iter.len(), 3);
+        assert_eq!(into_iter.as_keys_slice(), &[2, 1, 5]);
+        assert_eq!(into_iter.as_values_slice(), &[34, 42, 69]);
     }
 
     #[test]

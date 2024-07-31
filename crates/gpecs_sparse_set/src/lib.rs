@@ -308,7 +308,7 @@ impl<T> SparseSet<T> {
         } = self;
 
         if key >= sparse.len() {
-            sparse.resize(key + 1, SparseEntry::Vacant);
+            sparse.resize(key.saturating_add(1), SparseEntry::Vacant);
         }
 
         let sparse = sparse.as_mut_slice();
@@ -595,6 +595,20 @@ impl<T> AsMut<[T]> for SparseSet<T> {
     }
 }
 
+impl<T> AsRef<SparseSet<T>> for SparseSet<T> {
+    #[inline]
+    fn as_ref(&self) -> &SparseSet<T> {
+        self
+    }
+}
+
+impl<T> AsMut<SparseSet<T>> for SparseSet<T> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut SparseSet<T> {
+        self
+    }
+}
+
 impl<'a, T> IntoIterator for &'a SparseSet<T> {
     type Item = (&'a usize, &'a T);
 
@@ -638,7 +652,38 @@ impl<T> IntoIterator for SparseSet<T> {
     }
 }
 
-// TODO `FromIterator`, `Extend`
+impl<T> FromIterator<(usize, T)> for SparseSet<T> {
+    fn from_iter<I: IntoIterator<Item = (usize, T)>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let (lower, upper) = iter.size_hint();
+        let capacity = upper.unwrap_or(lower);
+
+        let mut me = Self::with_capacity(capacity, capacity);
+        for (key, value) in iter {
+            me.insert(key, value);
+        }
+
+        me
+    }
+}
+
+impl<T> FromIterator<T> for SparseSet<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let dense_values: Vec<_> = iter.into_iter().collect();
+
+        let len = dense_values.len();
+        let dense_keys = (0..len).collect();
+        let sparse = (0..len).map(SparseEntry::occupied).collect();
+
+        Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        }
+    }
+}
+
+// TODO `Extend`
 
 pub struct Keys<'a, T> {
     keys: slice::Iter<'a, usize>,
@@ -2606,5 +2651,55 @@ mod tests {
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some(&value));
         assert!(sparse_set.contains_key(key));
+    }
+
+    #[test]
+    fn from_keys_values_iter() {
+        let keys = [3, 10, 5, 10, 1, usize::MAX];
+        let values = [34, 42, 69, 228, 666];
+
+        let sparse_set: SparseSet<i32> = keys.into_iter().zip(values).collect();
+        assert_eq!(sparse_set.len(), 4);
+        assert_eq!(sparse_set.keys().as_slice(), &[3, 10, 5, 1]);
+        assert_eq!(sparse_set.values().as_slice(), &[34, 228, 69, 666]);
+
+        assert_eq!(sparse_set.get(3), Some(&34));
+        assert_eq!(sparse_set.get(10), Some(&228));
+        assert_eq!(sparse_set.get(5), Some(&69));
+        assert_eq!(sparse_set.get(1), Some(&666));
+    }
+
+    #[test]
+    #[should_panic(expected = "capacity overflow")]
+    fn from_keys_values_iter_too_large_key() {
+        let keys = [3, 10, 5, 10, 1, usize::MAX];
+        let values = [34, 42, 69, 228, 666, 999];
+
+        let sparse_set: SparseSet<i32> = keys.into_iter().zip(values).collect();
+        assert_eq!(sparse_set.len(), 4);
+        assert_eq!(sparse_set.keys().as_slice(), &[3, 10, 5, 1, usize::MAX]);
+        assert_eq!(sparse_set.values().as_slice(), &[34, 228, 69, 666, 999]);
+
+        assert_eq!(sparse_set.get(3), Some(&34));
+        assert_eq!(sparse_set.get(10), Some(&228));
+        assert_eq!(sparse_set.get(5), Some(&69));
+        assert_eq!(sparse_set.get(1), Some(&666));
+        assert_eq!(sparse_set.get(usize::MAX), Some(&999));
+    }
+
+    #[test]
+    fn from_values_iter() {
+        let values = [34, 42, 69, 228, 666];
+        let sparse_set: SparseSet<i32> = values.into_iter().collect();
+
+        assert_eq!(sparse_set.len(), 5);
+        assert_eq!(sparse_set.keys().as_slice(), &[0, 1, 2, 3, 4]);
+        assert_eq!(sparse_set.values().as_slice(), &[34, 42, 69, 228, 666]);
+
+        assert_eq!(sparse_set.get(0), Some(&34));
+        assert_eq!(sparse_set.get(1), Some(&42));
+        assert_eq!(sparse_set.get(2), Some(&69));
+        assert_eq!(sparse_set.get(3), Some(&228));
+        assert_eq!(sparse_set.get(4), Some(&666));
     }
 }

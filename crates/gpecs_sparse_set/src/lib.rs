@@ -133,14 +133,11 @@ impl<T> SparseSet<T> {
         sparse.len()
     }
 
-    pub fn capacity(&self) -> usize {
-        let dense_capacity = self.dense_capacity();
-        let sparse_capacity = self.sparse_capacity();
-
-        usize::min(dense_capacity, sparse_capacity)
+    pub fn sparse_is_empty(&self) -> bool {
+        self.sparse_len() == 0
     }
 
-    pub fn dense_capacity(&self) -> usize {
+    pub fn capacity(&self) -> usize {
         let Self {
             dense_keys,
             dense_values,
@@ -373,6 +370,7 @@ impl<T> SparseSet<T> {
             return Some(value);
         }
 
+        debug_assert_eq!(dense_keys.len(), dense_values.len());
         dense_keys.push(key);
         dense_values.push(value);
         sparse[key] = SparseEntry::occupied(dense_keys.len() - 1);
@@ -391,9 +389,10 @@ impl<T> SparseSet<T> {
             return;
         }
 
-        let first_index = sparse.get(first_key).and_then(SparseEntry::dense_index);
-        let second_index = sparse.get(second_key).and_then(SparseEntry::dense_index);
-        let (Some(first_index), Some(second_index)) = (first_index, second_index) else {
+        let Some(first_index) = sparse.get(first_key).and_then(SparseEntry::dense_index) else {
+            return;
+        };
+        let Some(second_index) = sparse.get(second_key).and_then(SparseEntry::dense_index) else {
             return;
         };
 
@@ -415,6 +414,7 @@ impl<T> SparseSet<T> {
             "index from sparse should be in bounds of dense",
         );
 
+        debug_assert_eq!(dense_keys.len(), dense_values.len());
         let value = dense_values.swap_remove(dense_index);
         let dense_key = dense_keys.swap_remove(dense_index);
         debug_assert_eq!(key, dense_key);
@@ -438,6 +438,7 @@ impl<T> SparseSet<T> {
             "index from sparse should be in bounds of dense",
         );
 
+        debug_assert_eq!(dense_keys.len(), dense_values.len());
         let value = dense_values.remove(dense_index);
         let dense_key = dense_keys.remove(dense_index);
         debug_assert_eq!(key, dense_key);
@@ -571,12 +572,30 @@ impl<T> SparseSet<T> {
         IntoValues { values }
     }
 
-    pub fn iter(&self) {
-        todo!()
+    pub fn iter(&self) -> Iter<'_, T> {
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        let keys = dense_keys.iter();
+        let values = dense_values.iter();
+        Iter { keys, values }
     }
 
-    pub fn iter_mut(&mut self) {
-        todo!()
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        let keys = dense_keys.iter();
+        let values = dense_values.iter_mut();
+        IterMut { keys, values }
     }
 }
 
@@ -1279,6 +1298,295 @@ impl<T> ExactSizeIterator for IntoValues<T> {}
 
 impl<T> FusedIterator for IntoValues<T> {}
 
+#[inline]
+#[track_caller]
+fn unwrap_kv<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
+    match (key, value) {
+        (Some(key), Some(value)) => Some((key, value)),
+        (None, None) => None,
+        _ => panic!("keys and values should have the same length"),
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct Iter<'a, T> {
+    keys: slice::Iter<'a, usize>,
+    values: slice::Iter<'a, T>,
+}
+
+impl<'a, T> Iter<'a, T> {
+    pub fn as_keys_slice(&self) -> &'a [usize] {
+        let Self { keys, .. } = self;
+        keys.as_slice()
+    }
+
+    pub fn as_values_slice(&self) -> &'a [T] {
+        let Self { values, .. } = self;
+        values.as_slice()
+    }
+
+    pub fn as_slices(&self) -> (&'a [usize], &'a [T]) {
+        let Self { keys, values } = self;
+        (keys.as_slice(), values.as_slice())
+    }
+}
+
+impl<'a, T> Debug for Iter<'a, T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { keys, values } = self;
+
+        let keys = &keys.as_slice();
+        let values = &values.as_slice();
+        f.debug_struct("Iter")
+            .field("keys", keys)
+            .field("values", values)
+            .finish()
+    }
+}
+
+impl<'a, T> AsRef<[T]> for Iter<'a, T> {
+    fn as_ref(&self) -> &[T] {
+        self.as_values_slice()
+    }
+}
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = (&'a usize, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.next();
+        let value = values.next();
+        unwrap_kv(key, value)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.size_hint(), values.size_hint());
+        keys.size_hint()
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.len(), values.len());
+        keys.count()
+    }
+
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { keys, values } = self;
+
+        let key = keys.last();
+        let value = values.last();
+        unwrap_kv(key, value)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.nth(n);
+        let value = values.nth(n);
+        unwrap_kv(key, value)
+    }
+
+    fn for_each<F>(self, mut f: F)
+    where
+        Self: Sized,
+        F: FnMut(Self::Item),
+    {
+        for x in self {
+            f(x);
+        }
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.next_back();
+        let value = values.next_back();
+        unwrap_kv(key, value)
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.nth_back(n);
+        let value = values.nth_back(n);
+        unwrap_kv(key, value)
+    }
+}
+
+impl<'a, T> ExactSizeIterator for Iter<'a, T> {
+    fn len(&self) -> usize {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.len(), values.len());
+        keys.len()
+    }
+}
+
+impl<'a, T> FusedIterator for Iter<'a, T> {}
+
+#[derive(Default)]
+pub struct IterMut<'a, T> {
+    keys: slice::Iter<'a, usize>,
+    values: slice::IterMut<'a, T>,
+}
+
+impl<'a, T> IterMut<'a, T> {
+    pub fn into_keys_slice(self) -> &'a [usize] {
+        let Self { keys, .. } = self;
+        keys.as_slice()
+    }
+
+    pub fn as_keys_slice(&self) -> &'a [usize] {
+        let Self { keys, .. } = self;
+        keys.as_slice()
+    }
+
+    pub fn into_values_slice(self) -> &'a mut [T] {
+        let Self { values, .. } = self;
+        values.into_slice()
+    }
+
+    pub fn as_values_slice(&self) -> &[T] {
+        let Self { values, .. } = self;
+        values.as_slice()
+    }
+
+    pub fn into_slices(self) -> (&'a [usize], &'a mut [T]) {
+        let Self { keys, values } = self;
+        (keys.as_slice(), values.into_slice())
+    }
+
+    pub fn as_slices(&self) -> (&'a [usize], &[T]) {
+        let Self { keys, values } = self;
+        (keys.as_slice(), values.as_slice())
+    }
+}
+
+impl<'a, T> Debug for IterMut<'a, T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { keys, values } = self;
+
+        let keys = &keys.as_slice();
+        let values = &values.as_slice();
+        f.debug_struct("IterMut")
+            .field("keys", keys)
+            .field("values", values)
+            .finish()
+    }
+}
+
+impl<'a, T> AsRef<[T]> for IterMut<'a, T> {
+    fn as_ref(&self) -> &[T] {
+        self.as_values_slice()
+    }
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = (&'a usize, &'a mut T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.next();
+        let value = values.next();
+        unwrap_kv(key, value)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.size_hint(), values.size_hint());
+        keys.size_hint()
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.len(), values.len());
+        keys.count()
+    }
+
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { keys, values } = self;
+
+        let key = keys.last();
+        let value = values.last();
+        unwrap_kv(key, value)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.nth(n);
+        let value = values.nth(n);
+        unwrap_kv(key, value)
+    }
+
+    fn for_each<F>(self, mut f: F)
+    where
+        Self: Sized,
+        F: FnMut(Self::Item),
+    {
+        for x in self {
+            f(x);
+        }
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.next_back();
+        let value = values.next_back();
+        unwrap_kv(key, value)
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.nth_back(n);
+        let value = values.nth_back(n);
+        unwrap_kv(key, value)
+    }
+}
+
+impl<'a, T> ExactSizeIterator for IterMut<'a, T> {
+    fn len(&self) -> usize {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.len(), values.len());
+        keys.len()
+    }
+}
+
+impl<'a, T> FusedIterator for IterMut<'a, T> {}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Not;
@@ -1295,7 +1603,7 @@ mod tests {
     fn with_capacity() {
         let sparse_set = SparseSet::<i32>::with_capacity_all(10);
         assert!(sparse_set.is_empty());
-        assert_eq!(sparse_set.dense_capacity(), 10);
+        assert_eq!(sparse_set.capacity(), 10);
         assert_eq!(sparse_set.sparse_capacity(), 10);
     }
 
@@ -1342,6 +1650,26 @@ mod tests {
         let values = sparse_set.into_values();
         assert_eq!(values.len(), 0);
         assert_eq!(values.as_slice(), &[]);
+    }
+
+    #[test]
+    fn empty_iter() {
+        let sparse_set = SparseSet::<i32>::new();
+
+        let iter = sparse_set.iter();
+        assert_eq!(iter.len(), 0);
+        assert_eq!(iter.as_keys_slice(), &[]);
+        assert_eq!(iter.as_values_slice(), &[]);
+    }
+
+    #[test]
+    fn empty_iter_mut() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        let iter_mut = sparse_set.iter_mut();
+
+        assert_eq!(iter_mut.len(), 0);
+        assert_eq!(iter_mut.as_keys_slice(), &[]);
+        assert_eq!(iter_mut.into_values_slice(), &mut []);
     }
 
     #[test]
@@ -1520,6 +1848,28 @@ mod tests {
         let values = sparse_set.into_values();
         assert_eq!(values.len(), 1);
         assert_eq!(values.as_slice(), &[42]);
+    }
+
+    #[test]
+    fn one_item_iter() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(0, 42);
+
+        let iter = sparse_set.iter();
+        assert_eq!(iter.len(), 1);
+        assert_eq!(iter.as_keys_slice(), &[0]);
+        assert_eq!(iter.as_values_slice(), &[42]);
+    }
+
+    #[test]
+    fn one_item_iter_mut() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(0, 42);
+
+        let iter_mut = sparse_set.iter_mut();
+        assert_eq!(iter_mut.len(), 1);
+        assert_eq!(iter_mut.as_keys_slice(), &[0]);
+        assert_eq!(iter_mut.into_values_slice(), &mut [42]);
     }
 
     #[test]
@@ -1794,6 +2144,32 @@ mod tests {
         let values = sparse_set.into_values();
         assert_eq!(values.len(), 3);
         assert_eq!(values.as_slice(), &[34, 42, 69]);
+    }
+
+    #[test]
+    fn three_items_iter() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let iter = sparse_set.iter();
+        assert_eq!(iter.len(), 3);
+        assert_eq!(iter.as_keys_slice(), &[2, 1, 5]);
+        assert_eq!(iter.as_values_slice(), &[34, 42, 69]);
+    }
+
+    #[test]
+    fn three_items_iter_mut() {
+        let mut sparse_set = SparseSet::<i32>::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let iter_mut = sparse_set.iter_mut();
+        assert_eq!(iter_mut.len(), 3);
+        assert_eq!(iter_mut.as_keys_slice(), &[2, 1, 5]);
+        assert_eq!(iter_mut.into_values_slice(), &mut [34, 42, 69]);
     }
 
     #[test]

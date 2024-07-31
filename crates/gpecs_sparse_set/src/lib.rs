@@ -328,6 +328,18 @@ impl<T> SparseSet<T> {
         None
     }
 
+    pub fn push(&mut self, value: T) -> usize {
+        let Self { sparse, .. } = self;
+
+        let key = sparse
+            .iter()
+            .position(SparseEntry::is_vacant)
+            .unwrap_or(self.sparse.len());
+        self.insert(key, value);
+
+        key
+    }
+
     pub fn swap(&mut self, first_key: usize, second_key: usize) {
         let Self {
             dense_values,
@@ -2150,6 +2162,17 @@ mod tests {
     }
 
     #[test]
+    fn empty_push() {
+        let mut sparse_set = SparseSet::new();
+
+        let key = sparse_set.push(42);
+        assert_eq!(key, 0);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(key), Some(&42));
+        assert!(sparse_set.contains_key(key));
+    }
+
+    #[test]
     fn one_item_remove_one() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
@@ -2422,6 +2445,44 @@ mod tests {
         assert_eq!(sparse_set.get(0), None);
 
         sparse_set.insert(0, 34);
+        assert_eq!(sparse_set.get(0), Some(&34));
+        assert_eq!(sparse_set.get(1), Some(&69));
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1));
+    }
+
+    #[test]
+    fn two_items_remove_one_push_one() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(0, 42);
+        sparse_set.insert(1, 69);
+
+        let removed = sparse_set.remove(0);
+        assert_eq!(removed, Some(42));
+        assert_eq!(sparse_set.get(0), None);
+
+        let key = sparse_set.push(34);
+        assert_eq!(key, 0);
+
+        assert_eq!(sparse_set.get(0), Some(&34));
+        assert_eq!(sparse_set.get(1), Some(&69));
+        assert!(sparse_set.contains_key(0));
+        assert!(sparse_set.contains_key(1));
+    }
+
+    #[test]
+    fn two_items_swap_remove_one_push_one() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(0, 42);
+        sparse_set.insert(1, 69);
+
+        let removed = sparse_set.swap_remove(0);
+        assert_eq!(removed, Some(42));
+        assert_eq!(sparse_set.get(0), None);
+
+        let key = sparse_set.push(34);
+        assert_eq!(key, 0);
+
         assert_eq!(sparse_set.get(0), Some(&34));
         assert_eq!(sparse_set.get(1), Some(&69));
         assert!(sparse_set.contains_key(0));

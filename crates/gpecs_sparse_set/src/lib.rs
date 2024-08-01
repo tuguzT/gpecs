@@ -36,6 +36,16 @@ fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut 
     Some(pair)
 }
 
+#[inline]
+#[track_caller]
+fn kv_to_item<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
+    match (key, value) {
+        (Some(key), Some(value)) => Some((key, value)),
+        (None, None) => None,
+        _ => panic!("keys and values should have the same length"),
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum SparseEntry {
     Occupied { dense_index: usize },
@@ -457,9 +467,9 @@ impl<T> SparseSet<T> {
         let dense_key = dense_keys.remove(dense_index);
         debug_assert_eq!(key, dense_key);
 
-        for sparse_index in dense_keys.iter().copied().skip(dense_index) {
+        for key in dense_keys.iter().copied().skip(dense_index) {
             let sparse_entry = sparse
-                .get_mut(sparse_index)
+                .get_mut(key)
                 .expect("key from dense should be in bounds of sparse");
             let dense_index = sparse_entry
                 .dense_index_mut()
@@ -469,6 +479,26 @@ impl<T> SparseSet<T> {
         sparse[key] = SparseEntry::Vacant;
 
         Some(value)
+    }
+
+    pub fn pop(&mut self) -> Option<(usize, T)> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        let key = dense_keys.pop();
+        let value = dense_values.pop();
+        let (key, value) = kv_to_item(key, value)?;
+
+        assert!(
+            key < sparse.len(),
+            "key from dense should be in bounds of sparse",
+        );
+        sparse[key] = SparseEntry::Vacant;
+
+        Some((key, value))
     }
 
     pub fn drain(&mut self) -> Drain<'_, T> {
@@ -1585,16 +1615,6 @@ impl<T> ExactSizeIterator for IntoValues<T> {}
 
 impl<T> FusedIterator for IntoValues<T> {}
 
-#[inline]
-#[track_caller]
-fn kv_to_item<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
-    match (key, value) {
-        (Some(key), Some(value)) => Some((key, value)),
-        (None, None) => None,
-        _ => panic!("keys and values should have the same length"),
-    }
-}
-
 pub struct Iter<'a, T> {
     keys: slice::Iter<'a, usize>,
     values: slice::Iter<'a, T>,
@@ -2326,6 +2346,15 @@ mod tests {
     }
 
     #[test]
+    fn empty_pop() {
+        let mut sparse_set = SparseSet::<i32>::new();
+
+        let popped = sparse_set.pop();
+        assert_eq!(popped, None);
+        assert_eq!(sparse_set.len(), 0);
+    }
+
+    #[test]
     fn one_item_remove_one() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
@@ -2662,6 +2691,19 @@ mod tests {
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some(&69));
         assert_eq!(sparse_set.get(1), Some(&42));
+    }
+
+    #[test]
+    fn two_items_pop() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(5, 42);
+        sparse_set.insert(2, 69);
+
+        let popped = sparse_set.pop();
+        assert_eq!(popped, Some((2, 69)));
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(5), Some(&42));
+        assert_eq!(sparse_set.get(2), None);
     }
 
     #[test]

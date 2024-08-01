@@ -501,6 +501,20 @@ impl<T> SparseSet<T> {
         Some((key, value))
     }
 
+    pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
+        for dense_index in (dense_len..self.len()).rev() {
+            let key = self.dense_keys[dense_index];
+            self.remove(key);
+        }
+        self.dense_keys.truncate(dense_len);
+        self.dense_values.truncate(dense_len);
+
+        for key in sparse_len..self.sparse_len() {
+            self.remove(key);
+        }
+        self.sparse.truncate(sparse_len);
+    }
+
     pub fn drain(&mut self) -> Drain<'_, T> {
         let Self {
             dense_keys,
@@ -2981,6 +2995,32 @@ mod tests {
         assert_eq!(sparse_set.sparse_len(), 0);
         assert_eq!(sparse_set.keys().as_slice(), &[]);
         assert_eq!(sparse_set.values().as_slice(), &[]);
+    }
+
+    #[test]
+    fn five_items_truncate() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(8, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(4, 69);
+        sparse_set.insert(3, 228);
+        sparse_set.insert(6, 666);
+
+        sparse_set.truncate(usize::MAX, 5);
+        assert_eq!(sparse_set.sparse_len(), 5);
+        assert_eq!(sparse_set.keys().as_slice(), &[1, 4, 3]);
+        assert_eq!(sparse_set.values().as_slice(), &[42, 69, 228]);
+
+        assert_eq!(sparse_set.get(1), Some(&42));
+        assert_eq!(sparse_set.get(4), Some(&69));
+        assert_eq!(sparse_set.get(3), Some(&228));
+
+        sparse_set.truncate(1, usize::MAX);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.keys().as_slice(), &[1]);
+        assert_eq!(sparse_set.values().as_slice(), &[42]);
+
+        assert_eq!(sparse_set.get(1), Some(&42));
     }
 
     #[test]

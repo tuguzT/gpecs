@@ -471,6 +471,21 @@ impl<T> SparseSet<T> {
         Some(value)
     }
 
+    pub fn drain(&mut self) -> Drain<'_, T> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        let keys = dense_keys.drain(..);
+        let values = dense_values.drain(..);
+        debug_assert_eq!(keys.len(), values.len());
+        sparse.clear();
+
+        Drain { keys, values }
+    }
+
     pub fn retain<F>(&mut self, mut f: F)
     where
         F: FnMut(usize, &mut T) -> bool,
@@ -2045,9 +2060,82 @@ impl<T> ExactSizeIterator for IntoIter<T> {}
 
 impl<T> FusedIterator for IntoIter<T> {}
 
+pub struct Drain<'a, T> {
+    keys: vec::Drain<'a, usize>,
+    values: vec::Drain<'a, T>,
+}
+
+impl<'a, T: Debug> Debug for Drain<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let keys = &self.as_keys_slice();
+        let values = &self.as_values_slice();
+        f.debug_struct("Drain")
+            .field("keys", keys)
+            .field("values", values)
+            .finish()
+    }
+}
+
+impl<'a, T> Drain<'a, T> {
+    #[inline]
+    pub fn as_keys_slice(&self) -> &[usize] {
+        let Self { keys, .. } = self;
+        keys.as_slice()
+    }
+
+    #[inline]
+    pub fn as_values_slice(&self) -> &[T] {
+        let Self { values, .. } = self;
+        values.as_slice()
+    }
+}
+
+impl<'a, T> AsRef<[T]> for Drain<'a, T> {
+    #[inline]
+    fn as_ref(&self) -> &[T] {
+        self.as_values_slice()
+    }
+}
+
+impl<'a, T> Iterator for Drain<'a, T> {
+    type Item = (usize, T);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.next();
+        let value = values.next();
+        kv_to_item(key, value)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { keys, values } = self;
+
+        debug_assert_eq!(keys.size_hint(), values.size_hint());
+        keys.size_hint()
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for Drain<'a, T> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { keys, values } = self;
+
+        let key = keys.next_back();
+        let value = values.next_back();
+        kv_to_item(key, value)
+    }
+}
+
+impl<'a, T> ExactSizeIterator for Drain<'a, T> {}
+
+impl<'a, T> FusedIterator for Drain<'a, T> {}
+
 #[cfg(test)]
 mod tests {
-    use std::ops::Not;
+    use std::{mem::forget, ops::Not};
 
     use crate::SparseSet;
 
@@ -2831,6 +2919,26 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.keys().as_slice(), &[4]);
         assert_eq!(sparse_set.values().as_slice(), &[69]);
+    }
+
+    #[test]
+    fn five_items_drain() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(8, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(4, 69);
+        sparse_set.insert(3, 228);
+        sparse_set.insert(6, 666);
+
+        let drain = sparse_set.drain();
+        assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
+        assert_eq!(drain.as_values_slice(), &[34, 42, 69, 228, 666]);
+
+        forget(drain);
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.sparse_len(), 0);
+        assert_eq!(sparse_set.keys().as_slice(), &[]);
+        assert_eq!(sparse_set.values().as_slice(), &[]);
     }
 
     #[test]

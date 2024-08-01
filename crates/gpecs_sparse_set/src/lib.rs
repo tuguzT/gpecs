@@ -37,28 +37,212 @@ fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut 
     Some(pair)
 }
 
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_kv_same_len_failed() -> ! {
+    panic!("keys and values should have the same length")
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_kv_same_capacity_failed() -> ! {
+    panic!("keys and values should have the same capacity")
+}
+
 #[inline]
 #[track_caller]
-fn kv_to_item<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
+fn match_kv_same_kind<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
     match (key, value) {
         (Some(key), Some(value)) => Some((key, value)),
         (None, None) => None,
-        _ => panic!("keys and values should have the same length"),
+        _ => check_kv_same_len_failed(),
     }
 }
 
 #[inline]
 #[track_caller]
-fn get_value<'a, T>(key: usize, values: &'a [T], sparse: &[SparseEntry]) -> &'a T {
-    let sparse_entry = sparse
-        .get(key)
-        .expect("key from dense should be in bounds of sparse");
-    let dense_index = sparse_entry
-        .dense_index()
-        .expect("current sparse entry should be occupied");
-    values
-        .get(dense_index)
-        .expect("index from sparse should be in bounds of dense")
+fn unwrap_sparse_entry(sparse: &[SparseEntry], key: usize) -> SparseEntry {
+    let Some(entry) = sparse.get(key).copied() else {
+        check_key_bounds_failed()
+    };
+    entry
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_sparse_entry_mut(sparse: &mut [SparseEntry], key: usize) -> &mut SparseEntry {
+    let Some(entry) = sparse.get_mut(key) else {
+        check_key_bounds_failed()
+    };
+    entry
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn unwrap_dense_index_failed() -> ! {
+    panic!("current sparse entry should be occupied")
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_index(entry: &SparseEntry) -> usize {
+    let Some(dense_index) = entry.dense_index() else {
+        unwrap_dense_index_failed()
+    };
+    dense_index
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_index_mut(entry: &mut SparseEntry) -> &mut usize {
+    let Some(dense_index) = entry.dense_index_mut() else {
+        unwrap_dense_index_failed()
+    };
+    dense_index
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_key(keys: &[usize], dense_index: usize) -> usize {
+    let Some(dense_key) = keys.get(dense_index).copied() else {
+        check_dense_index_bounds_failed();
+    };
+    dense_key
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_value<T>(values: &[T], dense_index: usize) -> &T {
+    let Some(dense_value) = values.get(dense_index) else {
+        check_dense_index_bounds_failed();
+    };
+    dense_value
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_value_mut<T>(values: &mut [T], dense_index: usize) -> &mut T {
+    let Some(dense_value) = values.get_mut(dense_index) else {
+        check_dense_index_bounds_failed();
+    };
+    dense_value
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn unwrap_dense_value_pair_mut_failed() -> ! {
+    panic!("indices from sparse should be in bounds of dense and differ from each other")
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_value_pair_mut<T>(
+    values: &mut [T],
+    first_index: usize,
+    second_index: usize,
+) -> (&mut T, &mut T) {
+    let Some(pair) = get_pair_mut(values, first_index, second_index) else {
+        unwrap_dense_value_pair_mut_failed()
+    };
+    pair
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn unwrap_sparse_entry_pair_mut_failed() -> ! {
+    panic!("keys should be in bounds of sparse and differ from each other")
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_sparse_entry_pair_mut(
+    sparse: &mut [SparseEntry],
+    first_key: usize,
+    second_key: usize,
+) -> (&mut SparseEntry, &mut SparseEntry) {
+    let Some(pair) = get_pair_mut(sparse, first_key, second_key) else {
+        unwrap_sparse_entry_pair_mut_failed()
+    };
+    pair
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_value_from_key<'a, T>(key: usize, values: &'a [T], sparse: &[SparseEntry]) -> &'a T {
+    let sparse_entry = unwrap_sparse_entry(sparse, key);
+    let dense_index = unwrap_dense_index(&sparse_entry);
+    unwrap_dense_value(values, dense_index)
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_dense_index_bounds_failed() -> ! {
+    panic!("index from sparse should be in bounds of dense")
+}
+
+#[inline]
+#[track_caller]
+fn check_dense_index_bounds(dense_index: usize, dense_len: usize) {
+    if dense_index < dense_len {
+        return;
+    }
+    check_dense_index_bounds_failed()
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_key_bounds_failed() -> ! {
+    panic!("key from dense should be in bounds of sparse")
+}
+
+#[inline]
+#[track_caller]
+fn check_key_bounds(key: usize, sparse_len: usize) {
+    if key < sparse_len {
+        return;
+    }
+    check_key_bounds_failed()
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_equal_key_failed() -> ! {
+    panic!("provided key and key from dense should be equal")
+}
+
+#[inline]
+#[track_caller]
+fn check_equal_key(key: usize, dense_key: usize) {
+    if key == dense_key {
+        return;
+    }
+    check_equal_key_failed()
+}
+
+#[inline]
+#[track_caller]
+fn check_kv_same_len(keys_len: usize, values_len: usize) {
+    if keys_len == values_len {
+        return;
+    }
+    check_kv_same_len_failed()
+}
+
+#[inline]
+#[track_caller]
+fn check_kv_same_capacity(keys_capacity: usize, values_capacity: usize) {
+    if keys_capacity == values_capacity {
+        return;
+    }
+    check_kv_same_capacity_failed()
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -68,22 +252,27 @@ pub enum SparseEntry {
 }
 
 impl SparseEntry {
+    #[inline]
     pub const fn occupied(dense_index: usize) -> Self {
         Self::Occupied { dense_index }
     }
 
+    #[inline]
     pub const fn vacant() -> Self {
         Self::Vacant
     }
 
+    #[inline]
     pub const fn is_occupied(&self) -> bool {
         matches!(self, Self::Occupied { .. })
     }
 
+    #[inline]
     pub const fn is_vacant(&self) -> bool {
         matches!(self, Self::Vacant)
     }
 
+    #[inline]
     pub const fn dense_index(&self) -> Option<usize> {
         match self {
             Self::Occupied { dense_index } => Some(*dense_index),
@@ -91,6 +280,7 @@ impl SparseEntry {
         }
     }
 
+    #[inline]
     pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
         match self {
             Self::Occupied { dense_index } => Some(dense_index),
@@ -140,7 +330,7 @@ impl<T> SparseSet<T> {
             ..
         } = self;
 
-        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        check_kv_same_len(dense_keys.len(), dense_values.len());
         dense_keys.len()
     }
 
@@ -168,7 +358,7 @@ impl<T> SparseSet<T> {
             ..
         } = self;
 
-        debug_assert_eq!(dense_keys.capacity(), dense_values.capacity());
+        check_kv_same_capacity(dense_keys.capacity(), dense_values.capacity());
         dense_keys.capacity()
     }
 
@@ -345,14 +535,12 @@ impl<T> SparseSet<T> {
 
         let sparse = sparse.as_mut_slice();
         if let SparseEntry::Occupied { dense_index } = sparse[key] {
-            let entry_value = dense_values
-                .get_mut(dense_index)
-                .expect("index from sparse should be in bounds of dense");
+            let entry_value = unwrap_dense_value_mut(dense_values, dense_index);
             let value = replace(entry_value, value);
             return Some(value);
         }
 
-        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        check_kv_same_len(dense_keys.len(), dense_values.len());
         dense_keys.push(key);
         dense_values.push(value);
         sparse[key] = SparseEntry::occupied(dense_keys.len() - 1);
@@ -375,14 +563,12 @@ impl<T> SparseSet<T> {
 
         let sparse = sparse.as_mut_slice();
         if let SparseEntry::Occupied { dense_index } = sparse[key] {
-            let entry_value = dense_values
-                .get_mut(dense_index)
-                .expect("index from sparse should be in bounds of dense");
+            let entry_value = unwrap_dense_value_mut(dense_values, dense_index);
             let value = replace(entry_value, value);
             return Ok(Some(value));
         }
 
-        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        check_kv_same_len(dense_keys.len(), dense_values.len());
         dense_keys.try_reserve(1)?;
         dense_values.try_reserve(1)?;
 
@@ -435,8 +621,8 @@ impl<T> SparseSet<T> {
             return;
         };
 
-        let (first_value, second_value) = get_pair_mut(dense_values, first_index, second_index)
-            .expect("indices from sparse should be in bounds of dense and differ from each other");
+        let (first_value, second_value) =
+            unwrap_dense_value_pair_mut(dense_values, first_index, second_index);
         swap(first_value, second_value);
     }
 
@@ -448,15 +634,12 @@ impl<T> SparseSet<T> {
         } = self;
 
         let dense_index = sparse.get(key).and_then(SparseEntry::dense_index)?;
-        assert!(
-            dense_index < dense_keys.len(),
-            "index from sparse should be in bounds of dense",
-        );
+        check_dense_index_bounds(dense_index, dense_keys.len());
 
-        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        check_kv_same_len(dense_keys.len(), dense_values.len());
         let value = dense_values.swap_remove(dense_index);
         let dense_key = dense_keys.swap_remove(dense_index);
-        debug_assert_eq!(key, dense_key);
+        check_equal_key(key, dense_key);
 
         sparse[dense_keys.len()] = sparse[key];
         sparse[key] = SparseEntry::Vacant;
@@ -472,23 +655,16 @@ impl<T> SparseSet<T> {
         } = self;
 
         let dense_index = sparse.get(key).and_then(SparseEntry::dense_index)?;
-        assert!(
-            dense_index < dense_keys.len(),
-            "index from sparse should be in bounds of dense",
-        );
+        check_dense_index_bounds(dense_index, dense_keys.len());
 
-        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        check_kv_same_len(dense_keys.len(), dense_values.len());
         let value = dense_values.remove(dense_index);
         let dense_key = dense_keys.remove(dense_index);
-        debug_assert_eq!(key, dense_key);
+        check_equal_key(key, dense_key);
 
         for key in dense_keys.iter().copied().skip(dense_index) {
-            let sparse_entry = sparse
-                .get_mut(key)
-                .expect("key from dense should be in bounds of sparse");
-            let dense_index = sparse_entry
-                .dense_index_mut()
-                .expect("current sparse entry should be occupied");
+            let sparse_entry = unwrap_sparse_entry_mut(sparse, key);
+            let dense_index = unwrap_dense_index_mut(sparse_entry);
             *dense_index -= 1;
         }
         sparse[key] = SparseEntry::Vacant;
@@ -505,12 +681,9 @@ impl<T> SparseSet<T> {
 
         let key = dense_keys.pop();
         let value = dense_values.pop();
-        let (key, value) = kv_to_item(key, value)?;
+        let (key, value) = match_kv_same_kind(key, value)?;
 
-        assert!(
-            key < sparse.len(),
-            "key from dense should be in bounds of sparse",
-        );
+        check_key_bounds(key, sparse.len());
         sparse[key] = SparseEntry::Vacant;
 
         Some((key, value))
@@ -539,7 +712,7 @@ impl<T> SparseSet<T> {
 
         let keys = dense_keys.drain(..);
         let values = dense_values.drain(..);
-        debug_assert_eq!(keys.len(), values.len());
+        check_kv_same_len(keys.len(), values.len());
         sparse.clear();
 
         Drain { keys, values }
@@ -564,7 +737,7 @@ impl<T> SparseSet<T> {
         T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
-            keys.sort_by_cached_key(|&key| get_value(key, values, sparse))
+            keys.sort_by_cached_key(|&key| unwrap_value_from_key(key, values, sparse))
         });
     }
 
@@ -580,8 +753,8 @@ impl<T> SparseSet<T> {
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by(|&lhs_key, &rhs_key| {
-                let lhs_value = get_value(lhs_key, values, sparse);
-                let rhs_value = get_value(rhs_key, values, sparse);
+                let lhs_value = unwrap_value_from_key(lhs_key, values, sparse);
+                let rhs_value = unwrap_value_from_key(rhs_key, values, sparse);
                 let lhs = (lhs_key, lhs_value);
                 let rhs = (rhs_key, rhs_value);
                 f(lhs, rhs)
@@ -597,7 +770,7 @@ impl<T> SparseSet<T> {
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_key(|&key| {
-                let value = get_value(key, values, sparse);
+                let value = unwrap_value_from_key(key, values, sparse);
                 f((key, value))
             })
         });
@@ -611,7 +784,7 @@ impl<T> SparseSet<T> {
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
-                let value = get_value(key, values, sparse);
+                let value = unwrap_value_from_key(key, values, sparse);
                 f((key, value))
             })
         });
@@ -623,7 +796,7 @@ impl<T> SparseSet<T> {
         T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
-            keys.sort_unstable_by_key(|&key| get_value(key, values, sparse))
+            keys.sort_unstable_by_key(|&key| unwrap_value_from_key(key, values, sparse))
         });
     }
 
@@ -639,8 +812,8 @@ impl<T> SparseSet<T> {
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by(|&lhs_key, &rhs_key| {
-                let lhs_value = get_value(lhs_key, values, sparse);
-                let rhs_value = get_value(rhs_key, values, sparse);
+                let lhs_value = unwrap_value_from_key(lhs_key, values, sparse);
+                let rhs_value = unwrap_value_from_key(rhs_key, values, sparse);
                 let lhs = (lhs_key, lhs_value);
                 let rhs = (rhs_key, rhs_value);
                 f(lhs, rhs)
@@ -656,12 +829,14 @@ impl<T> SparseSet<T> {
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
-                let value = get_value(key, values, sparse);
+                let value = unwrap_value_from_key(key, values, sparse);
                 f((key, value))
             })
         });
     }
 
+    // Implementation was borrowed from the links below:
+    // https://skypjack.github.io/2019-09-25-ecs-baf-part-5/#:~:text=Mixing%20in%2Dplace%20sorting%20and%20permutations
     // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
     fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
     where
@@ -676,19 +851,26 @@ impl<T> SparseSet<T> {
         let dense_keys = dense_keys.as_mut_slice();
         let dense_values = dense_values.as_mut_slice();
         let sparse = sparse.as_mut_slice();
-        debug_assert_eq!(dense_keys.len(), dense_values.len());
+        check_kv_same_len(dense_keys.len(), dense_values.len());
 
         sort_keys(dense_keys, dense_values, sparse);
 
         for pos in 0..dense_keys.len() {
             let mut curr = pos;
-            let mut next = sparse[dense_keys[curr]].dense_index().unwrap();
+            let mut next = {
+                let key = unwrap_dense_key(dense_keys, curr);
+                let entry = unwrap_sparse_entry(sparse, key);
+                unwrap_dense_index(&entry)
+            };
 
             while curr != next {
-                let (curr_entry, next_entry) =
-                    get_pair_mut(sparse, dense_keys[curr], dense_keys[next]).unwrap();
-                let curr_dense_index = curr_entry.dense_index_mut().unwrap();
-                let next_dense_index = next_entry.dense_index_mut().unwrap();
+                let (curr_entry, next_entry) = {
+                    let first_key = unwrap_dense_key(dense_keys, curr);
+                    let second_key = unwrap_dense_key(dense_keys, next);
+                    unwrap_sparse_entry_pair_mut(sparse, first_key, second_key)
+                };
+                let curr_dense_index = unwrap_dense_index_mut(curr_entry);
+                let next_dense_index = unwrap_dense_index_mut(next_entry);
 
                 dense_values.swap(*curr_dense_index, *next_dense_index);
 
@@ -709,14 +891,9 @@ impl<T> SparseSet<T> {
         let sparse_entry = sparse.get(key).copied()?;
         let dense_index = sparse_entry.dense_index()?;
 
-        let value = dense_values
-            .get(dense_index)
-            .expect("index from sparse should be in bounds of dense");
-        let dense_key = dense_keys
-            .get(dense_index)
-            .copied()
-            .expect("index from sparse should be in bounds of dense");
-        debug_assert_eq!(key, dense_key);
+        let value = unwrap_dense_value(dense_values, dense_index);
+        let dense_key = unwrap_dense_key(dense_keys, dense_index);
+        check_equal_key(key, dense_key);
 
         Some(value)
     }
@@ -731,14 +908,9 @@ impl<T> SparseSet<T> {
         let sparse_entry = sparse.get(key).copied()?;
         let dense_index = sparse_entry.dense_index()?;
 
-        let value = dense_values
-            .get_mut(dense_index)
-            .expect("index from sparse should be in bounds of dense");
-        let dense_key = dense_keys
-            .get(dense_index)
-            .copied()
-            .expect("index from sparse should be in bounds of dense");
-        debug_assert_eq!(key, dense_key);
+        let value = unwrap_dense_value_mut(dense_values, dense_index);
+        let dense_key = unwrap_dense_key(dense_keys, dense_index);
+        check_equal_key(key, dense_key);
 
         Some(value)
     }
@@ -755,10 +927,7 @@ impl<T> SparseSet<T> {
             return false;
         };
 
-        debug_assert!(
-            dense_index < dense_keys.len(),
-            "index from sparse should be in bounds of dense",
-        );
+        check_dense_index_bounds(dense_index, dense_keys.len());
         true
     }
 
@@ -830,7 +999,7 @@ impl<T> SparseSet<T> {
 
         let keys = dense_keys.iter();
         let values = dense_values.iter();
-        debug_assert_eq!(keys.len(), values.len());
+        check_kv_same_len(keys.len(), values.len());
 
         Iter { keys, values }
     }
@@ -845,7 +1014,7 @@ impl<T> SparseSet<T> {
 
         let keys = dense_keys.iter();
         let values = dense_values.iter_mut();
-        debug_assert_eq!(keys.len(), values.len());
+        check_kv_same_len(keys.len(), values.len());
 
         IterMut { keys, values }
     }
@@ -938,7 +1107,7 @@ impl<T> IntoIterator for SparseSet<T> {
 
         let keys = dense_keys.into_iter();
         let values = dense_values.into_iter();
-        debug_assert_eq!(keys.len(), values.len());
+        check_kv_same_len(keys.len(), values.len());
 
         IntoIter { keys, values }
     }
@@ -1862,14 +2031,12 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
         let key = keys.next();
         let value = values.next();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.size_hint(), values.size_hint());
+        let Self { keys, .. } = self;
         keys.size_hint()
     }
 
@@ -1878,9 +2045,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
     where
         Self: Sized,
     {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.len(), values.len());
+        let Self { keys, .. } = self;
         keys.count()
     }
 
@@ -1893,7 +2058,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
         let key = keys.last();
         let value = values.last();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
@@ -1902,7 +2067,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
         let key = keys.nth(n);
         let value = values.nth(n);
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
@@ -1924,7 +2089,7 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
 
         let key = keys.next_back();
         let value = values.next_back();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
@@ -1933,16 +2098,14 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
 
         let key = keys.nth_back(n);
         let value = values.nth_back(n);
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 }
 
 impl<'a, T> ExactSizeIterator for Iter<'a, T> {
     #[inline]
     fn len(&self) -> usize {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.len(), values.len());
+        let Self { keys, .. } = self;
         keys.len()
     }
 }
@@ -2033,14 +2196,12 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
         let key = keys.next();
         let value = values.next();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.size_hint(), values.size_hint());
+        let Self { keys, .. } = self;
         keys.size_hint()
     }
 
@@ -2049,9 +2210,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     where
         Self: Sized,
     {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.len(), values.len());
+        let Self { keys, .. } = self;
         keys.count()
     }
 
@@ -2064,7 +2223,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
         let key = keys.last();
         let value = values.last();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
@@ -2073,7 +2232,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 
         let key = keys.nth(n);
         let value = values.nth(n);
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
@@ -2095,7 +2254,7 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
 
         let key = keys.next_back();
         let value = values.next_back();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
@@ -2104,16 +2263,14 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
 
         let key = keys.nth_back(n);
         let value = values.nth_back(n);
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 }
 
 impl<'a, T> ExactSizeIterator for IterMut<'a, T> {
     #[inline]
     fn len(&self) -> usize {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.len(), values.len());
+        let Self { keys, .. } = self;
         keys.len()
     }
 }
@@ -2212,14 +2369,12 @@ impl<T> Iterator for IntoIter<T> {
 
         let key = keys.next();
         let value = values.next();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.size_hint(), values.size_hint());
+        let Self { keys, .. } = self;
         keys.size_hint()
     }
 
@@ -2228,9 +2383,7 @@ impl<T> Iterator for IntoIter<T> {
     where
         Self: Sized,
     {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.len(), values.len());
+        let Self { keys, .. } = self;
         keys.count()
     }
 }
@@ -2242,7 +2395,7 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 
         let key = keys.next_back();
         let value = values.next_back();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 }
 
@@ -2296,14 +2449,12 @@ impl<'a, T> Iterator for Drain<'a, T> {
 
         let key = keys.next();
         let value = values.next();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { keys, values } = self;
-
-        debug_assert_eq!(keys.size_hint(), values.size_hint());
+        let Self { keys, .. } = self;
         keys.size_hint()
     }
 }
@@ -2315,7 +2466,7 @@ impl<'a, T> DoubleEndedIterator for Drain<'a, T> {
 
         let key = keys.next_back();
         let value = values.next_back();
-        kv_to_item(key, value)
+        match_kv_same_kind(key, value)
     }
 }
 

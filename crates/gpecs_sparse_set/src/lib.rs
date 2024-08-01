@@ -471,6 +471,19 @@ impl<T> SparseSet<T> {
         Some(value)
     }
 
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut(usize, &mut T) -> bool,
+    {
+        for dense_index in (0..self.len()).rev() {
+            let key = self.dense_keys[dense_index];
+            let value = self.dense_values.index_mut(dense_index);
+            if !f(key, value) {
+                self.remove(key);
+            }
+        }
+    }
+
     pub fn get(&self, key: usize) -> Option<&T> {
         let Self {
             dense_keys,
@@ -2798,6 +2811,26 @@ mod tests {
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some(&value));
         assert!(sparse_set.contains_key(key));
+    }
+
+    #[test]
+    fn five_items_retain() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(8, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(4, 69);
+        sparse_set.insert(3, 228);
+        sparse_set.insert(6, 666);
+
+        sparse_set.retain(|key, _| key % 2 == 0);
+        assert_eq!(sparse_set.len(), 3);
+        assert_eq!(sparse_set.keys().as_slice(), &[8, 4, 6]);
+        assert_eq!(sparse_set.values().as_slice(), &[34, 69, 666]);
+
+        sparse_set.retain(|_, value| *value % 2 == 1);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.keys().as_slice(), &[4]);
+        assert_eq!(sparse_set.values().as_slice(), &[69]);
     }
 
     #[test]

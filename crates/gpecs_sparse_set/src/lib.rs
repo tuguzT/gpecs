@@ -22,273 +22,6 @@ use core::{
     slice,
 };
 
-fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
-    let (first, second) = (usize::min(a, b), usize::max(a, b));
-
-    let [first, .., second] = slice.get_mut(first..=second)? else {
-        return None;
-    };
-
-    let pair = if a < b {
-        (first, second)
-    } else {
-        (second, first)
-    };
-    Some(pair)
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn check_kv_same_len_failed() -> ! {
-    panic!("keys and values should have the same length")
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn check_kv_same_capacity_failed() -> ! {
-    panic!("keys and values should have the same capacity")
-}
-
-#[inline]
-#[track_caller]
-fn match_kv_same_kind<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
-    match (key, value) {
-        (Some(key), Some(value)) => Some((key, value)),
-        (None, None) => None,
-        _ => check_kv_same_len_failed(),
-    }
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_sparse_entry(sparse: &[SparseEntry], key: usize) -> SparseEntry {
-    let Some(entry) = sparse.get(key).copied() else {
-        check_key_bounds_failed()
-    };
-    entry
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_sparse_entry_mut(sparse: &mut [SparseEntry], key: usize) -> &mut SparseEntry {
-    let Some(entry) = sparse.get_mut(key) else {
-        check_key_bounds_failed()
-    };
-    entry
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn unwrap_dense_index_failed() -> ! {
-    panic!("current sparse entry should be occupied")
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_dense_index(entry: &SparseEntry) -> usize {
-    let Some(dense_index) = entry.dense_index() else {
-        unwrap_dense_index_failed()
-    };
-    dense_index
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_dense_index_mut(entry: &mut SparseEntry) -> &mut usize {
-    let Some(dense_index) = entry.dense_index_mut() else {
-        unwrap_dense_index_failed()
-    };
-    dense_index
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_dense_key(keys: &[usize], dense_index: usize) -> usize {
-    let Some(dense_key) = keys.get(dense_index).copied() else {
-        check_dense_index_bounds_failed();
-    };
-    dense_key
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_dense_value<T>(values: &[T], dense_index: usize) -> &T {
-    let Some(dense_value) = values.get(dense_index) else {
-        check_dense_index_bounds_failed();
-    };
-    dense_value
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_dense_value_mut<T>(values: &mut [T], dense_index: usize) -> &mut T {
-    let Some(dense_value) = values.get_mut(dense_index) else {
-        check_dense_index_bounds_failed();
-    };
-    dense_value
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn unwrap_dense_value_pair_mut_failed() -> ! {
-    panic!("indices from sparse should be in bounds of dense and differ from each other")
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_dense_value_pair_mut<T>(
-    values: &mut [T],
-    first_index: usize,
-    second_index: usize,
-) -> (&mut T, &mut T) {
-    let Some(pair) = get_pair_mut(values, first_index, second_index) else {
-        unwrap_dense_value_pair_mut_failed()
-    };
-    pair
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn unwrap_sparse_entry_pair_mut_failed() -> ! {
-    panic!("keys should be in bounds of sparse and differ from each other")
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_sparse_entry_pair_mut(
-    sparse: &mut [SparseEntry],
-    first_key: usize,
-    second_key: usize,
-) -> (&mut SparseEntry, &mut SparseEntry) {
-    let Some(pair) = get_pair_mut(sparse, first_key, second_key) else {
-        unwrap_sparse_entry_pair_mut_failed()
-    };
-    pair
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_value_from_key<'a, T>(key: usize, values: &'a [T], sparse: &[SparseEntry]) -> &'a T {
-    let sparse_entry = unwrap_sparse_entry(sparse, key);
-    let dense_index = unwrap_dense_index(&sparse_entry);
-    unwrap_dense_value(values, dense_index)
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn check_dense_index_bounds_failed() -> ! {
-    panic!("index from sparse should be in bounds of dense")
-}
-
-#[inline]
-#[track_caller]
-fn check_dense_index_bounds(dense_index: usize, dense_len: usize) {
-    if dense_index < dense_len {
-        return;
-    }
-    check_dense_index_bounds_failed()
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn check_key_bounds_failed() -> ! {
-    panic!("key from dense should be in bounds of sparse")
-}
-
-#[inline]
-#[track_caller]
-fn check_key_bounds(key: usize, sparse_len: usize) {
-    if key < sparse_len {
-        return;
-    }
-    check_key_bounds_failed()
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn check_equal_key_failed() -> ! {
-    panic!("provided key and key from dense should be equal")
-}
-
-#[inline]
-#[track_caller]
-fn check_equal_key(key: usize, dense_key: usize) {
-    if key == dense_key {
-        return;
-    }
-    check_equal_key_failed()
-}
-
-#[inline]
-#[track_caller]
-fn check_kv_same_len(keys_len: usize, values_len: usize) {
-    if keys_len == values_len {
-        return;
-    }
-    check_kv_same_len_failed()
-}
-
-#[inline]
-#[track_caller]
-fn check_kv_same_capacity(keys_capacity: usize, values_capacity: usize) {
-    if keys_capacity == values_capacity {
-        return;
-    }
-    check_kv_same_capacity_failed()
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub enum SparseEntry {
-    Occupied { dense_index: usize },
-    Vacant,
-}
-
-impl SparseEntry {
-    #[inline]
-    pub const fn occupied(dense_index: usize) -> Self {
-        Self::Occupied { dense_index }
-    }
-
-    #[inline]
-    pub const fn vacant() -> Self {
-        Self::Vacant
-    }
-
-    #[inline]
-    pub const fn is_occupied(&self) -> bool {
-        matches!(self, Self::Occupied { .. })
-    }
-
-    #[inline]
-    pub const fn is_vacant(&self) -> bool {
-        matches!(self, Self::Vacant)
-    }
-
-    #[inline]
-    pub const fn dense_index(&self) -> Option<usize> {
-        match self {
-            Self::Occupied { dense_index } => Some(*dense_index),
-            Self::Vacant => None,
-        }
-    }
-
-    #[inline]
-    pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
-        match self {
-            Self::Occupied { dense_index } => Some(dense_index),
-            Self::Vacant => None,
-        }
-    }
-}
-
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct SparseSet<T> {
     dense_keys: Vec<usize>,
@@ -1176,6 +909,50 @@ impl<T> Extend<T> for SparseSet<T> {
                 .find(|&key| self.sparse[key].is_vacant())
                 .unwrap_or(self.sparse.len());
             self.insert(key, value);
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub enum SparseEntry {
+    Occupied { dense_index: usize },
+    Vacant,
+}
+
+impl SparseEntry {
+    #[inline]
+    pub const fn occupied(dense_index: usize) -> Self {
+        Self::Occupied { dense_index }
+    }
+
+    #[inline]
+    pub const fn vacant() -> Self {
+        Self::Vacant
+    }
+
+    #[inline]
+    pub const fn is_occupied(&self) -> bool {
+        matches!(self, Self::Occupied { .. })
+    }
+
+    #[inline]
+    pub const fn is_vacant(&self) -> bool {
+        matches!(self, Self::Vacant)
+    }
+
+    #[inline]
+    pub const fn dense_index(&self) -> Option<usize> {
+        match self {
+            Self::Occupied { dense_index } => Some(*dense_index),
+            Self::Vacant => None,
+        }
+    }
+
+    #[inline]
+    pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
+        match self {
+            Self::Occupied { dense_index } => Some(dense_index),
+            Self::Vacant => None,
         }
     }
 }
@@ -2473,6 +2250,229 @@ impl<'a, T> DoubleEndedIterator for Drain<'a, T> {
 impl<'a, T> ExactSizeIterator for Drain<'a, T> {}
 
 impl<'a, T> FusedIterator for Drain<'a, T> {}
+
+fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
+    let (first, second) = (usize::min(a, b), usize::max(a, b));
+
+    let [first, .., second] = slice.get_mut(first..=second)? else {
+        return None;
+    };
+
+    let pair = if a < b {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    Some(pair)
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_kv_same_len_failed() -> ! {
+    panic!("keys and values should have the same length")
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_kv_same_capacity_failed() -> ! {
+    panic!("keys and values should have the same capacity")
+}
+
+#[inline]
+#[track_caller]
+fn match_kv_same_kind<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
+    match (key, value) {
+        (Some(key), Some(value)) => Some((key, value)),
+        (None, None) => None,
+        _ => check_kv_same_len_failed(),
+    }
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_sparse_entry(sparse: &[SparseEntry], key: usize) -> SparseEntry {
+    let Some(entry) = sparse.get(key).copied() else {
+        check_key_bounds_failed()
+    };
+    entry
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_sparse_entry_mut(sparse: &mut [SparseEntry], key: usize) -> &mut SparseEntry {
+    let Some(entry) = sparse.get_mut(key) else {
+        check_key_bounds_failed()
+    };
+    entry
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn unwrap_dense_index_failed() -> ! {
+    panic!("current sparse entry should be occupied")
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_index(entry: &SparseEntry) -> usize {
+    let Some(dense_index) = entry.dense_index() else {
+        unwrap_dense_index_failed()
+    };
+    dense_index
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_index_mut(entry: &mut SparseEntry) -> &mut usize {
+    let Some(dense_index) = entry.dense_index_mut() else {
+        unwrap_dense_index_failed()
+    };
+    dense_index
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_key(keys: &[usize], dense_index: usize) -> usize {
+    let Some(dense_key) = keys.get(dense_index).copied() else {
+        check_dense_index_bounds_failed();
+    };
+    dense_key
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_value<T>(values: &[T], dense_index: usize) -> &T {
+    let Some(dense_value) = values.get(dense_index) else {
+        check_dense_index_bounds_failed();
+    };
+    dense_value
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_value_mut<T>(values: &mut [T], dense_index: usize) -> &mut T {
+    let Some(dense_value) = values.get_mut(dense_index) else {
+        check_dense_index_bounds_failed();
+    };
+    dense_value
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn unwrap_dense_value_pair_mut_failed() -> ! {
+    panic!("indices from sparse should be in bounds of dense and differ from each other")
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_dense_value_pair_mut<T>(
+    values: &mut [T],
+    first_index: usize,
+    second_index: usize,
+) -> (&mut T, &mut T) {
+    let Some(pair) = get_pair_mut(values, first_index, second_index) else {
+        unwrap_dense_value_pair_mut_failed()
+    };
+    pair
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn unwrap_sparse_entry_pair_mut_failed() -> ! {
+    panic!("keys should be in bounds of sparse and differ from each other")
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_sparse_entry_pair_mut(
+    sparse: &mut [SparseEntry],
+    first_key: usize,
+    second_key: usize,
+) -> (&mut SparseEntry, &mut SparseEntry) {
+    let Some(pair) = get_pair_mut(sparse, first_key, second_key) else {
+        unwrap_sparse_entry_pair_mut_failed()
+    };
+    pair
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_value_from_key<'a, T>(key: usize, values: &'a [T], sparse: &[SparseEntry]) -> &'a T {
+    let sparse_entry = unwrap_sparse_entry(sparse, key);
+    let dense_index = unwrap_dense_index(&sparse_entry);
+    unwrap_dense_value(values, dense_index)
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_dense_index_bounds_failed() -> ! {
+    panic!("index from sparse should be in bounds of dense")
+}
+
+#[inline]
+#[track_caller]
+fn check_dense_index_bounds(dense_index: usize, dense_len: usize) {
+    if dense_index < dense_len {
+        return;
+    }
+    check_dense_index_bounds_failed()
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_key_bounds_failed() -> ! {
+    panic!("key from dense should be in bounds of sparse")
+}
+
+#[inline]
+#[track_caller]
+fn check_key_bounds(key: usize, sparse_len: usize) {
+    if key < sparse_len {
+        return;
+    }
+    check_key_bounds_failed()
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_equal_key_failed() -> ! {
+    panic!("provided key and key from dense should be equal")
+}
+
+#[inline]
+#[track_caller]
+fn check_equal_key(key: usize, dense_key: usize) {
+    if key == dense_key {
+        return;
+    }
+    check_equal_key_failed()
+}
+
+#[inline]
+#[track_caller]
+fn check_kv_same_len(keys_len: usize, values_len: usize) {
+    if keys_len == values_len {
+        return;
+    }
+    check_kv_same_len_failed()
+}
+
+#[inline]
+#[track_caller]
+fn check_kv_same_capacity(keys_capacity: usize, values_capacity: usize) {
+    if keys_capacity == values_capacity {
+        return;
+    }
+    check_kv_same_capacity_failed()
+}
 
 #[cfg(test)]
 mod tests {

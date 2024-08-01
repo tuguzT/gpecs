@@ -13,6 +13,7 @@ use alloc::{
     vec::{self, Vec},
 };
 use core::{
+    cmp,
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
@@ -44,6 +45,20 @@ fn kv_to_item<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
         (None, None) => None,
         _ => panic!("keys and values should have the same length"),
     }
+}
+
+#[inline]
+#[track_caller]
+fn get_value<'a, T>(key: usize, values: &'a [T], sparse: &[SparseEntry]) -> &'a T {
+    let sparse_entry = sparse
+        .get(key)
+        .expect("key from dense should be in bounds of sparse");
+    let dense_index = sparse_entry
+        .dense_index()
+        .expect("current sparse entry should be occupied");
+    values
+        .get(dense_index)
+        .expect("index from sparse should be in bounds of dense")
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -539,6 +554,147 @@ impl<T> SparseSet<T> {
             let value = self.dense_values.index_mut(dense_index);
             if !f(key, value) {
                 self.remove(key);
+            }
+        }
+    }
+
+    #[inline]
+    pub fn sort(&mut self)
+    where
+        T: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_by_cached_key(|&key| get_value(key, values, sparse))
+        });
+    }
+
+    #[inline]
+    pub fn sort_keys(&mut self) {
+        self.sort_impl(|keys, _, _| keys.sort());
+    }
+
+    #[inline]
+    pub fn sort_by<F>(&mut self, mut f: F)
+    where
+        F: FnMut((usize, &T), (usize, &T)) -> cmp::Ordering,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_by(|&lhs_key, &rhs_key| {
+                let lhs_value = get_value(lhs_key, values, sparse);
+                let rhs_value = get_value(rhs_key, values, sparse);
+                let lhs = (lhs_key, lhs_value);
+                let rhs = (rhs_key, rhs_value);
+                f(lhs, rhs)
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_by_key<K, F>(&mut self, mut f: F)
+    where
+        F: FnMut((usize, &T)) -> K,
+        K: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_by_key(|&key| {
+                let value = get_value(key, values, sparse);
+                f((key, value))
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_by_cached_key<K, F>(&mut self, mut f: F)
+    where
+        F: FnMut((usize, &T)) -> K,
+        K: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_by_cached_key(|&key| {
+                let value = get_value(key, values, sparse);
+                f((key, value))
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_unstable(&mut self)
+    where
+        T: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_unstable_by_key(|&key| get_value(key, values, sparse))
+        });
+    }
+
+    #[inline]
+    pub fn sort_keys_unstable(&mut self) {
+        self.sort_impl(|keys, _, _| keys.sort_unstable());
+    }
+
+    #[inline]
+    pub fn sort_unstable_by<F>(&mut self, mut f: F)
+    where
+        F: FnMut((usize, &T), (usize, &T)) -> cmp::Ordering,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_unstable_by(|&lhs_key, &rhs_key| {
+                let lhs_value = get_value(lhs_key, values, sparse);
+                let rhs_value = get_value(rhs_key, values, sparse);
+                let lhs = (lhs_key, lhs_value);
+                let rhs = (rhs_key, rhs_value);
+                f(lhs, rhs)
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_unstable_by_key<K, F>(&mut self, mut f: F)
+    where
+        F: FnMut((usize, &T)) -> K,
+        K: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_unstable_by_key(|&key| {
+                let value = get_value(key, values, sparse);
+                f((key, value))
+            })
+        });
+    }
+
+    // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
+    fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
+    where
+        SortKeys: FnOnce(&mut [usize], &[T], &[SparseEntry]),
+    {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        let dense_keys = dense_keys.as_mut_slice();
+        let dense_values = dense_values.as_mut_slice();
+        let sparse = sparse.as_mut_slice();
+        debug_assert_eq!(dense_keys.len(), dense_values.len());
+
+        sort_keys(dense_keys, dense_values, sparse);
+
+        for pos in 0..dense_keys.len() {
+            let mut curr = pos;
+            let mut next = sparse[dense_keys[curr]].dense_index().unwrap();
+
+            while curr != next {
+                let (curr_entry, next_entry) =
+                    get_pair_mut(sparse, dense_keys[curr], dense_keys[next]).unwrap();
+                let curr_dense_index = curr_entry.dense_index_mut().unwrap();
+                let next_dense_index = next_entry.dense_index_mut().unwrap();
+
+                dense_values.swap(*curr_dense_index, *next_dense_index);
+
+                *curr_dense_index = curr;
+                curr = next;
+                next = *next_dense_index;
             }
         }
     }
@@ -3021,6 +3177,66 @@ mod tests {
         assert_eq!(sparse_set.values().as_slice(), &[42]);
 
         assert_eq!(sparse_set.get(1), Some(&42));
+    }
+
+    #[test]
+    fn five_items_sort() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(8, 42);
+        sparse_set.insert(1, 228);
+        sparse_set.insert(4, 69);
+        sparse_set.insert(3, 666);
+        sparse_set.insert(6, 34);
+
+        sparse_set.sort();
+        assert_eq!(sparse_set.keys().as_slice(), &[6, 8, 4, 1, 3]);
+        assert_eq!(sparse_set.values().as_slice(), &[34, 42, 69, 228, 666]);
+
+        assert_eq!(sparse_set.get(8), Some(&42));
+        assert_eq!(sparse_set.get(1), Some(&228));
+        assert_eq!(sparse_set.get(4), Some(&69));
+        assert_eq!(sparse_set.get(3), Some(&666));
+        assert_eq!(sparse_set.get(6), Some(&34));
+    }
+
+    #[test]
+    fn five_items_sort_keys() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(8, 42);
+        sparse_set.insert(1, 228);
+        sparse_set.insert(4, 69);
+        sparse_set.insert(3, 666);
+        sparse_set.insert(6, 34);
+
+        sparse_set.sort_keys();
+        assert_eq!(sparse_set.keys().as_slice(), &[1, 3, 4, 6, 8]);
+        assert_eq!(sparse_set.values().as_slice(), &[228, 666, 69, 34, 42]);
+
+        assert_eq!(sparse_set.get(8), Some(&42));
+        assert_eq!(sparse_set.get(1), Some(&228));
+        assert_eq!(sparse_set.get(4), Some(&69));
+        assert_eq!(sparse_set.get(3), Some(&666));
+        assert_eq!(sparse_set.get(6), Some(&34));
+    }
+
+    #[test]
+    fn five_items_sort_by() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(8, 42);
+        sparse_set.insert(1, 228);
+        sparse_set.insert(4, 69);
+        sparse_set.insert(3, 666);
+        sparse_set.insert(6, 34);
+
+        sparse_set.sort_by(|(_, a), (_, b)| Ord::cmp(b, a));
+        assert_eq!(sparse_set.keys().as_slice(), &[3, 1, 4, 8, 6]);
+        assert_eq!(sparse_set.values().as_slice(), &[666, 228, 69, 42, 34]);
+
+        assert_eq!(sparse_set.get(8), Some(&42));
+        assert_eq!(sparse_set.get(1), Some(&228));
+        assert_eq!(sparse_set.get(4), Some(&69));
+        assert_eq!(sparse_set.get(3), Some(&666));
+        assert_eq!(sparse_set.get(6), Some(&34));
     }
 
     #[test]

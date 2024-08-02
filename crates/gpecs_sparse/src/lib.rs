@@ -3009,7 +3009,7 @@ mod tests {
 
     #[test]
     fn one_item_keys() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
 
         let keys = sparse_set.keys();
@@ -3019,7 +3019,7 @@ mod tests {
 
     #[test]
     fn one_item_into_keys() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
 
         let keys = sparse_set.into_keys();
@@ -3029,7 +3029,7 @@ mod tests {
 
     #[test]
     fn one_item_values() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
 
         let values = sparse_set.values();
@@ -3039,7 +3039,7 @@ mod tests {
 
     #[test]
     fn one_item_values_mut() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
 
         let values_mut = sparse_set.values_mut();
@@ -3049,7 +3049,7 @@ mod tests {
 
     #[test]
     fn one_item_into_values() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
 
         let values = sparse_set.into_values();
@@ -3059,7 +3059,7 @@ mod tests {
 
     #[test]
     fn one_item_iter() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
 
         let iter = sparse_set.iter();
@@ -3070,7 +3070,7 @@ mod tests {
 
     #[test]
     fn one_item_iter_mut() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
 
         let iter_mut = sparse_set.iter_mut();
@@ -3081,7 +3081,7 @@ mod tests {
 
     #[test]
     fn one_item_into_iter() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
 
         let into_iter = sparse_set.into_iter();
@@ -3417,7 +3417,7 @@ mod tests {
 
     #[test]
     fn three_items_iter() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(2, 34);
         sparse_set.insert(1, 42);
         sparse_set.insert(5, 69);
@@ -3430,7 +3430,7 @@ mod tests {
 
     #[test]
     fn three_items_iter_mut() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(2, 34);
         sparse_set.insert(1, 42);
         sparse_set.insert(5, 69);
@@ -3443,7 +3443,7 @@ mod tests {
 
     #[test]
     fn three_items_into_iter() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(2, 34);
         sparse_set.insert(1, 42);
         sparse_set.insert(5, 69);
@@ -3710,7 +3710,7 @@ mod tests {
         let keys = [3, 10, 5, 10, 1, usize::MAX];
         let values = [34, 42, 69, 228, 666];
 
-        let sparse_set: SparseSet<i32> = keys.into_iter().zip(values).collect();
+        let sparse_set: SparseSet<_> = keys.into_iter().zip(values).collect();
         assert_eq!(sparse_set.len(), 4);
         assert_eq!(sparse_set.keys().as_slice(), &[3, 10, 5, 1]);
         assert_eq!(sparse_set.values().as_slice(), &[34, 228, 69, 666]);
@@ -3727,7 +3727,7 @@ mod tests {
         let keys = [3, 10, 5, 10, 1, usize::MAX];
         let values = [34, 42, 69, 228, 666, 999];
 
-        let sparse_set: SparseSet<i32> = keys.into_iter().zip(values).collect();
+        let sparse_set: SparseSet<_> = keys.into_iter().zip(values).collect();
         assert_eq!(sparse_set.len(), 4);
         assert_eq!(sparse_set.keys().as_slice(), &[3, 10, 5, 1, usize::MAX]);
         assert_eq!(sparse_set.values().as_slice(), &[34, 228, 69, 666, 999]);
@@ -3742,7 +3742,7 @@ mod tests {
     #[test]
     fn from_values_iter() {
         let values = [34, 42, 69, 228, 666];
-        let sparse_set: SparseSet<i32> = values.into_iter().collect();
+        let sparse_set: SparseSet<_> = values.into_iter().collect();
 
         assert_eq!(sparse_set.len(), 5);
         assert_eq!(sparse_set.keys().as_slice(), &[0, 1, 2, 3, 4]);
@@ -3757,7 +3757,7 @@ mod tests {
 
     #[test]
     fn extend_keys_values() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(2, 34);
         sparse_set.insert(1, 42);
         sparse_set.insert(5, 69);
@@ -3772,7 +3772,7 @@ mod tests {
 
     #[test]
     fn extend_values() {
-        let mut sparse_set = SparseSet::<i32>::new();
+        let mut sparse_set = SparseSet::new();
         sparse_set.insert(2, 34);
         sparse_set.insert(1, 42);
         sparse_set.insert(4, 69);

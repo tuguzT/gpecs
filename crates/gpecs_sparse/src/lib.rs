@@ -974,6 +974,7 @@ impl SparseEntry {
     }
 }
 
+#[derive(Debug)]
 pub enum Entry<'a, T> {
     Occupied(OccupiedEntry<'a, T>),
     Vacant(VacantEntry<'a, T>),
@@ -1090,6 +1091,18 @@ pub struct OccupiedEntry<'a, T> {
     sparse_set: &'a mut SparseSet<T>,
 }
 
+impl<'a, T: Debug> Debug for OccupiedEntry<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, .. } = self;
+
+        let value = self.get();
+        f.debug_struct("OccupiedEntry")
+            .field("key", key)
+            .field("value", value)
+            .finish()
+    }
+}
+
 impl<'a, T> OccupiedEntry<'a, T> {
     #[inline]
     pub fn key(&self) -> usize {
@@ -1177,6 +1190,13 @@ impl<'a, T> OccupiedEntry<'a, T> {
 pub struct VacantEntry<'a, T> {
     key: usize,
     sparse_set: &'a mut SparseSet<T>,
+}
+
+impl<'a, T> Debug for VacantEntry<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, .. } = self;
+        f.debug_struct("VacantEntry").field("key", key).finish()
+    }
 }
 
 impl<'a, T> VacantEntry<'a, T> {

@@ -664,6 +664,26 @@ impl<T> SparseSet<T> {
         true
     }
 
+    pub fn entry(&mut self, key: usize) -> Entry<'_, T> {
+        let Self {
+            dense_keys, sparse, ..
+        } = self;
+
+        let Some(dense_index) = sparse.get(key).and_then(SparseEntry::dense_index) else {
+            let sparse_set = self;
+            let entry = VacantEntry { key, sparse_set };
+            return Entry::Vacant(entry);
+        };
+
+        check_dense_index_bounds(dense_index, dense_keys.len());
+        let entry = OccupiedEntry {
+            key,
+            dense_index,
+            sparse_set: self,
+        };
+        Entry::Occupied(entry)
+    }
+
     #[inline]
     pub fn clear(&mut self) {
         let Self {
@@ -676,9 +696,6 @@ impl<T> SparseSet<T> {
         dense_values.clear();
         sparse.clear();
     }
-
-    // TODO operations from `Vec<T>` and `HashMap<K, V>` if possible
-    // TODO Entry API
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, T> {
@@ -955,6 +972,259 @@ impl SparseEntry {
             Self::Vacant => None,
         }
     }
+}
+
+pub enum Entry<'a, T> {
+    Occupied(OccupiedEntry<'a, T>),
+    Vacant(VacantEntry<'a, T>),
+}
+
+impl<'a, T> Entry<'a, T> {
+    #[inline]
+    pub const fn is_occupied(&self) -> bool {
+        matches!(self, Self::Occupied(_))
+    }
+
+    #[inline]
+    pub const fn is_vacant(&self) -> bool {
+        matches!(self, Self::Vacant(_))
+    }
+
+    #[inline]
+    pub fn key(&self) -> usize {
+        match self {
+            Self::Occupied(entry) => entry.key(),
+            Self::Vacant(entry) => entry.key(),
+        }
+    }
+
+    #[inline]
+    pub fn get(&self) -> Option<&T> {
+        match self {
+            Self::Occupied(entry) => Some(entry.get()),
+            Self::Vacant(_) => None,
+        }
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        match self {
+            Self::Occupied(entry) => Some(entry.get_mut()),
+            Self::Vacant(_) => None,
+        }
+    }
+
+    #[inline]
+    pub fn and_modify<F>(self, f: F) -> Self
+    where
+        F: FnOnce(&mut T),
+    {
+        match self {
+            Self::Occupied(mut entry) => {
+                f(entry.get_mut());
+                Self::Occupied(entry)
+            }
+            Self::Vacant(entry) => Self::Vacant(entry),
+        }
+    }
+
+    #[inline]
+    pub fn or_insert(self, default: T) -> &'a mut T {
+        match self {
+            Self::Occupied(entry) => entry.into_mut(),
+            Self::Vacant(entry) => entry.insert(default),
+        }
+    }
+
+    #[inline]
+    pub fn or_insert_with<F>(self, default: F) -> &'a mut T
+    where
+        F: FnOnce() -> T,
+    {
+        match self {
+            Self::Occupied(entry) => entry.into_mut(),
+            Self::Vacant(entry) => entry.insert(default()),
+        }
+    }
+
+    #[inline]
+    pub fn or_default(self) -> &'a mut T
+    where
+        T: Default,
+    {
+        match self {
+            Self::Occupied(entry) => entry.into_mut(),
+            Self::Vacant(entry) => entry.insert(Default::default()),
+        }
+    }
+
+    #[inline]
+    pub fn insert_entry(self, value: T) -> OccupiedEntry<'a, T> {
+        match self {
+            Self::Occupied(mut entry) => {
+                entry.insert(value);
+                entry
+            }
+            Self::Vacant(entry) => entry.insert_entry(value),
+        }
+    }
+
+    #[inline]
+    pub fn replace_key(self, key: usize) -> Self {
+        match self {
+            Self::Occupied(mut entry) => {
+                entry.replace_key(key);
+                Self::Occupied(entry)
+            }
+            Self::Vacant(entry) => {
+                let VacantEntry { sparse_set, .. } = entry;
+                sparse_set.entry(key)
+            }
+        }
+    }
+}
+
+pub struct OccupiedEntry<'a, T> {
+    key: usize,
+    dense_index: usize,
+    sparse_set: &'a mut SparseSet<T>,
+}
+
+impl<'a, T> OccupiedEntry<'a, T> {
+    #[inline]
+    pub fn key(&self) -> usize {
+        let Self { key, .. } = self;
+        *key
+    }
+
+    #[inline]
+    pub fn get(&self) -> &T {
+        let Self {
+            dense_index,
+            sparse_set,
+            ..
+        } = self;
+
+        let values = sparse_set.dense_values.as_slice();
+        unwrap_dense_value(values, *dense_index)
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut T {
+        let Self {
+            dense_index,
+            sparse_set,
+            ..
+        } = self;
+
+        let values = sparse_set.dense_values.as_mut_slice();
+        unwrap_dense_value_mut(values, *dense_index)
+    }
+
+    #[inline]
+    pub fn into_mut(self) -> &'a mut T {
+        let Self {
+            dense_index,
+            sparse_set,
+            ..
+        } = self;
+
+        let values = sparse_set.dense_values.as_mut_slice();
+        unwrap_dense_value_mut(values, dense_index)
+    }
+
+    #[inline]
+    pub fn insert(&mut self, value: T) -> T {
+        let previous = self.get_mut();
+        replace(previous, value)
+    }
+
+    #[inline]
+    pub fn remove(self) -> T {
+        let Self {
+            key, sparse_set, ..
+        } = self;
+
+        let value = sparse_set.remove(key);
+        unwrap_entry_value(value)
+    }
+
+    #[inline]
+    pub fn swap_remove(self) -> T {
+        let Self {
+            key, sparse_set, ..
+        } = self;
+
+        let value = sparse_set.swap_remove(key);
+        unwrap_entry_value(value)
+    }
+
+    #[inline]
+    pub fn replace_key(&mut self, key: usize) -> Option<T> {
+        let new_key = key;
+        let Self {
+            key, sparse_set, ..
+        } = self;
+
+        let value = sparse_set.remove(*key);
+        let value = unwrap_entry_value(value);
+
+        *key = new_key;
+        sparse_set.insert(*key, value)
+    }
+}
+
+pub struct VacantEntry<'a, T> {
+    key: usize,
+    sparse_set: &'a mut SparseSet<T>,
+}
+
+impl<'a, T> VacantEntry<'a, T> {
+    #[inline]
+    pub fn key(&self) -> usize {
+        let Self { key, .. } = self;
+        *key
+    }
+
+    #[inline]
+    pub fn insert(self, value: T) -> &'a mut T {
+        let Self { key, sparse_set } = self;
+
+        sparse_set.insert(key, value);
+
+        let value = sparse_set.dense_values.last_mut();
+        unwrap_entry_value(value)
+    }
+
+    #[inline]
+    pub fn insert_entry(self, value: T) -> OccupiedEntry<'a, T> {
+        let Self { key, sparse_set } = self;
+
+        sparse_set.insert(key, value);
+        let dense_index = sparse_set.dense_values.len() - 1;
+
+        OccupiedEntry {
+            key,
+            dense_index,
+            sparse_set,
+        }
+    }
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn unwrap_entry_value_failed() -> ! {
+    panic!("value by provided key should exist")
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_entry_value<T>(value: Option<T>) -> T {
+    let Some(value) = value else {
+        unwrap_entry_value_failed()
+    };
+    value
 }
 
 pub struct Keys<'a, T> {
@@ -3388,6 +3658,31 @@ mod tests {
         assert_eq!(sparse_set.get(4), Some(&69));
         assert_eq!(sparse_set.get(3), Some(&666));
         assert_eq!(sparse_set.get(6), Some(&34));
+    }
+
+    #[test]
+    fn five_items_entry() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(8, 42);
+        sparse_set.insert(1, 228);
+        sparse_set.insert(4, 69);
+        sparse_set.insert(3, 666);
+        sparse_set.insert(6, 34);
+
+        let entry = sparse_set.entry(0);
+        assert_eq!(entry.key(), 0);
+        assert_eq!(entry.get(), None);
+
+        let entry = entry.and_modify(|value| *value += 1);
+        assert_eq!(entry.key(), 0);
+        assert_eq!(entry.get(), None);
+
+        let entry = entry.replace_key(1);
+        assert_eq!(entry.key(), 1);
+        assert_eq!(entry.get(), Some(&228));
+
+        let value = entry.and_modify(|value| *value += 1).or_insert(47);
+        assert_eq!(value, &229);
     }
 
     #[test]

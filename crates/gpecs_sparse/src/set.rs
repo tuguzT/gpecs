@@ -5,7 +5,7 @@ use alloc::{
 };
 use core::{
     cmp,
-    fmt::{self, Debug},
+    fmt::{self, Debug, Display},
     iter::FusedIterator,
     marker::PhantomData,
     mem::{replace, swap},
@@ -13,16 +13,24 @@ use core::{
     slice,
 };
 
-// TODO add support for generations, or epochs
+use crate::key::{Epoch, Key};
+
+pub type SparseSet<T> = EpochSparseSet<usize, T>;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct SparseSet<T> {
-    dense_keys: Vec<usize>,
-    dense_values: Vec<T>,
-    sparse: Vec<SparseEntry>,
+pub struct EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    dense_keys: Vec<K>,
+    dense_values: Vec<V>,
+    sparse: Vec<SparseItem<K::Epoch>>,
 }
 
-impl<T> SparseSet<T> {
+impl<K, V> EpochSparseSet<K, V>
+where
+    K: Key,
+{
     #[inline]
     pub const fn new() -> Self {
         Self {
@@ -219,78 +227,93 @@ impl<T> SparseSet<T> {
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[T] {
+    pub fn as_slice(&self) -> &[V] {
         let Self { dense_values, .. } = self;
         dense_values.as_slice()
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
+    pub fn as_mut_slice(&mut self) -> &mut [V] {
         let Self { dense_values, .. } = self;
         dense_values.as_mut_slice()
     }
 
     #[inline]
-    pub fn into_boxed_slice(self) -> Box<[T]> {
+    pub fn into_boxed_slice(self) -> Box<[V]> {
         let Self { dense_values, .. } = self;
         dense_values.into_boxed_slice()
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const T {
+    pub fn as_ptr(&self) -> *const V {
         let Self { dense_values, .. } = self;
         dense_values.as_ptr()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut T {
+    pub fn as_mut_ptr(&mut self) -> *mut V {
         let Self { dense_values, .. } = self;
         dense_values.as_mut_ptr()
     }
 
-    pub fn insert(&mut self, key: usize, value: T) -> Option<T> {
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         let Self {
             dense_keys,
             dense_values,
             sparse,
         } = self;
 
-        if key >= sparse.len() {
-            sparse.resize(key.saturating_add(1), SparseEntry::Vacant);
+        let sparse_index = key.sparse_index();
+        if sparse_index >= sparse.len() {
+            let epoch = Default::default();
+            let value = SparseItem::vacant(epoch);
+            sparse.resize(sparse_index.saturating_add(1), value);
         }
 
-        let sparse = sparse.as_mut_slice();
-        if let SparseEntry::Occupied { dense_index } = sparse[key] {
-            let entry_value = unwrap_dense_value_mut(dense_values, dense_index);
-            let value = replace(entry_value, value);
+        let sparse_item = sparse.index_mut(sparse_index);
+        if key.epoch() != sparse_item.epoch {
+            return None;
+        }
+
+        if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
+            let value_mut = unwrap_dense_value_mut(dense_values, dense_index);
+            let value = replace(value_mut, value);
             return Some(value);
         }
 
         check_kv_same_len(dense_keys.len(), dense_values.len());
         dense_keys.push(key);
         dense_values.push(value);
-        sparse[key] = SparseEntry::occupied(dense_keys.len() - 1);
+        *sparse_item = SparseItem::occupied(dense_keys.len() - 1, key.epoch());
 
         None
     }
 
-    pub fn try_insert(&mut self, key: usize, value: T) -> Result<Option<T>, TryReserveError> {
+    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryReserveError> {
         let Self {
             dense_keys,
             dense_values,
             sparse,
         } = self;
 
-        if key >= sparse.len() {
-            let new_sparse_len = key.saturating_add(1);
+        let sparse_index = key.sparse_index();
+        if sparse_index >= sparse.len() {
+            let new_sparse_len = sparse_index.saturating_add(1);
             sparse.try_reserve(new_sparse_len - sparse.len())?;
-            sparse.resize(new_sparse_len, SparseEntry::Vacant);
+
+            let epoch = Default::default();
+            let value = SparseItem::vacant(epoch);
+            sparse.resize(new_sparse_len, value);
         }
 
-        let sparse = sparse.as_mut_slice();
-        if let SparseEntry::Occupied { dense_index } = sparse[key] {
-            let entry_value = unwrap_dense_value_mut(dense_values, dense_index);
-            let value = replace(entry_value, value);
+        let sparse_item = sparse.index_mut(sparse_index);
+        if key.epoch() != sparse_item.epoch {
+            return Ok(None);
+        }
+
+        if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
+            let value_mut = unwrap_dense_value_mut(dense_values, dense_index);
+            let value = replace(value_mut, value);
             return Ok(Some(value));
         }
 
@@ -300,50 +323,66 @@ impl<T> SparseSet<T> {
 
         dense_keys.push(key);
         dense_values.push(value);
-        sparse[key] = SparseEntry::occupied(dense_keys.len() - 1);
+        *sparse_item = SparseItem::occupied(dense_keys.len() - 1, key.epoch());
 
         Ok(None)
     }
 
-    pub fn push(&mut self, value: T) -> usize {
+    pub fn push(&mut self, value: V) -> K {
         let Self { sparse, .. } = self;
 
-        let key = sparse
+        let (sparse_index, epoch) = sparse
             .iter()
-            .position(SparseEntry::is_vacant)
-            .unwrap_or(self.sparse.len());
-        self.insert(key, value);
+            .enumerate()
+            .find(|(_, item)| item.is_vacant())
+            .map(|(sparse_index, item)| (sparse_index, item.epoch))
+            .unwrap_or((self.sparse.len(), Default::default()));
+        let key = K::new(sparse_index, epoch);
 
+        self.insert(key, value);
         key
     }
 
-    pub fn try_push(&mut self, value: T) -> Result<usize, TryReserveError> {
+    pub fn try_push(&mut self, value: V) -> Result<K, TryReserveError> {
         let Self { sparse, .. } = self;
 
-        let key = sparse
+        let (sparse_index, epoch) = sparse
             .iter()
-            .position(SparseEntry::is_vacant)
-            .unwrap_or(self.sparse.len());
-        self.try_insert(key, value)?;
+            .enumerate()
+            .find(|(_, item)| item.is_vacant())
+            .map(|(sparse_index, item)| (sparse_index, item.epoch))
+            .unwrap_or((self.sparse.len(), Default::default()));
+        let key = K::new(sparse_index, epoch);
 
+        self.try_insert(key, value)?;
         Ok(key)
     }
 
-    pub fn swap(&mut self, first_key: usize, second_key: usize) {
+    pub fn swap(&mut self, first_key: K, second_key: K) {
         let Self {
             dense_values,
             sparse,
             ..
         } = self;
 
-        if first_key == second_key {
+        let first_index = first_key.sparse_index();
+        let second_index = second_key.sparse_index();
+        if first_index == second_index {
             return;
         }
 
-        let Some(first_index) = sparse.get(first_key).and_then(SparseEntry::dense_index) else {
+        let Some(first_index) = sparse
+            .get(first_index)
+            .take_if(|item| item.epoch == first_key.epoch())
+            .and_then(SparseItem::dense_index)
+        else {
             return;
         };
-        let Some(second_index) = sparse.get(second_key).and_then(SparseEntry::dense_index) else {
+        let Some(second_index) = sparse
+            .get(second_index)
+            .take_if(|item| item.epoch == second_key.epoch())
+            .and_then(SparseItem::dense_index)
+        else {
             return;
         };
 
@@ -352,14 +391,18 @@ impl<T> SparseSet<T> {
         swap(first_value, second_value);
     }
 
-    pub fn swap_remove(&mut self, key: usize) -> Option<T> {
+    pub fn swap_remove(&mut self, key: K) -> Option<V> {
         let Self {
             dense_keys,
             dense_values,
             sparse,
         } = self;
 
-        let dense_index = sparse.get(key).and_then(SparseEntry::dense_index)?;
+        let sparse_index = key.sparse_index();
+        let dense_index = sparse
+            .get(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())
+            .and_then(SparseItem::dense_index)?;
         check_dense_index_bounds(dense_index, dense_keys.len());
 
         check_kv_same_len(dense_keys.len(), dense_values.len());
@@ -367,20 +410,24 @@ impl<T> SparseSet<T> {
         let dense_key = dense_keys.swap_remove(dense_index);
         check_equal_key(key, dense_key);
 
-        sparse[dense_keys.len()] = sparse[key];
-        sparse[key] = SparseEntry::Vacant;
+        sparse[dense_keys.len()] = sparse[sparse_index];
+        sparse[sparse_index] = SparseItem::vacant(key.epoch().next());
 
         Some(value)
     }
 
-    pub fn remove(&mut self, key: usize) -> Option<T> {
+    pub fn remove(&mut self, key: K) -> Option<V> {
         let Self {
             dense_keys,
             dense_values,
             sparse,
         } = self;
 
-        let dense_index = sparse.get(key).and_then(SparseEntry::dense_index)?;
+        let sparse_index = key.sparse_index();
+        let dense_index = sparse
+            .get(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())
+            .and_then(SparseItem::dense_index)?;
         check_dense_index_bounds(dense_index, dense_keys.len());
 
         check_kv_same_len(dense_keys.len(), dense_values.len());
@@ -389,16 +436,17 @@ impl<T> SparseSet<T> {
         check_equal_key(key, dense_key);
 
         for key in dense_keys.iter().copied().skip(dense_index) {
-            let sparse_entry = unwrap_sparse_entry_mut(sparse, key);
-            let dense_index = unwrap_dense_index_mut(sparse_entry);
+            let sparse_index = key.sparse_index();
+            let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
+            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
             *dense_index -= 1;
         }
-        sparse[key] = SparseEntry::Vacant;
+        sparse[sparse_index] = SparseItem::vacant(key.epoch().next());
 
         Some(value)
     }
 
-    pub fn pop(&mut self) -> Option<(usize, T)> {
+    pub fn pop(&mut self) -> Option<(K, V)> {
         let Self {
             dense_keys,
             dense_values,
@@ -409,8 +457,9 @@ impl<T> SparseSet<T> {
         let value = dense_values.pop();
         let (key, value) = match_kv_same_kind(key, value)?;
 
-        check_key_bounds(key, sparse.len());
-        sparse[key] = SparseEntry::Vacant;
+        let sparse_index = key.sparse_index();
+        check_key_bounds(sparse_index, sparse.len());
+        sparse[sparse_index] = SparseItem::vacant(key.epoch().next());
 
         Some((key, value))
     }
@@ -423,13 +472,15 @@ impl<T> SparseSet<T> {
         self.dense_keys.truncate(dense_len);
         self.dense_values.truncate(dense_len);
 
-        for key in sparse_len..self.sparse_len() {
+        for sparse_index in sparse_len..self.sparse_len() {
+            let epoch = self.sparse[sparse_index].epoch;
+            let key = K::new(sparse_index, epoch.next());
             self.remove(key);
         }
         self.sparse.truncate(sparse_len);
     }
 
-    pub fn drain(&mut self) -> Drain<'_, T> {
+    pub fn drain(&mut self) -> Drain<'_, K, V> {
         let Self {
             dense_keys,
             dense_values,
@@ -446,7 +497,7 @@ impl<T> SparseSet<T> {
 
     pub fn retain<F>(&mut self, mut f: F)
     where
-        F: FnMut(usize, &mut T) -> bool,
+        F: FnMut(K, &mut V) -> bool,
     {
         for dense_index in (0..self.len()).rev() {
             let key = self.dense_keys[dense_index];
@@ -460,10 +511,13 @@ impl<T> SparseSet<T> {
     #[inline]
     pub fn sort(&mut self)
     where
-        T: Ord,
+        V: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
-            keys.sort_by_cached_key(|&key| unwrap_value_from_key(key, values, sparse))
+            keys.sort_by_cached_key(|&key| {
+                let sparse_index = key.sparse_index();
+                unwrap_value_from_sparse_index(sparse_index, values, sparse)
+            })
         });
     }
 
@@ -475,42 +529,48 @@ impl<T> SparseSet<T> {
     #[inline]
     pub fn sort_by<F>(&mut self, mut f: F)
     where
-        F: FnMut((usize, &T), (usize, &T)) -> cmp::Ordering,
+        F: FnMut((K, &V), (K, &V)) -> cmp::Ordering,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by(|&lhs_key, &rhs_key| {
-                let lhs_value = unwrap_value_from_key(lhs_key, values, sparse);
-                let rhs_value = unwrap_value_from_key(rhs_key, values, sparse);
+                let lhs_index = lhs_key.sparse_index();
+                let lhs_value = unwrap_value_from_sparse_index(lhs_index, values, sparse);
                 let lhs = (lhs_key, lhs_value);
+
+                let rhs_index = rhs_key.sparse_index();
+                let rhs_value = unwrap_value_from_sparse_index(rhs_index, values, sparse);
                 let rhs = (rhs_key, rhs_value);
+
                 f(lhs, rhs)
             })
         });
     }
 
     #[inline]
-    pub fn sort_by_key<K, F>(&mut self, mut f: F)
+    pub fn sort_by_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((usize, &T)) -> K,
-        K: Ord,
+        F: FnMut((K, &V)) -> T,
+        T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_key(|&key| {
-                let value = unwrap_value_from_key(key, values, sparse);
+                let sparse_index = key.sparse_index();
+                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
                 f((key, value))
             })
         });
     }
 
     #[inline]
-    pub fn sort_by_cached_key<K, F>(&mut self, mut f: F)
+    pub fn sort_by_cached_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((usize, &T)) -> K,
-        K: Ord,
+        F: FnMut((K, &V)) -> T,
+        T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
-                let value = unwrap_value_from_key(key, values, sparse);
+                let sparse_index = key.sparse_index();
+                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
                 f((key, value))
             })
         });
@@ -519,10 +579,13 @@ impl<T> SparseSet<T> {
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        T: Ord,
+        V: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
-            keys.sort_unstable_by_key(|&key| unwrap_value_from_key(key, values, sparse))
+            keys.sort_unstable_by_key(|&key| {
+                let sparse_index = key.sparse_index();
+                unwrap_value_from_sparse_index(sparse_index, values, sparse)
+            })
         });
     }
 
@@ -534,28 +597,33 @@ impl<T> SparseSet<T> {
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, mut f: F)
     where
-        F: FnMut((usize, &T), (usize, &T)) -> cmp::Ordering,
+        F: FnMut((K, &V), (K, &V)) -> cmp::Ordering,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by(|&lhs_key, &rhs_key| {
-                let lhs_value = unwrap_value_from_key(lhs_key, values, sparse);
-                let rhs_value = unwrap_value_from_key(rhs_key, values, sparse);
+                let lhs_index = lhs_key.sparse_index();
+                let lhs_value = unwrap_value_from_sparse_index(lhs_index, values, sparse);
                 let lhs = (lhs_key, lhs_value);
+
+                let rhs_index = rhs_key.sparse_index();
+                let rhs_value = unwrap_value_from_sparse_index(rhs_index, values, sparse);
                 let rhs = (rhs_key, rhs_value);
+
                 f(lhs, rhs)
             })
         });
     }
 
     #[inline]
-    pub fn sort_unstable_by_key<K, F>(&mut self, mut f: F)
+    pub fn sort_unstable_by_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((usize, &T)) -> K,
-        K: Ord,
+        F: FnMut((K, &V)) -> T,
+        T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
-                let value = unwrap_value_from_key(key, values, sparse);
+                let sparse_index = key.sparse_index();
+                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
                 f((key, value))
             })
         });
@@ -566,7 +634,7 @@ impl<T> SparseSet<T> {
     // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
     fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
     where
-        SortKeys: FnOnce(&mut [usize], &[T], &[SparseEntry]),
+        SortKeys: FnOnce(&mut [K], &[V], &[SparseItem<K::Epoch>]),
     {
         let Self {
             dense_keys,
@@ -584,19 +652,19 @@ impl<T> SparseSet<T> {
         for pos in 0..dense_keys.len() {
             let mut curr = pos;
             let mut next = {
-                let key = unwrap_dense_key(dense_keys, curr);
-                let entry = unwrap_sparse_entry(sparse, key);
-                unwrap_dense_index(&entry)
+                let sparse_index = unwrap_dense_key(dense_keys, curr).sparse_index();
+                let sparse_item = unwrap_sparse_item(sparse, sparse_index);
+                unwrap_dense_index(sparse_item.kind())
             };
 
             while curr != next {
-                let (curr_entry, next_entry) = {
-                    let first_key = unwrap_dense_key(dense_keys, curr);
-                    let second_key = unwrap_dense_key(dense_keys, next);
-                    unwrap_sparse_entry_pair_mut(sparse, first_key, second_key)
+                let (curr_item, next_item) = {
+                    let first_index = unwrap_dense_key(dense_keys, curr).sparse_index();
+                    let second_index = unwrap_dense_key(dense_keys, next).sparse_index();
+                    unwrap_sparse_items_pair_mut(sparse, first_index, second_index)
                 };
-                let curr_dense_index = unwrap_dense_index_mut(curr_entry);
-                let next_dense_index = unwrap_dense_index_mut(next_entry);
+                let curr_dense_index = unwrap_dense_index_mut(curr_item.kind_mut());
+                let next_dense_index = unwrap_dense_index_mut(next_item.kind_mut());
 
                 dense_values.swap(*curr_dense_index, *next_dense_index);
 
@@ -607,49 +675,62 @@ impl<T> SparseSet<T> {
         }
     }
 
-    pub fn get(&self, key: usize) -> Option<&T> {
+    pub fn get(&self, key: K) -> Option<&V> {
         let Self {
             dense_keys,
             dense_values,
             sparse,
         } = self;
 
-        let sparse_entry = sparse.get(key).copied()?;
-        let dense_index = sparse_entry.dense_index()?;
+        let sparse_index = key.sparse_index();
+        let sparse_item = sparse
+            .get(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())
+            .copied()?;
+        let dense_index = sparse_item.dense_index()?;
 
         let value = unwrap_dense_value(dense_values, dense_index);
         let dense_key = unwrap_dense_key(dense_keys, dense_index);
-        check_equal_key(key, dense_key);
+        check_equal_key(key, *dense_key);
 
         Some(value)
     }
 
-    pub fn get_mut(&mut self, key: usize) -> Option<&mut T> {
+    pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
         let Self {
             dense_keys,
             dense_values,
             sparse,
         } = self;
 
-        let sparse_entry = sparse.get(key).copied()?;
-        let dense_index = sparse_entry.dense_index()?;
+        let sparse_index = key.sparse_index();
+        let sparse_item = sparse
+            .get(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())
+            .copied()?;
+        let dense_index = sparse_item.dense_index()?;
 
         let value = unwrap_dense_value_mut(dense_values, dense_index);
         let dense_key = unwrap_dense_key(dense_keys, dense_index);
-        check_equal_key(key, dense_key);
+        check_equal_key(key, *dense_key);
 
         Some(value)
     }
 
-    pub fn contains_key(&self, key: usize) -> bool {
+    pub fn contains_key(&self, key: K) -> bool {
         let Self {
             dense_keys, sparse, ..
         } = self;
 
-        let Some(sparse_entry) = sparse.get(key).copied() else {
+        let sparse_index = key.sparse_index();
+        let Some(sparse_item) = sparse
+            .get(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())
+            .copied()
+        else {
             return false;
         };
-        let SparseEntry::Occupied { dense_index } = sparse_entry else {
+        let SparseItemKind::Occupied { dense_index } = sparse_item.kind else {
             return false;
         };
 
@@ -657,12 +738,17 @@ impl<T> SparseSet<T> {
         true
     }
 
-    pub fn entry(&mut self, key: usize) -> Entry<'_, T> {
+    pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
         let Self {
             dense_keys, sparse, ..
         } = self;
 
-        let Some(dense_index) = sparse.get(key).and_then(SparseEntry::dense_index) else {
+        let sparse_index = key.sparse_index();
+        let Some(dense_index) = sparse
+            .get(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())
+            .and_then(SparseItem::dense_index)
+        else {
             let sparse_set = self;
             let entry = VacantEntry { key, sparse_set };
             return Entry::Vacant(entry);
@@ -691,7 +777,7 @@ impl<T> SparseSet<T> {
     }
 
     #[inline]
-    pub fn keys(&self) -> Keys<'_, T> {
+    pub fn keys(&self) -> Keys<'_, K, V> {
         let Self { dense_keys, .. } = self;
 
         let keys = dense_keys.iter();
@@ -700,7 +786,7 @@ impl<T> SparseSet<T> {
     }
 
     #[inline]
-    pub fn into_keys(self) -> IntoKeys<T> {
+    pub fn into_keys(self) -> IntoKeys<K, V> {
         let Self { dense_keys, .. } = self;
 
         let keys = dense_keys.into_iter();
@@ -709,31 +795,34 @@ impl<T> SparseSet<T> {
     }
 
     #[inline]
-    pub fn values(&self) -> Values<'_, T> {
+    pub fn values(&self) -> Values<'_, K, V> {
         let Self { dense_values, .. } = self;
 
         let values = dense_values.iter();
-        Values { values }
+        let phantom = PhantomData;
+        Values { values, phantom }
     }
 
     #[inline]
-    pub fn values_mut(&mut self) -> ValuesMut<'_, T> {
+    pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
         let Self { dense_values, .. } = self;
 
         let values = dense_values.iter_mut();
-        ValuesMut { values }
+        let phantom = PhantomData;
+        ValuesMut { values, phantom }
     }
 
     #[inline]
-    pub fn into_values(self) -> IntoValues<T> {
+    pub fn into_values(self) -> IntoValues<K, V> {
         let Self { dense_values, .. } = self;
 
         let values = dense_values.into_iter();
-        IntoValues { values }
+        let phantom = PhantomData;
+        IntoValues { values, phantom }
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub fn iter(&self) -> Iter<'_, K, V> {
         let Self {
             dense_keys,
             dense_values,
@@ -748,7 +837,7 @@ impl<T> SparseSet<T> {
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         let Self {
             dense_keys,
             dense_values,
@@ -763,11 +852,14 @@ impl<T> SparseSet<T> {
     }
 }
 
-impl<T> Index<usize> for SparseSet<T> {
-    type Output = T;
+impl<K, V> Index<K> for EpochSparseSet<K, V>
+where
+    K: Key + Display,
+{
+    type Output = V;
 
     #[inline]
-    fn index(&self, key: usize) -> &Self::Output {
+    fn index(&self, key: K) -> &Self::Output {
         match self.get(key) {
             Some(value) => value,
             None => panic!("key {key} not found"),
@@ -775,9 +867,12 @@ impl<T> Index<usize> for SparseSet<T> {
     }
 }
 
-impl<T> IndexMut<usize> for SparseSet<T> {
+impl<K, V> IndexMut<K> for EpochSparseSet<K, V>
+where
+    K: Key + Display,
+{
     #[inline]
-    fn index_mut(&mut self, key: usize) -> &mut Self::Output {
+    fn index_mut(&mut self, key: K) -> &mut Self::Output {
         match self.get_mut(key) {
             Some(value) => value,
             None => panic!("key {key} not found"),
@@ -785,38 +880,53 @@ impl<T> IndexMut<usize> for SparseSet<T> {
     }
 }
 
-impl<T> AsRef<[T]> for SparseSet<T> {
+impl<K, V> AsRef<[V]> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[V] {
         self.as_slice()
     }
 }
 
-impl<T> AsMut<[T]> for SparseSet<T> {
+impl<K, V> AsMut<[V]> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
     #[inline]
-    fn as_mut(&mut self) -> &mut [T] {
+    fn as_mut(&mut self) -> &mut [V] {
         self.as_mut_slice()
     }
 }
 
-impl<T> AsRef<SparseSet<T>> for SparseSet<T> {
+impl<K, V> AsRef<EpochSparseSet<K, V>> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
     #[inline]
-    fn as_ref(&self) -> &SparseSet<T> {
+    fn as_ref(&self) -> &EpochSparseSet<K, V> {
         self
     }
 }
 
-impl<T> AsMut<SparseSet<T>> for SparseSet<T> {
+impl<K, V> AsMut<EpochSparseSet<K, V>> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
     #[inline]
-    fn as_mut(&mut self) -> &mut SparseSet<T> {
+    fn as_mut(&mut self) -> &mut EpochSparseSet<K, V> {
         self
     }
 }
 
-impl<'a, T> IntoIterator for &'a SparseSet<T> {
-    type Item = (&'a usize, &'a T);
+impl<'a, K, V> IntoIterator for &'a EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    type Item = (&'a K, &'a V);
 
-    type IntoIter = Iter<'a, T>;
+    type IntoIter = Iter<'a, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -824,10 +934,13 @@ impl<'a, T> IntoIterator for &'a SparseSet<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut SparseSet<T> {
-    type Item = (&'a usize, &'a mut T);
+impl<'a, K, V> IntoIterator for &'a mut EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    type Item = (&'a K, &'a mut V);
 
-    type IntoIter = IterMut<'a, T>;
+    type IntoIter = IterMut<'a, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -835,10 +948,13 @@ impl<'a, T> IntoIterator for &'a mut SparseSet<T> {
     }
 }
 
-impl<T> IntoIterator for SparseSet<T> {
-    type Item = (usize, T);
+impl<K, V> IntoIterator for EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    type Item = (K, V);
 
-    type IntoIter = IntoIter<T>;
+    type IntoIter = IntoIter<K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -856,8 +972,11 @@ impl<T> IntoIterator for SparseSet<T> {
     }
 }
 
-impl<T> FromIterator<(usize, T)> for SparseSet<T> {
-    fn from_iter<I: IntoIterator<Item = (usize, T)>>(iter: I) -> Self {
+impl<K, V> FromIterator<(K, V)> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let iter_len = {
             let (lower, upper) = iter.size_hint();
@@ -873,13 +992,20 @@ impl<T> FromIterator<(usize, T)> for SparseSet<T> {
     }
 }
 
-impl<T> FromIterator<T> for SparseSet<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+impl<K, V> FromIterator<V> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
         let dense_values: Vec<_> = iter.into_iter().collect();
 
         let len = dense_values.len();
-        let dense_keys = (0..len).collect();
-        let sparse = (0..len).map(SparseEntry::occupied).collect();
+        let dense_keys = (0..len)
+            .map(|sparse_index| K::new(sparse_index, Default::default()))
+            .collect();
+        let sparse = (0..len)
+            .map(|dense_index| SparseItem::occupied(dense_index, Default::default()))
+            .collect();
 
         Self {
             dense_keys,
@@ -889,8 +1015,11 @@ impl<T> FromIterator<T> for SparseSet<T> {
     }
 }
 
-impl<T> Extend<(usize, T)> for SparseSet<T> {
-    fn extend<I: IntoIterator<Item = (usize, T)>>(&mut self, iter: I) {
+impl<K, V> Extend<(K, V)> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         let iter = iter.into_iter();
         let iter_len = {
             let (lower, upper) = iter.size_hint();
@@ -904,8 +1033,11 @@ impl<T> Extend<(usize, T)> for SparseSet<T> {
     }
 }
 
-impl<T> Extend<T> for SparseSet<T> {
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+impl<K, V> Extend<V> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
         let iter = iter.into_iter();
         let iter_len = {
             let (lower, upper) = iter.size_hint();
@@ -915,21 +1047,85 @@ impl<T> Extend<T> for SparseSet<T> {
 
         let mut maybe_vacant_keys = 0..self.sparse.len();
         for value in iter {
-            let key = maybe_vacant_keys
+            let sparse_index = maybe_vacant_keys
                 .find(|&key| self.sparse[key].is_vacant())
                 .unwrap_or(self.sparse.len());
+            let key = K::new(sparse_index, Default::default());
             self.insert(key, value);
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-enum SparseEntry {
+struct SparseItem<E> {
+    pub kind: SparseItemKind,
+    pub epoch: E,
+}
+
+impl<E> SparseItem<E> {
+    #[inline]
+    pub const fn new(kind: SparseItemKind, epoch: E) -> Self {
+        Self { kind, epoch }
+    }
+
+    #[inline]
+    pub const fn occupied(dense_index: usize, epoch: E) -> Self {
+        let kind = SparseItemKind::occupied(dense_index);
+        Self::new(kind, epoch)
+    }
+
+    #[inline]
+    pub const fn vacant(epoch: E) -> Self {
+        let kind = SparseItemKind::vacant();
+        Self::new(kind, epoch)
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    pub const fn is_occupied(&self) -> bool {
+        let Self { kind, .. } = self;
+        kind.is_occupied()
+    }
+
+    #[inline]
+    pub const fn is_vacant(&self) -> bool {
+        let Self { kind, .. } = self;
+        kind.is_vacant()
+    }
+
+    #[inline]
+    pub const fn kind(&self) -> &SparseItemKind {
+        let Self { kind, .. } = self;
+        kind
+    }
+
+    #[inline]
+    pub fn kind_mut(&mut self) -> &mut SparseItemKind {
+        let Self { kind, .. } = self;
+        kind
+    }
+
+    #[inline]
+    pub const fn dense_index(&self) -> Option<usize> {
+        let Self { kind, .. } = self;
+        kind.dense_index()
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
+        let Self { kind, .. } = self;
+        kind.dense_index_mut()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+enum SparseItemKind {
     Occupied { dense_index: usize },
     Vacant,
 }
 
-impl SparseEntry {
+impl SparseItemKind {
     #[inline]
     pub const fn occupied(dense_index: usize) -> Self {
         Self::Occupied { dense_index }
@@ -969,12 +1165,18 @@ impl SparseEntry {
 }
 
 #[derive(Debug)]
-pub enum Entry<'a, T> {
-    Occupied(OccupiedEntry<'a, T>),
-    Vacant(VacantEntry<'a, T>),
+pub enum Entry<'a, K, V>
+where
+    K: Key,
+{
+    Occupied(OccupiedEntry<'a, K, V>),
+    Vacant(VacantEntry<'a, K, V>),
 }
 
-impl<'a, T> Entry<'a, T> {
+impl<'a, K, V> Entry<'a, K, V>
+where
+    K: Key,
+{
     #[inline]
     pub const fn is_occupied(&self) -> bool {
         matches!(self, Self::Occupied(_))
@@ -986,7 +1188,7 @@ impl<'a, T> Entry<'a, T> {
     }
 
     #[inline]
-    pub fn key(&self) -> usize {
+    pub fn key(&self) -> K {
         match self {
             Self::Occupied(entry) => entry.key(),
             Self::Vacant(entry) => entry.key(),
@@ -994,7 +1196,7 @@ impl<'a, T> Entry<'a, T> {
     }
 
     #[inline]
-    pub fn get(&self) -> Option<&T> {
+    pub fn get(&self) -> Option<&V> {
         match self {
             Self::Occupied(entry) => Some(entry.get()),
             Self::Vacant(_) => None,
@@ -1002,7 +1204,7 @@ impl<'a, T> Entry<'a, T> {
     }
 
     #[inline]
-    pub fn get_mut(&mut self) -> Option<&mut T> {
+    pub fn get_mut(&mut self) -> Option<&mut V> {
         match self {
             Self::Occupied(entry) => Some(entry.get_mut()),
             Self::Vacant(_) => None,
@@ -1012,7 +1214,7 @@ impl<'a, T> Entry<'a, T> {
     #[inline]
     pub fn and_modify<F>(self, f: F) -> Self
     where
-        F: FnOnce(&mut T),
+        F: FnOnce(&mut V),
     {
         match self {
             Self::Occupied(mut entry) => {
@@ -1024,7 +1226,7 @@ impl<'a, T> Entry<'a, T> {
     }
 
     #[inline]
-    pub fn or_insert(self, default: T) -> &'a mut T {
+    pub fn or_insert(self, default: V) -> &'a mut V {
         match self {
             Self::Occupied(entry) => entry.into_mut(),
             Self::Vacant(entry) => entry.insert(default),
@@ -1032,9 +1234,9 @@ impl<'a, T> Entry<'a, T> {
     }
 
     #[inline]
-    pub fn or_insert_with<F>(self, default: F) -> &'a mut T
+    pub fn or_insert_with<F>(self, default: F) -> &'a mut V
     where
-        F: FnOnce() -> T,
+        F: FnOnce() -> V,
     {
         match self {
             Self::Occupied(entry) => entry.into_mut(),
@@ -1043,9 +1245,9 @@ impl<'a, T> Entry<'a, T> {
     }
 
     #[inline]
-    pub fn or_default(self) -> &'a mut T
+    pub fn or_default(self) -> &'a mut V
     where
-        T: Default,
+        V: Default,
     {
         match self {
             Self::Occupied(entry) => entry.into_mut(),
@@ -1054,7 +1256,7 @@ impl<'a, T> Entry<'a, T> {
     }
 
     #[inline]
-    pub fn insert_entry(self, value: T) -> OccupiedEntry<'a, T> {
+    pub fn insert_entry(self, value: V) -> OccupiedEntry<'a, K, V> {
         match self {
             Self::Occupied(mut entry) => {
                 entry.insert(value);
@@ -1065,7 +1267,7 @@ impl<'a, T> Entry<'a, T> {
     }
 
     #[inline]
-    pub fn replace_key(self, key: usize) -> Self {
+    pub fn replace_key(self, key: K) -> Self {
         match self {
             Self::Occupied(mut entry) => {
                 entry.replace_key(key);
@@ -1079,33 +1281,21 @@ impl<'a, T> Entry<'a, T> {
     }
 }
 
-pub struct OccupiedEntry<'a, T> {
-    key: usize,
+pub struct OccupiedEntry<'a, K, V>
+where
+    K: Key,
+{
+    key: K,
     dense_index: usize,
-    sparse_set: &'a mut SparseSet<T>,
+    sparse_set: &'a mut EpochSparseSet<K, V>,
 }
 
-impl<'a, T: Debug> Debug for OccupiedEntry<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { key, .. } = self;
-
-        let value = self.get();
-        f.debug_struct("OccupiedEntry")
-            .field("key", key)
-            .field("value", value)
-            .finish()
-    }
-}
-
-impl<'a, T> OccupiedEntry<'a, T> {
+impl<'a, K, V> OccupiedEntry<'a, K, V>
+where
+    K: Key,
+{
     #[inline]
-    pub fn key(&self) -> usize {
-        let Self { key, .. } = self;
-        *key
-    }
-
-    #[inline]
-    pub fn get(&self) -> &T {
+    pub fn get(&self) -> &V {
         let Self {
             dense_index,
             sparse_set,
@@ -1117,7 +1307,7 @@ impl<'a, T> OccupiedEntry<'a, T> {
     }
 
     #[inline]
-    pub fn get_mut(&mut self) -> &mut T {
+    pub fn get_mut(&mut self) -> &mut V {
         let Self {
             dense_index,
             sparse_set,
@@ -1129,7 +1319,7 @@ impl<'a, T> OccupiedEntry<'a, T> {
     }
 
     #[inline]
-    pub fn into_mut(self) -> &'a mut T {
+    pub fn into_mut(self) -> &'a mut V {
         let Self {
             dense_index,
             sparse_set,
@@ -1141,77 +1331,103 @@ impl<'a, T> OccupiedEntry<'a, T> {
     }
 
     #[inline]
-    pub fn insert(&mut self, value: T) -> T {
+    pub fn insert(&mut self, value: V) -> V {
         let previous = self.get_mut();
         replace(previous, value)
     }
+}
+
+impl<'a, K, V> OccupiedEntry<'a, K, V>
+where
+    K: Key,
+{
+    #[inline]
+    pub fn key(&self) -> K {
+        let Self { key, .. } = self;
+        *key
+    }
 
     #[inline]
-    pub fn remove(self) -> T {
+    pub fn remove(self) -> V {
         let Self {
             key, sparse_set, ..
         } = self;
 
         let value = sparse_set.remove(key);
-        unwrap_entry_value(value)
+        unwrap_sparse_value(value)
     }
 
     #[inline]
-    pub fn swap_remove(self) -> T {
+    pub fn swap_remove(self) -> V {
         let Self {
             key, sparse_set, ..
         } = self;
 
         let value = sparse_set.swap_remove(key);
-        unwrap_entry_value(value)
+        unwrap_sparse_value(value)
     }
 
     #[inline]
-    pub fn replace_key(&mut self, key: usize) -> Option<T> {
+    pub fn replace_key(&mut self, key: K) -> Option<V> {
         let new_key = key;
         let Self {
             key, sparse_set, ..
         } = self;
 
         let value = sparse_set.remove(*key);
-        let value = unwrap_entry_value(value);
+        let value = unwrap_sparse_value(value);
 
         *key = new_key;
         sparse_set.insert(*key, value)
     }
 }
 
-pub struct VacantEntry<'a, T> {
-    key: usize,
-    sparse_set: &'a mut SparseSet<T>,
-}
-
-impl<'a, T> Debug for VacantEntry<'a, T> {
+impl<'a, K, V> Debug for OccupiedEntry<'a, K, V>
+where
+    K: Key + Debug,
+    V: Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
-        f.debug_struct("VacantEntry").field("key", key).finish()
+
+        let value = self.get();
+        f.debug_struct("OccupiedEntry")
+            .field("key", key)
+            .field("value", value)
+            .finish()
     }
 }
 
-impl<'a, T> VacantEntry<'a, T> {
+pub struct VacantEntry<'a, K, V>
+where
+    K: Key,
+{
+    key: K,
+    sparse_set: &'a mut EpochSparseSet<K, V>,
+}
+
+impl<'a, K, V> VacantEntry<'a, K, V>
+where
+    K: Key,
+{
     #[inline]
-    pub fn key(&self) -> usize {
+    pub fn key(&self) -> K {
         let Self { key, .. } = self;
         *key
     }
 
     #[inline]
-    pub fn insert(self, value: T) -> &'a mut T {
+    pub fn insert(self, value: V) -> &'a mut V {
         let Self { key, sparse_set } = self;
 
         sparse_set.insert(key, value);
 
         let value = sparse_set.dense_values.last_mut();
-        unwrap_entry_value(value)
+        unwrap_sparse_value(value)
     }
 
     #[inline]
-    pub fn insert_entry(self, value: T) -> OccupiedEntry<'a, T> {
+    pub fn insert_entry(self, value: V) -> OccupiedEntry<'a, K, V> {
         let Self { key, sparse_set } = self;
 
         sparse_set.insert(key, value);
@@ -1225,43 +1441,56 @@ impl<'a, T> VacantEntry<'a, T> {
     }
 }
 
+impl<'a, K, V> Debug for VacantEntry<'a, K, V>
+where
+    K: Key + Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, .. } = self;
+        f.debug_struct("VacantEntry").field("key", key).finish()
+    }
+}
+
 #[cold]
 #[track_caller]
 #[inline(never)]
-const fn unwrap_entry_value_failed() -> ! {
+const fn unwrap_sparse_value_failed() -> ! {
     panic!("value by provided key should exist")
 }
 
 #[inline]
 #[track_caller]
-fn unwrap_entry_value<T>(value: Option<T>) -> T {
+fn unwrap_sparse_value<T>(value: Option<T>) -> T {
     let Some(value) = value else {
-        unwrap_entry_value_failed()
+        unwrap_sparse_value_failed()
     };
     value
 }
 
-pub struct Keys<'a, T> {
-    keys: slice::Iter<'a, usize>,
-    phantom: PhantomData<&'a T>,
+pub struct Keys<'a, K, V> {
+    keys: slice::Iter<'a, K>,
+    phantom: PhantomData<&'a V>,
 }
 
-impl<'a, T> Keys<'a, T> {
+impl<'a, K, V> Keys<'a, K, V> {
     #[inline]
-    pub fn as_slice(&self) -> &'a [usize] {
+    pub fn as_slice(&self) -> &'a [K] {
         let Self { keys, .. } = self;
         keys.as_slice()
     }
 }
 
-impl<'a, T> Debug for Keys<'a, T> {
+impl<'a, K, V> Debug for Keys<'a, K, V>
+where
+    K: Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice();
         f.debug_tuple("Keys").field(keys).finish()
     }
 }
 
-impl<'a, T> Default for Keys<'a, T> {
+impl<'a, K, V> Default for Keys<'a, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -1270,7 +1499,7 @@ impl<'a, T> Default for Keys<'a, T> {
     }
 }
 
-impl<'a, T> Clone for Keys<'a, T> {
+impl<'a, K, V> Clone for Keys<'a, K, V> {
     #[inline]
     fn clone(&self) -> Self {
         let Self { keys, phantom } = self;
@@ -1281,15 +1510,15 @@ impl<'a, T> Clone for Keys<'a, T> {
     }
 }
 
-impl<'a, T> AsRef<[usize]> for Keys<'a, T> {
+impl<'a, K, V> AsRef<[K]> for Keys<'a, K, V> {
     #[inline]
-    fn as_ref(&self) -> &[usize] {
+    fn as_ref(&self) -> &[K] {
         self.as_slice()
     }
 }
 
-impl<'a, T> Iterator for Keys<'a, T> {
-    type Item = &'a usize;
+impl<'a, K, V> Iterator for Keys<'a, K, V> {
+    type Item = &'a K;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -1408,7 +1637,7 @@ impl<'a, T> Iterator for Keys<'a, T> {
     }
 }
 
-impl<'a, T> DoubleEndedIterator for Keys<'a, T> {
+impl<'a, K, V> DoubleEndedIterator for Keys<'a, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, .. } = self;
@@ -1422,7 +1651,7 @@ impl<'a, T> DoubleEndedIterator for Keys<'a, T> {
     }
 }
 
-impl<'a, T> ExactSizeIterator for Keys<'a, T> {
+impl<'a, K, V> ExactSizeIterator for Keys<'a, K, V> {
     #[inline]
     fn len(&self) -> usize {
         let Self { keys, .. } = self;
@@ -1430,35 +1659,38 @@ impl<'a, T> ExactSizeIterator for Keys<'a, T> {
     }
 }
 
-impl<'a, T> FusedIterator for Keys<'a, T> {}
+impl<'a, K, V> FusedIterator for Keys<'a, K, V> {}
 
-pub struct IntoKeys<T> {
-    keys: vec::IntoIter<usize>,
-    phantom: PhantomData<T>,
+pub struct IntoKeys<K, V> {
+    keys: vec::IntoIter<K>,
+    phantom: PhantomData<V>,
 }
 
-impl<T> IntoKeys<T> {
+impl<K, V> IntoKeys<K, V> {
     #[inline]
-    pub fn as_slice(&self) -> &[usize] {
+    pub fn as_slice(&self) -> &[K] {
         let Self { keys, .. } = self;
         keys.as_slice()
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [usize] {
+    pub fn as_mut_slice(&mut self) -> &mut [K] {
         let Self { keys, .. } = self;
         keys.as_mut_slice()
     }
 }
 
-impl<T> Debug for IntoKeys<T> {
+impl<K, V> Debug for IntoKeys<K, V>
+where
+    K: Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice();
         f.debug_tuple("IntoKeys").field(keys).finish()
     }
 }
 
-impl<T> Default for IntoKeys<T> {
+impl<K, V> Default for IntoKeys<K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -1467,7 +1699,10 @@ impl<T> Default for IntoKeys<T> {
     }
 }
 
-impl<T> Clone for IntoKeys<T> {
+impl<K, V> Clone for IntoKeys<K, V>
+where
+    K: Clone,
+{
     #[inline]
     fn clone(&self) -> Self {
         let Self { keys, phantom } = self;
@@ -1478,22 +1713,22 @@ impl<T> Clone for IntoKeys<T> {
     }
 }
 
-impl<T> AsRef<[usize]> for IntoKeys<T> {
+impl<K, V> AsRef<[K]> for IntoKeys<K, V> {
     #[inline]
-    fn as_ref(&self) -> &[usize] {
+    fn as_ref(&self) -> &[K] {
         self.as_slice()
     }
 }
 
-impl<T> AsMut<[usize]> for IntoKeys<T> {
+impl<K, V> AsMut<[K]> for IntoKeys<K, V> {
     #[inline]
-    fn as_mut(&mut self) -> &mut [usize] {
+    fn as_mut(&mut self) -> &mut [K] {
         self.as_mut_slice()
     }
 }
 
-impl<T> Iterator for IntoKeys<T> {
-    type Item = usize;
+impl<K, V> Iterator for IntoKeys<K, V> {
+    type Item = K;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -1527,7 +1762,7 @@ impl<T> Iterator for IntoKeys<T> {
     }
 }
 
-impl<T> DoubleEndedIterator for IntoKeys<T> {
+impl<K, V> DoubleEndedIterator for IntoKeys<K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, .. } = self;
@@ -1535,25 +1770,26 @@ impl<T> DoubleEndedIterator for IntoKeys<T> {
     }
 }
 
-impl<T> ExactSizeIterator for IntoKeys<T> {}
+impl<K, V> ExactSizeIterator for IntoKeys<K, V> {}
 
-impl<T> FusedIterator for IntoKeys<T> {}
+impl<K, V> FusedIterator for IntoKeys<K, V> {}
 
-pub struct Values<'a, T> {
-    values: slice::Iter<'a, T>,
+pub struct Values<'a, K, V> {
+    values: slice::Iter<'a, V>,
+    phantom: PhantomData<&'a K>,
 }
 
-impl<'a, T> Values<'a, T> {
+impl<'a, K, V> Values<'a, K, V> {
     #[inline]
-    pub fn as_slice(&self) -> &'a [T] {
-        let Self { values } = self;
+    pub fn as_slice(&self) -> &'a [V] {
+        let Self { values, .. } = self;
         values.as_slice()
     }
 }
 
-impl<'a, T> Debug for Values<'a, T>
+impl<'a, K, V> Debug for Values<'a, K, V>
 where
-    T: Debug,
+    V: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
@@ -1561,43 +1797,45 @@ where
     }
 }
 
-impl<'a, T> Default for Values<'a, T> {
+impl<'a, K, V> Default for Values<'a, K, V> {
     #[inline]
     fn default() -> Self {
         let values = Default::default();
-        Self { values }
+        let phantom = Default::default();
+        Self { values, phantom }
     }
 }
 
-impl<'a, T> Clone for Values<'a, T> {
+impl<'a, K, V> Clone for Values<'a, K, V> {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { values } = self;
+        let Self { values, phantom } = self;
 
         let values = values.clone();
-        Self { values }
+        let phantom = *phantom;
+        Self { values, phantom }
     }
 }
 
-impl<'a, T> AsRef<[T]> for Values<'a, T> {
+impl<'a, K, V> AsRef<[V]> for Values<'a, K, V> {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[V] {
         self.as_slice()
     }
 }
 
-impl<'a, T> Iterator for Values<'a, T> {
-    type Item = &'a T;
+impl<'a, K, V> Iterator for Values<'a, K, V> {
+    type Item = &'a V;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.next()
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.size_hint()
     }
 
@@ -1606,7 +1844,7 @@ impl<'a, T> Iterator for Values<'a, T> {
     where
         Self: Sized,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.count()
     }
 
@@ -1615,13 +1853,13 @@ impl<'a, T> Iterator for Values<'a, T> {
     where
         Self: Sized,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.last()
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.nth(n)
     }
 
@@ -1631,7 +1869,7 @@ impl<'a, T> Iterator for Values<'a, T> {
         Self: Sized,
         F: FnMut(Self::Item),
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.for_each(f)
     }
 
@@ -1641,7 +1879,7 @@ impl<'a, T> Iterator for Values<'a, T> {
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.fold(init, f)
     }
 
@@ -1651,7 +1889,7 @@ impl<'a, T> Iterator for Values<'a, T> {
         Self: Sized,
         F: FnMut(Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.all(f)
     }
 
@@ -1661,7 +1899,7 @@ impl<'a, T> Iterator for Values<'a, T> {
         Self: Sized,
         F: FnMut(Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.any(f)
     }
 
@@ -1671,7 +1909,7 @@ impl<'a, T> Iterator for Values<'a, T> {
         Self: Sized,
         P: FnMut(&Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.find(predicate)
     }
 
@@ -1681,7 +1919,7 @@ impl<'a, T> Iterator for Values<'a, T> {
         Self: Sized,
         F: FnMut(Self::Item) -> Option<B>,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.find_map(f)
     }
 
@@ -1691,7 +1929,7 @@ impl<'a, T> Iterator for Values<'a, T> {
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.position(predicate)
     }
 
@@ -1701,56 +1939,57 @@ impl<'a, T> Iterator for Values<'a, T> {
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.rposition(predicate)
     }
 }
 
-impl<'a, T> DoubleEndedIterator for Values<'a, T> {
+impl<'a, K, V> DoubleEndedIterator for Values<'a, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.next_back()
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.nth_back(n)
     }
 }
 
-impl<'a, T> ExactSizeIterator for Values<'a, T> {
+impl<'a, K, V> ExactSizeIterator for Values<'a, K, V> {
     #[inline]
     fn len(&self) -> usize {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.len()
     }
 }
 
-impl<'a, T> FusedIterator for Values<'a, T> {}
+impl<'a, K, V> FusedIterator for Values<'a, K, V> {}
 
-pub struct ValuesMut<'a, T> {
-    values: slice::IterMut<'a, T>,
+pub struct ValuesMut<'a, K, V> {
+    values: slice::IterMut<'a, V>,
+    phantom: PhantomData<&'a K>,
 }
 
-impl<'a, T> ValuesMut<'a, T> {
+impl<'a, K, V> ValuesMut<'a, K, V> {
     #[inline]
-    pub fn into_slice(self) -> &'a [T] {
-        let Self { values } = self;
+    pub fn into_slice(self) -> &'a [V] {
+        let Self { values, .. } = self;
         values.into_slice()
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[T] {
-        let Self { values } = self;
+    pub fn as_slice(&self) -> &[V] {
+        let Self { values, .. } = self;
         values.as_slice()
     }
 }
 
-impl<'a, T> Debug for ValuesMut<'a, T>
+impl<'a, K, V> Debug for ValuesMut<'a, K, V>
 where
-    T: Debug,
+    V: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
@@ -1758,33 +1997,34 @@ where
     }
 }
 
-impl<'a, T> Default for ValuesMut<'a, T> {
+impl<'a, K, V> Default for ValuesMut<'a, K, V> {
     #[inline]
     fn default() -> Self {
         let values = Default::default();
-        Self { values }
+        let phantom = Default::default();
+        Self { values, phantom }
     }
 }
 
-impl<'a, T> AsRef<[T]> for ValuesMut<'a, T> {
+impl<'a, K, V> AsRef<[V]> for ValuesMut<'a, K, V> {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[V] {
         self.as_slice()
     }
 }
 
-impl<'a, T> Iterator for ValuesMut<'a, T> {
-    type Item = &'a mut T;
+impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
+    type Item = &'a mut V;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.next()
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.size_hint()
     }
 
@@ -1793,7 +2033,7 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
     where
         Self: Sized,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.count()
     }
 
@@ -1802,13 +2042,13 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
     where
         Self: Sized,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.last()
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.nth(n)
     }
 
@@ -1818,7 +2058,7 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
         Self: Sized,
         F: FnMut(Self::Item),
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.for_each(f)
     }
 
@@ -1828,7 +2068,7 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.fold(init, f)
     }
 
@@ -1838,7 +2078,7 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
         Self: Sized,
         F: FnMut(Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.all(f)
     }
 
@@ -1848,7 +2088,7 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
         Self: Sized,
         F: FnMut(Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.any(f)
     }
 
@@ -1858,7 +2098,7 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
         Self: Sized,
         P: FnMut(&Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.find(predicate)
     }
 
@@ -1868,7 +2108,7 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
         Self: Sized,
         F: FnMut(Self::Item) -> Option<B>,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.find_map(f)
     }
 
@@ -1878,7 +2118,7 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.position(predicate)
     }
 
@@ -1888,57 +2128,58 @@ impl<'a, T> Iterator for ValuesMut<'a, T> {
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.rposition(predicate)
     }
 }
 
-impl<'a, T> DoubleEndedIterator for ValuesMut<'a, T> {
+impl<'a, K, V> DoubleEndedIterator for ValuesMut<'a, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.next_back()
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.nth_back(n)
     }
 }
 
-impl<'a, T> ExactSizeIterator for ValuesMut<'a, T> {
+impl<'a, K, V> ExactSizeIterator for ValuesMut<'a, K, V> {
     #[inline]
     fn len(&self) -> usize {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.len()
     }
 }
 
-impl<'a, T> FusedIterator for ValuesMut<'a, T> {}
+impl<'a, K, V> FusedIterator for ValuesMut<'a, K, V> {}
 
 #[derive(Clone)]
-pub struct IntoValues<T> {
-    values: vec::IntoIter<T>,
+pub struct IntoValues<K, V> {
+    values: vec::IntoIter<V>,
+    phantom: PhantomData<K>,
 }
 
-impl<T> IntoValues<T> {
+impl<K, V> IntoValues<K, V> {
     #[inline]
-    pub fn as_slice(&self) -> &[T] {
-        let Self { values } = self;
+    pub fn as_slice(&self) -> &[V] {
+        let Self { values, .. } = self;
         values.as_slice()
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        let Self { values } = self;
+    pub fn as_mut_slice(&mut self) -> &mut [V] {
+        let Self { values, .. } = self;
         values.as_mut_slice()
     }
 }
 
-impl<T> Debug for IntoValues<T>
+impl<K, V> Debug for IntoValues<K, V>
 where
-    T: Debug,
+    V: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
@@ -1946,40 +2187,41 @@ where
     }
 }
 
-impl<T> Default for IntoValues<T> {
+impl<K, V> Default for IntoValues<K, V> {
     #[inline]
     fn default() -> Self {
         let values = Default::default();
-        Self { values }
+        let phantom = Default::default();
+        Self { values, phantom }
     }
 }
 
-impl<T> AsRef<[T]> for IntoValues<T> {
+impl<K, V> AsRef<[V]> for IntoValues<K, V> {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[V] {
         self.as_slice()
     }
 }
 
-impl<T> AsMut<[T]> for IntoValues<T> {
+impl<K, V> AsMut<[V]> for IntoValues<K, V> {
     #[inline]
-    fn as_mut(&mut self) -> &mut [T] {
+    fn as_mut(&mut self) -> &mut [V] {
         self.as_mut_slice()
     }
 }
 
-impl<T> Iterator for IntoValues<T> {
-    type Item = T;
+impl<K, V> Iterator for IntoValues<K, V> {
+    type Item = V;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.next()
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.size_hint()
     }
 
@@ -1988,7 +2230,7 @@ impl<T> Iterator for IntoValues<T> {
     where
         Self: Sized,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.count()
     }
 
@@ -1998,51 +2240,52 @@ impl<T> Iterator for IntoValues<T> {
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.fold(init, f)
     }
 }
 
-impl<T> DoubleEndedIterator for IntoValues<T> {
+impl<K, V> DoubleEndedIterator for IntoValues<K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { values } = self;
+        let Self { values, .. } = self;
         values.next_back()
     }
 }
 
-impl<T> ExactSizeIterator for IntoValues<T> {}
+impl<K, V> ExactSizeIterator for IntoValues<K, V> {}
 
-impl<T> FusedIterator for IntoValues<T> {}
+impl<K, V> FusedIterator for IntoValues<K, V> {}
 
-pub struct Iter<'a, T> {
-    keys: slice::Iter<'a, usize>,
-    values: slice::Iter<'a, T>,
+pub struct Iter<'a, K, V> {
+    keys: slice::Iter<'a, K>,
+    values: slice::Iter<'a, V>,
 }
 
-impl<'a, T> Iter<'a, T> {
+impl<'a, K, V> Iter<'a, K, V> {
     #[inline]
-    pub fn as_keys_slice(&self) -> &'a [usize] {
+    pub fn as_keys_slice(&self) -> &'a [K] {
         let Self { keys, .. } = self;
         keys.as_slice()
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> &'a [T] {
+    pub fn as_values_slice(&self) -> &'a [V] {
         let Self { values, .. } = self;
         values.as_slice()
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&'a [usize], &'a [T]) {
+    pub fn as_slices(&self) -> (&'a [K], &'a [V]) {
         let Self { keys, values } = self;
         (keys.as_slice(), values.as_slice())
     }
 }
 
-impl<'a, T> Debug for Iter<'a, T>
+impl<'a, K, V> Debug for Iter<'a, K, V>
 where
-    T: Debug,
+    K: Debug,
+    V: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -2056,7 +2299,7 @@ where
     }
 }
 
-impl<'a, T> Default for Iter<'a, T> {
+impl<'a, K, V> Default for Iter<'a, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -2065,7 +2308,7 @@ impl<'a, T> Default for Iter<'a, T> {
     }
 }
 
-impl<'a, T> Clone for Iter<'a, T> {
+impl<'a, K, V> Clone for Iter<'a, K, V> {
     #[inline]
     fn clone(&self) -> Self {
         let Self { keys, values } = self;
@@ -2076,15 +2319,15 @@ impl<'a, T> Clone for Iter<'a, T> {
     }
 }
 
-impl<'a, T> AsRef<[T]> for Iter<'a, T> {
+impl<'a, K, V> AsRef<[V]> for Iter<'a, K, V> {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[V] {
         self.as_values_slice()
     }
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = (&'a usize, &'a T);
+impl<'a, K, V> Iterator for Iter<'a, K, V> {
+    type Item = (&'a K, &'a V);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -2143,7 +2386,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
-impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
+impl<'a, K, V> DoubleEndedIterator for Iter<'a, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, values } = self;
@@ -2163,7 +2406,7 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
     }
 }
 
-impl<'a, T> ExactSizeIterator for Iter<'a, T> {
+impl<'a, K, V> ExactSizeIterator for Iter<'a, K, V> {
     #[inline]
     fn len(&self) -> usize {
         let Self { keys, .. } = self;
@@ -2171,54 +2414,55 @@ impl<'a, T> ExactSizeIterator for Iter<'a, T> {
     }
 }
 
-impl<'a, T> FusedIterator for Iter<'a, T> {}
+impl<'a, K, V> FusedIterator for Iter<'a, K, V> {}
 
-pub struct IterMut<'a, T> {
-    keys: slice::Iter<'a, usize>,
-    values: slice::IterMut<'a, T>,
+pub struct IterMut<'a, K, V> {
+    keys: slice::Iter<'a, K>,
+    values: slice::IterMut<'a, V>,
 }
 
-impl<'a, T> IterMut<'a, T> {
+impl<'a, K, V> IterMut<'a, K, V> {
     #[inline]
-    pub fn into_keys_slice(self) -> &'a [usize] {
+    pub fn into_keys_slice(self) -> &'a [K] {
         let Self { keys, .. } = self;
         keys.as_slice()
     }
 
     #[inline]
-    pub fn as_keys_slice(&self) -> &'a [usize] {
+    pub fn as_keys_slice(&self) -> &'a [K] {
         let Self { keys, .. } = self;
         keys.as_slice()
     }
 
     #[inline]
-    pub fn into_values_slice(self) -> &'a mut [T] {
+    pub fn into_values_slice(self) -> &'a mut [V] {
         let Self { values, .. } = self;
         values.into_slice()
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> &[T] {
+    pub fn as_values_slice(&self) -> &[V] {
         let Self { values, .. } = self;
         values.as_slice()
     }
 
     #[inline]
-    pub fn into_slices(self) -> (&'a [usize], &'a mut [T]) {
+    pub fn into_slices(self) -> (&'a [K], &'a mut [V]) {
         let Self { keys, values } = self;
         (keys.as_slice(), values.into_slice())
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&'a [usize], &[T]) {
+    pub fn as_slices(&self) -> (&'a [K], &[V]) {
         let Self { keys, values } = self;
         (keys.as_slice(), values.as_slice())
     }
 }
 
-impl<'a, T> Debug for IterMut<'a, T>
+impl<'a, K, V> Debug for IterMut<'a, K, V>
 where
-    T: Debug,
+    K: Debug,
+    V: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -2232,7 +2476,7 @@ where
     }
 }
 
-impl<'a, T> Default for IterMut<'a, T> {
+impl<'a, K, V> Default for IterMut<'a, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -2241,15 +2485,15 @@ impl<'a, T> Default for IterMut<'a, T> {
     }
 }
 
-impl<'a, T> AsRef<[T]> for IterMut<'a, T> {
+impl<'a, K, V> AsRef<[V]> for IterMut<'a, K, V> {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[V] {
         self.as_values_slice()
     }
 }
 
-impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = (&'a usize, &'a mut T);
+impl<'a, K, V> Iterator for IterMut<'a, K, V> {
+    type Item = (&'a K, &'a mut V);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -2308,7 +2552,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     }
 }
 
-impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
+impl<'a, K, V> DoubleEndedIterator for IterMut<'a, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, values } = self;
@@ -2328,7 +2572,7 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
     }
 }
 
-impl<'a, T> ExactSizeIterator for IterMut<'a, T> {
+impl<'a, K, V> ExactSizeIterator for IterMut<'a, K, V> {
     #[inline]
     fn len(&self) -> usize {
         let Self { keys, .. } = self;
@@ -2336,55 +2580,56 @@ impl<'a, T> ExactSizeIterator for IterMut<'a, T> {
     }
 }
 
-impl<'a, T> FusedIterator for IterMut<'a, T> {}
+impl<'a, K, V> FusedIterator for IterMut<'a, K, V> {}
 
 #[derive(Clone)]
-pub struct IntoIter<T> {
-    keys: vec::IntoIter<usize>,
-    values: vec::IntoIter<T>,
+pub struct IntoIter<K, V> {
+    keys: vec::IntoIter<K>,
+    values: vec::IntoIter<V>,
 }
 
-impl<T> IntoIter<T> {
+impl<K, V> IntoIter<K, V> {
     #[inline]
-    pub fn as_keys_slice(&self) -> &[usize] {
+    pub fn as_keys_slice(&self) -> &[K] {
         let Self { keys, .. } = self;
         keys.as_slice()
     }
 
     #[inline]
-    pub fn as_keys_mut_slice(&mut self) -> &mut [usize] {
+    pub fn as_keys_mut_slice(&mut self) -> &mut [K] {
         let Self { keys, .. } = self;
         keys.as_mut_slice()
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> &[T] {
+    pub fn as_values_slice(&self) -> &[V] {
         let Self { values, .. } = self;
         values.as_slice()
     }
 
     #[inline]
-    pub fn as_values_mut_slice(&mut self) -> &mut [T] {
+    pub fn as_values_mut_slice(&mut self) -> &mut [V] {
         let Self { values, .. } = self;
         values.as_mut_slice()
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[usize], &[T]) {
+    pub fn as_slices(&self) -> (&[K], &[V]) {
         let Self { keys, values } = self;
         (keys.as_slice(), values.as_slice())
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&mut [usize], &mut [T]) {
+    pub fn as_mut_slices(&mut self) -> (&mut [K], &mut [V]) {
         let Self { keys, values } = self;
         (keys.as_mut_slice(), values.as_mut_slice())
     }
 }
 
-impl<T> Debug for IntoIter<T>
+impl<K, V> Debug for IntoIter<K, V>
 where
-    T: Debug,
+    K: Debug,
+    V: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -2398,7 +2643,7 @@ where
     }
 }
 
-impl<T> Default for IntoIter<T> {
+impl<K, V> Default for IntoIter<K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -2407,22 +2652,22 @@ impl<T> Default for IntoIter<T> {
     }
 }
 
-impl<T> AsRef<[T]> for IntoIter<T> {
+impl<K, V> AsRef<[V]> for IntoIter<K, V> {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[V] {
         self.as_values_slice()
     }
 }
 
-impl<T> AsMut<[T]> for IntoIter<T> {
+impl<K, V> AsMut<[V]> for IntoIter<K, V> {
     #[inline]
-    fn as_mut(&mut self) -> &mut [T] {
+    fn as_mut(&mut self) -> &mut [V] {
         self.as_values_mut_slice()
     }
 }
 
-impl<T> Iterator for IntoIter<T> {
-    type Item = (usize, T);
+impl<K, V> Iterator for IntoIter<K, V> {
+    type Item = (K, V);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -2449,7 +2694,7 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-impl<T> DoubleEndedIterator for IntoIter<T> {
+impl<K, V> DoubleEndedIterator for IntoIter<K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, values } = self;
@@ -2460,16 +2705,20 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
     }
 }
 
-impl<T> ExactSizeIterator for IntoIter<T> {}
+impl<K, V> ExactSizeIterator for IntoIter<K, V> {}
 
-impl<T> FusedIterator for IntoIter<T> {}
+impl<K, V> FusedIterator for IntoIter<K, V> {}
 
-pub struct Drain<'a, T> {
-    keys: vec::Drain<'a, usize>,
-    values: vec::Drain<'a, T>,
+pub struct Drain<'a, K, V> {
+    keys: vec::Drain<'a, K>,
+    values: vec::Drain<'a, V>,
 }
 
-impl<'a, T: Debug> Debug for Drain<'a, T> {
+impl<'a, K, V> Debug for Drain<'a, K, V>
+where
+    K: Debug,
+    V: Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_keys_slice();
         let values = &self.as_values_slice();
@@ -2480,29 +2729,29 @@ impl<'a, T: Debug> Debug for Drain<'a, T> {
     }
 }
 
-impl<'a, T> Drain<'a, T> {
+impl<'a, K, V> Drain<'a, K, V> {
     #[inline]
-    pub fn as_keys_slice(&self) -> &[usize] {
+    pub fn as_keys_slice(&self) -> &[K] {
         let Self { keys, .. } = self;
         keys.as_slice()
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> &[T] {
+    pub fn as_values_slice(&self) -> &[V] {
         let Self { values, .. } = self;
         values.as_slice()
     }
 }
 
-impl<'a, T> AsRef<[T]> for Drain<'a, T> {
+impl<'a, K, V> AsRef<[V]> for Drain<'a, K, V> {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[V] {
         self.as_values_slice()
     }
 }
 
-impl<'a, T> Iterator for Drain<'a, T> {
-    type Item = (usize, T);
+impl<'a, K, V> Iterator for Drain<'a, K, V> {
+    type Item = (K, V);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -2520,7 +2769,7 @@ impl<'a, T> Iterator for Drain<'a, T> {
     }
 }
 
-impl<'a, T> DoubleEndedIterator for Drain<'a, T> {
+impl<'a, K, V> DoubleEndedIterator for Drain<'a, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, values } = self;
@@ -2531,9 +2780,9 @@ impl<'a, T> DoubleEndedIterator for Drain<'a, T> {
     }
 }
 
-impl<'a, T> ExactSizeIterator for Drain<'a, T> {}
+impl<'a, K, V> ExactSizeIterator for Drain<'a, K, V> {}
 
-impl<'a, T> FusedIterator for Drain<'a, T> {}
+impl<'a, K, V> FusedIterator for Drain<'a, K, V> {}
 
 fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
     let (first, second) = (usize::min(a, b), usize::max(a, b));
@@ -2576,33 +2825,33 @@ fn match_kv_same_kind<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> 
 
 #[inline]
 #[track_caller]
-fn unwrap_sparse_entry(sparse: &[SparseEntry], key: usize) -> SparseEntry {
-    let Some(entry) = sparse.get(key).copied() else {
+fn unwrap_sparse_item<E>(sparse: &[SparseItem<E>], sparse_index: usize) -> &SparseItem<E> {
+    let Some(item) = sparse.get(sparse_index) else {
         check_key_bounds_failed()
     };
-    entry
+    item
 }
 
 #[inline]
 #[track_caller]
-fn unwrap_sparse_entry_mut(sparse: &mut [SparseEntry], key: usize) -> &mut SparseEntry {
-    let Some(entry) = sparse.get_mut(key) else {
+fn unwrap_sparse_item_mut<E>(sparse: &mut [SparseItem<E>], key: usize) -> &mut SparseItem<E> {
+    let Some(item) = sparse.get_mut(key) else {
         check_key_bounds_failed()
     };
-    entry
+    item
 }
 
 #[cold]
 #[track_caller]
 #[inline(never)]
 const fn unwrap_dense_index_failed() -> ! {
-    panic!("current sparse entry should be occupied")
+    panic!("current sparse item should be occupied")
 }
 
 #[inline]
 #[track_caller]
-fn unwrap_dense_index(entry: &SparseEntry) -> usize {
-    let Some(dense_index) = entry.dense_index() else {
+fn unwrap_dense_index(kind: &SparseItemKind) -> usize {
+    let Some(dense_index) = kind.dense_index() else {
         unwrap_dense_index_failed()
     };
     dense_index
@@ -2610,8 +2859,8 @@ fn unwrap_dense_index(entry: &SparseEntry) -> usize {
 
 #[inline]
 #[track_caller]
-fn unwrap_dense_index_mut(entry: &mut SparseEntry) -> &mut usize {
-    let Some(dense_index) = entry.dense_index_mut() else {
+fn unwrap_dense_index_mut(kind: &mut SparseItemKind) -> &mut usize {
+    let Some(dense_index) = kind.dense_index_mut() else {
         unwrap_dense_index_failed()
     };
     dense_index
@@ -2619,8 +2868,8 @@ fn unwrap_dense_index_mut(entry: &mut SparseEntry) -> &mut usize {
 
 #[inline]
 #[track_caller]
-fn unwrap_dense_key(keys: &[usize], dense_index: usize) -> usize {
-    let Some(dense_key) = keys.get(dense_index).copied() else {
+fn unwrap_dense_key<K>(keys: &[K], dense_index: usize) -> &K {
+    let Some(dense_key) = keys.get(dense_index) else {
         check_dense_index_bounds_failed();
     };
     dense_key
@@ -2667,28 +2916,32 @@ fn unwrap_dense_value_pair_mut<T>(
 #[cold]
 #[track_caller]
 #[inline(never)]
-const fn unwrap_sparse_entry_pair_mut_failed() -> ! {
+const fn unwrap_sparse_items_pair_mut_failed() -> ! {
     panic!("keys should be in bounds of sparse and differ from each other")
 }
 
 #[inline]
 #[track_caller]
-fn unwrap_sparse_entry_pair_mut(
-    sparse: &mut [SparseEntry],
-    first_key: usize,
-    second_key: usize,
-) -> (&mut SparseEntry, &mut SparseEntry) {
-    let Some(pair) = get_pair_mut(sparse, first_key, second_key) else {
-        unwrap_sparse_entry_pair_mut_failed()
+fn unwrap_sparse_items_pair_mut<E>(
+    sparse: &mut [SparseItem<E>],
+    first_index: usize,
+    second_index: usize,
+) -> (&mut SparseItem<E>, &mut SparseItem<E>) {
+    let Some(pair) = get_pair_mut(sparse, first_index, second_index) else {
+        unwrap_sparse_items_pair_mut_failed()
     };
     pair
 }
 
 #[inline]
 #[track_caller]
-fn unwrap_value_from_key<'a, T>(key: usize, values: &'a [T], sparse: &[SparseEntry]) -> &'a T {
-    let sparse_entry = unwrap_sparse_entry(sparse, key);
-    let dense_index = unwrap_dense_index(&sparse_entry);
+fn unwrap_value_from_sparse_index<'a, T, E>(
+    sparse_index: usize,
+    values: &'a [T],
+    sparse: &[SparseItem<E>],
+) -> &'a T {
+    let sparse_item = unwrap_sparse_item(sparse, sparse_index);
+    let dense_index = unwrap_dense_index(&sparse_item.kind);
     unwrap_dense_value(values, dense_index)
 }
 
@@ -2733,7 +2986,10 @@ const fn check_equal_key_failed() -> ! {
 
 #[inline]
 #[track_caller]
-fn check_equal_key(key: usize, dense_key: usize) {
+fn check_equal_key<K>(key: K, dense_key: K)
+where
+    K: PartialEq,
+{
     if key == dense_key {
         return;
     }
@@ -2943,7 +3199,7 @@ mod tests {
     fn empty_push() {
         let mut sparse_set = SparseSet::new();
 
-        let key = sparse_set.push(42);
+        let key: usize = sparse_set.push(42);
         assert_eq!(key, 0);
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(key), Some(&42));

@@ -7,7 +7,7 @@
 
 extern crate alloc;
 
-pub use self::{arena::SparseArena, set::SparseSet};
-
 pub mod arena;
+pub mod key;
+pub mod prelude;
 pub mod set;

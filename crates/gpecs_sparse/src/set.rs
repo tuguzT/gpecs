@@ -256,6 +256,84 @@ where
         dense_values.as_mut_ptr()
     }
 
+    #[inline]
+    pub fn as_keys_slice(&self) -> &[K] {
+        let Self { dense_keys, .. } = self;
+        dense_keys.as_slice()
+    }
+
+    #[inline]
+    pub fn into_keys_boxed_slice(self) -> Box<[K]> {
+        let Self { dense_keys, .. } = self;
+        dense_keys.into_boxed_slice()
+    }
+
+    #[inline]
+    pub fn as_keys_ptr(&self) -> *const K {
+        let Self { dense_keys, .. } = self;
+        dense_keys.as_ptr()
+    }
+
+    #[inline]
+    pub fn as_sparse_slice(&self) -> &[SparseItem<K::Epoch>] {
+        let Self { sparse, .. } = self;
+        sparse.as_slice()
+    }
+
+    #[inline]
+    pub fn into_sparse_boxed_slice(self) -> Box<[SparseItem<K::Epoch>]> {
+        let Self { sparse, .. } = self;
+        sparse.into_boxed_slice()
+    }
+
+    #[inline]
+    pub fn as_sparse_ptr(&self) -> *const SparseItem<K::Epoch> {
+        let Self { sparse, .. } = self;
+        sparse.as_ptr()
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (Vec<K>, Vec<V>, Vec<SparseItem<K::Epoch>>) {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        (dense_keys, dense_values, sparse)
+    }
+
+    pub fn from_parts(
+        mut keys: Vec<K>,
+        mut values: Vec<V>,
+        mut sparse: Vec<SparseItem<K::Epoch>>,
+    ) -> Self {
+        keys.dedup_by_key(|key| key.sparse_index());
+        values.truncate(keys.len());
+        keys.truncate(values.len());
+        check_kv_same_len(keys.len(), values.len());
+
+        sparse.clear();
+        for (dense_index, key) in keys.iter().enumerate() {
+            let sparse_index = key.sparse_index();
+            let epoch = key.epoch();
+            let item = SparseItem::occupied(dense_index, epoch);
+
+            if sparse_index >= sparse.len() {
+                let epoch = Default::default();
+                let item = SparseItem::vacant(epoch);
+                sparse.resize(sparse_index.saturating_add(1), item);
+            }
+            sparse[sparse_index] = item;
+        }
+
+        Self {
+            dense_keys: keys,
+            dense_values: values,
+            sparse,
+        }
+    }
+
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         let Self {
             dense_keys,
@@ -266,8 +344,8 @@ where
         let sparse_index = key.sparse_index();
         if sparse_index >= sparse.len() {
             let epoch = Default::default();
-            let value = SparseItem::vacant(epoch);
-            sparse.resize(sparse_index.saturating_add(1), value);
+            let item = SparseItem::vacant(epoch);
+            sparse.resize(sparse_index.saturating_add(1), item);
         }
 
         let sparse_item = sparse.index_mut(sparse_index);
@@ -302,8 +380,8 @@ where
             sparse.try_reserve(new_sparse_len - sparse.len())?;
 
             let epoch = Default::default();
-            let value = SparseItem::vacant(epoch);
-            sparse.resize(new_sparse_len, value);
+            let item = SparseItem::vacant(epoch);
+            sparse.resize(new_sparse_len, item);
         }
 
         let sparse_item = sparse.index_mut(sparse_index);
@@ -1057,7 +1135,7 @@ where
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-struct SparseItem<E> {
+pub struct SparseItem<E> {
     pub kind: SparseItemKind,
     pub epoch: E,
 }
@@ -1081,7 +1159,6 @@ impl<E> SparseItem<E> {
     }
 
     #[inline]
-    #[allow(dead_code)]
     pub const fn is_occupied(&self) -> bool {
         let Self { kind, .. } = self;
         kind.is_occupied()
@@ -1112,7 +1189,6 @@ impl<E> SparseItem<E> {
     }
 
     #[inline]
-    #[allow(dead_code)]
     pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
         let Self { kind, .. } = self;
         kind.dense_index_mut()
@@ -1120,7 +1196,7 @@ impl<E> SparseItem<E> {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-enum SparseItemKind {
+pub enum SparseItemKind {
     Occupied { dense_index: usize },
     Vacant,
 }
@@ -1137,7 +1213,6 @@ impl SparseItemKind {
     }
 
     #[inline]
-    #[allow(dead_code)]
     pub const fn is_occupied(&self) -> bool {
         matches!(self, Self::Occupied { .. })
     }
@@ -3014,11 +3089,13 @@ fn check_kv_same_capacity(keys_capacity: usize, values_capacity: usize) {
     check_kv_same_capacity_failed()
 }
 
+// TODO tests for epochs
+
 #[cfg(test)]
 mod tests {
     use std::{mem::forget, ops::Not};
 
-    use super::SparseSet;
+    use super::{SparseItem, SparseSet};
 
     #[test]
     fn empty() {
@@ -3032,6 +3109,19 @@ mod tests {
         assert!(sparse_set.is_empty());
         assert!(sparse_set.capacity() >= 10);
         assert!(sparse_set.sparse_capacity() >= 10);
+    }
+
+    #[test]
+    fn empty_parts() {
+        let sparse_set = SparseSet::<i32>::new();
+
+        let (keys, values, sparse) = sparse_set.into_parts();
+        assert_eq!(keys.len(), 0);
+        assert_eq!(values.len(), 0);
+        assert_eq!(sparse.len(), 0);
+
+        let sparse_set = SparseSet::from_parts(keys, values, sparse);
+        assert_eq!(sparse_set.len(), 0);
     }
 
     #[test]
@@ -3255,6 +3345,30 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert!(sparse_set.contains_key(0));
+    }
+
+    #[test]
+    fn one_item_parts() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(2, 42);
+
+        let (keys, values, sparse) = sparse_set.into_parts();
+        assert_eq!(keys, &[2]);
+        assert_eq!(values, &[42]);
+        assert_eq!(
+            sparse,
+            &[
+                SparseItem::vacant(()),
+                SparseItem::vacant(()),
+                SparseItem::occupied(0, ()),
+            ]
+        );
+
+        let sparse_set = SparseSet::from_parts(keys, values, sparse);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.as_slice(), &[42]);
+        assert_eq!(sparse_set.as_keys_slice(), &[2]);
+        assert_eq!(sparse_set.get(2), Some(&42));
     }
 
     #[test]
@@ -3603,6 +3717,36 @@ mod tests {
         assert!(sparse_set.contains_key(0));
         assert!(sparse_set.contains_key(1).not());
         assert!(sparse_set.contains_key(2));
+    }
+
+    #[test]
+    fn three_items_parts() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let (mut keys, values, sparse) = sparse_set.into_parts();
+        assert_eq!(keys, &[2, 1, 5]);
+        assert_eq!(values, &[34, 42, 69]);
+        assert_eq!(
+            sparse,
+            &[
+                SparseItem::vacant(()),
+                SparseItem::occupied(1, ()),
+                SparseItem::occupied(0, ()),
+                SparseItem::vacant(()),
+                SparseItem::vacant(()),
+                SparseItem::occupied(2, ()),
+            ]
+        );
+
+        keys.swap_remove(0);
+        let sparse_set = SparseSet::from_parts(keys, values, sparse);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.as_slice(), &[34, 42]);
+        assert_eq!(sparse_set.as_keys_slice(), &[5, 1]);
+        assert_eq!(sparse_set.get(5), Some(&34));
     }
 
     #[test]

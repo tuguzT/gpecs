@@ -469,6 +469,37 @@ where
         swap(first_value, second_value);
     }
 
+    pub fn swap_keys(&mut self, first_key: K, second_key: K) {
+        let Self {
+            dense_keys, sparse, ..
+        } = self;
+
+        let first_index = first_key.sparse_index();
+        let second_index = second_key.sparse_index();
+        let Some((first_item, second_item)) = get_pair_mut(sparse, first_index, second_index)
+        else {
+            return;
+        };
+
+        let Some(first_index) = Some(&*first_item)
+            .take_if(|item| item.epoch == first_key.epoch())
+            .and_then(SparseItem::dense_index)
+        else {
+            return;
+        };
+        let Some(second_index) = Some(&*second_item)
+            .take_if(|item| item.epoch == second_key.epoch())
+            .and_then(SparseItem::dense_index)
+        else {
+            return;
+        };
+
+        let (first_key, second_key) =
+            unwrap_dense_value_pair_mut(dense_keys, first_index, second_index);
+        swap(first_item, second_item);
+        swap(first_key, second_key);
+    }
+
     pub fn swap_remove(&mut self, key: K) -> Option<V> {
         let Self {
             dense_keys,
@@ -3338,11 +3369,31 @@ mod tests {
 
         sparse_set.swap(0, 0);
         assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.as_slice(), &[42]);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert!(sparse_set.contains_key(0));
 
         sparse_set.swap(0, 1);
         assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.as_slice(), &[42]);
+        assert_eq!(sparse_set.get(0), Some(&42));
+        assert!(sparse_set.contains_key(0));
+    }
+
+    #[test]
+    fn one_item_swap_keys() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(0, 42);
+
+        sparse_set.swap_keys(0, 0);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.as_slice(), &[42]);
+        assert_eq!(sparse_set.get(0), Some(&42));
+        assert!(sparse_set.contains_key(0));
+
+        sparse_set.swap_keys(0, 1);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.as_slice(), &[42]);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert!(sparse_set.contains_key(0));
     }
@@ -3654,16 +3705,44 @@ mod tests {
 
         sparse_set.swap(0, 0);
         assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.as_slice(), &[42, 69]);
         assert_eq!(sparse_set.get(0), Some(&42));
         assert_eq!(sparse_set.get(1), Some(&69));
 
         sparse_set.swap(0, 1);
         assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.as_slice(), &[69, 42]);
         assert_eq!(sparse_set.get(0), Some(&69));
         assert_eq!(sparse_set.get(1), Some(&42));
 
         sparse_set.swap(1, 1);
         assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.as_slice(), &[69, 42]);
+        assert_eq!(sparse_set.get(0), Some(&69));
+        assert_eq!(sparse_set.get(1), Some(&42));
+    }
+
+    #[test]
+    fn two_items_swap_keys() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(0, 42);
+        sparse_set.insert(1, 69);
+
+        sparse_set.swap_keys(0, 0);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.as_slice(), &[42, 69]);
+        assert_eq!(sparse_set.get(0), Some(&42));
+        assert_eq!(sparse_set.get(1), Some(&69));
+
+        sparse_set.swap_keys(0, 1);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.as_slice(), &[42, 69]);
+        assert_eq!(sparse_set.get(0), Some(&69));
+        assert_eq!(sparse_set.get(1), Some(&42));
+
+        sparse_set.swap_keys(1, 1);
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.as_slice(), &[42, 69]);
         assert_eq!(sparse_set.get(0), Some(&69));
         assert_eq!(sparse_set.get(1), Some(&42));
     }

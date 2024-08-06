@@ -349,13 +349,15 @@ where
         }
 
         let sparse_item = sparse.index_mut(sparse_index);
-        if key.epoch() != sparse_item.epoch {
+        if key.epoch() < sparse_item.epoch {
             return None;
         }
 
         if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
             let value_mut = unwrap_dense_value_mut(dense_values, dense_index);
             let value = replace(value_mut, value);
+            sparse_item.epoch = key.epoch();
+            dense_keys[dense_index] = key;
             return Some(value);
         }
 
@@ -385,13 +387,15 @@ where
         }
 
         let sparse_item = sparse.index_mut(sparse_index);
-        if key.epoch() != sparse_item.epoch {
+        if key.epoch() < sparse_item.epoch {
             return Ok(None);
         }
 
         if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
             let value_mut = unwrap_dense_value_mut(dense_values, dense_index);
             let value = replace(value_mut, value);
+            sparse_item.epoch = key.epoch();
+            dense_keys[dense_index] = key;
             return Ok(Some(value));
         }
 
@@ -794,8 +798,7 @@ where
         let sparse_index = key.sparse_index();
         let sparse_item = sparse
             .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())
-            .copied()?;
+            .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = sparse_item.dense_index()?;
 
         let value = unwrap_dense_value(dense_values, dense_index);
@@ -815,8 +818,7 @@ where
         let sparse_index = key.sparse_index();
         let sparse_item = sparse
             .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())
-            .copied()?;
+            .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = sparse_item.dense_index()?;
 
         let value = unwrap_dense_value_mut(dense_values, dense_index);
@@ -824,6 +826,55 @@ where
         check_equal_key(key, *dense_key);
 
         Some(value)
+    }
+
+    pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, &V)> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        let sparse_item = sparse.get(sparse_index)?;
+        let dense_index = sparse_item.dense_index()?;
+
+        let value = unwrap_dense_value(dense_values, dense_index);
+        let key = *unwrap_dense_key(dense_keys, dense_index);
+        check_equal_key(key, K::new(sparse_index, sparse_item.epoch));
+
+        Some((key, value))
+    }
+
+    pub fn get_mut_with_key(&mut self, sparse_index: usize) -> Option<(K, &mut V)> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        let sparse_item = sparse.get(sparse_index)?;
+        let dense_index = sparse_item.dense_index()?;
+
+        let value = unwrap_dense_value_mut(dense_values, dense_index);
+        let key = *unwrap_dense_key(dense_keys, dense_index);
+        check_equal_key(key, K::new(sparse_index, sparse_item.epoch));
+
+        Some((key, value))
+    }
+
+    pub fn get_epoch(&self, sparse_index: usize) -> Option<K::Epoch> {
+        let Self {
+            sparse, dense_keys, ..
+        } = self;
+
+        let sparse_item = sparse.get(sparse_index)?;
+        let epoch = sparse_item.epoch;
+        if let Some(dense_index) = sparse_item.dense_index() {
+            let key = *unwrap_dense_key(dense_keys, dense_index);
+            check_equal_key(key, K::new(sparse_index, epoch));
+        }
+
+        Some(epoch)
     }
 
     pub fn contains_key(&self, key: K) -> bool {
@@ -3120,13 +3171,15 @@ fn check_kv_same_capacity(keys_capacity: usize, values_capacity: usize) {
     check_kv_same_capacity_failed()
 }
 
-// TODO tests for epochs
-
 #[cfg(test)]
 mod tests {
     use std::{mem::forget, ops::Not};
 
-    use super::{SparseItem, SparseSet};
+    use crate::key::{Epoch, EpochKey, Key as _};
+
+    use super::{EpochSparseSet, SparseItem, SparseSet};
+
+    type Key = EpochKey<usize>;
 
     #[test]
     fn empty() {
@@ -3350,6 +3403,29 @@ mod tests {
     }
 
     #[test]
+    fn one_item_remove_one_epoch() {
+        let mut sparse_set = EpochSparseSet::new();
+
+        let key = Key::new(0, 1);
+        sparse_set.insert(key, 42);
+
+        let removed = sparse_set.remove(key);
+        assert_eq!(removed, Some(42));
+
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains_key(key).not());
+
+        assert_eq!(
+            sparse_set.get_epoch(key.sparse_index()),
+            Some(key.epoch().next()),
+        );
+        let key = Key::new(0, key.epoch().next());
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains_key(key).not());
+    }
+
+    #[test]
     fn one_item_swap_remove_one() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(0, 42);
@@ -3360,6 +3436,29 @@ mod tests {
         assert_eq!(sparse_set.len(), 0);
         assert_eq!(sparse_set.get(0), None);
         assert!(sparse_set.contains_key(0).not());
+    }
+
+    #[test]
+    fn one_item_swap_remove_one_epoch() {
+        let mut sparse_set = EpochSparseSet::new();
+
+        let key = Key::new(0, 1);
+        sparse_set.insert(key, 42);
+
+        let removed = sparse_set.swap_remove(key);
+        assert_eq!(removed, Some(42));
+
+        assert_eq!(sparse_set.len(), 0);
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains_key(key).not());
+
+        assert_eq!(
+            sparse_set.get_epoch(key.sparse_index()),
+            Some(key.epoch().next()),
+        );
+        let key = Key::new(0, key.epoch().next());
+        assert_eq!(sparse_set.get(key), None);
+        assert!(sparse_set.contains_key(key).not());
     }
 
     #[test]
@@ -3523,6 +3622,31 @@ mod tests {
         assert_eq!(sparse_set.get(1), Some(&69));
         assert!(sparse_set.contains_key(0));
         assert!(sparse_set.contains_key(1));
+    }
+
+    #[test]
+    fn two_items_insert_first_epoch() {
+        let mut sparse_set = EpochSparseSet::new();
+
+        let first_key = Key::new(0, 3);
+        sparse_set.insert(first_key, 42);
+
+        let second_key = Key::new(1, 0);
+        sparse_set.insert(second_key, 69);
+
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(first_key), Some(&42));
+        assert_eq!(sparse_set.get(second_key), Some(&69));
+
+        let first_key = Key::new(first_key.sparse_index(), first_key.epoch().next());
+        let previous = sparse_set.insert(first_key, 34);
+        assert_eq!(previous, Some(42));
+
+        assert_eq!(sparse_set.len(), 2);
+        assert_eq!(sparse_set.get(first_key), Some(&34));
+        assert_eq!(sparse_set.get(second_key), Some(&69));
+        assert!(sparse_set.contains_key(first_key));
+        assert!(sparse_set.contains_key(second_key));
     }
 
     #[test]
@@ -3758,6 +3882,28 @@ mod tests {
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(5), Some(&42));
         assert_eq!(sparse_set.get(2), None);
+    }
+
+    #[test]
+    fn two_items_pop_epoch() {
+        let mut sparse_set = EpochSparseSet::new();
+
+        let first_key = Key::new(5, 1);
+        sparse_set.insert(first_key, 42);
+
+        let second_key = Key::new(2, 0);
+        sparse_set.insert(second_key, 69);
+
+        let popped = sparse_set.pop();
+        assert_eq!(popped, Some((second_key, 69)));
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.get(first_key), Some(&42));
+        assert_eq!(sparse_set.get(second_key), None);
+
+        assert_eq!(
+            sparse_set.get_epoch(second_key.sparse_index()),
+            Some(second_key.epoch().next()),
+        );
     }
 
     #[test]

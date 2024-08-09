@@ -941,8 +941,7 @@ where
         let Self { dense_keys, .. } = self;
 
         let keys = dense_keys.iter();
-        let phantom = PhantomData;
-        Keys { keys, phantom }
+        Keys::new(keys)
     }
 
     #[inline]
@@ -950,8 +949,7 @@ where
         let Self { dense_keys, .. } = self;
 
         let keys = dense_keys.into_iter();
-        let phantom = PhantomData;
-        IntoKeys { keys, phantom }
+        IntoKeys::new(keys)
     }
 
     #[inline]
@@ -959,8 +957,7 @@ where
         let Self { dense_values, .. } = self;
 
         let values = dense_values.iter();
-        let phantom = PhantomData;
-        Values { values, phantom }
+        Values::new(values)
     }
 
     #[inline]
@@ -968,8 +965,7 @@ where
         let Self { dense_values, .. } = self;
 
         let values = dense_values.iter_mut();
-        let phantom = PhantomData;
-        ValuesMut { values, phantom }
+        ValuesMut::new(values)
     }
 
     #[inline]
@@ -977,8 +973,7 @@ where
         let Self { dense_values, .. } = self;
 
         let values = dense_values.into_iter();
-        let phantom = PhantomData;
-        IntoValues { values, phantom }
+        IntoValues::new(values)
     }
 
     #[inline]
@@ -991,9 +986,7 @@ where
 
         let keys = dense_keys.iter();
         let values = dense_values.iter();
-        check_kv_same_len(keys.len(), values.len());
-
-        Iter { keys, values }
+        Iter::new(keys, values)
     }
 
     #[inline]
@@ -1006,9 +999,7 @@ where
 
         let keys = dense_keys.iter();
         let values = dense_values.iter_mut();
-        check_kv_same_len(keys.len(), values.len());
-
-        IterMut { keys, values }
+        IterMut::new(keys, values)
     }
 }
 
@@ -1126,9 +1117,7 @@ where
 
         let keys = dense_keys.into_iter();
         let values = dense_values.into_iter();
-        check_kv_same_len(keys.len(), values.len());
-
-        IntoIter { keys, values }
+        IntoIter::new(keys, values)
     }
 }
 
@@ -1624,12 +1613,19 @@ fn unwrap_sparse_value<T>(value: Option<T>) -> T {
     value
 }
 
+#[repr(transparent)]
 pub struct Keys<'a, K, V> {
     keys: slice::Iter<'a, K>,
-    phantom: PhantomData<&'a V>,
+    values: PhantomData<&'a V>,
 }
 
 impl<'a, K, V> Keys<'a, K, V> {
+    #[inline]
+    fn new(keys: slice::Iter<'a, K>) -> Self {
+        let values = PhantomData;
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn as_slice(&self) -> &'a [K] {
         let Self { keys, .. } = self;
@@ -1651,19 +1647,19 @@ impl<'a, K, V> Default for Keys<'a, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
-        let phantom = Default::default();
-        Self { keys, phantom }
+        let values = Default::default();
+        Self { keys, values }
     }
 }
 
 impl<'a, K, V> Clone for Keys<'a, K, V> {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { keys, phantom } = self;
+        let Self { keys, values } = self;
 
         let keys = keys.clone();
-        let phantom = *phantom;
-        Self { keys, phantom }
+        let values = *values;
+        Self { keys, values }
     }
 }
 
@@ -1818,12 +1814,19 @@ impl<'a, K, V> ExactSizeIterator for Keys<'a, K, V> {
 
 impl<'a, K, V> FusedIterator for Keys<'a, K, V> {}
 
+#[repr(transparent)]
 pub struct IntoKeys<K, V> {
     keys: vec::IntoIter<K>,
-    phantom: PhantomData<V>,
+    values: PhantomData<V>,
 }
 
 impl<K, V> IntoKeys<K, V> {
+    #[inline]
+    fn new(keys: vec::IntoIter<K>) -> Self {
+        let values = PhantomData;
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn as_slice(&self) -> &[K] {
         let Self { keys, .. } = self;
@@ -1851,8 +1854,8 @@ impl<K, V> Default for IntoKeys<K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
-        let phantom = Default::default();
-        Self { keys, phantom }
+        let values = Default::default();
+        Self { keys, values }
     }
 }
 
@@ -1862,11 +1865,11 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { keys, phantom } = self;
+        let Self { keys, values } = self;
 
         let keys = keys.clone();
-        let phantom = *phantom;
-        Self { keys, phantom }
+        let values = *values;
+        Self { keys, values }
     }
 }
 
@@ -1931,12 +1934,19 @@ impl<K, V> ExactSizeIterator for IntoKeys<K, V> {}
 
 impl<K, V> FusedIterator for IntoKeys<K, V> {}
 
+#[repr(transparent)]
 pub struct Values<'a, K, V> {
+    keys: PhantomData<&'a K>,
     values: slice::Iter<'a, V>,
-    phantom: PhantomData<&'a K>,
 }
 
 impl<'a, K, V> Values<'a, K, V> {
+    #[inline]
+    fn new(values: slice::Iter<'a, V>) -> Self {
+        let keys = PhantomData;
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn as_slice(&self) -> &'a [V] {
         let Self { values, .. } = self;
@@ -1957,20 +1967,20 @@ where
 impl<'a, K, V> Default for Values<'a, K, V> {
     #[inline]
     fn default() -> Self {
+        let keys = Default::default();
         let values = Default::default();
-        let phantom = Default::default();
-        Self { values, phantom }
+        Self { keys, values }
     }
 }
 
 impl<'a, K, V> Clone for Values<'a, K, V> {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { values, phantom } = self;
+        let Self { keys, values } = self;
 
+        let keys = *keys;
         let values = values.clone();
-        let phantom = *phantom;
-        Self { values, phantom }
+        Self { keys, values }
     }
 }
 
@@ -2125,12 +2135,19 @@ impl<'a, K, V> ExactSizeIterator for Values<'a, K, V> {
 
 impl<'a, K, V> FusedIterator for Values<'a, K, V> {}
 
+#[repr(transparent)]
 pub struct ValuesMut<'a, K, V> {
+    keys: PhantomData<&'a K>,
     values: slice::IterMut<'a, V>,
-    phantom: PhantomData<&'a K>,
 }
 
 impl<'a, K, V> ValuesMut<'a, K, V> {
+    #[inline]
+    fn new(values: slice::IterMut<'a, V>) -> Self {
+        let keys = PhantomData;
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn into_slice(self) -> &'a [V] {
         let Self { values, .. } = self;
@@ -2157,9 +2174,9 @@ where
 impl<'a, K, V> Default for ValuesMut<'a, K, V> {
     #[inline]
     fn default() -> Self {
+        let keys = Default::default();
         let values = Default::default();
-        let phantom = Default::default();
-        Self { values, phantom }
+        Self { values, keys }
     }
 }
 
@@ -2315,12 +2332,19 @@ impl<'a, K, V> ExactSizeIterator for ValuesMut<'a, K, V> {
 impl<'a, K, V> FusedIterator for ValuesMut<'a, K, V> {}
 
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct IntoValues<K, V> {
+    keys: PhantomData<K>,
     values: vec::IntoIter<V>,
-    phantom: PhantomData<K>,
 }
 
 impl<K, V> IntoValues<K, V> {
+    #[inline]
+    fn new(values: vec::IntoIter<V>) -> Self {
+        let keys = PhantomData;
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn as_slice(&self) -> &[V] {
         let Self { values, .. } = self;
@@ -2347,9 +2371,9 @@ where
 impl<K, V> Default for IntoValues<K, V> {
     #[inline]
     fn default() -> Self {
+        let keys = Default::default();
         let values = Default::default();
-        let phantom = Default::default();
-        Self { values, phantom }
+        Self { values, keys }
     }
 }
 
@@ -2420,6 +2444,12 @@ pub struct Iter<'a, K, V> {
 }
 
 impl<'a, K, V> Iter<'a, K, V> {
+    #[inline]
+    fn new(keys: slice::Iter<'a, K>, values: slice::Iter<'a, V>) -> Self {
+        check_kv_same_len(keys.len(), values.len());
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn as_keys_slice(&self) -> &'a [K] {
         let Self { keys, .. } = self;
@@ -2579,6 +2609,12 @@ pub struct IterMut<'a, K, V> {
 }
 
 impl<'a, K, V> IterMut<'a, K, V> {
+    #[inline]
+    fn new(keys: slice::Iter<'a, K>, values: slice::IterMut<'a, V>) -> Self {
+        check_kv_same_len(keys.len(), values.len());
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn into_keys_slice(self) -> &'a [K] {
         let Self { keys, .. } = self;
@@ -2746,6 +2782,12 @@ pub struct IntoIter<K, V> {
 }
 
 impl<K, V> IntoIter<K, V> {
+    #[inline]
+    fn new(keys: vec::IntoIter<K>, values: vec::IntoIter<V>) -> Self {
+        check_kv_same_len(keys.len(), values.len());
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { keys, .. } = self;

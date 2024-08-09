@@ -1,5 +1,5 @@
 pub use crate::{
-    arena::SparseArena,
+    arena::{EpochSparseArena, SparseArena},
     key::EpochKey as Key,
     set::{EpochSparseSet, SparseSet},
 };

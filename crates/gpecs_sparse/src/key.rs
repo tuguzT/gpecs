@@ -189,6 +189,7 @@ where
 {
     #[inline]
     fn next(self) -> Self {
-        self + Self(1.into())
+        let one = 1.into();
+        self + Self(one)
     }
 }

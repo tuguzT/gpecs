@@ -1,5 +1,7 @@
 use core::marker::PhantomData;
 
-pub struct SparseArena<T> {
-    ph: PhantomData<T>,
+pub type SparseArena<T> = EpochSparseArena<usize, T>;
+
+pub struct EpochSparseArena<K, V> {
+    ph: PhantomData<(K, V)>,
 }

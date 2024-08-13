@@ -1,4 +1,4 @@
-use core::mem::swap;
+use core::mem::{replace, swap};
 
 use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 
@@ -341,6 +341,83 @@ where
     //     todo!()
     // }
 
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        let sparse_index = key.sparse_index();
+        match sparse.get_mut(sparse_index) {
+            Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
+                SparseItemKind::Occupied { dense_index } => {
+                    let value_mut = unwrap_dense_value_mut(dense_values, dense_index);
+                    let value = replace(value_mut, value);
+                    sparse_item.epoch = key.epoch();
+                    dense_keys[dense_index] = key;
+                    Some(value)
+                }
+                SparseItemKind::Vacant { next_vacant } => {
+                    let mut next_fp = *sparse_vacant_head;
+                    let mut current_slot = None;
+                    while next_fp != sparse_index {
+                        current_slot = Some(next_fp);
+                        next_fp = sparse.get(next_fp).unwrap().next_vacant().unwrap();
+                    }
+
+                    match current_slot {
+                        Some(slot_to_fix) => {
+                            *sparse
+                                .get_mut(slot_to_fix)
+                                .unwrap()
+                                .next_vacant_mut()
+                                .unwrap() = next_vacant
+                        }
+                        None => *sparse_vacant_head = next_vacant,
+                    }
+
+                    check_kv_same_len(dense_keys.len(), dense_values.len());
+                    dense_keys.push(key);
+                    dense_values.push(value);
+                    sparse[sparse_index] = SparseItem::occupied(dense_keys.len() - 1, key.epoch());
+
+                    None
+                }
+            },
+            Some(_) => None,
+            None => {
+                let mut first_free = sparse_index.saturating_add(1);
+                if sparse_index >= sparse.len() {
+                    let mut new_slot = sparse.len();
+                    sparse.resize_with(sparse_index.saturating_add(1), || {
+                        let epoch = Default::default();
+                        let item = SparseItem::vacant(first_free, epoch);
+
+                        first_free = new_slot;
+                        new_slot += 1;
+                        item
+                    });
+                }
+                *sparse_vacant_head = unwrap_next_vacant(sparse[sparse_index].kind());
+
+                check_kv_same_len(dense_keys.len(), dense_values.len());
+                dense_keys.push(key);
+                dense_values.push(value);
+                sparse[sparse_index] = SparseItem::occupied(dense_keys.len() - 1, key.epoch());
+
+                None
+            }
+        }
+    }
+
+    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryReserveError> {
+        let _ = key;
+        let _ = value;
+        todo!()
+    }
+
     pub fn push(&mut self, value: V) -> K {
         let Self {
             dense_keys,
@@ -377,9 +454,10 @@ where
         key
     }
 
-    // pub fn try_push(&mut self, value: V) -> Result<K, TryReserveError> {
-    //     todo!()
-    // }
+    pub fn try_push(&mut self, value: V) -> Result<K, TryReserveError> {
+        let _ = value;
+        todo!()
+    }
 
     pub fn swap(&mut self, first_key: K, second_key: K) {
         let Self {
@@ -541,16 +619,16 @@ where
         self.sparse.truncate(sparse_len);
     }
 
-    // pub fn sort(&mut self)
-    // where
-    //     V: Ord,
-    // {
-    //     todo!()
-    // }
+    pub fn sort(&mut self)
+    where
+        V: Ord,
+    {
+        todo!()
+    }
 
-    // pub fn sort_keys(&mut self) {
-    //     todo!()
-    // }
+    pub fn sort_keys(&mut self) {
+        todo!()
+    }
 
     pub fn get(&self, key: K) -> Option<&V> {
         let Self {
@@ -680,13 +758,13 @@ where
         *sparse_vacant_head = 0;
     }
 
-    // pub fn iter(&self) {
-    //     todo!()
-    // }
+    pub fn iter(&self) {
+        todo!()
+    }
 
-    // pub fn iter_mut(&mut self) {
-    //     todo!()
-    // }
+    pub fn iter_mut(&mut self) {
+        todo!()
+    }
 
     // TODO other methods
 }
@@ -802,6 +880,92 @@ mod tests {
     //     assert_eq!(into_iter.as_keys_slice(), &[]);
     //     assert_eq!(into_iter.as_values_slice(), &[]);
     // }
+
+    #[test]
+    fn empty_insert_one() {
+        let mut sparse_arena = SparseArena::new();
+        let previous = sparse_arena.insert(0, 42);
+        assert_eq!(previous, None);
+
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.get(0), Some(&42));
+        assert!(sparse_arena.contains_key(0));
+    }
+
+    #[test]
+    fn with_capacity_insert_one() {
+        let mut sparse_arena = SparseArena::with_capacity(10, 10);
+        let previous = sparse_arena.insert(0, 42);
+        assert_eq!(previous, None);
+
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.get(0), Some(&42));
+        assert!(sparse_arena.contains_key(0));
+    }
+
+    #[test]
+    fn empty_insert_one_mutate() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
+        *sparse_arena.get_mut(0).unwrap() = 43;
+
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.get(0), Some(&43));
+        assert!(sparse_arena.contains_key(0));
+    }
+
+    #[test]
+    fn with_capacity_insert_one_mutate() {
+        let mut sparse_arena = SparseArena::with_capacity(10, 10);
+        sparse_arena.insert(0, 42);
+        *sparse_arena.get_mut(0).unwrap() = 43;
+
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.get(0), Some(&43));
+        assert!(sparse_arena.contains_key(0));
+    }
+
+    #[test]
+    fn empty_insert_far() {
+        let mut sparse_arena = SparseArena::new();
+
+        let (key, value) = (3, 42);
+        sparse_arena.insert(key, value);
+
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.get(key), Some(&value));
+        assert!(sparse_arena.contains_key(key));
+
+        let (key, value) = (6, 69);
+        sparse_arena.insert(key, value);
+
+        assert_eq!(sparse_arena.len(), 2);
+        assert_eq!(sparse_arena.get(key), Some(&value));
+        assert!(sparse_arena.contains_key(key));
+    }
+
+    #[test]
+    fn empty_insert_far_remove() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(3, 42);
+        sparse_arena.insert(1, 69);
+
+        let key = 3;
+        let value = sparse_arena.remove(key).unwrap();
+
+        assert_eq!(value, 42);
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.get(key), None);
+        assert!(sparse_arena.contains_key(key).not());
+
+        let key = 1;
+        let value = sparse_arena.remove(key).unwrap();
+
+        assert_eq!(value, 69);
+        assert_eq!(sparse_arena.len(), 0);
+        assert_eq!(sparse_arena.get(key), None);
+        assert!(sparse_arena.contains_key(key).not());
+    }
 
     #[test]
     fn empty_push() {
@@ -1036,70 +1200,70 @@ mod tests {
     //     assert_eq!(into_iter.as_values_slice(), &[42]);
     // }
 
-    // #[test]
-    // fn two_items_insert_first() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
-    //     sparse_arena.insert(1, 69);
+    #[test]
+    fn two_items_insert_first() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
+        sparse_arena.insert(1, 69);
 
-    //     assert_eq!(sparse_arena.len(), 2);
-    //     assert_eq!(sparse_arena.get(0), Some(&42));
-    //     assert_eq!(sparse_arena.get(1), Some(&69));
+        assert_eq!(sparse_arena.len(), 2);
+        assert_eq!(sparse_arena.get(0), Some(&42));
+        assert_eq!(sparse_arena.get(1), Some(&69));
 
-    //     let previous = sparse_arena.insert(0, 34);
-    //     assert_eq!(previous, Some(42));
+        let previous = sparse_arena.insert(0, 34);
+        assert_eq!(previous, Some(42));
 
-    //     assert_eq!(sparse_arena.len(), 2);
-    //     assert_eq!(sparse_arena.get(0), Some(&34));
-    //     assert_eq!(sparse_arena.get(1), Some(&69));
-    //     assert!(sparse_arena.contains_key(0));
-    //     assert!(sparse_arena.contains_key(1));
-    // }
+        assert_eq!(sparse_arena.len(), 2);
+        assert_eq!(sparse_arena.get(0), Some(&34));
+        assert_eq!(sparse_arena.get(1), Some(&69));
+        assert!(sparse_arena.contains_key(0));
+        assert!(sparse_arena.contains_key(1));
+    }
 
-    // #[test]
-    // fn two_items_insert_first_epoch() {
-    //     let mut sparse_arena = EpochSparseArena::new();
+    #[test]
+    fn two_items_insert_first_epoch() {
+        let mut sparse_arena = EpochSparseArena::new();
 
-    //     let first_key = Key::new(0, 3);
-    //     sparse_arena.insert(first_key, 42);
+        let first_key = Key::new(0, 3);
+        sparse_arena.insert(first_key, 42);
 
-    //     let second_key = Key::new(1, 0);
-    //     sparse_arena.insert(second_key, 69);
+        let second_key = Key::new(1, 0);
+        sparse_arena.insert(second_key, 69);
 
-    //     assert_eq!(sparse_arena.len(), 2);
-    //     assert_eq!(sparse_arena.get(first_key), Some(&42));
-    //     assert_eq!(sparse_arena.get(second_key), Some(&69));
+        assert_eq!(sparse_arena.len(), 2);
+        assert_eq!(sparse_arena.get(first_key), Some(&42));
+        assert_eq!(sparse_arena.get(second_key), Some(&69));
 
-    //     let first_key = Key::new(first_key.sparse_index(), first_key.epoch().next());
-    //     let previous = sparse_arena.insert(first_key, 34);
-    //     assert_eq!(previous, Some(42));
+        let first_key = Key::new(first_key.sparse_index(), first_key.epoch().next());
+        let previous = sparse_arena.insert(first_key, 34);
+        assert_eq!(previous, Some(42));
 
-    //     assert_eq!(sparse_arena.len(), 2);
-    //     assert_eq!(sparse_arena.get(first_key), Some(&34));
-    //     assert_eq!(sparse_arena.get(second_key), Some(&69));
-    //     assert!(sparse_arena.contains_key(first_key));
-    //     assert!(sparse_arena.contains_key(second_key));
-    // }
+        assert_eq!(sparse_arena.len(), 2);
+        assert_eq!(sparse_arena.get(first_key), Some(&34));
+        assert_eq!(sparse_arena.get(second_key), Some(&69));
+        assert!(sparse_arena.contains_key(first_key));
+        assert!(sparse_arena.contains_key(second_key));
+    }
 
-    // #[test]
-    // fn two_items_insert_second() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
-    //     sparse_arena.insert(1, 69);
+    #[test]
+    fn two_items_insert_second() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
+        sparse_arena.insert(1, 69);
 
-    //     assert_eq!(sparse_arena.len(), 2);
-    //     assert_eq!(sparse_arena.get(0), Some(&42));
-    //     assert_eq!(sparse_arena.get(1), Some(&69));
+        assert_eq!(sparse_arena.len(), 2);
+        assert_eq!(sparse_arena.get(0), Some(&42));
+        assert_eq!(sparse_arena.get(1), Some(&69));
 
-    //     let previous = sparse_arena.insert(1, 34);
-    //     assert_eq!(previous, Some(69));
+        let previous = sparse_arena.insert(1, 34);
+        assert_eq!(previous, Some(69));
 
-    //     assert_eq!(sparse_arena.len(), 2);
-    //     assert_eq!(sparse_arena.get(0), Some(&42));
-    //     assert_eq!(sparse_arena.get(1), Some(&34));
-    //     assert!(sparse_arena.contains_key(0));
-    //     assert!(sparse_arena.contains_key(1));
-    // }
+        assert_eq!(sparse_arena.len(), 2);
+        assert_eq!(sparse_arena.get(0), Some(&42));
+        assert_eq!(sparse_arena.get(1), Some(&34));
+        assert!(sparse_arena.contains_key(0));
+        assert!(sparse_arena.contains_key(1));
+    }
 
     #[test]
     fn two_items_remove_first() {
@@ -1179,6 +1343,40 @@ mod tests {
         assert_eq!(sparse_arena.get(second_key), None);
         assert!(sparse_arena.contains_key(first_key));
         assert!(sparse_arena.contains_key(second_key).not());
+    }
+
+    #[test]
+    fn two_items_remove_one_insert_one() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
+        sparse_arena.insert(1, 69);
+
+        let removed = sparse_arena.remove(0);
+        assert_eq!(removed, Some(42));
+        assert_eq!(sparse_arena.get(0), None);
+
+        sparse_arena.insert(0, 34);
+        assert_eq!(sparse_arena.get(0), Some(&34));
+        assert_eq!(sparse_arena.get(1), Some(&69));
+        assert!(sparse_arena.contains_key(0));
+        assert!(sparse_arena.contains_key(1));
+    }
+
+    #[test]
+    fn two_items_swap_remove_one_insert_one() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
+        sparse_arena.insert(1, 69);
+
+        let removed = sparse_arena.swap_remove(0);
+        assert_eq!(removed, Some(42));
+        assert_eq!(sparse_arena.get(0), None);
+
+        sparse_arena.insert(0, 34);
+        assert_eq!(sparse_arena.get(0), Some(&34));
+        assert_eq!(sparse_arena.get(1), Some(&69));
+        assert!(sparse_arena.contains_key(0));
+        assert!(sparse_arena.contains_key(1));
     }
 
     #[test]
@@ -1470,6 +1668,106 @@ mod tests {
     #[test]
     fn five_items_remove_insert() {
         let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(2, 69);
+        sparse_arena.insert(3, 228);
+        sparse_arena.insert(4, 666);
+
+        let key = 1;
+        let value = sparse_arena.remove(key).unwrap();
+        assert_eq!(value, 42);
+
+        let key = 3;
+        let value = sparse_arena.remove(key).unwrap();
+        assert_eq!(value, 228);
+
+        let key = 4;
+        let value = sparse_arena.remove(key).unwrap();
+        assert_eq!(value, 666);
+
+        let key = 2;
+        let value = sparse_arena.remove(key).unwrap();
+        assert_eq!(value, 69);
+
+        let key = 3;
+        let value = 0;
+        let previous = sparse_arena.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_arena.get(key), Some(&value));
+        assert!(sparse_arena.contains_key(key));
+
+        let key = 2;
+        let value = 1;
+        let previous = sparse_arena.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_arena.get(key), Some(&value));
+        assert!(sparse_arena.contains_key(key));
+
+        let key = 4;
+        let value = 10;
+        let previous = sparse_arena.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_arena.get(key), Some(&value));
+        assert!(sparse_arena.contains_key(key));
+    }
+
+    #[test]
+    fn five_items_swap_remove_insert() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(2, 69);
+        sparse_arena.insert(3, 228);
+        sparse_arena.insert(4, 666);
+
+        let key = 1;
+        let value = sparse_arena.swap_remove(key).unwrap();
+        assert_eq!(value, 42);
+
+        let key = 3;
+        let value = sparse_arena.swap_remove(key).unwrap();
+        assert_eq!(value, 228);
+
+        let key = 4;
+        let value = sparse_arena.swap_remove(key).unwrap();
+        assert_eq!(value, 666);
+
+        let key = 2;
+        let value = sparse_arena.swap_remove(key).unwrap();
+        assert_eq!(value, 69);
+
+        let key = 3;
+        let value = 0;
+        let previous = sparse_arena.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_arena.get(key), Some(&value));
+        assert!(sparse_arena.contains_key(key));
+
+        let key = 2;
+        let value = 1;
+        let previous = sparse_arena.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_arena.get(key), Some(&value));
+        assert!(sparse_arena.contains_key(key));
+
+        let key = 4;
+        let value = 10;
+        let previous = sparse_arena.insert(key, value);
+
+        assert_eq!(previous, None);
+        assert_eq!(sparse_arena.get(key), Some(&value));
+        assert!(sparse_arena.contains_key(key));
+    }
+
+    #[test]
+    fn five_items_remove_push() {
+        let mut sparse_arena = SparseArena::new();
         let _key0 = sparse_arena.push(34);
         let key1 = sparse_arena.push(42);
         let key2 = sparse_arena.push(69);
@@ -1505,7 +1803,7 @@ mod tests {
     }
 
     #[test]
-    fn five_items_swap_remove_insert() {
+    fn five_items_swap_remove_push() {
         let mut sparse_arena = SparseArena::new();
         let _key0 = sparse_arena.push(34);
         let key1 = sparse_arena.push(42);
@@ -1582,7 +1880,33 @@ mod tests {
     // }
 
     #[test]
-    fn five_items_truncate() {
+    fn five_items_insert_truncate() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(8, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(4, 69);
+        sparse_arena.insert(3, 228);
+        sparse_arena.insert(6, 666);
+
+        sparse_arena.truncate(usize::MAX, 5);
+        assert_eq!(sparse_arena.sparse_len(), 5);
+        assert_eq!(sparse_arena.as_keys_slice(), &[1, 4, 3]);
+        assert_eq!(sparse_arena.as_slice(), &[42, 69, 228]);
+
+        assert_eq!(sparse_arena.get(1), Some(&42));
+        assert_eq!(sparse_arena.get(4), Some(&69));
+        assert_eq!(sparse_arena.get(3), Some(&228));
+
+        sparse_arena.truncate(1, usize::MAX);
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.as_keys_slice(), &[1]);
+        assert_eq!(sparse_arena.as_slice(), &[42]);
+
+        assert_eq!(sparse_arena.get(1), Some(&42));
+    }
+
+    #[test]
+    fn five_items_push_truncate() {
         let mut sparse_arena = SparseArena::new();
         let key0 = sparse_arena.push(34);
         let key1 = sparse_arena.push(42);

@@ -3889,6 +3889,80 @@ mod tests {
     }
 
     #[test]
+    fn five_items_remove_push() {
+        let mut sparse_set = SparseSet::new();
+        let _key0 = sparse_set.push(34);
+        let key1 = sparse_set.push(42);
+        let key2 = sparse_set.push(69);
+        let key3 = sparse_set.push(228);
+        let key4 = sparse_set.push(666);
+
+        let value = sparse_set.remove(key1).unwrap();
+        assert_eq!(value, 42);
+
+        let value = sparse_set.remove(key3).unwrap();
+        assert_eq!(value, 228);
+
+        let value = sparse_set.remove(key4).unwrap();
+        assert_eq!(value, 666);
+
+        let value = sparse_set.remove(key2).unwrap();
+        assert_eq!(value, 69);
+
+        let value = 0;
+        let key = sparse_set.push(value);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains_key(key));
+
+        let value = 1;
+        let key = sparse_set.push(value);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains_key(key));
+
+        let value = 10;
+        let key = sparse_set.push(value);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains_key(key));
+    }
+
+    #[test]
+    fn five_items_swap_remove_push() {
+        let mut sparse_set = SparseSet::new();
+        let _key0 = sparse_set.push(34);
+        let key1 = sparse_set.push(42);
+        let key2 = sparse_set.push(69);
+        let key3 = sparse_set.push(228);
+        let key4 = sparse_set.push(666);
+
+        let value = sparse_set.swap_remove(key1).unwrap();
+        assert_eq!(value, 42);
+
+        let value = sparse_set.swap_remove(key3).unwrap();
+        assert_eq!(value, 228);
+
+        let value = sparse_set.swap_remove(key4).unwrap();
+        assert_eq!(value, 666);
+
+        let value = sparse_set.swap_remove(key2).unwrap();
+        assert_eq!(value, 69);
+
+        let value = 0;
+        let key = sparse_set.push(value);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains_key(key));
+
+        let value = 1;
+        let key = sparse_set.push(value);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains_key(key));
+
+        let value = 10;
+        let key = sparse_set.push(value);
+        assert_eq!(sparse_set.get(key), Some(&value));
+        assert!(sparse_set.contains_key(key));
+    }
+
+    #[test]
     fn five_items_retain() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(8, 34);
@@ -3929,7 +4003,7 @@ mod tests {
     }
 
     #[test]
-    fn five_items_truncate() {
+    fn five_items_insert_truncate() {
         let mut sparse_set = SparseSet::new();
         sparse_set.insert(8, 34);
         sparse_set.insert(1, 42);
@@ -3952,6 +4026,34 @@ mod tests {
         assert_eq!(sparse_set.values().as_slice(), &[42]);
 
         assert_eq!(sparse_set.get(1), Some(&42));
+    }
+
+    #[test]
+    fn five_items_push_truncate() {
+        let mut sparse_set = SparseSet::new();
+        let key0 = sparse_set.push(34);
+        let key1 = sparse_set.push(42);
+        let key2 = sparse_set.push(69);
+        let key3 = sparse_set.push(228);
+        let key4 = sparse_set.push(666);
+
+        sparse_set.truncate(usize::MAX, 3);
+        assert_eq!(sparse_set.sparse_len(), 3);
+        assert_eq!(sparse_set.as_keys_slice(), &[key0, key1, key2]);
+        assert_eq!(sparse_set.as_slice(), &[34, 42, 69]);
+
+        assert_eq!(sparse_set.get(key0), Some(&34));
+        assert_eq!(sparse_set.get(key1), Some(&42));
+        assert_eq!(sparse_set.get(key2), Some(&69));
+        assert_eq!(sparse_set.get(key3), None);
+        assert_eq!(sparse_set.get(key4), None);
+
+        sparse_set.truncate(1, usize::MAX);
+        assert_eq!(sparse_set.len(), 1);
+        assert_eq!(sparse_set.as_keys_slice(), &[key0]);
+        assert_eq!(sparse_set.as_slice(), &[34]);
+
+        assert_eq!(sparse_set.get(key0), Some(&34));
     }
 
     #[test]

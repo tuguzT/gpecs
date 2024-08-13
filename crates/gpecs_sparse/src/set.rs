@@ -610,10 +610,9 @@ where
 
         let keys = dense_keys.drain(..);
         let values = dense_values.drain(..);
-        check_kv_same_len(keys.len(), values.len());
         sparse.clear();
 
-        Drain { keys, values }
+        Drain::new(keys, values)
     }
 
     pub fn retain<F>(&mut self, mut f: F)
@@ -2832,6 +2831,11 @@ where
 }
 
 impl<'a, K, V> Drain<'a, K, V> {
+    fn new(keys: vec::Drain<'a, K>, values: vec::Drain<'a, V>) -> Self {
+        check_kv_same_len(keys.len(), values.len());
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { keys, .. } = self;

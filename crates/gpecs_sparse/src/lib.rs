@@ -211,7 +211,7 @@ const fn unwrap_dense_index_failed() -> ! {
 
 #[inline]
 #[track_caller]
-fn unwrap_dense_index(kind: &SparseItemKind) -> usize {
+const fn unwrap_dense_index(kind: &SparseItemKind) -> usize {
     let Some(dense_index) = kind.dense_index() else {
         unwrap_dense_index_failed()
     };
@@ -236,7 +236,7 @@ const fn unwrap_next_vacant_failed() -> ! {
 
 #[inline]
 #[track_caller]
-fn unwrap_next_vacant(kind: &SparseItemKind) -> usize {
+const fn unwrap_next_vacant(kind: &SparseItemKind) -> usize {
     let Some(next_vacant) = kind.next_vacant() else {
         unwrap_next_vacant_failed()
     };
@@ -331,7 +331,7 @@ const fn check_dense_index_bounds_failed() -> ! {
 
 #[inline]
 #[track_caller]
-fn check_dense_index_bounds(dense_index: usize, dense_len: usize) {
+const fn check_dense_index_bounds(dense_index: usize, dense_len: usize) {
     if dense_index < dense_len {
         return;
     }
@@ -347,7 +347,7 @@ const fn check_key_bounds_failed() -> ! {
 
 #[inline]
 #[track_caller]
-fn check_key_bounds(key: usize, sparse_len: usize) {
+const fn check_key_bounds(key: usize, sparse_len: usize) {
     if key < sparse_len {
         return;
     }
@@ -375,7 +375,7 @@ where
 
 #[inline]
 #[track_caller]
-fn check_kv_same_len(keys_len: usize, values_len: usize) {
+const fn check_kv_same_len(keys_len: usize, values_len: usize) {
     if keys_len == values_len {
         return;
     }
@@ -384,7 +384,7 @@ fn check_kv_same_len(keys_len: usize, values_len: usize) {
 
 #[inline]
 #[track_caller]
-fn check_kv_same_capacity(keys_capacity: usize, values_capacity: usize) {
+const fn check_kv_same_capacity(keys_capacity: usize, values_capacity: usize) {
     if keys_capacity == values_capacity {
         return;
     }

@@ -41,7 +41,7 @@ pub struct EpochKey<E = usize> {
 
 impl<E> EpochKey<E> {
     #[inline]
-    pub fn new(sparse_index: usize, epoch: E) -> Self {
+    pub const fn new(sparse_index: usize, epoch: E) -> Self {
         Self {
             sparse_index,
             epoch,
@@ -49,21 +49,21 @@ impl<E> EpochKey<E> {
     }
 
     #[inline]
-    pub fn sparse_index(&self) -> usize {
+    pub const fn sparse_index(&self) -> usize {
         let Self { sparse_index, .. } = self;
         *sparse_index
-    }
-
-    #[inline]
-    pub fn epoch(&self) -> &E {
-        let Self { epoch, .. } = self;
-        epoch
     }
 
     #[inline]
     pub fn sparse_index_mut(&mut self) -> &mut usize {
         let Self { sparse_index, .. } = self;
         sparse_index
+    }
+
+    #[inline]
+    pub const fn epoch(&self) -> &E {
+        let Self { epoch, .. } = self;
+        epoch
     }
 
     #[inline]

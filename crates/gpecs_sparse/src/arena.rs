@@ -309,37 +309,65 @@ where
         (dense_keys, dense_values, sparse)
     }
 
-    // pub fn from_parts(
-    //     mut keys: Vec<K>,
-    //     mut values: Vec<V>,
-    //     mut sparse: Vec<SparseItem<K::Epoch>>,
-    // ) -> Self {
-    // keys.dedup_by_key(|key| key.sparse_index());
-    // values.truncate(keys.len());
-    // keys.truncate(values.len());
-    // check_kv_same_len(keys.len(), values.len());
+    pub fn from_parts(
+        mut keys: Vec<K>,
+        mut values: Vec<V>,
+        mut sparse: Vec<SparseItem<K::Epoch>>,
+    ) -> Self {
+        keys.dedup_by_key(|key| key.sparse_index());
+        values.truncate(keys.len());
+        keys.truncate(values.len());
+        check_kv_same_len(keys.len(), values.len());
 
-    // sparse.clear();
-    // for (dense_index, key) in keys.iter().enumerate() {
-    //     let sparse_index = key.sparse_index();
-    //     let epoch = key.epoch();
-    //     let item = SparseItem::occupied(dense_index, epoch);
+        sparse.clear();
+        let mut sparse_vacant_head = 0;
+        for (dense_index, key) in keys.iter().enumerate() {
+            let sparse_index = key.sparse_index();
+            let epoch = key.epoch();
+            let item = SparseItem::occupied(dense_index, epoch);
 
-    //     if sparse_index >= sparse.len() {
-    //         let epoch = Default::default();
-    //         let item = SparseItem::vacant(0, epoch);
-    //         sparse.resize(sparse_index.saturating_add(1), item);
-    //     }
-    //     sparse[sparse_index] = item;
-    // }
+            if sparse_index >= sparse.len() {
+                let old_len = sparse.len();
+                let new_len = sparse_index.saturating_add(1);
 
-    // Self {
-    //     dense_keys: keys,
-    //     dense_values: values,
-    //     sparse,
-    // }
-    //     todo!()
-    // }
+                if sparse_vacant_head < old_len {
+                    let mut last_vacant = sparse_vacant_head;
+                    loop {
+                        let next_vacant = sparse[last_vacant].next_vacant_mut().unwrap();
+                        if *next_vacant == old_len {
+                            *next_vacant = new_len;
+                            break;
+                        }
+                        last_vacant = *next_vacant;
+                    }
+                }
+
+                let mut first_free = if sparse_vacant_head < old_len {
+                    sparse_vacant_head
+                } else {
+                    new_len
+                };
+                let mut new_slot = old_len;
+                sparse.resize_with(new_len, || {
+                    let epoch = Default::default();
+                    let item = SparseItem::vacant(first_free, epoch);
+
+                    first_free = new_slot;
+                    new_slot += 1;
+                    item
+                });
+                sparse_vacant_head = unwrap_next_vacant(sparse[sparse_index].kind());
+            }
+            sparse[sparse_index] = item;
+        }
+
+        Self {
+            dense_keys: keys,
+            dense_values: values,
+            sparse,
+            sparse_vacant_head,
+        }
+    }
 
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         let Self {
@@ -797,7 +825,10 @@ where
 mod tests {
     use std::ops::Not;
 
-    use crate::key::{Epoch, EpochKey, Key as _};
+    use crate::{
+        key::{Epoch, EpochKey, Key as _},
+        SparseItem,
+    };
 
     use super::{EpochSparseArena, SparseArena};
 
@@ -817,18 +848,18 @@ mod tests {
         assert!(sparse_arena.sparse_capacity() >= 10);
     }
 
-    // #[test]
-    // fn empty_parts() {
-    //     let sparse_arena = SparseArena::<i32>::new();
+    #[test]
+    fn empty_parts() {
+        let sparse_arena = SparseArena::<i32>::new();
 
-    //     let (keys, values, sparse) = sparse_arena.into_parts();
-    //     assert_eq!(keys.len(), 0);
-    //     assert_eq!(values.len(), 0);
-    //     assert_eq!(sparse.len(), 0);
+        let (keys, values, sparse) = sparse_arena.into_parts();
+        assert_eq!(keys.len(), 0);
+        assert_eq!(values.len(), 0);
+        assert_eq!(sparse.len(), 0);
 
-    //     let sparse_arena = SparseArena::from_parts(keys, values, sparse);
-    //     assert_eq!(sparse_arena.len(), 0);
-    // }
+        let sparse_arena = SparseArena::from_parts(keys, values, sparse);
+        assert_eq!(sparse_arena.len(), 0);
+    }
 
     // #[test]
     // fn empty_keys() {
@@ -1189,29 +1220,29 @@ mod tests {
         assert!(sparse_arena.contains_key(0));
     }
 
-    // #[test]
-    // fn one_item_parts() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 42);
+    #[test]
+    fn one_item_parts() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 42);
 
-    //     let (keys, values, sparse) = sparse_arena.into_parts();
-    //     assert_eq!(keys, &[2]);
-    //     assert_eq!(values, &[42]);
-    //     assert_eq!(
-    //         sparse,
-    //         &[
-    //             SparseItem::vacant(0, ()),
-    //             SparseItem::vacant(0, ()),
-    //             SparseItem::occupied(0, ()),
-    //         ]
-    //     );
+        let (keys, values, sparse) = sparse_arena.into_parts();
+        assert_eq!(keys, &[2]);
+        assert_eq!(values, &[42]);
+        assert_eq!(
+            sparse,
+            &[
+                SparseItem::vacant(3, ()),
+                SparseItem::vacant(0, ()),
+                SparseItem::occupied(0, ()),
+            ]
+        );
 
-    //     let sparse_arena = SparseArena::from_parts(keys, values, sparse);
-    //     assert_eq!(sparse_arena.len(), 1);
-    //     assert_eq!(sparse_arena.as_slice(), &[42]);
-    //     assert_eq!(sparse_arena.as_keys_slice(), &[2]);
-    //     assert_eq!(sparse_arena.get(2), Some(&42));
-    // }
+        let sparse_arena = SparseArena::from_parts(keys, values, sparse);
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.as_slice(), &[42]);
+        assert_eq!(sparse_arena.as_keys_slice(), &[2]);
+        assert_eq!(sparse_arena.get(2), Some(&42));
+    }
 
     // #[test]
     // fn one_item_keys() {
@@ -1687,35 +1718,35 @@ mod tests {
         assert!(sparse_arena.contains_key(last_key));
     }
 
-    // #[test]
-    // fn three_items_parts() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_parts() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let (mut keys, values, sparse) = sparse_arena.into_parts();
-    //     assert_eq!(keys, &[2, 1, 5]);
-    //     assert_eq!(values, &[34, 42, 69]);
-    //     assert_eq!(
-    //         sparse,
-    //         &[
-    //             SparseItem::vacant(0, ()),
-    //             SparseItem::occupied(1, ()),
-    //             SparseItem::occupied(0, ()),
-    //             SparseItem::vacant(0, ()),
-    //             SparseItem::vacant(0, ()),
-    //             SparseItem::occupied(2, ()),
-    //         ]
-    //     );
+        let (mut keys, values, sparse) = sparse_arena.into_parts();
+        assert_eq!(keys, &[2, 1, 5]);
+        assert_eq!(values, &[34, 42, 69]);
+        assert_eq!(
+            sparse,
+            &[
+                SparseItem::vacant(6, ()),
+                SparseItem::occupied(1, ()),
+                SparseItem::occupied(0, ()),
+                SparseItem::vacant(0, ()),
+                SparseItem::vacant(3, ()),
+                SparseItem::occupied(2, ()),
+            ]
+        );
 
-    //     keys.swap_remove(0);
-    //     let sparse_arena = SparseArena::from_parts(keys, values, sparse);
-    //     assert_eq!(sparse_arena.len(), 2);
-    //     assert_eq!(sparse_arena.as_slice(), &[34, 42]);
-    //     assert_eq!(sparse_arena.as_keys_slice(), &[5, 1]);
-    //     assert_eq!(sparse_arena.get(5), Some(&34));
-    // }
+        keys.swap_remove(0);
+        let sparse_arena = SparseArena::from_parts(keys, values, sparse);
+        assert_eq!(sparse_arena.len(), 2);
+        assert_eq!(sparse_arena.as_slice(), &[34, 42]);
+        assert_eq!(sparse_arena.as_keys_slice(), &[5, 1]);
+        assert_eq!(sparse_arena.get(5), Some(&34));
+    }
 
     // #[test]
     // fn three_items_keys() {

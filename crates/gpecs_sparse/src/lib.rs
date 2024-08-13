@@ -195,8 +195,11 @@ fn unwrap_sparse_item<E>(sparse: &[SparseItem<E>], sparse_index: usize) -> &Spar
 
 #[inline]
 #[track_caller]
-fn unwrap_sparse_item_mut<E>(sparse: &mut [SparseItem<E>], key: usize) -> &mut SparseItem<E> {
-    let Some(item) = sparse.get_mut(key) else {
+fn unwrap_sparse_item_mut<E>(
+    sparse: &mut [SparseItem<E>],
+    sparse_index: usize,
+) -> &mut SparseItem<E> {
+    let Some(item) = sparse.get_mut(sparse_index) else {
         check_key_bounds_failed()
     };
     item

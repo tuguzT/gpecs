@@ -452,8 +452,8 @@ where
             },
             Some(_) => None,
             None => {
-                let new_len = sparse_index.saturating_add(1);
-                extend_sparse(sparse, new_len, sparse_vacant_head);
+                let new_sparse_len = sparse_index.saturating_add(1);
+                extend_sparse(sparse, new_sparse_len, sparse_vacant_head);
 
                 check_kv_same_len(dense_keys.len(), dense_values.len());
                 dense_keys.push(key);
@@ -466,9 +466,54 @@ where
     }
 
     pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryReserveError> {
-        let _ = key;
-        let _ = value;
-        todo!()
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        let sparse_index = key.sparse_index();
+        match sparse.get_mut(sparse_index) {
+            Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
+                SparseItemKind::Occupied { dense_index } => {
+                    let value_mut = unwrap_dense_value_mut(dense_values, dense_index);
+                    let value = replace(value_mut, value);
+                    sparse_item.epoch = key.epoch();
+                    dense_keys[dense_index] = key;
+                    Ok(Some(value))
+                }
+                SparseItemKind::Vacant { next_vacant } => {
+                    remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
+
+                    check_kv_same_len(dense_keys.len(), dense_values.len());
+                    dense_keys.try_reserve(1)?;
+                    dense_values.try_reserve(1)?;
+
+                    dense_keys.push(key);
+                    dense_values.push(value);
+                    sparse[sparse_index] = SparseItem::occupied(dense_keys.len() - 1, key.epoch());
+
+                    Ok(None)
+                }
+            },
+            Some(_) => Ok(None),
+            None => {
+                let new_sparse_len = sparse_index.saturating_add(1);
+                sparse.try_reserve(new_sparse_len.saturating_sub(sparse.len()))?;
+                extend_sparse(sparse, new_sparse_len, sparse_vacant_head);
+
+                check_kv_same_len(dense_keys.len(), dense_values.len());
+                dense_keys.try_reserve(1)?;
+                dense_values.try_reserve(1)?;
+
+                dense_keys.push(key);
+                dense_values.push(value);
+                sparse[sparse_index] = SparseItem::occupied(dense_keys.len() - 1, key.epoch());
+
+                Ok(None)
+            }
+        }
     }
 
     pub fn push(&mut self, value: V) -> K {
@@ -485,6 +530,7 @@ where
             let key = K::new(*sparse_vacant_head, sparse_item.epoch);
             let sparse_item_kind = SparseItemKind::occupied(dense_keys.len());
 
+            check_kv_same_len(dense_keys.len(), dense_values.len());
             dense_keys.push(key);
             dense_values.push(value);
 
@@ -508,8 +554,47 @@ where
     }
 
     pub fn try_push(&mut self, value: V) -> Result<K, TryReserveError> {
-        let _ = value;
-        todo!()
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
+            let next_vacant = unwrap_next_vacant(sparse_item.kind());
+
+            let key = K::new(*sparse_vacant_head, sparse_item.epoch);
+            let sparse_item_kind = SparseItemKind::occupied(dense_keys.len());
+
+            check_kv_same_len(dense_keys.len(), dense_values.len());
+            dense_keys.try_reserve(1)?;
+            dense_values.try_reserve(1)?;
+
+            dense_keys.push(key);
+            dense_values.push(value);
+
+            sparse_item.kind = sparse_item_kind;
+            *sparse_vacant_head = next_vacant;
+
+            return Ok(key);
+        }
+
+        let key = Key::new(*sparse_vacant_head, Default::default());
+        let sparse_item = SparseItem::occupied(dense_keys.len(), Default::default());
+
+        check_kv_same_len(dense_keys.len(), dense_values.len());
+        dense_keys.try_reserve(1)?;
+        dense_values.try_reserve(1)?;
+        sparse.try_reserve(1)?;
+
+        dense_keys.push(key);
+        dense_values.push(value);
+
+        sparse.push(sparse_item);
+        *sparse_vacant_head = dense_keys.len();
+
+        Ok(key)
     }
 
     pub fn swap(&mut self, first_key: K, second_key: K) {

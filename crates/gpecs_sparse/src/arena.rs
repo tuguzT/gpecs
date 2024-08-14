@@ -1,10 +1,10 @@
+use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
     cmp,
+    fmt::Display,
     mem::{replace, swap},
     ops::{Index, IndexMut},
 };
-
-use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 
 use crate::{
     check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_capacity,
@@ -13,7 +13,8 @@ use crate::{
     match_kv_same_kind, unwrap_dense_index, unwrap_dense_index_mut, unwrap_dense_key,
     unwrap_dense_value, unwrap_dense_value_mut, unwrap_dense_value_pair_mut, unwrap_next_vacant,
     unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
-    unwrap_sparse_items_pair_mut, unwrap_value_from_sparse_index, SparseItem, SparseItemKind,
+    unwrap_sparse_items_pair_mut, unwrap_value_from_sparse_index, Drain, IntoIter, IntoKeys,
+    IntoValues, Iter, IterMut, Keys, SparseItem, SparseItemKind, Values, ValuesMut,
 };
 
 fn extend_sparse<E>(sparse: &mut Vec<SparseItem<E>>, new_len: usize, sparse_vacant_head: &mut usize)
@@ -678,8 +679,20 @@ where
         self.sparse.truncate(sparse_len);
     }
 
-    pub fn drain(&mut self) {
-        todo!()
+    pub fn drain(&mut self) -> Drain<'_, K, V> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        let keys = dense_keys.drain(..);
+        let values = dense_values.drain(..);
+        sparse.clear();
+        *sparse_vacant_head = 0;
+
+        Drain::new(keys, values)
     }
 
     pub fn retain<F>(&mut self, mut f: F)
@@ -997,43 +1010,274 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) {
-        todo!()
+    pub fn keys(&self) -> Keys<'_, K, V> {
+        let Self { dense_keys, .. } = self;
+
+        let keys = dense_keys.iter();
+        Keys::new(keys)
     }
 
     #[inline]
-    pub fn into_keys(self) {
-        todo!()
+    pub fn into_keys(self) -> IntoKeys<K, V> {
+        let Self { dense_keys, .. } = self;
+
+        let keys = dense_keys.into_iter();
+        IntoKeys::new(keys)
     }
 
     #[inline]
-    pub fn values(&self) {
-        todo!()
+    pub fn values(&self) -> Values<'_, K, V> {
+        let Self { dense_values, .. } = self;
+
+        let values = dense_values.iter();
+        Values::new(values)
     }
 
     #[inline]
-    pub fn values_mut(&mut self) {
-        todo!()
+    pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+        let Self { dense_values, .. } = self;
+
+        let values = dense_values.iter_mut();
+        ValuesMut::new(values)
     }
 
     #[inline]
-    pub fn into_values(self) {
-        todo!()
+    pub fn into_values(self) -> IntoValues<K, V> {
+        let Self { dense_values, .. } = self;
+
+        let values = dense_values.into_iter();
+        IntoValues::new(values)
     }
 
     #[inline]
-    pub fn iter(&self) {
-        todo!()
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        let keys = dense_keys.iter();
+        let values = dense_values.iter();
+        Iter::new(keys, values)
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) {
-        todo!()
+    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        let keys = dense_keys.iter();
+        let values = dense_values.iter_mut();
+        IterMut::new(keys, values)
+    }
+}
+
+impl<K, V> Index<K> for EpochSparseArena<K, V>
+where
+    K: Key + Display,
+{
+    type Output = V;
+
+    #[inline]
+    fn index(&self, key: K) -> &Self::Output {
+        match self.get(key) {
+            Some(value) => value,
+            None => panic!("key {key} not found"),
+        }
+    }
+}
+
+impl<K, V> IndexMut<K> for EpochSparseArena<K, V>
+where
+    K: Key + Display,
+{
+    #[inline]
+    fn index_mut(&mut self, key: K) -> &mut Self::Output {
+        match self.get_mut(key) {
+            Some(value) => value,
+            None => panic!("key {key} not found"),
+        }
+    }
+}
+
+impl<K, V> AsRef<[V]> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    #[inline]
+    fn as_ref(&self) -> &[V] {
+        self.as_slice()
+    }
+}
+
+impl<K, V> AsMut<[V]> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    #[inline]
+    fn as_mut(&mut self) -> &mut [V] {
+        self.as_mut_slice()
+    }
+}
+
+impl<K, V> AsRef<EpochSparseArena<K, V>> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    #[inline]
+    fn as_ref(&self) -> &EpochSparseArena<K, V> {
+        self
+    }
+}
+
+impl<K, V> AsMut<EpochSparseArena<K, V>> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    #[inline]
+    fn as_mut(&mut self) -> &mut EpochSparseArena<K, V> {
+        self
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    type Item = (&'a K, &'a V);
+
+    type IntoIter = Iter<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a mut EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    type Item = (&'a K, &'a mut V);
+
+    type IntoIter = IterMut<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl<K, V> IntoIterator for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    type Item = (K, V);
+
+    type IntoIter = IntoIter<K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Self {
+            dense_keys,
+            dense_values,
+            ..
+        } = self;
+
+        let keys = dense_keys.into_iter();
+        let values = dense_values.into_iter();
+        IntoIter::new(keys, values)
+    }
+}
+
+impl<K, V> FromIterator<(K, V)> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let iter_len = {
+            let (lower, upper) = iter.size_hint();
+            upper.unwrap_or(lower)
+        };
+
+        let mut me = Self::with_capacity(iter_len, iter_len);
+        for (key, value) in iter {
+            me.insert(key, value);
+        }
+
+        me
+    }
+}
+
+impl<K, V> FromIterator<V> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
+        let dense_values: Vec<_> = iter.into_iter().collect();
+
+        let len = dense_values.len();
+        let dense_keys = (0..len)
+            .map(|sparse_index| K::new(sparse_index, Default::default()))
+            .collect();
+        let sparse = (0..len)
+            .map(|dense_index| SparseItem::occupied(dense_index, Default::default()))
+            .collect();
+        let sparse_vacant_head = len;
+
+        Self {
+            dense_keys,
+            dense_values,
+            sparse,
+            sparse_vacant_head,
+        }
+    }
+}
+
+impl<K, V> Extend<(K, V)> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
+        let iter = iter.into_iter();
+        let iter_len = {
+            let (lower, upper) = iter.size_hint();
+            upper.unwrap_or(lower)
+        };
+        self.reserve(iter_len, iter_len);
+
+        for (key, value) in iter {
+            self.insert(key, value);
+        }
+    }
+}
+
+impl<K, V> Extend<V> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
+        let iter = iter.into_iter();
+        let iter_len = {
+            let (lower, upper) = iter.size_hint();
+            upper.unwrap_or(lower)
+        };
+        self.reserve(iter_len, iter_len);
+
+        for value in iter {
+            self.push(value);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use core::mem::forget;
     use std::ops::Not;
 
     use crate::{
@@ -1072,80 +1316,80 @@ mod tests {
         assert_eq!(sparse_arena.len(), 0);
     }
 
-    // #[test]
-    // fn empty_keys() {
-    //     let sparse_arena = SparseArena::<i32>::new();
+    #[test]
+    fn empty_keys() {
+        let sparse_arena = SparseArena::<i32>::new();
 
-    //     let keys = sparse_arena.keys();
-    //     assert_eq!(keys.len(), 0);
-    //     assert_eq!(keys.as_slice(), &[]);
-    // }
+        let keys = sparse_arena.keys();
+        assert_eq!(keys.len(), 0);
+        assert_eq!(keys.as_slice(), &[]);
+    }
 
-    // #[test]
-    // fn empty_into_keys() {
-    //     let sparse_arena = SparseArena::<i32>::new();
+    #[test]
+    fn empty_into_keys() {
+        let sparse_arena = SparseArena::<i32>::new();
 
-    //     let keys = sparse_arena.into_keys();
-    //     assert_eq!(keys.len(), 0);
-    //     assert_eq!(keys.as_slice(), &[]);
-    // }
+        let keys = sparse_arena.into_keys();
+        assert_eq!(keys.len(), 0);
+        assert_eq!(keys.as_slice(), &[]);
+    }
 
-    // #[test]
-    // fn empty_values() {
-    //     let sparse_arena = SparseArena::<i32>::new();
+    #[test]
+    fn empty_values() {
+        let sparse_arena = SparseArena::<i32>::new();
 
-    //     let values = sparse_arena.values();
-    //     assert_eq!(values.len(), 0);
-    //     assert_eq!(values.as_slice(), &[]);
-    // }
+        let values = sparse_arena.values();
+        assert_eq!(values.len(), 0);
+        assert_eq!(values.as_slice(), &[]);
+    }
 
-    // #[test]
-    // fn empty_values_mut() {
-    //     let mut sparse_arena = SparseArena::<i32>::new();
-    //     let values_mut = sparse_arena.values_mut();
+    #[test]
+    fn empty_values_mut() {
+        let mut sparse_arena = SparseArena::<i32>::new();
+        let values_mut = sparse_arena.values_mut();
 
-    //     assert_eq!(values_mut.len(), 0);
-    //     assert_eq!(values_mut.into_slice(), &mut []);
-    // }
+        assert_eq!(values_mut.len(), 0);
+        assert_eq!(values_mut.into_slice(), &mut []);
+    }
 
-    // #[test]
-    // fn empty_into_values() {
-    //     let sparse_arena = SparseArena::<i32>::new();
+    #[test]
+    fn empty_into_values() {
+        let sparse_arena = SparseArena::<i32>::new();
 
-    //     let values = sparse_arena.into_values();
-    //     assert_eq!(values.len(), 0);
-    //     assert_eq!(values.as_slice(), &[]);
-    // }
+        let values = sparse_arena.into_values();
+        assert_eq!(values.len(), 0);
+        assert_eq!(values.as_slice(), &[]);
+    }
 
-    // #[test]
-    // fn empty_iter() {
-    //     let sparse_arena = SparseArena::<i32>::new();
+    #[test]
+    fn empty_iter() {
+        let sparse_arena = SparseArena::<i32>::new();
 
-    //     let iter = sparse_arena.iter();
-    //     assert_eq!(iter.len(), 0);
-    //     assert_eq!(iter.as_keys_slice(), &[]);
-    //     assert_eq!(iter.as_values_slice(), &[]);
-    // }
+        let iter = sparse_arena.iter();
+        assert_eq!(iter.len(), 0);
+        assert_eq!(iter.as_keys_slice(), &[]);
+        assert_eq!(iter.as_values_slice(), &[]);
+    }
 
-    // #[test]
-    // fn empty_iter_mut() {
-    //     let mut sparse_arena = SparseArena::<i32>::new();
-    //     let iter_mut = sparse_arena.iter_mut();
+    #[test]
+    fn empty_iter_mut() {
+        let mut sparse_arena = SparseArena::<i32>::new();
+        let iter_mut = sparse_arena.iter_mut();
 
-    //     assert_eq!(iter_mut.len(), 0);
-    //     assert_eq!(iter_mut.as_keys_slice(), &[]);
-    //     assert_eq!(iter_mut.into_values_slice(), &mut []);
-    // }
+        assert_eq!(iter_mut.len(), 0);
+        assert_eq!(iter_mut.as_keys_slice(), &[]);
+        assert_eq!(iter_mut.into_values_slice(), &mut []);
+    }
 
-    // #[test]
-    // fn empty_into_iter() {
-    //     let sparse_arena = SparseArena::<i32>::new();
-    //     let into_iter = sparse_arena.into_iter();
+    #[test]
+    fn empty_into_iter() {
+        let sparse_arena = SparseArena::<i32>::new();
+        let into_iter = sparse_arena.into_iter();
 
-    //     assert_eq!(into_iter.len(), 0);
-    //     assert_eq!(into_iter.as_keys_slice(), &[]);
-    //     assert_eq!(into_iter.as_values_slice(), &[]);
-    // }
+        assert_eq!(into_iter.len(), 0);
+        assert_eq!(into_iter.as_keys_slice(), &[]);
+        assert_eq!(into_iter.as_values_slice(), &[]);
+    }
 
     #[test]
     fn empty_insert_one() {
@@ -1455,88 +1699,88 @@ mod tests {
         assert_eq!(sparse_arena.get(2), Some(&42));
     }
 
-    // #[test]
-    // fn one_item_keys() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
+    #[test]
+    fn one_item_keys() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
 
-    //     let keys = sparse_arena.keys();
-    //     assert_eq!(keys.len(), 1);
-    //     assert_eq!(keys.as_slice(), &[0]);
-    // }
+        let keys = sparse_arena.keys();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys.as_slice(), &[0]);
+    }
 
-    // #[test]
-    // fn one_item_into_keys() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
+    #[test]
+    fn one_item_into_keys() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
 
-    //     let keys = sparse_arena.into_keys();
-    //     assert_eq!(keys.len(), 1);
-    //     assert_eq!(keys.as_slice(), &[0]);
-    // }
+        let keys = sparse_arena.into_keys();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys.as_slice(), &[0]);
+    }
 
-    // #[test]
-    // fn one_item_values() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
+    #[test]
+    fn one_item_values() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
 
-    //     let values = sparse_arena.values();
-    //     assert_eq!(values.len(), 1);
-    //     assert_eq!(values.as_slice(), &[42]);
-    // }
+        let values = sparse_arena.values();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values.as_slice(), &[42]);
+    }
 
-    // #[test]
-    // fn one_item_values_mut() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
+    #[test]
+    fn one_item_values_mut() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
 
-    //     let values_mut = sparse_arena.values_mut();
-    //     assert_eq!(values_mut.len(), 1);
-    //     assert_eq!(values_mut.into_slice(), &mut [42]);
-    // }
+        let values_mut = sparse_arena.values_mut();
+        assert_eq!(values_mut.len(), 1);
+        assert_eq!(values_mut.into_slice(), &mut [42]);
+    }
 
-    // #[test]
-    // fn one_item_into_values() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
+    #[test]
+    fn one_item_into_values() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
 
-    //     let values = sparse_arena.into_values();
-    //     assert_eq!(values.len(), 1);
-    //     assert_eq!(values.as_slice(), &[42]);
-    // }
+        let values = sparse_arena.into_values();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values.as_slice(), &[42]);
+    }
 
-    // #[test]
-    // fn one_item_iter() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
+    #[test]
+    fn one_item_iter() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
 
-    //     let iter = sparse_arena.iter();
-    //     assert_eq!(iter.len(), 1);
-    //     assert_eq!(iter.as_keys_slice(), &[0]);
-    //     assert_eq!(iter.as_values_slice(), &[42]);
-    // }
+        let iter = sparse_arena.iter();
+        assert_eq!(iter.len(), 1);
+        assert_eq!(iter.as_keys_slice(), &[0]);
+        assert_eq!(iter.as_values_slice(), &[42]);
+    }
 
-    // #[test]
-    // fn one_item_iter_mut() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
+    #[test]
+    fn one_item_iter_mut() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
 
-    //     let iter_mut = sparse_arena.iter_mut();
-    //     assert_eq!(iter_mut.len(), 1);
-    //     assert_eq!(iter_mut.as_keys_slice(), &[0]);
-    //     assert_eq!(iter_mut.into_values_slice(), &mut [42]);
-    // }
+        let iter_mut = sparse_arena.iter_mut();
+        assert_eq!(iter_mut.len(), 1);
+        assert_eq!(iter_mut.as_keys_slice(), &[0]);
+        assert_eq!(iter_mut.into_values_slice(), &mut [42]);
+    }
 
-    // #[test]
-    // fn one_item_into_iter() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(0, 42);
+    #[test]
+    fn one_item_into_iter() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(0, 42);
 
-    //     let into_iter = sparse_arena.into_iter();
-    //     assert_eq!(into_iter.len(), 1);
-    //     assert_eq!(into_iter.as_keys_slice(), &[0]);
-    //     assert_eq!(into_iter.as_values_slice(), &[42]);
-    // }
+        let into_iter = sparse_arena.into_iter();
+        assert_eq!(into_iter.len(), 1);
+        assert_eq!(into_iter.as_keys_slice(), &[0]);
+        assert_eq!(into_iter.as_values_slice(), &[42]);
+    }
 
     #[test]
     fn two_items_insert_first() {
@@ -1959,104 +2203,104 @@ mod tests {
         assert_eq!(sparse_arena.get(5), Some(&34));
     }
 
-    // #[test]
-    // fn three_items_keys() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_keys() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let keys = sparse_arena.keys();
-    //     assert_eq!(keys.len(), 3);
-    //     assert_eq!(keys.as_slice(), &[2, 1, 5]);
-    // }
+        let keys = sparse_arena.keys();
+        assert_eq!(keys.len(), 3);
+        assert_eq!(keys.as_slice(), &[2, 1, 5]);
+    }
 
-    // #[test]
-    // fn three_items_into_keys() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_into_keys() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let keys = sparse_arena.into_keys();
-    //     assert_eq!(keys.len(), 3);
-    //     assert_eq!(keys.as_slice(), &[2, 1, 5]);
-    // }
+        let keys = sparse_arena.into_keys();
+        assert_eq!(keys.len(), 3);
+        assert_eq!(keys.as_slice(), &[2, 1, 5]);
+    }
 
-    // #[test]
-    // fn three_items_values() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_values() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let values = sparse_arena.values();
-    //     assert_eq!(values.len(), 3);
-    //     assert_eq!(values.as_slice(), &[34, 42, 69]);
-    // }
+        let values = sparse_arena.values();
+        assert_eq!(values.len(), 3);
+        assert_eq!(values.as_slice(), &[34, 42, 69]);
+    }
 
-    // #[test]
-    // fn three_items_values_mut() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_values_mut() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let values_mut = sparse_arena.values_mut();
-    //     assert_eq!(values_mut.len(), 3);
-    //     assert_eq!(values_mut.into_slice(), &mut [34, 42, 69]);
-    // }
+        let values_mut = sparse_arena.values_mut();
+        assert_eq!(values_mut.len(), 3);
+        assert_eq!(values_mut.into_slice(), &mut [34, 42, 69]);
+    }
 
-    // #[test]
-    // fn three_items_into_values() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_into_values() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let values = sparse_arena.into_values();
-    //     assert_eq!(values.len(), 3);
-    //     assert_eq!(values.as_slice(), &[34, 42, 69]);
-    // }
+        let values = sparse_arena.into_values();
+        assert_eq!(values.len(), 3);
+        assert_eq!(values.as_slice(), &[34, 42, 69]);
+    }
 
-    // #[test]
-    // fn three_items_iter() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_iter() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let iter = sparse_arena.iter();
-    //     assert_eq!(iter.len(), 3);
-    //     assert_eq!(iter.as_keys_slice(), &[2, 1, 5]);
-    //     assert_eq!(iter.as_values_slice(), &[34, 42, 69]);
-    // }
+        let iter = sparse_arena.iter();
+        assert_eq!(iter.len(), 3);
+        assert_eq!(iter.as_keys_slice(), &[2, 1, 5]);
+        assert_eq!(iter.as_values_slice(), &[34, 42, 69]);
+    }
 
-    // #[test]
-    // fn three_items_iter_mut() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_iter_mut() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let iter_mut = sparse_arena.iter_mut();
-    //     assert_eq!(iter_mut.len(), 3);
-    //     assert_eq!(iter_mut.as_keys_slice(), &[2, 1, 5]);
-    //     assert_eq!(iter_mut.into_values_slice(), &mut [34, 42, 69]);
-    // }
+        let iter_mut = sparse_arena.iter_mut();
+        assert_eq!(iter_mut.len(), 3);
+        assert_eq!(iter_mut.as_keys_slice(), &[2, 1, 5]);
+        assert_eq!(iter_mut.into_values_slice(), &mut [34, 42, 69]);
+    }
 
-    // #[test]
-    // fn three_items_into_iter() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn three_items_into_iter() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let into_iter = sparse_arena.into_iter();
-    //     assert_eq!(into_iter.len(), 3);
-    //     assert_eq!(into_iter.as_keys_slice(), &[2, 1, 5]);
-    //     assert_eq!(into_iter.as_values_slice(), &[34, 42, 69]);
-    // }
+        let into_iter = sparse_arena.into_iter();
+        assert_eq!(into_iter.len(), 3);
+        assert_eq!(into_iter.as_keys_slice(), &[2, 1, 5]);
+        assert_eq!(into_iter.as_values_slice(), &[34, 42, 69]);
+    }
 
     #[test]
     fn five_items_remove_insert() {
@@ -2252,25 +2496,25 @@ mod tests {
         assert_eq!(sparse_arena.as_slice(), &[69]);
     }
 
-    // #[test]
-    // fn five_items_drain() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(8, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(4, 69);
-    //     sparse_arena.insert(3, 228);
-    //     sparse_arena.insert(6, 666);
+    #[test]
+    fn five_items_drain() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(8, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(4, 69);
+        sparse_arena.insert(3, 228);
+        sparse_arena.insert(6, 666);
 
-    //     let drain = sparse_arena.drain();
-    //     assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
-    //     assert_eq!(drain.as_values_slice(), &[34, 42, 69, 228, 666]);
+        let drain = sparse_arena.drain();
+        assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
+        assert_eq!(drain.as_values_slice(), &[34, 42, 69, 228, 666]);
 
-    //     forget(drain);
-    //     assert_eq!(sparse_arena.len(), 0);
-    //     assert_eq!(sparse_arena.sparse_len(), 0);
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[]);
-    // }
+        forget(drain);
+        assert_eq!(sparse_arena.len(), 0);
+        assert_eq!(sparse_arena.sparse_len(), 0);
+        assert_eq!(sparse_arena.keys().as_slice(), &[]);
+        assert_eq!(sparse_arena.values().as_slice(), &[]);
+    }
 
     #[test]
     fn five_items_insert_truncate() {
@@ -2411,88 +2655,88 @@ mod tests {
     //     assert_eq!(value, &229);
     // }
 
-    // #[test]
-    // fn from_keys_values_iter() {
-    //     let keys = [3, 10, 5, 10, 1, usize::MAX];
-    //     let values = [34, 42, 69, 228, 666];
+    #[test]
+    fn from_keys_values_iter() {
+        let keys = [3, 10, 5, 10, 1, usize::MAX];
+        let values = [34, 42, 69, 228, 666];
 
-    //     let sparse_arena: SparseArena<_> = keys.into_iter().zip(values).collect();
-    //     assert_eq!(sparse_arena.len(), 4);
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[3, 10, 5, 1]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[34, 228, 69, 666]);
+        let sparse_arena: SparseArena<_> = keys.into_iter().zip(values).collect();
+        assert_eq!(sparse_arena.len(), 4);
+        assert_eq!(sparse_arena.keys().as_slice(), &[3, 10, 5, 1]);
+        assert_eq!(sparse_arena.values().as_slice(), &[34, 228, 69, 666]);
 
-    //     assert_eq!(sparse_arena.get(3), Some(&34));
-    //     assert_eq!(sparse_arena.get(10), Some(&228));
-    //     assert_eq!(sparse_arena.get(5), Some(&69));
-    //     assert_eq!(sparse_arena.get(1), Some(&666));
-    // }
+        assert_eq!(sparse_arena.get(3), Some(&34));
+        assert_eq!(sparse_arena.get(10), Some(&228));
+        assert_eq!(sparse_arena.get(5), Some(&69));
+        assert_eq!(sparse_arena.get(1), Some(&666));
+    }
 
-    // #[test]
-    // #[should_panic(expected = "capacity overflow")]
-    // fn from_keys_values_iter_too_large_key() {
-    //     let keys = [3, 10, 5, 10, 1, usize::MAX];
-    //     let values = [34, 42, 69, 228, 666, 999];
+    #[test]
+    #[should_panic(expected = "capacity overflow")]
+    fn from_keys_values_iter_too_large_key() {
+        let keys = [3, 10, 5, 10, 1, usize::MAX];
+        let values = [34, 42, 69, 228, 666, 999];
 
-    //     let sparse_arena: SparseArena<_> = keys.into_iter().zip(values).collect();
-    //     assert_eq!(sparse_arena.len(), 4);
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[3, 10, 5, 1, usize::MAX]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[34, 228, 69, 666, 999]);
+        let sparse_arena: SparseArena<_> = keys.into_iter().zip(values).collect();
+        assert_eq!(sparse_arena.len(), 4);
+        assert_eq!(sparse_arena.keys().as_slice(), &[3, 10, 5, 1, usize::MAX]);
+        assert_eq!(sparse_arena.values().as_slice(), &[34, 228, 69, 666, 999]);
 
-    //     assert_eq!(sparse_arena.get(3), Some(&34));
-    //     assert_eq!(sparse_arena.get(10), Some(&228));
-    //     assert_eq!(sparse_arena.get(5), Some(&69));
-    //     assert_eq!(sparse_arena.get(1), Some(&666));
-    //     assert_eq!(sparse_arena.get(usize::MAX), Some(&999));
-    // }
+        assert_eq!(sparse_arena.get(3), Some(&34));
+        assert_eq!(sparse_arena.get(10), Some(&228));
+        assert_eq!(sparse_arena.get(5), Some(&69));
+        assert_eq!(sparse_arena.get(1), Some(&666));
+        assert_eq!(sparse_arena.get(usize::MAX), Some(&999));
+    }
 
-    // #[test]
-    // fn from_values_iter() {
-    //     let values = [34, 42, 69, 228, 666];
-    //     let sparse_arena: SparseArena<_> = values.into_iter().collect();
+    #[test]
+    fn from_values_iter() {
+        let values = [34, 42, 69, 228, 666];
+        let sparse_arena: SparseArena<_> = values.into_iter().collect();
 
-    //     assert_eq!(sparse_arena.len(), 5);
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[0, 1, 2, 3, 4]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[34, 42, 69, 228, 666]);
+        assert_eq!(sparse_arena.len(), 5);
+        assert_eq!(sparse_arena.keys().as_slice(), &[0, 1, 2, 3, 4]);
+        assert_eq!(sparse_arena.values().as_slice(), &[34, 42, 69, 228, 666]);
 
-    //     assert_eq!(sparse_arena.get(0), Some(&34));
-    //     assert_eq!(sparse_arena.get(1), Some(&42));
-    //     assert_eq!(sparse_arena.get(2), Some(&69));
-    //     assert_eq!(sparse_arena.get(3), Some(&228));
-    //     assert_eq!(sparse_arena.get(4), Some(&666));
-    // }
+        assert_eq!(sparse_arena.get(0), Some(&34));
+        assert_eq!(sparse_arena.get(1), Some(&42));
+        assert_eq!(sparse_arena.get(2), Some(&69));
+        assert_eq!(sparse_arena.get(3), Some(&228));
+        assert_eq!(sparse_arena.get(4), Some(&666));
+    }
 
-    // #[test]
-    // fn extend_keys_values() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(5, 69);
+    #[test]
+    fn extend_keys_values() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
 
-    //     let keys = [3, 0, 2, 8];
-    //     let values = [228, 666, 42, 69];
-    //     sparse_arena.extend(keys.into_iter().zip(values));
+        let keys = [3, 0, 2, 8];
+        let values = [228, 666, 42, 69];
+        sparse_arena.extend(keys.into_iter().zip(values));
 
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 5, 3, 0, 8]);
-    //     assert_eq!(
-    //         sparse_arena.values().as_slice(),
-    //         &[42, 42, 69, 228, 666, 69]
-    //     );
-    // }
+        assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 5, 3, 0, 8]);
+        assert_eq!(
+            sparse_arena.values().as_slice(),
+            &[42, 42, 69, 228, 666, 69]
+        );
+    }
 
-    // #[test]
-    // fn extend_values() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(2, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(4, 69);
+    #[test]
+    fn extend_values() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(4, 69);
 
-    //     let values = [228, 666, 201];
-    //     sparse_arena.extend(values);
+        let values = [228, 666, 201];
+        sparse_arena.extend(values);
 
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 4, 0, 3, 5]);
-    //     assert_eq!(
-    //         sparse_arena.values().as_slice(),
-    //         &[34, 42, 69, 228, 666, 201]
-    //     );
-    // }
+        assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 4, 3, 0, 5]);
+        assert_eq!(
+            sparse_arena.values().as_slice(),
+            &[34, 42, 69, 228, 666, 201]
+        );
+    }
 }

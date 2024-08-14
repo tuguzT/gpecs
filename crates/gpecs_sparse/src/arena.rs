@@ -11,8 +11,8 @@ use crate::{
     check_kv_same_len, get_pair_mut,
     key::{Epoch, Key},
     match_kv_same_kind, unwrap_dense_index, unwrap_dense_index_mut, unwrap_dense_key,
-    unwrap_dense_value, unwrap_dense_value_mut, unwrap_dense_value_pair_mut, unwrap_next_vacant,
-    unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
+    unwrap_dense_key_mut, unwrap_dense_value, unwrap_dense_value_mut, unwrap_dense_value_pair_mut,
+    unwrap_next_vacant, unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
     unwrap_sparse_items_pair_mut, unwrap_value_from_sparse_index, Drain, IntoIter, IntoKeys,
     IntoValues, Iter, IterMut, Keys, SparseItem, SparseItemKind, Values, ValuesMut,
 };
@@ -746,6 +746,26 @@ where
         *sparse_vacant_head = sparse_index;
 
         Some((key, value))
+    }
+
+    pub fn invalidate_epoch(&mut self, key: K) -> Option<K> {
+        let Self {
+            dense_keys, sparse, ..
+        } = self;
+
+        let sparse_index = key.sparse_index();
+        let sparse_item = sparse
+            .get_mut(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())?;
+        let dense_index = sparse_item.dense_index()?;
+
+        let dense_key = unwrap_dense_key_mut(dense_keys, dense_index);
+        check_equal_key(key, *dense_key);
+
+        sparse_item.epoch = sparse_item.epoch.next();
+        *dense_key = K::new(sparse_index, sparse_item.epoch);
+
+        Some(*dense_key)
     }
 
     pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
@@ -2521,6 +2541,35 @@ mod tests {
             sparse_arena.get_epoch(second_key.sparse_index()),
             Some(second_key.epoch().next()),
         );
+    }
+
+    #[test]
+    fn two_items_invalidate_epoch() {
+        let mut sparse_arena = EpochSparseArena::new();
+
+        let first_key = Key::new(5, 1);
+        sparse_arena.insert(first_key, 42);
+
+        let second_key = Key::new(2, 0);
+        sparse_arena.insert(second_key, 69);
+
+        let new_first_key = sparse_arena
+            .invalidate_epoch(first_key)
+            .expect("first key should be present");
+        assert_eq!(new_first_key.sparse_index(), first_key.sparse_index());
+        assert_eq!(new_first_key.epoch(), first_key.epoch().next());
+        assert_eq!(new_first_key, Key::new(5, 2));
+        assert_eq!(sparse_arena.get(first_key), None);
+        assert_eq!(sparse_arena.get(new_first_key), Some(&42));
+
+        let new_second_key = sparse_arena
+            .invalidate_epoch(second_key)
+            .expect("second key should be present");
+        assert_eq!(new_second_key.sparse_index(), second_key.sparse_index());
+        assert_eq!(new_second_key.epoch(), second_key.epoch().next());
+        assert_eq!(new_second_key, Key::new(2, 1));
+        assert_eq!(sparse_arena.get(second_key), None);
+        assert_eq!(sparse_arena.get(new_second_key), Some(&69));
     }
 
     #[test]

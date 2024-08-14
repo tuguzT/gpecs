@@ -274,6 +274,15 @@ fn unwrap_dense_key<K>(keys: &[K], dense_index: usize) -> &K {
 
 #[inline]
 #[track_caller]
+fn unwrap_dense_key_mut<K>(keys: &mut [K], dense_index: usize) -> &mut K {
+    let Some(dense_key) = keys.get_mut(dense_index) else {
+        check_dense_index_bounds_failed();
+    };
+    dense_key
+}
+
+#[inline]
+#[track_caller]
 fn unwrap_dense_value<T>(values: &[T], dense_index: usize) -> &T {
     let Some(dense_value) = values.get(dense_index) else {
         check_dense_index_bounds_failed();

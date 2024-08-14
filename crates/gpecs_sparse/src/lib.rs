@@ -12,6 +12,7 @@ pub mod iter;
 pub mod key;
 pub mod prelude;
 pub mod set;
+pub mod view;
 
 mod algo;
 mod assert;

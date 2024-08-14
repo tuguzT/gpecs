@@ -2,21 +2,19 @@ use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
     cmp,
     fmt::{self, Debug, Display},
-    mem::{replace, swap},
+    mem::replace,
     ops::{Index, IndexMut},
 };
 
 use crate::{
-    algo::get_pair_mut,
     assert::{
         check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_capacity,
-        check_kv_same_len, match_kv_same_kind, unwrap_dense_index, unwrap_dense_index_mut,
-        unwrap_dense_key, unwrap_dense_key_mut, unwrap_dense_value, unwrap_dense_value_mut,
-        unwrap_dense_value_pair_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
-        unwrap_sparse_items_pair_mut, unwrap_value_from_sparse_index,
+        check_kv_same_len, match_kv_same_kind, unwrap_dense_index_mut, unwrap_dense_value,
+        unwrap_dense_value_mut, unwrap_sparse_item_mut,
     },
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
+    view::{EpochSparseView, EpochSparseViewMut},
     SparseItem, SparseItemKind,
 };
 
@@ -312,6 +310,28 @@ where
     }
 
     #[inline]
+    pub fn as_view(&self) -> EpochSparseView<'_, K, V> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        EpochSparseView::new(dense_keys, dense_values, sparse)
+    }
+
+    #[inline]
+    pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, K, V> {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        EpochSparseViewMut::new(dense_keys, dense_values, sparse)
+    }
+
+    #[inline]
     pub fn into_parts(self) -> (Vec<K>, Vec<V>, Vec<SparseItem<K::Epoch>>) {
         let Self {
             dense_keys,
@@ -448,67 +468,13 @@ where
     }
 
     pub fn swap(&mut self, first_key: K, second_key: K) {
-        let Self {
-            dense_values,
-            sparse,
-            ..
-        } = self;
-
-        let first_index = first_key.sparse_index();
-        let second_index = second_key.sparse_index();
-        if first_index == second_index {
-            return;
-        }
-
-        let Some(first_index) = sparse
-            .get(first_index)
-            .take_if(|item| item.epoch == first_key.epoch())
-            .and_then(SparseItem::dense_index)
-        else {
-            return;
-        };
-        let Some(second_index) = sparse
-            .get(second_index)
-            .take_if(|item| item.epoch == second_key.epoch())
-            .and_then(SparseItem::dense_index)
-        else {
-            return;
-        };
-
-        let (first_value, second_value) =
-            unwrap_dense_value_pair_mut(dense_values, first_index, second_index);
-        swap(first_value, second_value);
+        let mut view_mut = self.as_mut_view();
+        view_mut.swap(first_key, second_key)
     }
 
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
-        let Self {
-            dense_keys, sparse, ..
-        } = self;
-
-        let first_index = first_key.sparse_index();
-        let second_index = second_key.sparse_index();
-        let Some((first_item, second_item)) = get_pair_mut(sparse, first_index, second_index)
-        else {
-            return;
-        };
-
-        let Some(first_index) = Some(&*first_item)
-            .take_if(|item| item.epoch == first_key.epoch())
-            .and_then(SparseItem::dense_index)
-        else {
-            return;
-        };
-        let Some(second_index) = Some(&*second_item)
-            .take_if(|item| item.epoch == second_key.epoch())
-            .and_then(SparseItem::dense_index)
-        else {
-            return;
-        };
-
-        let (first_key, second_key) =
-            unwrap_dense_value_pair_mut(dense_keys, first_index, second_index);
-        swap(first_item, second_item);
-        swap(first_key, second_key);
+        let mut view_mut = self.as_mut_view();
+        view_mut.swap_keys(first_key, second_key)
     }
 
     pub fn swap_remove(&mut self, key: K) -> Option<V> {
@@ -591,23 +557,8 @@ where
     }
 
     pub fn invalidate_epoch(&mut self, key: K) -> Option<K> {
-        let Self {
-            dense_keys, sparse, ..
-        } = self;
-
-        let sparse_index = key.sparse_index();
-        let sparse_item = sparse
-            .get_mut(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())?;
-        let dense_index = sparse_item.dense_index()?;
-
-        let dense_key = unwrap_dense_key_mut(dense_keys, dense_index);
-        check_equal_key(key, *dense_key);
-
-        sparse_item.epoch = sparse_item.epoch.next();
-        *dense_key = K::new(sparse_index, sparse_item.epoch);
-
-        Some(*dense_key)
+        let mut view_mut = self.as_mut_view();
+        view_mut.invalidate_epoch(key)
     }
 
     pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
@@ -658,67 +609,43 @@ where
     where
         V: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_by_cached_key(|&key| {
-                let sparse_index = key.sparse_index();
-                unwrap_value_from_sparse_index(sparse_index, values, sparse)
-            })
-        });
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort()
     }
 
     #[inline]
     pub fn sort_keys(&mut self) {
-        self.sort_impl(|keys, _, _| keys.sort());
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort_keys()
     }
 
     #[inline]
-    pub fn sort_by<F>(&mut self, mut f: F)
+    pub fn sort_by<F>(&mut self, f: F)
     where
         F: FnMut((K, &V), (K, &V)) -> cmp::Ordering,
     {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_by(|&lhs_key, &rhs_key| {
-                let lhs_index = lhs_key.sparse_index();
-                let lhs_value = unwrap_value_from_sparse_index(lhs_index, values, sparse);
-                let lhs = (lhs_key, lhs_value);
-
-                let rhs_index = rhs_key.sparse_index();
-                let rhs_value = unwrap_value_from_sparse_index(rhs_index, values, sparse);
-                let rhs = (rhs_key, rhs_value);
-
-                f(lhs, rhs)
-            })
-        });
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort_by(f)
     }
 
     #[inline]
-    pub fn sort_by_key<T, F>(&mut self, mut f: F)
+    pub fn sort_by_key<T, F>(&mut self, f: F)
     where
         F: FnMut((K, &V)) -> T,
         T: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_by_key(|&key| {
-                let sparse_index = key.sparse_index();
-                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
-                f((key, value))
-            })
-        });
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort_by_key(f)
     }
 
     #[inline]
-    pub fn sort_by_cached_key<T, F>(&mut self, mut f: F)
+    pub fn sort_by_cached_key<T, F>(&mut self, f: F)
     where
         F: FnMut((K, &V)) -> T,
         T: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_by_cached_key(|&key| {
-                let sparse_index = key.sparse_index();
-                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
-                f((key, value))
-            })
-        });
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort_by_cached_key(f)
     }
 
     #[inline]
@@ -726,208 +653,69 @@ where
     where
         V: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_unstable_by_key(|&key| {
-                let sparse_index = key.sparse_index();
-                unwrap_value_from_sparse_index(sparse_index, values, sparse)
-            })
-        });
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort_unstable()
     }
 
     #[inline]
     pub fn sort_keys_unstable(&mut self) {
-        self.sort_impl(|keys, _, _| keys.sort_unstable());
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort_keys_unstable()
     }
 
     #[inline]
-    pub fn sort_unstable_by<F>(&mut self, mut f: F)
+    pub fn sort_unstable_by<F>(&mut self, f: F)
     where
         F: FnMut((K, &V), (K, &V)) -> cmp::Ordering,
     {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_unstable_by(|&lhs_key, &rhs_key| {
-                let lhs_index = lhs_key.sparse_index();
-                let lhs_value = unwrap_value_from_sparse_index(lhs_index, values, sparse);
-                let lhs = (lhs_key, lhs_value);
-
-                let rhs_index = rhs_key.sparse_index();
-                let rhs_value = unwrap_value_from_sparse_index(rhs_index, values, sparse);
-                let rhs = (rhs_key, rhs_value);
-
-                f(lhs, rhs)
-            })
-        });
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort_unstable_by(f)
     }
 
     #[inline]
-    pub fn sort_unstable_by_key<T, F>(&mut self, mut f: F)
+    pub fn sort_unstable_by_key<T, F>(&mut self, f: F)
     where
         F: FnMut((K, &V)) -> T,
         T: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_unstable_by_key(|&key| {
-                let sparse_index = key.sparse_index();
-                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
-                f((key, value))
-            })
-        });
+        let mut view_mut = self.as_mut_view();
+        view_mut.sort_unstable_by_key(f)
     }
 
-    // Implementation was borrowed from the links below:
-    // https://skypjack.github.io/2019-09-25-ecs-baf-part-5/#:~:text=Mixing%20in%2Dplace%20sorting%20and%20permutations
-    // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
-    fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
-    where
-        SortKeys: FnOnce(&mut [K], &[V], &[SparseItem<K::Epoch>]),
-    {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
-
-        let dense_keys = dense_keys.as_mut_slice();
-        let dense_values = dense_values.as_mut_slice();
-        let sparse = sparse.as_mut_slice();
-        check_kv_same_len(dense_keys.len(), dense_values.len());
-
-        sort_keys(dense_keys, dense_values, sparse);
-
-        for pos in 0..dense_keys.len() {
-            let mut curr = pos;
-            let mut next = {
-                let sparse_index = unwrap_dense_key(dense_keys, curr).sparse_index();
-                let sparse_item = unwrap_sparse_item(sparse, sparse_index);
-                unwrap_dense_index(sparse_item.kind())
-            };
-
-            while curr != next {
-                let (curr_item, next_item) = {
-                    let first_index = unwrap_dense_key(dense_keys, curr).sparse_index();
-                    let second_index = unwrap_dense_key(dense_keys, next).sparse_index();
-                    unwrap_sparse_items_pair_mut(sparse, first_index, second_index)
-                };
-                let curr_dense_index = unwrap_dense_index_mut(curr_item.kind_mut());
-                let next_dense_index = unwrap_dense_index_mut(next_item.kind_mut());
-
-                dense_values.swap(*curr_dense_index, *next_dense_index);
-
-                *curr_dense_index = curr;
-                curr = next;
-                next = *next_dense_index;
-            }
-        }
-    }
-
+    #[inline]
     pub fn get(&self, key: K) -> Option<&V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
-
-        let sparse_index = key.sparse_index();
-        let sparse_item = sparse
-            .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())?;
-        let dense_index = sparse_item.dense_index()?;
-
-        let value = unwrap_dense_value(dense_values, dense_index);
-        let dense_key = unwrap_dense_key(dense_keys, dense_index);
-        check_equal_key(key, *dense_key);
-
-        Some(value)
+        let view = self.as_view();
+        view.get(key)
     }
 
+    #[inline]
     pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
-
-        let sparse_index = key.sparse_index();
-        let sparse_item = sparse
-            .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())?;
-        let dense_index = sparse_item.dense_index()?;
-
-        let value = unwrap_dense_value_mut(dense_values, dense_index);
-        let dense_key = unwrap_dense_key(dense_keys, dense_index);
-        check_equal_key(key, *dense_key);
-
-        Some(value)
+        let view_mut = self.as_mut_view();
+        view_mut.into_get_mut(key)
     }
 
+    #[inline]
     pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, &V)> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
-
-        let sparse_item = sparse.get(sparse_index)?;
-        let dense_index = sparse_item.dense_index()?;
-
-        let value = unwrap_dense_value(dense_values, dense_index);
-        let key = *unwrap_dense_key(dense_keys, dense_index);
-        check_equal_key(key, K::new(sparse_index, sparse_item.epoch));
-
-        Some((key, value))
+        let view = self.as_view();
+        view.get_with_key(sparse_index)
     }
 
+    #[inline]
     pub fn get_mut_with_key(&mut self, sparse_index: usize) -> Option<(K, &mut V)> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
-
-        let sparse_item = sparse.get(sparse_index)?;
-        let dense_index = sparse_item.dense_index()?;
-
-        let value = unwrap_dense_value_mut(dense_values, dense_index);
-        let key = *unwrap_dense_key(dense_keys, dense_index);
-        check_equal_key(key, K::new(sparse_index, sparse_item.epoch));
-
-        Some((key, value))
+        let view_mut = self.as_mut_view();
+        view_mut.into_get_mut_with_key(sparse_index)
     }
 
+    #[inline]
     pub fn get_epoch(&self, sparse_index: usize) -> Option<K::Epoch> {
-        let Self {
-            sparse, dense_keys, ..
-        } = self;
-
-        let sparse_item = sparse.get(sparse_index)?;
-        let epoch = sparse_item.epoch;
-        if let Some(dense_index) = sparse_item.dense_index() {
-            let key = *unwrap_dense_key(dense_keys, dense_index);
-            check_equal_key(key, K::new(sparse_index, epoch));
-        }
-
-        Some(epoch)
+        let view = self.as_view();
+        view.get_epoch(sparse_index)
     }
 
+    #[inline]
     pub fn contains_key(&self, key: K) -> bool {
-        let Self {
-            dense_keys, sparse, ..
-        } = self;
-
-        let sparse_index = key.sparse_index();
-        let Some(sparse_item) = sparse
-            .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())
-            .copied()
-        else {
-            return false;
-        };
-        let SparseItemKind::Occupied { dense_index } = sparse_item.kind else {
-            return false;
-        };
-
-        check_dense_index_bounds(dense_index, dense_keys.len());
-        true
+        let view = self.as_view();
+        view.contains_key(key)
     }
 
     pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
@@ -970,10 +758,8 @@ where
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, K, V> {
-        let Self { dense_keys, .. } = self;
-
-        let keys = dense_keys.iter();
-        Keys::new(keys)
+        let view = self.as_view();
+        view.keys()
     }
 
     #[inline]
@@ -986,18 +772,14 @@ where
 
     #[inline]
     pub fn values(&self) -> Values<'_, K, V> {
-        let Self { dense_values, .. } = self;
-
-        let values = dense_values.iter();
-        Values::new(values)
+        let view = self.as_view();
+        view.values()
     }
 
     #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
-        let Self { dense_values, .. } = self;
-
-        let values = dense_values.iter_mut();
-        ValuesMut::new(values)
+        let view_mut = self.as_mut_view();
+        view_mut.into_values_mut()
     }
 
     #[inline]
@@ -1010,28 +792,14 @@ where
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, K, V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        let keys = dense_keys.iter();
-        let values = dense_values.iter();
-        Iter::new(keys, values)
+        let view = self.as_view();
+        view.iter()
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        let keys = dense_keys.iter();
-        let values = dense_values.iter_mut();
-        IterMut::new(keys, values)
+        let view_mut = self.as_mut_view();
+        view_mut.into_iter()
     }
 }
 
@@ -1043,10 +811,8 @@ where
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        match self.get(key) {
-            Some(value) => value,
-            None => panic!("key {key} not found"),
-        }
+        let view = self.as_view();
+        view.into_index(key)
     }
 }
 
@@ -1056,10 +822,8 @@ where
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        match self.get_mut(key) {
-            Some(value) => value,
-            None => panic!("key {key} not found"),
-        }
+        let view_mut = self.as_mut_view();
+        view_mut.into_index_mut(key)
     }
 }
 

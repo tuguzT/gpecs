@@ -1,7 +1,7 @@
 use core::{
     cmp,
     mem::{replace, swap},
-    ops::IndexMut,
+    ops::{Index, IndexMut},
 };
 
 use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
@@ -12,9 +12,75 @@ use crate::{
     key::{Epoch, Key},
     match_kv_same_kind, unwrap_dense_index, unwrap_dense_index_mut, unwrap_dense_key,
     unwrap_dense_value, unwrap_dense_value_mut, unwrap_dense_value_pair_mut, unwrap_next_vacant,
-    unwrap_sparse_item, unwrap_sparse_item_mut, unwrap_sparse_items_pair_mut,
-    unwrap_value_from_sparse_index, SparseItem, SparseItemKind,
+    unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
+    unwrap_sparse_items_pair_mut, unwrap_value_from_sparse_index, SparseItem, SparseItemKind,
 };
+
+fn extend_sparse<E>(sparse: &mut Vec<SparseItem<E>>, new_len: usize, sparse_vacant_head: &mut usize)
+where
+    E: Epoch,
+{
+    let old_len = sparse.len();
+    if old_len >= new_len {
+        return;
+    }
+
+    if *sparse_vacant_head < old_len {
+        let mut last_vacant = *sparse_vacant_head;
+        loop {
+            let next_vacant = unwrap_next_vacant_mut(sparse[last_vacant].kind_mut());
+            if *next_vacant == old_len {
+                *next_vacant = new_len;
+                break;
+            }
+            last_vacant = *next_vacant;
+        }
+    }
+
+    let mut next_vacant = if *sparse_vacant_head < old_len {
+        *sparse_vacant_head
+    } else {
+        new_len
+    };
+    let mut current_vacant = old_len;
+    sparse.resize_with(new_len, || {
+        let epoch = Default::default();
+        let item = SparseItem::vacant(next_vacant, epoch);
+        next_vacant = current_vacant;
+        current_vacant += 1;
+        item
+    });
+
+    *sparse_vacant_head = unwrap_next_vacant(sparse.last().unwrap().kind());
+}
+
+fn remove_from_vacant_list<E>(
+    sparse: &mut [SparseItem<E>],
+    sparse_vacant_head: &mut usize,
+    sparse_index: usize,
+    next_vacant: usize,
+) {
+    let vacant_to_fix = {
+        let mut result = None;
+        let mut next_vacant = *sparse_vacant_head;
+        while next_vacant != sparse_index {
+            result = Some(next_vacant);
+
+            let vacant_item = sparse.index(next_vacant);
+            next_vacant = unwrap_next_vacant(vacant_item.kind());
+        }
+        result
+    };
+
+    let vacant_to_fix = match vacant_to_fix {
+        Some(vacant_to_fix) => {
+            let vacant_item = sparse.index_mut(vacant_to_fix);
+            unwrap_next_vacant_mut(vacant_item.kind_mut())
+        }
+        None => sparse_vacant_head,
+    };
+    *vacant_to_fix = next_vacant;
+}
 
 pub type SparseArena<T> = EpochSparseArena<usize, T>;
 
@@ -332,56 +398,16 @@ where
             let item = SparseItem::occupied(dense_index, epoch);
 
             if sparse_index >= sparse.len() {
-                let old_len = sparse.len();
                 let new_len = sparse_index.saturating_add(1);
-
-                if sparse_vacant_head < old_len {
-                    let mut last_vacant = sparse_vacant_head;
-                    loop {
-                        let next_vacant = sparse[last_vacant].next_vacant_mut().unwrap();
-                        if *next_vacant == old_len {
-                            *next_vacant = new_len;
-                            break;
-                        }
-                        last_vacant = *next_vacant;
-                    }
-                }
-
-                let mut first_free = if sparse_vacant_head < old_len {
-                    sparse_vacant_head
-                } else {
-                    new_len
-                };
-                let mut new_slot = old_len;
-                sparse.resize_with(new_len, || {
-                    let epoch = Default::default();
-                    let item = SparseItem::vacant(first_free, epoch);
-
-                    first_free = new_slot;
-                    new_slot += 1;
-                    item
-                });
-                sparse_vacant_head = unwrap_next_vacant(sparse[sparse_index].kind());
+                extend_sparse(&mut sparse, new_len, &mut sparse_vacant_head);
             } else {
                 let next_vacant = sparse.get(sparse_index).unwrap().next_vacant().unwrap();
-
-                let mut next_fp = sparse_vacant_head;
-                let mut current_slot = None;
-                while next_fp != sparse_index {
-                    current_slot = Some(next_fp);
-                    next_fp = sparse.get(next_fp).unwrap().next_vacant().unwrap();
-                }
-
-                match current_slot {
-                    Some(slot_to_fix) => {
-                        *sparse
-                            .get_mut(slot_to_fix)
-                            .unwrap()
-                            .next_vacant_mut()
-                            .unwrap() = next_vacant
-                    }
-                    None => sparse_vacant_head = next_vacant,
-                }
+                remove_from_vacant_list(
+                    &mut sparse,
+                    &mut sparse_vacant_head,
+                    sparse_index,
+                    next_vacant,
+                );
             }
             sparse[sparse_index] = item;
         }
@@ -413,23 +439,7 @@ where
                     Some(value)
                 }
                 SparseItemKind::Vacant { next_vacant } => {
-                    let mut next_fp = *sparse_vacant_head;
-                    let mut current_slot = None;
-                    while next_fp != sparse_index {
-                        current_slot = Some(next_fp);
-                        next_fp = sparse.get(next_fp).unwrap().next_vacant().unwrap();
-                    }
-
-                    match current_slot {
-                        Some(slot_to_fix) => {
-                            *sparse
-                                .get_mut(slot_to_fix)
-                                .unwrap()
-                                .next_vacant_mut()
-                                .unwrap() = next_vacant
-                        }
-                        None => *sparse_vacant_head = next_vacant,
-                    }
+                    remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
 
                     check_kv_same_len(dense_keys.len(), dense_values.len());
                     dense_keys.push(key);
@@ -441,36 +451,8 @@ where
             },
             Some(_) => None,
             None => {
-                let old_len = sparse.len();
                 let new_len = sparse_index.saturating_add(1);
-
-                if *sparse_vacant_head < old_len {
-                    let mut last_vacant = *sparse_vacant_head;
-                    loop {
-                        let next_vacant = sparse[last_vacant].next_vacant_mut().unwrap();
-                        if *next_vacant == old_len {
-                            *next_vacant = new_len;
-                            break;
-                        }
-                        last_vacant = *next_vacant;
-                    }
-                }
-
-                let mut first_free = if *sparse_vacant_head < old_len {
-                    *sparse_vacant_head
-                } else {
-                    new_len
-                };
-                let mut new_slot = old_len;
-                sparse.resize_with(new_len, || {
-                    let epoch = Default::default();
-                    let item = SparseItem::vacant(first_free, epoch);
-
-                    first_free = new_slot;
-                    new_slot += 1;
-                    item
-                });
-                *sparse_vacant_head = unwrap_next_vacant(sparse[sparse_index].kind());
+                extend_sparse(sparse, new_len, sparse_vacant_head);
 
                 check_kv_same_len(dense_keys.len(), dense_values.len());
                 dense_keys.push(key);

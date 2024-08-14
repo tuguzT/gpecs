@@ -23,6 +23,20 @@ use crate::{
     SparseItem, SparseItemKind,
 };
 
+fn extend_sparse<E>(sparse: &mut Vec<SparseItem<E>>, new_len: usize)
+where
+    E: Epoch,
+{
+    let old_len = sparse.len();
+    if old_len >= new_len {
+        return;
+    }
+
+    let epoch = Default::default();
+    let item = SparseItem::vacant(0, epoch);
+    sparse.resize(new_len, item);
+}
+
 pub type SparseSet<T> = EpochSparseSet<usize, T>;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -327,11 +341,7 @@ where
             let epoch = key.epoch();
             let item = SparseItem::occupied(dense_index, epoch);
 
-            if sparse_index >= sparse.len() {
-                let epoch = Default::default();
-                let item = SparseItem::vacant(0, epoch);
-                sparse.resize(sparse_index.saturating_add(1), item);
-            }
+            extend_sparse(&mut sparse, sparse_index.saturating_add(1));
             sparse[sparse_index] = item;
         }
 
@@ -350,11 +360,7 @@ where
         } = self;
 
         let sparse_index = key.sparse_index();
-        if sparse_index >= sparse.len() {
-            let epoch = Default::default();
-            let item = SparseItem::vacant(0, epoch);
-            sparse.resize(sparse_index.saturating_add(1), item);
-        }
+        extend_sparse(sparse, sparse_index.saturating_add(1));
 
         let sparse_item = sparse.index_mut(sparse_index);
         if key.epoch() < sparse_item.epoch {
@@ -385,14 +391,10 @@ where
         } = self;
 
         let sparse_index = key.sparse_index();
-        if sparse_index >= sparse.len() {
-            let new_sparse_len = sparse_index.saturating_add(1);
-            sparse.try_reserve(new_sparse_len - sparse.len())?;
 
-            let epoch = Default::default();
-            let item = SparseItem::vacant(0, epoch);
-            sparse.resize(new_sparse_len, item);
-        }
+        let new_sparse_len = sparse_index.saturating_add(1);
+        sparse.try_reserve(new_sparse_len.saturating_sub(sparse.len()))?;
+        extend_sparse(sparse, new_sparse_len);
 
         let sparse_item = sparse.index_mut(sparse_index);
         if key.epoch() < sparse_item.epoch {
@@ -1207,6 +1209,8 @@ where
         };
         self.reserve(iter_len, iter_len);
 
+        // I could have used `push` here, but it would search for a vacant sparse item
+        // multiple times from the beginning of a sparse
         let mut maybe_vacant_keys = 0..self.sparse.len();
         for value in iter {
             let sparse_index = maybe_vacant_keys

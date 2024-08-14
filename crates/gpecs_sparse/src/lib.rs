@@ -248,6 +248,15 @@ const fn unwrap_next_vacant(kind: &SparseItemKind) -> usize {
 
 #[inline]
 #[track_caller]
+fn unwrap_next_vacant_mut(kind: &mut SparseItemKind) -> &mut usize {
+    let Some(next_vacant) = kind.next_vacant_mut() else {
+        unwrap_next_vacant_failed()
+    };
+    next_vacant
+}
+
+#[inline]
+#[track_caller]
 fn unwrap_dense_key<K>(keys: &[K], dense_index: usize) -> &K {
     let Some(dense_key) = keys.get(dense_index) else {
         check_dense_index_bounds_failed();

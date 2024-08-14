@@ -6,7 +6,7 @@ use core::{
     slice,
 };
 
-use crate::{check_kv_same_len, match_kv_same_kind};
+use crate::assert::{check_kv_same_len, match_kv_same_kind};
 
 #[repr(transparent)]
 pub struct Keys<'a, K, V> {

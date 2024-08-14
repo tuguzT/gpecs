@@ -357,6 +357,26 @@ where
                     item
                 });
                 sparse_vacant_head = unwrap_next_vacant(sparse[sparse_index].kind());
+            } else {
+                let next_vacant = sparse.get(sparse_index).unwrap().next_vacant().unwrap();
+
+                let mut next_fp = sparse_vacant_head;
+                let mut current_slot = None;
+                while next_fp != sparse_index {
+                    current_slot = Some(next_fp);
+                    next_fp = sparse.get(next_fp).unwrap().next_vacant().unwrap();
+                }
+
+                match current_slot {
+                    Some(slot_to_fix) => {
+                        *sparse
+                            .get_mut(slot_to_fix)
+                            .unwrap()
+                            .next_vacant_mut()
+                            .unwrap() = next_vacant
+                    }
+                    None => sparse_vacant_head = next_vacant,
+                }
             }
             sparse[sparse_index] = item;
         }

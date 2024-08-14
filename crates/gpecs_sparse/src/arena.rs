@@ -9,12 +9,12 @@ use core::{
 use crate::{
     check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_capacity,
     check_kv_same_len, get_pair_mut,
+    iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
     match_kv_same_kind, unwrap_dense_index, unwrap_dense_index_mut, unwrap_dense_key,
     unwrap_dense_key_mut, unwrap_dense_value, unwrap_dense_value_mut, unwrap_dense_value_pair_mut,
     unwrap_next_vacant, unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
-    unwrap_sparse_items_pair_mut, unwrap_value_from_sparse_index, Drain, IntoIter, IntoKeys,
-    IntoValues, Iter, IterMut, Keys, SparseItem, SparseItemKind, Values, ValuesMut,
+    unwrap_sparse_items_pair_mut, unwrap_value_from_sparse_index, SparseItem, SparseItemKind,
 };
 
 fn extend_sparse<E>(sparse: &mut Vec<SparseItem<E>>, new_len: usize, sparse_vacant_head: &mut usize)

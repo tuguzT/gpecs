@@ -1705,17 +1705,11 @@ fn unwrap_sparse_value<T>(value: Option<T>) -> T {
 
 #[cfg(test)]
 mod tests {
-    use core::mem::forget;
-    use std::ops::Not;
+    use core::{mem::forget, ops::Not};
 
-    use crate::{
-        key::{Epoch, EpochKey, Key as _},
-        SparseItem,
-    };
+    use crate::prelude::*;
 
-    use super::{EpochSparseArena, SparseArena};
-
-    type Key = EpochKey<usize>;
+    type Key = EpochKey;
 
     #[test]
     fn empty() {
@@ -2557,7 +2551,7 @@ mod tests {
             .invalidate_epoch(first_key)
             .expect("first key should be present");
         assert_eq!(new_first_key.sparse_index(), first_key.sparse_index());
-        assert_eq!(new_first_key.epoch(), first_key.epoch().next());
+        assert_eq!(new_first_key.epoch(), &first_key.epoch().next());
         assert_eq!(new_first_key, Key::new(5, 2));
         assert_eq!(sparse_arena.get(first_key), None);
         assert_eq!(sparse_arena.get(new_first_key), Some(&42));
@@ -2566,7 +2560,7 @@ mod tests {
             .invalidate_epoch(second_key)
             .expect("second key should be present");
         assert_eq!(new_second_key.sparse_index(), second_key.sparse_index());
-        assert_eq!(new_second_key.epoch(), second_key.epoch().next());
+        assert_eq!(new_second_key.epoch(), &second_key.epoch().next());
         assert_eq!(new_second_key, Key::new(2, 1));
         assert_eq!(sparse_arena.get(second_key), None);
         assert_eq!(sparse_arena.get(new_second_key), Some(&69));

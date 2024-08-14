@@ -1,4 +1,8 @@
-use core::mem::{replace, swap};
+use core::{
+    cmp,
+    mem::{replace, swap},
+    ops::IndexMut,
+};
 
 use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 
@@ -6,9 +10,10 @@ use crate::{
     check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_capacity,
     check_kv_same_len, get_pair_mut,
     key::{Epoch, Key},
-    match_kv_same_kind, unwrap_dense_index_mut, unwrap_dense_key, unwrap_dense_value,
-    unwrap_dense_value_mut, unwrap_dense_value_pair_mut, unwrap_next_vacant,
-    unwrap_sparse_item_mut, SparseItem, SparseItemKind,
+    match_kv_same_kind, unwrap_dense_index, unwrap_dense_index_mut, unwrap_dense_key,
+    unwrap_dense_value, unwrap_dense_value_mut, unwrap_dense_value_pair_mut, unwrap_next_vacant,
+    unwrap_sparse_item, unwrap_sparse_item_mut, unwrap_sparse_items_pair_mut,
+    unwrap_value_from_sparse_index, SparseItem, SparseItemKind,
 };
 
 pub type SparseArena<T> = EpochSparseArena<usize, T>;
@@ -691,15 +696,189 @@ where
         self.sparse.truncate(sparse_len);
     }
 
+    pub fn drain(&mut self) {
+        todo!()
+    }
+
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut(K, &mut V) -> bool,
+    {
+        for dense_index in (0..self.len()).rev() {
+            let key = self.dense_keys[dense_index];
+            let value = self.dense_values.index_mut(dense_index);
+            if !f(key, value) {
+                self.remove(key);
+            }
+        }
+    }
+
+    #[inline]
     pub fn sort(&mut self)
     where
         V: Ord,
     {
-        todo!()
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_by_cached_key(|&key| {
+                let sparse_index = key.sparse_index();
+                unwrap_value_from_sparse_index(sparse_index, values, sparse)
+            })
+        });
     }
 
+    #[inline]
     pub fn sort_keys(&mut self) {
-        todo!()
+        self.sort_impl(|keys, _, _| keys.sort());
+    }
+
+    #[inline]
+    pub fn sort_by<F>(&mut self, mut f: F)
+    where
+        F: FnMut((K, &V), (K, &V)) -> cmp::Ordering,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_by(|&lhs_key, &rhs_key| {
+                let lhs_index = lhs_key.sparse_index();
+                let lhs_value = unwrap_value_from_sparse_index(lhs_index, values, sparse);
+                let lhs = (lhs_key, lhs_value);
+
+                let rhs_index = rhs_key.sparse_index();
+                let rhs_value = unwrap_value_from_sparse_index(rhs_index, values, sparse);
+                let rhs = (rhs_key, rhs_value);
+
+                f(lhs, rhs)
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_by_key<T, F>(&mut self, mut f: F)
+    where
+        F: FnMut((K, &V)) -> T,
+        T: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_by_key(|&key| {
+                let sparse_index = key.sparse_index();
+                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
+                f((key, value))
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_by_cached_key<T, F>(&mut self, mut f: F)
+    where
+        F: FnMut((K, &V)) -> T,
+        T: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_by_cached_key(|&key| {
+                let sparse_index = key.sparse_index();
+                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
+                f((key, value))
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_unstable(&mut self)
+    where
+        V: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_unstable_by_key(|&key| {
+                let sparse_index = key.sparse_index();
+                unwrap_value_from_sparse_index(sparse_index, values, sparse)
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_keys_unstable(&mut self) {
+        self.sort_impl(|keys, _, _| keys.sort_unstable());
+    }
+
+    #[inline]
+    pub fn sort_unstable_by<F>(&mut self, mut f: F)
+    where
+        F: FnMut((K, &V), (K, &V)) -> cmp::Ordering,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_unstable_by(|&lhs_key, &rhs_key| {
+                let lhs_index = lhs_key.sparse_index();
+                let lhs_value = unwrap_value_from_sparse_index(lhs_index, values, sparse);
+                let lhs = (lhs_key, lhs_value);
+
+                let rhs_index = rhs_key.sparse_index();
+                let rhs_value = unwrap_value_from_sparse_index(rhs_index, values, sparse);
+                let rhs = (rhs_key, rhs_value);
+
+                f(lhs, rhs)
+            })
+        });
+    }
+
+    #[inline]
+    pub fn sort_unstable_by_key<T, F>(&mut self, mut f: F)
+    where
+        F: FnMut((K, &V)) -> T,
+        T: Ord,
+    {
+        self.sort_impl(|keys, values, sparse| {
+            keys.sort_unstable_by_key(|&key| {
+                let sparse_index = key.sparse_index();
+                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
+                f((key, value))
+            })
+        });
+    }
+
+    // Implementation was borrowed from the links below:
+    // https://skypjack.github.io/2019-09-25-ecs-baf-part-5/#:~:text=Mixing%20in%2Dplace%20sorting%20and%20permutations
+    // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
+    fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
+    where
+        SortKeys: FnOnce(&mut [K], &[V], &[SparseItem<K::Epoch>]),
+    {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+            ..
+        } = self;
+
+        let dense_keys = dense_keys.as_mut_slice();
+        let dense_values = dense_values.as_mut_slice();
+        let sparse = sparse.as_mut_slice();
+        check_kv_same_len(dense_keys.len(), dense_values.len());
+
+        sort_keys(dense_keys, dense_values, sparse);
+
+        for pos in 0..dense_keys.len() {
+            let mut curr = pos;
+            let mut next = {
+                let sparse_index = unwrap_dense_key(dense_keys, curr).sparse_index();
+                let sparse_item = unwrap_sparse_item(sparse, sparse_index);
+                unwrap_dense_index(sparse_item.kind())
+            };
+
+            while curr != next {
+                let (curr_item, next_item) = {
+                    let first_index = unwrap_dense_key(dense_keys, curr).sparse_index();
+                    let second_index = unwrap_dense_key(dense_keys, next).sparse_index();
+                    unwrap_sparse_items_pair_mut(sparse, first_index, second_index)
+                };
+                let curr_dense_index = unwrap_dense_index_mut(curr_item.kind_mut());
+                let next_dense_index = unwrap_dense_index_mut(next_item.kind_mut());
+
+                dense_values.swap(*curr_dense_index, *next_dense_index);
+
+                *curr_dense_index = curr;
+                curr = next;
+                next = *next_dense_index;
+            }
+        }
     }
 
     pub fn get(&self, key: K) -> Option<&V> {
@@ -816,6 +995,11 @@ where
         true
     }
 
+    pub fn entry(&mut self, key: K) {
+        let _ = key;
+        todo!()
+    }
+
     pub fn clear(&mut self) {
         let Self {
             dense_keys,
@@ -830,15 +1014,40 @@ where
         *sparse_vacant_head = 0;
     }
 
+    #[inline]
+    pub fn keys(&self) {
+        todo!()
+    }
+
+    #[inline]
+    pub fn into_keys(self) {
+        todo!()
+    }
+
+    #[inline]
+    pub fn values(&self) {
+        todo!()
+    }
+
+    #[inline]
+    pub fn values_mut(&mut self) {
+        todo!()
+    }
+
+    #[inline]
+    pub fn into_values(self) {
+        todo!()
+    }
+
+    #[inline]
     pub fn iter(&self) {
         todo!()
     }
 
+    #[inline]
     pub fn iter_mut(&mut self) {
         todo!()
     }
-
-    // TODO other methods
 }
 
 #[cfg(test)]
@@ -2041,25 +2250,25 @@ mod tests {
         assert!(sparse_arena.contains_key(key));
     }
 
-    // #[test]
-    // fn five_items_retain() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(8, 34);
-    //     sparse_arena.insert(1, 42);
-    //     sparse_arena.insert(4, 69);
-    //     sparse_arena.insert(3, 228);
-    //     sparse_arena.insert(6, 666);
+    #[test]
+    fn five_items_retain() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(8, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(4, 69);
+        sparse_arena.insert(3, 228);
+        sparse_arena.insert(6, 666);
 
-    //     sparse_arena.retain(|key, _| key % 2 == 0);
-    //     assert_eq!(sparse_arena.len(), 3);
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[8, 4, 6]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[34, 69, 666]);
+        sparse_arena.retain(|key, _| key % 2 == 0);
+        assert_eq!(sparse_arena.len(), 3);
+        assert_eq!(sparse_arena.as_keys_slice(), &[8, 4, 6]);
+        assert_eq!(sparse_arena.as_slice(), &[34, 69, 666]);
 
-    //     sparse_arena.retain(|_, value| *value % 2 == 1);
-    //     assert_eq!(sparse_arena.len(), 1);
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[4]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[69]);
-    // }
+        sparse_arena.retain(|_, value| *value % 2 == 1);
+        assert_eq!(sparse_arena.len(), 1);
+        assert_eq!(sparse_arena.as_keys_slice(), &[4]);
+        assert_eq!(sparse_arena.as_slice(), &[69]);
+    }
 
     // #[test]
     // fn five_items_drain() {
@@ -2135,65 +2344,65 @@ mod tests {
         assert_eq!(sparse_arena.get(key0), Some(&34));
     }
 
-    // #[test]
-    // fn five_items_sort() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(8, 42);
-    //     sparse_arena.insert(1, 228);
-    //     sparse_arena.insert(4, 69);
-    //     sparse_arena.insert(3, 666);
-    //     sparse_arena.insert(6, 34);
+    #[test]
+    fn five_items_sort() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(8, 42);
+        sparse_arena.insert(1, 228);
+        sparse_arena.insert(4, 69);
+        sparse_arena.insert(3, 666);
+        sparse_arena.insert(6, 34);
 
-    //     sparse_arena.sort();
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[6, 8, 4, 1, 3]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[34, 42, 69, 228, 666]);
+        sparse_arena.sort();
+        assert_eq!(sparse_arena.as_keys_slice(), &[6, 8, 4, 1, 3]);
+        assert_eq!(sparse_arena.as_slice(), &[34, 42, 69, 228, 666]);
 
-    //     assert_eq!(sparse_arena.get(8), Some(&42));
-    //     assert_eq!(sparse_arena.get(1), Some(&228));
-    //     assert_eq!(sparse_arena.get(4), Some(&69));
-    //     assert_eq!(sparse_arena.get(3), Some(&666));
-    //     assert_eq!(sparse_arena.get(6), Some(&34));
-    // }
+        assert_eq!(sparse_arena.get(8), Some(&42));
+        assert_eq!(sparse_arena.get(1), Some(&228));
+        assert_eq!(sparse_arena.get(4), Some(&69));
+        assert_eq!(sparse_arena.get(3), Some(&666));
+        assert_eq!(sparse_arena.get(6), Some(&34));
+    }
 
-    // #[test]
-    // fn five_items_sort_keys() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(8, 42);
-    //     sparse_arena.insert(1, 228);
-    //     sparse_arena.insert(4, 69);
-    //     sparse_arena.insert(3, 666);
-    //     sparse_arena.insert(6, 34);
+    #[test]
+    fn five_items_sort_keys() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(8, 42);
+        sparse_arena.insert(1, 228);
+        sparse_arena.insert(4, 69);
+        sparse_arena.insert(3, 666);
+        sparse_arena.insert(6, 34);
 
-    //     sparse_arena.sort_keys();
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[1, 3, 4, 6, 8]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[228, 666, 69, 34, 42]);
+        sparse_arena.sort_keys();
+        assert_eq!(sparse_arena.as_keys_slice(), &[1, 3, 4, 6, 8]);
+        assert_eq!(sparse_arena.as_slice(), &[228, 666, 69, 34, 42]);
 
-    //     assert_eq!(sparse_arena.get(8), Some(&42));
-    //     assert_eq!(sparse_arena.get(1), Some(&228));
-    //     assert_eq!(sparse_arena.get(4), Some(&69));
-    //     assert_eq!(sparse_arena.get(3), Some(&666));
-    //     assert_eq!(sparse_arena.get(6), Some(&34));
-    // }
+        assert_eq!(sparse_arena.get(8), Some(&42));
+        assert_eq!(sparse_arena.get(1), Some(&228));
+        assert_eq!(sparse_arena.get(4), Some(&69));
+        assert_eq!(sparse_arena.get(3), Some(&666));
+        assert_eq!(sparse_arena.get(6), Some(&34));
+    }
 
-    // #[test]
-    // fn five_items_sort_by() {
-    //     let mut sparse_arena = SparseArena::new();
-    //     sparse_arena.insert(8, 42);
-    //     sparse_arena.insert(1, 228);
-    //     sparse_arena.insert(4, 69);
-    //     sparse_arena.insert(3, 666);
-    //     sparse_arena.insert(6, 34);
+    #[test]
+    fn five_items_sort_by() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(8, 42);
+        sparse_arena.insert(1, 228);
+        sparse_arena.insert(4, 69);
+        sparse_arena.insert(3, 666);
+        sparse_arena.insert(6, 34);
 
-    //     sparse_arena.sort_by(|(_, a), (_, b)| Ord::cmp(b, a));
-    //     assert_eq!(sparse_arena.keys().as_slice(), &[3, 1, 4, 8, 6]);
-    //     assert_eq!(sparse_arena.values().as_slice(), &[666, 228, 69, 42, 34]);
+        sparse_arena.sort_by(|(_, a), (_, b)| Ord::cmp(b, a));
+        assert_eq!(sparse_arena.as_keys_slice(), &[3, 1, 4, 8, 6]);
+        assert_eq!(sparse_arena.as_slice(), &[666, 228, 69, 42, 34]);
 
-    //     assert_eq!(sparse_arena.get(8), Some(&42));
-    //     assert_eq!(sparse_arena.get(1), Some(&228));
-    //     assert_eq!(sparse_arena.get(4), Some(&69));
-    //     assert_eq!(sparse_arena.get(3), Some(&666));
-    //     assert_eq!(sparse_arena.get(6), Some(&34));
-    // }
+        assert_eq!(sparse_arena.get(8), Some(&42));
+        assert_eq!(sparse_arena.get(1), Some(&228));
+        assert_eq!(sparse_arena.get(4), Some(&69));
+        assert_eq!(sparse_arena.get(3), Some(&666));
+        assert_eq!(sparse_arena.get(6), Some(&34));
+    }
 
     // #[test]
     // fn five_items_entry() {

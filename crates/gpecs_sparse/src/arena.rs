@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
     cmp,
-    fmt::{self, Debug, Display},
+    fmt::Display,
     mem::replace,
     ops::{Index, IndexMut},
 };
@@ -9,80 +9,15 @@ use core::{
 use crate::{
     assert::{
         check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_capacity,
-        check_kv_same_len, match_kv_same_kind, unwrap_dense_index_mut, unwrap_dense_value,
-        unwrap_dense_value_mut, unwrap_next_vacant, unwrap_next_vacant_mut, unwrap_sparse_item_mut,
+        check_kv_same_len, match_kv_same_kind, unwrap_dense_index_mut, unwrap_dense_value_mut,
+        unwrap_next_vacant, unwrap_next_vacant_mut, unwrap_sparse_item_mut,
     },
+    entry::generate_entry_types,
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
     view::{EpochSparseView, EpochSparseViewMut},
     SparseItem, SparseItemKind,
 };
-
-fn extend_sparse<E>(sparse: &mut Vec<SparseItem<E>>, new_len: usize, sparse_vacant_head: &mut usize)
-where
-    E: Epoch,
-{
-    let old_len = sparse.len();
-    if old_len >= new_len {
-        return;
-    }
-
-    if *sparse_vacant_head < old_len {
-        let mut last_vacant = *sparse_vacant_head;
-        loop {
-            let next_vacant = unwrap_next_vacant_mut(sparse[last_vacant].kind_mut());
-            if *next_vacant == old_len {
-                *next_vacant = new_len;
-                break;
-            }
-            last_vacant = *next_vacant;
-        }
-    }
-
-    let mut next_vacant = if *sparse_vacant_head < old_len {
-        *sparse_vacant_head
-    } else {
-        new_len
-    };
-    let mut current_vacant = old_len;
-    sparse.resize_with(new_len, || {
-        let epoch = Default::default();
-        let item = SparseItem::vacant(next_vacant, epoch);
-        next_vacant = current_vacant;
-        current_vacant += 1;
-        item
-    });
-
-    *sparse_vacant_head = unwrap_next_vacant(sparse.last().unwrap().kind());
-}
-
-fn remove_from_vacant_list<E>(
-    sparse: &mut [SparseItem<E>],
-    sparse_vacant_head: &mut usize,
-    sparse_index: usize,
-    next_vacant: usize,
-) {
-    let vacant_to_fix = {
-        let mut result = None;
-        let mut next_vacant = *sparse_vacant_head;
-        while next_vacant != sparse_index {
-            result = Some(next_vacant);
-
-            let vacant_item = sparse.index(next_vacant);
-            next_vacant = unwrap_next_vacant(vacant_item.kind());
-        }
-        result
-    };
-
-    let vacant_to_fix = match vacant_to_fix {
-        Some(vacant_to_fix) => {
-            let vacant_item = sparse.index_mut(vacant_to_fix);
-            unwrap_next_vacant_mut(vacant_item.kind_mut())
-        }
-        None => sparse_vacant_head,
-    };
-    *vacant_to_fix = next_vacant;
-}
 
 pub type SparseArena<T> = EpochSparseArena<usize, T>;
 
@@ -894,17 +829,12 @@ where
             .take_if(|item| item.epoch == key.epoch())
             .and_then(SparseItem::dense_index)
         else {
-            let sparse_set = self;
-            let entry = VacantEntry { key, sparse_set };
+            let entry = VacantEntry::new(key, self);
             return Entry::Vacant(entry);
         };
 
         check_dense_index_bounds(dense_index, dense_keys.len());
-        let entry = OccupiedEntry {
-            key,
-            dense_index,
-            sparse_set: self,
-        };
+        let entry = OccupiedEntry::new(key, dense_index, self);
         Entry::Occupied(entry)
     }
 
@@ -1164,308 +1094,73 @@ where
     }
 }
 
-#[derive(Debug)]
-pub enum Entry<'a, K, V>
+fn extend_sparse<E>(sparse: &mut Vec<SparseItem<E>>, new_len: usize, sparse_vacant_head: &mut usize)
 where
-    K: Key,
+    E: Epoch,
 {
-    Occupied(OccupiedEntry<'a, K, V>),
-    Vacant(VacantEntry<'a, K, V>),
-}
-
-impl<'a, K, V> Entry<'a, K, V>
-where
-    K: Key,
-{
-    #[inline]
-    pub const fn is_occupied(&self) -> bool {
-        matches!(self, Self::Occupied(_))
+    let old_len = sparse.len();
+    if old_len >= new_len {
+        return;
     }
 
-    #[inline]
-    pub const fn is_vacant(&self) -> bool {
-        matches!(self, Self::Vacant(_))
-    }
-
-    #[inline]
-    pub fn key(&self) -> K {
-        match self {
-            Self::Occupied(entry) => entry.key(),
-            Self::Vacant(entry) => entry.key(),
-        }
-    }
-
-    #[inline]
-    pub fn get(&self) -> Option<&V> {
-        match self {
-            Self::Occupied(entry) => Some(entry.get()),
-            Self::Vacant(_) => None,
-        }
-    }
-
-    #[inline]
-    pub fn get_mut(&mut self) -> Option<&mut V> {
-        match self {
-            Self::Occupied(entry) => Some(entry.get_mut()),
-            Self::Vacant(_) => None,
-        }
-    }
-
-    #[inline]
-    pub fn and_modify<F>(self, f: F) -> Self
-    where
-        F: FnOnce(&mut V),
-    {
-        match self {
-            Self::Occupied(mut entry) => {
-                f(entry.get_mut());
-                Self::Occupied(entry)
+    if *sparse_vacant_head < old_len {
+        let mut last_vacant = *sparse_vacant_head;
+        loop {
+            let next_vacant = unwrap_next_vacant_mut(sparse[last_vacant].kind_mut());
+            if *next_vacant == old_len {
+                *next_vacant = new_len;
+                break;
             }
-            Self::Vacant(entry) => Self::Vacant(entry),
+            last_vacant = *next_vacant;
         }
     }
 
-    #[inline]
-    pub fn or_insert(self, default: V) -> &'a mut V {
-        match self {
-            Self::Occupied(entry) => entry.into_mut(),
-            Self::Vacant(entry) => entry.insert(default),
-        }
-    }
-
-    #[inline]
-    pub fn or_insert_with<F>(self, default: F) -> &'a mut V
-    where
-        F: FnOnce() -> V,
-    {
-        match self {
-            Self::Occupied(entry) => entry.into_mut(),
-            Self::Vacant(entry) => entry.insert(default()),
-        }
-    }
-
-    #[inline]
-    pub fn or_default(self) -> &'a mut V
-    where
-        V: Default,
-    {
-        match self {
-            Self::Occupied(entry) => entry.into_mut(),
-            Self::Vacant(entry) => entry.insert(Default::default()),
-        }
-    }
-
-    #[inline]
-    pub fn insert_entry(self, value: V) -> OccupiedEntry<'a, K, V> {
-        match self {
-            Self::Occupied(mut entry) => {
-                entry.insert(value);
-                entry
-            }
-            Self::Vacant(entry) => entry.insert_entry(value),
-        }
-    }
-
-    #[inline]
-    pub fn replace_key(self, key: K) -> Self {
-        match self {
-            Self::Occupied(mut entry) => {
-                entry.replace_key(key);
-                Self::Occupied(entry)
-            }
-            Self::Vacant(entry) => {
-                let VacantEntry { sparse_set, .. } = entry;
-                sparse_set.entry(key)
-            }
-        }
-    }
-}
-
-pub struct OccupiedEntry<'a, K, V>
-where
-    K: Key,
-{
-    key: K,
-    dense_index: usize,
-    sparse_set: &'a mut EpochSparseArena<K, V>,
-}
-
-impl<'a, K, V> OccupiedEntry<'a, K, V>
-where
-    K: Key,
-{
-    #[inline]
-    pub fn get(&self) -> &V {
-        let Self {
-            dense_index,
-            sparse_set,
-            ..
-        } = self;
-
-        let values = sparse_set.dense_values.as_slice();
-        unwrap_dense_value(values, *dense_index)
-    }
-
-    #[inline]
-    pub fn get_mut(&mut self) -> &mut V {
-        let Self {
-            dense_index,
-            sparse_set,
-            ..
-        } = self;
-
-        let values = sparse_set.dense_values.as_mut_slice();
-        unwrap_dense_value_mut(values, *dense_index)
-    }
-
-    #[inline]
-    pub fn into_mut(self) -> &'a mut V {
-        let Self {
-            dense_index,
-            sparse_set,
-            ..
-        } = self;
-
-        let values = sparse_set.dense_values.as_mut_slice();
-        unwrap_dense_value_mut(values, dense_index)
-    }
-
-    #[inline]
-    pub fn insert(&mut self, value: V) -> V {
-        let previous = self.get_mut();
-        replace(previous, value)
-    }
-}
-
-impl<'a, K, V> OccupiedEntry<'a, K, V>
-where
-    K: Key,
-{
-    #[inline]
-    pub fn key(&self) -> K {
-        let Self { key, .. } = self;
-        *key
-    }
-
-    #[inline]
-    pub fn remove(self) -> V {
-        let Self {
-            key, sparse_set, ..
-        } = self;
-
-        let value = sparse_set.remove(key);
-        unwrap_sparse_value(value)
-    }
-
-    #[inline]
-    pub fn swap_remove(self) -> V {
-        let Self {
-            key, sparse_set, ..
-        } = self;
-
-        let value = sparse_set.swap_remove(key);
-        unwrap_sparse_value(value)
-    }
-
-    #[inline]
-    pub fn replace_key(&mut self, key: K) -> Option<V> {
-        let new_key = key;
-        let Self {
-            key, sparse_set, ..
-        } = self;
-
-        let value = sparse_set.remove(*key);
-        let value = unwrap_sparse_value(value);
-
-        *key = new_key;
-        sparse_set.insert(*key, value)
-    }
-}
-
-impl<'a, K, V> Debug for OccupiedEntry<'a, K, V>
-where
-    K: Key + Debug,
-    V: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { key, .. } = self;
-
-        let value = self.get();
-        f.debug_struct("OccupiedEntry")
-            .field("key", key)
-            .field("value", value)
-            .finish()
-    }
-}
-
-pub struct VacantEntry<'a, K, V>
-where
-    K: Key,
-{
-    key: K,
-    sparse_set: &'a mut EpochSparseArena<K, V>,
-}
-
-impl<'a, K, V> VacantEntry<'a, K, V>
-where
-    K: Key,
-{
-    #[inline]
-    pub fn key(&self) -> K {
-        let Self { key, .. } = self;
-        *key
-    }
-
-    #[inline]
-    pub fn insert(self, value: V) -> &'a mut V {
-        let Self { key, sparse_set } = self;
-
-        sparse_set.insert(key, value);
-
-        let value = sparse_set.dense_values.last_mut();
-        unwrap_sparse_value(value)
-    }
-
-    #[inline]
-    pub fn insert_entry(self, value: V) -> OccupiedEntry<'a, K, V> {
-        let Self { key, sparse_set } = self;
-
-        sparse_set.insert(key, value);
-        let dense_index = sparse_set.dense_values.len() - 1;
-
-        OccupiedEntry {
-            key,
-            dense_index,
-            sparse_set,
-        }
-    }
-}
-
-impl<'a, K, V> Debug for VacantEntry<'a, K, V>
-where
-    K: Key + Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { key, .. } = self;
-        f.debug_struct("VacantEntry").field("key", key).finish()
-    }
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn unwrap_sparse_value_failed() -> ! {
-    panic!("value by provided key should exist")
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_sparse_value<T>(value: Option<T>) -> T {
-    let Some(value) = value else {
-        unwrap_sparse_value_failed()
+    let mut next_vacant = if *sparse_vacant_head < old_len {
+        *sparse_vacant_head
+    } else {
+        new_len
     };
-    value
+    let mut current_vacant = old_len;
+    sparse.resize_with(new_len, || {
+        let epoch = Default::default();
+        let item = SparseItem::vacant(next_vacant, epoch);
+        next_vacant = current_vacant;
+        current_vacant += 1;
+        item
+    });
+
+    *sparse_vacant_head = unwrap_next_vacant(sparse.last().unwrap().kind());
 }
+
+fn remove_from_vacant_list<E>(
+    sparse: &mut [SparseItem<E>],
+    sparse_vacant_head: &mut usize,
+    sparse_index: usize,
+    next_vacant: usize,
+) {
+    let vacant_to_fix = {
+        let mut result = None;
+        let mut next_vacant = *sparse_vacant_head;
+        while next_vacant != sparse_index {
+            result = Some(next_vacant);
+
+            let vacant_item = sparse.index(next_vacant);
+            next_vacant = unwrap_next_vacant(vacant_item.kind());
+        }
+        result
+    };
+
+    let vacant_to_fix = match vacant_to_fix {
+        Some(vacant_to_fix) => {
+            let vacant_item = sparse.index_mut(vacant_to_fix);
+            unwrap_next_vacant_mut(vacant_item.kind_mut())
+        }
+        None => sparse_vacant_head,
+    };
+    *vacant_to_fix = next_vacant;
+}
+
+generate_entry_types!(EpochSparseArena<K, V>);
 
 #[cfg(test)]
 mod tests {

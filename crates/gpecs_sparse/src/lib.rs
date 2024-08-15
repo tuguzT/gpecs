@@ -16,6 +16,7 @@ pub mod view;
 
 mod algo;
 mod assert;
+mod entry;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct SparseItem<E> {

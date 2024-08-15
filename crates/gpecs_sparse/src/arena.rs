@@ -2031,7 +2031,6 @@ mod tests {
         sparse_arena.insert(2, 34);
         sparse_arena.insert(1, 42);
         sparse_arena.insert(5, 69);
-        println!("{:#?}", sparse_arena);
 
         let removed = sparse_arena.remove(2);
         assert_eq!(removed, Some(34));

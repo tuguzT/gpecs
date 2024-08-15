@@ -1003,7 +1003,7 @@ generate_entry_types!(EpochSparseSet<K, V>);
 
 #[cfg(test)]
 mod tests {
-    use std::{mem::forget, ops::Not};
+    use core::{mem::forget, ops::Not};
 
     use crate::prelude::*;
 

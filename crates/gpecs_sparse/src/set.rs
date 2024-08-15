@@ -7,6 +7,7 @@ use core::{
 };
 
 use crate::{
+    arena,
     assert::{
         check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_capacity,
         check_kv_same_len, match_kv_same_kind, unwrap_dense_index_mut, unwrap_dense_value_mut,
@@ -981,6 +982,20 @@ where
                 .unwrap_or(self.sparse.len());
             let key = K::new(sparse_index, Default::default());
             self.insert(key, value);
+        }
+    }
+}
+
+impl<K, V> From<arena::EpochSparseArena<K, V>> for EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    fn from(value: arena::EpochSparseArena<K, V>) -> Self {
+        let (dense_keys, dense_values, sparse) = value.into_parts();
+        Self {
+            dense_keys,
+            dense_values,
+            sparse,
         }
     }
 }
@@ -2478,5 +2493,22 @@ mod tests {
 
         assert_eq!(sparse_set.keys().as_slice(), &[2, 1, 4, 0, 3, 5]);
         assert_eq!(sparse_set.values().as_slice(), &[34, 42, 69, 228, 666, 201]);
+    }
+
+    #[test]
+    fn from_arena() {
+        let mut sparse_arena = SparseArena::new();
+        sparse_arena.insert(2, 34);
+        sparse_arena.insert(1, 42);
+        sparse_arena.insert(5, 69);
+
+        let sparse_set = SparseSet::from(sparse_arena);
+        assert_eq!(sparse_set.len(), 3);
+        assert_eq!(sparse_set.keys().as_slice(), &[2, 1, 5]);
+        assert_eq!(sparse_set.values().as_slice(), &[34, 42, 69]);
+
+        assert_eq!(sparse_set.get(2), Some(&34));
+        assert_eq!(sparse_set.get(1), Some(&42));
+        assert_eq!(sparse_set.get(5), Some(&69));
     }
 }

@@ -15,6 +15,7 @@ use crate::{
     entry::generate_entry_types,
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
+    set,
     view::{EpochSparseView, EpochSparseViewMut},
     SparseItem, SparseItemKind,
 };
@@ -1091,6 +1092,16 @@ where
         for value in iter {
             self.push(value);
         }
+    }
+}
+
+impl<K, V> From<set::EpochSparseSet<K, V>> for EpochSparseArena<K, V>
+where
+    K: Key,
+{
+    fn from(value: set::EpochSparseSet<K, V>) -> Self {
+        let (keys, values, sparse) = value.into_parts();
+        Self::from_parts(keys, values, sparse)
     }
 }
 
@@ -2647,5 +2658,22 @@ mod tests {
             sparse_arena.values().as_slice(),
             &[34, 42, 69, 228, 666, 201]
         );
+    }
+
+    #[test]
+    fn from_set() {
+        let mut sparse_set = SparseSet::new();
+        sparse_set.insert(2, 34);
+        sparse_set.insert(1, 42);
+        sparse_set.insert(5, 69);
+
+        let sparse_arena = SparseArena::from(sparse_set);
+        assert_eq!(sparse_arena.len(), 3);
+        assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 5]);
+        assert_eq!(sparse_arena.values().as_slice(), &[34, 42, 69]);
+
+        assert_eq!(sparse_arena.get(2), Some(&34));
+        assert_eq!(sparse_arena.get(1), Some(&42));
+        assert_eq!(sparse_arena.get(5), Some(&69));
     }
 }

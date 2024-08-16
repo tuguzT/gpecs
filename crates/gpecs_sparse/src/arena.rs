@@ -696,13 +696,38 @@ where
     where
         F: FnMut(K, &mut V) -> bool,
     {
-        for dense_index in (0..self.len()).rev() {
-            let key = self.dense_keys[dense_index];
-            let value = self.dense_values.index_mut(dense_index);
+        let old_len = self.len();
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        let mut last = 0;
+        for curr in 0..old_len {
+            let key = dense_keys[curr];
+            let value = dense_values.index_mut(curr);
             if !f(key, value) {
-                self.remove(key);
+                let sparse_index = key.sparse_index();
+                sparse[sparse_index] = SparseItem::vacant(*sparse_vacant_head, key.epoch().next());
+                *sparse_vacant_head = sparse_index;
+                continue;
             }
+
+            dense_keys.swap(curr, last);
+            dense_values.swap(curr, last);
+
+            let sparse_index = key.sparse_index();
+            let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
+            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
+            *dense_index -= curr - last;
+
+            last += 1;
         }
+
+        dense_keys.truncate(last);
+        dense_values.truncate(last);
     }
 
     #[inline]
@@ -2410,10 +2435,22 @@ mod tests {
         assert_eq!(sparse_arena.as_keys_slice(), &[8, 4, 6]);
         assert_eq!(sparse_arena.as_slice(), &[34, 69, 666]);
 
+        assert_eq!(sparse_arena.get(8), Some(&34));
+        assert_eq!(sparse_arena.get(1), None);
+        assert_eq!(sparse_arena.get(4), Some(&69));
+        assert_eq!(sparse_arena.get(3), None);
+        assert_eq!(sparse_arena.get(6), Some(&666));
+
         sparse_arena.retain(|_, value| *value % 2 == 1);
         assert_eq!(sparse_arena.len(), 1);
         assert_eq!(sparse_arena.as_keys_slice(), &[4]);
         assert_eq!(sparse_arena.as_slice(), &[69]);
+
+        assert_eq!(sparse_arena.get(8), None);
+        assert_eq!(sparse_arena.get(1), None);
+        assert_eq!(sparse_arena.get(4), Some(&69));
+        assert_eq!(sparse_arena.get(3), None);
+        assert_eq!(sparse_arena.get(6), None);
     }
 
     #[test]

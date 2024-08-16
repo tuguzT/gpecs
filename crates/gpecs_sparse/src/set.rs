@@ -583,13 +583,36 @@ where
     where
         F: FnMut(K, &mut V) -> bool,
     {
-        for dense_index in (0..self.len()).rev() {
-            let key = self.dense_keys[dense_index];
-            let value = self.dense_values.index_mut(dense_index);
+        let old_len = self.len();
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
+        let mut last = 0;
+        for curr in 0..old_len {
+            let key = dense_keys[curr];
+            let value = dense_values.index_mut(curr);
             if !f(key, value) {
-                self.remove(key);
+                let sparse_index = key.sparse_index();
+                sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
+                continue;
             }
+
+            dense_keys.swap(curr, last);
+            dense_values.swap(curr, last);
+
+            let sparse_index = key.sparse_index();
+            let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
+            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
+            *dense_index -= curr - last;
+
+            last += 1;
         }
+
+        dense_keys.truncate(last);
+        dense_values.truncate(last);
     }
 
     #[inline]
@@ -2251,10 +2274,22 @@ mod tests {
         assert_eq!(sparse_set.keys().as_slice(), &[8, 4, 6]);
         assert_eq!(sparse_set.values().as_slice(), &[34, 69, 666]);
 
+        assert_eq!(sparse_set.get(8), Some(&34));
+        assert_eq!(sparse_set.get(1), None);
+        assert_eq!(sparse_set.get(4), Some(&69));
+        assert_eq!(sparse_set.get(3), None);
+        assert_eq!(sparse_set.get(6), Some(&666));
+
         sparse_set.retain(|_, value| *value % 2 == 1);
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.keys().as_slice(), &[4]);
         assert_eq!(sparse_set.values().as_slice(), &[69]);
+
+        assert_eq!(sparse_set.get(8), None);
+        assert_eq!(sparse_set.get(1), None);
+        assert_eq!(sparse_set.get(4), Some(&69));
+        assert_eq!(sparse_set.get(3), None);
+        assert_eq!(sparse_set.get(6), None);
     }
 
     #[test]

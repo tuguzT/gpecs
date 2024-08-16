@@ -1324,6 +1324,7 @@ where
 }
 
 impl<'a, K, V> Drain<'a, K, V> {
+    #[inline]
     pub(crate) fn new(keys: vec::Drain<'a, K>, values: vec::Drain<'a, V>) -> Self {
         check_kv_same_len(keys.len(), values.len());
         Self { keys, values }

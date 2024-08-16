@@ -10,7 +10,7 @@ use crate::{
     assert::{
         check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_capacity,
         check_kv_same_len, match_kv_same_kind, unwrap_dense_index_mut, unwrap_dense_value_mut,
-        unwrap_next_vacant, unwrap_next_vacant_mut, unwrap_sparse_item_mut,
+        unwrap_next_vacant, unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
     },
     entry::generate_entry_types,
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
@@ -558,11 +558,13 @@ where
         Ok(key)
     }
 
+    #[inline]
     pub fn swap(&mut self, first_key: K, second_key: K) {
         let mut view_mut = self.as_mut_view();
         view_mut.swap(first_key, second_key)
     }
 
+    #[inline]
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
         let mut view_mut = self.as_mut_view();
         view_mut.swap_keys(first_key, second_key)
@@ -655,6 +657,7 @@ where
         Some((key, value))
     }
 
+    #[inline]
     pub fn invalidate_epoch(&mut self, key: K) -> Option<K> {
         let mut view_mut = self.as_mut_view();
         view_mut.invalidate_epoch(key)
@@ -676,6 +679,7 @@ where
         self.sparse.truncate(sparse_len);
     }
 
+    #[inline]
     pub fn drain(&mut self) -> Drain<'_, K, V> {
         let Self {
             dense_keys,
@@ -864,6 +868,7 @@ where
         Entry::Occupied(entry)
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         let Self {
             dense_keys,
@@ -1124,10 +1129,42 @@ impl<K, V> From<set::EpochSparseSet<K, V>> for EpochSparseArena<K, V>
 where
     K: Key,
 {
+    #[inline]
     fn from(value: set::EpochSparseSet<K, V>) -> Self {
         let (keys, values, sparse) = value.into_parts();
         Self::from_parts(keys, values, sparse)
     }
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn last_vacant_item_failed() -> ! {
+    panic!("list of vacant items should not contain any cycles")
+}
+
+#[track_caller]
+fn last_vacant_item<E>(
+    sparse: &mut [SparseItem<E>],
+    first_vacant: usize,
+) -> Option<&mut SparseItem<E>> {
+    let old_len = sparse.len();
+    if first_vacant >= old_len {
+        return None;
+    }
+
+    let mut last_vacant = first_vacant;
+    for _ in 0..old_len {
+        let last_vacant_item = unwrap_sparse_item_mut(sparse, last_vacant);
+        let next_vacant = unwrap_next_vacant(last_vacant_item.kind_mut());
+        if next_vacant == old_len {
+            // should be `Some(last_vacant_item)`, but the lack of Polonius strikes again
+            return Some(unwrap_sparse_item_mut(sparse, last_vacant));
+        }
+        last_vacant = next_vacant;
+    }
+
+    last_vacant_item_failed()
 }
 
 fn extend_sparse<E>(sparse: &mut Vec<SparseItem<E>>, new_len: usize, sparse_vacant_head: &mut usize)
@@ -1139,16 +1176,9 @@ where
         return;
     }
 
-    if *sparse_vacant_head < old_len {
-        let mut last_vacant = *sparse_vacant_head;
-        loop {
-            let next_vacant = unwrap_next_vacant_mut(sparse[last_vacant].kind_mut());
-            if *next_vacant == old_len {
-                *next_vacant = new_len;
-                break;
-            }
-            last_vacant = *next_vacant;
-        }
+    if let Some(last_vacant_item) = last_vacant_item(sparse, *sparse_vacant_head) {
+        let next_vacant = unwrap_next_vacant_mut(last_vacant_item.kind_mut());
+        *next_vacant = new_len;
     }
 
     let mut next_vacant = if *sparse_vacant_head < old_len {
@@ -1165,7 +1195,10 @@ where
         item
     });
 
-    *sparse_vacant_head = unwrap_next_vacant(sparse.last().unwrap().kind());
+    let last_sparse_item = sparse
+        .last()
+        .expect("sparse should contain at least one item");
+    *sparse_vacant_head = unwrap_next_vacant(last_sparse_item.kind());
 }
 
 fn remove_from_vacant_list<E>(
@@ -1180,7 +1213,7 @@ fn remove_from_vacant_list<E>(
         while next_vacant != sparse_index {
             result = Some(next_vacant);
 
-            let vacant_item = sparse.index(next_vacant);
+            let vacant_item = unwrap_sparse_item(sparse, next_vacant);
             next_vacant = unwrap_next_vacant(vacant_item.kind());
         }
         result
@@ -1188,7 +1221,7 @@ fn remove_from_vacant_list<E>(
 
     let vacant_to_fix = match vacant_to_fix {
         Some(vacant_to_fix) => {
-            let vacant_item = sparse.index_mut(vacant_to_fix);
+            let vacant_item = unwrap_sparse_item_mut(sparse, vacant_to_fix);
             unwrap_next_vacant_mut(vacant_item.kind_mut())
         }
         None => sparse_vacant_head,

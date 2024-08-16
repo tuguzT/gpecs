@@ -455,11 +455,13 @@ where
         Ok(key)
     }
 
+    #[inline]
     pub fn swap(&mut self, first_key: K, second_key: K) {
         let mut view_mut = self.as_mut_view();
         view_mut.swap(first_key, second_key)
     }
 
+    #[inline]
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
         let mut view_mut = self.as_mut_view();
         view_mut.swap_keys(first_key, second_key)
@@ -544,6 +546,7 @@ where
         Some((key, value))
     }
 
+    #[inline]
     pub fn invalidate_epoch(&mut self, key: K) -> Option<K> {
         let mut view_mut = self.as_mut_view();
         view_mut.invalidate_epoch(key)
@@ -565,6 +568,7 @@ where
         self.sparse.truncate(sparse_len);
     }
 
+    #[inline]
     pub fn drain(&mut self) -> Drain<'_, K, V> {
         let Self {
             dense_keys,
@@ -1013,6 +1017,7 @@ impl<K, V> From<arena::EpochSparseArena<K, V>> for EpochSparseSet<K, V>
 where
     K: Key,
 {
+    #[inline]
     fn from(value: arena::EpochSparseArena<K, V>) -> Self {
         let (dense_keys, dense_values, sparse) = value.into_parts();
         Self {

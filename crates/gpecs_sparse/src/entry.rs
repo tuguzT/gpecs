@@ -243,22 +243,27 @@ impl<K, V> EpochSparseContainer<K, V> for EpochSparseSet<K, V>
 where
     K: Key,
 {
+    #[inline]
     fn dense_values(&self) -> &[V] {
         self.as_slice()
     }
 
+    #[inline]
     fn dense_values_mut(&mut self) -> &mut [V] {
         self.as_mut_slice()
     }
 
+    #[inline]
     fn insert(&mut self, key: K, value: V) -> Option<V> {
         EpochSparseSet::insert(self, key, value)
     }
 
+    #[inline]
     fn remove(&mut self, key: K) -> Option<V> {
         EpochSparseSet::remove(self, key)
     }
 
+    #[inline]
     fn swap_remove(&mut self, key: K) -> Option<V> {
         EpochSparseSet::swap_remove(self, key)
     }
@@ -268,22 +273,27 @@ impl<K, V> EpochSparseContainer<K, V> for EpochSparseArena<K, V>
 where
     K: Key,
 {
+    #[inline]
     fn dense_values(&self) -> &[V] {
         self.as_slice()
     }
 
+    #[inline]
     fn dense_values_mut(&mut self) -> &mut [V] {
         self.as_mut_slice()
     }
 
+    #[inline]
     fn insert(&mut self, key: K, value: V) -> Option<V> {
         EpochSparseArena::insert(self, key, value)
     }
 
+    #[inline]
     fn remove(&mut self, key: K) -> Option<V> {
         EpochSparseArena::remove(self, key)
     }
 
+    #[inline]
     fn swap_remove(&mut self, key: K) -> Option<V> {
         EpochSparseArena::swap_remove(self, key)
     }

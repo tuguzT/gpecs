@@ -363,7 +363,8 @@ where
                 let new_len = sparse_index.saturating_add(1);
                 extend_sparse(&mut sparse, new_len, &mut sparse_vacant_head);
             } else {
-                let next_vacant = sparse.get(sparse_index).unwrap().next_vacant().unwrap();
+                let sparse_item = unwrap_sparse_item(sparse.as_slice(), sparse_index);
+                let next_vacant = unwrap_next_vacant(sparse_item.kind());
                 remove_from_vacant_list(
                     &mut sparse,
                     &mut sparse_vacant_head,
@@ -1367,7 +1368,7 @@ mod tests {
     fn empty_insert_one_mutate() {
         let mut sparse_arena = SparseArena::new();
         sparse_arena.insert(0, 42);
-        *sparse_arena.get_mut(0).unwrap() = 43;
+        sparse_arena[0] = 43;
 
         assert_eq!(sparse_arena.len(), 1);
         assert_eq!(sparse_arena.get(0), Some(&43));
@@ -1378,7 +1379,7 @@ mod tests {
     fn with_capacity_insert_one_mutate() {
         let mut sparse_arena = SparseArena::with_capacity(10, 10);
         sparse_arena.insert(0, 42);
-        *sparse_arena.get_mut(0).unwrap() = 43;
+        sparse_arena[0] = 43;
 
         assert_eq!(sparse_arena.len(), 1);
         assert_eq!(sparse_arena.get(0), Some(&43));

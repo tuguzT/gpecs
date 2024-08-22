@@ -576,9 +576,12 @@ where
             sparse,
         } = self;
 
+        for key in dense_keys.iter() {
+            let sparse_index = key.sparse_index();
+            sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
+        }
         let keys = dense_keys.drain(..);
         let values = dense_values.drain(..);
-        sparse.clear();
 
         Drain::new(keys, values)
     }
@@ -777,9 +780,9 @@ where
             sparse,
         } = self;
 
+        sparse.clear();
         dense_keys.clear();
         dense_values.clear();
-        sparse.clear();
     }
 
     #[inline]
@@ -2328,7 +2331,7 @@ mod tests {
 
         forget(drain);
         assert_eq!(sparse_set.len(), 0);
-        assert_eq!(sparse_set.sparse_len(), 0);
+        assert_ne!(sparse_set.sparse_len(), 0);
         assert_eq!(sparse_set.keys().as_slice(), &[]);
         assert_eq!(sparse_set.values().as_slice(), &[]);
     }

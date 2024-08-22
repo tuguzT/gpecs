@@ -689,10 +689,13 @@ where
             sparse_vacant_head,
         } = self;
 
+        for key in dense_keys.iter() {
+            let sparse_index = key.sparse_index();
+            sparse[sparse_index] = SparseItem::vacant(*sparse_vacant_head, key.epoch().next());
+            *sparse_vacant_head = sparse_index;
+        }
         let keys = dense_keys.drain(..);
         let values = dense_values.drain(..);
-        sparse.clear();
-        *sparse_vacant_head = 0;
 
         Drain::new(keys, values)
     }
@@ -896,10 +899,11 @@ where
             sparse_vacant_head,
         } = self;
 
-        dense_keys.clear();
-        dense_values.clear();
         sparse.clear();
         *sparse_vacant_head = 0;
+
+        dense_keys.clear();
+        dense_values.clear();
     }
 
     #[inline]
@@ -2520,7 +2524,7 @@ mod tests {
 
         forget(drain);
         assert_eq!(sparse_arena.len(), 0);
-        assert_eq!(sparse_arena.sparse_len(), 0);
+        assert_ne!(sparse_arena.sparse_len(), 0);
         assert_eq!(sparse_arena.keys().as_slice(), &[]);
         assert_eq!(sparse_arena.values().as_slice(), &[]);
     }

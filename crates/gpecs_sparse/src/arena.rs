@@ -878,6 +878,24 @@ where
             sparse_vacant_head,
         } = self;
 
+        for key in dense_keys.iter() {
+            let sparse_index = key.sparse_index();
+            sparse[sparse_index] = SparseItem::vacant(*sparse_vacant_head, key.epoch().next());
+            *sparse_vacant_head = sparse_index;
+        }
+        dense_keys.clear();
+        dense_values.clear();
+    }
+
+    #[inline]
+    pub fn clear_sparse(&mut self) {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
         dense_keys.clear();
         dense_values.clear();
         sparse.clear();

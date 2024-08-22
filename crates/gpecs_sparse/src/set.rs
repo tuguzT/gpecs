@@ -761,6 +761,22 @@ where
             sparse,
         } = self;
 
+        for key in dense_keys.iter() {
+            let sparse_index = key.sparse_index();
+            sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
+        }
+        dense_keys.clear();
+        dense_values.clear();
+    }
+
+    #[inline]
+    pub fn clear_sparse(&mut self) {
+        let Self {
+            dense_keys,
+            dense_values,
+            sparse,
+        } = self;
+
         dense_keys.clear();
         dense_values.clear();
         sparse.clear();

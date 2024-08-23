@@ -14,9 +14,9 @@ use crate::{
         unwrap_dense_key, unwrap_dense_key_mut, unwrap_sparse_item, unwrap_sparse_items_pair_mut,
         unwrap_value_from_sparse_index,
     },
+    item::SparseItem,
     iter::{Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
-    SparseItem,
 };
 
 pub type SparseView<'a, T> = EpochSparseView<'a, usize, T>;

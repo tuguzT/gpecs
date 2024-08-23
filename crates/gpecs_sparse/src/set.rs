@@ -14,10 +14,10 @@ use crate::{
         unwrap_sparse_item_mut,
     },
     entry::generate_entry_types,
+    item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
     view::{EpochSparseView, EpochSparseViewMut},
-    SparseItem, SparseItemKind,
 };
 
 pub type SparseSet<T> = EpochSparseSet<usize, T>;

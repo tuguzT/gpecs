@@ -1,4 +1,7 @@
-use crate::{algo::get_pair_mut, SparseItem, SparseItemKind};
+use crate::{
+    algo::get_pair_mut,
+    item::{SparseItem, SparseItemKind},
+};
 
 #[cold]
 #[track_caller]

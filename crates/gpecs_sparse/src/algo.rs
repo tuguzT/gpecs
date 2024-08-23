@@ -5,8 +5,8 @@ use crate::{
         check_dense_index_bounds, check_equal_key, unwrap_dense_key, unwrap_dense_value,
         unwrap_dense_value_mut, unwrap_dense_value_pair_mut,
     },
+    item::{SparseItem, SparseItemKind},
     key::Key,
-    SparseItem, SparseItemKind,
 };
 
 pub fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {

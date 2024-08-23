@@ -13,11 +13,11 @@ use crate::{
         unwrap_next_vacant, unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
     },
     entry::generate_entry_types,
+    item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
     set,
     view::{EpochSparseView, EpochSparseViewMut},
-    SparseItem, SparseItemKind,
 };
 
 pub type SparseArena<T> = EpochSparseArena<usize, T>;

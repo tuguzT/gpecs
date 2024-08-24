@@ -1,0 +1,6 @@
+[package]
+name = "gpecs_soa"
+description = "Structure of Arrays (SoA) implementation for (probably) ECS on GPU"
+version = "0.0.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"

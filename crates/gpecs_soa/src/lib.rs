@@ -24,12 +24,29 @@ unsafe fn align_cast_then_advance<T>(ptr: *mut u8, len: usize) -> (*mut T, *mut 
 #[inline]
 fn multi_vec_len_in_bytes<T, U, V>(len: usize) -> usize {
     let start = core::ptr::null_mut();
-    let end = start;
-
     unsafe {
-        let (_, end) = align_cast_then_advance::<T>(end, len);
-        let (_, end) = align_cast_then_advance::<U>(end, len);
-        let (_, end) = align_cast_then_advance::<V>(end, len);
+        let MultiVecPtrs { end, .. } = multi_vec_ptrs::<T, U, V>(start, len);
         end.offset_from(start) as usize
+    }
+}
+
+struct MultiVecPtrs<T, U, V> {
+    t_ptr: *mut T,
+    u_ptr: *mut U,
+    v_ptr: *mut V,
+    end: *mut u8,
+}
+
+#[inline]
+unsafe fn multi_vec_ptrs<T, U, V>(ptr: *mut u8, len: usize) -> MultiVecPtrs<T, U, V> {
+    let (t_ptr, ptr) = align_cast_then_advance(ptr, len);
+    let (u_ptr, ptr) = align_cast_then_advance(ptr, len);
+    let (v_ptr, end) = align_cast_then_advance(ptr, len);
+
+    MultiVecPtrs {
+        t_ptr,
+        u_ptr,
+        v_ptr,
+        end,
     }
 }

@@ -2,7 +2,7 @@ use core::{marker::PhantomData, mem::transmute, ptr::NonNull, slice};
 
 use alloc::vec::Vec;
 
-use crate::align_cast_then_advance;
+use crate::{multi_vec_ptrs, MultiVecPtrs};
 
 #[repr(transparent)]
 pub struct MultiSlice<T, U, V> {
@@ -55,11 +55,14 @@ impl<T, U, V> MultiSlice<T, U, V> {
             let len = self.capacity();
             let ptr = self.as_ptr().cast_mut();
 
-            let (t_ptr, ptr) = align_cast_then_advance(ptr, len);
-            let (u_ptr, ptr) = align_cast_then_advance(ptr, len);
-            let (v_ptr, ptr) = align_cast_then_advance(ptr, len);
+            let MultiVecPtrs {
+                t_ptr,
+                u_ptr,
+                v_ptr,
+                end,
+            } = multi_vec_ptrs::<T, U, V>(ptr, len);
+            debug_assert_eq!(end.cast_const(), self.as_ptr().add(self.vec().capacity()));
 
-            debug_assert_eq!(ptr.cast_const(), self.as_ptr().add(self.vec().capacity()));
             (t_ptr, u_ptr, v_ptr)
         }
     }
@@ -70,11 +73,14 @@ impl<T, U, V> MultiSlice<T, U, V> {
             let len = self.capacity();
             let ptr = self.as_mut_ptr();
 
-            let (t_ptr, ptr) = align_cast_then_advance(ptr, len);
-            let (u_ptr, ptr) = align_cast_then_advance(ptr, len);
-            let (v_ptr, ptr) = align_cast_then_advance(ptr, len);
+            let MultiVecPtrs {
+                t_ptr,
+                u_ptr,
+                v_ptr,
+                end,
+            } = multi_vec_ptrs::<T, U, V>(ptr, len);
+            debug_assert_eq!(end, self.as_mut_ptr().add(self.vec().capacity()));
 
-            debug_assert_eq!(ptr, self.as_mut_ptr().add(self.vec().capacity()));
             (t_ptr, u_ptr, v_ptr)
         }
     }

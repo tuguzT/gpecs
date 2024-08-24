@@ -180,3 +180,21 @@ impl<T, U, V> DerefMut for MultiVec<T, U, V> {
         unsafe { from_raw_parts_mut(inner) }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MultiVec;
+
+    #[test]
+    fn new() {
+        let multi_vec = MultiVec::<u32, u16, u8>::new();
+        assert!(multi_vec.is_empty());
+    }
+
+    #[test]
+    fn with_capacity() {
+        let multi_vec = MultiVec::<u8, u64, u16>::with_capacity(10);
+        assert!(multi_vec.is_empty());
+        assert!(multi_vec.capacity() >= 10);
+    }
+}

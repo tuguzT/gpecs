@@ -221,6 +221,141 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub unsafe fn set_len(&mut self, new_len: usize) {
         self.inner.set_len(new_len);
     }
+
+    pub fn insert(&mut self, index: usize, elements: (T, U, V)) {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed(index: usize, len: usize) -> ! {
+            panic!("insertion index (is {index}) should be <= len (is {len})");
+        }
+
+        let len = self.len();
+        if index > len {
+            assert_failed(index, len);
+        }
+
+        let capacity = self.capacity();
+        if len == capacity {
+            self.reserve(1);
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+            let t_end = t_ptr.add(index);
+            let u_end = u_ptr.add(index);
+            let v_end = v_ptr.add(index);
+
+            if index < len {
+                ptr::copy(t_end, t_end.add(1), len - index);
+                ptr::copy(u_end, u_end.add(1), len - index);
+                ptr::copy(v_end, v_end.add(1), len - index);
+            }
+            ptr::write(t_end, elements.0);
+            ptr::write(u_end, elements.1);
+            ptr::write(v_end, elements.2);
+
+            self.set_len(len + 1);
+        }
+    }
+
+    pub fn push(&mut self, values: (T, U, V)) {
+        let len = self.len();
+        let capacity = self.capacity();
+        if len == capacity {
+            self.reserve(1);
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+            let t_end = t_ptr.add(len);
+            let u_end = u_ptr.add(len);
+            let v_end = v_ptr.add(len);
+
+            ptr::write(t_end, values.0);
+            ptr::write(u_end, values.1);
+            ptr::write(v_end, values.2);
+
+            self.inner.set_len(len + 1);
+        }
+    }
+
+    pub fn swap_remove(&mut self, index: usize) -> (T, U, V) {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed(index: usize, len: usize) -> ! {
+            panic!("swap_remove index (is {index}) should be < len (is {len})");
+        }
+
+        let len = self.len();
+        if index >= len {
+            assert_failed(index, len);
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+            let t_value = ptr::read(t_ptr.add(index));
+            let u_value = ptr::read(u_ptr.add(index));
+            let v_value = ptr::read(v_ptr.add(index));
+
+            ptr::copy(t_ptr.add(len - 1), t_ptr.add(index), 1);
+            ptr::copy(u_ptr.add(len - 1), u_ptr.add(index), 1);
+            ptr::copy(v_ptr.add(len - 1), v_ptr.add(index), 1);
+
+            self.set_len(len - 1);
+            (t_value, u_value, v_value)
+        }
+    }
+
+    pub fn remove(&mut self, index: usize) -> (T, U, V) {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed(index: usize, len: usize) -> ! {
+            panic!("removal index (is {index}) should be < len (is {len})");
+        }
+
+        let len = self.len();
+        if index >= len {
+            assert_failed(index, len);
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+            let t_ptr = t_ptr.add(index);
+            let u_ptr = u_ptr.add(index);
+            let v_ptr = v_ptr.add(index);
+
+            let t_value = ptr::read(t_ptr);
+            let u_value = ptr::read(u_ptr);
+            let v_value = ptr::read(v_ptr);
+
+            ptr::copy(t_ptr.add(1), t_ptr, len - index - 1);
+            ptr::copy(u_ptr.add(1), u_ptr, len - index - 1);
+            ptr::copy(v_ptr.add(1), v_ptr, len - index - 1);
+
+            self.set_len(len - 1);
+            (t_value, u_value, v_value)
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<(T, U, V)> {
+        let len = self.len();
+        if len == 0 {
+            return None;
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+            let t_value = ptr::read(t_ptr.add(len - 1));
+            let u_value = ptr::read(u_ptr.add(len - 1));
+            let v_value = ptr::read(v_ptr.add(len - 1));
+
+            self.set_len(len - 1);
+            Some((t_value, u_value, v_value))
+        }
+    }
 }
 
 impl<T, U, V> Default for MultiVec<T, U, V> {
@@ -253,6 +388,9 @@ mod tests {
     fn new() {
         let multi_vec = MultiVec::<u32, u16, u8>::new();
         assert!(multi_vec.is_empty());
+
+        let slice = multi_vec.as_slice();
+        assert!(slice.is_empty());
     }
 
     #[test]
@@ -260,5 +398,28 @@ mod tests {
         let multi_vec = MultiVec::<u8, u64, u16>::with_capacity(10);
         assert!(multi_vec.is_empty());
         assert!(multi_vec.capacity() >= 10);
+
+        let slice = multi_vec.as_slice();
+        assert!(slice.is_empty());
+        assert!(slice.capacity() >= 10);
+    }
+
+    #[test]
+    fn one_item() {
+        let mut multi_vec = MultiVec::<u8, u32, u16>::new();
+        multi_vec.push((1, 2, 3));
+
+        assert_eq!(multi_vec.len(), 1);
+        assert_eq!(
+            multi_vec.as_slices(),
+            ([1].as_slice(), [2].as_slice(), [3].as_slice()),
+        );
+
+        let slice = multi_vec.as_slice();
+        assert_eq!(slice.len(), 1);
+
+        let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
+        assert_eq!((t, u, v), (1, 2, 3));
+        assert!(multi_vec.is_empty());
     }
 }

@@ -124,9 +124,9 @@ where
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
-pub unsafe fn slice_from_raw_parts<T, U, V>(data: *mut Vec<u8>) -> *mut MultiSlice<T, U, V> {
+pub unsafe fn slice_from_raw_parts<T, U, V>(data: *const Vec<u8>) -> *const MultiSlice<T, U, V> {
     let inner: MultiSliceInner<T, U, V, [(); 0]> = MultiSliceInner {
-        data: NonNull::new_unchecked(data),
+        data: NonNull::new_unchecked(data.cast_mut()),
         phantom: PhantomData,
         dst: [],
     };
@@ -136,12 +136,24 @@ pub unsafe fn slice_from_raw_parts<T, U, V>(data: *mut Vec<u8>) -> *mut MultiSli
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
+pub unsafe fn slice_from_raw_parts_mut<T, U, V>(data: *mut Vec<u8>) -> *mut MultiSlice<T, U, V> {
+    let mut inner: MultiSliceInner<T, U, V, [(); 0]> = MultiSliceInner {
+        data: NonNull::new_unchecked(data),
+        phantom: PhantomData,
+        dst: [],
+    };
+    let inner: *mut MultiSliceInner<T, U, V, [()]> = &mut inner;
+    transmute(inner)
+}
+
+#[allow(clippy::missing_safety_doc)]
+#[inline]
 pub unsafe fn from_raw_parts<'a, T, U, V>(data: *const Vec<u8>) -> &'a MultiSlice<T, U, V> {
-    &*slice_from_raw_parts(data.cast_mut())
+    &*slice_from_raw_parts(data)
 }
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts_mut<'a, T, U, V>(data: *mut Vec<u8>) -> &'a mut MultiSlice<T, U, V> {
-    &mut *slice_from_raw_parts(data)
+    &mut *slice_from_raw_parts_mut(data)
 }

@@ -8,41 +8,26 @@ use core::{
 use crate::{
     multi_vec_len_in_bytes, multi_vec_ptrs,
     slice::{from_raw_parts, from_raw_parts_mut, MultiSlice},
-    MultiVecPtrs,
 };
 
 #[repr(transparent)]
 pub struct MultiVec<T, U, V> {
-    inner: Vec<u8>,
+    bytes: Vec<usize>,
     phantom: PhantomData<(Vec<T>, Vec<U>, Vec<V>)>,
 }
 
 impl<T, U, V> MultiVec<T, U, V> {
-    // const ALIGN: usize = {
-    //     #[inline(always)]
-    //     const fn max(lhs: usize, rhs: usize) -> usize {
-    //         match lhs > rhs {
-    //             true => lhs,
-    //             false => rhs,
-    //         }
-    //     }
-
-    //     let align_of_item = align_of::<(T, U, V)>();
-    //     let align_of_len = align_of::<usize>();
-    //     max(align_of_item, align_of_len)
-    // };
-
     pub const fn new() -> Self {
         Self {
-            inner: Vec::new(),
+            bytes: Vec::new(),
             phantom: PhantomData,
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
-        let capacity = multi_vec_len_in_bytes::<T, U, V>(capacity);
+        let capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(capacity);
         let mut me = Self {
-            inner: Vec::with_capacity(capacity),
+            bytes: Vec::with_capacity(capacity_in_bytes / size_of::<usize>() + 1),
             phantom: PhantomData,
         };
 
@@ -57,26 +42,23 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     fn set_len_in_data(&mut self, new_len: usize) {
-        let ptr = self.as_mut_ptr();
-        let len = self.capacity();
-
         unsafe {
-            let MultiVecPtrs { start, .. } = multi_vec_ptrs::<T, U, V>(ptr, len);
-            *start = new_len;
+            let len = self.as_mut_ptr().cast();
+            *len = new_len;
         }
     }
 
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn from_raw_parts(ptr: *mut u8, length: usize, capacity: usize) -> Self {
-        let capacity = multi_vec_len_in_bytes::<T, U, V>(capacity);
+    pub unsafe fn from_raw_parts(ptr: *mut usize, length: usize, capacity: usize) -> Self {
+        let capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(capacity);
         Self {
-            inner: Vec::from_raw_parts(ptr, length, capacity),
+            bytes: Vec::from_raw_parts(ptr, length, capacity_in_bytes / size_of::<usize>() + 1),
             phantom: PhantomData,
         }
     }
 
     pub fn len(&self) -> usize {
-        self.inner.len()
+        self.bytes.len()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -85,7 +67,7 @@ impl<T, U, V> MultiVec<T, U, V> {
 
     #[inline]
     pub fn capacity_in_bytes(&self) -> usize {
-        self.inner.capacity()
+        self.bytes.capacity() * size_of::<usize>()
     }
 
     pub fn capacity(&self) -> usize {
@@ -103,8 +85,13 @@ impl<T, U, V> MultiVec<T, U, V> {
         }
 
         unsafe {
-            let old_ptrs = multi_vec_ptrs::<T, U, V>(self.as_mut_ptr(), old_capacity);
-            let new_ptrs = multi_vec_ptrs::<T, U, V>(self.as_mut_ptr(), new_capacity);
+            let ptr = self.as_mut_ptr().cast();
+
+            let old_len = old_capacity * size_of::<usize>();
+            let old_ptrs = multi_vec_ptrs::<T, U, V>(ptr, old_len);
+
+            let new_len = new_capacity * size_of::<usize>();
+            let new_ptrs = multi_vec_ptrs::<T, U, V>(ptr, new_len);
 
             ptr::copy(old_ptrs.v_ptr, new_ptrs.v_ptr, self.len());
             ptr::copy(old_ptrs.u_ptr, new_ptrs.u_ptr, self.len());
@@ -119,8 +106,13 @@ impl<T, U, V> MultiVec<T, U, V> {
         }
 
         unsafe {
-            let old_ptrs = multi_vec_ptrs::<T, U, V>(self.as_mut_ptr(), old_capacity);
-            let new_ptrs = multi_vec_ptrs::<T, U, V>(self.as_mut_ptr(), new_capacity);
+            let ptr = self.as_mut_ptr().cast();
+
+            let old_len = old_capacity * size_of::<usize>();
+            let old_ptrs = multi_vec_ptrs::<T, U, V>(ptr, old_len);
+
+            let new_len = new_capacity * size_of::<usize>();
+            let new_ptrs = multi_vec_ptrs::<T, U, V>(ptr, new_len);
 
             ptr::copy(old_ptrs.t_ptr, new_ptrs.t_ptr, self.len());
             ptr::copy(old_ptrs.u_ptr, new_ptrs.u_ptr, self.len());
@@ -131,42 +123,51 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub fn reserve(&mut self, additional: usize) {
         let old_capacity = self.capacity();
         if old_capacity == 0 {
-            let additional = multi_vec_len_in_bytes::<T, U, V>(additional);
-            self.inner.reserve(additional);
+            let additional_in_bytes = multi_vec_len_in_bytes::<T, U, V>(additional);
+            let additional = additional_in_bytes / size_of::<usize>() + 1;
+            self.bytes.reserve(additional);
             self.set_len_in_data(0);
             return;
         }
 
-        let additional = additional * (size_of::<T>() + size_of::<U>() + size_of::<V>());
-        self.inner.reserve(additional);
+        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
+        let additional_in_bytes = additional * size_of_all;
+        let additional = additional_in_bytes / size_of::<usize>() + 1;
+        self.bytes.reserve(additional);
         self.move_right(old_capacity);
     }
 
     pub fn reserve_exact(&mut self, additional: usize) {
         let old_capacity = self.capacity();
         if old_capacity == 0 {
-            let additional = multi_vec_len_in_bytes::<T, U, V>(additional);
-            self.inner.reserve_exact(additional);
+            let additional_in_bytes = multi_vec_len_in_bytes::<T, U, V>(additional);
+            let additional = additional_in_bytes / size_of::<usize>() + 1;
+            self.bytes.reserve_exact(additional);
             self.set_len_in_data(0);
             return;
         }
 
-        let additional = additional * (size_of::<T>() + size_of::<U>() + size_of::<V>());
-        self.inner.reserve_exact(additional);
+        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
+        let additional_in_bytes = additional * size_of_all;
+        let additional = additional_in_bytes / size_of::<usize>() + 1;
+        self.bytes.reserve_exact(additional);
         self.move_right(old_capacity);
     }
 
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let old_capacity = self.capacity();
         if old_capacity == 0 {
-            let additional = multi_vec_len_in_bytes::<T, U, V>(additional);
-            self.inner.try_reserve(additional)?;
+            let additional_in_bytes = multi_vec_len_in_bytes::<T, U, V>(additional);
+            let additional = additional_in_bytes / size_of::<usize>() + 1;
+            self.bytes.try_reserve(additional)?;
             self.set_len_in_data(0);
             return Ok(());
         }
 
-        let additional = additional * (size_of::<T>() + size_of::<U>() + size_of::<V>());
-        self.inner.try_reserve(additional)?;
+        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
+        let additional_in_bytes = additional * size_of_all;
+        let additional = additional_in_bytes / size_of::<usize>() + 1;
+        self.bytes.try_reserve(additional)?;
         self.move_right(old_capacity);
         Ok(())
     }
@@ -174,14 +175,17 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let old_capacity = self.capacity();
         if old_capacity == 0 {
-            let additional = multi_vec_len_in_bytes::<T, U, V>(additional);
-            self.inner.try_reserve_exact(additional)?;
+            let additional_in_bytes = multi_vec_len_in_bytes::<T, U, V>(additional);
+            let additional = additional_in_bytes / size_of::<usize>() + 1;
+            self.bytes.try_reserve_exact(additional)?;
             self.set_len_in_data(0);
             return Ok(());
         }
 
-        let additional = additional * (size_of::<T>() + size_of::<U>() + size_of::<V>());
-        self.inner.try_reserve_exact(additional)?;
+        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
+        let additional_in_bytes = additional * size_of_all;
+        let additional = additional_in_bytes / size_of::<usize>() + 1;
+        self.bytes.try_reserve_exact(additional)?;
         self.move_right(old_capacity);
         Ok(())
     }
@@ -192,13 +196,15 @@ impl<T, U, V> MultiVec<T, U, V> {
         }
 
         let len = self.len();
-        let new_byte_capacity = multi_vec_len_in_bytes::<T, U, V>(len);
         self.move_left(len);
 
         unsafe {
-            self.inner.set_len(new_byte_capacity);
-            self.inner.shrink_to_fit();
-            self.inner.set_len(len);
+            let new_capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(len);
+            let new_capacity = new_capacity_in_bytes / size_of::<usize>() + 1;
+            self.bytes.set_len(new_capacity);
+
+            self.bytes.shrink_to_fit();
+            self.bytes.set_len(len);
         }
     }
 
@@ -208,13 +214,15 @@ impl<T, U, V> MultiVec<T, U, V> {
         }
 
         let len = self.len();
-        let new_byte_capacity = multi_vec_len_in_bytes::<T, U, V>(min_capacity);
         self.move_left(min_capacity);
 
         unsafe {
-            self.inner.set_len(new_byte_capacity);
-            self.inner.shrink_to_fit();
-            self.inner.set_len(len);
+            let new_capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(min_capacity);
+            let new_capacity = new_capacity_in_bytes / size_of::<usize>() + 1;
+            self.bytes.set_len(new_capacity);
+
+            self.bytes.shrink_to_fit();
+            self.bytes.set_len(len);
         }
     }
 
@@ -248,17 +256,17 @@ impl<T, U, V> MultiVec<T, U, V> {
         self
     }
 
-    pub fn as_ptr(&self) -> *const u8 {
-        self.inner.as_ptr()
+    pub fn as_ptr(&self) -> *const usize {
+        self.bytes.as_ptr()
     }
 
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.inner.as_mut_ptr()
+    pub fn as_mut_ptr(&mut self) -> *mut usize {
+        self.bytes.as_mut_ptr()
     }
 
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn set_len(&mut self, new_len: usize) {
-        self.inner.set_len(new_len);
+        self.bytes.set_len(new_len);
         self.set_len_in_data(new_len);
     }
 
@@ -408,16 +416,16 @@ impl<T, U, V> Deref for MultiVec<T, U, V> {
     type Target = MultiSlice<T, U, V>;
 
     fn deref(&self) -> &Self::Target {
-        let capacity = self.capacity_in_bytes();
         let data = self.as_ptr();
+        let capacity = self.capacity();
         unsafe { from_raw_parts(data, capacity) }
     }
 }
 
 impl<T, U, V> DerefMut for MultiVec<T, U, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let capacity = self.capacity_in_bytes();
         let data = self.as_mut_ptr();
+        let capacity = self.capacity();
         unsafe { from_raw_parts_mut(data, capacity) }
     }
 }
@@ -447,11 +455,11 @@ mod tests {
     fn with_capacity() {
         let multi_vec = MultiVec::<u8, u64, u16>::with_capacity(10);
         assert!(multi_vec.is_empty());
-        assert!(dbg!(multi_vec.capacity()) >= 10);
+        assert!(multi_vec.capacity() >= 10);
 
         let slice = multi_vec.as_slice();
         assert!(slice.is_empty());
-        assert!(dbg!(slice.capacity()) >= 10);
+        assert!(slice.capacity() >= 10);
     }
 
     #[test]

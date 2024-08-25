@@ -8,6 +8,7 @@ use core::{
 use crate::{
     multi_vec_len_in_bytes, multi_vec_ptrs,
     slice::{from_raw_parts, from_raw_parts_mut, MultiSlice},
+    MultiVecPtrs,
 };
 
 #[repr(transparent)]
@@ -17,6 +18,20 @@ pub struct MultiVec<T, U, V> {
 }
 
 impl<T, U, V> MultiVec<T, U, V> {
+    // const ALIGN: usize = {
+    //     #[inline(always)]
+    //     const fn max(lhs: usize, rhs: usize) -> usize {
+    //         match lhs > rhs {
+    //             true => lhs,
+    //             false => rhs,
+    //         }
+    //     }
+
+    //     let align_of_item = align_of::<(T, U, V)>();
+    //     let align_of_len = align_of::<usize>();
+    //     max(align_of_item, align_of_len)
+    // };
+
     pub const fn new() -> Self {
         Self {
             inner: Vec::new(),
@@ -26,16 +41,29 @@ impl<T, U, V> MultiVec<T, U, V> {
 
     pub fn with_capacity(capacity: usize) -> Self {
         let capacity = multi_vec_len_in_bytes::<T, U, V>(capacity);
-        Self {
+        let mut me = Self {
             inner: Vec::with_capacity(capacity),
             phantom: PhantomData,
-        }
+        };
+
+        me.set_len_in_data(0);
+        me
     }
 
     pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
         let mut me = Self::new();
         me.try_reserve(capacity)?;
         Ok(me)
+    }
+
+    fn set_len_in_data(&mut self, new_len: usize) {
+        let ptr = self.as_mut_ptr();
+        let len = self.capacity();
+
+        unsafe {
+            let MultiVecPtrs { start, .. } = multi_vec_ptrs::<T, U, V>(ptr, len);
+            *start = new_len;
+        }
     }
 
     #[allow(clippy::missing_safety_doc)]
@@ -55,10 +83,15 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.len() == 0
     }
 
+    #[inline]
+    pub fn capacity_in_bytes(&self) -> usize {
+        self.inner.capacity()
+    }
+
     pub fn capacity(&self) -> usize {
         let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-        self.inner
-            .capacity()
+        self.capacity_in_bytes()
+            .saturating_sub(size_of::<usize>())
             .checked_div(size_of_all)
             .unwrap_or(usize::MAX)
     }
@@ -100,6 +133,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         if old_capacity == 0 {
             let additional = multi_vec_len_in_bytes::<T, U, V>(additional);
             self.inner.reserve(additional);
+            self.set_len_in_data(0);
             return;
         }
 
@@ -113,6 +147,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         if old_capacity == 0 {
             let additional = multi_vec_len_in_bytes::<T, U, V>(additional);
             self.inner.reserve_exact(additional);
+            self.set_len_in_data(0);
             return;
         }
 
@@ -125,7 +160,9 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_capacity = self.capacity();
         if old_capacity == 0 {
             let additional = multi_vec_len_in_bytes::<T, U, V>(additional);
-            return self.inner.try_reserve(additional);
+            self.inner.try_reserve(additional)?;
+            self.set_len_in_data(0);
+            return Ok(());
         }
 
         let additional = additional * (size_of::<T>() + size_of::<U>() + size_of::<V>());
@@ -138,7 +175,9 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_capacity = self.capacity();
         if old_capacity == 0 {
             let additional = multi_vec_len_in_bytes::<T, U, V>(additional);
-            return self.inner.try_reserve_exact(additional);
+            self.inner.try_reserve_exact(additional)?;
+            self.set_len_in_data(0);
+            return Ok(());
         }
 
         let additional = additional * (size_of::<T>() + size_of::<U>() + size_of::<V>());
@@ -193,7 +232,7 @@ impl<T, U, V> MultiVec<T, U, V> {
             let u_slice = ptr::slice_from_raw_parts_mut(u_ptr.add(new_len), remaining_len);
             let v_slice = ptr::slice_from_raw_parts_mut(v_ptr.add(new_len), remaining_len);
 
-            self.inner.set_len(new_len);
+            self.set_len(new_len);
 
             ptr::drop_in_place(t_slice);
             ptr::drop_in_place(u_slice);
@@ -220,6 +259,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         self.inner.set_len(new_len);
+        self.set_len_in_data(new_len);
     }
 
     pub fn insert(&mut self, index: usize, elements: (T, U, V)) {
@@ -276,7 +316,7 @@ impl<T, U, V> MultiVec<T, U, V> {
             ptr::write(u_end, values.1);
             ptr::write(v_end, values.2);
 
-            self.inner.set_len(len + 1);
+            self.set_len(len + 1);
         }
     }
 
@@ -368,15 +408,17 @@ impl<T, U, V> Deref for MultiVec<T, U, V> {
     type Target = MultiSlice<T, U, V>;
 
     fn deref(&self) -> &Self::Target {
-        let Self { inner, .. } = self;
-        unsafe { from_raw_parts(inner) }
+        let capacity = self.capacity_in_bytes();
+        let data = self.as_ptr();
+        unsafe { from_raw_parts(data, capacity) }
     }
 }
 
 impl<T, U, V> DerefMut for MultiVec<T, U, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let Self { inner, .. } = self;
-        unsafe { from_raw_parts_mut(inner) }
+        let capacity = self.capacity_in_bytes();
+        let data = self.as_mut_ptr();
+        unsafe { from_raw_parts_mut(data, capacity) }
     }
 }
 
@@ -385,38 +427,45 @@ mod tests {
     use super::MultiVec;
 
     #[test]
+    fn check_null_opt() {
+        type MultiVec = super::MultiVec<u32, u16, u8>;
+        assert_eq!(size_of::<Option<MultiVec>>(), size_of::<MultiVec>());
+    }
+
+    #[test]
     fn new() {
         let multi_vec = MultiVec::<u32, u16, u8>::new();
         assert!(multi_vec.is_empty());
+        assert_eq!(multi_vec.capacity(), 0);
 
         let slice = multi_vec.as_slice();
         assert!(slice.is_empty());
+        assert_eq!(slice.capacity(), 0);
     }
 
     #[test]
     fn with_capacity() {
         let multi_vec = MultiVec::<u8, u64, u16>::with_capacity(10);
         assert!(multi_vec.is_empty());
-        assert!(multi_vec.capacity() >= 10);
+        assert!(dbg!(multi_vec.capacity()) >= 10);
 
         let slice = multi_vec.as_slice();
         assert!(slice.is_empty());
-        assert!(slice.capacity() >= 10);
+        assert!(dbg!(slice.capacity()) >= 10);
     }
 
     #[test]
     fn one_item() {
         let mut multi_vec = MultiVec::<u8, u32, u16>::new();
         multi_vec.push((1, 2, 3));
-
         assert_eq!(multi_vec.len(), 1);
-        assert_eq!(
-            multi_vec.as_slices(),
-            ([1].as_slice(), [2].as_slice(), [3].as_slice()),
-        );
 
         let slice = multi_vec.as_slice();
         assert_eq!(slice.len(), 1);
+        assert_eq!(
+            slice.as_slices(),
+            ([1].as_slice(), [2].as_slice(), [3].as_slice()),
+        );
 
         let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
         assert_eq!((t, u, v), (1, 2, 3));

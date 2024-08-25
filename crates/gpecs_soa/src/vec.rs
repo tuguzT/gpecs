@@ -1,5 +1,6 @@
 use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
+    fmt::{self, Debug},
     marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -42,13 +43,6 @@ impl<T, U, V> MultiVec<T, U, V> {
         Ok(me)
     }
 
-    fn set_len_in_data(&mut self, new_len: usize) {
-        unsafe {
-            let len = self.as_mut_ptr().cast();
-            *len = new_len;
-        }
-    }
-
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn from_raw_parts(ptr: *mut usize, length: usize, capacity: usize) -> Self {
         let capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(capacity);
@@ -72,7 +66,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     #[inline]
-    fn capacity_in_bytes(&self) -> usize {
+    pub fn capacity_in_bytes(&self) -> usize {
         self.bytes.capacity() * size_of::<usize>()
     }
 
@@ -287,6 +281,17 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.set_len_in_data(new_len);
     }
 
+    fn set_len_in_data(&mut self, new_len: usize) {
+        if self.capacity_in_bytes() == 0 {
+            return;
+        }
+
+        unsafe {
+            let len = self.as_mut_ptr().cast();
+            *len = new_len;
+        }
+    }
+
     pub fn insert(&mut self, index: usize, elements: (T, U, V)) {
         #[cold]
         #[inline(never)]
@@ -423,6 +428,22 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 }
 
+impl<T, U, V> Debug for MultiVec<T, U, V>
+where
+    T: Debug,
+    U: Debug,
+    V: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (t_slice, u_slice, v_slice) = self.as_slices();
+        f.debug_struct("MultiVec")
+            .field("t_slice", &t_slice)
+            .field("u_slice", &u_slice)
+            .field("v_slice", &v_slice)
+            .finish()
+    }
+}
+
 impl<T, U, V> Default for MultiVec<T, U, V> {
     fn default() -> Self {
         Self::new()
@@ -444,6 +465,27 @@ impl<T, U, V> DerefMut for MultiVec<T, U, V> {
         let data = self.as_mut_ptr();
         let capacity = self.capacity();
         unsafe { from_raw_parts_mut(data, capacity) }
+    }
+}
+
+impl<T, U, V> Drop for MultiVec<T, U, V> {
+    fn drop(&mut self) {
+        if self.is_empty() {
+            return;
+        }
+
+        let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+        let len = self.len();
+
+        let t_ptr = ptr::slice_from_raw_parts_mut(t_ptr, len);
+        let u_ptr = ptr::slice_from_raw_parts_mut(u_ptr, len);
+        let v_ptr = ptr::slice_from_raw_parts_mut(v_ptr, len);
+
+        unsafe {
+            ptr::drop_in_place(t_ptr);
+            ptr::drop_in_place(u_ptr);
+            ptr::drop_in_place(v_ptr);
+        }
     }
 }
 

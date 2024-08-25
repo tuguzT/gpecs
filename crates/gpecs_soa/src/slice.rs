@@ -9,16 +9,11 @@ use crate::ptr::{multi_vec_ptrs, slice_from_raw_parts, slice_from_raw_parts_mut,
 
 #[repr(transparent)]
 pub struct MultiSlice<T, U, V> {
-    phantom: PhantomData<(NonNull<T>, NonNull<U>, NonNull<V>)>,
+    phantom: PhantomData<(T, U, V)>,
     data: [usize],
 }
 
 impl<T, U, V> MultiSlice<T, U, V> {
-    #[inline]
-    const fn capacity_in_bytes(&self) -> usize {
-        self.data.len() * size_of::<usize>()
-    }
-
     #[inline]
     pub const fn len(&self) -> usize {
         match self.capacity_in_bytes() {
@@ -30,6 +25,11 @@ impl<T, U, V> MultiSlice<T, U, V> {
     #[inline]
     pub const fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    #[inline]
+    pub const fn capacity_in_bytes(&self) -> usize {
+        self.data.len() * size_of::<usize>()
     }
 
     #[inline]
@@ -134,7 +134,6 @@ where
             .field("t_slice", &t_slice)
             .field("u_slice", &u_slice)
             .field("v_slice", &v_slice)
-            .field("capacity", &self.capacity())
             .finish()
     }
 }
@@ -150,6 +149,27 @@ impl<T, U, V> Default for &mut MultiSlice<T, U, V> {
     fn default() -> Self {
         let data = NonNull::dangling().as_ptr();
         unsafe { from_raw_parts_mut(data, 0) }
+    }
+}
+
+impl<T, U, V> Drop for MultiSlice<T, U, V> {
+    fn drop(&mut self) {
+        if self.is_empty() {
+            return;
+        }
+
+        let (t_data, u_data, v_data) = self.as_mut_ptrs();
+        let len = self.len();
+
+        unsafe {
+            let t_slice = ptr::slice_from_raw_parts_mut(t_data, len);
+            let u_slice = ptr::slice_from_raw_parts_mut(u_data, len);
+            let v_slice = ptr::slice_from_raw_parts_mut(v_data, len);
+
+            ptr::drop_in_place(t_slice);
+            ptr::drop_in_place(u_slice);
+            ptr::drop_in_place(v_slice);
+        }
     }
 }
 

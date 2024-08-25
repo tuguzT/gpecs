@@ -64,11 +64,11 @@ pub(crate) const fn multi_vec_len_in_bytes<T, U, V>(len: usize) -> usize {
 }
 
 pub(crate) struct MultiVecPtrs<T, U, V> {
-    pub(crate) start: *mut usize,
-    pub(crate) t_ptr: *mut T,
-    pub(crate) u_ptr: *mut U,
-    pub(crate) v_ptr: *mut V,
-    pub(crate) end: *mut u8,
+    pub start: *mut usize,
+    pub t_ptr: *mut T,
+    pub u_ptr: *mut U,
+    pub v_ptr: *mut V,
+    pub end: *mut u8,
 }
 
 #[inline]

@@ -1,12 +1,13 @@
-use alloc::{collections::TryReserveError, vec::Vec};
+use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
     marker::PhantomData,
+    mem::ManuallyDrop,
     ops::{Deref, DerefMut},
     ptr,
 };
 
 use crate::{
-    ptr::{multi_vec_len_in_bytes, multi_vec_ptrs},
+    ptr::{multi_vec_len_in_bytes, multi_vec_ptrs, slice_from_raw_parts_mut},
     slice::{from_raw_parts, from_raw_parts_mut, MultiSlice},
 };
 
@@ -55,6 +56,11 @@ impl<T, U, V> MultiVec<T, U, V> {
             bytes: Vec::from_raw_parts(ptr, length, capacity_in_bytes / size_of::<usize>() + 1),
             phantom: PhantomData,
         }
+    }
+
+    pub fn into_raw_parts(self) -> (*mut usize, usize, usize) {
+        let mut me = ManuallyDrop::new(self);
+        (me.as_mut_ptr(), me.len(), me.capacity())
     }
 
     pub fn len(&self) -> usize {
@@ -223,6 +229,17 @@ impl<T, U, V> MultiVec<T, U, V> {
 
             self.bytes.shrink_to_fit();
             self.bytes.set_len(len);
+        }
+    }
+
+    pub fn into_boxed_slice(self) -> Box<MultiSlice<T, U, V>> {
+        let mut me = ManuallyDrop::new(self);
+        let data = me.as_mut_ptr();
+        let capacity = me.capacity();
+
+        unsafe {
+            let raw = slice_from_raw_parts_mut(data, capacity);
+            Box::from_raw(raw)
         }
     }
 
@@ -449,6 +466,10 @@ mod tests {
         let slice = multi_vec.as_slice();
         assert!(slice.is_empty());
         assert_eq!(slice.capacity(), 0);
+
+        let boxed_slice = multi_vec.into_boxed_slice();
+        assert!(boxed_slice.is_empty());
+        assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]
@@ -460,6 +481,10 @@ mod tests {
         let slice = multi_vec.as_slice();
         assert!(slice.is_empty());
         assert!(slice.capacity() >= 10);
+
+        let boxed_slice = multi_vec.into_boxed_slice();
+        assert!(boxed_slice.is_empty());
+        assert!(boxed_slice.capacity() >= 10);
     }
 
     #[test]
@@ -467,9 +492,11 @@ mod tests {
         let mut multi_vec = MultiVec::<u8, u32, u16>::new();
         multi_vec.push((1, 2, 3));
         assert_eq!(multi_vec.len(), 1);
+        assert!(multi_vec.capacity() >= 1);
 
         let slice = multi_vec.as_slice();
         assert_eq!(slice.len(), 1);
+        assert!(slice.capacity() >= 1);
         assert_eq!(
             slice.as_slices(),
             ([1].as_slice(), [2].as_slice(), [3].as_slice()),
@@ -478,5 +505,10 @@ mod tests {
         let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
         assert_eq!((t, u, v), (1, 2, 3));
         assert!(multi_vec.is_empty());
+        assert!(multi_vec.capacity() >= 1);
+
+        let boxed_slice = multi_vec.into_boxed_slice();
+        assert!(boxed_slice.is_empty());
+        assert!(boxed_slice.capacity() >= 1);
     }
 }

@@ -66,7 +66,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     #[inline]
-    pub fn capacity_in_bytes(&self) -> usize {
+    fn capacity_in_bytes(&self) -> usize {
         self.bytes.capacity() * size_of::<usize>()
     }
 

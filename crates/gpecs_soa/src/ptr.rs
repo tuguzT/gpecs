@@ -8,12 +8,11 @@ pub fn slice_from_raw_parts<T, U, V>(
     data: *const usize,
     capacity: usize,
 ) -> *const MultiSlice<T, U, V> {
-    let (data, len) = match capacity {
-        0 => ([0].as_ptr(), 0),
+    let len = match capacity {
+        0 => 0,
         _ => {
             let capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(capacity);
-            let len = capacity_in_bytes.saturating_sub(size_of::<usize>()) / size_of::<usize>();
-            (data, len)
+            capacity_in_bytes / size_of::<usize>() + 1
         }
     };
     ptr::slice_from_raw_parts(data, len) as *const _
@@ -25,15 +24,14 @@ pub fn slice_from_raw_parts_mut<T, U, V>(
     data: *mut usize,
     capacity: usize,
 ) -> *mut MultiSlice<T, U, V> {
-    let (data, len) = match capacity {
-        0 => ([0].as_mut_ptr(), 0),
+    let len = match capacity {
+        0 => 0,
         _ => {
             let capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(capacity);
-            let len = capacity_in_bytes.saturating_sub(size_of::<usize>()) / size_of::<usize>();
-            (data, len)
+            capacity_in_bytes / size_of::<usize>() + 1
         }
     };
-    ptr::slice_from_raw_parts(data, len) as *mut _
+    ptr::slice_from_raw_parts_mut(data, len) as *mut _
 }
 
 #[inline(always)]

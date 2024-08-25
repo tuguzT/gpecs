@@ -9,7 +9,7 @@ extern crate alloc;
 pub mod slice;
 pub mod vec;
 
-#[inline]
+#[inline(always)]
 unsafe fn align_cast_then_advance<T>(ptr: *mut u8, len: usize) -> (*mut T, *mut u8) {
     let offset = ptr.align_offset(align_of::<T>());
     let ptr = ptr.add(offset);
@@ -21,13 +21,21 @@ unsafe fn align_cast_then_advance<T>(ptr: *mut u8, len: usize) -> (*mut T, *mut 
     (t_ptr, ptr)
 }
 
+#[inline(always)]
+const fn align_up<T>(addr: usize) -> usize {
+    let align = align_of::<T>();
+    (addr + align - 1) & !(align - 1)
+}
+
 #[inline]
-fn multi_vec_len_in_bytes<T, U, V>(len: usize) -> usize {
-    let ptr = core::ptr::null_mut();
-    unsafe {
-        let MultiVecPtrs { start, end, .. } = multi_vec_ptrs::<T, U, V>(ptr, len);
-        end.offset_from(start.cast()) as usize
-    }
+const fn multi_vec_len_in_bytes<T, U, V>(len: usize) -> usize {
+    let mut len_in_bytes = size_of::<usize>();
+
+    len_in_bytes = align_up::<T>(len_in_bytes) + (len * size_of::<T>());
+    len_in_bytes = align_up::<U>(len_in_bytes) + (len * size_of::<U>());
+    len_in_bytes = align_up::<V>(len_in_bytes) + (len * size_of::<V>());
+
+    len_in_bytes
 }
 
 struct MultiVecPtrs<T, U, V> {

@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    multi_vec_len_in_bytes, multi_vec_ptrs,
+    ptr::{multi_vec_len_in_bytes, multi_vec_ptrs},
     slice::{from_raw_parts, from_raw_parts_mut, MultiSlice},
 };
 

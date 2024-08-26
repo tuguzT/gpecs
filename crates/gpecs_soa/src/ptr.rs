@@ -63,20 +63,28 @@ pub(crate) const fn multi_vec_buffer_len<T, U, V>(len: usize) -> usize {
     align_up::<usize>(len_in_bytes) / size_of::<usize>()
 }
 
+#[inline]
+pub(crate) const fn multi_vec_len<T, U, V>(buffer_len: usize) -> usize {
+    let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
+    let len_in_bytes = buffer_len.saturating_sub(1) * size_of::<usize>();
+    len_in_bytes / size_of_all
+}
+
 pub(crate) struct MultiVecPtrs<T, U, V> {
     pub start: *mut usize,
     pub t_ptr: *mut T,
     pub u_ptr: *mut U,
     pub v_ptr: *mut V,
-    pub end: *mut u8,
+    pub end: *mut usize,
 }
 
 #[inline]
-pub(crate) unsafe fn multi_vec_ptrs<T, U, V>(ptr: *mut u8, len: usize) -> MultiVecPtrs<T, U, V> {
-    let (start, ptr) = align_cast_then_advance(ptr, 1);
+pub(crate) unsafe fn multi_vec_ptrs<T, U, V>(ptr: *mut usize, len: usize) -> MultiVecPtrs<T, U, V> {
+    let (start, ptr) = align_cast_then_advance(ptr.cast(), 1);
     let (t_ptr, ptr) = align_cast_then_advance(ptr, len);
     let (u_ptr, ptr) = align_cast_then_advance(ptr, len);
-    let (v_ptr, end) = align_cast_then_advance(ptr, len);
+    let (v_ptr, ptr) = align_cast_then_advance(ptr, len);
+    let end = ptr_align_up::<usize>(ptr).cast();
 
     MultiVecPtrs {
         start,

@@ -5,7 +5,9 @@ use core::{
     slice,
 };
 
-use crate::ptr::{multi_vec_ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, MultiVecPtrs};
+use crate::ptr::{
+    multi_vec_len, multi_vec_ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, MultiVecPtrs,
+};
 
 #[repr(transparent)]
 pub struct MultiSlice<T, U, V> {
@@ -16,9 +18,9 @@ pub struct MultiSlice<T, U, V> {
 impl<T, U, V> MultiSlice<T, U, V> {
     #[inline]
     pub const fn len(&self) -> usize {
-        match self.capacity_in_bytes() {
+        match self.capacity() {
             0 => 0,
-            _ => unsafe { ptr::read(self.as_ptr().cast()) },
+            _ => unsafe { ptr::read(self.as_ptr()) },
         }
     }
 
@@ -28,21 +30,9 @@ impl<T, U, V> MultiSlice<T, U, V> {
     }
 
     #[inline]
-    pub const fn capacity_in_bytes(&self) -> usize {
-        self.buffer.len() * size_of::<usize>()
-    }
-
-    #[inline]
     pub const fn capacity(&self) -> usize {
-        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-        match self
-            .capacity_in_bytes()
-            .saturating_sub(size_of::<usize>())
-            .checked_div(size_of_all)
-        {
-            Some(capacity) => capacity,
-            None => usize::MAX,
-        }
+        let buffer_len = self.buffer.len();
+        multi_vec_len::<T, U, V>(buffer_len)
     }
 
     #[inline]
@@ -57,19 +47,18 @@ impl<T, U, V> MultiSlice<T, U, V> {
 
     #[inline]
     pub fn as_ptrs(&self) -> (*const T, *const U, *const V) {
-        unsafe {
-            let len_in_bytes = self.capacity() * size_of::<T>();
-            let ptr = self.as_ptr().cast_mut().cast();
+        let ptr = self.as_ptr().cast_mut();
 
+        unsafe {
             let MultiVecPtrs {
                 start,
                 t_ptr,
                 u_ptr,
                 v_ptr,
                 end,
-            } = multi_vec_ptrs::<T, U, V>(ptr, len_in_bytes);
-            debug_assert_eq!(ptr, start.cast());
-            debug_assert!(end.offset_from(ptr) as usize <= self.capacity_in_bytes());
+            } = multi_vec_ptrs::<T, U, V>(ptr, self.capacity());
+            debug_assert_eq!(ptr, start);
+            debug_assert_eq!(end.offset_from(start) as usize, self.buffer.len());
 
             (t_ptr, u_ptr, v_ptr)
         }
@@ -77,19 +66,18 @@ impl<T, U, V> MultiSlice<T, U, V> {
 
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> (*mut T, *mut U, *mut V) {
-        unsafe {
-            let len_in_bytes = self.capacity() * size_of::<T>();
-            let ptr = self.as_mut_ptr().cast();
+        let ptr = self.as_mut_ptr();
 
+        unsafe {
             let MultiVecPtrs {
                 start,
                 t_ptr,
                 u_ptr,
                 v_ptr,
                 end,
-            } = multi_vec_ptrs::<T, U, V>(ptr, len_in_bytes);
-            debug_assert_eq!(ptr, start.cast());
-            debug_assert!(end.offset_from(ptr) as usize <= self.capacity_in_bytes());
+            } = multi_vec_ptrs::<T, U, V>(ptr, self.capacity());
+            debug_assert_eq!(ptr, start);
+            debug_assert_eq!(end.offset_from(start) as usize, self.buffer.len());
 
             (t_ptr, u_ptr, v_ptr)
         }

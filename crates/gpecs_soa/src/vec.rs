@@ -8,7 +8,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{multi_vec_buffer_len, multi_vec_ptrs, slice_from_raw_parts_mut},
+    ptr::{multi_vec_buffer_len, multi_vec_len, multi_vec_ptrs, slice_from_raw_parts_mut},
     slice::{from_raw_parts, from_raw_parts_mut, MultiSlice},
 };
 
@@ -65,17 +65,9 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.len() == 0
     }
 
-    #[inline]
-    pub fn capacity_in_bytes(&self) -> usize {
-        self.buffer.capacity() * size_of::<usize>()
-    }
-
     pub fn capacity(&self) -> usize {
-        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-        self.capacity_in_bytes()
-            .saturating_sub(size_of::<usize>())
-            .checked_div(size_of_all)
-            .unwrap_or(usize::MAX)
+        let buffer_len = self.buffer.capacity();
+        multi_vec_len::<T, U, V>(buffer_len)
     }
 
     fn move_right(&mut self, old_capacity: usize) {
@@ -85,13 +77,9 @@ impl<T, U, V> MultiVec<T, U, V> {
         }
 
         unsafe {
-            let ptr = self.as_mut_ptr().cast();
-
-            let old_len = old_capacity * size_of::<usize>();
-            let old_ptrs = multi_vec_ptrs::<T, U, V>(ptr, old_len);
-
-            let new_len = new_capacity * size_of::<usize>();
-            let new_ptrs = multi_vec_ptrs::<T, U, V>(ptr, new_len);
+            let ptr = self.as_mut_ptr();
+            let old_ptrs = multi_vec_ptrs::<T, U, V>(ptr, old_capacity);
+            let new_ptrs = multi_vec_ptrs::<T, U, V>(ptr, new_capacity);
 
             ptr::copy(old_ptrs.v_ptr, new_ptrs.v_ptr, self.len());
             ptr::copy(old_ptrs.u_ptr, new_ptrs.u_ptr, self.len());
@@ -106,13 +94,9 @@ impl<T, U, V> MultiVec<T, U, V> {
         }
 
         unsafe {
-            let ptr = self.as_mut_ptr().cast();
-
-            let old_len = old_capacity * size_of::<usize>();
-            let old_ptrs = multi_vec_ptrs::<T, U, V>(ptr, old_len);
-
-            let new_len = new_capacity * size_of::<usize>();
-            let new_ptrs = multi_vec_ptrs::<T, U, V>(ptr, new_len);
+            let ptr = self.as_mut_ptr();
+            let old_ptrs = multi_vec_ptrs::<T, U, V>(ptr, old_capacity);
+            let new_ptrs = multi_vec_ptrs::<T, U, V>(ptr, new_capacity);
 
             ptr::copy(old_ptrs.t_ptr, new_ptrs.t_ptr, self.len());
             ptr::copy(old_ptrs.u_ptr, new_ptrs.u_ptr, self.len());
@@ -122,67 +106,59 @@ impl<T, U, V> MultiVec<T, U, V> {
 
     pub fn reserve(&mut self, additional: usize) {
         let old_capacity = self.capacity();
-        if old_capacity == 0 {
-            let additional = multi_vec_buffer_len::<T, U, V>(additional);
-            self.buffer.reserve(additional);
-            self.set_len_in_data(0);
-            return;
-        }
 
-        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-        let additional_in_bytes = additional * size_of_all;
-        let additional = additional_in_bytes / size_of::<usize>() + 1;
+        let old_buffer_len = self.buffer.capacity();
+        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
+        let additional = new_buffer_len.saturating_sub(old_buffer_len);
         self.buffer.reserve(additional);
-        self.move_right(old_capacity);
+
+        match old_capacity {
+            0 => self.set_len_in_data(0),
+            _ => self.move_right(old_capacity),
+        }
     }
 
     pub fn reserve_exact(&mut self, additional: usize) {
         let old_capacity = self.capacity();
-        if old_capacity == 0 {
-            let additional = multi_vec_buffer_len::<T, U, V>(additional);
-            self.buffer.reserve_exact(additional);
-            self.set_len_in_data(0);
-            return;
-        }
 
-        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-        let additional_in_bytes = additional * size_of_all;
-        let additional = additional_in_bytes / size_of::<usize>() + 1;
+        let old_buffer_len = self.buffer.capacity();
+        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
+        let additional = new_buffer_len.saturating_sub(old_buffer_len);
         self.buffer.reserve_exact(additional);
-        self.move_right(old_capacity);
+
+        match old_capacity {
+            0 => self.set_len_in_data(0),
+            _ => self.move_right(old_capacity),
+        }
     }
 
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let old_capacity = self.capacity();
-        if old_capacity == 0 {
-            let additional = multi_vec_buffer_len::<T, U, V>(additional);
-            self.buffer.try_reserve(additional)?;
-            self.set_len_in_data(0);
-            return Ok(());
-        }
 
-        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-        let additional_in_bytes = additional * size_of_all;
-        let additional = additional_in_bytes / size_of::<usize>() + 1;
+        let old_buffer_len = self.buffer.capacity();
+        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
+        let additional = new_buffer_len.saturating_sub(old_buffer_len);
         self.buffer.try_reserve(additional)?;
-        self.move_right(old_capacity);
+
+        match old_capacity {
+            0 => self.set_len_in_data(0),
+            _ => self.move_right(old_capacity),
+        };
         Ok(())
     }
 
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let old_capacity = self.capacity();
-        if old_capacity == 0 {
-            let additional = multi_vec_buffer_len::<T, U, V>(additional);
-            self.buffer.try_reserve_exact(additional)?;
-            self.set_len_in_data(0);
-            return Ok(());
-        }
 
-        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-        let additional_in_bytes = additional * size_of_all;
-        let additional = additional_in_bytes / size_of::<usize>() + 1;
+        let old_buffer_len = self.buffer.capacity();
+        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
+        let additional = new_buffer_len.saturating_sub(old_buffer_len);
         self.buffer.try_reserve_exact(additional)?;
-        self.move_right(old_capacity);
+
+        match old_capacity {
+            0 => self.set_len_in_data(0),
+            _ => self.move_right(old_capacity),
+        };
         Ok(())
     }
 
@@ -276,7 +252,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     fn set_len_in_data(&mut self, new_len: usize) {
-        if self.capacity_in_bytes() == 0 {
+        if self.capacity() == 0 {
             return;
         }
 

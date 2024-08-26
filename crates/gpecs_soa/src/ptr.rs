@@ -10,10 +10,7 @@ pub fn slice_from_raw_parts<T, U, V>(
 ) -> *const MultiSlice<T, U, V> {
     let len = match capacity {
         0 => 0,
-        _ => {
-            let capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(capacity);
-            capacity_in_bytes / size_of::<usize>() + 1
-        }
+        _ => multi_vec_buffer_len::<T, U, V>(capacity),
     };
     ptr::slice_from_raw_parts(data, len) as *const _
 }
@@ -26,23 +23,27 @@ pub fn slice_from_raw_parts_mut<T, U, V>(
 ) -> *mut MultiSlice<T, U, V> {
     let len = match capacity {
         0 => 0,
-        _ => {
-            let capacity_in_bytes = multi_vec_len_in_bytes::<T, U, V>(capacity);
-            capacity_in_bytes / size_of::<usize>() + 1
-        }
+        _ => multi_vec_buffer_len::<T, U, V>(capacity),
     };
     ptr::slice_from_raw_parts_mut(data, len) as *mut _
 }
 
 #[inline(always)]
+unsafe fn ptr_align_up<T>(ptr: *mut u8) -> *mut u8 {
+    let align = align_of::<T>();
+    let offset = ptr.align_offset(align);
+
+    ptr.add(offset)
+}
+
+#[inline(always)]
 pub(crate) unsafe fn align_cast_then_advance<T>(ptr: *mut u8, len: usize) -> (*mut T, *mut u8) {
-    let offset = ptr.align_offset(align_of::<T>());
-    let ptr = ptr.add(offset);
+    let ptr = ptr_align_up::<T>(ptr);
 
     let t_ptr = ptr.cast::<T>();
     debug_assert!(t_ptr.is_aligned());
 
-    let ptr = ptr.add(len * size_of::<T>());
+    let ptr = t_ptr.add(len).cast();
     (t_ptr, ptr)
 }
 
@@ -53,14 +54,13 @@ const fn align_up<T>(addr: usize) -> usize {
 }
 
 #[inline]
-pub(crate) const fn multi_vec_len_in_bytes<T, U, V>(len: usize) -> usize {
+pub(crate) const fn multi_vec_buffer_len<T, U, V>(len: usize) -> usize {
     let mut len_in_bytes = size_of::<usize>();
-
     len_in_bytes = align_up::<T>(len_in_bytes) + (len * size_of::<T>());
     len_in_bytes = align_up::<U>(len_in_bytes) + (len * size_of::<U>());
     len_in_bytes = align_up::<V>(len_in_bytes) + (len * size_of::<V>());
 
-    len_in_bytes
+    align_up::<usize>(len_in_bytes) / size_of::<usize>()
 }
 
 pub(crate) struct MultiVecPtrs<T, U, V> {

@@ -10,7 +10,7 @@ use crate::ptr::{multi_vec_ptrs, slice_from_raw_parts, slice_from_raw_parts_mut,
 #[repr(transparent)]
 pub struct MultiSlice<T, U, V> {
     phantom: PhantomData<(T, U, V)>,
-    data: [usize],
+    buffer: [usize],
 }
 
 impl<T, U, V> MultiSlice<T, U, V> {
@@ -29,7 +29,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
 
     #[inline]
     pub const fn capacity_in_bytes(&self) -> usize {
-        self.data.len() * size_of::<usize>()
+        self.buffer.len() * size_of::<usize>()
     }
 
     #[inline]
@@ -47,12 +47,12 @@ impl<T, U, V> MultiSlice<T, U, V> {
 
     #[inline]
     pub const fn as_ptr(&self) -> *const usize {
-        self.data.as_ptr()
+        self.buffer.as_ptr()
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut usize {
-        self.data.as_mut_ptr()
+        self.buffer.as_mut_ptr()
     }
 
     #[inline]

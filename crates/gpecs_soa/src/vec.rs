@@ -33,7 +33,7 @@ impl<T, U, V> MultiVec<T, U, V> {
             phantom: PhantomData,
         };
 
-        me.set_len_in_data(0);
+        me.set_len_in_buffer(0);
         me
     }
 
@@ -113,7 +113,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.buffer.reserve(additional);
 
         match old_capacity {
-            0 => self.set_len_in_data(0),
+            0 => self.set_len_in_buffer(0),
             _ => self.move_right(old_capacity),
         }
     }
@@ -127,7 +127,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.buffer.reserve_exact(additional);
 
         match old_capacity {
-            0 => self.set_len_in_data(0),
+            0 => self.set_len_in_buffer(0),
             _ => self.move_right(old_capacity),
         }
     }
@@ -141,7 +141,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.buffer.try_reserve(additional)?;
 
         match old_capacity {
-            0 => self.set_len_in_data(0),
+            0 => self.set_len_in_buffer(0),
             _ => self.move_right(old_capacity),
         };
         Ok(())
@@ -156,7 +156,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.buffer.try_reserve_exact(additional)?;
 
         match old_capacity {
-            0 => self.set_len_in_data(0),
+            0 => self.set_len_in_buffer(0),
             _ => self.move_right(old_capacity),
         };
         Ok(())
@@ -238,10 +238,10 @@ impl<T, U, V> MultiVec<T, U, V> {
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         self.buffer.set_len(new_len);
-        self.set_len_in_data(new_len);
+        self.set_len_in_buffer(new_len);
     }
 
-    fn set_len_in_data(&mut self, new_len: usize) {
+    fn set_len_in_buffer(&mut self, new_len: usize) {
         if self.capacity() == 0 {
             return;
         }

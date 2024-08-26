@@ -170,13 +170,8 @@ impl<T, U, V> MultiVec<T, U, V> {
         let len = self.len();
         self.move_left(len);
 
-        unsafe {
-            let new_capacity = multi_vec_buffer_len::<T, U, V>(len);
-            self.buffer.set_len(new_capacity);
-
-            self.buffer.shrink_to_fit();
-            self.buffer.set_len(len);
-        }
+        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(len);
+        self.buffer.shrink_to(new_buffer_len);
     }
 
     pub fn shrink_to(&mut self, min_capacity: usize) {
@@ -184,23 +179,18 @@ impl<T, U, V> MultiVec<T, U, V> {
             return;
         }
 
-        let len = self.len();
         self.move_left(min_capacity);
 
-        unsafe {
-            let new_capacity = multi_vec_buffer_len::<T, U, V>(min_capacity);
-            self.buffer.set_len(new_capacity);
-
-            self.buffer.shrink_to_fit();
-            self.buffer.set_len(len);
-        }
+        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(min_capacity);
+        self.buffer.shrink_to(new_buffer_len);
     }
 
     pub fn into_boxed_slice(self) -> Box<MultiSlice<T, U, V>> {
         let mut me = ManuallyDrop::new(self);
+        me.shrink_to_fit();
+
         let data = me.as_mut_ptr();
         let capacity = me.capacity();
-
         unsafe {
             let raw = slice_from_raw_parts_mut(data, capacity);
             Box::from_raw(raw)
@@ -496,7 +486,7 @@ mod tests {
 
         let boxed_slice = multi_vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
-        assert!(boxed_slice.capacity() >= 10);
+        assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]
@@ -521,6 +511,6 @@ mod tests {
 
         let boxed_slice = multi_vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
-        assert!(boxed_slice.capacity() >= 1);
+        assert_eq!(boxed_slice.capacity(), 0);
     }
 }

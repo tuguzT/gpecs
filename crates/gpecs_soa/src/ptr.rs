@@ -55,6 +55,10 @@ const fn align_up<T>(addr: usize) -> usize {
 
 #[inline]
 pub(crate) const fn multi_vec_buffer_len<T, U, V>(len: usize) -> usize {
+    if len == 0 {
+        return 0;
+    }
+
     let mut len_in_bytes = size_of::<usize>();
     len_in_bytes = align_up::<T>(len_in_bytes) + (len * size_of::<T>());
     len_in_bytes = align_up::<U>(len_in_bytes) + (len * size_of::<U>());

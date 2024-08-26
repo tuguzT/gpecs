@@ -48,6 +48,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
     #[inline]
     pub fn as_ptrs(&self) -> (*const T, *const U, *const V) {
         let ptr = self.as_ptr().cast_mut();
+        let len = self.capacity();
 
         unsafe {
             let MultiVecPtrs {
@@ -56,7 +57,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
                 u_ptr,
                 v_ptr,
                 end,
-            } = multi_vec_ptrs::<T, U, V>(ptr, self.capacity());
+            } = multi_vec_ptrs::<T, U, V>(ptr, len);
             debug_assert_eq!(ptr, start);
             debug_assert_eq!(end.offset_from(start) as usize, self.buffer.len());
 
@@ -67,6 +68,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> (*mut T, *mut U, *mut V) {
         let ptr = self.as_mut_ptr();
+        let len = self.capacity();
 
         unsafe {
             let MultiVecPtrs {
@@ -75,7 +77,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
                 u_ptr,
                 v_ptr,
                 end,
-            } = multi_vec_ptrs::<T, U, V>(ptr, self.capacity());
+            } = multi_vec_ptrs::<T, U, V>(ptr, len);
             debug_assert_eq!(ptr, start);
             debug_assert_eq!(end.offset_from(start) as usize, self.buffer.len());
 

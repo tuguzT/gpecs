@@ -272,18 +272,18 @@ impl<T, U, V> MultiVec<T, U, V> {
 
         unsafe {
             let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_end = t_ptr.add(index);
-            let u_end = u_ptr.add(index);
-            let v_end = v_ptr.add(index);
+            let t_ptr = t_ptr.add(index);
+            let u_ptr = u_ptr.add(index);
+            let v_ptr = v_ptr.add(index);
 
             if index < len {
-                ptr::copy(t_end, t_end.add(1), len - index);
-                ptr::copy(u_end, u_end.add(1), len - index);
-                ptr::copy(v_end, v_end.add(1), len - index);
+                ptr::copy(t_ptr, t_ptr.add(1), len - index);
+                ptr::copy(u_ptr, u_ptr.add(1), len - index);
+                ptr::copy(v_ptr, v_ptr.add(1), len - index);
             }
-            ptr::write(t_end, elements.0);
-            ptr::write(u_end, elements.1);
-            ptr::write(v_end, elements.2);
+            ptr::write(t_ptr, elements.0);
+            ptr::write(u_ptr, elements.1);
+            ptr::write(v_ptr, elements.2);
 
             self.set_len(len + 1);
         }
@@ -298,13 +298,13 @@ impl<T, U, V> MultiVec<T, U, V> {
 
         unsafe {
             let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_end = t_ptr.add(len);
-            let u_end = u_ptr.add(len);
-            let v_end = v_ptr.add(len);
+            let t_ptr = t_ptr.add(len);
+            let u_ptr = u_ptr.add(len);
+            let v_ptr = v_ptr.add(len);
 
-            ptr::write(t_end, values.0);
-            ptr::write(u_end, values.1);
-            ptr::write(v_end, values.2);
+            ptr::write(t_ptr, values.0);
+            ptr::write(u_ptr, values.1);
+            ptr::write(v_ptr, values.2);
 
             self.set_len(len + 1);
         }
@@ -512,5 +512,43 @@ mod tests {
         let boxed_slice = multi_vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
         assert_eq!(boxed_slice.capacity(), 0);
+    }
+
+    #[test]
+    fn three_items() {
+        let mut multi_vec = MultiVec::<u8, u32, u16>::new();
+        multi_vec.insert(0, (1, 2, 3));
+        multi_vec.insert(0, (4, 5, 6));
+        multi_vec.insert(1, (7, 8, 9));
+
+        assert_eq!(multi_vec.len(), 3);
+        assert!(multi_vec.capacity() >= 3);
+
+        let slice = multi_vec.as_slice();
+        assert_eq!(slice.len(), 3);
+        assert!(slice.capacity() >= 3);
+        assert_eq!(
+            slice.as_slices(),
+            (
+                [4, 7, 1].as_slice(),
+                [5, 8, 2].as_slice(),
+                [6, 9, 3].as_slice(),
+            ),
+        );
+
+        let (t, u, v) = multi_vec.swap_remove(1);
+        assert_eq!((t, u, v), (7, 8, 9));
+        assert_eq!(multi_vec.len(), 2);
+        assert!(multi_vec.capacity() >= 3);
+
+        let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
+        assert_eq!((t, u, v), (1, 2, 3));
+        assert_eq!(multi_vec.len(), 1);
+        assert!(multi_vec.capacity() >= 3);
+
+        let (t, u, v) = multi_vec.remove(0);
+        assert_eq!((t, u, v), (4, 5, 6));
+        assert!(multi_vec.is_empty());
+        assert!(multi_vec.capacity() >= 3);
     }
 }

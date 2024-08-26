@@ -4,14 +4,11 @@ use crate::slice::MultiSlice;
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
-pub fn slice_from_raw_parts<T, U, V>(
+pub const fn slice_from_raw_parts<T, U, V>(
     data: *const usize,
     capacity: usize,
 ) -> *const MultiSlice<T, U, V> {
-    let len = match capacity {
-        0 => 0,
-        _ => multi_vec_buffer_len::<T, U, V>(capacity),
-    };
+    let len = multi_vec_buffer_len::<T, U, V>(capacity);
     ptr::slice_from_raw_parts(data, len) as *const _
 }
 
@@ -21,10 +18,7 @@ pub fn slice_from_raw_parts_mut<T, U, V>(
     data: *mut usize,
     capacity: usize,
 ) -> *mut MultiSlice<T, U, V> {
-    let len = match capacity {
-        0 => 0,
-        _ => multi_vec_buffer_len::<T, U, V>(capacity),
-    };
+    let len = multi_vec_buffer_len::<T, U, V>(capacity);
     ptr::slice_from_raw_parts_mut(data, len) as *mut _
 }
 

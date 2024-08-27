@@ -2,7 +2,7 @@ use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
-    mem::ManuallyDrop,
+    mem::{ManuallyDrop, MaybeUninit},
     ops::{Deref, DerefMut},
     ptr,
 };
@@ -14,7 +14,7 @@ use crate::{
 
 #[repr(transparent)]
 pub struct MultiVec<T, U, V> {
-    buffer: Vec<usize>,
+    buffer: Vec<MaybeUninit<usize>>,
     phantom: PhantomData<(Vec<T>, Vec<U>, Vec<V>)>,
 }
 
@@ -47,7 +47,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub unsafe fn from_raw_parts(ptr: *mut usize, length: usize, capacity: usize) -> Self {
         let capacity = multi_vec_buffer_len::<T, U, V>(capacity);
         Self {
-            buffer: Vec::from_raw_parts(ptr, length, capacity),
+            buffer: Vec::from_raw_parts(ptr.cast(), length, capacity),
             phantom: PhantomData,
         }
     }
@@ -110,7 +110,13 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_buffer_len = self.buffer.capacity();
         let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
-        self.buffer.reserve(additional);
+
+        unsafe {
+            let len = self.len();
+            self.buffer.set_len(old_buffer_len);
+            self.buffer.reserve(additional);
+            self.buffer.set_len(len);
+        }
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -124,7 +130,13 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_buffer_len = self.buffer.capacity();
         let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
-        self.buffer.reserve_exact(additional);
+
+        unsafe {
+            let len = self.len();
+            self.buffer.set_len(old_buffer_len);
+            self.buffer.reserve_exact(additional);
+            self.buffer.set_len(len);
+        }
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -138,7 +150,14 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_buffer_len = self.buffer.capacity();
         let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
-        self.buffer.try_reserve(additional)?;
+
+        unsafe {
+            let len = self.len();
+            self.buffer.set_len(old_buffer_len);
+            let result = self.buffer.try_reserve(additional);
+            self.buffer.set_len(len);
+            result?
+        }
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -153,7 +172,14 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_buffer_len = self.buffer.capacity();
         let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
-        self.buffer.try_reserve_exact(additional)?;
+
+        unsafe {
+            let len = self.len();
+            self.buffer.set_len(old_buffer_len);
+            let result = self.buffer.try_reserve_exact(additional);
+            self.buffer.set_len(len);
+            result?
+        }
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -228,11 +254,11 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     pub fn as_ptr(&self) -> *const usize {
-        self.buffer.as_ptr()
+        self.buffer.as_ptr().cast()
     }
 
     pub fn as_mut_ptr(&mut self) -> *mut usize {
-        self.buffer.as_mut_ptr()
+        self.buffer.as_mut_ptr().cast()
     }
 
     #[allow(clippy::missing_safety_doc)]
@@ -550,5 +576,14 @@ mod tests {
         assert_eq!((t, u, v), (4, 5, 6));
         assert!(multi_vec.is_empty());
         assert!(multi_vec.capacity() >= 3);
+
+        multi_vec.push((0, 0, 0));
+        multi_vec.push((0, 0, 0));
+        multi_vec.push((0, 0, 0));
+        multi_vec.reserve(1);
+        assert!(multi_vec.capacity() >= 4);
+
+        multi_vec.reserve_exact(6);
+        assert!(multi_vec.capacity() >= 9);
     }
 }

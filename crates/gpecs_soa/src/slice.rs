@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    mem::MaybeUninit,
     ptr::{self, NonNull},
     slice,
 };
@@ -12,7 +13,7 @@ use crate::ptr::{
 #[repr(transparent)]
 pub struct MultiSlice<T, U, V> {
     phantom: PhantomData<(T, U, V)>,
-    buffer: [usize],
+    buffer: [MaybeUninit<usize>],
 }
 
 impl<T, U, V> MultiSlice<T, U, V> {
@@ -37,12 +38,12 @@ impl<T, U, V> MultiSlice<T, U, V> {
 
     #[inline]
     pub const fn as_ptr(&self) -> *const usize {
-        self.buffer.as_ptr()
+        self.buffer.as_ptr().cast()
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut usize {
-        self.buffer.as_mut_ptr()
+        self.buffer.as_mut_ptr().cast()
     }
 
     #[inline]

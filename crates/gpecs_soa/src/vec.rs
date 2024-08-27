@@ -1,5 +1,6 @@
 use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
+    cmp,
     fmt::{self, Debug},
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
@@ -196,8 +197,12 @@ impl<T, U, V> MultiVec<T, U, V> {
         let len = self.len();
         self.move_left(len);
 
-        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(len);
-        self.buffer.shrink_to(new_buffer_len);
+        unsafe {
+            let new_buffer_len = multi_vec_buffer_len::<T, U, V>(len);
+            self.buffer.set_len(new_buffer_len);
+            self.buffer.shrink_to_fit();
+            self.buffer.set_len(len);
+        }
     }
 
     pub fn shrink_to(&mut self, min_capacity: usize) {
@@ -205,10 +210,16 @@ impl<T, U, V> MultiVec<T, U, V> {
             return;
         }
 
-        self.move_left(min_capacity);
+        let len = self.len();
+        let new_capacity = cmp::max(len, min_capacity);
+        self.move_left(new_capacity);
 
-        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(min_capacity);
-        self.buffer.shrink_to(new_buffer_len);
+        unsafe {
+            let new_buffer_len = multi_vec_buffer_len::<T, U, V>(new_capacity);
+            self.buffer.set_len(new_buffer_len);
+            self.buffer.shrink_to_fit();
+            self.buffer.set_len(len);
+        }
     }
 
     pub fn into_boxed_slice(self) -> Box<MultiSlice<T, U, V>> {
@@ -582,8 +593,12 @@ mod tests {
         multi_vec.push((0, 0, 0));
         multi_vec.reserve(1);
         assert!(multi_vec.capacity() >= 4);
-
         multi_vec.reserve_exact(6);
         assert!(multi_vec.capacity() >= 9);
+
+        multi_vec.shrink_to(6);
+        assert!(multi_vec.capacity() >= 6);
+        multi_vec.shrink_to(0);
+        assert!(multi_vec.capacity() >= 3);
     }
 }

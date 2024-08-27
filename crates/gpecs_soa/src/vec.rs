@@ -553,7 +553,7 @@ mod tests {
 
     #[test]
     fn three_items() {
-        let mut multi_vec = MultiVec::<u8, u32, u16>::new();
+        let mut multi_vec = MultiVec::<u16, u64, u8>::new();
         multi_vec.insert(0, (1, 2, 3));
         multi_vec.insert(0, (4, 5, 6));
         multi_vec.insert(1, (7, 8, 9));

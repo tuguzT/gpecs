@@ -63,9 +63,15 @@ pub(crate) const fn to_buffer_len<T, U, V>(len: usize) -> usize {
 
 #[inline]
 pub(crate) const fn to_len<T, U, V>(buffer_len: usize) -> usize {
-    let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-    let len_in_bytes = buffer_len.saturating_sub(1) * size_of::<usize>();
-    len_in_bytes / size_of_all
+    if buffer_len == 0 || buffer_len == 1 {
+        return 0;
+    }
+
+    let mut len = 0;
+    while to_buffer_len::<T, U, V>(len + 1) <= buffer_len {
+        len += 1;
+    }
+    len
 }
 
 pub(crate) struct Ptrs<T, U, V> {
@@ -137,6 +143,7 @@ mod tests {
         assert_eq!(to_buffer_len(6), 6);
         assert_eq!(to_buffer_len(7), 7);
         assert_eq!(to_buffer_len(8), 7);
+        assert_eq!(to_buffer_len(9), 8);
     }
 
     #[test]
@@ -310,5 +317,29 @@ mod tests {
         assert_eq!(to_len(7), 6);
         assert_eq!(to_len(8), 8);
         assert_eq!(to_len(9), 9);
+    }
+
+    #[test]
+    fn u16_u32_u16_to_buffer_len() {
+        let to_buffer_len = to_buffer_len::<u16, u32, u16>;
+
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), 3);
+        assert_eq!(to_buffer_len(2), 3);
+        assert_eq!(to_buffer_len(3), 5);
+        assert_eq!(to_buffer_len(4), 5);
+        assert_eq!(to_buffer_len(5), 7);
+    }
+
+    #[test]
+    fn u16_u32_u16_to_len() {
+        let to_len = to_len::<u16, u32, u16>;
+
+        assert_eq!(to_len(0), 0);
+        assert_eq!(to_len(1), 0);
+        assert_eq!(to_len(2), 0);
+        assert_eq!(to_len(3), 2);
+        assert_eq!(to_len(4), 2);
+        assert_eq!(to_len(5), 4);
     }
 }

@@ -9,7 +9,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{multi_vec_buffer_len, multi_vec_len, multi_vec_ptrs, slice_from_raw_parts_mut},
+    ptr::{ptrs, slice_from_raw_parts_mut, to_buffer_len, to_len},
     slice::{from_raw_parts, from_raw_parts_mut, MultiSlice},
 };
 
@@ -28,7 +28,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
-        let capacity = multi_vec_buffer_len::<T, U, V>(capacity);
+        let capacity = to_buffer_len::<T, U, V>(capacity);
         let mut me = Self {
             buffer: Vec::with_capacity(capacity),
             phantom: PhantomData,
@@ -46,7 +46,7 @@ impl<T, U, V> MultiVec<T, U, V> {
 
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn from_raw_parts(ptr: *mut usize, length: usize, capacity: usize) -> Self {
-        let capacity = multi_vec_buffer_len::<T, U, V>(capacity);
+        let capacity = to_buffer_len::<T, U, V>(capacity);
         Self {
             buffer: Vec::from_raw_parts(ptr.cast(), length, capacity),
             phantom: PhantomData,
@@ -68,7 +68,7 @@ impl<T, U, V> MultiVec<T, U, V> {
 
     pub fn capacity(&self) -> usize {
         let buffer_len = self.buffer.capacity();
-        multi_vec_len::<T, U, V>(buffer_len)
+        to_len::<T, U, V>(buffer_len)
     }
 
     fn move_right(&mut self, old_capacity: usize) {
@@ -79,8 +79,8 @@ impl<T, U, V> MultiVec<T, U, V> {
 
         unsafe {
             let ptr = self.as_mut_ptr();
-            let old_ptrs = multi_vec_ptrs::<T, U, V>(ptr, old_capacity);
-            let new_ptrs = multi_vec_ptrs::<T, U, V>(ptr, new_capacity);
+            let old_ptrs = ptrs::<T, U, V>(ptr, old_capacity);
+            let new_ptrs = ptrs::<T, U, V>(ptr, new_capacity);
 
             ptr::copy(old_ptrs.v_ptr, new_ptrs.v_ptr, self.len());
             ptr::copy(old_ptrs.u_ptr, new_ptrs.u_ptr, self.len());
@@ -96,8 +96,8 @@ impl<T, U, V> MultiVec<T, U, V> {
 
         unsafe {
             let ptr = self.as_mut_ptr();
-            let old_ptrs = multi_vec_ptrs::<T, U, V>(ptr, old_capacity);
-            let new_ptrs = multi_vec_ptrs::<T, U, V>(ptr, new_capacity);
+            let old_ptrs = ptrs::<T, U, V>(ptr, old_capacity);
+            let new_ptrs = ptrs::<T, U, V>(ptr, new_capacity);
 
             ptr::copy(old_ptrs.t_ptr, new_ptrs.t_ptr, self.len());
             ptr::copy(old_ptrs.u_ptr, new_ptrs.u_ptr, self.len());
@@ -109,7 +109,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_capacity = self.capacity();
 
         let old_buffer_len = self.buffer.capacity();
-        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
+        let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
 
         unsafe {
@@ -129,7 +129,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_capacity = self.capacity();
 
         let old_buffer_len = self.buffer.capacity();
-        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
+        let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
 
         unsafe {
@@ -149,7 +149,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_capacity = self.capacity();
 
         let old_buffer_len = self.buffer.capacity();
-        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
+        let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
 
         unsafe {
@@ -171,7 +171,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         let old_capacity = self.capacity();
 
         let old_buffer_len = self.buffer.capacity();
-        let new_buffer_len = multi_vec_buffer_len::<T, U, V>(self.len() + additional);
+        let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
 
         unsafe {
@@ -198,7 +198,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.move_left(len);
 
         unsafe {
-            let new_buffer_len = multi_vec_buffer_len::<T, U, V>(len);
+            let new_buffer_len = to_buffer_len::<T, U, V>(len);
             self.buffer.set_len(new_buffer_len);
             self.buffer.shrink_to_fit();
             self.buffer.set_len(len);
@@ -215,7 +215,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.move_left(new_capacity);
 
         unsafe {
-            let new_buffer_len = multi_vec_buffer_len::<T, U, V>(new_capacity);
+            let new_buffer_len = to_buffer_len::<T, U, V>(new_capacity);
             self.buffer.set_len(new_buffer_len);
             self.buffer.shrink_to_fit();
             self.buffer.set_len(len);

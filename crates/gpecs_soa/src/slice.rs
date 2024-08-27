@@ -6,9 +6,7 @@ use core::{
     slice,
 };
 
-use crate::ptr::{
-    multi_vec_len, multi_vec_ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, MultiVecPtrs,
-};
+use crate::ptr::{ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, to_len, Ptrs};
 
 #[repr(transparent)]
 pub struct MultiSlice<T, U, V> {
@@ -33,7 +31,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
     #[inline]
     pub const fn capacity(&self) -> usize {
         let buffer_len = self.buffer.len();
-        multi_vec_len::<T, U, V>(buffer_len)
+        to_len::<T, U, V>(buffer_len)
     }
 
     #[inline]
@@ -52,13 +50,13 @@ impl<T, U, V> MultiSlice<T, U, V> {
         let len = self.capacity();
 
         unsafe {
-            let MultiVecPtrs {
+            let Ptrs {
                 start,
                 t_ptr,
                 u_ptr,
                 v_ptr,
                 end,
-            } = multi_vec_ptrs::<T, U, V>(ptr, len);
+            } = ptrs::<T, U, V>(ptr, len);
             debug_assert_eq!(ptr, start);
             debug_assert_eq!(end.offset_from(start) as usize, self.buffer.len());
 
@@ -72,13 +70,13 @@ impl<T, U, V> MultiSlice<T, U, V> {
         let len = self.capacity();
 
         unsafe {
-            let MultiVecPtrs {
+            let Ptrs {
                 start,
                 t_ptr,
                 u_ptr,
                 v_ptr,
                 end,
-            } = multi_vec_ptrs::<T, U, V>(ptr, len);
+            } = ptrs::<T, U, V>(ptr, len);
             debug_assert_eq!(ptr, start);
             debug_assert_eq!(end.offset_from(start) as usize, self.buffer.len());
 

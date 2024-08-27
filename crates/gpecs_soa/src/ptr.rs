@@ -190,56 +190,125 @@ mod tests {
 
     #[test]
     fn u64_u64_u64_buffer_len() {
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(0), 0);
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(1), 4);
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(2), 7);
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(3), 10);
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(4), 13);
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(5), 16);
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(6), 19);
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(7), 22);
-        assert_eq!(multi_vec_buffer_len::<u64, u64, u64>(8), 25);
+        let buffer_len = multi_vec_buffer_len::<u64, u64, u64>;
+
+        assert_eq!(buffer_len(0), 0);
+        assert_eq!(buffer_len(1), 4);
+        assert_eq!(buffer_len(2), 7);
+        assert_eq!(buffer_len(3), 10);
+        assert_eq!(buffer_len(4), 13);
+        assert_eq!(buffer_len(5), 16);
+        assert_eq!(buffer_len(6), 19);
+        assert_eq!(buffer_len(7), 22);
+        assert_eq!(buffer_len(8), 25);
+    }
+
+    #[test]
+    fn u64_u64_u64_len() {
+        let len = multi_vec_len::<u64, u64, u64>;
+
+        assert_eq!(len(0), 0);
+        assert_eq!(len(1), 0);
+        assert_eq!(len(2), 0);
+        assert_eq!(len(3), 0);
+        assert_eq!(len(4), 1);
+        assert_eq!(len(5), 1);
+        assert_eq!(len(6), 1);
+        assert_eq!(len(7), 2);
+        assert_eq!(len(8), 2);
+        assert_eq!(len(9), 2);
+        assert_eq!(len(10), 3);
     }
 
     #[test]
     fn u8_u16_u8_buffer_len() {
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(0), 0);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(1), 2);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(2), 2);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(3), 3);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(4), 3);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(5), 4);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(6), 4);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(7), 5);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(8), 5);
-        assert_eq!(multi_vec_buffer_len::<u8, u16, u8>(9), 6);
+        let buffer_len = multi_vec_buffer_len::<u8, u16, u8>;
+
+        assert_eq!(buffer_len(0), 0);
+        assert_eq!(buffer_len(1), 2);
+        assert_eq!(buffer_len(2), 2);
+        assert_eq!(buffer_len(3), 3);
+        assert_eq!(buffer_len(4), 3);
+        assert_eq!(buffer_len(5), 4);
+        assert_eq!(buffer_len(6), 4);
+        assert_eq!(buffer_len(7), 5);
+        assert_eq!(buffer_len(8), 5);
+        assert_eq!(buffer_len(9), 6);
+        assert_eq!(buffer_len(10), 6);
+    }
+
+    #[test]
+    fn u8_u16_u8_len() {
+        let len = multi_vec_len::<u8, u16, u8>;
+
+        assert_eq!(len(0), 0);
+        assert_eq!(len(1), 0);
+        assert_eq!(len(2), 2);
+        assert_eq!(len(3), 4);
+        assert_eq!(len(4), 6);
+        assert_eq!(len(5), 8);
+        assert_eq!(len(6), 10);
     }
 
     #[test]
     fn u16_u8_u16_buffer_len() {
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(0), 0);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(1), 2);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(2), 3);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(3), 3);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(4), 4);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(5), 5);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(6), 5);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(7), 6);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(8), 6);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u16>(9), 7);
+        let buffer_len = multi_vec_buffer_len::<u16, u8, u16>;
+
+        assert_eq!(buffer_len(0), 0);
+        assert_eq!(buffer_len(1), 2);
+        assert_eq!(buffer_len(2), 3);
+        assert_eq!(buffer_len(3), 3);
+        assert_eq!(buffer_len(4), 4);
+        assert_eq!(buffer_len(5), 5);
+        assert_eq!(buffer_len(6), 5);
+        assert_eq!(buffer_len(7), 6);
+        assert_eq!(buffer_len(8), 6);
+        assert_eq!(buffer_len(9), 7);
+    }
+
+    #[test]
+    fn u16_u8_u16_len() {
+        let len = multi_vec_len::<u16, u8, u16>;
+
+        assert_eq!(len(0), 0);
+        assert_eq!(len(1), 0);
+        assert_eq!(len(2), 1);
+        assert_eq!(len(3), 3);
+        assert_eq!(len(4), 4);
+        assert_eq!(len(5), 6);
+        assert_eq!(len(6), 8);
+        assert_eq!(len(7), 9);
     }
 
     #[test]
     fn u16_u8_u32_buffer_len() {
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(0), 0);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(1), 2);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(2), 3);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(3), 4);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(4), 5);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(5), 6);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(6), 7);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(7), 8);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(8), 8);
-        assert_eq!(multi_vec_buffer_len::<u16, u8, u32>(9), 9);
+        let buffer_len = multi_vec_buffer_len::<u16, u8, u32>;
+
+        assert_eq!(buffer_len(0), 0);
+        assert_eq!(buffer_len(1), 2);
+        assert_eq!(buffer_len(2), 3);
+        assert_eq!(buffer_len(3), 4);
+        assert_eq!(buffer_len(4), 5);
+        assert_eq!(buffer_len(5), 6);
+        assert_eq!(buffer_len(6), 7);
+        assert_eq!(buffer_len(7), 8);
+        assert_eq!(buffer_len(8), 8);
+        assert_eq!(buffer_len(9), 9);
+    }
+
+    #[test]
+    fn u16_u8_u32_len() {
+        let len = multi_vec_len::<u16, u8, u32>;
+
+        assert_eq!(len(0), 0);
+        assert_eq!(len(1), 0);
+        assert_eq!(len(2), 1);
+        assert_eq!(len(3), 2);
+        assert_eq!(len(4), 3);
+        assert_eq!(len(5), 4);
+        assert_eq!(len(6), 5);
+        assert_eq!(len(7), 6);
+        assert_eq!(len(8), 8);
+        assert_eq!(len(9), 9);
     }
 }

@@ -48,7 +48,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub unsafe fn from_raw_parts(ptr: *mut usize, length: usize, capacity: usize) -> Self {
         let capacity = to_buffer_len::<T, U, V>(capacity);
         Self {
-            buffer: Vec::from_raw_parts(ptr.cast(), length, capacity),
+            buffer: unsafe { Vec::from_raw_parts(ptr.cast(), length, capacity) },
             phantom: PhantomData,
         }
     }
@@ -279,8 +279,10 @@ impl<T, U, V> MultiVec<T, U, V> {
 
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn set_len(&mut self, new_len: usize) {
-        self.buffer.set_len(new_len);
-        self.set_len_in_buffer(new_len);
+        unsafe {
+            self.buffer.set_len(new_len);
+            self.set_len_in_buffer(new_len);
+        }
     }
 
     fn set_len_in_buffer(&mut self, new_len: usize) {

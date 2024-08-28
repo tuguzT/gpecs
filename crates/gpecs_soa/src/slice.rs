@@ -155,11 +155,11 @@ impl<T, U, V> Drop for MultiSlice<T, U, V> {
         let (t_data, u_data, v_data) = self.as_mut_ptrs();
         let len = self.len();
 
-        unsafe {
-            let t_slice = ptr::slice_from_raw_parts_mut(t_data, len);
-            let u_slice = ptr::slice_from_raw_parts_mut(u_data, len);
-            let v_slice = ptr::slice_from_raw_parts_mut(v_data, len);
+        let t_slice = ptr::slice_from_raw_parts_mut(t_data, len);
+        let u_slice = ptr::slice_from_raw_parts_mut(u_data, len);
+        let v_slice = ptr::slice_from_raw_parts_mut(v_data, len);
 
+        unsafe {
             ptr::drop_in_place(t_slice);
             ptr::drop_in_place(u_slice);
             ptr::drop_in_place(v_slice);
@@ -173,7 +173,7 @@ pub unsafe fn from_raw_parts<'slice, T, U, V>(
     data: *const usize,
     capacity: usize,
 ) -> &'slice MultiSlice<T, U, V> {
-    &*slice_from_raw_parts(data, capacity)
+    unsafe { &*slice_from_raw_parts(data, capacity) }
 }
 
 #[allow(clippy::missing_safety_doc)]
@@ -182,5 +182,5 @@ pub unsafe fn from_raw_parts_mut<'slice, T, U, V>(
     data: *mut usize,
     capacity: usize,
 ) -> &'slice mut MultiSlice<T, U, V> {
-    &mut *slice_from_raw_parts_mut(data, capacity)
+    unsafe { &mut *slice_from_raw_parts_mut(data, capacity) }
 }

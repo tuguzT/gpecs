@@ -27,17 +27,17 @@ unsafe fn ptr_align_up<T>(ptr: *mut u8) -> *mut u8 {
     let align = align_of::<T>();
     let offset = ptr.align_offset(align);
 
-    ptr.add(offset)
+    unsafe { ptr.add(offset) }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn align_cast_then_advance<T>(ptr: *mut u8, len: usize) -> (*mut T, *mut u8) {
-    let ptr = ptr_align_up::<T>(ptr);
+    let ptr = unsafe { ptr_align_up::<T>(ptr) };
 
     let t_ptr = ptr.cast::<T>();
     debug_assert!(t_ptr.is_aligned());
 
-    let ptr = t_ptr.add(len).cast();
+    let ptr = unsafe { t_ptr.add(len).cast() };
     (t_ptr, ptr)
 }
 
@@ -94,11 +94,13 @@ pub(crate) struct Ptrs<T, U, V> {
 
 #[inline]
 pub(crate) unsafe fn ptrs<T, U, V>(ptr: *mut usize, len: usize) -> Ptrs<T, U, V> {
-    let (start, ptr) = align_cast_then_advance(ptr.cast(), 1);
-    let (t_ptr, ptr) = align_cast_then_advance(ptr, len);
-    let (u_ptr, ptr) = align_cast_then_advance(ptr, len);
-    let (v_ptr, ptr) = align_cast_then_advance(ptr, len);
-    let end = ptr_align_up::<usize>(ptr).cast();
+    let (start, ptr) = unsafe { align_cast_then_advance(ptr.cast(), 1) };
+
+    let (t_ptr, ptr) = unsafe { align_cast_then_advance(ptr, len) };
+    let (u_ptr, ptr) = unsafe { align_cast_then_advance(ptr, len) };
+    let (v_ptr, ptr) = unsafe { align_cast_then_advance(ptr, len) };
+
+    let end = unsafe { ptr_align_up::<usize>(ptr).cast() };
 
     Ptrs {
         start,

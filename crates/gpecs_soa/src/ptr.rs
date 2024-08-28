@@ -63,13 +63,13 @@ pub(crate) const fn to_buffer_len<T, U, V>(len: usize) -> usize {
 
 #[inline]
 pub(crate) const fn to_len<T, U, V>(buffer_len: usize) -> usize {
-    if buffer_len == 0 || buffer_len == 1 {
+    if buffer_len == 0 {
         return 0;
     }
 
     let max_len = {
         let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
-        let len_in_bytes = (buffer_len - 1) * size_of::<usize>();
+        let len_in_bytes = buffer_len * size_of::<usize>();
         len_in_bytes / size_of_all
     };
 

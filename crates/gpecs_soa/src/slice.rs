@@ -29,8 +29,13 @@ impl<T, U, V> MultiSlice<T, U, V> {
     }
 
     #[inline]
+    pub const fn buffer_len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    #[inline]
     pub const fn capacity(&self) -> usize {
-        let buffer_len = self.buffer.len();
+        let buffer_len = self.buffer_len();
         to_len::<T, U, V>(buffer_len)
     }
 
@@ -58,7 +63,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
                 end,
             } = ptrs::<T, U, V>(ptr, len);
             debug_assert_eq!(ptr, start);
-            debug_assert_eq!(end.offset_from(start) as usize, self.buffer.len());
+            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_len());
 
             (t_ptr, u_ptr, v_ptr)
         }
@@ -78,7 +83,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
                 end,
             } = ptrs::<T, U, V>(ptr, len);
             debug_assert_eq!(ptr, start);
-            debug_assert_eq!(end.offset_from(start) as usize, self.buffer.len());
+            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_len());
 
             (t_ptr, u_ptr, v_ptr)
         }

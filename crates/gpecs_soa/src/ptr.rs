@@ -8,8 +8,8 @@ pub const fn slice_from_raw_parts<T, U, V>(
     data: *const usize,
     capacity: usize,
 ) -> *const MultiSlice<T, U, V> {
-    let len = to_buffer_len::<T, U, V>(capacity);
-    ptr::slice_from_raw_parts(data, len) as *const _
+    let buffer_len = to_buffer_len::<T, U, V>(capacity);
+    ptr::slice_from_raw_parts(data, buffer_len) as *const _
 }
 
 #[allow(clippy::missing_safety_doc)]
@@ -18,8 +18,8 @@ pub fn slice_from_raw_parts_mut<T, U, V>(
     data: *mut usize,
     capacity: usize,
 ) -> *mut MultiSlice<T, U, V> {
-    let len = to_buffer_len::<T, U, V>(capacity);
-    ptr::slice_from_raw_parts_mut(data, len) as *mut _
+    let buffer_len = to_buffer_len::<T, U, V>(capacity);
+    ptr::slice_from_raw_parts_mut(data, buffer_len) as *mut _
 }
 
 #[inline(always)]

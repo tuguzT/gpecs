@@ -66,8 +66,13 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.len() == 0
     }
 
+    #[inline]
+    pub fn buffer_len(&self) -> usize {
+        self.buffer.capacity()
+    }
+
     pub fn capacity(&self) -> usize {
-        let buffer_len = self.buffer.capacity();
+        let buffer_len = self.buffer_len();
         to_len::<T, U, V>(buffer_len)
     }
 
@@ -108,7 +113,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub fn reserve(&mut self, additional: usize) {
         let old_capacity = self.capacity();
 
-        let old_buffer_len = self.buffer.capacity();
+        let old_buffer_len = self.buffer_len();
         let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
 
@@ -128,7 +133,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub fn reserve_exact(&mut self, additional: usize) {
         let old_capacity = self.capacity();
 
-        let old_buffer_len = self.buffer.capacity();
+        let old_buffer_len = self.buffer_len();
         let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
 
@@ -148,7 +153,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let old_capacity = self.capacity();
 
-        let old_buffer_len = self.buffer.capacity();
+        let old_buffer_len = self.buffer_len();
         let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
 
@@ -170,7 +175,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let old_capacity = self.capacity();
 
-        let old_buffer_len = self.buffer.capacity();
+        let old_buffer_len = self.buffer_len();
         let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
         let additional = new_buffer_len.saturating_sub(old_buffer_len);
 

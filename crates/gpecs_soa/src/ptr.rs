@@ -67,9 +67,19 @@ pub(crate) const fn to_len<T, U, V>(buffer_len: usize) -> usize {
         return 0;
     }
 
-    let mut len = 0;
-    while to_buffer_len::<T, U, V>(len + 1) <= buffer_len {
-        len += 1;
+    let max_len = {
+        let size_of_all = size_of::<T>() + size_of::<U>() + size_of::<V>();
+        let len_in_bytes = (buffer_len - 1) * size_of::<usize>();
+        len_in_bytes / size_of_all
+    };
+
+    let mut len = max_len;
+    while {
+        // this variable is not inlined (in debug builds) only for better debugging experience
+        let to_buffer_len = to_buffer_len::<T, U, V>(len);
+        to_buffer_len > buffer_len
+    } {
+        len -= 1;
     }
     len
 }

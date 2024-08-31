@@ -144,7 +144,7 @@ mod tests {
         let to_len = to_len::<u8, u8, u8>;
         let u8 = size_of::<u8>();
 
-        for len_in_bytes in 0..(size_of::<usize>() + 3 * u8) {
+        for len_in_bytes in 0..(size_of::<usize>() + 3 * u8 * 1) {
             assert_eq!(to_len(len_in_bytes), 0);
         }
 
@@ -185,7 +185,7 @@ mod tests {
         let to_len = to_len::<u16, u16, u16>;
         let u16 = size_of::<u16>();
 
-        for len_in_bytes in 0..(size_of::<usize>() + 3 * u16) {
+        for len_in_bytes in 0..(size_of::<usize>() + 3 * u16 * 1) {
             assert_eq!(to_len(len_in_bytes), 0);
         }
 
@@ -223,7 +223,7 @@ mod tests {
         let u32 = size_of::<u32>();
         let aligned_len = align_up::<u32>(size_of::<usize>());
 
-        for len_in_bytes in 0..(aligned_len + 3 * u32) {
+        for len_in_bytes in 0..(aligned_len + 3 * u32 * 1) {
             assert_eq!(to_len(len_in_bytes), 0);
         }
 
@@ -261,7 +261,7 @@ mod tests {
         let u64 = size_of::<u64>();
         let aligned_len = align_up::<u64>(size_of::<usize>());
 
-        for len_in_bytes in 0..(aligned_len + 3 * u64) {
+        for len_in_bytes in 0..(aligned_len + 3 * u64 * 1) {
             assert_eq!(to_len(len_in_bytes), 0);
         }
 

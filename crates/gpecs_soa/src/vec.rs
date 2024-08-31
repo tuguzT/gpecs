@@ -7,7 +7,7 @@ use core::{
     ptr, slice,
 };
 
-pub use crate::raw_vec::TryReserveError;
+pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
     ptr::ptrs,

@@ -49,7 +49,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn from_raw_parts(ptr: *mut u8, length: usize, capacity: usize) -> Self {
+    pub const unsafe fn from_raw_parts(ptr: *mut u8, length: usize, capacity: usize) -> Self {
         Self {
             buffer: unsafe { RawMultiVec::from_raw_parts(ptr, capacity) },
             len: length,
@@ -231,7 +231,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         self
     }
 
-    pub fn as_ptr(&self) -> *const u8 {
+    pub const fn as_ptr(&self) -> *const u8 {
         self.buffer.ptr().cast_const()
     }
 

@@ -1,7 +1,6 @@
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
-    mem::MaybeUninit,
     ptr::{self, NonNull},
     slice,
 };
@@ -11,15 +10,15 @@ use crate::ptr::{ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, to_len, P
 #[repr(transparent)]
 pub struct MultiSlice<T, U, V> {
     phantom: PhantomData<(T, U, V)>,
-    buffer: [MaybeUninit<usize>],
+    buffer: [u8],
 }
 
 impl<T, U, V> MultiSlice<T, U, V> {
     #[inline]
     pub const fn len(&self) -> usize {
-        match self.capacity() {
+        match self.buffer_capacity() {
             0 => 0,
-            _ => unsafe { ptr::read(self.as_ptr()) },
+            _ => unsafe { ptr::read(self.as_ptr().cast()) },
         }
     }
 
@@ -29,24 +28,24 @@ impl<T, U, V> MultiSlice<T, U, V> {
     }
 
     #[inline]
-    pub const fn buffer_len(&self) -> usize {
+    pub const fn buffer_capacity(&self) -> usize {
         self.buffer.len()
     }
 
     #[inline]
     pub const fn capacity(&self) -> usize {
-        let buffer_len = self.buffer_len();
+        let buffer_len = self.buffer_capacity();
         to_len::<T, U, V>(buffer_len)
     }
 
     #[inline]
-    pub const fn as_ptr(&self) -> *const usize {
-        self.buffer.as_ptr().cast()
+    pub const fn as_ptr(&self) -> *const u8 {
+        self.buffer.as_ptr()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut usize {
-        self.buffer.as_mut_ptr().cast()
+    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.buffer.as_mut_ptr()
     }
 
     #[inline]
@@ -63,7 +62,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
                 end,
             } = ptrs::<T, U, V>(ptr, len);
             debug_assert_eq!(ptr, start);
-            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_len());
+            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_capacity());
 
             (t_ptr, u_ptr, v_ptr)
         }
@@ -83,7 +82,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
                 end,
             } = ptrs::<T, U, V>(ptr, len);
             debug_assert_eq!(ptr, start);
-            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_len());
+            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_capacity());
 
             (t_ptr, u_ptr, v_ptr)
         }
@@ -170,7 +169,7 @@ impl<T, U, V> Drop for MultiSlice<T, U, V> {
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts<'slice, T, U, V>(
-    data: *const usize,
+    data: *const u8,
     capacity: usize,
 ) -> &'slice MultiSlice<T, U, V> {
     unsafe { &*slice_from_raw_parts(data, capacity) }
@@ -179,7 +178,7 @@ pub unsafe fn from_raw_parts<'slice, T, U, V>(
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts_mut<'slice, T, U, V>(
-    data: *mut usize,
+    data: *mut u8,
     capacity: usize,
 ) -> &'slice mut MultiSlice<T, U, V> {
     unsafe { &mut *slice_from_raw_parts_mut(data, capacity) }

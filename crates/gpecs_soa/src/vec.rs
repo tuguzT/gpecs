@@ -1,37 +1,37 @@
-use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
+use alloc::boxed::Box;
 use core::{
     cmp,
     fmt::{self, Debug},
-    marker::PhantomData,
-    mem::{ManuallyDrop, MaybeUninit},
+    mem::ManuallyDrop,
     ops::{Deref, DerefMut},
-    ptr,
+    ptr, slice,
 };
 
+pub use crate::raw_vec::TryReserveError;
+
 use crate::{
-    ptr::{ptrs, slice_from_raw_parts_mut, to_buffer_len, to_len},
+    ptr::ptrs,
+    raw_vec::RawMultiVec,
     slice::{from_raw_parts, from_raw_parts_mut, MultiSlice},
 };
 
-#[repr(transparent)]
 pub struct MultiVec<T, U, V> {
-    buffer: Vec<MaybeUninit<usize>>,
-    phantom: PhantomData<(Vec<T>, Vec<U>, Vec<V>)>,
+    buffer: RawMultiVec<T, U, V>,
+    len: usize,
 }
 
 impl<T, U, V> MultiVec<T, U, V> {
     pub const fn new() -> Self {
         Self {
-            buffer: Vec::new(),
-            phantom: PhantomData,
+            buffer: RawMultiVec::new(),
+            len: 0,
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
-        let capacity = to_buffer_len::<T, U, V>(capacity);
         let mut me = Self {
-            buffer: Vec::with_capacity(capacity),
-            phantom: PhantomData,
+            buffer: RawMultiVec::with_capacity(capacity),
+            len: 0,
         };
 
         me.set_len_in_buffer(0);
@@ -39,41 +39,46 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
-        let mut me = Self::new();
-        me.try_reserve(capacity)?;
+        let mut me = Self {
+            buffer: RawMultiVec::try_with_capacity(capacity)?,
+            len: 0,
+        };
+
+        me.set_len_in_buffer(0);
         Ok(me)
     }
 
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn from_raw_parts(ptr: *mut usize, length: usize, capacity: usize) -> Self {
-        let capacity = to_buffer_len::<T, U, V>(capacity);
+    pub unsafe fn from_raw_parts(ptr: *mut u8, length: usize, capacity: usize) -> Self {
         Self {
-            buffer: unsafe { Vec::from_raw_parts(ptr.cast(), length, capacity) },
-            phantom: PhantomData,
+            buffer: unsafe { RawMultiVec::from_raw_parts(ptr, capacity) },
+            len: length,
         }
     }
 
-    pub fn into_raw_parts(self) -> (*mut usize, usize, usize) {
+    pub fn into_raw_parts(self) -> (*mut u8, usize, usize) {
         let mut me = ManuallyDrop::new(self);
         (me.as_mut_ptr(), me.len(), me.capacity())
     }
 
-    pub fn len(&self) -> usize {
-        self.buffer.len()
+    #[inline]
+    pub const fn len(&self) -> usize {
+        self.len
     }
 
-    pub fn is_empty(&self) -> bool {
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     #[inline]
-    pub fn buffer_len(&self) -> usize {
-        self.buffer.capacity()
+    pub const fn buffer_capacity(&self) -> usize {
+        self.buffer.buffer_capacity()
     }
 
-    pub fn capacity(&self) -> usize {
-        let buffer_len = self.buffer_len();
-        to_len::<T, U, V>(buffer_len)
+    #[inline]
+    pub const fn capacity(&self) -> usize {
+        self.buffer.capacity()
     }
 
     fn move_right(&mut self, old_capacity: usize) {
@@ -111,18 +116,12 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        let old_capacity = self.capacity();
-
-        let old_buffer_len = self.buffer_len();
-        let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
-        let additional = new_buffer_len.saturating_sub(old_buffer_len);
-
-        unsafe {
-            let len = self.len();
-            self.buffer.set_len(old_buffer_len);
-            self.buffer.reserve(additional);
-            self.buffer.set_len(len);
+        if !self.buffer.needs_to_grow(self.len, additional) {
+            return;
         }
+
+        let old_capacity = self.capacity();
+        self.buffer.reserve(self.len, additional);
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -131,18 +130,12 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     pub fn reserve_exact(&mut self, additional: usize) {
-        let old_capacity = self.capacity();
-
-        let old_buffer_len = self.buffer_len();
-        let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
-        let additional = new_buffer_len.saturating_sub(old_buffer_len);
-
-        unsafe {
-            let len = self.len();
-            self.buffer.set_len(old_buffer_len);
-            self.buffer.reserve_exact(additional);
-            self.buffer.set_len(len);
+        if !self.buffer.needs_to_grow(self.len, additional) {
+            return;
         }
+
+        let old_capacity = self.capacity();
+        self.buffer.reserve_exact(self.len, additional);
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -151,19 +144,12 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let old_capacity = self.capacity();
-
-        let old_buffer_len = self.buffer_len();
-        let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
-        let additional = new_buffer_len.saturating_sub(old_buffer_len);
-
-        unsafe {
-            let len = self.len();
-            self.buffer.set_len(old_buffer_len);
-            let result = self.buffer.try_reserve(additional);
-            self.buffer.set_len(len);
-            result?
+        if !self.buffer.needs_to_grow(self.len, additional) {
+            return Ok(());
         }
+
+        let old_capacity = self.capacity();
+        self.buffer.try_reserve(self.len, additional)?;
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -173,19 +159,12 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        let old_capacity = self.capacity();
-
-        let old_buffer_len = self.buffer_len();
-        let new_buffer_len = to_buffer_len::<T, U, V>(self.len() + additional);
-        let additional = new_buffer_len.saturating_sub(old_buffer_len);
-
-        unsafe {
-            let len = self.len();
-            self.buffer.set_len(old_buffer_len);
-            let result = self.buffer.try_reserve_exact(additional);
-            self.buffer.set_len(len);
-            result?
+        if !self.buffer.needs_to_grow(self.len, additional) {
+            return Ok(());
         }
+
+        let old_capacity = self.capacity();
+        self.buffer.try_reserve_exact(self.len, additional)?;
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -195,19 +174,12 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 
     pub fn shrink_to_fit(&mut self) {
-        if self.capacity() == self.len() {
+        if self.capacity() <= self.len {
             return;
         }
 
-        let len = self.len();
-        self.move_left(len);
-
-        unsafe {
-            let new_buffer_len = to_buffer_len::<T, U, V>(len);
-            self.buffer.set_len(new_buffer_len);
-            self.buffer.shrink_to_fit();
-            self.buffer.set_len(len);
-        }
+        self.move_left(self.len);
+        self.buffer.shrink_to_fit(self.len);
     }
 
     pub fn shrink_to(&mut self, min_capacity: usize) {
@@ -215,45 +187,35 @@ impl<T, U, V> MultiVec<T, U, V> {
             return;
         }
 
-        let len = self.len();
-        let new_capacity = cmp::max(len, min_capacity);
+        let new_capacity = cmp::max(self.len, min_capacity);
         self.move_left(new_capacity);
-
-        unsafe {
-            let new_buffer_len = to_buffer_len::<T, U, V>(new_capacity);
-            self.buffer.set_len(new_buffer_len);
-            self.buffer.shrink_to_fit();
-            self.buffer.set_len(len);
-        }
+        self.buffer.shrink_to_fit(new_capacity);
     }
 
-    pub fn into_boxed_slice(self) -> Box<MultiSlice<T, U, V>> {
-        let mut me = ManuallyDrop::new(self);
-        me.shrink_to_fit();
+    pub fn into_boxed_slice(mut self) -> Box<MultiSlice<T, U, V>> {
+        self.shrink_to_fit();
+        let me = ManuallyDrop::new(self);
 
-        let data = me.as_mut_ptr();
-        let capacity = me.capacity();
         unsafe {
-            let raw = slice_from_raw_parts_mut(data, capacity);
-            Box::from_raw(raw)
+            let buffer = ptr::read(&me.buffer);
+            let len = me.len();
+            buffer.into_box(len)
         }
     }
 
     pub fn truncate(&mut self, len: usize) {
-        let new_len = len;
-        let old_len = self.len();
-        if new_len > old_len {
+        if len > self.len {
             return;
         }
 
-        let remaining_len = old_len - new_len;
+        let remaining_len = self.len - len;
         unsafe {
             let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_slice = ptr::slice_from_raw_parts_mut(t_ptr.add(new_len), remaining_len);
-            let u_slice = ptr::slice_from_raw_parts_mut(u_ptr.add(new_len), remaining_len);
-            let v_slice = ptr::slice_from_raw_parts_mut(v_ptr.add(new_len), remaining_len);
+            let t_slice = ptr::slice_from_raw_parts_mut(t_ptr.add(len), remaining_len);
+            let u_slice = ptr::slice_from_raw_parts_mut(u_ptr.add(len), remaining_len);
+            let v_slice = ptr::slice_from_raw_parts_mut(v_ptr.add(len), remaining_len);
 
-            self.set_len(new_len);
+            self.set_len(len);
 
             ptr::drop_in_place(t_slice);
             ptr::drop_in_place(u_slice);
@@ -269,24 +231,59 @@ impl<T, U, V> MultiVec<T, U, V> {
         self
     }
 
-    pub fn as_ptr(&self) -> *const usize {
-        self.buffer.as_ptr().cast()
+    pub fn as_ptr(&self) -> *const u8 {
+        self.buffer.ptr().cast_const()
     }
 
-    pub fn as_mut_ptr(&mut self) -> *mut usize {
-        self.buffer.as_mut_ptr().cast()
+    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.buffer.ptr()
+    }
+
+    pub fn as_ptrs(&self) -> (*const T, *const U, *const V) {
+        let (t_ptr, u_ptr, v_ptr) = self.buffer.ptrs();
+        (t_ptr, u_ptr, v_ptr)
+    }
+
+    pub fn as_mut_ptrs(&mut self) -> (*mut T, *mut U, *mut V) {
+        self.buffer.ptrs()
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> (&[T], &[U], &[V]) {
+        let (t_data, u_data, v_data) = self.as_ptrs();
+        let len = self.len();
+
+        unsafe {
+            let t_slice = slice::from_raw_parts(t_data, len);
+            let u_slice = slice::from_raw_parts(u_data, len);
+            let v_slice = slice::from_raw_parts(v_data, len);
+            (t_slice, u_slice, v_slice)
+        }
+    }
+
+    #[inline]
+    pub fn as_mut_slices(&mut self) -> (&mut [T], &mut [U], &mut [V]) {
+        let (t_data, u_data, v_data) = self.as_mut_ptrs();
+        let len = self.len();
+
+        unsafe {
+            let t_slice = slice::from_raw_parts_mut(t_data, len);
+            let u_slice = slice::from_raw_parts_mut(u_data, len);
+            let v_slice = slice::from_raw_parts_mut(v_data, len);
+            (t_slice, u_slice, v_slice)
+        }
     }
 
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn set_len(&mut self, new_len: usize) {
-        unsafe {
-            self.buffer.set_len(new_len);
-            self.set_len_in_buffer(new_len);
-        }
+        debug_assert!(new_len <= self.capacity());
+
+        self.len = new_len;
+        self.set_len_in_buffer(new_len);
     }
 
     fn set_len_in_buffer(&mut self, new_len: usize) {
-        if self.capacity() == 0 {
+        if self.buffer_capacity() == 0 {
             return;
         }
 
@@ -309,9 +306,8 @@ impl<T, U, V> MultiVec<T, U, V> {
             assert_failed(index, len);
         }
 
-        let capacity = self.capacity();
-        if len == capacity {
-            self.reserve(1);
+        if len == self.capacity() {
+            self.buffer.grow_one();
         }
 
         unsafe {
@@ -335,9 +331,8 @@ impl<T, U, V> MultiVec<T, U, V> {
 
     pub fn push(&mut self, values: (T, U, V)) {
         let len = self.len();
-        let capacity = self.capacity();
-        if len == capacity {
-            self.reserve(1);
+        if len == self.capacity() {
+            self.buffer.grow_one();
         }
 
         unsafe {
@@ -560,7 +555,7 @@ mod tests {
 
     #[test]
     fn three_items() {
-        let mut multi_vec = MultiVec::<u16, u64, u8>::new();
+        let mut multi_vec = MultiVec::<u16, u8, u128>::new();
         multi_vec.insert(0, (1, 2, 3));
         multi_vec.insert(0, (4, 5, 6));
         multi_vec.insert(1, (7, 8, 9));

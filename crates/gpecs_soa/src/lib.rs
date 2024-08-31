@@ -10,3 +10,5 @@ extern crate alloc;
 pub mod ptr;
 pub mod slice;
 pub mod vec;
+
+mod raw_vec;

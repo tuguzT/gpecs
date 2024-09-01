@@ -1,4 +1,4 @@
-use core::ptr;
+use core::ptr::{self, NonNull};
 
 use crate::slice::MultiSlice;
 
@@ -8,8 +8,8 @@ pub const fn slice_from_raw_parts<T, U, V>(
     data: *const u8,
     capacity: usize,
 ) -> *const MultiSlice<T, U, V> {
-    let buffer_len = to_len_in_bytes::<T, U, V>(capacity);
-    ptr::slice_from_raw_parts(data, buffer_len) as *const _
+    let len_in_bytes = to_len_in_bytes::<T, U, V>(capacity);
+    slice_from_len_in_bytes(data, len_in_bytes)
 }
 
 #[allow(clippy::missing_safety_doc)]
@@ -18,8 +18,24 @@ pub fn slice_from_raw_parts_mut<T, U, V>(
     data: *mut u8,
     capacity: usize,
 ) -> *mut MultiSlice<T, U, V> {
-    let buffer_len = to_len_in_bytes::<T, U, V>(capacity);
-    ptr::slice_from_raw_parts_mut(data, buffer_len) as *mut _
+    let len_in_bytes = to_len_in_bytes::<T, U, V>(capacity);
+    slice_from_len_in_bytes_mut(data, len_in_bytes)
+}
+
+#[inline(always)]
+pub(crate) const fn slice_from_len_in_bytes<T, U, V>(
+    data: *const u8,
+    len_in_bytes: usize,
+) -> *const MultiSlice<T, U, V> {
+    ptr::slice_from_raw_parts(data, len_in_bytes) as *const _
+}
+
+#[inline(always)]
+pub(crate) fn slice_from_len_in_bytes_mut<T, U, V>(
+    data: *mut u8,
+    len_in_bytes: usize,
+) -> *mut MultiSlice<T, U, V> {
+    ptr::slice_from_raw_parts_mut(data, len_in_bytes) as *mut _
 }
 
 #[inline(always)]
@@ -49,7 +65,7 @@ pub(crate) const fn align_up<T>(addr: usize) -> usize {
 
 #[inline]
 pub(crate) const fn to_len_in_bytes<T, U, V>(len: usize) -> usize {
-    if len == 0 {
+    if min_size_of::<T, U, V>() == 0 || len == 0 {
         return 0;
     }
 
@@ -73,7 +89,7 @@ pub(crate) const fn align_of_buffer<T, U, V>() -> usize {
 
 #[inline]
 pub(crate) const fn to_len<T, U, V>(len_in_bytes: usize) -> usize {
-    if len_in_bytes < size_of::<usize>() {
+    if min_size_of::<T, U, V>() == 0 || len_in_bytes < size_of::<usize>() {
         return 0;
     }
 
@@ -90,30 +106,22 @@ pub(crate) const fn to_len<T, U, V>(len_in_bytes: usize) -> usize {
     len
 }
 
-pub(crate) struct Ptrs<T, U, V> {
-    pub start: *mut u8,
-    pub t_ptr: *mut T,
-    pub u_ptr: *mut U,
-    pub v_ptr: *mut V,
-    pub end: *mut u8,
-}
-
 #[inline]
-pub(crate) unsafe fn ptrs<T, U, V>(ptr: *mut u8, len: usize) -> Ptrs<T, U, V> {
-    let (start, ptr) = unsafe { align_cast_then_advance::<usize>(ptr.cast(), 1) };
-    let start = start.cast();
+pub(crate) unsafe fn ptrs<T, U, V>(ptr: *mut u8, len: usize) -> (*mut T, *mut U, *mut V) {
+    if min_size_of::<T, U, V>() == 0 {
+        return (
+            NonNull::dangling().as_ptr(),
+            NonNull::dangling().as_ptr(),
+            NonNull::dangling().as_ptr(),
+        );
+    }
 
+    let (_, ptr) = unsafe { align_cast_then_advance::<usize>(ptr.cast(), 1) };
     let (t_ptr, ptr) = unsafe { align_cast_then_advance(ptr, len) };
     let (u_ptr, ptr) = unsafe { align_cast_then_advance(ptr, len) };
-    let (v_ptr, end) = unsafe { align_cast_then_advance(ptr, len) };
+    let (v_ptr, _) = unsafe { align_cast_then_advance(ptr, len) };
 
-    Ptrs {
-        start,
-        t_ptr,
-        u_ptr,
-        v_ptr,
-        end,
-    }
+    (t_ptr, u_ptr, v_ptr)
 }
 
 #[cfg(test)]

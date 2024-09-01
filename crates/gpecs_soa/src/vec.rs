@@ -4,15 +4,16 @@ use core::{
     fmt::{self, Debug},
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
-    ptr, slice,
+    ptr::{self, addr_of, addr_of_mut},
+    slice,
 };
 
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::ptrs,
+    ptr::{min_size_of, ptrs},
     raw_vec::RawMultiVec,
-    slice::{from_raw_parts, from_raw_parts_mut, MultiSlice},
+    slice::{from_len_in_bytes, from_len_in_bytes_mut, MultiSlice},
 };
 
 pub struct MultiVec<T, U, V> {
@@ -92,9 +93,9 @@ impl<T, U, V> MultiVec<T, U, V> {
             let old_ptrs = ptrs::<T, U, V>(ptr, old_capacity);
             let new_ptrs = ptrs::<T, U, V>(ptr, new_capacity);
 
-            ptr::copy(old_ptrs.v_ptr, new_ptrs.v_ptr, self.len());
-            ptr::copy(old_ptrs.u_ptr, new_ptrs.u_ptr, self.len());
-            ptr::copy(old_ptrs.t_ptr, new_ptrs.t_ptr, self.len());
+            ptr::copy(old_ptrs.2, new_ptrs.2, self.len());
+            ptr::copy(old_ptrs.1, new_ptrs.1, self.len());
+            ptr::copy(old_ptrs.0, new_ptrs.0, self.len());
         }
     }
 
@@ -109,9 +110,9 @@ impl<T, U, V> MultiVec<T, U, V> {
             let old_ptrs = ptrs::<T, U, V>(ptr, old_capacity);
             let new_ptrs = ptrs::<T, U, V>(ptr, new_capacity);
 
-            ptr::copy(old_ptrs.t_ptr, new_ptrs.t_ptr, self.len());
-            ptr::copy(old_ptrs.u_ptr, new_ptrs.u_ptr, self.len());
-            ptr::copy(old_ptrs.v_ptr, new_ptrs.v_ptr, self.len());
+            ptr::copy(old_ptrs.0, new_ptrs.0, self.len());
+            ptr::copy(old_ptrs.1, new_ptrs.1, self.len());
+            ptr::copy(old_ptrs.2, new_ptrs.2, self.len());
         }
     }
 
@@ -453,17 +454,21 @@ impl<T, U, V> Deref for MultiVec<T, U, V> {
     type Target = MultiSlice<T, U, V>;
 
     fn deref(&self) -> &Self::Target {
-        let data = self.as_ptr();
-        let capacity = self.capacity();
-        unsafe { from_raw_parts(data, capacity) }
+        let (data, len_in_bytes) = match min_size_of::<T, U, V>() {
+            0 => (addr_of!(self.len).cast(), size_of::<usize>()),
+            _ => (self.as_ptr(), self.buffer_capacity()),
+        };
+        unsafe { from_len_in_bytes(data, len_in_bytes) }
     }
 }
 
 impl<T, U, V> DerefMut for MultiVec<T, U, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let data = self.as_mut_ptr();
-        let capacity = self.capacity();
-        unsafe { from_raw_parts_mut(data, capacity) }
+        let (data, len_in_bytes) = match min_size_of::<T, U, V>() {
+            0 => (addr_of_mut!(self.len).cast(), size_of::<usize>()),
+            _ => (self.as_mut_ptr(), self.buffer_capacity()),
+        };
+        unsafe { from_len_in_bytes_mut(data, len_in_bytes) }
     }
 }
 
@@ -593,6 +598,68 @@ mod tests {
         multi_vec.push((0, 0, 0));
         multi_vec.push((0, 0, 0));
         multi_vec.push((0, 0, 0));
+        multi_vec.reserve(1);
+        assert!(multi_vec.capacity() >= 4);
+        multi_vec.reserve_exact(6);
+        assert!(multi_vec.capacity() >= 9);
+
+        multi_vec.shrink_to(6);
+        assert!(multi_vec.capacity() >= 6);
+        multi_vec.shrink_to(0);
+        assert!(multi_vec.capacity() >= 3);
+    }
+
+    #[test]
+    fn tree_items_zst() {
+        #[derive(Debug, PartialEq, Eq)]
+        struct ZST1;
+
+        #[derive(Debug, PartialEq, Eq)]
+        struct ZST2(());
+
+        #[derive(Debug, PartialEq, Eq)]
+        struct ZST3 {
+            empty: (),
+        }
+
+        let mut multi_vec = MultiVec::<ZST1, ZST2, ZST3>::new();
+        multi_vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
+        multi_vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
+        multi_vec.insert(1, (ZST1, ZST2(()), ZST3 { empty: () }));
+
+        assert_eq!(multi_vec.len(), 3);
+        assert!(multi_vec.capacity() >= 3);
+
+        let slice = multi_vec.as_slice();
+        assert_eq!(slice.len(), 3);
+        assert!(slice.capacity() >= 3);
+        assert_eq!(
+            slice.as_slices(),
+            (
+                [ZST1, ZST1, ZST1].as_slice(),
+                [ZST2(()), ZST2(()), ZST2(())].as_slice(),
+                [ZST3 { empty: () }, ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
+            ),
+        );
+
+        let (t, u, v) = multi_vec.swap_remove(1);
+        assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
+        assert_eq!(multi_vec.len(), 2);
+        assert!(multi_vec.capacity() >= 3);
+
+        let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
+        assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
+        assert_eq!(multi_vec.len(), 1);
+        assert!(multi_vec.capacity() >= 3);
+
+        let (t, u, v) = multi_vec.remove(0);
+        assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
+        assert!(multi_vec.is_empty());
+        assert!(multi_vec.capacity() >= 3);
+
+        multi_vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+        multi_vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+        multi_vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
         multi_vec.reserve(1);
         assert!(multi_vec.capacity() >= 4);
         multi_vec.reserve_exact(6);

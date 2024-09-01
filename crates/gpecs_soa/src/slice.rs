@@ -5,7 +5,10 @@ use core::{
     slice,
 };
 
-use crate::ptr::{ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, to_len, Ptrs};
+use crate::ptr::{
+    min_size_of, ptrs, slice_from_len_in_bytes, slice_from_len_in_bytes_mut, slice_from_raw_parts,
+    slice_from_raw_parts_mut, to_len,
+};
 
 #[repr(transparent)]
 pub struct MultiSlice<T, U, V> {
@@ -34,8 +37,12 @@ impl<T, U, V> MultiSlice<T, U, V> {
 
     #[inline]
     pub const fn capacity(&self) -> usize {
-        let buffer_len = self.buffer_capacity();
-        to_len::<T, U, V>(buffer_len)
+        if min_size_of::<T, U, V>() == 0 {
+            usize::MAX
+        } else {
+            let len_in_bytes = self.buffer_capacity();
+            to_len::<T, U, V>(len_in_bytes)
+        }
     }
 
     #[inline]
@@ -54,16 +61,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
         let len = self.capacity();
 
         unsafe {
-            let Ptrs {
-                start,
-                t_ptr,
-                u_ptr,
-                v_ptr,
-                end,
-            } = ptrs::<T, U, V>(ptr, len);
-            debug_assert_eq!(ptr, start);
-            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_capacity());
-
+            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
             (t_ptr, u_ptr, v_ptr)
         }
     }
@@ -74,16 +72,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
         let len = self.capacity();
 
         unsafe {
-            let Ptrs {
-                start,
-                t_ptr,
-                u_ptr,
-                v_ptr,
-                end,
-            } = ptrs::<T, U, V>(ptr, len);
-            debug_assert_eq!(ptr, start);
-            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_capacity());
-
+            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
             (t_ptr, u_ptr, v_ptr)
         }
     }
@@ -134,14 +123,14 @@ where
 impl<T, U, V> Default for &MultiSlice<T, U, V> {
     fn default() -> Self {
         let data = NonNull::dangling().as_ptr();
-        unsafe { from_raw_parts(data, 0) }
+        unsafe { from_len_in_bytes(data, 0) }
     }
 }
 
 impl<T, U, V> Default for &mut MultiSlice<T, U, V> {
     fn default() -> Self {
         let data = NonNull::dangling().as_ptr();
-        unsafe { from_raw_parts_mut(data, 0) }
+        unsafe { from_len_in_bytes_mut(data, 0) }
     }
 }
 
@@ -182,4 +171,20 @@ pub unsafe fn from_raw_parts_mut<'slice, T, U, V>(
     capacity: usize,
 ) -> &'slice mut MultiSlice<T, U, V> {
     unsafe { &mut *slice_from_raw_parts_mut(data, capacity) }
+}
+
+#[inline]
+pub(crate) unsafe fn from_len_in_bytes<'slice, T, U, V>(
+    data: *const u8,
+    len_in_bytes: usize,
+) -> &'slice MultiSlice<T, U, V> {
+    unsafe { &*slice_from_len_in_bytes(data, len_in_bytes) }
+}
+
+#[inline]
+pub(crate) unsafe fn from_len_in_bytes_mut<'slice, T, U, V>(
+    data: *mut u8,
+    len_in_bytes: usize,
+) -> &'slice mut MultiSlice<T, U, V> {
+    unsafe { &mut *slice_from_len_in_bytes_mut(data, len_in_bytes) }
 }

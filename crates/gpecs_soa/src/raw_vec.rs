@@ -12,11 +12,11 @@ use core::{
 };
 
 use crate::{
-    ptr::{
-        align_of_buffer, min_size_of, ptrs, slice_from_raw_parts_mut, to_len, to_len_in_bytes, Ptrs,
-    },
+    ptr::{align_of_buffer, min_size_of, ptrs, slice_from_raw_parts_mut, to_len, to_len_in_bytes},
     slice::MultiSlice,
 };
+
+use self::TryReserveErrorKind::*;
 
 /// The error type for `try_reserve` methods.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -49,8 +49,6 @@ pub enum TryReserveErrorKind {
         non_exhaustive: (),
     },
 }
-
-use self::TryReserveErrorKind::*;
 
 impl From<TryReserveErrorKind> for TryReserveError {
     #[inline]
@@ -242,16 +240,7 @@ impl<T, U, V> RawMultiVec<T, U, V> {
         let len = self.capacity();
 
         unsafe {
-            let Ptrs {
-                start,
-                t_ptr,
-                u_ptr,
-                v_ptr,
-                end,
-            } = ptrs::<T, U, V>(ptr, len);
-            debug_assert_eq!(ptr, start);
-            debug_assert_eq!(end.offset_from(start) as usize, self.buffer_capacity);
-
+            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
             (t_ptr, u_ptr, v_ptr)
         }
     }

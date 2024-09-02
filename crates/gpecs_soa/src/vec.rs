@@ -294,6 +294,34 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
     }
 
+    pub fn swap_remove(&mut self, index: usize) -> (T, U, V) {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed(index: usize, len: usize) -> ! {
+            panic!("swap_remove index (is {index}) should be < len (is {len})");
+        }
+
+        let len = self.len();
+        if index >= len {
+            assert_failed(index, len);
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+            let t_value = ptr::read(t_ptr.add(index));
+            let u_value = ptr::read(u_ptr.add(index));
+            let v_value = ptr::read(v_ptr.add(index));
+
+            ptr::copy(t_ptr.add(len - 1), t_ptr.add(index), 1);
+            ptr::copy(u_ptr.add(len - 1), u_ptr.add(index), 1);
+            ptr::copy(v_ptr.add(len - 1), v_ptr.add(index), 1);
+
+            self.set_len(len - 1);
+            (t_value, u_value, v_value)
+        }
+    }
+
     pub fn insert(&mut self, index: usize, elements: (T, U, V)) {
         #[cold]
         #[inline(never)]
@@ -330,54 +358,6 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
     }
 
-    pub fn push(&mut self, values: (T, U, V)) {
-        let len = self.len();
-        if len == self.capacity() {
-            self.buffer.grow_one();
-        }
-
-        unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_ptr = t_ptr.add(len);
-            let u_ptr = u_ptr.add(len);
-            let v_ptr = v_ptr.add(len);
-
-            ptr::write(t_ptr, values.0);
-            ptr::write(u_ptr, values.1);
-            ptr::write(v_ptr, values.2);
-
-            self.set_len(len + 1);
-        }
-    }
-
-    pub fn swap_remove(&mut self, index: usize) -> (T, U, V) {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("swap_remove index (is {index}) should be < len (is {len})");
-        }
-
-        let len = self.len();
-        if index >= len {
-            assert_failed(index, len);
-        }
-
-        unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_value = ptr::read(t_ptr.add(index));
-            let u_value = ptr::read(u_ptr.add(index));
-            let v_value = ptr::read(v_ptr.add(index));
-
-            ptr::copy(t_ptr.add(len - 1), t_ptr.add(index), 1);
-            ptr::copy(u_ptr.add(len - 1), u_ptr.add(index), 1);
-            ptr::copy(v_ptr.add(len - 1), v_ptr.add(index), 1);
-
-            self.set_len(len - 1);
-            (t_value, u_value, v_value)
-        }
-    }
-
     pub fn remove(&mut self, index: usize) -> (T, U, V) {
         #[cold]
         #[inline(never)]
@@ -407,6 +387,26 @@ impl<T, U, V> SoaVec<T, U, V> {
 
             self.set_len(len - 1);
             (t_value, u_value, v_value)
+        }
+    }
+
+    pub fn push(&mut self, values: (T, U, V)) {
+        let len = self.len();
+        if len == self.capacity() {
+            self.buffer.grow_one();
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+            let t_ptr = t_ptr.add(len);
+            let u_ptr = u_ptr.add(len);
+            let v_ptr = v_ptr.add(len);
+
+            ptr::write(t_ptr, values.0);
+            ptr::write(u_ptr, values.1);
+            ptr::write(v_ptr, values.2);
+
+            self.set_len(len + 1);
         }
     }
 

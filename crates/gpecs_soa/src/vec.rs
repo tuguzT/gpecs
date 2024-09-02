@@ -560,10 +560,10 @@ mod tests {
 
     #[test]
     fn three_items() {
-        let mut multi_vec = MultiVec::<u16, u8, u128>::new();
-        multi_vec.insert(0, (1, 2, 3));
-        multi_vec.insert(0, (4, 5, 6));
-        multi_vec.insert(1, (7, 8, 9));
+        let mut multi_vec = MultiVec::<u16, String, u128>::new();
+        multi_vec.insert(0, (1, "2".to_owned(), 3));
+        multi_vec.insert(0, (4, "5".to_owned(), 6));
+        multi_vec.insert(1, (7, "8".to_owned(), 9));
 
         assert_eq!(multi_vec.len(), 3);
         assert!(multi_vec.capacity() >= 3);
@@ -575,29 +575,29 @@ mod tests {
             slice.as_slices(),
             (
                 [4, 7, 1].as_slice(),
-                [5, 8, 2].as_slice(),
+                ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
                 [6, 9, 3].as_slice(),
             ),
         );
 
         let (t, u, v) = multi_vec.swap_remove(1);
-        assert_eq!((t, u, v), (7, 8, 9));
+        assert_eq!((t, u, v), (7, "8".to_owned(), 9));
         assert_eq!(multi_vec.len(), 2);
         assert!(multi_vec.capacity() >= 3);
 
         let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
-        assert_eq!((t, u, v), (1, 2, 3));
+        assert_eq!((t, u, v), (1, "2".to_owned(), 3));
         assert_eq!(multi_vec.len(), 1);
         assert!(multi_vec.capacity() >= 3);
 
         let (t, u, v) = multi_vec.remove(0);
-        assert_eq!((t, u, v), (4, 5, 6));
+        assert_eq!((t, u, v), (4, "5".to_owned(), 6));
         assert!(multi_vec.is_empty());
         assert!(multi_vec.capacity() >= 3);
 
-        multi_vec.push((0, 0, 0));
-        multi_vec.push((0, 0, 0));
-        multi_vec.push((0, 0, 0));
+        multi_vec.push((0, "0".to_owned(), 0));
+        multi_vec.push((0, "0".to_owned(), 0));
+        multi_vec.push((0, "0".to_owned(), 0));
         multi_vec.reserve(1);
         assert!(multi_vec.capacity() >= 4);
         multi_vec.reserve_exact(6);

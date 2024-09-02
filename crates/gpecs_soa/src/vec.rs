@@ -390,6 +390,147 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
     }
 
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut((&T, &U, &V)) -> bool,
+    {
+        self.retain_mut(|(t, u, v)| f((t, u, v)));
+    }
+
+    pub fn retain_mut<F>(&mut self, mut f: F)
+    where
+        F: FnMut((&mut T, &mut U, &mut V)) -> bool,
+    {
+        let original_len = self.len();
+        // Avoid double drop if the drop guard is not executed,
+        // since we may make some holes during the process.
+        unsafe { self.set_len(0) };
+
+        // Vec: [Kept, Kept, Hole, Hole, Hole, Hole, Unchecked, Unchecked]
+        //      |<-              processed len   ->| ^- next to check
+        //                  |<-  deleted cnt     ->|
+        //      |<-              original_len                          ->|
+        // Kept: Elements which predicate returns true on.
+        // Hole: Moved or dropped element slot.
+        // Unchecked: Unchecked valid elements.
+        //
+        // This drop guard will be invoked when predicate or `drop` of element panicked.
+        // It shifts unchecked elements to cover holes and `set_len` to the correct length.
+        // In cases when predicate and `drop` never panick, it will be optimized out.
+        struct BackshiftOnDrop<'a, T, U, V> {
+            v: &'a mut SoaVec<T, U, V>,
+            processed_len: usize,
+            deleted_cnt: usize,
+            original_len: usize,
+        }
+
+        impl<T, U, V> Drop for BackshiftOnDrop<'_, T, U, V> {
+            fn drop(&mut self) {
+                if self.deleted_cnt > 0 {
+                    // SAFETY: Trailing unchecked items must be valid since we never touch them.
+                    unsafe {
+                        let (t_ptr, u_ptr, v_ptr) = self.v.as_mut_ptrs();
+                        ptr::copy(
+                            t_ptr.add(self.processed_len),
+                            t_ptr.add(self.processed_len - self.deleted_cnt),
+                            self.original_len - self.processed_len,
+                        );
+                        ptr::copy(
+                            u_ptr.add(self.processed_len),
+                            u_ptr.add(self.processed_len - self.deleted_cnt),
+                            self.original_len - self.processed_len,
+                        );
+                        ptr::copy(
+                            v_ptr.add(self.processed_len),
+                            v_ptr.add(self.processed_len - self.deleted_cnt),
+                            self.original_len - self.processed_len,
+                        );
+                    }
+                }
+                // SAFETY: After filling holes, all items are in contiguous memory.
+                unsafe {
+                    self.v.set_len(self.original_len - self.deleted_cnt);
+                }
+            }
+        }
+
+        let mut g = BackshiftOnDrop {
+            v: self,
+            processed_len: 0,
+            deleted_cnt: 0,
+            original_len,
+        };
+
+        fn process_loop<F, T, U, V, const DELETED: bool>(
+            original_len: usize,
+            f: &mut F,
+            g: &mut BackshiftOnDrop<'_, T, U, V>,
+        ) where
+            F: FnMut((&mut T, &mut U, &mut V)) -> bool,
+        {
+            while g.processed_len != original_len {
+                // SAFETY: Unchecked element must be valid.
+                let (t_cur, u_cur, v_cur) = unsafe {
+                    let (t_ptr, u_ptr, v_ptr) = g.v.as_mut_ptrs();
+                    (
+                        &mut *t_ptr.add(g.processed_len),
+                        &mut *u_ptr.add(g.processed_len),
+                        &mut *v_ptr.add(g.processed_len),
+                    )
+                };
+                if !f((t_cur, u_cur, v_cur)) {
+                    // Advance early to avoid double drop if `drop_in_place` panicked.
+                    g.processed_len += 1;
+                    g.deleted_cnt += 1;
+                    // SAFETY: We never touch this element again after dropped.
+                    unsafe {
+                        ptr::drop_in_place(t_cur);
+                        ptr::drop_in_place(u_cur);
+                        ptr::drop_in_place(v_cur);
+                    };
+                    // We already advanced the counter.
+                    if DELETED {
+                        continue;
+                    } else {
+                        break;
+                    }
+                }
+                if DELETED {
+                    // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
+                    // We use copy for move, and never touch this element again.
+                    unsafe {
+                        let (t_ptr, u_ptr, v_ptr) = g.v.as_mut_ptrs();
+                        ptr::copy_nonoverlapping(
+                            t_cur,
+                            t_ptr.add(g.processed_len - g.deleted_cnt),
+                            1,
+                        );
+                        ptr::copy_nonoverlapping(
+                            u_cur,
+                            u_ptr.add(g.processed_len - g.deleted_cnt),
+                            1,
+                        );
+                        ptr::copy_nonoverlapping(
+                            v_cur,
+                            v_ptr.add(g.processed_len - g.deleted_cnt),
+                            1,
+                        );
+                    }
+                }
+                g.processed_len += 1;
+            }
+        }
+
+        // Stage 1: Nothing was deleted.
+        process_loop::<F, T, U, V, false>(original_len, &mut f, &mut g);
+
+        // Stage 2: Some elements were deleted.
+        process_loop::<F, T, U, V, true>(original_len, &mut f, &mut g);
+
+        // All item are processed. This can be optimized to `set_len` by LLVM.
+        drop(g);
+    }
+
     pub fn push(&mut self, values: (T, U, V)) {
         let len = self.len();
         if len == self.capacity() {
@@ -424,6 +565,18 @@ impl<T, U, V> SoaVec<T, U, V> {
 
             self.set_len(len - 1);
             Some((t_value, u_value, v_value))
+        }
+    }
+
+    pub fn clear(&mut self) {
+        let (t_ptr, u_ptr, v_ptr) = self.as_mut_slices();
+        let (t_ptr, u_ptr, v_ptr) = (t_ptr as *mut [_], u_ptr as *mut [_], v_ptr as *mut [_]);
+
+        unsafe {
+            self.set_len(0);
+            ptr::drop_in_place(t_ptr);
+            ptr::drop_in_place(u_ptr);
+            ptr::drop_in_place(v_ptr);
         }
     }
 }
@@ -607,6 +760,28 @@ mod tests {
         assert!(vec.capacity() >= 6);
         vec.shrink_to(0);
         assert!(vec.capacity() >= 3);
+
+        vec.clear();
+        assert!(vec.is_empty());
+        assert!(vec.capacity() >= 3);
+
+        vec.push((1, "2".to_owned(), 3));
+        vec.push((4, "5".to_owned(), 6));
+        vec.push((7, "8".to_owned(), 9));
+        vec.retain_mut(|(x, _, _)| {
+            if *x <= 3 {
+                *x += 1;
+                true
+            } else {
+                false
+            }
+        });
+        assert_eq!(vec.len(), 1);
+        assert!(vec.capacity() >= 3);
+        assert_eq!(
+            vec.as_slices(),
+            ([2].as_slice(), ["2".to_owned()].as_slice(), [3].as_slice()),
+        );
     }
 
     #[test]
@@ -668,6 +843,23 @@ mod tests {
         vec.shrink_to(6);
         assert!(vec.capacity() >= 6);
         vec.shrink_to(0);
+        assert!(vec.capacity() >= 3);
+
+        vec.clear();
+        assert!(vec.is_empty());
+        assert!(vec.capacity() >= 3);
+
+        vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+        vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+        vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+
+        let mut idx = 0;
+        vec.retain(|_| {
+            let current = idx;
+            idx += 1;
+            current % 2 == 0
+        });
+        assert_eq!(vec.len(), 2);
         assert!(vec.capacity() >= 3);
     }
 }

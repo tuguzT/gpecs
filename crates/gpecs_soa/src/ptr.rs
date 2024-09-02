@@ -1,23 +1,20 @@
 use core::ptr::{self, NonNull};
 
-use crate::slice::MultiSlice;
+use crate::slice::SoaSlice;
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 pub const fn slice_from_raw_parts<T, U, V>(
     data: *const u8,
     capacity: usize,
-) -> *const MultiSlice<T, U, V> {
+) -> *const SoaSlice<T, U, V> {
     let len_in_bytes = to_len_in_bytes::<T, U, V>(capacity);
     slice_from_len_in_bytes(data, len_in_bytes)
 }
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
-pub fn slice_from_raw_parts_mut<T, U, V>(
-    data: *mut u8,
-    capacity: usize,
-) -> *mut MultiSlice<T, U, V> {
+pub fn slice_from_raw_parts_mut<T, U, V>(data: *mut u8, capacity: usize) -> *mut SoaSlice<T, U, V> {
     let len_in_bytes = to_len_in_bytes::<T, U, V>(capacity);
     slice_from_len_in_bytes_mut(data, len_in_bytes)
 }
@@ -26,7 +23,7 @@ pub fn slice_from_raw_parts_mut<T, U, V>(
 pub(crate) const fn slice_from_len_in_bytes<T, U, V>(
     data: *const u8,
     len_in_bytes: usize,
-) -> *const MultiSlice<T, U, V> {
+) -> *const SoaSlice<T, U, V> {
     ptr::slice_from_raw_parts(data, len_in_bytes) as *const _
 }
 
@@ -34,7 +31,7 @@ pub(crate) const fn slice_from_len_in_bytes<T, U, V>(
 pub(crate) fn slice_from_len_in_bytes_mut<T, U, V>(
     data: *mut u8,
     len_in_bytes: usize,
-) -> *mut MultiSlice<T, U, V> {
+) -> *mut SoaSlice<T, U, V> {
     ptr::slice_from_raw_parts_mut(data, len_in_bytes) as *mut _
 }
 

@@ -13,7 +13,7 @@ use core::{
 
 use crate::{
     ptr::{align_of_buffer, min_size_of, ptrs, slice_from_raw_parts_mut, to_len, to_len_in_bytes},
-    slice::MultiSlice,
+    slice::SoaSlice,
 };
 
 use self::TryReserveErrorKind::*;
@@ -92,13 +92,13 @@ enum AllocInit {
     Zeroed,
 }
 
-pub struct RawMultiVec<T, U, V> {
+pub struct RawSoaVec<T, U, V> {
     ptr: NonNull<u8>,
     buffer_capacity: usize,
     phantom: PhantomData<(T, U, V)>,
 }
 
-impl<T, U, V> RawMultiVec<T, U, V> {
+impl<T, U, V> RawSoaVec<T, U, V> {
     // Tiny Vecs are dumb. Skip to:
     // - 8 if the element size is 1, because any heap allocators is likely
     //   to round up a request of less than 8 bytes to at least 8 bytes.
@@ -176,7 +176,7 @@ impl<T, U, V> RawMultiVec<T, U, V> {
         Self::try_allocate_in(capacity, AllocInit::Zeroed)
     }
 
-    pub unsafe fn into_box(self, len: usize) -> Box<MultiSlice<T, U, V>> {
+    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T, U, V>> {
         debug_assert!(
             len <= self.capacity(),
             "`len` must be smaller than or equal to `self.capacity()`"
@@ -292,7 +292,7 @@ impl<T, U, V> RawMultiVec<T, U, V> {
         // inlined as just a comparison and a call if the comparison fails.
         #[cold]
         fn do_reserve_and_handle<T, U, V>(
-            slf: &mut RawMultiVec<T, U, V>,
+            slf: &mut RawSoaVec<T, U, V>,
             len: usize,
             additional: usize,
         ) {
@@ -428,7 +428,7 @@ impl<T, U, V> RawMultiVec<T, U, V> {
     }
 }
 
-impl<T, U, V> Drop for RawMultiVec<T, U, V> {
+impl<T, U, V> Drop for RawSoaVec<T, U, V> {
     fn drop(&mut self) {
         if let Some((ptr, layout)) = self.current_memory() {
             unsafe { dealloc(ptr.as_ptr(), layout) }

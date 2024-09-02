@@ -12,26 +12,26 @@ pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
     ptr::{min_size_of, ptrs},
-    raw_vec::RawMultiVec,
-    slice::{from_len_in_bytes, from_len_in_bytes_mut, MultiSlice},
+    raw_vec::RawSoaVec,
+    slice::{from_len_in_bytes, from_len_in_bytes_mut, SoaSlice},
 };
 
-pub struct MultiVec<T, U, V> {
-    buffer: RawMultiVec<T, U, V>,
+pub struct SoaVec<T, U, V> {
+    buffer: RawSoaVec<T, U, V>,
     len: usize,
 }
 
-impl<T, U, V> MultiVec<T, U, V> {
+impl<T, U, V> SoaVec<T, U, V> {
     pub const fn new() -> Self {
         Self {
-            buffer: RawMultiVec::new(),
+            buffer: RawSoaVec::new(),
             len: 0,
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         let mut me = Self {
-            buffer: RawMultiVec::with_capacity(capacity),
+            buffer: RawSoaVec::with_capacity(capacity),
             len: 0,
         };
 
@@ -41,7 +41,7 @@ impl<T, U, V> MultiVec<T, U, V> {
 
     pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
         let mut me = Self {
-            buffer: RawMultiVec::try_with_capacity(capacity)?,
+            buffer: RawSoaVec::try_with_capacity(capacity)?,
             len: 0,
         };
 
@@ -52,7 +52,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     #[allow(clippy::missing_safety_doc)]
     pub const unsafe fn from_raw_parts(ptr: *mut u8, length: usize, capacity: usize) -> Self {
         Self {
-            buffer: unsafe { RawMultiVec::from_raw_parts(ptr, capacity) },
+            buffer: unsafe { RawSoaVec::from_raw_parts(ptr, capacity) },
             len: length,
         }
     }
@@ -193,7 +193,7 @@ impl<T, U, V> MultiVec<T, U, V> {
         self.buffer.shrink_to_fit(new_capacity);
     }
 
-    pub fn into_boxed_slice(mut self) -> Box<MultiSlice<T, U, V>> {
+    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T, U, V>> {
         self.shrink_to_fit();
         let me = ManuallyDrop::new(self);
 
@@ -224,11 +224,11 @@ impl<T, U, V> MultiVec<T, U, V> {
         }
     }
 
-    pub fn as_slice(&self) -> &MultiSlice<T, U, V> {
+    pub fn as_slice(&self) -> &SoaSlice<T, U, V> {
         self
     }
 
-    pub fn as_mut_slice(&mut self) -> &mut MultiSlice<T, U, V> {
+    pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T, U, V> {
         self
     }
 
@@ -428,7 +428,7 @@ impl<T, U, V> MultiVec<T, U, V> {
     }
 }
 
-impl<T, U, V> Debug for MultiVec<T, U, V>
+impl<T, U, V> Debug for SoaVec<T, U, V>
 where
     T: Debug,
     U: Debug,
@@ -444,14 +444,14 @@ where
     }
 }
 
-impl<T, U, V> Default for MultiVec<T, U, V> {
+impl<T, U, V> Default for SoaVec<T, U, V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T, U, V> Deref for MultiVec<T, U, V> {
-    type Target = MultiSlice<T, U, V>;
+impl<T, U, V> Deref for SoaVec<T, U, V> {
+    type Target = SoaSlice<T, U, V>;
 
     fn deref(&self) -> &Self::Target {
         let (data, len_in_bytes) = match min_size_of::<T, U, V>() {
@@ -462,7 +462,7 @@ impl<T, U, V> Deref for MultiVec<T, U, V> {
     }
 }
 
-impl<T, U, V> DerefMut for MultiVec<T, U, V> {
+impl<T, U, V> DerefMut for SoaVec<T, U, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         let (data, len_in_bytes) = match min_size_of::<T, U, V>() {
             0 => (addr_of_mut!(self.len).cast(), size_of::<usize>()),
@@ -472,7 +472,7 @@ impl<T, U, V> DerefMut for MultiVec<T, U, V> {
     }
 }
 
-impl<T, U, V> Drop for MultiVec<T, U, V> {
+impl<T, U, V> Drop for SoaVec<T, U, V> {
     fn drop(&mut self) {
         if self.is_empty() {
             return;
@@ -495,52 +495,52 @@ impl<T, U, V> Drop for MultiVec<T, U, V> {
 
 #[cfg(test)]
 mod tests {
-    use super::MultiVec;
+    use super::SoaVec;
 
     #[test]
     fn check_null_opt() {
-        type MultiVec = super::MultiVec<u32, u16, u8>;
-        assert_eq!(size_of::<Option<MultiVec>>(), size_of::<MultiVec>());
+        type SoaVec = super::SoaVec<u32, u16, u8>;
+        assert_eq!(size_of::<Option<SoaVec>>(), size_of::<SoaVec>());
     }
 
     #[test]
     fn new() {
-        let multi_vec = MultiVec::<u32, u16, u8>::new();
-        assert!(multi_vec.is_empty());
-        assert_eq!(multi_vec.capacity(), 0);
+        let vec = SoaVec::<u32, u16, u8>::new();
+        assert!(vec.is_empty());
+        assert_eq!(vec.capacity(), 0);
 
-        let slice = multi_vec.as_slice();
+        let slice = vec.as_slice();
         assert!(slice.is_empty());
         assert_eq!(slice.capacity(), 0);
 
-        let boxed_slice = multi_vec.into_boxed_slice();
+        let boxed_slice = vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
         assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]
     fn with_capacity() {
-        let multi_vec = MultiVec::<u8, u64, u16>::with_capacity(10);
-        assert!(multi_vec.is_empty());
-        assert!(multi_vec.capacity() >= 10);
+        let vec = SoaVec::<u8, u64, u16>::with_capacity(10);
+        assert!(vec.is_empty());
+        assert!(vec.capacity() >= 10);
 
-        let slice = multi_vec.as_slice();
+        let slice = vec.as_slice();
         assert!(slice.is_empty());
         assert!(slice.capacity() >= 10);
 
-        let boxed_slice = multi_vec.into_boxed_slice();
+        let boxed_slice = vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
         assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]
     fn one_item() {
-        let mut multi_vec = MultiVec::<u8, u32, u16>::new();
-        multi_vec.push((1, 2, 3));
-        assert_eq!(multi_vec.len(), 1);
-        assert!(multi_vec.capacity() >= 1);
+        let mut vec = SoaVec::<u8, u32, u16>::new();
+        vec.push((1, 2, 3));
+        assert_eq!(vec.len(), 1);
+        assert!(vec.capacity() >= 1);
 
-        let slice = multi_vec.as_slice();
+        let slice = vec.as_slice();
         assert_eq!(slice.len(), 1);
         assert!(slice.capacity() >= 1);
         assert_eq!(
@@ -548,27 +548,27 @@ mod tests {
             ([1].as_slice(), [2].as_slice(), [3].as_slice()),
         );
 
-        let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
+        let (t, u, v) = vec.pop().expect("multi vector should not be empty");
         assert_eq!((t, u, v), (1, 2, 3));
-        assert!(multi_vec.is_empty());
-        assert!(multi_vec.capacity() >= 1);
+        assert!(vec.is_empty());
+        assert!(vec.capacity() >= 1);
 
-        let boxed_slice = multi_vec.into_boxed_slice();
+        let boxed_slice = vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
         assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]
     fn three_items() {
-        let mut multi_vec = MultiVec::<u16, String, u128>::new();
-        multi_vec.insert(0, (1, "2".to_owned(), 3));
-        multi_vec.insert(0, (4, "5".to_owned(), 6));
-        multi_vec.insert(1, (7, "8".to_owned(), 9));
+        let mut vec = SoaVec::<u16, String, u128>::new();
+        vec.insert(0, (1, "2".to_owned(), 3));
+        vec.insert(0, (4, "5".to_owned(), 6));
+        vec.insert(1, (7, "8".to_owned(), 9));
 
-        assert_eq!(multi_vec.len(), 3);
-        assert!(multi_vec.capacity() >= 3);
+        assert_eq!(vec.len(), 3);
+        assert!(vec.capacity() >= 3);
 
-        let slice = multi_vec.as_slice();
+        let slice = vec.as_slice();
         assert_eq!(slice.len(), 3);
         assert!(slice.capacity() >= 3);
         assert_eq!(
@@ -580,33 +580,33 @@ mod tests {
             ),
         );
 
-        let (t, u, v) = multi_vec.swap_remove(1);
+        let (t, u, v) = vec.swap_remove(1);
         assert_eq!((t, u, v), (7, "8".to_owned(), 9));
-        assert_eq!(multi_vec.len(), 2);
-        assert!(multi_vec.capacity() >= 3);
+        assert_eq!(vec.len(), 2);
+        assert!(vec.capacity() >= 3);
 
-        let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
+        let (t, u, v) = vec.pop().expect("multi vector should not be empty");
         assert_eq!((t, u, v), (1, "2".to_owned(), 3));
-        assert_eq!(multi_vec.len(), 1);
-        assert!(multi_vec.capacity() >= 3);
+        assert_eq!(vec.len(), 1);
+        assert!(vec.capacity() >= 3);
 
-        let (t, u, v) = multi_vec.remove(0);
+        let (t, u, v) = vec.remove(0);
         assert_eq!((t, u, v), (4, "5".to_owned(), 6));
-        assert!(multi_vec.is_empty());
-        assert!(multi_vec.capacity() >= 3);
+        assert!(vec.is_empty());
+        assert!(vec.capacity() >= 3);
 
-        multi_vec.push((0, "0".to_owned(), 0));
-        multi_vec.push((0, "0".to_owned(), 0));
-        multi_vec.push((0, "0".to_owned(), 0));
-        multi_vec.reserve(1);
-        assert!(multi_vec.capacity() >= 4);
-        multi_vec.reserve_exact(6);
-        assert!(multi_vec.capacity() >= 9);
+        vec.push((0, "0".to_owned(), 0));
+        vec.push((0, "0".to_owned(), 0));
+        vec.push((0, "0".to_owned(), 0));
+        vec.reserve(1);
+        assert!(vec.capacity() >= 4);
+        vec.reserve_exact(6);
+        assert!(vec.capacity() >= 9);
 
-        multi_vec.shrink_to(6);
-        assert!(multi_vec.capacity() >= 6);
-        multi_vec.shrink_to(0);
-        assert!(multi_vec.capacity() >= 3);
+        vec.shrink_to(6);
+        assert!(vec.capacity() >= 6);
+        vec.shrink_to(0);
+        assert!(vec.capacity() >= 3);
     }
 
     #[test]
@@ -622,15 +622,15 @@ mod tests {
             empty: (),
         }
 
-        let mut multi_vec = MultiVec::<ZST1, ZST2, ZST3>::new();
-        multi_vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
-        multi_vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
-        multi_vec.insert(1, (ZST1, ZST2(()), ZST3 { empty: () }));
+        let mut vec = SoaVec::<ZST1, ZST2, ZST3>::new();
+        vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
+        vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
+        vec.insert(1, (ZST1, ZST2(()), ZST3 { empty: () }));
 
-        assert_eq!(multi_vec.len(), 3);
-        assert!(multi_vec.capacity() >= 3);
+        assert_eq!(vec.len(), 3);
+        assert!(vec.capacity() >= 3);
 
-        let slice = multi_vec.as_slice();
+        let slice = vec.as_slice();
         assert_eq!(slice.len(), 3);
         assert!(slice.capacity() >= 3);
         assert_eq!(
@@ -642,32 +642,32 @@ mod tests {
             ),
         );
 
-        let (t, u, v) = multi_vec.swap_remove(1);
+        let (t, u, v) = vec.swap_remove(1);
         assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
-        assert_eq!(multi_vec.len(), 2);
-        assert!(multi_vec.capacity() >= 3);
+        assert_eq!(vec.len(), 2);
+        assert!(vec.capacity() >= 3);
 
-        let (t, u, v) = multi_vec.pop().expect("multi vector should not be empty");
+        let (t, u, v) = vec.pop().expect("multi vector should not be empty");
         assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
-        assert_eq!(multi_vec.len(), 1);
-        assert!(multi_vec.capacity() >= 3);
+        assert_eq!(vec.len(), 1);
+        assert!(vec.capacity() >= 3);
 
-        let (t, u, v) = multi_vec.remove(0);
+        let (t, u, v) = vec.remove(0);
         assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
-        assert!(multi_vec.is_empty());
-        assert!(multi_vec.capacity() >= 3);
+        assert!(vec.is_empty());
+        assert!(vec.capacity() >= 3);
 
-        multi_vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
-        multi_vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
-        multi_vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
-        multi_vec.reserve(1);
-        assert!(multi_vec.capacity() >= 4);
-        multi_vec.reserve_exact(6);
-        assert!(multi_vec.capacity() >= 9);
+        vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+        vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+        vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+        vec.reserve(1);
+        assert!(vec.capacity() >= 4);
+        vec.reserve_exact(6);
+        assert!(vec.capacity() >= 9);
 
-        multi_vec.shrink_to(6);
-        assert!(multi_vec.capacity() >= 6);
-        multi_vec.shrink_to(0);
-        assert!(multi_vec.capacity() >= 3);
+        vec.shrink_to(6);
+        assert!(vec.capacity() >= 6);
+        vec.shrink_to(0);
+        assert!(vec.capacity() >= 3);
     }
 }

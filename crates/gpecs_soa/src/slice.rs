@@ -11,12 +11,12 @@ use crate::ptr::{
 };
 
 #[repr(transparent)]
-pub struct MultiSlice<T, U, V> {
+pub struct SoaSlice<T, U, V> {
     phantom: PhantomData<(T, U, V)>,
     buffer: [u8],
 }
 
-impl<T, U, V> MultiSlice<T, U, V> {
+impl<T, U, V> SoaSlice<T, U, V> {
     #[inline]
     pub const fn len(&self) -> usize {
         match self.buffer_capacity() {
@@ -104,7 +104,7 @@ impl<T, U, V> MultiSlice<T, U, V> {
     }
 }
 
-impl<T, U, V> Debug for MultiSlice<T, U, V>
+impl<T, U, V> Debug for SoaSlice<T, U, V>
 where
     T: Debug,
     U: Debug,
@@ -120,21 +120,21 @@ where
     }
 }
 
-impl<T, U, V> Default for &MultiSlice<T, U, V> {
+impl<T, U, V> Default for &SoaSlice<T, U, V> {
     fn default() -> Self {
         let data = NonNull::dangling().as_ptr();
         unsafe { from_len_in_bytes(data, 0) }
     }
 }
 
-impl<T, U, V> Default for &mut MultiSlice<T, U, V> {
+impl<T, U, V> Default for &mut SoaSlice<T, U, V> {
     fn default() -> Self {
         let data = NonNull::dangling().as_ptr();
         unsafe { from_len_in_bytes_mut(data, 0) }
     }
 }
 
-impl<T, U, V> Drop for MultiSlice<T, U, V> {
+impl<T, U, V> Drop for SoaSlice<T, U, V> {
     fn drop(&mut self) {
         if self.is_empty() {
             return;
@@ -160,7 +160,7 @@ impl<T, U, V> Drop for MultiSlice<T, U, V> {
 pub unsafe fn from_raw_parts<'slice, T, U, V>(
     data: *const u8,
     capacity: usize,
-) -> &'slice MultiSlice<T, U, V> {
+) -> &'slice SoaSlice<T, U, V> {
     unsafe { &*slice_from_raw_parts(data, capacity) }
 }
 
@@ -169,7 +169,7 @@ pub unsafe fn from_raw_parts<'slice, T, U, V>(
 pub unsafe fn from_raw_parts_mut<'slice, T, U, V>(
     data: *mut u8,
     capacity: usize,
-) -> &'slice mut MultiSlice<T, U, V> {
+) -> &'slice mut SoaSlice<T, U, V> {
     unsafe { &mut *slice_from_raw_parts_mut(data, capacity) }
 }
 
@@ -177,7 +177,7 @@ pub unsafe fn from_raw_parts_mut<'slice, T, U, V>(
 pub(crate) unsafe fn from_len_in_bytes<'slice, T, U, V>(
     data: *const u8,
     len_in_bytes: usize,
-) -> &'slice MultiSlice<T, U, V> {
+) -> &'slice SoaSlice<T, U, V> {
     unsafe { &*slice_from_len_in_bytes(data, len_in_bytes) }
 }
 
@@ -185,6 +185,6 @@ pub(crate) unsafe fn from_len_in_bytes<'slice, T, U, V>(
 pub(crate) unsafe fn from_len_in_bytes_mut<'slice, T, U, V>(
     data: *mut u8,
     len_in_bytes: usize,
-) -> &'slice mut MultiSlice<T, U, V> {
+) -> &'slice mut SoaSlice<T, U, V> {
     unsafe { &mut *slice_from_len_in_bytes_mut(data, len_in_bytes) }
 }

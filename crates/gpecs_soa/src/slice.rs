@@ -102,6 +102,56 @@ impl<T, U, V> SoaSlice<T, U, V> {
             (t_slice, u_slice, v_slice)
         }
     }
+
+    #[inline]
+    pub fn get<I>(&self, index: I) -> Option<I::Ref<'_>>
+    where
+        I: SoaSliceIndex<Self>,
+    {
+        index.get(self)
+    }
+
+    #[inline]
+    pub fn get_mut<I>(&mut self, index: I) -> Option<I::RefMut<'_>>
+    where
+        I: SoaSliceIndex<Self>,
+    {
+        index.get_mut(self)
+    }
+
+    #[inline]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn get_unchecked<I>(&self, index: I) -> I::ConstPtr
+    where
+        I: SoaSliceIndex<Self>,
+    {
+        unsafe { index.get_unchecked(self) }
+    }
+
+    #[inline]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> I::MutPtr
+    where
+        I: SoaSliceIndex<Self>,
+    {
+        unsafe { index.get_unchecked_mut(self) }
+    }
+
+    #[inline]
+    pub fn index<I>(&self, index: I) -> I::Ref<'_>
+    where
+        I: SoaSliceIndex<Self>,
+    {
+        index.index(self)
+    }
+
+    #[inline]
+    pub fn index_mut<I>(&mut self, index: I) -> I::RefMut<'_>
+    where
+        I: SoaSliceIndex<Self>,
+    {
+        index.index_mut(self)
+    }
 }
 
 impl<T, U, V> Debug for SoaSlice<T, U, V>
@@ -140,13 +190,7 @@ impl<T, U, V> Drop for SoaSlice<T, U, V> {
             return;
         }
 
-        let (t_data, u_data, v_data) = self.as_mut_ptrs();
-        let len = self.len();
-
-        let t_slice = ptr::slice_from_raw_parts_mut(t_data, len);
-        let u_slice = ptr::slice_from_raw_parts_mut(u_data, len);
-        let v_slice = ptr::slice_from_raw_parts_mut(v_data, len);
-
+        let (t_slice, u_slice, v_slice) = self.as_mut_slices();
         unsafe {
             ptr::drop_in_place(t_slice);
             ptr::drop_in_place(u_slice);
@@ -187,4 +231,144 @@ pub(crate) unsafe fn from_len_in_bytes_mut<'slice, T, U, V>(
     len_in_bytes: usize,
 ) -> &'slice mut SoaSlice<T, U, V> {
     unsafe { &mut *slice_from_len_in_bytes_mut(data, len_in_bytes) }
+}
+
+#[allow(clippy::missing_safety_doc)]
+pub unsafe trait SoaSliceIndex<T>: private_slice_index::Sealed
+where
+    T: ?Sized,
+{
+    type Ref<'a>
+    where
+        T: 'a;
+
+    type RefMut<'a>
+    where
+        T: 'a;
+
+    fn get(self, slice: &T) -> Option<Self::Ref<'_>>;
+
+    fn get_mut(self, slice: &mut T) -> Option<Self::RefMut<'_>>;
+
+    fn index(self, slice: &T) -> Self::Ref<'_>;
+
+    fn index_mut(self, slice: &mut T) -> Self::RefMut<'_>;
+
+    type ConstPtr;
+
+    type MutPtr;
+
+    unsafe fn get_unchecked(self, slice: *const T) -> Self::ConstPtr;
+
+    unsafe fn get_unchecked_mut(self, slice: *mut T) -> Self::MutPtr;
+}
+
+unsafe impl<T, U, V> SoaSliceIndex<SoaSlice<T, U, V>> for usize {
+    type Ref<'a> = (&'a T, &'a U, &'a V)
+    where
+        SoaSlice<T, U, V>: 'a;
+
+    type RefMut<'a> = (&'a mut T, &'a mut U, &'a mut V)
+    where
+        SoaSlice<T, U, V>: 'a;
+
+    fn get(self, slice: &SoaSlice<T, U, V>) -> Option<Self::Ref<'_>> {
+        if self >= slice.len() {
+            return None;
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.get_unchecked(slice);
+            Some((&*t_ptr, &*u_ptr, &*v_ptr))
+        }
+    }
+
+    fn get_mut(self, slice: &mut SoaSlice<T, U, V>) -> Option<Self::RefMut<'_>> {
+        if self >= slice.len() {
+            return None;
+        }
+
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = self.get_unchecked_mut(slice);
+            Some((&mut *t_ptr, &mut *u_ptr, &mut *v_ptr))
+        }
+    }
+
+    fn index(self, slice: &SoaSlice<T, U, V>) -> Self::Ref<'_> {
+        match self.get(slice) {
+            Some(value) => value,
+            None => slice_index_usize_fail(slice.len(), self),
+        }
+    }
+
+    fn index_mut(self, slice: &mut SoaSlice<T, U, V>) -> Self::RefMut<'_> {
+        let len = slice.len();
+        match self.get_mut(slice) {
+            Some(value) => value,
+            None => slice_index_usize_fail(len, self),
+        }
+    }
+
+    type ConstPtr = (*const T, *const U, *const V);
+
+    type MutPtr = (*mut T, *mut U, *mut V);
+
+    unsafe fn get_unchecked(self, slice: *const SoaSlice<T, U, V>) -> Self::ConstPtr {
+        unsafe {
+            debug_assert!(self < (*slice).len());
+        }
+
+        let buffer = slice as *const [u8];
+        let ptr = buffer as _;
+        let len = to_len::<T, U, V>(buffer.len());
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
+            (t_ptr.add(self), u_ptr.add(self), v_ptr.add(self))
+        }
+    }
+
+    unsafe fn get_unchecked_mut(self, slice: *mut SoaSlice<T, U, V>) -> Self::MutPtr {
+        unsafe {
+            debug_assert!(self < (*slice).len());
+        }
+
+        let buffer = slice as *mut [u8];
+        let ptr = buffer as _;
+        let len = to_len::<T, U, V>(buffer.len());
+        unsafe {
+            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
+            (t_ptr.add(self), u_ptr.add(self), v_ptr.add(self))
+        }
+    }
+}
+
+#[cold]
+#[inline(never)]
+#[track_caller]
+fn slice_index_usize_fail(len: usize, index: usize) -> ! {
+    panic!("index out of bounds: the len is {len} but the index is {index}")
+}
+
+mod private_slice_index {
+    use core::ops::{
+        Bound, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive,
+    };
+
+    pub trait Sealed {}
+
+    impl Sealed for usize {}
+
+    impl Sealed for Range<usize> {}
+
+    impl Sealed for RangeFrom<usize> {}
+
+    impl Sealed for RangeFull {}
+
+    impl Sealed for RangeTo<usize> {}
+
+    impl Sealed for RangeInclusive<usize> {}
+
+    impl Sealed for RangeToInclusive<usize> {}
+
+    impl Sealed for (Bound<usize>, Bound<usize>) {}
 }

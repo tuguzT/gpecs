@@ -1,4 +1,6 @@
+use alloc::vec::Vec;
 use core::{
+    cmp,
     fmt::{self, Debug},
     marker::PhantomData,
     ops,
@@ -152,6 +154,168 @@ impl<T, U, V> SoaSlice<T, U, V> {
         I: SoaSliceIndex<Self>,
     {
         index.index_mut(self)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn swap(&mut self, a: usize, b: usize) {
+        let (t_a, u_a, v_a) = {
+            let (t, u, v) = self.index_mut(a);
+            (t as _, u as _, v as _)
+        };
+        let (t_b, u_b, v_b) = {
+            let (t, u, v) = self.index_mut(b);
+            (t as _, u as _, v as _)
+        };
+
+        unsafe {
+            ptr::swap(t_a, t_b);
+            ptr::swap(u_a, u_b);
+            ptr::swap(v_a, v_b);
+        }
+    }
+
+    #[inline]
+    pub fn sort(&mut self)
+    where
+        T: Ord,
+        U: Ord,
+        V: Ord,
+    {
+        self.sort_by(|a, b| a.cmp(&b))
+    }
+
+    #[inline]
+    pub fn sort_by<F>(&mut self, mut compare: F)
+    where
+        F: FnMut((&T, &U, &V), (&T, &U, &V)) -> cmp::Ordering,
+    {
+        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        self.sort_impl(|indices| {
+            indices.sort_by(|&a, &b| {
+                let a = unsafe {
+                    let t_ptr = t_ptr.add(a);
+                    let u_ptr = u_ptr.add(a);
+                    let v_ptr = v_ptr.add(a);
+                    (&*t_ptr, &*u_ptr, &*v_ptr)
+                };
+                let b = unsafe {
+                    let t_ptr = t_ptr.add(b);
+                    let u_ptr = u_ptr.add(b);
+                    let v_ptr = v_ptr.add(b);
+                    (&*t_ptr, &*u_ptr, &*v_ptr)
+                };
+                compare(a, b)
+            })
+        })
+    }
+
+    #[inline]
+    pub fn sort_by_key<K, F>(&mut self, mut f: F)
+    where
+        F: FnMut((&T, &U, &V)) -> K,
+        K: Ord,
+    {
+        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        self.sort_impl(|indices| {
+            indices.sort_by_key(|&index| unsafe {
+                let t_ptr = t_ptr.add(index);
+                let u_ptr = u_ptr.add(index);
+                let v_ptr = v_ptr.add(index);
+                f((&*t_ptr, &*u_ptr, &*v_ptr))
+            })
+        })
+    }
+
+    #[inline]
+    pub fn sort_by_cached_key<K, F>(&mut self, mut f: F)
+    where
+        F: FnMut((&T, &U, &V)) -> K,
+        K: Ord,
+    {
+        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        self.sort_impl(|indices| {
+            indices.sort_by_cached_key(|&index| unsafe {
+                let t_ptr = t_ptr.add(index);
+                let u_ptr = u_ptr.add(index);
+                let v_ptr = v_ptr.add(index);
+                f((&*t_ptr, &*u_ptr, &*v_ptr))
+            })
+        })
+    }
+
+    #[inline]
+    pub fn sort_unstable(&mut self)
+    where
+        T: Ord,
+        U: Ord,
+        V: Ord,
+    {
+        self.sort_unstable_by(|a, b| a.cmp(&b))
+    }
+
+    #[inline]
+    pub fn sort_unstable_by<F>(&mut self, mut compare: F)
+    where
+        F: FnMut((&T, &U, &V), (&T, &U, &V)) -> cmp::Ordering,
+    {
+        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        self.sort_impl(|indices| {
+            indices.sort_unstable_by(|&a, &b| {
+                let a = unsafe {
+                    let t_ptr = t_ptr.add(a);
+                    let u_ptr = u_ptr.add(a);
+                    let v_ptr = v_ptr.add(a);
+                    (&*t_ptr, &*u_ptr, &*v_ptr)
+                };
+                let b = unsafe {
+                    let t_ptr = t_ptr.add(b);
+                    let u_ptr = u_ptr.add(b);
+                    let v_ptr = v_ptr.add(b);
+                    (&*t_ptr, &*u_ptr, &*v_ptr)
+                };
+                compare(a, b)
+            })
+        })
+    }
+
+    #[inline]
+    pub fn sort_unstable_by_key<K, F>(&mut self, mut f: F)
+    where
+        F: FnMut((&T, &U, &V)) -> K,
+        K: Ord,
+    {
+        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        self.sort_impl(|indices| {
+            indices.sort_unstable_by_key(|&index| unsafe {
+                let t_ptr = t_ptr.add(index);
+                let u_ptr = u_ptr.add(index);
+                let v_ptr = v_ptr.add(index);
+                f((&*t_ptr, &*u_ptr, &*v_ptr))
+            })
+        })
+    }
+
+    fn sort_impl<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut [usize]),
+    {
+        let len = self.len();
+        if min_size_of::<T, U, V>() == 0 || len < 2 {
+            return;
+        }
+
+        let mut permutation: Vec<_> = (0..len).collect();
+        f(&mut permutation);
+
+        for src in 0..len {
+            let dst = permutation[src];
+            if src == dst {
+                continue;
+            }
+            self.swap(src, dst);
+            permutation.swap(src, dst);
+        }
     }
 }
 

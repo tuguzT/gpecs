@@ -737,6 +737,14 @@ mod tests {
         assert_eq!(slice.get(0), Some((&4, &"5".to_owned(), &6)));
         assert_eq!(slice.get(1), Some((&7, &"8".to_owned(), &9)));
         assert_eq!(slice.get(2), Some((&1, &"2".to_owned(), &3)));
+        assert_eq!(
+            slice.get(0..),
+            Some((
+                [4, 7, 1].as_slice(),
+                ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
+                [6, 9, 3].as_slice(),
+            )),
+        );
 
         let (t, u, v) = vec.swap_remove(1);
         assert_eq!((t, u, v), (7, "8".to_owned(), 9));
@@ -824,6 +832,14 @@ mod tests {
         assert_eq!(slice.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
         assert_eq!(slice.get(1), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
         assert_eq!(slice.get(2), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+        assert_eq!(
+            slice.get(0..),
+            Some((
+                [ZST1, ZST1, ZST1].as_slice(),
+                [ZST2(()), ZST2(()), ZST2(())].as_slice(),
+                [ZST3 { empty: () }, ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
+            )),
+        );
 
         let (t, u, v) = vec.swap_remove(1);
         assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));

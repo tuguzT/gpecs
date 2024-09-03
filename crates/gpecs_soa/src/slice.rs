@@ -591,6 +591,110 @@ unsafe impl<T, U, V> SoaSliceIndex<SoaSlice<T, U, V>> for ops::RangeFull {
     }
 }
 
+/// Based on implementation of 2 methods:
+/// - [`core::ops::RangeInclusive::into_slice_range()`]
+/// - [`core::ops::RangeInclusive::is_empty()`] which replaces access to [`core::ops::RangeInclusive::exhausted`] private field
+fn into_slice_range(range: ops::RangeInclusive<usize>) -> ops::Range<usize> {
+    let exclusive_end = range.end() + 1;
+
+    let exhausted = range.is_empty();
+    let start = if exhausted {
+        exclusive_end
+    } else {
+        *range.start()
+    };
+
+    start..exclusive_end
+}
+
+unsafe impl<T, U, V> SoaSliceIndex<SoaSlice<T, U, V>> for ops::RangeInclusive<usize> {
+    type Ref<'a> = (&'a [T], &'a [U], &'a [V])
+    where
+        SoaSlice<T, U, V>: 'a;
+
+    type RefMut<'a> = (&'a mut [T], &'a mut [U], &'a mut [V])
+    where
+        SoaSlice<T, U, V>: 'a;
+
+    fn get(self, slice: &SoaSlice<T, U, V>) -> Option<Self::Ref<'_>> {
+        if *self.end() == usize::MAX {
+            return None;
+        }
+        into_slice_range(self).get(slice)
+    }
+
+    fn get_mut(self, slice: &mut SoaSlice<T, U, V>) -> Option<Self::RefMut<'_>> {
+        if *self.end() == usize::MAX {
+            return None;
+        }
+        into_slice_range(self).get_mut(slice)
+    }
+
+    fn index(self, slice: &SoaSlice<T, U, V>) -> Self::Ref<'_> {
+        if *self.end() == usize::MAX {
+            slice_end_index_overflow_fail();
+        }
+        into_slice_range(self).index(slice)
+    }
+
+    fn index_mut(self, slice: &mut SoaSlice<T, U, V>) -> Self::RefMut<'_> {
+        if *self.end() == usize::MAX {
+            slice_end_index_overflow_fail();
+        }
+        into_slice_range(self).index_mut(slice)
+    }
+
+    type ConstPtr = (*const [T], *const [U], *const [V]);
+
+    type MutPtr = (*mut [T], *mut [U], *mut [V]);
+
+    unsafe fn get_unchecked(self, slice: *const SoaSlice<T, U, V>) -> Self::ConstPtr {
+        unsafe { into_slice_range(self).get_unchecked(slice) }
+    }
+
+    unsafe fn get_unchecked_mut(self, slice: *mut SoaSlice<T, U, V>) -> Self::MutPtr {
+        unsafe { into_slice_range(self).get_unchecked_mut(slice) }
+    }
+}
+
+unsafe impl<T, U, V> SoaSliceIndex<SoaSlice<T, U, V>> for ops::RangeToInclusive<usize> {
+    type Ref<'a> = (&'a [T], &'a [U], &'a [V])
+    where
+        SoaSlice<T, U, V>: 'a;
+
+    type RefMut<'a> = (&'a mut [T], &'a mut [U], &'a mut [V])
+    where
+        SoaSlice<T, U, V>: 'a;
+
+    fn get(self, slice: &SoaSlice<T, U, V>) -> Option<Self::Ref<'_>> {
+        (0..=self.end).get(slice)
+    }
+
+    fn get_mut(self, slice: &mut SoaSlice<T, U, V>) -> Option<Self::RefMut<'_>> {
+        (0..=self.end).get_mut(slice)
+    }
+
+    fn index(self, slice: &SoaSlice<T, U, V>) -> Self::Ref<'_> {
+        (0..=self.end).index(slice)
+    }
+
+    fn index_mut(self, slice: &mut SoaSlice<T, U, V>) -> Self::RefMut<'_> {
+        (0..=self.end).index_mut(slice)
+    }
+
+    type ConstPtr = (*const [T], *const [U], *const [V]);
+
+    type MutPtr = (*mut [T], *mut [U], *mut [V]);
+
+    unsafe fn get_unchecked(self, slice: *const SoaSlice<T, U, V>) -> Self::ConstPtr {
+        unsafe { (0..=self.end).get_unchecked(slice) }
+    }
+
+    unsafe fn get_unchecked_mut(self, slice: *mut SoaSlice<T, U, V>) -> Self::MutPtr {
+        unsafe { (0..=self.end).get_unchecked_mut(slice) }
+    }
+}
+
 #[cold]
 #[inline(never)]
 #[track_caller]
@@ -618,6 +722,13 @@ fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
     panic!("range end index {index} out of range for slice of length {len}");
 }
 
+#[cold]
+#[inline(never)]
+#[track_caller]
+const fn slice_end_index_overflow_fail() -> ! {
+    panic!("attempted to index slice up to maximum usize");
+}
+
 mod private_slice_index {
     use core::ops;
 
@@ -637,5 +748,6 @@ mod private_slice_index {
 
     impl Sealed for ops::RangeToInclusive<usize> {}
 
+    // do not implement for now
     impl Sealed for (ops::Bound<usize>, ops::Bound<usize>) {}
 }

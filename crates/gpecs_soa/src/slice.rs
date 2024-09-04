@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     cmp,
     fmt::{self, Debug},
@@ -7,9 +7,12 @@ use core::{
     slice,
 };
 
-use crate::ptr::{
-    min_size_of, ptrs, slice_from_len_in_bytes, slice_from_len_in_bytes_mut, slice_from_raw_parts,
-    slice_from_raw_parts_mut, to_len, BufferAlign,
+use crate::{
+    ptr::{
+        min_size_of, ptrs, slice_from_len_in_bytes, slice_from_len_in_bytes_mut,
+        slice_from_raw_parts, slice_from_raw_parts_mut, to_len, BufferAlign,
+    },
+    vec::SoaVec,
 };
 
 #[repr(C)]
@@ -103,6 +106,14 @@ impl<T, U, V> SoaSlice<T, U, V> {
             let v_slice = slice::from_raw_parts_mut(v_data, len);
             (t_slice, u_slice, v_slice)
         }
+    }
+
+    #[inline]
+    pub fn into_vec(self: Box<Self>) -> SoaVec<T, U, V> {
+        let length = self.len();
+        let capacity_in_bytes = self.capacity_in_bytes();
+        let ptr = Box::into_raw(self).cast();
+        unsafe { SoaVec::from_capacity_in_bytes(ptr, length, capacity_in_bytes) }
     }
 
     #[inline]

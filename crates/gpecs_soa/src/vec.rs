@@ -57,6 +57,17 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
     }
 
+    pub(crate) const unsafe fn from_capacity_in_bytes(
+        ptr: *mut u8,
+        length: usize,
+        capacity_in_bytes: usize,
+    ) -> Self {
+        Self {
+            buffer: unsafe { RawSoaVec::from_capacity_in_bytes(ptr, capacity_in_bytes) },
+            len: length,
+        }
+    }
+
     pub fn into_raw_parts(self) -> (*mut u8, usize, usize) {
         let mut me = ManuallyDrop::new(self);
         (me.as_mut_ptr(), me.len(), me.capacity())
@@ -678,6 +689,14 @@ mod tests {
         let boxed_slice = vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
         assert_eq!(boxed_slice.capacity(), 0);
+
+        let vec = boxed_slice.into_vec();
+        assert!(vec.is_empty());
+        assert_eq!(vec.capacity(), 0);
+
+        let boxed_slice = vec.into_boxed_slice();
+        assert!(boxed_slice.is_empty());
+        assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]
@@ -689,6 +708,14 @@ mod tests {
         let slice = vec.as_slice();
         assert!(slice.is_empty());
         assert!(slice.capacity() >= 10);
+
+        let boxed_slice = vec.into_boxed_slice();
+        assert!(boxed_slice.is_empty());
+        assert_eq!(boxed_slice.capacity(), 0);
+
+        let vec = boxed_slice.into_vec();
+        assert!(vec.is_empty());
+        assert_eq!(vec.capacity(), 0);
 
         let boxed_slice = vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
@@ -716,6 +743,14 @@ mod tests {
         assert!(vec.is_empty());
         assert!(vec.capacity() >= 1);
         assert_eq!(vec.get(0), None);
+
+        let boxed_slice = vec.into_boxed_slice();
+        assert!(boxed_slice.is_empty());
+        assert_eq!(boxed_slice.capacity(), 0);
+
+        let vec = boxed_slice.into_vec();
+        assert!(vec.is_empty());
+        assert_eq!(vec.capacity(), 0);
 
         let boxed_slice = vec.into_boxed_slice();
         assert!(boxed_slice.is_empty());
@@ -804,6 +839,16 @@ mod tests {
             vec.as_slices(),
             ([2].as_slice(), ["2".to_owned()].as_slice(), [3].as_slice()),
         );
+
+        let boxed_slice = vec.into_boxed_slice();
+        assert_eq!(boxed_slice.len(), 1);
+        assert_eq!(boxed_slice.capacity(), 1);
+        assert_eq!(boxed_slice.get(0), Some((&2, &"2".to_owned(), &3)));
+
+        let vec = boxed_slice.into_vec();
+        assert_eq!(vec.len(), 1);
+        assert!(vec.capacity() >= 1);
+        assert_eq!(vec.get(0), Some((&2, &"2".to_owned(), &3)));
 
         let boxed_slice = vec.into_boxed_slice();
         assert_eq!(boxed_slice.len(), 1);
@@ -911,5 +956,13 @@ mod tests {
                 [ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
             )),
         );
+
+        let vec = boxed_slice.into_vec();
+        assert_eq!(vec.len(), 2);
+        assert!(vec.capacity() >= 2);
+
+        let boxed_slice = vec.into_boxed_slice();
+        assert_eq!(boxed_slice.len(), 2);
+        assert_eq!(boxed_slice.capacity(), usize::MAX);
     }
 }

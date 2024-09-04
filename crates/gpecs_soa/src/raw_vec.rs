@@ -195,6 +195,13 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         }
     }
 
+    pub const unsafe fn from_capacity_in_bytes(ptr: *mut u8, capacity_in_bytes: usize) -> Self {
+        unsafe {
+            let ptr = NonNull::new_unchecked(ptr);
+            Self::from_nonnull_capacity_in_bytes(ptr, capacity_in_bytes)
+        }
+    }
+
     pub const unsafe fn from_nonnull(ptr: NonNull<u8>, capacity: usize) -> Self {
         let capacity_in_bytes = if min_size_of::<T, U, V>() == 0 {
             0
@@ -202,6 +209,16 @@ impl<T, U, V> RawSoaVec<T, U, V> {
             to_len_in_bytes::<T, U, V>(capacity)
         };
 
+        Self {
+            ptr: ptr.cast(),
+            capacity_in_bytes,
+        }
+    }
+
+    pub const unsafe fn from_nonnull_capacity_in_bytes(
+        ptr: NonNull<u8>,
+        capacity_in_bytes: usize,
+    ) -> Self {
         Self {
             ptr: ptr.cast(),
             capacity_in_bytes,

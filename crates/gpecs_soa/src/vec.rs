@@ -611,7 +611,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (t_slice, u_slice, v_slice) = self.as_slices();
-        f.debug_struct("MultiVec")
+        f.debug_struct("SoaVec")
             .field("t_slice", &t_slice)
             .field("u_slice", &u_slice)
             .field("v_slice", &v_slice)
@@ -787,6 +787,11 @@ mod tests {
         );
         assert_eq!(slice.get(0), Some((&1, &2, &3)));
 
+        let mut iter = vec.iter();
+        assert_eq!(iter.len(), 1);
+        assert_eq!(iter.next(), Some((&1, &2, &3)));
+        assert_eq!(iter.next(), None);
+
         let (t, u, v) = vec.pop().expect("multi vector should not be empty");
         assert_eq!((t, u, v), (1, 2, 3));
         assert!(vec.is_empty());
@@ -838,6 +843,20 @@ mod tests {
                 [6, 9, 3].as_slice(),
             )),
         );
+
+        let mut iter = vec.iter();
+        assert_eq!(iter.len(), 3);
+
+        assert_eq!(iter.next(), Some((&4, &"5".to_owned(), &6)));
+        assert_eq!(iter.len(), 2);
+
+        assert_eq!(iter.next_back(), Some((&1, &"2".to_owned(), &3)));
+        assert_eq!(iter.len(), 1);
+
+        assert_eq!(iter.next(), Some((&7, &"8".to_owned(), &9)));
+        assert_eq!(iter.len(), 0);
+
+        assert_eq!(iter.next_back(), None);
 
         let (t, u, v) = vec.swap_remove(1);
         assert_eq!((t, u, v), (7, "8".to_owned(), 9));
@@ -948,6 +967,20 @@ mod tests {
                 [ZST3 { empty: () }, ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
             )),
         );
+
+        let mut iter = vec.iter();
+        assert_eq!(iter.len(), 3);
+
+        assert!(iter.next().is_some());
+        assert_eq!(iter.len(), 2);
+
+        assert!(iter.next_back().is_some());
+        assert_eq!(iter.len(), 1);
+
+        assert!(iter.next().is_some());
+        assert_eq!(iter.len(), 0);
+
+        assert!(iter.next_back().is_none());
 
         let (t, u, v) = vec.swap_remove(1);
         assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));

@@ -65,9 +65,16 @@ pub(crate) const fn min_size_of<T, U, V>() -> usize {
     size_of::<T>() + size_of::<U>() + size_of::<V>()
 }
 
+#[repr(transparent)]
+pub(crate) struct UsizeAlign {
+    align: [usize; 0],
+}
+
+pub(crate) struct BufferItem<T, U, V>(UsizeAlign, (T, U, V));
+
 #[inline]
 pub(crate) const fn align_of_buffer<T, U, V>() -> usize {
-    align_of::<(usize, (T, U, V))>()
+    align_of::<BufferItem<T, U, V>>()
 }
 
 #[inline]

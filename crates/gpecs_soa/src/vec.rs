@@ -1,7 +1,9 @@
 use alloc::boxed::Box;
 use core::{
+    borrow::{Borrow, BorrowMut},
     cmp,
     fmt::{self, Debug},
+    hash::{self, Hash},
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
     ptr::{self, addr_of, addr_of_mut},
@@ -620,6 +622,53 @@ where
 impl<T, U, V> Default for SoaVec<T, U, V> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<T, U, V> AsRef<SoaVec<T, U, V>> for SoaVec<T, U, V> {
+    fn as_ref(&self) -> &SoaVec<T, U, V> {
+        self
+    }
+}
+
+impl<T, U, V> AsRef<SoaSlice<T, U, V>> for SoaVec<T, U, V> {
+    fn as_ref(&self) -> &SoaSlice<T, U, V> {
+        self
+    }
+}
+
+impl<T, U, V> AsMut<SoaVec<T, U, V>> for SoaVec<T, U, V> {
+    fn as_mut(&mut self) -> &mut SoaVec<T, U, V> {
+        self
+    }
+}
+
+impl<T, U, V> AsMut<SoaSlice<T, U, V>> for SoaVec<T, U, V> {
+    fn as_mut(&mut self) -> &mut SoaSlice<T, U, V> {
+        self
+    }
+}
+
+impl<T, U, V> Borrow<SoaSlice<T, U, V>> for SoaVec<T, U, V> {
+    fn borrow(&self) -> &SoaSlice<T, U, V> {
+        self
+    }
+}
+
+impl<T, U, V> BorrowMut<SoaSlice<T, U, V>> for SoaVec<T, U, V> {
+    fn borrow_mut(&mut self) -> &mut SoaSlice<T, U, V> {
+        self
+    }
+}
+
+impl<T, U, V> Hash for SoaVec<T, U, V>
+where
+    T: Hash,
+    U: Hash,
+    V: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        Hash::hash(&**self, state)
     }
 }
 

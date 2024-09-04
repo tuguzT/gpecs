@@ -451,6 +451,22 @@ impl<T, U, V> Drop for RawSoaVec<T, U, V> {
     }
 }
 
+unsafe impl<T, U, V> Send for RawSoaVec<T, U, V>
+where
+    T: Send,
+    U: Send,
+    V: Send,
+{
+}
+
+unsafe impl<T, U, V> Sync for RawSoaVec<T, U, V>
+where
+    T: Sync,
+    U: Sync,
+    V: Sync,
+{
+}
+
 #[inline(never)]
 fn finish_grow(
     new_layout: Result<Layout, LayoutError>,

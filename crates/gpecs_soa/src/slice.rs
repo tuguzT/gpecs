@@ -2,6 +2,7 @@ use alloc::{boxed::Box, vec::Vec};
 use core::{
     cmp,
     fmt::{self, Debug},
+    hash::{self, Hash},
     ops,
     ptr::{self, NonNull},
     slice,
@@ -347,15 +348,51 @@ where
 
 impl<T, U, V> Default for &SoaSlice<T, U, V> {
     fn default() -> Self {
-        let data = NonNull::dangling().as_ptr();
+        let data = NonNull::<BufferAlign<T, U, V>>::dangling().as_ptr().cast();
         unsafe { from_len_in_bytes(data, 0) }
     }
 }
 
 impl<T, U, V> Default for &mut SoaSlice<T, U, V> {
     fn default() -> Self {
-        let data = NonNull::dangling().as_ptr();
+        let data = NonNull::<BufferAlign<T, U, V>>::dangling().as_ptr().cast();
         unsafe { from_len_in_bytes_mut(data, 0) }
+    }
+}
+
+impl<T, U, V> Default for Box<SoaSlice<T, U, V>> {
+    fn default() -> Self {
+        let data = NonNull::<BufferAlign<T, U, V>>::dangling().as_ptr().cast();
+        unsafe { Box::from_raw(slice_from_len_in_bytes_mut(data, 0)) }
+    }
+}
+
+impl<T, U, V> AsRef<SoaSlice<T, U, V>> for SoaSlice<T, U, V> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<T, U, V> AsMut<SoaSlice<T, U, V>> for SoaSlice<T, U, V> {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
+impl<T, U, V> Hash for SoaSlice<T, U, V>
+where
+    T: Hash,
+    U: Hash,
+    V: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        let len = self.len();
+        state.write_usize(len);
+
+        let (t_slice, u_slice, v_slice) = self.as_slices();
+        t_slice.hash(state);
+        u_slice.hash(state);
+        v_slice.hash(state);
     }
 }
 

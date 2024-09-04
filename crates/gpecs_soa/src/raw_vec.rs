@@ -1,20 +1,13 @@
-use alloc::{
-    alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc},
-    boxed::Box,
-};
+use alloc::alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc};
 use core::{
     alloc::{Layout, LayoutError},
     cmp,
     fmt::{self, Display},
     marker::PhantomData,
-    mem::ManuallyDrop,
     ptr::NonNull,
 };
 
-use crate::{
-    ptr::{align_of_buffer, min_size_of, ptrs, slice_from_raw_parts_mut, to_len, to_len_in_bytes},
-    slice::SoaSlice,
-};
+use crate::ptr::{align_of_buffer, min_size_of, ptrs, to_len, to_len_in_bytes};
 
 use self::TryReserveErrorKind::*;
 
@@ -174,19 +167,6 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     #[allow(dead_code)]
     pub fn try_with_capacity_zeroed(capacity: usize) -> Result<Self, TryReserveError> {
         Self::try_allocate_in(capacity, AllocInit::Zeroed)
-    }
-
-    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T, U, V>> {
-        debug_assert!(
-            len <= self.capacity(),
-            "`len` must be smaller than or equal to `self.capacity()`"
-        );
-
-        let me = ManuallyDrop::new(self);
-        unsafe {
-            let slice = slice_from_raw_parts_mut(me.ptr(), len);
-            Box::from_raw(slice)
-        }
     }
 
     pub const unsafe fn from_raw_parts(ptr: *mut u8, capacity: usize) -> Self {

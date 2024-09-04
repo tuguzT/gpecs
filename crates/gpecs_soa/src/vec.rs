@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use core::{
     cmp,
     fmt::{self, Debug},
@@ -191,17 +190,6 @@ impl<T, U, V> SoaVec<T, U, V> {
         let new_capacity = cmp::max(self.len, min_capacity);
         self.move_left(new_capacity);
         self.buffer.shrink_to_fit(new_capacity);
-    }
-
-    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T, U, V>> {
-        self.shrink_to_fit();
-        let me = ManuallyDrop::new(self);
-
-        unsafe {
-            let buffer = ptr::read(&me.buffer);
-            let len = me.len();
-            buffer.into_box(len)
-        }
     }
 
     pub fn truncate(&mut self, len: usize) {
@@ -665,10 +653,6 @@ mod tests {
         let slice = vec.as_slice();
         assert!(slice.is_empty());
         assert_eq!(slice.capacity(), 0);
-
-        let boxed_slice = vec.into_boxed_slice();
-        assert!(boxed_slice.is_empty());
-        assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]
@@ -680,10 +664,6 @@ mod tests {
         let slice = vec.as_slice();
         assert!(slice.is_empty());
         assert!(slice.capacity() >= 10);
-
-        let boxed_slice = vec.into_boxed_slice();
-        assert!(boxed_slice.is_empty());
-        assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]
@@ -707,10 +687,6 @@ mod tests {
         assert!(vec.is_empty());
         assert!(vec.capacity() >= 1);
         assert_eq!(vec.get(0), None);
-
-        let boxed_slice = vec.into_boxed_slice();
-        assert!(boxed_slice.is_empty());
-        assert_eq!(boxed_slice.capacity(), 0);
     }
 
     #[test]

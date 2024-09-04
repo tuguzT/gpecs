@@ -1,13 +1,22 @@
-use alloc::alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc};
+use alloc::{
+    alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc},
+    boxed::Box,
+};
 use core::{
     alloc::{Layout, LayoutError},
     cmp,
     fmt::{self, Display},
-    marker::PhantomData,
+    mem::ManuallyDrop,
     ptr::NonNull,
 };
 
-use crate::ptr::{align_of_buffer, min_size_of, ptrs, to_len, to_len_in_bytes, BufferAlign};
+use crate::{
+    ptr::{
+        align_of_buffer, min_size_of, ptrs, slice_from_raw_parts_mut, to_len, to_len_in_bytes,
+        BufferAlign,
+    },
+    slice::SoaSlice,
+};
 
 use self::TryReserveErrorKind::*;
 
@@ -88,7 +97,6 @@ enum AllocInit {
 pub struct RawSoaVec<T, U, V> {
     ptr: NonNull<BufferAlign<T, U, V>>,
     buffer_capacity: usize,
-    phantom: PhantomData<(T, U, V)>,
 }
 
 impl<T, U, V> RawSoaVec<T, U, V> {
@@ -112,7 +120,6 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         Self {
             ptr: NonNull::dangling(),
             buffer_capacity: 0,
-            phantom: PhantomData,
         }
     }
 
@@ -141,7 +148,6 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         Ok(Self {
             ptr: ptr.cast(),
             buffer_capacity: layout.size(),
-            phantom: PhantomData,
         })
     }
 
@@ -169,6 +175,19 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         Self::try_allocate_in(capacity, AllocInit::Zeroed)
     }
 
+    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T, U, V>> {
+        debug_assert!(
+            len <= self.capacity(),
+            "`len` must be smaller than or equal to `self.capacity()`"
+        );
+
+        let me = ManuallyDrop::new(self);
+        unsafe {
+            let slice = slice_from_raw_parts_mut(me.ptr(), len);
+            Box::from_raw(slice)
+        }
+    }
+
     pub const unsafe fn from_raw_parts(ptr: *mut u8, capacity: usize) -> Self {
         unsafe {
             let ptr = NonNull::new_unchecked(ptr);
@@ -186,7 +205,6 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         Self {
             ptr: ptr.cast(),
             buffer_capacity,
-            phantom: PhantomData,
         }
     }
 
@@ -327,8 +345,8 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         new_buffer_capacity > self.buffer_capacity
     }
 
-    unsafe fn set_ptr_and_cap(&mut self, ptr: NonNull<u8>, cap: usize) {
-        self.ptr = ptr.cast();
+    unsafe fn set_ptr_and_cap(&mut self, ptr: NonNull<BufferAlign<T, U, V>>, cap: usize) {
+        self.ptr = ptr;
         self.buffer_capacity = to_len_in_bytes::<T, U, V>(cap);
     }
 
@@ -349,7 +367,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
-            self.set_ptr_and_cap(ptr, cap);
+            self.set_ptr_and_cap(ptr.cast(), cap);
         }
         Ok(())
     }
@@ -366,7 +384,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
-            self.set_ptr_and_cap(ptr, cap);
+            self.set_ptr_and_cap(ptr.cast(), cap);
         }
         Ok(())
     }
@@ -402,7 +420,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
             }
         };
         unsafe {
-            self.set_ptr_and_cap(ptr, cap);
+            self.set_ptr_and_cap(ptr.cast(), cap);
         }
         Ok(())
     }

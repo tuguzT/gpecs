@@ -96,7 +96,7 @@ enum AllocInit {
 
 pub struct RawSoaVec<T, U, V> {
     ptr: NonNull<BufferAlign<T, U, V>>,
-    buffer_capacity: usize,
+    capacity_in_bytes: usize,
 }
 
 impl<T, U, V> RawSoaVec<T, U, V> {
@@ -119,7 +119,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     pub const fn new() -> Self {
         Self {
             ptr: NonNull::dangling(),
-            buffer_capacity: 0,
+            capacity_in_bytes: 0,
         }
     }
 
@@ -147,7 +147,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
 
         Ok(Self {
             ptr: ptr.cast(),
-            buffer_capacity: layout.size(),
+            capacity_in_bytes: layout.size(),
         })
     }
 
@@ -196,7 +196,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 
     pub const unsafe fn from_nonnull(ptr: NonNull<u8>, capacity: usize) -> Self {
-        let buffer_capacity = if min_size_of::<T, U, V>() == 0 {
+        let capacity_in_bytes = if min_size_of::<T, U, V>() == 0 {
             0
         } else {
             to_len_in_bytes::<T, U, V>(capacity)
@@ -204,7 +204,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
 
         Self {
             ptr: ptr.cast(),
-            buffer_capacity,
+            capacity_in_bytes,
         }
     }
 
@@ -218,7 +218,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
 
     #[allow(dead_code)]
     pub const fn ptr_without_header(&self) -> Option<*mut u8> {
-        if self.buffer_capacity == 0 {
+        if self.capacity_in_bytes == 0 {
             return None;
         }
 
@@ -259,16 +259,16 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         if min_size_of::<T, U, V>() == 0 {
             usize::MAX
         } else {
-            to_len::<T, U, V>(self.buffer_capacity)
+            to_len::<T, U, V>(self.capacity_in_bytes)
         }
     }
 
-    pub const fn buffer_capacity(&self) -> usize {
-        self.buffer_capacity
+    pub const fn capacity_in_bytes(&self) -> usize {
+        self.capacity_in_bytes
     }
 
     const fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
-        if min_size_of::<T, U, V>() == 0 || self.buffer_capacity == 0 {
+        if min_size_of::<T, U, V>() == 0 || self.capacity_in_bytes == 0 {
             return None;
         }
 
@@ -277,7 +277,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         // has already been allocated so we know it can't overflow and currently Rust does not
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
         unsafe {
-            let size = self.buffer_capacity;
+            let size = self.capacity_in_bytes;
             let layout = Layout::from_size_align_unchecked(size, Self::LAYOUT_ALIGN);
             Some((self.ptr.cast(), layout))
         }
@@ -341,13 +341,13 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 
     pub fn needs_to_grow(&self, len: usize, additional: usize) -> bool {
-        let new_buffer_capacity = to_len_in_bytes::<T, U, V>(len + additional);
-        new_buffer_capacity > self.buffer_capacity
+        let new_capacity_in_bytes = to_len_in_bytes::<T, U, V>(len + additional);
+        new_capacity_in_bytes > self.capacity_in_bytes
     }
 
     unsafe fn set_ptr_and_cap(&mut self, ptr: NonNull<BufferAlign<T, U, V>>, cap: usize) {
         self.ptr = ptr;
-        self.buffer_capacity = to_len_in_bytes::<T, U, V>(cap);
+        self.capacity_in_bytes = to_len_in_bytes::<T, U, V>(cap);
     }
 
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
@@ -359,7 +359,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
 
         let required_cap = len.checked_add(additional).ok_or(CapacityOverflow)?;
 
-        let cap = cmp::max(self.buffer_capacity * 2, required_cap);
+        let cap = cmp::max(self.capacity_in_bytes * 2, required_cap);
         let cap = cmp::max(Self::MIN_NON_ZERO_CAP, cap);
 
         let layout_size = to_len_in_bytes::<T, U, V>(cap);

@@ -21,7 +21,7 @@ pub struct SoaSlice<T, U, V> {
 impl<T, U, V> SoaSlice<T, U, V> {
     #[inline]
     pub const fn len(&self) -> usize {
-        match self.buffer_capacity() {
+        match self.capacity_in_bytes() {
             0 => 0,
             _ => unsafe { ptr::read(self.as_ptr().cast()) },
         }
@@ -33,7 +33,7 @@ impl<T, U, V> SoaSlice<T, U, V> {
     }
 
     #[inline]
-    pub const fn buffer_capacity(&self) -> usize {
+    pub const fn capacity_in_bytes(&self) -> usize {
         self.buffer.len()
     }
 
@@ -42,7 +42,7 @@ impl<T, U, V> SoaSlice<T, U, V> {
         if min_size_of::<T, U, V>() == 0 {
             usize::MAX
         } else {
-            let len_in_bytes = self.buffer_capacity();
+            let len_in_bytes = self.capacity_in_bytes();
             to_len::<T, U, V>(len_in_bytes)
         }
     }

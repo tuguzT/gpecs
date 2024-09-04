@@ -11,7 +11,7 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{min_size_of, ptrs},
+    ptr::{min_size_of, ptrs, slice_from_len_in_bytes_mut},
     raw_vec::RawSoaVec,
     slice::{from_len_in_bytes, from_len_in_bytes_mut, SoaSlice},
 };
@@ -73,8 +73,8 @@ impl<T, U, V> SoaVec<T, U, V> {
     }
 
     #[inline]
-    pub const fn buffer_capacity(&self) -> usize {
-        self.buffer.buffer_capacity()
+    pub const fn capacity_in_bytes(&self) -> usize {
+        self.buffer.capacity_in_bytes()
     }
 
     #[inline]
@@ -195,11 +195,20 @@ impl<T, U, V> SoaVec<T, U, V> {
 
     pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T, U, V>> {
         self.shrink_to_fit();
-        let me = ManuallyDrop::new(self);
+        let mut me = ManuallyDrop::new(self);
+
+        if min_size_of::<T, U, V>() == 0 && me.len > 0 {
+            let (data, len_in_bytes) = match me.capacity_in_bytes() {
+                0 => (Box::into_raw(Box::new(me.len)).cast(), size_of::<usize>()),
+                _ => (me.as_mut_ptr(), me.capacity_in_bytes()),
+            };
+            let slice = slice_from_len_in_bytes_mut(data, len_in_bytes);
+            return unsafe { Box::from_raw(slice) };
+        }
 
         unsafe {
             let buffer = ptr::read(&me.buffer);
-            let len = me.len();
+            let len = me.len;
             buffer.into_box(len)
         }
     }
@@ -284,7 +293,7 @@ impl<T, U, V> SoaVec<T, U, V> {
     }
 
     fn set_len_in_buffer(&mut self, new_len: usize) {
-        if self.buffer_capacity() == 0 {
+        if self.capacity_in_bytes() == 0 {
             return;
         }
 
@@ -609,7 +618,7 @@ impl<T, U, V> Deref for SoaVec<T, U, V> {
     fn deref(&self) -> &Self::Target {
         let (data, len_in_bytes) = match min_size_of::<T, U, V>() {
             0 => (addr_of!(self.len).cast(), size_of::<usize>()),
-            _ => (self.as_ptr(), self.buffer_capacity()),
+            _ => (self.as_ptr(), self.capacity_in_bytes()),
         };
         unsafe { from_len_in_bytes(data, len_in_bytes) }
     }
@@ -619,7 +628,7 @@ impl<T, U, V> DerefMut for SoaVec<T, U, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         let (data, len_in_bytes) = match min_size_of::<T, U, V>() {
             0 => (addr_of_mut!(self.len).cast(), size_of::<usize>()),
-            _ => (self.as_mut_ptr(), self.buffer_capacity()),
+            _ => (self.as_mut_ptr(), self.capacity_in_bytes()),
         };
         unsafe { from_len_in_bytes_mut(data, len_in_bytes) }
     }
@@ -803,7 +812,7 @@ mod tests {
     }
 
     #[test]
-    fn tree_items_zst() {
+    fn three_items_zst() {
         #[derive(Debug, PartialEq, Eq)]
         struct ZST1;
 
@@ -890,5 +899,17 @@ mod tests {
         });
         assert_eq!(vec.len(), 2);
         assert!(vec.capacity() >= 3);
+
+        let boxed_slice = vec.into_boxed_slice();
+        assert_eq!(boxed_slice.len(), 2);
+        assert_eq!(boxed_slice.capacity(), usize::MAX);
+        assert_eq!(
+            boxed_slice.get(..),
+            Some((
+                [ZST1, ZST1].as_slice(),
+                [ZST2(()), ZST2(())].as_slice(),
+                [ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
+            )),
+        );
     }
 }

@@ -7,7 +7,7 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::ptr::{align_of_buffer, min_size_of, ptrs, to_len, to_len_in_bytes};
+use crate::ptr::{align_of_buffer, min_size_of, ptrs, to_len, to_len_in_bytes, BufferAlign};
 
 use self::TryReserveErrorKind::*;
 
@@ -86,7 +86,7 @@ enum AllocInit {
 }
 
 pub struct RawSoaVec<T, U, V> {
-    ptr: NonNull<u8>,
+    ptr: NonNull<BufferAlign<T, U, V>>,
     buffer_capacity: usize,
     phantom: PhantomData<(T, U, V)>,
 }
@@ -139,7 +139,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         };
 
         Ok(Self {
-            ptr,
+            ptr: ptr.cast(),
             buffer_capacity: layout.size(),
             phantom: PhantomData,
         })
@@ -184,7 +184,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         };
 
         Self {
-            ptr,
+            ptr: ptr.cast(),
             buffer_capacity,
             phantom: PhantomData,
         }
@@ -195,7 +195,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 
     pub const fn non_null(&self) -> NonNull<u8> {
-        self.ptr
+        self.ptr.cast()
     }
 
     #[allow(dead_code)]
@@ -261,7 +261,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         unsafe {
             let size = self.buffer_capacity;
             let layout = Layout::from_size_align_unchecked(size, Self::LAYOUT_ALIGN);
-            Some((self.ptr, layout))
+            Some((self.ptr.cast(), layout))
         }
     }
 
@@ -328,7 +328,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 
     unsafe fn set_ptr_and_cap(&mut self, ptr: NonNull<u8>, cap: usize) {
-        self.ptr = ptr;
+        self.ptr = ptr.cast();
         self.buffer_capacity = to_len_in_bytes::<T, U, V>(cap);
     }
 

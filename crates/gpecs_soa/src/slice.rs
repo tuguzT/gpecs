@@ -2,7 +2,6 @@ use alloc::vec::Vec;
 use core::{
     cmp,
     fmt::{self, Debug},
-    marker::PhantomData,
     ops,
     ptr::{self, NonNull},
     slice,
@@ -10,12 +9,12 @@ use core::{
 
 use crate::ptr::{
     min_size_of, ptrs, slice_from_len_in_bytes, slice_from_len_in_bytes_mut, slice_from_raw_parts,
-    slice_from_raw_parts_mut, to_len,
+    slice_from_raw_parts_mut, to_len, BufferAlign,
 };
 
-#[repr(transparent)]
+#[repr(C)]
 pub struct SoaSlice<T, U, V> {
-    phantom: PhantomData<(T, U, V)>,
+    align: BufferAlign<T, U, V>,
     buffer: [u8],
 }
 

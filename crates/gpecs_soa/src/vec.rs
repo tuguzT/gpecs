@@ -15,7 +15,7 @@ pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 use crate::{
     ptr::{min_size_of, ptrs, slice_from_len_in_bytes_mut},
     raw_vec::RawSoaVec,
-    slice::{from_len_in_bytes, from_len_in_bytes_mut, SoaSlice},
+    slice::{from_len_in_bytes, from_len_in_bytes_mut, Iter, IterMut, SoaSlice},
 };
 
 pub struct SoaVec<T, U, V> {
@@ -694,6 +694,24 @@ impl<T, U, V> DerefMut for SoaVec<T, U, V> {
     }
 }
 
+impl<'a, T, U, V> IntoIterator for &'a SoaVec<T, U, V> {
+    type Item = (&'a T, &'a U, &'a V);
+    type IntoIter = Iter<'a, T, U, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T, U, V> IntoIterator for &'a mut SoaVec<T, U, V> {
+    type Item = (&'a mut T, &'a mut U, &'a mut V);
+    type IntoIter = IterMut<'a, T, U, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
 impl<T, U, V> Drop for SoaVec<T, U, V> {
     fn drop(&mut self) {
         if self.is_empty() {
@@ -844,32 +862,39 @@ mod tests {
             )),
         );
 
-        let mut iter = vec.iter();
+        for (t, _, _) in &mut vec {
+            *t += 1;
+        }
+
+        let mut iter = vec.iter_mut();
         assert_eq!(iter.len(), 3);
 
-        assert_eq!(iter.next(), Some((&4, &"5".to_owned(), &6)));
+        assert_eq!(iter.next(), Some((&mut 5, &mut "5".to_owned(), &mut 6)));
         assert_eq!(iter.len(), 2);
 
-        assert_eq!(iter.next_back(), Some((&1, &"2".to_owned(), &3)));
+        assert_eq!(
+            iter.next_back(),
+            Some((&mut 2, &mut "2".to_owned(), &mut 3)),
+        );
         assert_eq!(iter.len(), 1);
 
-        assert_eq!(iter.next(), Some((&7, &"8".to_owned(), &9)));
+        assert_eq!(iter.next(), Some((&mut 8, &mut "8".to_owned(), &mut 9)));
         assert_eq!(iter.len(), 0);
 
         assert_eq!(iter.next_back(), None);
 
         let (t, u, v) = vec.swap_remove(1);
-        assert_eq!((t, u, v), (7, "8".to_owned(), 9));
+        assert_eq!((t, u, v), (8, "8".to_owned(), 9));
         assert_eq!(vec.len(), 2);
         assert!(vec.capacity() >= 3);
 
         let (t, u, v) = vec.pop().expect("multi vector should not be empty");
-        assert_eq!((t, u, v), (1, "2".to_owned(), 3));
+        assert_eq!((t, u, v), (2, "2".to_owned(), 3));
         assert_eq!(vec.len(), 1);
         assert!(vec.capacity() >= 3);
 
         let (t, u, v) = vec.remove(0);
-        assert_eq!((t, u, v), (4, "5".to_owned(), 6));
+        assert_eq!((t, u, v), (5, "5".to_owned(), 6));
         assert!(vec.is_empty());
         assert!(vec.capacity() >= 3);
 
@@ -968,7 +993,7 @@ mod tests {
             )),
         );
 
-        let mut iter = vec.iter();
+        let mut iter = vec.iter_mut();
         assert_eq!(iter.len(), 3);
 
         assert!(iter.next().is_some());

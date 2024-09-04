@@ -78,12 +78,7 @@ pub(crate) const fn align_of_buffer<T, U, V>() -> usize {
 }
 
 #[inline]
-pub(crate) const fn align_up_to_buffer<T, U, V>(addr: usize) -> usize {
-    align_up::<BufferItem<T, U, V>>(addr)
-}
-
-#[inline]
-const fn unaligned_to_len_in_bytes<T, U, V>(len: usize) -> usize {
+pub(crate) const fn to_len_in_bytes<T, U, V>(len: usize) -> usize {
     if min_size_of::<T, U, V>() == 0 || len == 0 {
         return 0;
     }
@@ -97,13 +92,7 @@ const fn unaligned_to_len_in_bytes<T, U, V>(len: usize) -> usize {
 }
 
 #[inline]
-pub(crate) const fn to_len_in_bytes<T, U, V>(len: usize) -> usize {
-    let unaligned = unaligned_to_len_in_bytes::<T, U, V>(len);
-    align_up_to_buffer::<T, U, V>(unaligned)
-}
-
-#[inline]
-const fn unaligned_to_len<T, U, V>(len_in_bytes: usize) -> usize {
+pub(crate) const fn to_len<T, U, V>(len_in_bytes: usize) -> usize {
     if min_size_of::<T, U, V>() == 0 || len_in_bytes < size_of::<usize>() {
         return 0;
     }
@@ -113,18 +102,12 @@ const fn unaligned_to_len<T, U, V>(len_in_bytes: usize) -> usize {
     let mut len = max_len;
     while {
         // this variable is not inlined (in debug builds) only for better debugging experience
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<T, U, V>(len);
+        let to_len_in_bytes = to_len_in_bytes::<T, U, V>(len);
         to_len_in_bytes > len_in_bytes
     } {
         len -= 1;
     }
     len
-}
-
-#[inline]
-pub(crate) const fn to_len<T, U, V>(len_in_bytes: usize) -> usize {
-    let aligned_len = align_up_to_buffer::<T, U, V>(len_in_bytes);
-    unaligned_to_len::<T, U, V>(aligned_len)
 }
 
 #[inline]
@@ -148,29 +131,29 @@ pub(crate) unsafe fn ptrs<T, U, V>(ptr: *mut u8, len: usize) -> (*mut T, *mut U,
 #[cfg(test)]
 #[allow(clippy::identity_op)]
 mod tests {
-    use super::{align_up, unaligned_to_len, unaligned_to_len_in_bytes};
+    use super::{align_up, to_len, to_len_in_bytes};
 
     #[test]
-    fn u8_u8_u8_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u8, u8, u8>;
+    fn u8_u8_u8_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u8, u8, u8>;
         let usize = size_of::<usize>();
         let u8 = size_of::<u8>();
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), usize + 3 * u8 * 1);
-        assert_eq!(to_len_in_bytes(2), usize + 3 * u8 * 2);
-        assert_eq!(to_len_in_bytes(3), usize + 3 * u8 * 3);
-        assert_eq!(to_len_in_bytes(4), usize + 3 * u8 * 4);
-        assert_eq!(to_len_in_bytes(5), usize + 3 * u8 * 5);
-        assert_eq!(to_len_in_bytes(6), usize + 3 * u8 * 6);
-        assert_eq!(to_len_in_bytes(7), usize + 3 * u8 * 7);
-        assert_eq!(to_len_in_bytes(8), usize + 3 * u8 * 8);
-        assert_eq!(to_len_in_bytes(9), usize + 3 * u8 * 9);
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), usize + 3 * u8 * 1);
+        assert_eq!(to_buffer_len(2), usize + 3 * u8 * 2);
+        assert_eq!(to_buffer_len(3), usize + 3 * u8 * 3);
+        assert_eq!(to_buffer_len(4), usize + 3 * u8 * 4);
+        assert_eq!(to_buffer_len(5), usize + 3 * u8 * 5);
+        assert_eq!(to_buffer_len(6), usize + 3 * u8 * 6);
+        assert_eq!(to_buffer_len(7), usize + 3 * u8 * 7);
+        assert_eq!(to_buffer_len(8), usize + 3 * u8 * 8);
+        assert_eq!(to_buffer_len(9), usize + 3 * u8 * 9);
     }
 
     #[test]
     fn u8_u8_u8_to_len() {
-        let to_len = unaligned_to_len::<u8, u8, u8>;
+        let to_len = to_len::<u8, u8, u8>;
         let usize = size_of::<usize>();
         let u8 = size_of::<u8>();
 
@@ -194,26 +177,26 @@ mod tests {
     }
 
     #[test]
-    fn u16_u16_u16_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u16, u16, u16>;
+    fn u16_u16_u16_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u16, u16, u16>;
         let usize = size_of::<usize>();
         let u16 = size_of::<u16>();
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), usize + 3 * u16 * 1);
-        assert_eq!(to_len_in_bytes(2), usize + 3 * u16 * 2);
-        assert_eq!(to_len_in_bytes(3), usize + 3 * u16 * 3);
-        assert_eq!(to_len_in_bytes(4), usize + 3 * u16 * 4);
-        assert_eq!(to_len_in_bytes(5), usize + 3 * u16 * 5);
-        assert_eq!(to_len_in_bytes(6), usize + 3 * u16 * 6);
-        assert_eq!(to_len_in_bytes(7), usize + 3 * u16 * 7);
-        assert_eq!(to_len_in_bytes(8), usize + 3 * u16 * 8);
-        assert_eq!(to_len_in_bytes(9), usize + 3 * u16 * 9);
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), usize + 3 * u16 * 1);
+        assert_eq!(to_buffer_len(2), usize + 3 * u16 * 2);
+        assert_eq!(to_buffer_len(3), usize + 3 * u16 * 3);
+        assert_eq!(to_buffer_len(4), usize + 3 * u16 * 4);
+        assert_eq!(to_buffer_len(5), usize + 3 * u16 * 5);
+        assert_eq!(to_buffer_len(6), usize + 3 * u16 * 6);
+        assert_eq!(to_buffer_len(7), usize + 3 * u16 * 7);
+        assert_eq!(to_buffer_len(8), usize + 3 * u16 * 8);
+        assert_eq!(to_buffer_len(9), usize + 3 * u16 * 9);
     }
 
     #[test]
     fn u16_u16_u16_to_len() {
-        let to_len = unaligned_to_len::<u16, u16, u16>;
+        let to_len = to_len::<u16, u16, u16>;
         let usize = size_of::<usize>();
         let u16 = size_of::<u16>();
 
@@ -233,25 +216,25 @@ mod tests {
     }
 
     #[test]
-    fn u32_u32_u32_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u32, u32, u32>;
+    fn u32_u32_u32_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u32, u32, u32>;
         let u32 = size_of::<u32>();
         let aligned_len = align_up::<u32>(size_of::<usize>());
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), aligned_len + 3 * u32 * 1);
-        assert_eq!(to_len_in_bytes(2), aligned_len + 3 * u32 * 2);
-        assert_eq!(to_len_in_bytes(3), aligned_len + 3 * u32 * 3);
-        assert_eq!(to_len_in_bytes(4), aligned_len + 3 * u32 * 4);
-        assert_eq!(to_len_in_bytes(5), aligned_len + 3 * u32 * 5);
-        assert_eq!(to_len_in_bytes(6), aligned_len + 3 * u32 * 6);
-        assert_eq!(to_len_in_bytes(7), aligned_len + 3 * u32 * 7);
-        assert_eq!(to_len_in_bytes(8), aligned_len + 3 * u32 * 8);
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), aligned_len + 3 * u32 * 1);
+        assert_eq!(to_buffer_len(2), aligned_len + 3 * u32 * 2);
+        assert_eq!(to_buffer_len(3), aligned_len + 3 * u32 * 3);
+        assert_eq!(to_buffer_len(4), aligned_len + 3 * u32 * 4);
+        assert_eq!(to_buffer_len(5), aligned_len + 3 * u32 * 5);
+        assert_eq!(to_buffer_len(6), aligned_len + 3 * u32 * 6);
+        assert_eq!(to_buffer_len(7), aligned_len + 3 * u32 * 7);
+        assert_eq!(to_buffer_len(8), aligned_len + 3 * u32 * 8);
     }
 
     #[test]
     fn u32_u32_u32_to_len() {
-        let to_len = unaligned_to_len::<u32, u32, u32>;
+        let to_len = to_len::<u32, u32, u32>;
         let u32 = size_of::<u32>();
         let aligned_len = align_up::<u32>(size_of::<usize>());
 
@@ -271,25 +254,25 @@ mod tests {
     }
 
     #[test]
-    fn u64_u64_u64_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u64, u64, u64>;
+    fn u64_u64_u64_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u64, u64, u64>;
         let u64 = size_of::<u64>();
         let aligned_len = align_up::<u64>(size_of::<usize>());
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), aligned_len + 3 * u64 * 1);
-        assert_eq!(to_len_in_bytes(2), aligned_len + 3 * u64 * 2);
-        assert_eq!(to_len_in_bytes(3), aligned_len + 3 * u64 * 3);
-        assert_eq!(to_len_in_bytes(4), aligned_len + 3 * u64 * 4);
-        assert_eq!(to_len_in_bytes(5), aligned_len + 3 * u64 * 5);
-        assert_eq!(to_len_in_bytes(6), aligned_len + 3 * u64 * 6);
-        assert_eq!(to_len_in_bytes(7), aligned_len + 3 * u64 * 7);
-        assert_eq!(to_len_in_bytes(8), aligned_len + 3 * u64 * 8);
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), aligned_len + 3 * u64 * 1);
+        assert_eq!(to_buffer_len(2), aligned_len + 3 * u64 * 2);
+        assert_eq!(to_buffer_len(3), aligned_len + 3 * u64 * 3);
+        assert_eq!(to_buffer_len(4), aligned_len + 3 * u64 * 4);
+        assert_eq!(to_buffer_len(5), aligned_len + 3 * u64 * 5);
+        assert_eq!(to_buffer_len(6), aligned_len + 3 * u64 * 6);
+        assert_eq!(to_buffer_len(7), aligned_len + 3 * u64 * 7);
+        assert_eq!(to_buffer_len(8), aligned_len + 3 * u64 * 8);
     }
 
     #[test]
     fn u64_u64_u64_to_len() {
-        let to_len = unaligned_to_len::<u64, u64, u64>;
+        let to_len = to_len::<u64, u64, u64>;
         let u64 = size_of::<u64>();
         let aligned_len = align_up::<u64>(size_of::<usize>());
 
@@ -310,28 +293,28 @@ mod tests {
 
     #[test]
     #[rustfmt::skip::macros(assert_eq)]
-    fn u8_u16_u32_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u8, u16, u32>;
+    fn u8_u16_u32_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u8, u16, u32>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
         let usize = size_of::<usize>();
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1));
-        assert_eq!(to_len_in_bytes(2), usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2));
-        assert_eq!(to_len_in_bytes(3), usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3));
-        assert_eq!(to_len_in_bytes(4), usize + (u8 * 4) + 0 + (u16 * 4) + 0 + (u32 * 4));
-        assert_eq!(to_len_in_bytes(5), usize + (u8 * 5) + 1 + (u16 * 5) + 0 + (u32 * 5));
-        assert_eq!(to_len_in_bytes(6), usize + (u8 * 6) + 0 + (u16 * 6) + 2 + (u32 * 6));
-        assert_eq!(to_len_in_bytes(7), usize + (u8 * 7) + 1 + (u16 * 7) + 2 + (u32 * 7));
-        assert_eq!(to_len_in_bytes(8), usize + (u8 * 8) + 0 + (u16 * 8) + 0 + (u32 * 8));
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1));
+        assert_eq!(to_buffer_len(2), usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2));
+        assert_eq!(to_buffer_len(3), usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3));
+        assert_eq!(to_buffer_len(4), usize + (u8 * 4) + 0 + (u16 * 4) + 0 + (u32 * 4));
+        assert_eq!(to_buffer_len(5), usize + (u8 * 5) + 1 + (u16 * 5) + 0 + (u32 * 5));
+        assert_eq!(to_buffer_len(6), usize + (u8 * 6) + 0 + (u16 * 6) + 2 + (u32 * 6));
+        assert_eq!(to_buffer_len(7), usize + (u8 * 7) + 1 + (u16 * 7) + 2 + (u32 * 7));
+        assert_eq!(to_buffer_len(8), usize + (u8 * 8) + 0 + (u16 * 8) + 0 + (u32 * 8));
     }
 
     #[test]
     #[rustfmt::skip::macros(assert_eq)]
     fn u8_u16_u32_to_len() {
-        let to_len = unaligned_to_len::<u8, u16, u32>;
+        let to_len = to_len::<u8, u16, u32>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
@@ -353,27 +336,27 @@ mod tests {
     }
 
     #[test]
-    fn u32_u16_u8_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u32, u16, u8>;
+    fn u32_u16_u8_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u32, u16, u8>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
         let aligned_len = align_up::<u32>(size_of::<usize>());
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), aligned_len + (u32 + u16 + u8) * 1);
-        assert_eq!(to_len_in_bytes(2), aligned_len + (u32 + u16 + u8) * 2);
-        assert_eq!(to_len_in_bytes(3), aligned_len + (u32 + u16 + u8) * 3);
-        assert_eq!(to_len_in_bytes(4), aligned_len + (u32 + u16 + u8) * 4);
-        assert_eq!(to_len_in_bytes(5), aligned_len + (u32 + u16 + u8) * 5);
-        assert_eq!(to_len_in_bytes(6), aligned_len + (u32 + u16 + u8) * 6);
-        assert_eq!(to_len_in_bytes(7), aligned_len + (u32 + u16 + u8) * 7);
-        assert_eq!(to_len_in_bytes(8), aligned_len + (u32 + u16 + u8) * 8);
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), aligned_len + (u32 + u16 + u8) * 1);
+        assert_eq!(to_buffer_len(2), aligned_len + (u32 + u16 + u8) * 2);
+        assert_eq!(to_buffer_len(3), aligned_len + (u32 + u16 + u8) * 3);
+        assert_eq!(to_buffer_len(4), aligned_len + (u32 + u16 + u8) * 4);
+        assert_eq!(to_buffer_len(5), aligned_len + (u32 + u16 + u8) * 5);
+        assert_eq!(to_buffer_len(6), aligned_len + (u32 + u16 + u8) * 6);
+        assert_eq!(to_buffer_len(7), aligned_len + (u32 + u16 + u8) * 7);
+        assert_eq!(to_buffer_len(8), aligned_len + (u32 + u16 + u8) * 8);
     }
 
     #[test]
     fn u32_u16_u8_to_len() {
-        let to_len = unaligned_to_len::<u32, u16, u8>;
+        let to_len = to_len::<u32, u16, u8>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
@@ -395,26 +378,26 @@ mod tests {
     }
 
     #[test]
-    fn u8_u16_u8_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u8, u16, u8>;
+    fn u8_u16_u8_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u8, u16, u8>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let usize = size_of::<usize>();
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), usize + (u8 * 1) + 1 + (u16 + u8) * 1);
-        assert_eq!(to_len_in_bytes(2), usize + (u8 * 2) + 0 + (u16 + u8) * 2);
-        assert_eq!(to_len_in_bytes(3), usize + (u8 * 3) + 1 + (u16 + u8) * 3);
-        assert_eq!(to_len_in_bytes(4), usize + (u8 * 4) + 0 + (u16 + u8) * 4);
-        assert_eq!(to_len_in_bytes(5), usize + (u8 * 5) + 1 + (u16 + u8) * 5);
-        assert_eq!(to_len_in_bytes(6), usize + (u8 * 6) + 0 + (u16 + u8) * 6);
-        assert_eq!(to_len_in_bytes(7), usize + (u8 * 7) + 1 + (u16 + u8) * 7);
-        assert_eq!(to_len_in_bytes(8), usize + (u8 * 8) + 0 + (u16 + u8) * 8);
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), usize + (u8 * 1) + 1 + (u16 + u8) * 1);
+        assert_eq!(to_buffer_len(2), usize + (u8 * 2) + 0 + (u16 + u8) * 2);
+        assert_eq!(to_buffer_len(3), usize + (u8 * 3) + 1 + (u16 + u8) * 3);
+        assert_eq!(to_buffer_len(4), usize + (u8 * 4) + 0 + (u16 + u8) * 4);
+        assert_eq!(to_buffer_len(5), usize + (u8 * 5) + 1 + (u16 + u8) * 5);
+        assert_eq!(to_buffer_len(6), usize + (u8 * 6) + 0 + (u16 + u8) * 6);
+        assert_eq!(to_buffer_len(7), usize + (u8 * 7) + 1 + (u16 + u8) * 7);
+        assert_eq!(to_buffer_len(8), usize + (u8 * 8) + 0 + (u16 + u8) * 8);
     }
 
     #[test]
     fn u8_u16_u8_to_len() {
-        let to_len = unaligned_to_len::<u8, u16, u8>;
+        let to_len = to_len::<u8, u16, u8>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let usize = size_of::<usize>();
@@ -435,26 +418,26 @@ mod tests {
     }
 
     #[test]
-    fn u16_u8_u16_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u16, u8, u16>;
+    fn u16_u8_u16_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u16, u8, u16>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let usize = size_of::<usize>();
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), usize + (u16 + u8) * 1 + 1 + (u16 * 1));
-        assert_eq!(to_len_in_bytes(2), usize + (u16 + u8) * 2 + 0 + (u16 * 2));
-        assert_eq!(to_len_in_bytes(3), usize + (u16 + u8) * 3 + 1 + (u16 * 3));
-        assert_eq!(to_len_in_bytes(4), usize + (u16 + u8) * 4 + 0 + (u16 * 4));
-        assert_eq!(to_len_in_bytes(5), usize + (u16 + u8) * 5 + 1 + (u16 * 5));
-        assert_eq!(to_len_in_bytes(6), usize + (u16 + u8) * 6 + 0 + (u16 * 6));
-        assert_eq!(to_len_in_bytes(7), usize + (u16 + u8) * 7 + 1 + (u16 * 7));
-        assert_eq!(to_len_in_bytes(8), usize + (u16 + u8) * 8 + 0 + (u16 * 8));
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), usize + (u16 + u8) * 1 + 1 + (u16 * 1));
+        assert_eq!(to_buffer_len(2), usize + (u16 + u8) * 2 + 0 + (u16 * 2));
+        assert_eq!(to_buffer_len(3), usize + (u16 + u8) * 3 + 1 + (u16 * 3));
+        assert_eq!(to_buffer_len(4), usize + (u16 + u8) * 4 + 0 + (u16 * 4));
+        assert_eq!(to_buffer_len(5), usize + (u16 + u8) * 5 + 1 + (u16 * 5));
+        assert_eq!(to_buffer_len(6), usize + (u16 + u8) * 6 + 0 + (u16 * 6));
+        assert_eq!(to_buffer_len(7), usize + (u16 + u8) * 7 + 1 + (u16 * 7));
+        assert_eq!(to_buffer_len(8), usize + (u16 + u8) * 8 + 0 + (u16 * 8));
     }
 
     #[test]
     fn u16_u8_u16_to_len() {
-        let to_len = unaligned_to_len::<u16, u8, u16>;
+        let to_len = to_len::<u16, u8, u16>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let usize = size_of::<usize>();
@@ -475,27 +458,27 @@ mod tests {
     }
 
     #[test]
-    fn u16_u8_u32_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u16, u8, u32>;
+    fn u16_u8_u32_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u16, u8, u32>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
         let usize = size_of::<usize>();
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), usize + (u16 + u8) * 1 + 1 + (u32 * 1));
-        assert_eq!(to_len_in_bytes(2), usize + (u16 + u8) * 2 + 2 + (u32 * 2));
-        assert_eq!(to_len_in_bytes(3), usize + (u16 + u8) * 3 + 3 + (u32 * 3));
-        assert_eq!(to_len_in_bytes(4), usize + (u16 + u8) * 4 + 0 + (u32 * 4));
-        assert_eq!(to_len_in_bytes(5), usize + (u16 + u8) * 5 + 1 + (u32 * 5));
-        assert_eq!(to_len_in_bytes(6), usize + (u16 + u8) * 6 + 2 + (u32 * 6));
-        assert_eq!(to_len_in_bytes(7), usize + (u16 + u8) * 7 + 3 + (u32 * 7));
-        assert_eq!(to_len_in_bytes(8), usize + (u16 + u8) * 8 + 0 + (u32 * 8));
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), usize + (u16 + u8) * 1 + 1 + (u32 * 1));
+        assert_eq!(to_buffer_len(2), usize + (u16 + u8) * 2 + 2 + (u32 * 2));
+        assert_eq!(to_buffer_len(3), usize + (u16 + u8) * 3 + 3 + (u32 * 3));
+        assert_eq!(to_buffer_len(4), usize + (u16 + u8) * 4 + 0 + (u32 * 4));
+        assert_eq!(to_buffer_len(5), usize + (u16 + u8) * 5 + 1 + (u32 * 5));
+        assert_eq!(to_buffer_len(6), usize + (u16 + u8) * 6 + 2 + (u32 * 6));
+        assert_eq!(to_buffer_len(7), usize + (u16 + u8) * 7 + 3 + (u32 * 7));
+        assert_eq!(to_buffer_len(8), usize + (u16 + u8) * 8 + 0 + (u32 * 8));
     }
 
     #[test]
     fn u16_u8_u32_to_len() {
-        let to_len = unaligned_to_len::<u16, u8, u32>;
+        let to_len = to_len::<u16, u8, u32>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
@@ -517,26 +500,26 @@ mod tests {
     }
 
     #[test]
-    fn u16_u32_u16_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<u16, u32, u16>;
+    fn u16_u32_u16_to_buffer_len() {
+        let to_buffer_len = to_len_in_bytes::<u16, u32, u16>;
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
         let usize = size_of::<usize>();
 
-        assert_eq!(to_len_in_bytes(0), 0);
-        assert_eq!(to_len_in_bytes(1), usize + (u16 + u32) * 1 + 2 + (u16 * 1));
-        assert_eq!(to_len_in_bytes(2), usize + (u16 + u32) * 2 + 0 + (u16 * 2));
-        assert_eq!(to_len_in_bytes(3), usize + (u16 + u32) * 3 + 2 + (u16 * 3));
-        assert_eq!(to_len_in_bytes(4), usize + (u16 + u32) * 4 + 0 + (u16 * 4));
-        assert_eq!(to_len_in_bytes(5), usize + (u16 + u32) * 5 + 2 + (u16 * 5));
-        assert_eq!(to_len_in_bytes(6), usize + (u16 + u32) * 6 + 0 + (u16 * 6));
-        assert_eq!(to_len_in_bytes(7), usize + (u16 + u32) * 7 + 2 + (u16 * 7));
-        assert_eq!(to_len_in_bytes(8), usize + (u16 + u32) * 8 + 0 + (u16 * 8));
+        assert_eq!(to_buffer_len(0), 0);
+        assert_eq!(to_buffer_len(1), usize + (u16 + u32) * 1 + 2 + (u16 * 1));
+        assert_eq!(to_buffer_len(2), usize + (u16 + u32) * 2 + 0 + (u16 * 2));
+        assert_eq!(to_buffer_len(3), usize + (u16 + u32) * 3 + 2 + (u16 * 3));
+        assert_eq!(to_buffer_len(4), usize + (u16 + u32) * 4 + 0 + (u16 * 4));
+        assert_eq!(to_buffer_len(5), usize + (u16 + u32) * 5 + 2 + (u16 * 5));
+        assert_eq!(to_buffer_len(6), usize + (u16 + u32) * 6 + 0 + (u16 * 6));
+        assert_eq!(to_buffer_len(7), usize + (u16 + u32) * 7 + 2 + (u16 * 7));
+        assert_eq!(to_buffer_len(8), usize + (u16 + u32) * 8 + 0 + (u16 * 8));
     }
 
     #[test]
     fn u16_u32_u16_to_len() {
-        let to_len = unaligned_to_len::<u16, u32, u16>;
+        let to_len = to_len::<u16, u32, u16>;
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
         let usize = size_of::<usize>();

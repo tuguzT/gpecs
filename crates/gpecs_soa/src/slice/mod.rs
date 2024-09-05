@@ -12,7 +12,7 @@ use crate::{
         min_size_of, ptrs, slice_from_len_in_bytes, slice_from_len_in_bytes_mut,
         slice_from_raw_parts, slice_from_raw_parts_mut, to_len, BufferAlign,
     },
-    vec::SoaVec,
+    vec::{IntoIter, SoaVec},
 };
 
 pub use self::{
@@ -437,12 +437,39 @@ impl<'a, T, U, V> IntoIterator for &'a SoaSlice<T, U, V> {
     }
 }
 
+impl<'a, T, U, V> IntoIterator for &'a Box<SoaSlice<T, U, V>> {
+    type Item = (&'a T, &'a U, &'a V);
+    type IntoIter = Iter<'a, T, U, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<'a, T, U, V> IntoIterator for &'a mut SoaSlice<T, U, V> {
     type Item = (&'a mut T, &'a mut U, &'a mut V);
     type IntoIter = IterMut<'a, T, U, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
+    }
+}
+
+impl<'a, T, U, V> IntoIterator for &'a mut Box<SoaSlice<T, U, V>> {
+    type Item = (&'a mut T, &'a mut U, &'a mut V);
+    type IntoIter = IterMut<'a, T, U, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl<T, U, V> IntoIterator for Box<SoaSlice<T, U, V>> {
+    type Item = (T, U, V);
+    type IntoIter = IntoIter<T, U, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_vec().into_iter()
     }
 }
 

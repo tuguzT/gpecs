@@ -285,7 +285,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 
     const fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
-        if min_size_of::<T, U, V>() == 0 || self.capacity_in_bytes == 0 {
+        if self.capacity_in_bytes == 0 {
             return None;
         }
 
@@ -427,6 +427,9 @@ impl<T, U, V> RawSoaVec<T, U, V> {
 
         let ptr = unsafe {
             let layout_size = to_len_in_bytes::<T, U, V>(cap);
+            if layout_size == 0 {
+                return Ok(());
+            }
             let new_layout = Layout::from_size_align_unchecked(layout_size, Self::LAYOUT_ALIGN);
 
             let ptr = realloc(ptr.as_ptr(), old_layout, new_layout.size());

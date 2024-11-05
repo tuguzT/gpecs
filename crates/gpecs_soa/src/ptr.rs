@@ -92,6 +92,10 @@ fn unaligned_to_len_in_bytes<T>(len: usize) -> usize
 where
     T: Soa,
 {
+    if T::min_size_of_components() == 0 || len == 0 {
+        return 0;
+    }
+
     let initial = size_of::<usize>();
     T::len_in_bytes_unaligned(initial, len)
 }
@@ -141,7 +145,7 @@ pub(crate) unsafe fn ptrs<T>(ptr: *mut u8, len: usize) -> T::MutPtrs
 where
     T: Soa,
 {
-    if T::min_size_of_components() == 0 {
+    if T::min_size_of_components() == 0 || len == 0 {
         return T::ptrs_dangling();
     }
 

@@ -98,10 +98,6 @@ unsafe impl<T, U, V> Soa for (T, U, V) {
     }
 
     fn len_in_bytes_unaligned(initial: usize, len: usize) -> usize {
-        if Self::min_size_of_components() == 0 || len == 0 {
-            return 0;
-        }
-
         let mut len_in_bytes = initial;
         len_in_bytes = align_up::<T>(len_in_bytes) + (len * size_of::<T>());
         len_in_bytes = align_up::<U>(len_in_bytes) + (len * size_of::<U>());
@@ -119,14 +115,6 @@ unsafe impl<T, U, V> Soa for (T, U, V) {
     }
 
     unsafe fn ptrs(ptr: *mut u8, len: usize) -> Self::MutPtrs {
-        if Self::min_size_of_components() == 0 {
-            return (
-                NonNull::dangling().as_ptr(),
-                NonNull::dangling().as_ptr(),
-                NonNull::dangling().as_ptr(),
-            );
-        }
-
         let (t_ptr, ptr) = unsafe { align_cast_then_advance(ptr, len) };
         let (u_ptr, ptr) = unsafe { align_cast_then_advance(ptr, len) };
         let (v_ptr, _) = unsafe { align_cast_then_advance(ptr, len) };

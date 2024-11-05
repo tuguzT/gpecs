@@ -5,6 +5,7 @@ use alloc::{
 use core::{
     alloc::{Layout, LayoutError},
     cmp,
+    error::Error,
     fmt::{self, Display},
     mem::ManuallyDrop,
     ptr::NonNull,
@@ -79,7 +80,7 @@ impl Display for TryReserveError {
     }
 }
 
-// impl core::error::Error for TryReserveError {}
+impl Error for TryReserveError {}
 
 #[inline(never)]
 const fn capacity_overflow() -> ! {

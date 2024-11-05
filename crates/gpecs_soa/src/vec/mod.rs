@@ -7,27 +7,33 @@ use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
     ptr::{self, addr_of, addr_of_mut},
-    slice,
 };
 
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{min_size_of, ptrs, slice_from_len_in_bytes_mut},
+    ptr::{ptrs, slice_from_len_in_bytes_mut},
     raw_vec::RawSoaVec,
     slice::{from_len_in_bytes, from_len_in_bytes_mut, Iter, IterMut, SoaSlice},
+    soa::Soa,
 };
 
 pub use self::into_iter::IntoIter;
 
 mod into_iter;
 
-pub struct SoaVec<T, U, V> {
-    buffer: RawSoaVec<T, U, V>,
+pub struct SoaVec<T>
+where
+    T: Soa,
+{
+    buffer: RawSoaVec<T>,
     len: usize,
 }
 
-impl<T, U, V> SoaVec<T, U, V> {
+impl<T> SoaVec<T>
+where
+    T: Soa,
+{
     pub const fn new() -> Self {
         Self {
             buffer: RawSoaVec::new(),
@@ -56,7 +62,7 @@ impl<T, U, V> SoaVec<T, U, V> {
     }
 
     #[allow(clippy::missing_safety_doc)]
-    pub const unsafe fn from_raw_parts(ptr: *mut u8, length: usize, capacity: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: *mut u8, length: usize, capacity: usize) -> Self {
         Self {
             buffer: unsafe { RawSoaVec::from_raw_parts(ptr, capacity) },
             len: length,
@@ -95,7 +101,7 @@ impl<T, U, V> SoaVec<T, U, V> {
     }
 
     #[inline]
-    pub const fn capacity(&self) -> usize {
+    pub fn capacity(&self) -> usize {
         self.buffer.capacity()
     }
 
@@ -107,12 +113,10 @@ impl<T, U, V> SoaVec<T, U, V> {
 
         unsafe {
             let ptr = self.as_mut_ptr();
-            let old_ptrs = ptrs::<T, U, V>(ptr, old_capacity);
-            let new_ptrs = ptrs::<T, U, V>(ptr, new_capacity);
+            let old_ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity));
+            let new_ptrs = ptrs::<T>(ptr, new_capacity);
 
-            ptr::copy(old_ptrs.2, new_ptrs.2, self.len());
-            ptr::copy(old_ptrs.1, new_ptrs.1, self.len());
-            ptr::copy(old_ptrs.0, new_ptrs.0, self.len());
+            T::ptrs_copy_rev(old_ptrs, new_ptrs, self.len());
         }
     }
 
@@ -124,12 +128,10 @@ impl<T, U, V> SoaVec<T, U, V> {
 
         unsafe {
             let ptr = self.as_mut_ptr();
-            let old_ptrs = ptrs::<T, U, V>(ptr, old_capacity);
-            let new_ptrs = ptrs::<T, U, V>(ptr, new_capacity);
+            let old_ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity));
+            let new_ptrs = ptrs::<T>(ptr, new_capacity);
 
-            ptr::copy(old_ptrs.0, new_ptrs.0, self.len());
-            ptr::copy(old_ptrs.1, new_ptrs.1, self.len());
-            ptr::copy(old_ptrs.2, new_ptrs.2, self.len());
+            T::ptrs_copy(old_ptrs, new_ptrs, self.len());
         }
     }
 
@@ -210,11 +212,11 @@ impl<T, U, V> SoaVec<T, U, V> {
         self.buffer.shrink_to_fit(new_capacity);
     }
 
-    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T, U, V>> {
+    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T>> {
         self.shrink_to_fit();
         let mut me = ManuallyDrop::new(self);
 
-        if min_size_of::<T, U, V>() == 0 && me.len > 0 {
+        if T::min_size_of_components() == 0 && me.len > 0 {
             let (data, len_in_bytes) = match me.capacity_in_bytes() {
                 0 => (Box::into_raw(Box::new(me.len)).cast(), size_of::<usize>()),
                 _ => (me.as_mut_ptr(), me.capacity_in_bytes()),
@@ -237,24 +239,19 @@ impl<T, U, V> SoaVec<T, U, V> {
 
         let remaining_len = self.len - len;
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_slice = ptr::slice_from_raw_parts_mut(t_ptr.add(len), remaining_len);
-            let u_slice = ptr::slice_from_raw_parts_mut(u_ptr.add(len), remaining_len);
-            let v_slice = ptr::slice_from_raw_parts_mut(v_ptr.add(len), remaining_len);
+            let ptrs = T::ptrs_add_mut(self.as_mut_ptrs(), len);
+            let slices = T::slices_from_raw_parts_mut(ptrs, remaining_len);
 
             self.set_len(len);
-
-            ptr::drop_in_place(t_slice);
-            ptr::drop_in_place(u_slice);
-            ptr::drop_in_place(v_slice);
+            T::slices_drop_in_place(slices);
         }
     }
 
-    pub fn as_slice(&self) -> &SoaSlice<T, U, V> {
+    pub fn as_slice(&self) -> &SoaSlice<T> {
         self
     }
 
-    pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T, U, V> {
+    pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T> {
         self
     }
 
@@ -266,39 +263,31 @@ impl<T, U, V> SoaVec<T, U, V> {
         self.buffer.ptr()
     }
 
-    pub fn as_ptrs(&self) -> (*const T, *const U, *const V) {
-        let (t_ptr, u_ptr, v_ptr) = self.buffer.ptrs();
-        (t_ptr, u_ptr, v_ptr)
+    pub fn as_ptrs(&self) -> T::Ptrs {
+        let ptrs = self.buffer.ptrs();
+        T::ptrs_cast_const(ptrs)
     }
 
-    pub fn as_mut_ptrs(&mut self) -> (*mut T, *mut U, *mut V) {
+    pub fn as_mut_ptrs(&mut self) -> T::MutPtrs {
         self.buffer.ptrs()
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[T], &[U], &[V]) {
-        let (t_data, u_data, v_data) = self.as_ptrs();
+    pub fn as_slices(&self) -> T::Slices<'_> {
+        let ptrs = self.as_ptrs();
         let len = self.len();
 
-        unsafe {
-            let t_slice = slice::from_raw_parts(t_data, len);
-            let u_slice = slice::from_raw_parts(u_data, len);
-            let v_slice = slice::from_raw_parts(v_data, len);
-            (t_slice, u_slice, v_slice)
-        }
+        let slices = T::slices_from_raw_parts(ptrs, len);
+        unsafe { T::slices_as_refs(slices) }
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&mut [T], &mut [U], &mut [V]) {
-        let (t_data, u_data, v_data) = self.as_mut_ptrs();
+    pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_> {
+        let ptrs = self.as_mut_ptrs();
         let len = self.len();
 
-        unsafe {
-            let t_slice = slice::from_raw_parts_mut(t_data, len);
-            let u_slice = slice::from_raw_parts_mut(u_data, len);
-            let v_slice = slice::from_raw_parts_mut(v_data, len);
-            (t_slice, u_slice, v_slice)
-        }
+        let slices = T::slices_from_raw_parts_mut(ptrs, len);
+        unsafe { T::mut_slices_as_refs(slices) }
     }
 
     #[allow(clippy::missing_safety_doc)]
@@ -320,7 +309,7 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
     }
 
-    pub fn swap_remove(&mut self, index: usize) -> (T, U, V) {
+    pub fn swap_remove(&mut self, index: usize) -> T {
         #[cold]
         #[inline(never)]
         #[track_caller]
@@ -334,21 +323,24 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_value = ptr::read(t_ptr.add(index));
-            let u_value = ptr::read(u_ptr.add(index));
-            let v_value = ptr::read(v_ptr.add(index));
+            let ptrs = self.as_mut_ptrs();
+            let value = {
+                let ptrs = T::ptrs_add_mut(ptrs, index);
+                T::ptrs_read(T::ptrs_cast_const(ptrs))
+            };
 
-            ptr::copy(t_ptr.add(len - 1), t_ptr.add(index), 1);
-            ptr::copy(u_ptr.add(len - 1), u_ptr.add(index), 1);
-            ptr::copy(v_ptr.add(len - 1), v_ptr.add(index), 1);
+            T::ptrs_copy(
+                T::ptrs_add(T::ptrs_cast_const(ptrs), len - 1),
+                T::ptrs_add_mut(ptrs, index),
+                1,
+            );
 
             self.set_len(len - 1);
-            (t_value, u_value, v_value)
+            value
         }
     }
 
-    pub fn insert(&mut self, index: usize, elements: (T, U, V)) {
+    pub fn insert(&mut self, index: usize, elements: T) {
         #[cold]
         #[inline(never)]
         #[track_caller]
@@ -366,25 +358,21 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_ptr = t_ptr.add(index);
-            let u_ptr = u_ptr.add(index);
-            let v_ptr = v_ptr.add(index);
+            let ptrs = self.as_mut_ptrs();
+            let ptrs = T::ptrs_add_mut(ptrs, index);
 
             if index < len {
-                ptr::copy(t_ptr, t_ptr.add(1), len - index);
-                ptr::copy(u_ptr, u_ptr.add(1), len - index);
-                ptr::copy(v_ptr, v_ptr.add(1), len - index);
+                let src = T::ptrs_cast_const(ptrs);
+                let dst = T::ptrs_add_mut(ptrs, 1);
+                T::ptrs_copy(src, dst, len - index);
             }
-            ptr::write(t_ptr, elements.0);
-            ptr::write(u_ptr, elements.1);
-            ptr::write(v_ptr, elements.2);
+            T::ptrs_write(ptrs, elements);
 
             self.set_len(len + 1);
         }
     }
 
-    pub fn remove(&mut self, index: usize) -> (T, U, V) {
+    pub fn remove(&mut self, index: usize) -> T {
         #[cold]
         #[inline(never)]
         #[track_caller]
@@ -398,34 +386,35 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_ptr = t_ptr.add(index);
-            let u_ptr = u_ptr.add(index);
-            let v_ptr = v_ptr.add(index);
+            let ptrs = self.as_mut_ptrs();
+            let ptrs = T::ptrs_add_mut(ptrs, index);
 
-            let t_value = ptr::read(t_ptr);
-            let u_value = ptr::read(u_ptr);
-            let v_value = ptr::read(v_ptr);
+            let value = T::ptrs_read(T::ptrs_cast_const(ptrs));
 
-            ptr::copy(t_ptr.add(1), t_ptr, len - index - 1);
-            ptr::copy(u_ptr.add(1), u_ptr, len - index - 1);
-            ptr::copy(v_ptr.add(1), v_ptr, len - index - 1);
-
+            T::ptrs_copy(
+                T::ptrs_add(T::ptrs_cast_const(ptrs), 1),
+                ptrs,
+                len - index - 1,
+            );
             self.set_len(len - 1);
-            (t_value, u_value, v_value)
+
+            value
         }
     }
 
     pub fn retain<F>(&mut self, mut f: F)
     where
-        F: FnMut((&T, &U, &V)) -> bool,
+        F: FnMut(T::Refs<'_>) -> bool,
     {
-        self.retain_mut(|(t, u, v)| f((t, u, v)));
+        self.retain_mut(|refs| {
+            let refs = T::mut_refs_as_refs(refs);
+            f(refs)
+        });
     }
 
     pub fn retain_mut<F>(&mut self, mut f: F)
     where
-        F: FnMut((&mut T, &mut U, &mut V)) -> bool,
+        F: FnMut(T::RefsMut<'_>) -> bool,
     {
         let original_len = self.len();
         // Avoid double drop if the drop guard is not executed,
@@ -443,32 +432,28 @@ impl<T, U, V> SoaVec<T, U, V> {
         // This drop guard will be invoked when predicate or `drop` of element panicked.
         // It shifts unchecked elements to cover holes and `set_len` to the correct length.
         // In cases when predicate and `drop` never panick, it will be optimized out.
-        struct BackshiftOnDrop<'a, T, U, V> {
-            v: &'a mut SoaVec<T, U, V>,
+        struct BackshiftOnDrop<'a, T>
+        where
+            T: Soa,
+        {
+            v: &'a mut SoaVec<T>,
             processed_len: usize,
             deleted_cnt: usize,
             original_len: usize,
         }
 
-        impl<T, U, V> Drop for BackshiftOnDrop<'_, T, U, V> {
+        impl<T> Drop for BackshiftOnDrop<'_, T>
+        where
+            T: Soa,
+        {
             fn drop(&mut self) {
                 if self.deleted_cnt > 0 {
                     // SAFETY: Trailing unchecked items must be valid since we never touch them.
                     unsafe {
-                        let (t_ptr, u_ptr, v_ptr) = self.v.as_mut_ptrs();
-                        ptr::copy(
-                            t_ptr.add(self.processed_len),
-                            t_ptr.add(self.processed_len - self.deleted_cnt),
-                            self.original_len - self.processed_len,
-                        );
-                        ptr::copy(
-                            u_ptr.add(self.processed_len),
-                            u_ptr.add(self.processed_len - self.deleted_cnt),
-                            self.original_len - self.processed_len,
-                        );
-                        ptr::copy(
-                            v_ptr.add(self.processed_len),
-                            v_ptr.add(self.processed_len - self.deleted_cnt),
+                        let ptrs = self.v.as_mut_ptrs();
+                        T::ptrs_copy(
+                            T::ptrs_add(T::ptrs_cast_const(ptrs), self.processed_len),
+                            T::ptrs_add_mut(ptrs, self.processed_len - self.deleted_cnt),
                             self.original_len - self.processed_len,
                         );
                     }
@@ -487,33 +472,32 @@ impl<T, U, V> SoaVec<T, U, V> {
             original_len,
         };
 
-        fn process_loop<F, T, U, V, const DELETED: bool>(
+        fn process_loop<F, T, const DELETED: bool>(
             original_len: usize,
             f: &mut F,
-            g: &mut BackshiftOnDrop<'_, T, U, V>,
+            g: &mut BackshiftOnDrop<'_, T>,
         ) where
-            F: FnMut((&mut T, &mut U, &mut V)) -> bool,
+            T: Soa,
+            F: FnMut(T::RefsMut<'_>) -> bool,
         {
             while g.processed_len != original_len {
                 // SAFETY: Unchecked element must be valid.
-                let (t_cur, u_cur, v_cur) = unsafe {
-                    let (t_ptr, u_ptr, v_ptr) = g.v.as_mut_ptrs();
-                    (
-                        &mut *t_ptr.add(g.processed_len),
-                        &mut *u_ptr.add(g.processed_len),
-                        &mut *v_ptr.add(g.processed_len),
-                    )
+                let cur = unsafe {
+                    let ptrs = g.v.as_mut_ptrs();
+                    T::ptrs_add_mut(ptrs, g.processed_len)
                 };
-                if !f((t_cur, u_cur, v_cur)) {
+                let res = {
+                    let cur = unsafe { T::as_mut_refs(cur) };
+                    !f(cur)
+                };
+                if res {
                     // Advance early to avoid double drop if `drop_in_place` panicked.
                     g.processed_len += 1;
                     g.deleted_cnt += 1;
                     // SAFETY: We never touch this element again after dropped.
                     unsafe {
-                        ptr::drop_in_place(t_cur);
-                        ptr::drop_in_place(u_cur);
-                        ptr::drop_in_place(v_cur);
-                    };
+                        T::ptrs_drop_in_place(cur);
+                    }
                     // We already advanced the counter.
                     if DELETED {
                         continue;
@@ -525,20 +509,10 @@ impl<T, U, V> SoaVec<T, U, V> {
                     // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
                     // We use copy for move, and never touch this element again.
                     unsafe {
-                        let (t_ptr, u_ptr, v_ptr) = g.v.as_mut_ptrs();
-                        ptr::copy_nonoverlapping(
-                            t_cur,
-                            t_ptr.add(g.processed_len - g.deleted_cnt),
-                            1,
-                        );
-                        ptr::copy_nonoverlapping(
-                            u_cur,
-                            u_ptr.add(g.processed_len - g.deleted_cnt),
-                            1,
-                        );
-                        ptr::copy_nonoverlapping(
-                            v_cur,
-                            v_ptr.add(g.processed_len - g.deleted_cnt),
+                        let ptrs = g.v.as_mut_ptrs();
+                        T::ptrs_copy_nonoverlapping(
+                            T::ptrs_cast_const(cur),
+                            T::ptrs_add_mut(ptrs, g.processed_len - g.deleted_cnt),
                             1,
                         );
                     }
@@ -548,139 +522,150 @@ impl<T, U, V> SoaVec<T, U, V> {
         }
 
         // Stage 1: Nothing was deleted.
-        process_loop::<F, T, U, V, false>(original_len, &mut f, &mut g);
+        process_loop::<F, T, false>(original_len, &mut f, &mut g);
 
         // Stage 2: Some elements were deleted.
-        process_loop::<F, T, U, V, true>(original_len, &mut f, &mut g);
+        process_loop::<F, T, true>(original_len, &mut f, &mut g);
 
         // All item are processed. This can be optimized to `set_len` by LLVM.
         drop(g);
     }
 
-    pub fn push(&mut self, values: (T, U, V)) {
+    pub fn push(&mut self, values: T) {
         let len = self.len();
         if len == self.capacity() {
             self.buffer.grow_one();
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_ptr = t_ptr.add(len);
-            let u_ptr = u_ptr.add(len);
-            let v_ptr = v_ptr.add(len);
+            let ptrs = self.as_mut_ptrs();
+            let ptrs = T::ptrs_add_mut(ptrs, len);
 
-            ptr::write(t_ptr, values.0);
-            ptr::write(u_ptr, values.1);
-            ptr::write(v_ptr, values.2);
-
+            T::ptrs_write(ptrs, values);
             self.set_len(len + 1);
         }
     }
 
-    pub fn pop(&mut self) -> Option<(T, U, V)> {
+    pub fn pop(&mut self) -> Option<T> {
         let len = self.len();
         if len == 0 {
             return None;
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
-            let t_value = ptr::read(t_ptr.add(len - 1));
-            let u_value = ptr::read(u_ptr.add(len - 1));
-            let v_value = ptr::read(v_ptr.add(len - 1));
+            let ptrs = self.as_ptrs();
+            let ptrs = T::ptrs_add(ptrs, len - 1);
 
+            let value = T::ptrs_read(ptrs);
             self.set_len(len - 1);
-            Some((t_value, u_value, v_value))
+
+            Some(value)
         }
     }
 
     pub fn clear(&mut self) {
-        let (t_ptr, u_ptr, v_ptr) = self.as_mut_slices();
-        let (t_ptr, u_ptr, v_ptr) = (t_ptr as *mut [_], u_ptr as *mut [_], v_ptr as *mut [_]);
+        let slices = self.as_mut_slices();
+        let slices = T::mut_slice_refs_as_ptrs(slices);
 
         unsafe {
             self.set_len(0);
-            ptr::drop_in_place(t_ptr);
-            ptr::drop_in_place(u_ptr);
-            ptr::drop_in_place(v_ptr);
+            T::slices_drop_in_place(slices);
         }
     }
 }
 
-impl<T, U, V> Debug for SoaVec<T, U, V>
+impl<T> Debug for SoaVec<T>
 where
-    T: Debug,
-    U: Debug,
-    V: Debug,
+    T: Soa,
+    for<'any> T::Slices<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (t_slice, u_slice, v_slice) = self.as_slices();
-        f.debug_struct("SoaVec")
-            .field("t_slice", &t_slice)
-            .field("u_slice", &u_slice)
-            .field("v_slice", &v_slice)
-            .finish()
+        let slices = self.as_slices();
+        f.debug_tuple("SoaVec").field(&slices).finish()
     }
 }
 
-impl<T, U, V> Default for SoaVec<T, U, V> {
+impl<T> Default for SoaVec<T>
+where
+    T: Soa,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T, U, V> AsRef<SoaVec<T, U, V>> for SoaVec<T, U, V> {
-    fn as_ref(&self) -> &SoaVec<T, U, V> {
-        self
-    }
-}
-
-impl<T, U, V> AsRef<SoaSlice<T, U, V>> for SoaVec<T, U, V> {
-    fn as_ref(&self) -> &SoaSlice<T, U, V> {
-        self
-    }
-}
-
-impl<T, U, V> AsMut<SoaVec<T, U, V>> for SoaVec<T, U, V> {
-    fn as_mut(&mut self) -> &mut SoaVec<T, U, V> {
-        self
-    }
-}
-
-impl<T, U, V> AsMut<SoaSlice<T, U, V>> for SoaVec<T, U, V> {
-    fn as_mut(&mut self) -> &mut SoaSlice<T, U, V> {
-        self
-    }
-}
-
-impl<T, U, V> Borrow<SoaSlice<T, U, V>> for SoaVec<T, U, V> {
-    fn borrow(&self) -> &SoaSlice<T, U, V> {
-        self
-    }
-}
-
-impl<T, U, V> BorrowMut<SoaSlice<T, U, V>> for SoaVec<T, U, V> {
-    fn borrow_mut(&mut self) -> &mut SoaSlice<T, U, V> {
-        self
-    }
-}
-
-impl<T, U, V> Hash for SoaVec<T, U, V>
+impl<T> AsRef<SoaVec<T>> for SoaVec<T>
 where
-    T: Hash,
-    U: Hash,
-    V: Hash,
+    T: Soa,
+{
+    fn as_ref(&self) -> &SoaVec<T> {
+        self
+    }
+}
+
+impl<T> AsRef<SoaSlice<T>> for SoaVec<T>
+where
+    T: Soa,
+{
+    fn as_ref(&self) -> &SoaSlice<T> {
+        self
+    }
+}
+
+impl<T> AsMut<SoaVec<T>> for SoaVec<T>
+where
+    T: Soa,
+{
+    fn as_mut(&mut self) -> &mut SoaVec<T> {
+        self
+    }
+}
+
+impl<T> AsMut<SoaSlice<T>> for SoaVec<T>
+where
+    T: Soa,
+{
+    fn as_mut(&mut self) -> &mut SoaSlice<T> {
+        self
+    }
+}
+
+impl<T> Borrow<SoaSlice<T>> for SoaVec<T>
+where
+    T: Soa,
+{
+    fn borrow(&self) -> &SoaSlice<T> {
+        self
+    }
+}
+
+impl<T> BorrowMut<SoaSlice<T>> for SoaVec<T>
+where
+    T: Soa,
+{
+    fn borrow_mut(&mut self) -> &mut SoaSlice<T> {
+        self
+    }
+}
+
+impl<T> Hash for SoaVec<T>
+where
+    T: Soa,
+    for<'any> T::Slices<'any>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         Hash::hash(&**self, state)
     }
 }
 
-impl<T, U, V> Deref for SoaVec<T, U, V> {
-    type Target = SoaSlice<T, U, V>;
+impl<T> Deref for SoaVec<T>
+where
+    T: Soa,
+{
+    type Target = SoaSlice<T>;
 
     fn deref(&self) -> &Self::Target {
-        let (data, len_in_bytes) = match min_size_of::<T, U, V>() {
+        let (data, len_in_bytes) = match T::min_size_of_components() {
             0 => (addr_of!(self.len).cast(), size_of::<usize>()),
             _ => (self.as_ptr(), self.capacity_in_bytes()),
         };
@@ -688,9 +673,12 @@ impl<T, U, V> Deref for SoaVec<T, U, V> {
     }
 }
 
-impl<T, U, V> DerefMut for SoaVec<T, U, V> {
+impl<T> DerefMut for SoaVec<T>
+where
+    T: Soa,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let (data, len_in_bytes) = match min_size_of::<T, U, V>() {
+        let (data, len_in_bytes) = match T::min_size_of_components() {
             0 => (addr_of_mut!(self.len).cast(), size_of::<usize>()),
             _ => (self.as_mut_ptr(), self.capacity_in_bytes()),
         };
@@ -698,50 +686,55 @@ impl<T, U, V> DerefMut for SoaVec<T, U, V> {
     }
 }
 
-impl<'a, T, U, V> IntoIterator for &'a SoaVec<T, U, V> {
-    type Item = (&'a T, &'a U, &'a V);
-    type IntoIter = Iter<'a, T, U, V>;
+impl<'a, T> IntoIterator for &'a SoaVec<T>
+where
+    T: Soa,
+{
+    type Item = T::Refs<'a>;
+    type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, T, U, V> IntoIterator for &'a mut SoaVec<T, U, V> {
-    type Item = (&'a mut T, &'a mut U, &'a mut V);
-    type IntoIter = IterMut<'a, T, U, V>;
+impl<'a, T> IntoIterator for &'a mut SoaVec<T>
+where
+    T: Soa,
+{
+    type Item = T::RefsMut<'a>;
+    type IntoIter = IterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
-impl<T, U, V> IntoIterator for SoaVec<T, U, V> {
-    type Item = (T, U, V);
-    type IntoIter = IntoIter<T, U, V>;
+impl<T> IntoIterator for SoaVec<T>
+where
+    T: Soa,
+{
+    type Item = T;
+    type IntoIter = IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter::new(self)
     }
 }
 
-impl<T, U, V> Drop for SoaVec<T, U, V> {
+impl<T> Drop for SoaVec<T>
+where
+    T: Soa,
+{
     fn drop(&mut self) {
         if self.is_empty() {
             return;
         }
 
-        let (t_ptr, u_ptr, v_ptr) = self.as_mut_ptrs();
+        let ptrs = self.as_mut_ptrs();
         let len = self.len();
 
-        let t_ptr = ptr::slice_from_raw_parts_mut(t_ptr, len);
-        let u_ptr = ptr::slice_from_raw_parts_mut(u_ptr, len);
-        let v_ptr = ptr::slice_from_raw_parts_mut(v_ptr, len);
-
-        unsafe {
-            ptr::drop_in_place(t_ptr);
-            ptr::drop_in_place(u_ptr);
-            ptr::drop_in_place(v_ptr);
-        }
+        let slices = T::slices_from_raw_parts_mut(ptrs, len);
+        unsafe { T::slices_drop_in_place(slices) }
     }
 }

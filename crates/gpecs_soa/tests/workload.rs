@@ -13,7 +13,7 @@ struct ZST3 {
 
 #[test]
 fn new() {
-    let vec = SoaVec::<u32, u16, u8>::new();
+    let vec = SoaVec::<(u32, u16, u8)>::new();
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), 0);
 
@@ -39,7 +39,7 @@ fn new() {
 
 #[test]
 fn new_zst() {
-    let vec = SoaVec::<ZST1, ZST2, ZST3>::new();
+    let vec = SoaVec::<(ZST1, ZST2, ZST3)>::new();
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), usize::MAX);
 
@@ -65,7 +65,7 @@ fn new_zst() {
 
 #[test]
 fn with_capacity() {
-    let vec = SoaVec::<u8, u64, u16>::with_capacity(10);
+    let vec = SoaVec::<(u8, u64, u16)>::with_capacity(10);
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 10);
 
@@ -91,7 +91,7 @@ fn with_capacity() {
 
 #[test]
 fn with_capacity_zst() {
-    let vec = SoaVec::<ZST1, ZST2, ZST3>::with_capacity(10);
+    let vec = SoaVec::<(ZST1, ZST2, ZST3)>::with_capacity(10);
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 10);
 
@@ -117,7 +117,7 @@ fn with_capacity_zst() {
 
 #[test]
 fn one_item() {
-    let mut vec = SoaVec::<u8, u32, u16>::new();
+    let mut vec = SoaVec::<(u8, u32, u16)>::new();
     vec.push((1, 2, 3));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
@@ -160,7 +160,7 @@ fn one_item() {
 
 #[test]
 fn one_item_zst() {
-    let mut vec = SoaVec::<ZST1, ZST2, ZST3>::new();
+    let mut vec = SoaVec::<(ZST1, ZST2, ZST3)>::new();
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
@@ -207,7 +207,7 @@ fn one_item_zst() {
 
 #[test]
 fn three_items() {
-    let mut vec = SoaVec::<u16, String, u128>::new();
+    let mut vec = SoaVec::<(u16, String, u128)>::new();
     vec.insert(0, (1, "2".to_owned(), 3));
     vec.insert(0, (4, "5".to_owned(), 6));
     vec.insert(1, (7, "8".to_owned(), 9));
@@ -333,7 +333,7 @@ fn three_items() {
 
 #[test]
 fn three_items_zst() {
-    let mut vec = SoaVec::<ZST1, ZST2, ZST3>::new();
+    let mut vec = SoaVec::<(ZST1, ZST2, ZST3)>::new();
     vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
     vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
     vec.insert(1, (ZST1, ZST2(()), ZST3 { empty: () }));

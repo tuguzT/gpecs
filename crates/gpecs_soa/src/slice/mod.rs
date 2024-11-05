@@ -4,14 +4,14 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     ptr::{self, NonNull},
-    slice,
 };
 
 use crate::{
     ptr::{
-        min_size_of, ptrs, slice_from_len_in_bytes, slice_from_len_in_bytes_mut,
-        slice_from_raw_parts, slice_from_raw_parts_mut, to_len, BufferAlign,
+        ptrs, slice_from_len_in_bytes, slice_from_len_in_bytes_mut, slice_from_raw_parts,
+        slice_from_raw_parts_mut, to_len, BufferAlign,
     },
+    soa::Soa,
     vec::{IntoIter, SoaVec},
 };
 
@@ -24,12 +24,18 @@ mod index;
 mod iter;
 
 #[repr(C)]
-pub struct SoaSlice<T, U, V> {
-    align: BufferAlign<T, U, V>,
+pub struct SoaSlice<T>
+where
+    T: Soa,
+{
+    align: BufferAlign<T>,
     buffer: [u8],
 }
 
-impl<T, U, V> SoaSlice<T, U, V> {
+impl<T> SoaSlice<T>
+where
+    T: Soa,
+{
     #[inline]
     pub const fn len(&self) -> usize {
         match self.capacity_in_bytes() {
@@ -49,12 +55,12 @@ impl<T, U, V> SoaSlice<T, U, V> {
     }
 
     #[inline]
-    pub const fn capacity(&self) -> usize {
-        if min_size_of::<T, U, V>() == 0 {
+    pub fn capacity(&self) -> usize {
+        if T::min_size_of_components() == 0 {
             usize::MAX
         } else {
             let len_in_bytes = self.capacity_in_bytes();
-            to_len::<T, U, V>(len_in_bytes)
+            to_len::<T>(len_in_bytes)
         }
     }
 
@@ -69,55 +75,44 @@ impl<T, U, V> SoaSlice<T, U, V> {
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const T, *const U, *const V) {
+    pub fn as_ptrs(&self) -> T::Ptrs {
         let ptr = self.as_ptr().cast_mut();
         let len = self.capacity();
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
-            (t_ptr, u_ptr, v_ptr)
+            let ptrs = ptrs::<T>(ptr, len);
+            T::ptrs_cast_const(ptrs)
         }
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> (*mut T, *mut U, *mut V) {
+    pub fn as_mut_ptrs(&mut self) -> T::MutPtrs {
         let ptr = self.as_mut_ptr();
         let len = self.capacity();
 
-        unsafe {
-            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
-            (t_ptr, u_ptr, v_ptr)
-        }
+        unsafe { ptrs::<T>(ptr, len) }
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[T], &[U], &[V]) {
-        let (t_data, u_data, v_data) = self.as_ptrs();
+    pub fn as_slices(&self) -> T::Slices<'_> {
+        let ptrs = self.as_ptrs();
         let len = self.len();
 
-        unsafe {
-            let t_slice = slice::from_raw_parts(t_data, len);
-            let u_slice = slice::from_raw_parts(u_data, len);
-            let v_slice = slice::from_raw_parts(v_data, len);
-            (t_slice, u_slice, v_slice)
-        }
+        let slices = T::slices_from_raw_parts(ptrs, len);
+        unsafe { T::slices_as_refs(slices) }
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&mut [T], &mut [U], &mut [V]) {
-        let (t_data, u_data, v_data) = self.as_mut_ptrs();
+    pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_> {
+        let ptrs = self.as_mut_ptrs();
         let len = self.len();
 
-        unsafe {
-            let t_slice = slice::from_raw_parts_mut(t_data, len);
-            let u_slice = slice::from_raw_parts_mut(u_data, len);
-            let v_slice = slice::from_raw_parts_mut(v_data, len);
-            (t_slice, u_slice, v_slice)
-        }
+        let slices = T::slices_from_raw_parts_mut(ptrs, len);
+        unsafe { T::mut_slices_as_refs(slices) }
     }
 
     #[inline]
-    pub fn into_vec(self: Box<Self>) -> SoaVec<T, U, V> {
+    pub fn into_vec(self: Box<Self>) -> SoaVec<T> {
         let length = self.len();
         let capacity_in_bytes = self.capacity_in_bytes();
         let ptr = Box::into_raw(self).cast();
@@ -142,7 +137,7 @@ impl<T, U, V> SoaSlice<T, U, V> {
 
     #[inline]
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn get_unchecked<I>(&self, index: I) -> I::ConstPtr
+    pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptr
     where
         I: SoaSliceIndex<Self>,
     {
@@ -177,51 +172,43 @@ impl<T, U, V> SoaSlice<T, U, V> {
     #[inline]
     #[track_caller]
     pub fn swap(&mut self, a: usize, b: usize) {
-        let (t_a, u_a, v_a) = {
-            let (t, u, v) = self.index_mut(a);
-            (t as _, u as _, v as _)
+        let ptrs_a = {
+            let refs = self.index_mut(a);
+            T::mut_refs_as_ptrs(refs)
         };
-        let (t_b, u_b, v_b) = {
-            let (t, u, v) = self.index_mut(b);
-            (t as _, u as _, v as _)
+        let ptrs_b = {
+            let refs = self.index_mut(b);
+            T::mut_refs_as_ptrs(refs)
         };
 
-        unsafe {
-            ptr::swap(t_a, t_b);
-            ptr::swap(u_a, u_b);
-            ptr::swap(v_a, v_b);
-        }
+        unsafe { T::ptrs_swap(ptrs_a, ptrs_b) }
     }
 
     #[inline]
     pub fn sort(&mut self)
     where
-        T: Ord,
-        U: Ord,
-        V: Ord,
+        for<'any> T::Refs<'any>: Ord,
     {
-        self.sort_by(|a, b| a.cmp(&b))
+        self.sort_by(|a, b| Ord::cmp(&a, &b))
     }
 
     #[inline]
     pub fn sort_by<F>(&mut self, mut compare: F)
     where
-        F: FnMut((&T, &U, &V), (&T, &U, &V)) -> cmp::Ordering,
+        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
-        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        let ptrs = self.as_mut_ptrs();
         self.sort_impl(|indices| {
             indices.sort_by(|&a, &b| {
                 let a = unsafe {
-                    let t_ptr = t_ptr.add(a);
-                    let u_ptr = u_ptr.add(a);
-                    let v_ptr = v_ptr.add(a);
-                    (&*t_ptr, &*u_ptr, &*v_ptr)
+                    let ptrs = T::ptrs_add_mut(ptrs, a);
+                    let ptrs = T::ptrs_cast_const(ptrs);
+                    T::as_refs(ptrs)
                 };
                 let b = unsafe {
-                    let t_ptr = t_ptr.add(b);
-                    let u_ptr = u_ptr.add(b);
-                    let v_ptr = v_ptr.add(b);
-                    (&*t_ptr, &*u_ptr, &*v_ptr)
+                    let ptrs = T::ptrs_add_mut(ptrs, b);
+                    let ptrs = T::ptrs_cast_const(ptrs);
+                    T::as_refs(ptrs)
                 };
                 compare(a, b)
             })
@@ -231,16 +218,16 @@ impl<T, U, V> SoaSlice<T, U, V> {
     #[inline]
     pub fn sort_by_key<K, F>(&mut self, mut f: F)
     where
-        F: FnMut((&T, &U, &V)) -> K,
+        F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
-        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        let ptrs = self.as_mut_ptrs();
         self.sort_impl(|indices| {
             indices.sort_by_key(|&index| unsafe {
-                let t_ptr = t_ptr.add(index);
-                let u_ptr = u_ptr.add(index);
-                let v_ptr = v_ptr.add(index);
-                f((&*t_ptr, &*u_ptr, &*v_ptr))
+                let ptrs = T::ptrs_add_mut(ptrs, index);
+                let ptrs = T::ptrs_cast_const(ptrs);
+                let refs = T::as_refs(ptrs);
+                f(refs)
             })
         })
     }
@@ -248,16 +235,16 @@ impl<T, U, V> SoaSlice<T, U, V> {
     #[inline]
     pub fn sort_by_cached_key<K, F>(&mut self, mut f: F)
     where
-        F: FnMut((&T, &U, &V)) -> K,
+        F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
-        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        let ptrs = self.as_mut_ptrs();
         self.sort_impl(|indices| {
             indices.sort_by_cached_key(|&index| unsafe {
-                let t_ptr = t_ptr.add(index);
-                let u_ptr = u_ptr.add(index);
-                let v_ptr = v_ptr.add(index);
-                f((&*t_ptr, &*u_ptr, &*v_ptr))
+                let ptrs = T::ptrs_add_mut(ptrs, index);
+                let ptrs = T::ptrs_cast_const(ptrs);
+                let refs = T::as_refs(ptrs);
+                f(refs)
             })
         })
     }
@@ -265,32 +252,28 @@ impl<T, U, V> SoaSlice<T, U, V> {
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        T: Ord,
-        U: Ord,
-        V: Ord,
+        for<'any> T::Refs<'any>: Ord,
     {
-        self.sort_unstable_by(|a, b| a.cmp(&b))
+        self.sort_unstable_by(|a, b| Ord::cmp(&a, &b))
     }
 
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, mut compare: F)
     where
-        F: FnMut((&T, &U, &V), (&T, &U, &V)) -> cmp::Ordering,
+        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
-        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        let ptrs = self.as_mut_ptrs();
         self.sort_impl(|indices| {
             indices.sort_unstable_by(|&a, &b| {
                 let a = unsafe {
-                    let t_ptr = t_ptr.add(a);
-                    let u_ptr = u_ptr.add(a);
-                    let v_ptr = v_ptr.add(a);
-                    (&*t_ptr, &*u_ptr, &*v_ptr)
+                    let ptrs = T::ptrs_add_mut(ptrs, a);
+                    let ptrs = T::ptrs_cast_const(ptrs);
+                    T::as_refs(ptrs)
                 };
                 let b = unsafe {
-                    let t_ptr = t_ptr.add(b);
-                    let u_ptr = u_ptr.add(b);
-                    let v_ptr = v_ptr.add(b);
-                    (&*t_ptr, &*u_ptr, &*v_ptr)
+                    let ptrs = T::ptrs_add_mut(ptrs, b);
+                    let ptrs = T::ptrs_cast_const(ptrs);
+                    T::as_refs(ptrs)
                 };
                 compare(a, b)
             })
@@ -300,16 +283,16 @@ impl<T, U, V> SoaSlice<T, U, V> {
     #[inline]
     pub fn sort_unstable_by_key<K, F>(&mut self, mut f: F)
     where
-        F: FnMut((&T, &U, &V)) -> K,
+        F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
-        let (t_ptr, u_ptr, v_ptr) = self.as_ptrs();
+        let ptrs = self.as_mut_ptrs();
         self.sort_impl(|indices| {
             indices.sort_unstable_by_key(|&index| unsafe {
-                let t_ptr = t_ptr.add(index);
-                let u_ptr = u_ptr.add(index);
-                let v_ptr = v_ptr.add(index);
-                f((&*t_ptr, &*u_ptr, &*v_ptr))
+                let ptrs = T::ptrs_add_mut(ptrs, index);
+                let ptrs = T::ptrs_cast_const(ptrs);
+                let refs = T::as_refs(ptrs);
+                f(refs)
             })
         })
     }
@@ -319,7 +302,7 @@ impl<T, U, V> SoaSlice<T, U, V> {
         F: FnOnce(&mut [usize]),
     {
         let len = self.len();
-        if min_size_of::<T, U, V>() == 0 || len < 2 {
+        if T::min_size_of_components() == 0 || len < 2 {
             return;
         }
 
@@ -337,136 +320,158 @@ impl<T, U, V> SoaSlice<T, U, V> {
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, T, U, V> {
+    pub fn iter(&self) -> Iter<'_, T> {
         Iter::new(self)
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, T, U, V> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         IterMut::new(self)
     }
 }
 
-impl<T, U, V> Debug for SoaSlice<T, U, V>
+impl<T> Debug for SoaSlice<T>
 where
-    T: Debug,
-    U: Debug,
-    V: Debug,
+    T: Soa,
+    for<'any> T::Slices<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (t_slice, u_slice, v_slice) = self.as_slices();
-        f.debug_struct("SoaSlice")
-            .field("t_slice", &t_slice)
-            .field("u_slice", &u_slice)
-            .field("v_slice", &v_slice)
-            .finish()
+        let slices = self.as_slices();
+        f.debug_tuple("SoaSlice").field(&slices).finish()
     }
 }
 
-impl<T, U, V> Default for &SoaSlice<T, U, V> {
+impl<T> Default for &SoaSlice<T>
+where
+    T: Soa,
+{
     fn default() -> Self {
-        let data = NonNull::<BufferAlign<T, U, V>>::dangling().as_ptr().cast();
+        let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
         unsafe { from_len_in_bytes(data, 0) }
     }
 }
 
-impl<T, U, V> Default for &mut SoaSlice<T, U, V> {
+impl<T> Default for &mut SoaSlice<T>
+where
+    T: Soa,
+{
     fn default() -> Self {
-        let data = NonNull::<BufferAlign<T, U, V>>::dangling().as_ptr().cast();
+        let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
         unsafe { from_len_in_bytes_mut(data, 0) }
     }
 }
 
-impl<T, U, V> Default for Box<SoaSlice<T, U, V>> {
+impl<T> Default for Box<SoaSlice<T>>
+where
+    T: Soa,
+{
     fn default() -> Self {
-        let data = NonNull::<BufferAlign<T, U, V>>::dangling().as_ptr().cast();
+        let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
         unsafe { Box::from_raw(slice_from_len_in_bytes_mut(data, 0)) }
     }
 }
 
-impl<T, U, V> AsRef<SoaSlice<T, U, V>> for SoaSlice<T, U, V> {
+impl<T> AsRef<SoaSlice<T>> for SoaSlice<T>
+where
+    T: Soa,
+{
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<T, U, V> AsMut<SoaSlice<T, U, V>> for SoaSlice<T, U, V> {
+impl<T> AsMut<SoaSlice<T>> for SoaSlice<T>
+where
+    T: Soa,
+{
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl<T, U, V> Hash for SoaSlice<T, U, V>
+impl<T> Hash for SoaSlice<T>
 where
-    T: Hash,
-    U: Hash,
-    V: Hash,
+    T: Soa,
+    for<'any> T::Slices<'any>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let len = self.len();
         state.write_usize(len);
 
-        let (t_slice, u_slice, v_slice) = self.as_slices();
-        t_slice.hash(state);
-        u_slice.hash(state);
-        v_slice.hash(state);
+        let slices = self.as_slices();
+        slices.hash(state);
     }
 }
 
-impl<T, U, V> Drop for SoaSlice<T, U, V> {
+impl<T> Drop for SoaSlice<T>
+where
+    T: Soa,
+{
     fn drop(&mut self) {
         if self.is_empty() {
             return;
         }
 
-        let (t_slice, u_slice, v_slice) = self.as_mut_slices();
-        unsafe {
-            ptr::drop_in_place(t_slice);
-            ptr::drop_in_place(u_slice);
-            ptr::drop_in_place(v_slice);
-        }
+        let slices = self.as_mut_slices();
+        let slices = T::mut_slice_refs_as_ptrs(slices);
+        unsafe { T::slices_drop_in_place(slices) }
     }
 }
 
-impl<'a, T, U, V> IntoIterator for &'a SoaSlice<T, U, V> {
-    type Item = (&'a T, &'a U, &'a V);
-    type IntoIter = Iter<'a, T, U, V>;
+impl<'a, T> IntoIterator for &'a SoaSlice<T>
+where
+    T: Soa,
+{
+    type Item = T::Refs<'a>;
+    type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, T, U, V> IntoIterator for &'a Box<SoaSlice<T, U, V>> {
-    type Item = (&'a T, &'a U, &'a V);
-    type IntoIter = Iter<'a, T, U, V>;
+impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
+where
+    T: Soa,
+{
+    type Item = T::Refs<'a>;
+    type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, T, U, V> IntoIterator for &'a mut SoaSlice<T, U, V> {
-    type Item = (&'a mut T, &'a mut U, &'a mut V);
-    type IntoIter = IterMut<'a, T, U, V>;
+impl<'a, T> IntoIterator for &'a mut SoaSlice<T>
+where
+    T: Soa,
+{
+    type Item = T::RefsMut<'a>;
+    type IntoIter = IterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
-impl<'a, T, U, V> IntoIterator for &'a mut Box<SoaSlice<T, U, V>> {
-    type Item = (&'a mut T, &'a mut U, &'a mut V);
-    type IntoIter = IterMut<'a, T, U, V>;
+impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
+where
+    T: Soa,
+{
+    type Item = T::RefsMut<'a>;
+    type IntoIter = IterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
-impl<T, U, V> IntoIterator for Box<SoaSlice<T, U, V>> {
-    type Item = (T, U, V);
-    type IntoIter = IntoIter<T, U, V>;
+impl<T> IntoIterator for Box<SoaSlice<T>>
+where
+    T: Soa,
+{
+    type Item = T;
+    type IntoIter = IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.into_vec().into_iter()
@@ -475,34 +480,43 @@ impl<T, U, V> IntoIterator for Box<SoaSlice<T, U, V>> {
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
-pub unsafe fn from_raw_parts<'slice, T, U, V>(
-    data: *const u8,
-    capacity: usize,
-) -> &'slice SoaSlice<T, U, V> {
+pub unsafe fn from_raw_parts<'slice, T>(data: *const u8, capacity: usize) -> &'slice SoaSlice<T>
+where
+    T: Soa,
+{
     unsafe { &*slice_from_raw_parts(data, capacity) }
 }
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
-pub unsafe fn from_raw_parts_mut<'slice, T, U, V>(
+pub unsafe fn from_raw_parts_mut<'slice, T>(
     data: *mut u8,
     capacity: usize,
-) -> &'slice mut SoaSlice<T, U, V> {
+) -> &'slice mut SoaSlice<T>
+where
+    T: Soa,
+{
     unsafe { &mut *slice_from_raw_parts_mut(data, capacity) }
 }
 
 #[inline]
-pub(crate) unsafe fn from_len_in_bytes<'slice, T, U, V>(
+pub(crate) unsafe fn from_len_in_bytes<'slice, T>(
     data: *const u8,
     len_in_bytes: usize,
-) -> &'slice SoaSlice<T, U, V> {
+) -> &'slice SoaSlice<T>
+where
+    T: Soa,
+{
     unsafe { &*slice_from_len_in_bytes(data, len_in_bytes) }
 }
 
 #[inline]
-pub(crate) unsafe fn from_len_in_bytes_mut<'slice, T, U, V>(
+pub(crate) unsafe fn from_len_in_bytes_mut<'slice, T>(
     data: *mut u8,
     len_in_bytes: usize,
-) -> &'slice mut SoaSlice<T, U, V> {
+) -> &'slice mut SoaSlice<T>
+where
+    T: Soa,
+{
     unsafe { &mut *slice_from_len_in_bytes_mut(data, len_in_bytes) }
 }

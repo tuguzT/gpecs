@@ -2,25 +2,31 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::ManuallyDrop,
-    ptr::{self, NonNull},
-    slice,
+    ptr::NonNull,
 };
 
 use crate::{
     ptr::{ptrs, to_len, BufferAlign},
     raw_vec::RawSoaVec,
+    soa::Soa,
     vec::SoaVec,
 };
 
-pub struct IntoIter<T, U, V> {
-    buffer: NonNull<BufferAlign<T, U, V>>,
+pub struct IntoIter<T>
+where
+    T: Soa,
+{
+    buffer: NonNull<BufferAlign<T>>,
     capacity_in_bytes: usize,
     start: usize,
     end: usize,
 }
 
-impl<T, U, V> IntoIter<T, U, V> {
-    pub(super) fn new(vec: SoaVec<T, U, V>) -> Self {
+impl<T> IntoIter<T>
+where
+    T: Soa,
+{
+    pub(super) fn new(vec: SoaVec<T>) -> Self {
         let vec = ManuallyDrop::new(vec);
         let buffer = vec.buffer.non_null().cast();
         Self {
@@ -39,108 +45,94 @@ impl<T, U, V> IntoIter<T, U, V> {
         self.len() == 0
     }
 
-    pub fn as_slices(&self) -> (&[T], &[U], &[V]) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
+    pub fn as_slices(&self) -> T::Slices<'_> {
+        let ptrs = T::ptrs_cast_const(self.ptrs());
         let len = self.len();
 
         unsafe {
-            let t_slice = slice::from_raw_parts(t_ptr.add(self.start), len);
-            let u_slice = slice::from_raw_parts(u_ptr.add(self.start), len);
-            let v_slice = slice::from_raw_parts(v_ptr.add(self.start), len);
-            (t_slice, u_slice, v_slice)
+            let ptrs = T::ptrs_add(ptrs, self.start);
+            let slices = T::slices_from_raw_parts(ptrs, len);
+            T::slices_as_refs(slices)
         }
     }
 
-    pub fn as_mut_slices(&mut self) -> (&mut [T], &mut [U], &mut [V]) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
+    pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_> {
+        let ptrs = self.ptrs();
         let len = self.len();
 
         unsafe {
-            let t_slice = slice::from_raw_parts_mut(t_ptr.add(self.start), len);
-            let u_slice = slice::from_raw_parts_mut(u_ptr.add(self.start), len);
-            let v_slice = slice::from_raw_parts_mut(v_ptr.add(self.start), len);
-            (t_slice, u_slice, v_slice)
+            let ptrs = T::ptrs_add_mut(ptrs, self.start);
+            let slices = T::slices_from_raw_parts_mut(ptrs, len);
+            T::mut_slices_as_refs(slices)
         }
     }
 
-    fn ptrs(&self) -> (*mut T, *mut U, *mut V) {
+    fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.buffer.as_ptr().cast();
-        let len = to_len::<T, U, V>(self.capacity_in_bytes);
+        let len = to_len::<T>(self.capacity_in_bytes);
 
-        unsafe { ptrs::<T, U, V>(ptr, len) }
+        unsafe { ptrs::<T>(ptr, len) }
     }
 
-    unsafe fn post_inc_start(&mut self, offset: usize) -> (NonNull<T>, NonNull<U>, NonNull<V>) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-        let t_ptr = unsafe { NonNull::new_unchecked(t_ptr).add(self.start) };
-        let u_ptr = unsafe { NonNull::new_unchecked(u_ptr).add(self.start) };
-        let v_ptr = unsafe { NonNull::new_unchecked(v_ptr).add(self.start) };
+    unsafe fn post_inc_start(&mut self, offset: usize) -> T::Ptrs {
+        let ptrs = T::ptrs_cast_const(self.ptrs());
+        let ptrs = unsafe { T::ptrs_add(ptrs, self.start) };
 
         self.start += offset;
-        (t_ptr, u_ptr, v_ptr)
+        ptrs
     }
 
-    unsafe fn pre_dec_end(&mut self, offset: usize) -> (NonNull<T>, NonNull<U>, NonNull<V>) {
+    unsafe fn pre_dec_end(&mut self, offset: usize) -> T::Ptrs {
         self.end -= offset;
 
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-        let t_ptr = unsafe { NonNull::new_unchecked(t_ptr).add(self.end) };
-        let u_ptr = unsafe { NonNull::new_unchecked(u_ptr).add(self.end) };
-        let v_ptr = unsafe { NonNull::new_unchecked(v_ptr).add(self.end) };
-        (t_ptr, u_ptr, v_ptr)
+        let ptrs = T::ptrs_cast_const(self.ptrs());
+        unsafe { T::ptrs_add(ptrs, self.end) }
     }
 }
 
-unsafe impl<T, U, V> Send for IntoIter<T, U, V>
-where
-    T: Send,
-    U: Send,
-    V: Send,
-{
-}
+unsafe impl<T> Send for IntoIter<T> where T: Soa + Send {}
+unsafe impl<T> Sync for IntoIter<T> where T: Soa + Sync {}
 
-unsafe impl<T, U, V> Sync for IntoIter<T, U, V>
+impl<T> Debug for IntoIter<T>
 where
-    T: Sync,
-    U: Sync,
-    V: Sync,
-{
-}
-
-impl<T, U, V> Debug for IntoIter<T, U, V>
-where
-    T: Debug,
-    U: Debug,
-    V: Debug,
+    T: Soa,
+    for<'any> T::Slices<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (t_slice, u_slice, v_slice) = self.as_slices();
-        f.debug_struct("IntoIter")
-            .field("t_slice", &t_slice)
-            .field("u_slice", &u_slice)
-            .field("v_slice", &v_slice)
-            .finish()
+        let slices = self.as_slices();
+        f.debug_tuple("IntoIter").field(&slices).finish()
     }
 }
 
-impl<T, U, V> Default for IntoIter<T, U, V> {
+impl<T> Default for IntoIter<T>
+where
+    T: Soa,
+{
     fn default() -> Self {
         let slice = Default::default();
         Self::new(slice)
     }
 }
 
-impl<T, U, V> Drop for IntoIter<T, U, V> {
+impl<T> Drop for IntoIter<T>
+where
+    T: Soa,
+{
     fn drop(&mut self) {
-        struct DropGuard<'a, T, U, V>(&'a mut IntoIter<T, U, V>);
+        struct DropGuard<'a, T>(&'a mut IntoIter<T>)
+        where
+            T: Soa;
 
-        impl<T, U, V> Drop for DropGuard<'_, T, U, V> {
+        impl<T> Drop for DropGuard<'_, T>
+        where
+            T: Soa,
+        {
             fn drop(&mut self) {
                 unsafe {
                     // `IntoIter::alloc` is not used anymore after this and will be dropped by RawVec
                     // let alloc = ManuallyDrop::take(&mut self.0.alloc);
                     // RawVec handles deallocation
-                    let _ = RawSoaVec::<T, U, V>::from_nonnull_capacity_in_bytes(
+                    let _ = RawSoaVec::<T>::from_nonnull_capacity_in_bytes(
                         self.0.buffer.cast(),
                         self.0.capacity_in_bytes,
                     );
@@ -153,19 +145,19 @@ impl<T, U, V> Drop for IntoIter<T, U, V> {
         if IntoIter::is_empty(guard.0) {
             return;
         }
-        let (t_slice, u_slice, v_slice) = guard.0.as_mut_slices();
-        unsafe {
-            ptr::drop_in_place(t_slice);
-            ptr::drop_in_place(u_slice);
-            ptr::drop_in_place(v_slice);
-        }
+        let slices = guard.0.as_mut_slices();
+        let slices = T::mut_slice_refs_as_ptrs(slices);
+        unsafe { T::slices_drop_in_place(slices) }
         // now `guard` will be dropped and do the rest
     }
 }
 
 #[allow(clippy::while_let_on_iterator)]
-impl<T, U, V> Iterator for IntoIter<T, U, V> {
-    type Item = (T, U, V);
+impl<T> Iterator for IntoIter<T>
+where
+    T: Soa,
+{
+    type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         if IntoIter::is_empty(self) {
@@ -173,8 +165,9 @@ impl<T, U, V> Iterator for IntoIter<T, U, V> {
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.post_inc_start(1);
-            Some((t_ptr.read(), u_ptr.read(), v_ptr.read()))
+            let ptrs = self.post_inc_start(1);
+            let item = T::ptrs_read(ptrs);
+            Some(item)
         }
     }
 
@@ -230,13 +223,10 @@ impl<T, U, V> Iterator for IntoIter<T, U, V> {
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
-            let (t_ptr, u_ptr, v_ptr) = self.ptrs();
+            let ptrs = T::ptrs_cast_const(self.ptrs());
             let item = unsafe {
-                (
-                    t_ptr.add(i).read(),
-                    u_ptr.add(i).read(),
-                    v_ptr.add(i).read(),
-                )
+                let ptrs = T::ptrs_add(ptrs, i);
+                T::ptrs_read(ptrs)
             };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
@@ -347,15 +337,19 @@ impl<T, U, V> Iterator for IntoIter<T, U, V> {
     }
 }
 
-impl<T, U, V> DoubleEndedIterator for IntoIter<T, U, V> {
+impl<T> DoubleEndedIterator for IntoIter<T>
+where
+    T: Soa,
+{
     fn next_back(&mut self) -> Option<Self::Item> {
         if IntoIter::is_empty(self) {
             return None;
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.pre_dec_end(1);
-            Some((t_ptr.read(), u_ptr.read(), v_ptr.read()))
+            let ptrs = self.pre_dec_end(1);
+            let item = T::ptrs_read(ptrs);
+            Some(item)
         }
     }
 
@@ -372,10 +366,13 @@ impl<T, U, V> DoubleEndedIterator for IntoIter<T, U, V> {
     }
 }
 
-impl<T, U, V> ExactSizeIterator for IntoIter<T, U, V> {
+impl<T> ExactSizeIterator for IntoIter<T>
+where
+    T: Soa,
+{
     fn len(&self) -> usize {
         IntoIter::len(self)
     }
 }
 
-impl<T, U, V> FusedIterator for IntoIter<T, U, V> {}
+impl<T> FusedIterator for IntoIter<T> where T: Soa {}

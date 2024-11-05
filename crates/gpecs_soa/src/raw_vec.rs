@@ -12,11 +12,9 @@ use core::{
 };
 
 use crate::{
-    ptr::{
-        align_of_buffer, min_size_of, ptrs, slice_from_raw_parts_mut, to_len, to_len_in_bytes,
-        BufferAlign,
-    },
+    ptr::{align_of_buffer, ptrs, slice_from_raw_parts_mut, to_len, to_len_in_bytes, BufferAlign},
     slice::SoaSlice,
+    soa::Soa,
 };
 
 use self::TryReserveErrorKind::*;
@@ -95,26 +93,34 @@ enum AllocInit {
     Zeroed,
 }
 
-pub struct RawSoaVec<T, U, V> {
-    ptr: NonNull<BufferAlign<T, U, V>>,
+pub struct RawSoaVec<T>
+where
+    T: Soa,
+{
+    ptr: NonNull<BufferAlign<T>>,
     capacity_in_bytes: usize,
 }
 
-impl<T, U, V> RawSoaVec<T, U, V> {
+impl<T> RawSoaVec<T>
+where
+    T: Soa,
+{
     // Tiny Vecs are dumb. Skip to:
     // - 8 if the element size is 1, because any heap allocators is likely
     //   to round up a request of less than 8 bytes to at least 8 bytes.
     // - 4 if elements are moderate-sized (<= 1 KiB).
     // - 1 otherwise, to avoid wasting too much space for very short Vecs.
-    pub(crate) const MIN_NON_ZERO_CAP: usize = if min_size_of::<T, U, V>() == 1 {
-        8
-    } else if min_size_of::<T, U, V>() <= 1024 {
-        4
-    } else {
-        1
-    };
+    pub(crate) fn min_non_zero_cap() -> usize {
+        if T::min_size_of_components() == 1 {
+            8
+        } else if T::min_size_of_components() <= 1024 {
+            4
+        } else {
+            1
+        }
+    }
 
-    pub const LAYOUT_ALIGN: usize = align_of_buffer::<T, U, V>();
+    pub const LAYOUT_ALIGN: usize = align_of_buffer::<T>();
 
     #[must_use]
     pub const fn new() -> Self {
@@ -125,11 +131,11 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 
     fn try_allocate_in(capacity: usize, init: AllocInit) -> Result<Self, TryReserveError> {
-        if capacity == 0 || min_size_of::<T, U, V>() == 0 {
+        if capacity == 0 || T::min_size_of_components() == 0 {
             return Ok(Self::new());
         }
 
-        let size = to_len_in_bytes::<T, U, V>(capacity);
+        let size = to_len_in_bytes::<T>(capacity);
         let layout = match Layout::from_size_align(size, Self::LAYOUT_ALIGN) {
             Ok(layout) => layout,
             Err(_) => return Err(CapacityOverflow.into()),
@@ -176,7 +182,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         Self::try_allocate_in(capacity, AllocInit::Zeroed)
     }
 
-    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T, U, V>> {
+    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>> {
         debug_assert!(
             len <= self.capacity(),
             "`len` must be smaller than or equal to `self.capacity()`"
@@ -189,7 +195,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         }
     }
 
-    pub const unsafe fn from_raw_parts(ptr: *mut u8, capacity: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: *mut u8, capacity: usize) -> Self {
         unsafe {
             let ptr = NonNull::new_unchecked(ptr);
             Self::from_nonnull(ptr, capacity)
@@ -203,11 +209,11 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         }
     }
 
-    pub const unsafe fn from_nonnull(ptr: NonNull<u8>, capacity: usize) -> Self {
-        let capacity_in_bytes = if min_size_of::<T, U, V>() == 0 {
+    pub unsafe fn from_nonnull(ptr: NonNull<u8>, capacity: usize) -> Self {
+        let capacity_in_bytes = if T::min_size_of_components() == 0 {
             0
         } else {
-            to_len_in_bytes::<T, U, V>(capacity)
+            to_len_in_bytes::<T>(capacity)
         };
 
         Self {
@@ -251,33 +257,24 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         }
     }
 
-    pub fn ptrs(&self) -> (*mut T, *mut U, *mut V) {
+    pub fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr();
         let len = self.capacity();
 
-        unsafe {
-            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
-            (t_ptr, u_ptr, v_ptr)
-        }
+        unsafe { ptrs::<T>(ptr, len) }
     }
 
     #[allow(dead_code)]
-    pub fn non_nulls(&self) -> (NonNull<T>, NonNull<U>, NonNull<V>) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-        unsafe {
-            (
-                NonNull::new_unchecked(t_ptr),
-                NonNull::new_unchecked(u_ptr),
-                NonNull::new_unchecked(v_ptr),
-            )
-        }
+    pub fn non_nulls(&self) -> T::NonNullPtrs {
+        let ptrs = self.ptrs();
+        unsafe { T::ptrs_to_nonnull(ptrs) }
     }
 
-    pub const fn capacity(&self) -> usize {
-        if min_size_of::<T, U, V>() == 0 {
+    pub fn capacity(&self) -> usize {
+        if T::min_size_of_components() == 0 {
             usize::MAX
         } else {
-            to_len::<T, U, V>(self.capacity_in_bytes)
+            to_len::<T>(self.capacity_in_bytes)
         }
     }
 
@@ -307,11 +304,10 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         // handle_reserve behind a call, while making sure that this function is likely to be
         // inlined as just a comparison and a call if the comparison fails.
         #[cold]
-        fn do_reserve_and_handle<T, U, V>(
-            slf: &mut RawSoaVec<T, U, V>,
-            len: usize,
-            additional: usize,
-        ) {
+        fn do_reserve_and_handle<T>(slf: &mut RawSoaVec<T>, len: usize, additional: usize)
+        where
+            T: Soa,
+        {
             if let Err(err) = slf.grow_amortized(len, additional) {
                 handle_error(err);
             }
@@ -359,28 +355,28 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 
     pub fn needs_to_grow(&self, len: usize, additional: usize) -> bool {
-        let new_capacity_in_bytes = to_len_in_bytes::<T, U, V>(len + additional);
+        let new_capacity_in_bytes = to_len_in_bytes::<T>(len + additional);
         new_capacity_in_bytes > self.capacity_in_bytes
     }
 
-    unsafe fn set_ptr_and_cap(&mut self, ptr: NonNull<BufferAlign<T, U, V>>, cap: usize) {
+    unsafe fn set_ptr_and_cap(&mut self, ptr: NonNull<BufferAlign<T>>, cap: usize) {
         self.ptr = ptr;
-        self.capacity_in_bytes = to_len_in_bytes::<T, U, V>(cap);
+        self.capacity_in_bytes = to_len_in_bytes::<T>(cap);
     }
 
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
         debug_assert!(additional > 0);
 
-        if min_size_of::<T, U, V>() == 0 {
+        if T::min_size_of_components() == 0 {
             return Err(CapacityOverflow.into());
         }
 
         let required_cap = len.checked_add(additional).ok_or(CapacityOverflow)?;
 
         let cap = cmp::max(self.capacity_in_bytes * 2, required_cap);
-        let cap = cmp::max(Self::MIN_NON_ZERO_CAP, cap);
+        let cap = cmp::max(Self::min_non_zero_cap(), cap);
 
-        let layout_size = to_len_in_bytes::<T, U, V>(cap);
+        let layout_size = to_len_in_bytes::<T>(cap);
         let new_layout = Layout::from_size_align(layout_size, Self::LAYOUT_ALIGN);
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
@@ -391,13 +387,13 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 
     fn grow_exact(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
-        if min_size_of::<T, U, V>() == 0 {
+        if T::min_size_of_components() == 0 {
             return Err(CapacityOverflow.into());
         }
 
         let cap = len.checked_add(additional).ok_or(CapacityOverflow)?;
 
-        let layout_size = to_len_in_bytes::<T, U, V>(cap);
+        let layout_size = to_len_in_bytes::<T>(cap);
         let new_layout = Layout::from_size_align(layout_size, Self::LAYOUT_ALIGN);
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
@@ -427,7 +423,7 @@ impl<T, U, V> RawSoaVec<T, U, V> {
         }
 
         let ptr = unsafe {
-            let layout_size = to_len_in_bytes::<T, U, V>(cap);
+            let layout_size = to_len_in_bytes::<T>(cap);
             if layout_size == 0 {
                 return Ok(());
             }
@@ -447,7 +443,10 @@ impl<T, U, V> RawSoaVec<T, U, V> {
     }
 }
 
-impl<T, U, V> Drop for RawSoaVec<T, U, V> {
+impl<T> Drop for RawSoaVec<T>
+where
+    T: Soa,
+{
     fn drop(&mut self) {
         if let Some((ptr, layout)) = self.current_memory() {
             unsafe { dealloc(ptr.as_ptr(), layout) }
@@ -455,21 +454,8 @@ impl<T, U, V> Drop for RawSoaVec<T, U, V> {
     }
 }
 
-unsafe impl<T, U, V> Send for RawSoaVec<T, U, V>
-where
-    T: Send,
-    U: Send,
-    V: Send,
-{
-}
-
-unsafe impl<T, U, V> Sync for RawSoaVec<T, U, V>
-where
-    T: Sync,
-    U: Sync,
-    V: Sync,
-{
-}
+unsafe impl<T> Send for RawSoaVec<T> where T: Soa + Send {}
+unsafe impl<T> Sync for RawSoaVec<T> where T: Soa + Sync {}
 
 #[inline(never)]
 fn finish_grow(

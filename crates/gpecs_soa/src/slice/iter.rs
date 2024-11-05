@@ -3,24 +3,32 @@ use core::{
     iter::FusedIterator,
     marker::PhantomData,
     ptr::NonNull,
-    slice,
 };
 
-use crate::ptr::{ptrs, BufferAlign};
+use crate::{
+    ptr::{ptrs, BufferAlign},
+    soa::Soa,
+};
 
 use super::SoaSlice;
 
-pub struct Iter<'a, T, U, V> {
-    ptr: NonNull<BufferAlign<T, U, V>>,
+pub struct Iter<'a, T>
+where
+    T: Soa,
+{
+    ptr: NonNull<BufferAlign<T>>,
     capacity: usize,
     start: usize,
     end: usize,
-    phantom: PhantomData<(&'a T, &'a U, &'a V)>,
+    phantom: PhantomData<&'a T>,
 }
 
-impl<'a, T, U, V> Iter<'a, T, U, V> {
+impl<'a, T> Iter<'a, T>
+where
+    T: Soa,
+{
     #[inline]
-    pub(super) const fn new(slice: &'a SoaSlice<T, U, V>) -> Self {
+    pub(super) fn new(slice: &'a SoaSlice<T>) -> Self {
         let ptr = slice.as_ptr().cast_mut();
         let ptr = unsafe { NonNull::new_unchecked(ptr) }.cast();
         Self {
@@ -40,89 +48,71 @@ impl<'a, T, U, V> Iter<'a, T, U, V> {
         self.len() == 0
     }
 
-    fn ptrs(&self) -> (*const T, *const U, *const V) {
+    fn ptrs(&self) -> T::Ptrs {
         let ptr = self.ptr.as_ptr().cast();
         let len = self.capacity;
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = ptrs::<T, U, V>(ptr, len);
-            (t_ptr, u_ptr, v_ptr)
+            let ptrs = ptrs::<T>(ptr, len);
+            T::ptrs_cast_const(ptrs)
         }
     }
 
-    pub fn as_slices(&self) -> (&'a [T], &'a [U], &'a [V]) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
+    pub fn as_slices(&self) -> T::Slices<'_> {
+        let ptrs = self.ptrs();
         let len = self.len();
 
         unsafe {
-            let t_slice = slice::from_raw_parts(t_ptr.add(self.start), len);
-            let u_slice = slice::from_raw_parts(u_ptr.add(self.start), len);
-            let v_slice = slice::from_raw_parts(v_ptr.add(self.start), len);
-            (t_slice, u_slice, v_slice)
+            let ptrs = T::ptrs_add(ptrs, self.start);
+            let slices = T::slices_from_raw_parts(ptrs, len);
+            T::slices_as_refs(slices)
         }
     }
 
-    unsafe fn post_inc_start(&mut self, offset: usize) -> (NonNull<T>, NonNull<U>, NonNull<V>) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-        let t_ptr = unsafe { NonNull::new_unchecked(t_ptr.cast_mut()).add(self.start) };
-        let u_ptr = unsafe { NonNull::new_unchecked(u_ptr.cast_mut()).add(self.start) };
-        let v_ptr = unsafe { NonNull::new_unchecked(v_ptr.cast_mut()).add(self.start) };
+    unsafe fn post_inc_start(&mut self, offset: usize) -> T::MutPtrs {
+        let ptrs = T::ptrs_cast_mut(self.ptrs());
+        let ptrs = unsafe { T::ptrs_add_mut(ptrs, self.start) };
 
         self.start += offset;
-        (t_ptr, u_ptr, v_ptr)
+        ptrs
     }
 
-    unsafe fn pre_dec_end(&mut self, offset: usize) -> (NonNull<T>, NonNull<U>, NonNull<V>) {
+    unsafe fn pre_dec_end(&mut self, offset: usize) -> T::MutPtrs {
         self.end -= offset;
 
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-        let t_ptr = unsafe { NonNull::new_unchecked(t_ptr.cast_mut()).add(self.end) };
-        let u_ptr = unsafe { NonNull::new_unchecked(u_ptr.cast_mut()).add(self.end) };
-        let v_ptr = unsafe { NonNull::new_unchecked(v_ptr.cast_mut()).add(self.end) };
-        (t_ptr, u_ptr, v_ptr)
+        let ptrs = T::ptrs_cast_mut(self.ptrs());
+        unsafe { T::ptrs_add_mut(ptrs, self.end) }
     }
 }
 
-unsafe impl<T, U, V> Send for Iter<'_, T, U, V>
-where
-    T: Send,
-    U: Send,
-    V: Send,
-{
-}
+unsafe impl<T> Send for Iter<'_, T> where T: Soa + Send {}
+unsafe impl<T> Sync for Iter<'_, T> where T: Soa + Sync {}
 
-unsafe impl<T, U, V> Sync for Iter<'_, T, U, V>
+impl<T> Debug for Iter<'_, T>
 where
-    T: Sync,
-    U: Sync,
-    V: Sync,
-{
-}
-
-impl<T, U, V> Debug for Iter<'_, T, U, V>
-where
-    T: Debug,
-    U: Debug,
-    V: Debug,
+    T: Soa,
+    for<'any> T::Slices<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (t_slice, u_slice, v_slice) = self.as_slices();
-        f.debug_struct("Iter")
-            .field("t_slice", &t_slice)
-            .field("u_slice", &u_slice)
-            .field("v_slice", &v_slice)
-            .finish()
+        let slices = self.as_slices();
+        f.debug_tuple("Iter").field(&slices).finish()
     }
 }
 
-impl<T, U, V> Default for Iter<'_, T, U, V> {
+impl<T> Default for Iter<'_, T>
+where
+    T: Soa,
+{
     fn default() -> Self {
         let slice = Default::default();
         Self::new(slice)
     }
 }
 
-impl<T, U, V> Clone for Iter<'_, T, U, V> {
+impl<T> Clone for Iter<'_, T>
+where
+    T: Soa,
+{
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr,
@@ -135,8 +125,11 @@ impl<T, U, V> Clone for Iter<'_, T, U, V> {
 }
 
 #[allow(clippy::while_let_on_iterator)]
-impl<'a, T, U, V> Iterator for Iter<'a, T, U, V> {
-    type Item = (&'a T, &'a U, &'a V);
+impl<'a, T> Iterator for Iter<'a, T>
+where
+    T: Soa,
+{
+    type Item = T::Refs<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if Iter::is_empty(self) {
@@ -144,8 +137,10 @@ impl<'a, T, U, V> Iterator for Iter<'a, T, U, V> {
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.post_inc_start(1);
-            Some((t_ptr.as_ref(), u_ptr.as_ref(), v_ptr.as_ref()))
+            let ptrs = self.post_inc_start(1);
+            let ptrs = T::ptrs_cast_const(ptrs);
+            let refs = T::as_refs(ptrs);
+            Some(refs)
         }
     }
 
@@ -201,8 +196,11 @@ impl<'a, T, U, V> Iterator for Iter<'a, T, U, V> {
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
-            let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-            let item = unsafe { (&*t_ptr.add(i), &*u_ptr.add(i), &*v_ptr.add(i)) };
+            let ptrs = self.ptrs();
+            let item = unsafe {
+                let ptrs = T::ptrs_add(ptrs, i);
+                T::as_refs(ptrs)
+            };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
             // slice had that length, in which case we'll break out of the loop
@@ -312,15 +310,20 @@ impl<'a, T, U, V> Iterator for Iter<'a, T, U, V> {
     }
 }
 
-impl<'a, T, U, V> DoubleEndedIterator for Iter<'a, T, U, V> {
+impl<'a, T> DoubleEndedIterator for Iter<'a, T>
+where
+    T: Soa,
+{
     fn next_back(&mut self) -> Option<Self::Item> {
         if Iter::is_empty(self) {
             return None;
         }
 
         unsafe {
-            let (t_ptr, u_ptr, v_ptr) = self.pre_dec_end(1);
-            Some((t_ptr.as_ref(), u_ptr.as_ref(), v_ptr.as_ref()))
+            let ptrs = self.pre_dec_end(1);
+            let ptrs = T::ptrs_cast_const(ptrs);
+            let refs = T::as_refs(ptrs);
+            Some(refs)
         }
     }
 
@@ -337,25 +340,34 @@ impl<'a, T, U, V> DoubleEndedIterator for Iter<'a, T, U, V> {
     }
 }
 
-impl<T, U, V> ExactSizeIterator for Iter<'_, T, U, V> {
+impl<T> ExactSizeIterator for Iter<'_, T>
+where
+    T: Soa,
+{
     fn len(&self) -> usize {
         Iter::len(self)
     }
 }
 
-impl<T, U, V> FusedIterator for Iter<'_, T, U, V> {}
+impl<T> FusedIterator for Iter<'_, T> where T: Soa {}
 
-pub struct IterMut<'a, T, U, V> {
-    ptr: NonNull<BufferAlign<T, U, V>>,
+pub struct IterMut<'a, T>
+where
+    T: Soa,
+{
+    ptr: NonNull<BufferAlign<T>>,
     capacity: usize,
     start: usize,
     end: usize,
-    phantom: PhantomData<(&'a mut T, &'a mut U, &'a mut V)>,
+    phantom: PhantomData<&'a mut T>,
 }
 
-impl<'a, T, U, V> IterMut<'a, T, U, V> {
+impl<'a, T> IterMut<'a, T>
+where
+    T: Soa,
+{
     #[inline]
-    pub(super) fn new(slice: &'a mut SoaSlice<T, U, V>) -> Self {
+    pub(super) fn new(slice: &'a mut SoaSlice<T>) -> Self {
         let ptr = slice.as_mut_ptr();
         let ptr = unsafe { NonNull::new_unchecked(ptr) }.cast();
         Self {
@@ -375,91 +387,69 @@ impl<'a, T, U, V> IterMut<'a, T, U, V> {
         self.len() == 0
     }
 
-    fn ptrs(&self) -> (*mut T, *mut U, *mut V) {
+    fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr.as_ptr().cast();
         let len = self.capacity;
 
-        unsafe { ptrs::<T, U, V>(ptr, len) }
+        unsafe { ptrs::<T>(ptr, len) }
     }
 
-    pub fn into_slices(self) -> (&'a mut [T], &'a mut [U], &'a mut [V]) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
+    pub fn into_slices(self) -> T::SlicesMut<'a> {
+        let ptrs = self.ptrs();
         let len = self.len();
 
         unsafe {
-            let t_slice = slice::from_raw_parts_mut(t_ptr.add(self.start), len);
-            let u_slice = slice::from_raw_parts_mut(u_ptr.add(self.start), len);
-            let v_slice = slice::from_raw_parts_mut(v_ptr.add(self.start), len);
-            (t_slice, u_slice, v_slice)
+            let ptrs = T::ptrs_add_mut(ptrs, self.start);
+            let slices = T::slices_from_raw_parts_mut(ptrs, len);
+            T::mut_slices_as_refs(slices)
         }
     }
 
-    pub fn as_slices(&self) -> (&[T], &[U], &[V]) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
+    pub fn as_slices(&self) -> T::Slices<'_> {
+        let ptrs = T::ptrs_cast_const(self.ptrs());
         let len = self.len();
 
         unsafe {
-            let t_slice = slice::from_raw_parts(t_ptr.add(self.start), len);
-            let u_slice = slice::from_raw_parts(u_ptr.add(self.start), len);
-            let v_slice = slice::from_raw_parts(v_ptr.add(self.start), len);
-            (t_slice, u_slice, v_slice)
+            let ptrs = T::ptrs_add(ptrs, self.start);
+            let slices = T::slices_from_raw_parts(ptrs, len);
+            T::slices_as_refs(slices)
         }
     }
 
-    unsafe fn post_inc_start(&mut self, offset: usize) -> (NonNull<T>, NonNull<U>, NonNull<V>) {
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-        let t_ptr = unsafe { NonNull::new_unchecked(t_ptr).add(self.start) };
-        let u_ptr = unsafe { NonNull::new_unchecked(u_ptr).add(self.start) };
-        let v_ptr = unsafe { NonNull::new_unchecked(v_ptr).add(self.start) };
+    unsafe fn post_inc_start(&mut self, offset: usize) -> T::MutPtrs {
+        let ptrs = self.ptrs();
+        let ptrs = unsafe { T::ptrs_add_mut(ptrs, self.start) };
 
         self.start += offset;
-        (t_ptr, u_ptr, v_ptr)
+        ptrs
     }
 
-    unsafe fn pre_dec_end(&mut self, offset: usize) -> (NonNull<T>, NonNull<U>, NonNull<V>) {
+    unsafe fn pre_dec_end(&mut self, offset: usize) -> T::MutPtrs {
         self.end -= offset;
 
-        let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-        let t_ptr = unsafe { NonNull::new_unchecked(t_ptr).add(self.end) };
-        let u_ptr = unsafe { NonNull::new_unchecked(u_ptr).add(self.end) };
-        let v_ptr = unsafe { NonNull::new_unchecked(v_ptr).add(self.end) };
-        (t_ptr, u_ptr, v_ptr)
+        let ptrs = self.ptrs();
+        unsafe { T::ptrs_add_mut(ptrs, self.end) }
     }
 }
 
-unsafe impl<T, U, V> Send for IterMut<'_, T, U, V>
-where
-    T: Send,
-    U: Send,
-    V: Send,
-{
-}
+unsafe impl<T> Send for IterMut<'_, T> where T: Soa + Send {}
+unsafe impl<T> Sync for IterMut<'_, T> where T: Soa + Sync {}
 
-unsafe impl<T, U, V> Sync for IterMut<'_, T, U, V>
+impl<T> Debug for IterMut<'_, T>
 where
-    T: Sync,
-    U: Sync,
-    V: Sync,
-{
-}
-
-impl<T, U, V> Debug for IterMut<'_, T, U, V>
-where
-    T: Debug,
-    U: Debug,
-    V: Debug,
+    T: Soa,
+    for<'any> T::Slices<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (t_slice, u_slice, v_slice) = self.as_slices();
-        f.debug_struct("IterMut")
-            .field("t_slice", &t_slice)
-            .field("u_slice", &u_slice)
-            .field("v_slice", &v_slice)
-            .finish()
+        let slices = self.as_slices();
+        f.debug_tuple("IterMut").field(&slices).finish()
     }
 }
 
-impl<T, U, V> Default for IterMut<'_, T, U, V> {
+impl<T> Default for IterMut<'_, T>
+where
+    T: Soa,
+{
     fn default() -> Self {
         let slice = Default::default();
         Self::new(slice)
@@ -467,8 +457,11 @@ impl<T, U, V> Default for IterMut<'_, T, U, V> {
 }
 
 #[allow(clippy::while_let_on_iterator)]
-impl<'a, T, U, V> Iterator for IterMut<'a, T, U, V> {
-    type Item = (&'a mut T, &'a mut U, &'a mut V);
+impl<'a, T> Iterator for IterMut<'a, T>
+where
+    T: Soa,
+{
+    type Item = T::RefsMut<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if IterMut::is_empty(self) {
@@ -476,8 +469,9 @@ impl<'a, T, U, V> Iterator for IterMut<'a, T, U, V> {
         }
 
         unsafe {
-            let (mut t_ptr, mut u_ptr, mut v_ptr) = self.post_inc_start(1);
-            Some((t_ptr.as_mut(), u_ptr.as_mut(), v_ptr.as_mut()))
+            let ptrs = self.post_inc_start(1);
+            let refs = T::as_mut_refs(ptrs);
+            Some(refs)
         }
     }
 
@@ -533,8 +527,11 @@ impl<'a, T, U, V> Iterator for IterMut<'a, T, U, V> {
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
-            let (t_ptr, u_ptr, v_ptr) = self.ptrs();
-            let item = unsafe { (&mut *t_ptr.add(i), &mut *u_ptr.add(i), &mut *v_ptr.add(i)) };
+            let ptrs = self.ptrs();
+            let item = unsafe {
+                let ptrs = T::ptrs_add_mut(ptrs, i);
+                T::as_mut_refs(ptrs)
+            };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
             // slice had that length, in which case we'll break out of the loop
@@ -644,15 +641,19 @@ impl<'a, T, U, V> Iterator for IterMut<'a, T, U, V> {
     }
 }
 
-impl<'a, T, U, V> DoubleEndedIterator for IterMut<'a, T, U, V> {
+impl<'a, T> DoubleEndedIterator for IterMut<'a, T>
+where
+    T: Soa,
+{
     fn next_back(&mut self) -> Option<Self::Item> {
         if IterMut::is_empty(self) {
             return None;
         }
 
         unsafe {
-            let (mut t_ptr, mut u_ptr, mut v_ptr) = self.pre_dec_end(1);
-            Some((t_ptr.as_mut(), u_ptr.as_mut(), v_ptr.as_mut()))
+            let ptrs = self.pre_dec_end(1);
+            let refs = T::as_mut_refs(ptrs);
+            Some(refs)
         }
     }
 
@@ -669,10 +670,13 @@ impl<'a, T, U, V> DoubleEndedIterator for IterMut<'a, T, U, V> {
     }
 }
 
-impl<T, U, V> ExactSizeIterator for IterMut<'_, T, U, V> {
+impl<T> ExactSizeIterator for IterMut<'_, T>
+where
+    T: Soa,
+{
     fn len(&self) -> usize {
         IterMut::len(self)
     }
 }
 
-impl<T, U, V> FusedIterator for IterMut<'_, T, U, V> {}
+impl<T> FusedIterator for IterMut<'_, T> where T: Soa {}

@@ -12,7 +12,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{align_of_buffer, ptrs, slice_from_raw_parts_mut, to_len, to_len_in_bytes, BufferAlign},
+    ptr::{buffer_layout, ptrs, slice_from_raw_parts_mut, to_len, BufferAlign},
     slice::SoaSlice,
     soa::Soa,
 };
@@ -120,8 +120,6 @@ where
         }
     }
 
-    pub const LAYOUT_ALIGN: usize = align_of_buffer::<T>();
-
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -135,8 +133,7 @@ where
             return Ok(Self::new());
         }
 
-        let size = to_len_in_bytes::<T>(capacity);
-        let layout = match Layout::from_size_align(size, Self::LAYOUT_ALIGN) {
+        let layout = match buffer_layout::<T>(capacity) {
             Ok(layout) => layout,
             Err(_) => return Err(CapacityOverflow.into()),
         };
@@ -213,7 +210,9 @@ where
         let capacity_in_bytes = if T::min_size_of_components() == 0 {
             0
         } else {
-            to_len_in_bytes::<T>(capacity)
+            buffer_layout::<T>(capacity)
+                .expect("layout size should not exceed `isize::MAX`")
+                .size()
         };
 
         Self {
@@ -293,7 +292,7 @@ where
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
         unsafe {
             let size = self.capacity_in_bytes;
-            let layout = Layout::from_size_align_unchecked(size, Self::LAYOUT_ALIGN);
+            let layout = Layout::from_size_align_unchecked(size, align_of::<BufferAlign<T>>());
             Some((self.ptr.cast(), layout))
         }
     }
@@ -355,13 +354,17 @@ where
     }
 
     pub fn needs_to_grow(&self, len: usize, additional: usize) -> bool {
-        let new_capacity_in_bytes = to_len_in_bytes::<T>(len + additional);
+        let new_capacity_in_bytes = buffer_layout::<T>(len + additional)
+            .expect("layout size should not exceed `isize::MAX`")
+            .size();
         new_capacity_in_bytes > self.capacity_in_bytes
     }
 
     unsafe fn set_ptr_and_cap(&mut self, ptr: NonNull<BufferAlign<T>>, cap: usize) {
         self.ptr = ptr;
-        self.capacity_in_bytes = to_len_in_bytes::<T>(cap);
+        self.capacity_in_bytes = buffer_layout::<T>(cap)
+            .expect("layout size should not exceed `isize::MAX`")
+            .size();
     }
 
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
@@ -375,9 +378,7 @@ where
 
         let cap = cmp::max(self.capacity_in_bytes * 2, required_cap);
         let cap = cmp::max(Self::min_non_zero_cap(), cap);
-
-        let layout_size = to_len_in_bytes::<T>(cap);
-        let new_layout = Layout::from_size_align(layout_size, Self::LAYOUT_ALIGN);
+        let new_layout = buffer_layout::<T>(cap);
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
@@ -392,9 +393,7 @@ where
         }
 
         let cap = len.checked_add(additional).ok_or(CapacityOverflow)?;
-
-        let layout_size = to_len_in_bytes::<T>(cap);
-        let new_layout = Layout::from_size_align(layout_size, Self::LAYOUT_ALIGN);
+        let new_layout = buffer_layout::<T>(cap);
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
@@ -423,11 +422,13 @@ where
         }
 
         let ptr = unsafe {
-            let layout_size = to_len_in_bytes::<T>(cap);
-            if layout_size == 0 {
+            let new_layout = match buffer_layout::<T>(cap) {
+                Ok(layout) => layout,
+                Err(_) => return Err(CapacityOverflow.into()),
+            };
+            if new_layout.size() == 0 {
                 return Ok(());
             }
-            let new_layout = Layout::from_size_align_unchecked(layout_size, Self::LAYOUT_ALIGN);
 
             let ptr = realloc(ptr.as_ptr(), old_layout, new_layout.size());
             match NonNull::new(ptr) {

@@ -1,4 +1,7 @@
-use core::ptr;
+use core::{
+    alloc::{Layout, LayoutError},
+    ptr,
+};
 
 use crate::{slice::SoaSlice, soa::Soa};
 
@@ -8,7 +11,9 @@ pub fn slice_from_raw_parts<T>(data: *const u8, capacity: usize) -> *const SoaSl
 where
     T: Soa,
 {
-    let len_in_bytes = to_len_in_bytes::<T>(capacity);
+    let len_in_bytes = buffer_layout::<T>(capacity)
+        .expect("layout size should not exceed `isize::MAX`")
+        .size();
     slice_from_len_in_bytes(data, len_in_bytes)
 }
 
@@ -18,7 +23,9 @@ pub fn slice_from_raw_parts_mut<T>(data: *mut u8, capacity: usize) -> *mut SoaSl
 where
     T: Soa,
 {
-    let len_in_bytes = to_len_in_bytes::<T>(capacity);
+    let len_in_bytes = buffer_layout::<T>(capacity)
+        .expect("layout size should not exceed `isize::MAX`")
+        .size();
     slice_from_len_in_bytes_mut(data, len_in_bytes)
 }
 
@@ -38,31 +45,6 @@ where
     ptr::slice_from_raw_parts_mut(data, len_in_bytes) as *mut _
 }
 
-#[inline(always)]
-pub(crate) unsafe fn ptr_align_up<T>(ptr: *mut u8) -> *mut u8 {
-    let align = align_of::<T>();
-    let offset = ptr.align_offset(align);
-
-    unsafe { ptr.add(offset) }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn align_cast_then_advance<T>(ptr: *mut u8, len: usize) -> (*mut T, *mut u8) {
-    let ptr = unsafe { ptr_align_up::<T>(ptr) };
-
-    let t_ptr = ptr.cast::<T>();
-    debug_assert!(t_ptr.is_aligned());
-
-    let ptr = unsafe { t_ptr.add(len).cast() };
-    (t_ptr, ptr)
-}
-
-#[inline(always)]
-pub(crate) const fn align_up<T>(addr: usize) -> usize {
-    let align = align_of::<T>();
-    (addr + align - 1) & !(align - 1)
-}
-
 #[repr(transparent)]
 pub(crate) struct BufferAlign<T>
 where
@@ -72,41 +54,26 @@ where
 }
 
 #[inline]
-pub(crate) const fn align_of_buffer<T>() -> usize
-where
-    T: Soa,
-{
-    align_of::<BufferAlign<T>>()
-}
-
-#[inline]
-pub(crate) const fn align_up_to_buffer<T>(addr: usize) -> usize
-where
-    T: Soa,
-{
-    align_up::<BufferAlign<T>>(addr)
-}
-
-#[inline]
-fn unaligned_to_len_in_bytes<T>(len: usize) -> usize
+pub(crate) fn buffer_layout_unaligned<T>(len: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,
 {
     if T::min_size_of_components() == 0 || len == 0 {
-        return 0;
+        return Ok(Layout::new::<()>());
     }
 
-    let initial = size_of::<usize>();
-    T::len_in_bytes_unaligned(initial, len)
+    let initial = Layout::new::<usize>();
+    let (layout, _) = T::buffer_layout_unaligned(initial, len)?;
+    Ok(layout)
 }
 
 #[inline]
-pub(crate) fn to_len_in_bytes<T>(len: usize) -> usize
+pub(crate) fn buffer_layout<T>(len: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,
 {
-    let unaligned = unaligned_to_len_in_bytes::<T>(len);
-    align_up_to_buffer::<T>(unaligned)
+    let unaligned = buffer_layout_unaligned::<T>(len)?;
+    Ok(unaligned.pad_to_align())
 }
 
 #[inline]
@@ -123,7 +90,9 @@ where
     let mut len = max_len;
     while {
         // this variable is not inlined (in debug builds) only for better debugging experience
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<T>(len);
+        let to_len_in_bytes = buffer_layout_unaligned::<T>(len)
+            .expect("layout size should not exceed `isize::MAX`")
+            .size();
         to_len_in_bytes > len_in_bytes
     } {
         len -= 1;
@@ -136,7 +105,9 @@ pub(crate) fn to_len<T>(len_in_bytes: usize) -> usize
 where
     T: Soa,
 {
-    let aligned_len = align_up_to_buffer::<T>(len_in_bytes);
+    let layout = Layout::from_size_align(len_in_bytes, align_of::<BufferAlign<T>>())
+        .expect("layout should be valid");
+    let aligned_len = layout.pad_to_align().size();
     unaligned_to_len::<T>(aligned_len)
 }
 
@@ -149,18 +120,20 @@ where
         return T::ptrs_dangling();
     }
 
-    let (_, ptr) = unsafe { align_cast_then_advance::<usize>(ptr.cast(), 1) };
-    unsafe { T::ptrs(ptr, len) }
+    let initial = Layout::new::<usize>();
+    unsafe { T::ptrs(ptr, initial, len) }
 }
 
 #[cfg(test)]
 #[allow(clippy::identity_op)]
 mod tests {
-    use super::{align_up, unaligned_to_len, unaligned_to_len_in_bytes};
+    use core::alloc::Layout;
+
+    use super::{buffer_layout_unaligned, unaligned_to_len};
 
     #[test]
     fn u8_u8_u8_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u8, u8, u8)>;
+        let to_len_in_bytes = |len| buffer_layout_unaligned::<(u8, u8, u8)>(len).unwrap().size();
         let usize = size_of::<usize>();
         let u8 = size_of::<u8>();
 
@@ -203,7 +176,11 @@ mod tests {
 
     #[test]
     fn u16_u16_u16_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u16, u16, u16)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u16, u16, u16)>(len)
+                .unwrap()
+                .size()
+        };
         let usize = size_of::<usize>();
         let u16 = size_of::<u16>();
 
@@ -242,9 +219,17 @@ mod tests {
 
     #[test]
     fn u32_u32_u32_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u32, u32, u32)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u32, u32, u32)>(len)
+                .unwrap()
+                .size()
+        };
         let u32 = size_of::<u32>();
-        let aligned_len = align_up::<u32>(size_of::<usize>());
+        let aligned_len = Layout::new::<usize>()
+            .align_to(align_of::<u32>())
+            .unwrap()
+            .pad_to_align()
+            .size();
 
         assert_eq!(to_len_in_bytes(0), 0);
         assert_eq!(to_len_in_bytes(1), aligned_len + 3 * u32 * 1);
@@ -261,7 +246,11 @@ mod tests {
     fn u32_u32_u32_to_len() {
         let to_len = unaligned_to_len::<(u32, u32, u32)>;
         let u32 = size_of::<u32>();
-        let aligned_len = align_up::<u32>(size_of::<usize>());
+        let aligned_len = Layout::new::<usize>()
+            .align_to(align_of::<u32>())
+            .unwrap()
+            .pad_to_align()
+            .size();
 
         for len_in_bytes in 0..(aligned_len + 3 * u32 * 1) {
             assert_eq!(to_len(len_in_bytes), 0);
@@ -280,9 +269,17 @@ mod tests {
 
     #[test]
     fn u64_u64_u64_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u64, u64, u64)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u64, u64, u64)>(len)
+                .unwrap()
+                .size()
+        };
         let u64 = size_of::<u64>();
-        let aligned_len = align_up::<u64>(size_of::<usize>());
+        let aligned_len = Layout::new::<usize>()
+            .align_to(align_of::<u64>())
+            .unwrap()
+            .pad_to_align()
+            .size();
 
         assert_eq!(to_len_in_bytes(0), 0);
         assert_eq!(to_len_in_bytes(1), aligned_len + 3 * u64 * 1);
@@ -299,7 +296,11 @@ mod tests {
     fn u64_u64_u64_to_len() {
         let to_len = unaligned_to_len::<(u64, u64, u64)>;
         let u64 = size_of::<u64>();
-        let aligned_len = align_up::<u64>(size_of::<usize>());
+        let aligned_len = Layout::new::<usize>()
+            .align_to(align_of::<u64>())
+            .unwrap()
+            .pad_to_align()
+            .size();
 
         for len_in_bytes in 0..(aligned_len + 3 * u64 * 1) {
             assert_eq!(to_len(len_in_bytes), 0);
@@ -319,7 +320,11 @@ mod tests {
     #[test]
     #[rustfmt::skip::macros(assert_eq)]
     fn u8_u16_u32_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u8, u16, u32)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u8, u16, u32)>(len)
+                .unwrap()
+                .size()
+        };
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
@@ -362,11 +367,19 @@ mod tests {
 
     #[test]
     fn u32_u16_u8_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u32, u16, u8)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u32, u16, u8)>(len)
+                .unwrap()
+                .size()
+        };
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
-        let aligned_len = align_up::<u32>(size_of::<usize>());
+        let aligned_len = Layout::new::<usize>()
+            .align_to(align_of::<u32>())
+            .unwrap()
+            .pad_to_align()
+            .size();
 
         assert_eq!(to_len_in_bytes(0), 0);
         assert_eq!(to_len_in_bytes(1), aligned_len + (u32 + u16 + u8) * 1);
@@ -385,7 +398,11 @@ mod tests {
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
-        let aligned_len = align_up::<u32>(size_of::<usize>());
+        let aligned_len = Layout::new::<usize>()
+            .align_to(align_of::<u32>())
+            .unwrap()
+            .pad_to_align()
+            .size();
 
         for len_in_bytes in 0..(aligned_len + (u32 + u16 + u8) * 1) {
             assert_eq!(to_len(len_in_bytes), 0);
@@ -404,7 +421,11 @@ mod tests {
 
     #[test]
     fn u8_u16_u8_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u8, u16, u8)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u8, u16, u8)>(len)
+                .unwrap()
+                .size()
+        };
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let usize = size_of::<usize>();
@@ -444,7 +465,11 @@ mod tests {
 
     #[test]
     fn u16_u8_u16_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u16, u8, u16)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u16, u8, u16)>(len)
+                .unwrap()
+                .size()
+        };
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let usize = size_of::<usize>();
@@ -484,7 +509,11 @@ mod tests {
 
     #[test]
     fn u16_u8_u32_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u16, u8, u32)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u16, u8, u32)>(len)
+                .unwrap()
+                .size()
+        };
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
@@ -526,7 +555,11 @@ mod tests {
 
     #[test]
     fn u16_u32_u16_to_len_in_bytes() {
-        let to_len_in_bytes = unaligned_to_len_in_bytes::<(u16, u32, u16)>;
+        let to_len_in_bytes = |len| {
+            buffer_layout_unaligned::<(u16, u32, u16)>(len)
+                .unwrap()
+                .size()
+        };
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
         let usize = size_of::<usize>();

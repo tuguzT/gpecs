@@ -1,8 +1,11 @@
+use core::alloc::{Layout, LayoutError};
+
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
     type Ptrs: Copy;
     type MutPtrs: Copy;
     type NonNullPtrs: Copy;
+    type Offsets: AsRef<[usize]>;
 
     type Refs<'a>
     where
@@ -24,10 +27,13 @@ pub unsafe trait Soa: Sized {
         Self: 'a;
 
     fn min_size_of_components() -> usize;
-    fn len_in_bytes_unaligned(initial: usize, len: usize) -> usize;
+    fn buffer_layout_unaligned(
+        initial: Layout,
+        len: usize,
+    ) -> Result<(Layout, Self::Offsets), LayoutError>;
 
     fn ptrs_dangling() -> Self::MutPtrs;
-    unsafe fn ptrs(ptr: *mut u8, len: usize) -> Self::MutPtrs;
+    unsafe fn ptrs(ptr: *mut u8, initial: Layout, len: usize) -> Self::MutPtrs;
     unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
 
     fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs;
@@ -66,6 +72,7 @@ unsafe impl Soa for () {
     type Ptrs = ();
     type MutPtrs = ();
     type NonNullPtrs = ();
+    type Offsets = [usize; 0];
 
     type Refs<'a>  = ()
     where
@@ -90,12 +97,15 @@ unsafe impl Soa for () {
         size_of::<Self>()
     }
 
-    fn len_in_bytes_unaligned(initial: usize, _: usize) -> usize {
-        initial
+    fn buffer_layout_unaligned(
+        initial: Layout,
+        _: usize,
+    ) -> Result<(Layout, Self::Offsets), LayoutError> {
+        Ok((initial, []))
     }
 
     fn ptrs_dangling() -> Self::MutPtrs {}
-    unsafe fn ptrs(_: *mut u8, _: usize) -> Self::MutPtrs {}
+    unsafe fn ptrs(_: *mut u8, _: Layout, _: usize) -> Self::MutPtrs {}
     unsafe fn ptrs_to_nonnull(_: Self::MutPtrs) -> Self::NonNullPtrs {}
 
     fn ptrs_cast_const(_: Self::MutPtrs) -> Self::Ptrs {}
@@ -130,12 +140,27 @@ unsafe impl Soa for () {
     unsafe fn slices_drop_in_place(_: Self::SliceMutPtrs) {}
 }
 
+// https://veykril.github.io/tlborm/decl-macros/building-blocks/counting.html#enum-counting
+macro_rules! count_idents {
+    ($($idents:ident),* $(,)*) => {
+        {
+            #[allow(dead_code, non_camel_case_types)]
+            #[repr(usize)]
+            enum Idents { $($idents,)* __CountIdentsLast }
+
+            const COUNT: usize = Idents::__CountIdentsLast as usize;
+            COUNT
+        }
+    };
+}
+
 macro_rules! soa_impl {
     ($($types:ident index $indices:tt reversed_index $reversed_indices:tt),* $(,)?) => {
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
             type Ptrs = ($(*const $types,)*);
             type MutPtrs = ($(*mut $types,)*);
             type NonNullPtrs = ($(::core::ptr::NonNull<$types>,)*);
+            type Offsets = [usize; count_idents!($($types,)*)];
 
             type Refs<'a> = ($(&'a $types,)*)
             where
@@ -160,20 +185,28 @@ macro_rules! soa_impl {
                 $(size_of::<$types>() +)* 0
             }
 
-            fn len_in_bytes_unaligned(initial: usize, len: usize) -> usize {
-                let mut result = initial;
-                $(result = $crate::ptr::align_up::<$types>(result) + (len * size_of::<$types>());)*
-                result
+            fn buffer_layout_unaligned(
+                initial: Layout,
+                len: usize,
+            ) -> Result<(Layout, Self::Offsets), LayoutError> {
+                let mut offsets = Self::Offsets::default();
+
+                let layout = initial;
+                $(
+                    let (layout, offset) = layout.extend(Layout::array::<$types>(len)?)?;
+                    offsets[$indices] = offset;
+                )*
+
+                Ok((layout, offsets))
             }
 
             fn ptrs_dangling() -> Self::MutPtrs {
                 ($(::core::ptr::NonNull::<$types>::dangling().as_ptr(),)*)
             }
 
-            #[allow(unused_variables, non_snake_case)]
-            unsafe fn ptrs(ptr: *mut u8, len: usize) -> Self::MutPtrs {
-                $(let ($types, ptr) = unsafe { $crate::ptr::align_cast_then_advance::<$types>(ptr, len) };)*
-                ($($types,)*)
+            unsafe fn ptrs(ptr: *mut u8, initial: Layout, len: usize) -> Self::MutPtrs {
+                let (_, offsets) = Self::buffer_layout_unaligned(initial, len).unwrap();
+                unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) }
             }
 
             #[allow(non_snake_case)]

@@ -1,4 +1,7 @@
-use core::alloc::{Layout, LayoutError};
+use core::{
+    alloc::{Layout, LayoutError},
+    marker::PhantomData,
+};
 
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
@@ -154,8 +157,18 @@ macro_rules! count_idents {
     };
 }
 
+struct SoaTupleConst<T> {
+    _ph: PhantomData<T>,
+}
+
 macro_rules! soa_impl {
     ($($types:ident index $indices:tt reversed_index $reversed_indices:tt),* $(,)?) => {
+        impl<$($types,)*> SoaTupleConst<($($types,)*)> {
+            const LAYOUTS: [Layout; count_idents!($($types,)*)] = [
+                $(Layout::new::<$types>(),)*
+            ];
+        }
+
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
             type Ptrs = ($(*const $types,)*);
             type MutPtrs = ($(*mut $types,)*);
@@ -189,12 +202,20 @@ macro_rules! soa_impl {
                 initial: Layout,
                 len: usize,
             ) -> Result<(Layout, Self::Offsets), LayoutError> {
+                let layouts = SoaTupleConst::<($($types,)*)>::LAYOUTS;
+                let permutation = { // lack of compile-time sorting: hope this gets optimized away
+                    let mut permutation = [$($indices,)*];
+                    permutation.sort_unstable_by_key(|&index| layouts[index].align());
+                    permutation
+                };
+
+                let layouts = [$(Layout::array::<$types>(len)?,)*];
                 let mut offsets = Self::Offsets::default();
 
                 let layout = initial;
                 $(
-                    let (layout, offset) = layout.extend(Layout::array::<$types>(len)?)?;
-                    offsets[$indices] = offset;
+                    let (layout, offset) = layout.extend(layouts[permutation[$indices]])?;
+                    offsets[permutation[$indices]] = offset;
                 )*
 
                 Ok((layout, offsets))
@@ -205,7 +226,7 @@ macro_rules! soa_impl {
             }
 
             unsafe fn ptrs(ptr: *mut u8, initial: Layout, len: usize) -> Self::MutPtrs {
-                let (_, offsets) = Self::buffer_layout_unaligned(initial, len).unwrap();
+                let (_, offsets) = Self::buffer_layout_unaligned(initial, len).expect("layout size should not exceed `isize::MAX`");
                 unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) }
             }
 

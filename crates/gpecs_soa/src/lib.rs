@@ -9,6 +9,7 @@ extern crate alloc;
 
 pub use self::soa::Soa;
 
+pub mod prelude;
 pub mod ptr;
 pub mod slice;
 pub mod vec;

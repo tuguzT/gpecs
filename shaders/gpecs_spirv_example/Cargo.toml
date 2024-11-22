@@ -1,0 +1,13 @@
+[package]
+name = "gpecs_spirv_example"
+description = "Example SPIR-V shader for (probably) ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["dylib", "lib"]
+
+[dependencies]
+spirv-std = { workspace = true }

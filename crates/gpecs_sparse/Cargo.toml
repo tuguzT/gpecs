@@ -1,6 +1,7 @@
 [package]
 name = "gpecs_sparse"
 description = "Sparse vector, map & set implementations for (probably) ECS on GPU"
-version = "0.0.0"
-license = "MIT OR Apache-2.0"
-edition = "2021"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true

@@ -3,7 +3,7 @@
 #![deny(warnings)] // to see warnings from `spirv-builder` builds
 #![feature(asm_experimental_arch)]
 
-use spirv_std::{glam::UVec3, macros::debug_printfln, spirv};
+use spirv_std::{arch::IndexUnchecked, glam::UVec3, macros::debug_printfln, spirv};
 
 #[allow(dead_code)]
 struct SliceTest<'a, T, U, V> {
@@ -27,6 +27,15 @@ pub fn compute_shader(
     };
 
     let index = id.x as usize;
-    test.t_slice[index] = id.y;
-    unsafe { debug_printfln!("test.u_slice[%o] = %f", id.x, test.u_slice[index]) }
+    unsafe {
+        *test.t_slice.index_unchecked_mut(index) = id.y;
+        debug_printfln!("test.u_slice[%o] = %f", id.x, test.u_slice[index]);
+        debug_printfln!(
+            "test.t_slice[%o] < test.t_slice[%o + 1] = %o",
+            id.x,
+            id.x,
+            (*test.t_slice.index_unchecked_mut(index)
+                < *test.t_slice.index_unchecked_mut(index + 1)) as u32,
+        );
+    }
 }

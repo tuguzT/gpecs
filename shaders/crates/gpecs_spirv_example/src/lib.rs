@@ -4,21 +4,14 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![feature(asm_experimental_arch)]
 
+use core::mem::swap;
+
 use spirv_std::{arch::IndexUnchecked, glam::UVec3, macros::debug_printfln, spirv};
 
 struct SliceTest<'a, T, U, V> {
     t_slice: &'a mut [T],
     u_slice: &'a [U],
     v_slice: &'a mut [V],
-}
-
-fn swap_copy<T>(a: &mut T, b: &mut T)
-where
-    T: Copy,
-{
-    let temp = *a;
-    *a = *b;
-    *b = temp;
 }
 
 unsafe fn bubble_sort<T>(data: &mut [T])
@@ -31,7 +24,7 @@ where
             let a = unsafe { &mut *(data.index_unchecked_mut(j) as *mut _) };
             let b = unsafe { &mut *(data.index_unchecked_mut(j + 1) as *mut _) };
             if a > b {
-                swap_copy(a, b);
+                swap(a, b);
             }
         }
     }

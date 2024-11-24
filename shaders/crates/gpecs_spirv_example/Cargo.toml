@@ -11,3 +11,5 @@ crate-type = ["dylib", "lib"]
 
 [dependencies]
 spirv-std = { workspace = true }
+unroll = { workspace = true }
+static_assertions = { workspace = true }

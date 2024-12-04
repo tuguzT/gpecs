@@ -1,0 +1,10 @@
+[package]
+name = "gpecs_spirv_analysis"
+description = "SPIR-V analysis for (probably) ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+rspirv = { workspace = true }

@@ -9,4 +9,5 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [workspace.dependencies]
+rspirv = { version = "0.12" }
 criterion = { version = "0.5", features = ["html_reports"] }

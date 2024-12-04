@@ -1,16 +1,19 @@
-use std::{
-    io::{self, Write},
-    process::Command,
-};
+use std::{error::Error, fs};
 
-pub fn main() {
+use gpecs_spirv_analysis::Work;
+use rspirv::{binary::Parser, dr::Loader};
+
+pub fn main() -> Result<(), Box<dyn Error>> {
     const PATH: &str = env!("gpecs_spirv_example.spv");
 
-    let output = Command::new("spirv-dis")
-        .arg(PATH)
-        .output()
-        .expect("Failed to run spirv-dis");
+    let mut loader = Loader::new();
 
-    println!("Path to the shader: {PATH}\n");
-    io::stdout().write_all(&output.stdout).unwrap();
+    let file_data = fs::read(PATH)?;
+    let parser = Parser::new(&file_data, &mut loader);
+    parser.parse()?;
+
+    let module = loader.module();
+    println!("Calculated work: {:?}", module.work()?);
+
+    Ok(())
 }

@@ -11,5 +11,9 @@ default = ["use-installed-tools"]
 use-installed-tools = ["spirv-builder/use-installed-tools"]
 use-compiled-tools = ["spirv-builder/use-compiled-tools"]
 
+[dependencies]
+gpecs_spirv_analysis = { workspace = true }
+rspirv = { workspace = true }
+
 [build-dependencies]
 spirv-builder = { workspace = true }

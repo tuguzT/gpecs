@@ -28,7 +28,7 @@ impl<'a, K, V> Keys<'a, K, V> {
     }
 }
 
-impl<'a, K, V> Debug for Keys<'a, K, V>
+impl<K, V> Debug for Keys<'_, K, V>
 where
     K: Debug,
 {
@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<'a, K, V> Default for Keys<'a, K, V> {
+impl<K, V> Default for Keys<'_, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -47,7 +47,7 @@ impl<'a, K, V> Default for Keys<'a, K, V> {
     }
 }
 
-impl<'a, K, V> Clone for Keys<'a, K, V> {
+impl<K, V> Clone for Keys<'_, K, V> {
     #[inline]
     fn clone(&self) -> Self {
         let Self { keys, values } = self;
@@ -58,7 +58,7 @@ impl<'a, K, V> Clone for Keys<'a, K, V> {
     }
 }
 
-impl<'a, K, V> AsRef<[K]> for Keys<'a, K, V> {
+impl<K, V> AsRef<[K]> for Keys<'_, K, V> {
     #[inline]
     fn as_ref(&self) -> &[K] {
         self.as_slice()
@@ -185,7 +185,7 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
     }
 }
 
-impl<'a, K, V> DoubleEndedIterator for Keys<'a, K, V> {
+impl<K, V> DoubleEndedIterator for Keys<'_, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, .. } = self;
@@ -199,7 +199,7 @@ impl<'a, K, V> DoubleEndedIterator for Keys<'a, K, V> {
     }
 }
 
-impl<'a, K, V> ExactSizeIterator for Keys<'a, K, V> {
+impl<K, V> ExactSizeIterator for Keys<'_, K, V> {
     #[inline]
     fn len(&self) -> usize {
         let Self { keys, .. } = self;
@@ -207,7 +207,7 @@ impl<'a, K, V> ExactSizeIterator for Keys<'a, K, V> {
     }
 }
 
-impl<'a, K, V> FusedIterator for Keys<'a, K, V> {}
+impl<K, V> FusedIterator for Keys<'_, K, V> {}
 
 #[repr(transparent)]
 pub struct IntoKeys<K, V> {
@@ -349,7 +349,7 @@ impl<'a, K, V> Values<'a, K, V> {
     }
 }
 
-impl<'a, K, V> Debug for Values<'a, K, V>
+impl<K, V> Debug for Values<'_, K, V>
 where
     V: Debug,
 {
@@ -359,7 +359,7 @@ where
     }
 }
 
-impl<'a, K, V> Default for Values<'a, K, V> {
+impl<K, V> Default for Values<'_, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -368,7 +368,7 @@ impl<'a, K, V> Default for Values<'a, K, V> {
     }
 }
 
-impl<'a, K, V> Clone for Values<'a, K, V> {
+impl<K, V> Clone for Values<'_, K, V> {
     #[inline]
     fn clone(&self) -> Self {
         let Self { keys, values } = self;
@@ -379,7 +379,7 @@ impl<'a, K, V> Clone for Values<'a, K, V> {
     }
 }
 
-impl<'a, K, V> AsRef<[V]> for Values<'a, K, V> {
+impl<K, V> AsRef<[V]> for Values<'_, K, V> {
     #[inline]
     fn as_ref(&self) -> &[V] {
         self.as_slice()
@@ -506,7 +506,7 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
     }
 }
 
-impl<'a, K, V> DoubleEndedIterator for Values<'a, K, V> {
+impl<K, V> DoubleEndedIterator for Values<'_, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { values, .. } = self;
@@ -520,7 +520,7 @@ impl<'a, K, V> DoubleEndedIterator for Values<'a, K, V> {
     }
 }
 
-impl<'a, K, V> ExactSizeIterator for Values<'a, K, V> {
+impl<K, V> ExactSizeIterator for Values<'_, K, V> {
     #[inline]
     fn len(&self) -> usize {
         let Self { values, .. } = self;
@@ -528,7 +528,7 @@ impl<'a, K, V> ExactSizeIterator for Values<'a, K, V> {
     }
 }
 
-impl<'a, K, V> FusedIterator for Values<'a, K, V> {}
+impl<K, V> FusedIterator for Values<'_, K, V> {}
 
 #[repr(transparent)]
 pub struct ValuesMut<'a, K, V> {
@@ -556,7 +556,7 @@ impl<'a, K, V> ValuesMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> Debug for ValuesMut<'a, K, V>
+impl<K, V> Debug for ValuesMut<'_, K, V>
 where
     V: Debug,
 {
@@ -566,7 +566,7 @@ where
     }
 }
 
-impl<'a, K, V> Default for ValuesMut<'a, K, V> {
+impl<K, V> Default for ValuesMut<'_, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -575,7 +575,7 @@ impl<'a, K, V> Default for ValuesMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> AsRef<[V]> for ValuesMut<'a, K, V> {
+impl<K, V> AsRef<[V]> for ValuesMut<'_, K, V> {
     #[inline]
     fn as_ref(&self) -> &[V] {
         self.as_slice()
@@ -702,7 +702,7 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> DoubleEndedIterator for ValuesMut<'a, K, V> {
+impl<K, V> DoubleEndedIterator for ValuesMut<'_, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { values, .. } = self;
@@ -716,7 +716,7 @@ impl<'a, K, V> DoubleEndedIterator for ValuesMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> ExactSizeIterator for ValuesMut<'a, K, V> {
+impl<K, V> ExactSizeIterator for ValuesMut<'_, K, V> {
     #[inline]
     fn len(&self) -> usize {
         let Self { values, .. } = self;
@@ -724,7 +724,7 @@ impl<'a, K, V> ExactSizeIterator for ValuesMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> FusedIterator for ValuesMut<'a, K, V> {}
+impl<K, V> FusedIterator for ValuesMut<'_, K, V> {}
 
 #[derive(Clone)]
 #[repr(transparent)]
@@ -864,7 +864,7 @@ impl<'a, K, V> Iter<'a, K, V> {
     }
 }
 
-impl<'a, K, V> Debug for Iter<'a, K, V>
+impl<K, V> Debug for Iter<'_, K, V>
 where
     K: Debug,
     V: Debug,
@@ -881,7 +881,7 @@ where
     }
 }
 
-impl<'a, K, V> Default for Iter<'a, K, V> {
+impl<K, V> Default for Iter<'_, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -890,7 +890,7 @@ impl<'a, K, V> Default for Iter<'a, K, V> {
     }
 }
 
-impl<'a, K, V> Clone for Iter<'a, K, V> {
+impl<K, V> Clone for Iter<'_, K, V> {
     #[inline]
     fn clone(&self) -> Self {
         let Self { keys, values } = self;
@@ -901,7 +901,7 @@ impl<'a, K, V> Clone for Iter<'a, K, V> {
     }
 }
 
-impl<'a, K, V> AsRef<[V]> for Iter<'a, K, V> {
+impl<K, V> AsRef<[V]> for Iter<'_, K, V> {
     #[inline]
     fn as_ref(&self) -> &[V] {
         self.as_values_slice()
@@ -968,7 +968,7 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
     }
 }
 
-impl<'a, K, V> DoubleEndedIterator for Iter<'a, K, V> {
+impl<K, V> DoubleEndedIterator for Iter<'_, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, values } = self;
@@ -988,7 +988,7 @@ impl<'a, K, V> DoubleEndedIterator for Iter<'a, K, V> {
     }
 }
 
-impl<'a, K, V> ExactSizeIterator for Iter<'a, K, V> {
+impl<K, V> ExactSizeIterator for Iter<'_, K, V> {
     #[inline]
     fn len(&self) -> usize {
         let Self { keys, .. } = self;
@@ -996,7 +996,7 @@ impl<'a, K, V> ExactSizeIterator for Iter<'a, K, V> {
     }
 }
 
-impl<'a, K, V> FusedIterator for Iter<'a, K, V> {}
+impl<K, V> FusedIterator for Iter<'_, K, V> {}
 
 pub struct IterMut<'a, K, V> {
     keys: slice::Iter<'a, K>,
@@ -1047,7 +1047,7 @@ impl<'a, K, V> IterMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> Debug for IterMut<'a, K, V>
+impl<K, V> Debug for IterMut<'_, K, V>
 where
     K: Debug,
     V: Debug,
@@ -1064,7 +1064,7 @@ where
     }
 }
 
-impl<'a, K, V> Default for IterMut<'a, K, V> {
+impl<K, V> Default for IterMut<'_, K, V> {
     #[inline]
     fn default() -> Self {
         let keys = Default::default();
@@ -1073,7 +1073,7 @@ impl<'a, K, V> Default for IterMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> AsRef<[V]> for IterMut<'a, K, V> {
+impl<K, V> AsRef<[V]> for IterMut<'_, K, V> {
     #[inline]
     fn as_ref(&self) -> &[V] {
         self.as_values_slice()
@@ -1140,7 +1140,7 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> DoubleEndedIterator for IterMut<'a, K, V> {
+impl<K, V> DoubleEndedIterator for IterMut<'_, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, values } = self;
@@ -1160,7 +1160,7 @@ impl<'a, K, V> DoubleEndedIterator for IterMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> ExactSizeIterator for IterMut<'a, K, V> {
+impl<K, V> ExactSizeIterator for IterMut<'_, K, V> {
     #[inline]
     fn len(&self) -> usize {
         let Self { keys, .. } = self;
@@ -1168,7 +1168,7 @@ impl<'a, K, V> ExactSizeIterator for IterMut<'a, K, V> {
     }
 }
 
-impl<'a, K, V> FusedIterator for IterMut<'a, K, V> {}
+impl<K, V> FusedIterator for IterMut<'_, K, V> {}
 
 #[derive(Clone)]
 pub struct IntoIter<K, V> {
@@ -1308,7 +1308,7 @@ pub struct Drain<'a, K, V> {
     values: vec::Drain<'a, V>,
 }
 
-impl<'a, K, V> Debug for Drain<'a, K, V>
+impl<K, V> Debug for Drain<'_, K, V>
 where
     K: Debug,
     V: Debug,
@@ -1343,14 +1343,14 @@ impl<'a, K, V> Drain<'a, K, V> {
     }
 }
 
-impl<'a, K, V> AsRef<[V]> for Drain<'a, K, V> {
+impl<K, V> AsRef<[V]> for Drain<'_, K, V> {
     #[inline]
     fn as_ref(&self) -> &[V] {
         self.as_values_slice()
     }
 }
 
-impl<'a, K, V> Iterator for Drain<'a, K, V> {
+impl<K, V> Iterator for Drain<'_, K, V> {
     type Item = (K, V);
 
     #[inline]
@@ -1369,7 +1369,7 @@ impl<'a, K, V> Iterator for Drain<'a, K, V> {
     }
 }
 
-impl<'a, K, V> DoubleEndedIterator for Drain<'a, K, V> {
+impl<K, V> DoubleEndedIterator for Drain<'_, K, V> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { keys, values } = self;
@@ -1380,6 +1380,6 @@ impl<'a, K, V> DoubleEndedIterator for Drain<'a, K, V> {
     }
 }
 
-impl<'a, K, V> ExactSizeIterator for Drain<'a, K, V> {}
+impl<K, V> ExactSizeIterator for Drain<'_, K, V> {}
 
-impl<'a, K, V> FusedIterator for Drain<'a, K, V> {}
+impl<K, V> FusedIterator for Drain<'_, K, V> {}

@@ -310,7 +310,7 @@ where
     }
 }
 
-impl<'a, T> DoubleEndedIterator for Iter<'a, T>
+impl<T> DoubleEndedIterator for Iter<'_, T>
 where
     T: Soa,
 {
@@ -641,7 +641,7 @@ where
     }
 }
 
-impl<'a, T> DoubleEndedIterator for IterMut<'a, T>
+impl<T> DoubleEndedIterator for IterMut<'_, T>
 where
     T: Soa,
 {

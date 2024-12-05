@@ -191,7 +191,7 @@ where
     }
 }
 
-impl<'a, K, V> Default for EpochSparseView<'a, K, V>
+impl<K, V> Default for EpochSparseView<'_, K, V>
 where
     K: Key,
 {
@@ -205,7 +205,7 @@ where
     }
 }
 
-impl<'a, K, V> Clone for EpochSparseView<'a, K, V>
+impl<K, V> Clone for EpochSparseView<'_, K, V>
 where
     K: Key,
 {
@@ -215,9 +215,9 @@ where
     }
 }
 
-impl<'a, K, V> Copy for EpochSparseView<'a, K, V> where K: Key {}
+impl<K, V> Copy for EpochSparseView<'_, K, V> where K: Key {}
 
-impl<'a, K, V> Index<K> for EpochSparseView<'a, K, V>
+impl<K, V> Index<K> for EpochSparseView<'_, K, V>
 where
     K: Key + Display,
 {
@@ -235,7 +235,7 @@ where
     }
 }
 
-impl<'a, K, V> AsRef<[V]> for EpochSparseView<'a, K, V>
+impl<K, V> AsRef<[V]> for EpochSparseView<'_, K, V>
 where
     K: Key,
 {
@@ -797,7 +797,7 @@ where
     }
 }
 
-impl<'a, K, V> Default for EpochSparseViewMut<'a, K, V>
+impl<K, V> Default for EpochSparseViewMut<'_, K, V>
 where
     K: Key,
 {
@@ -811,7 +811,7 @@ where
     }
 }
 
-impl<'a, K, V> Index<K> for EpochSparseViewMut<'a, K, V>
+impl<K, V> Index<K> for EpochSparseViewMut<'_, K, V>
 where
     K: Key + Display,
 {
@@ -829,7 +829,7 @@ where
     }
 }
 
-impl<'a, K, V> IndexMut<K> for EpochSparseViewMut<'a, K, V>
+impl<K, V> IndexMut<K> for EpochSparseViewMut<'_, K, V>
 where
     K: Key + Display,
 {
@@ -845,7 +845,7 @@ where
     }
 }
 
-impl<'a, K, V> AsRef<[V]> for EpochSparseViewMut<'a, K, V>
+impl<K, V> AsRef<[V]> for EpochSparseViewMut<'_, K, V>
 where
     K: Key,
 {
@@ -855,7 +855,7 @@ where
     }
 }
 
-impl<'a, K, V> AsMut<[V]> for EpochSparseViewMut<'a, K, V>
+impl<K, V> AsMut<[V]> for EpochSparseViewMut<'_, K, V>
 where
     K: Key,
 {

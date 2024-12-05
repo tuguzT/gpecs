@@ -114,7 +114,7 @@ where
     }
 }
 
-impl<'a, K, V, C> Debug for OccupiedEntry<'a, K, V, C>
+impl<K, V, C> Debug for OccupiedEntry<'_, K, V, C>
 where
     K: Key + Debug,
     V: Debug,
@@ -197,7 +197,7 @@ where
     }
 }
 
-impl<'a, K, V, C> Debug for VacantEntry<'a, K, V, C>
+impl<K, V, C> Debug for VacantEntry<'_, K, V, C>
 where
     K: Key + Debug,
     C: EpochSparseContainer<K, V> + ?Sized,

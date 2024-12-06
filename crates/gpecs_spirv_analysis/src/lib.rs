@@ -3,14 +3,16 @@
 #![warn(clippy::all)]
 // TODO `#![warn(missing_docs)]` after implementation & tests
 #![forbid(unsafe_code)]
-// TODO `#![no_std]` with `alloc` enabled
 
 use std::{
     error::Error,
     fmt::{self, Display},
 };
 
-use rspirv::{binary::Disassemble, dr::Module};
+use rspirv::{
+    binary::Disassemble,
+    dr::{Block, Function, Module},
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct WorkError;
@@ -29,7 +31,30 @@ pub trait Work {
 
 impl Work for Module {
     fn work(&self) -> Result<(), WorkError> {
-        println!("{}", self.disassemble());
+        for function in self.functions.as_slice() {
+            function.work()?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Work for Function {
+    fn work(&self) -> Result<(), WorkError> {
+        println!("Function definition:\n{:#?}", self.def);
+        for block in self.blocks.as_slice() {
+            block.work()?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Work for Block {
+    fn work(&self) -> Result<(), WorkError> {
+        println!("Block label:\n{:#?}", self.label);
+        println!("Block assembler:\n{}", self.disassemble());
+
         Ok(())
     }
 }

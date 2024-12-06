@@ -13,7 +13,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
     parser.parse()?;
 
     let module = loader.module();
-    println!("Calculated work: {:?}", module.work()?);
+    println!("\nCalculated work: {:?}", module.work()?);
 
     Ok(())
 }

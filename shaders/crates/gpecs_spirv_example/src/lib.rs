@@ -1,4 +1,4 @@
-#![cfg_attr(target_arch = "spirv", no_std)]
+#![no_std]
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![feature(asm_experimental_arch)]
 

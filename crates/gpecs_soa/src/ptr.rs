@@ -54,7 +54,7 @@ where
 }
 
 #[inline]
-pub(crate) fn buffer_layout_unaligned<T>(len: usize) -> Result<Layout, LayoutError>
+fn buffer_layout_unaligned<T>(len: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,
 {

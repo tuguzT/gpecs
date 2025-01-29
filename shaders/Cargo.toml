@@ -12,7 +12,15 @@ edition = "2021"
 gpecs_spirv_analysis = { path = "../crates/gpecs_spirv_analysis" }
 
 rspirv = { version = "0.12" }
-spirv-std = { version = "0.9.0" }
-spirv-builder = { version = "0.9.0", default-features = false }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "6e2c84d4" }
+spirv-builder = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "6e2c84d4", default-features = false }
 unroll = { version = "0.1.5" }
 static_assertions = { version = "1.1.0" }
+
+# Compile build-dependencies in release mode with
+# the same settings as regular dependencies.
+[profile.release.build-override]
+opt-level = 3
+codegen-units = 16
+[profile.dev.build-override]
+opt-level = 3

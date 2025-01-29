@@ -13,3 +13,6 @@ crate-type = ["dylib", "lib"]
 spirv-std = { workspace = true }
 unroll = { workspace = true }
 static_assertions = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,5 +1,4 @@
 #![cfg_attr(target_arch = "spirv", no_std)]
-#![allow(unexpected_cfgs)] // to not warn about `spirv` target arch
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![feature(asm_experimental_arch)]
 

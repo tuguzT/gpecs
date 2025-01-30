@@ -32,11 +32,11 @@ pub unsafe trait Soa: Sized {
     fn min_size_of_components() -> usize;
     fn buffer_layout_unaligned(
         initial: Layout,
-        len: usize,
+        capacity: usize,
     ) -> Result<(Layout, Self::Offsets), LayoutError>;
 
     fn ptrs_dangling() -> Self::MutPtrs;
-    unsafe fn ptrs(ptr: *mut u8, initial: Layout, len: usize) -> Self::MutPtrs;
+    unsafe fn ptrs(ptr: *mut u8, initial: Layout, capacity: usize) -> Self::MutPtrs;
     unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
 
     fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs;
@@ -208,7 +208,7 @@ macro_rules! soa_impl {
 
             fn buffer_layout_unaligned(
                 initial: Layout,
-                len: usize,
+                capacity: usize,
             ) -> Result<(Layout, Self::Offsets), LayoutError> {
                 let layouts = SoaTupleConst::<($($types,)*)>::LAYOUTS;
                 let permutation = { // lack of compile-time sorting: hope this gets optimized away
@@ -217,7 +217,7 @@ macro_rules! soa_impl {
                     permutation
                 };
 
-                let layouts = [$(Layout::array::<$types>(len)?,)*];
+                let layouts = [$(Layout::array::<$types>(capacity)?,)*];
                 let mut offsets = Self::Offsets::default();
 
                 let layout = initial;
@@ -233,8 +233,8 @@ macro_rules! soa_impl {
                 ($(::core::ptr::NonNull::<$types>::dangling().as_ptr(),)*)
             }
 
-            unsafe fn ptrs(ptr: *mut u8, initial: Layout, len: usize) -> Self::MutPtrs {
-                let (_, offsets) = Self::buffer_layout_unaligned(initial, len).expect("layout size should not exceed `isize::MAX`");
+            unsafe fn ptrs(ptr: *mut u8, initial: Layout, capacity: usize) -> Self::MutPtrs {
+                let (_, offsets) = Self::buffer_layout_unaligned(initial, capacity).expect("layout size should not exceed `isize::MAX`");
                 unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) }
             }
 

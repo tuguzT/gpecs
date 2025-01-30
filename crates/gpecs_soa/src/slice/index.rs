@@ -1,7 +1,7 @@
 use core::ops;
 
 use crate::{
-    ptr::{ptrs, to_len},
+    ptr::{ptrs, to_capacity},
     soa::Soa,
 };
 
@@ -104,9 +104,9 @@ where
 
         let buffer = slice as *const [u8];
         let ptr = buffer as _;
-        let len = to_len::<T>(buffer.len());
+        let capacity = to_capacity::<T>(buffer.len());
         unsafe {
-            let ptrs = ptrs::<T>(ptr, len);
+            let ptrs = ptrs::<T>(ptr, capacity);
             let ptrs = T::ptrs_add_mut(ptrs, self);
             T::ptrs_cast_const(ptrs)
         }
@@ -122,9 +122,9 @@ where
 
         let buffer = slice as *mut [u8];
         let ptr = buffer as _;
-        let len = to_len::<T>(buffer.len());
+        let capacity = to_capacity::<T>(buffer.len());
         unsafe {
-            let ptrs = ptrs::<T>(ptr, len);
+            let ptrs = ptrs::<T>(ptr, capacity);
             T::ptrs_add_mut(ptrs, self)
         }
     }
@@ -208,9 +208,9 @@ where
 
         let buffer = slice as *const [u8];
         let ptr = buffer as _;
-        let len = to_len::<T>(buffer.len());
+        let capacity = to_capacity::<T>(buffer.len());
         unsafe {
-            let ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, len));
+            let ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, capacity));
             let ptrs = T::ptrs_add(ptrs, self.start);
             let new_len = self.end.unchecked_sub(self.start);
             T::slices_from_raw_parts(ptrs, new_len)
@@ -227,9 +227,9 @@ where
 
         let buffer = slice as *const [u8];
         let ptr = buffer as _;
-        let len = to_len::<T>(buffer.len());
+        let capacity = to_capacity::<T>(buffer.len());
         unsafe {
-            let ptrs = ptrs::<T>(ptr, len);
+            let ptrs = ptrs::<T>(ptr, capacity);
             let ptrs = T::ptrs_add_mut(ptrs, self.start);
             let new_len = self.end.unchecked_sub(self.start);
             T::slices_from_raw_parts_mut(ptrs, new_len)
@@ -330,13 +330,13 @@ where
 
     unsafe fn get_unchecked(self, slice: *const SoaSlice<T>) -> Self::Ptr {
         let buffer = slice as *const [u8];
-        let len = to_len::<T>(buffer.len());
+        let len = to_capacity::<T>(buffer.len());
         unsafe { (self.start..len).get_unchecked(slice) }
     }
 
     unsafe fn get_unchecked_mut(self, slice: *mut SoaSlice<T>) -> Self::MutPtr {
         let buffer = slice as *const [u8];
-        let len = to_len::<T>(buffer.len());
+        let len = to_capacity::<T>(buffer.len());
         unsafe { (self.start..len).get_unchecked_mut(slice) }
     }
 }
@@ -607,13 +607,13 @@ where
 
     unsafe fn get_unchecked(self, slice: *const SoaSlice<T>) -> Self::Ptr {
         let buffer = slice as *const [u8];
-        let len = to_len::<T>(buffer.len());
+        let len = to_capacity::<T>(buffer.len());
         unsafe { into_range_unchecked(len, self).get_unchecked(slice) }
     }
 
     unsafe fn get_unchecked_mut(self, slice: *mut SoaSlice<T>) -> Self::MutPtr {
         let buffer = slice as *const [u8];
-        let len = to_len::<T>(buffer.len());
+        let len = to_capacity::<T>(buffer.len());
         unsafe { into_range_unchecked(len, self).get_unchecked_mut(slice) }
     }
 }

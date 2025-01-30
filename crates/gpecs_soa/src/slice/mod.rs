@@ -9,7 +9,7 @@ use core::{
 use crate::{
     ptr::{
         ptrs, slice_from_capacity_in_bytes, slice_from_capacity_in_bytes_mut, slice_from_raw_parts,
-        slice_from_raw_parts_mut, to_len, BufferAlign,
+        slice_from_raw_parts_mut, to_capacity, BufferAlign,
     },
     soa::Soa,
     vec::{IntoIter, SoaVec},
@@ -60,7 +60,7 @@ where
             usize::MAX
         } else {
             let capacity_in_bytes = self.capacity_in_bytes();
-            to_len::<T>(capacity_in_bytes)
+            to_capacity::<T>(capacity_in_bytes)
         }
     }
 

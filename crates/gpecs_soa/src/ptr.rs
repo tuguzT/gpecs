@@ -64,30 +64,30 @@ where
 }
 
 #[inline]
-fn buffer_layout_unaligned<T>(len: usize) -> Result<Layout, LayoutError>
+fn buffer_layout_unaligned<T>(capacity: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,
 {
-    if T::min_size_of_components() == 0 || len == 0 {
+    if T::min_size_of_components() == 0 || capacity == 0 {
         return Ok(Layout::new::<()>());
     }
 
     let initial = Layout::new::<usize>();
-    let (layout, _) = T::buffer_layout_unaligned(initial, len)?;
+    let (layout, _) = T::buffer_layout_unaligned(initial, capacity)?;
     Ok(layout)
 }
 
 #[inline]
-pub(crate) fn buffer_layout<T>(len: usize) -> Result<Layout, LayoutError>
+pub(crate) fn buffer_layout<T>(capacity: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,
 {
-    let unaligned = buffer_layout_unaligned::<T>(len)?;
+    let unaligned = buffer_layout_unaligned::<T>(capacity)?;
     Ok(unaligned.pad_to_align())
 }
 
 #[inline]
-fn unaligned_to_len<T>(capacity_in_bytes: usize) -> usize
+fn unaligned_to_capacity<T>(capacity_in_bytes: usize) -> usize
 where
     T: Soa,
 {
@@ -95,43 +95,43 @@ where
         return 0;
     }
 
-    let max_len = (capacity_in_bytes - size_of::<usize>()) / T::min_size_of_components();
+    let max_capacity = (capacity_in_bytes - size_of::<usize>()) / T::min_size_of_components();
 
-    let mut len = max_len;
+    let mut capacity = max_capacity;
     while {
         // this variable is not inlined (in debug builds) only for better debugging experience
-        let to_capacity_in_bytes = buffer_layout_unaligned::<T>(len)
+        let to_capacity_in_bytes = buffer_layout_unaligned::<T>(capacity)
             .expect("layout size should not exceed `isize::MAX`")
             .size();
         to_capacity_in_bytes > capacity_in_bytes
     } {
-        len -= 1;
+        capacity -= 1;
     }
-    len
+    capacity
 }
 
 #[inline]
-pub(crate) fn to_len<T>(capacity_in_bytes: usize) -> usize
+pub(crate) fn to_capacity<T>(capacity_in_bytes: usize) -> usize
 where
     T: Soa,
 {
     let layout = Layout::from_size_align(capacity_in_bytes, align_of::<BufferAlign<T>>())
         .expect("layout should be valid");
     let capacity_in_bytes = layout.pad_to_align().size();
-    unaligned_to_len::<T>(capacity_in_bytes)
+    unaligned_to_capacity::<T>(capacity_in_bytes)
 }
 
 #[inline]
-pub(crate) unsafe fn ptrs<T>(ptr: *mut u8, len: usize) -> T::MutPtrs
+pub(crate) unsafe fn ptrs<T>(ptr: *mut u8, capacity: usize) -> T::MutPtrs
 where
     T: Soa,
 {
-    if T::min_size_of_components() == 0 || len == 0 {
+    if T::min_size_of_components() == 0 || capacity == 0 {
         return T::ptrs_dangling();
     }
 
     let initial = Layout::new::<usize>();
-    unsafe { T::ptrs(ptr, initial, len) }
+    unsafe { T::ptrs(ptr, initial, capacity) }
 }
 
 #[cfg(test)]
@@ -139,12 +139,15 @@ where
 mod tests {
     use core::alloc::Layout;
 
-    use super::{buffer_layout_unaligned, unaligned_to_len};
+    use super::{buffer_layout_unaligned, unaligned_to_capacity};
 
     #[test]
     fn u8_u8_u8_to_capacity_in_bytes() {
-        let to_capacity_in_bytes =
-            |len| buffer_layout_unaligned::<(u8, u8, u8)>(len).unwrap().size();
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u8, u8, u8)>(capacity)
+                .unwrap()
+                .size()
+        };
         let usize = size_of::<usize>();
         let u8 = size_of::<u8>();
 
@@ -161,34 +164,34 @@ mod tests {
     }
 
     #[test]
-    fn u8_u8_u8_to_len() {
-        let to_len = unaligned_to_len::<(u8, u8, u8)>;
+    fn u8_u8_u8_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u8, u8, u8)>;
         let usize = size_of::<usize>();
         let u8 = size_of::<u8>();
 
         for capacity_in_bytes in 0..(usize + 3 * u8 * 1) {
-            assert_eq!(to_len(capacity_in_bytes), 0);
+            assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
-        assert_eq!(1, to_len(usize + 3 * u8 * 1));
-        assert_eq!(1, to_len(usize + 3 * u8 * 1 + 1));
-        assert_eq!(1, to_len(usize + 3 * u8 * 2 - 1));
+        assert_eq!(1, to_capacity(usize + 3 * u8 * 1));
+        assert_eq!(1, to_capacity(usize + 3 * u8 * 1 + 1));
+        assert_eq!(1, to_capacity(usize + 3 * u8 * 2 - 1));
 
-        assert_eq!(2, to_len(usize + 3 * u8 * 2));
-        assert_eq!(2, to_len(usize + 3 * u8 * 2 + 1));
-        assert_eq!(2, to_len(usize + 3 * u8 * 3 - 1));
+        assert_eq!(2, to_capacity(usize + 3 * u8 * 2));
+        assert_eq!(2, to_capacity(usize + 3 * u8 * 2 + 1));
+        assert_eq!(2, to_capacity(usize + 3 * u8 * 3 - 1));
 
-        assert_eq!(3, to_len(usize + 3 * u8 * 3));
-        assert_eq!(3, to_len(usize + 3 * u8 * 3 + 1));
-        assert_eq!(3, to_len(usize + 3 * u8 * 4 - 1));
+        assert_eq!(3, to_capacity(usize + 3 * u8 * 3));
+        assert_eq!(3, to_capacity(usize + 3 * u8 * 3 + 1));
+        assert_eq!(3, to_capacity(usize + 3 * u8 * 4 - 1));
 
-        assert_eq!(4, to_len(usize + 3 * u8 * 4));
+        assert_eq!(4, to_capacity(usize + 3 * u8 * 4));
     }
 
     #[test]
     fn u16_u16_u16_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u16, u16, u16)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u16, u16, u16)>(capacity)
                 .unwrap()
                 .size()
         };
@@ -208,131 +211,131 @@ mod tests {
     }
 
     #[test]
-    fn u16_u16_u16_to_len() {
-        let to_len = unaligned_to_len::<(u16, u16, u16)>;
+    fn u16_u16_u16_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u16, u16, u16)>;
         let usize = size_of::<usize>();
         let u16 = size_of::<u16>();
 
         for capacity_in_bytes in 0..(usize + 3 * u16 * 1) {
-            assert_eq!(to_len(capacity_in_bytes), 0);
+            assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
-        assert_eq!(1, to_len(usize + 3 * u16 * 1));
-        assert_eq!(1, to_len(usize + 3 * u16 * 1 + 1));
-        assert_eq!(1, to_len(usize + 3 * u16 * 2 - 1));
+        assert_eq!(1, to_capacity(usize + 3 * u16 * 1));
+        assert_eq!(1, to_capacity(usize + 3 * u16 * 1 + 1));
+        assert_eq!(1, to_capacity(usize + 3 * u16 * 2 - 1));
 
-        assert_eq!(2, to_len(usize + 3 * u16 * 2));
-        assert_eq!(2, to_len(usize + 3 * u16 * 2 + 1));
-        assert_eq!(2, to_len(usize + 3 * u16 * 3 - 1));
+        assert_eq!(2, to_capacity(usize + 3 * u16 * 2));
+        assert_eq!(2, to_capacity(usize + 3 * u16 * 2 + 1));
+        assert_eq!(2, to_capacity(usize + 3 * u16 * 3 - 1));
 
-        assert_eq!(3, to_len(usize + 3 * u16 * 3));
+        assert_eq!(3, to_capacity(usize + 3 * u16 * 3));
     }
 
     #[test]
     fn u32_u32_u32_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u32, u32, u32)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u32, u32, u32)>(capacity)
                 .unwrap()
                 .size()
         };
         let u32 = size_of::<u32>();
-        let aligned_len = Layout::new::<usize>()
+        let aligned_bytes = Layout::new::<usize>()
             .align_to(align_of::<u32>())
             .unwrap()
             .pad_to_align()
             .size();
 
         assert_eq!(to_capacity_in_bytes(0), 0);
-        assert_eq!(to_capacity_in_bytes(1), aligned_len + 3 * u32 * 1);
-        assert_eq!(to_capacity_in_bytes(2), aligned_len + 3 * u32 * 2);
-        assert_eq!(to_capacity_in_bytes(3), aligned_len + 3 * u32 * 3);
-        assert_eq!(to_capacity_in_bytes(4), aligned_len + 3 * u32 * 4);
-        assert_eq!(to_capacity_in_bytes(5), aligned_len + 3 * u32 * 5);
-        assert_eq!(to_capacity_in_bytes(6), aligned_len + 3 * u32 * 6);
-        assert_eq!(to_capacity_in_bytes(7), aligned_len + 3 * u32 * 7);
-        assert_eq!(to_capacity_in_bytes(8), aligned_len + 3 * u32 * 8);
+        assert_eq!(to_capacity_in_bytes(1), aligned_bytes + 3 * u32 * 1);
+        assert_eq!(to_capacity_in_bytes(2), aligned_bytes + 3 * u32 * 2);
+        assert_eq!(to_capacity_in_bytes(3), aligned_bytes + 3 * u32 * 3);
+        assert_eq!(to_capacity_in_bytes(4), aligned_bytes + 3 * u32 * 4);
+        assert_eq!(to_capacity_in_bytes(5), aligned_bytes + 3 * u32 * 5);
+        assert_eq!(to_capacity_in_bytes(6), aligned_bytes + 3 * u32 * 6);
+        assert_eq!(to_capacity_in_bytes(7), aligned_bytes + 3 * u32 * 7);
+        assert_eq!(to_capacity_in_bytes(8), aligned_bytes + 3 * u32 * 8);
     }
 
     #[test]
-    fn u32_u32_u32_to_len() {
-        let to_len = unaligned_to_len::<(u32, u32, u32)>;
+    fn u32_u32_u32_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u32, u32, u32)>;
         let u32 = size_of::<u32>();
-        let aligned_len = Layout::new::<usize>()
+        let aligned_bytes = Layout::new::<usize>()
             .align_to(align_of::<u32>())
             .unwrap()
             .pad_to_align()
             .size();
 
-        for capacity_in_bytes in 0..(aligned_len + 3 * u32 * 1) {
-            assert_eq!(to_len(capacity_in_bytes), 0);
+        for capacity_in_bytes in 0..(aligned_bytes + 3 * u32 * 1) {
+            assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
-        assert_eq!(1, to_len(aligned_len + 3 * u32 * 1));
-        assert_eq!(1, to_len(aligned_len + 3 * u32 * 1 + 1));
-        assert_eq!(1, to_len(aligned_len + 3 * u32 * 2 - 1));
+        assert_eq!(1, to_capacity(aligned_bytes + 3 * u32 * 1));
+        assert_eq!(1, to_capacity(aligned_bytes + 3 * u32 * 1 + 1));
+        assert_eq!(1, to_capacity(aligned_bytes + 3 * u32 * 2 - 1));
 
-        assert_eq!(2, to_len(aligned_len + 3 * u32 * 2));
-        assert_eq!(2, to_len(aligned_len + 3 * u32 * 2 + 1));
-        assert_eq!(2, to_len(aligned_len + 3 * u32 * 3 - 1));
+        assert_eq!(2, to_capacity(aligned_bytes + 3 * u32 * 2));
+        assert_eq!(2, to_capacity(aligned_bytes + 3 * u32 * 2 + 1));
+        assert_eq!(2, to_capacity(aligned_bytes + 3 * u32 * 3 - 1));
 
-        assert_eq!(3, to_len(aligned_len + 3 * u32 * 3));
+        assert_eq!(3, to_capacity(aligned_bytes + 3 * u32 * 3));
     }
 
     #[test]
     fn u64_u64_u64_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u64, u64, u64)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u64, u64, u64)>(capacity)
                 .unwrap()
                 .size()
         };
         let u64 = size_of::<u64>();
-        let aligned_len = Layout::new::<usize>()
+        let aligned_bytes = Layout::new::<usize>()
             .align_to(align_of::<u64>())
             .unwrap()
             .pad_to_align()
             .size();
 
         assert_eq!(to_capacity_in_bytes(0), 0);
-        assert_eq!(to_capacity_in_bytes(1), aligned_len + 3 * u64 * 1);
-        assert_eq!(to_capacity_in_bytes(2), aligned_len + 3 * u64 * 2);
-        assert_eq!(to_capacity_in_bytes(3), aligned_len + 3 * u64 * 3);
-        assert_eq!(to_capacity_in_bytes(4), aligned_len + 3 * u64 * 4);
-        assert_eq!(to_capacity_in_bytes(5), aligned_len + 3 * u64 * 5);
-        assert_eq!(to_capacity_in_bytes(6), aligned_len + 3 * u64 * 6);
-        assert_eq!(to_capacity_in_bytes(7), aligned_len + 3 * u64 * 7);
-        assert_eq!(to_capacity_in_bytes(8), aligned_len + 3 * u64 * 8);
+        assert_eq!(to_capacity_in_bytes(1), aligned_bytes + 3 * u64 * 1);
+        assert_eq!(to_capacity_in_bytes(2), aligned_bytes + 3 * u64 * 2);
+        assert_eq!(to_capacity_in_bytes(3), aligned_bytes + 3 * u64 * 3);
+        assert_eq!(to_capacity_in_bytes(4), aligned_bytes + 3 * u64 * 4);
+        assert_eq!(to_capacity_in_bytes(5), aligned_bytes + 3 * u64 * 5);
+        assert_eq!(to_capacity_in_bytes(6), aligned_bytes + 3 * u64 * 6);
+        assert_eq!(to_capacity_in_bytes(7), aligned_bytes + 3 * u64 * 7);
+        assert_eq!(to_capacity_in_bytes(8), aligned_bytes + 3 * u64 * 8);
     }
 
     #[test]
-    fn u64_u64_u64_to_len() {
-        let to_len = unaligned_to_len::<(u64, u64, u64)>;
+    fn u64_u64_u64_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u64, u64, u64)>;
         let u64 = size_of::<u64>();
-        let aligned_len = Layout::new::<usize>()
+        let aligned_bytes = Layout::new::<usize>()
             .align_to(align_of::<u64>())
             .unwrap()
             .pad_to_align()
             .size();
 
-        for capacity_in_bytes in 0..(aligned_len + 3 * u64 * 1) {
-            assert_eq!(to_len(capacity_in_bytes), 0);
+        for capacity_in_bytes in 0..(aligned_bytes + 3 * u64 * 1) {
+            assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
-        assert_eq!(1, to_len(aligned_len + 3 * u64 * 1));
-        assert_eq!(1, to_len(aligned_len + 3 * u64 * 1 + 1));
-        assert_eq!(1, to_len(aligned_len + 3 * u64 * 2 - 1));
+        assert_eq!(1, to_capacity(aligned_bytes + 3 * u64 * 1));
+        assert_eq!(1, to_capacity(aligned_bytes + 3 * u64 * 1 + 1));
+        assert_eq!(1, to_capacity(aligned_bytes + 3 * u64 * 2 - 1));
 
-        assert_eq!(2, to_len(aligned_len + 3 * u64 * 2));
-        assert_eq!(2, to_len(aligned_len + 3 * u64 * 2 + 1));
-        assert_eq!(2, to_len(aligned_len + 3 * u64 * 3 - 1));
+        assert_eq!(2, to_capacity(aligned_bytes + 3 * u64 * 2));
+        assert_eq!(2, to_capacity(aligned_bytes + 3 * u64 * 2 + 1));
+        assert_eq!(2, to_capacity(aligned_bytes + 3 * u64 * 3 - 1));
 
-        assert_eq!(3, to_len(aligned_len + 3 * u64 * 3));
+        assert_eq!(3, to_capacity(aligned_bytes + 3 * u64 * 3));
     }
 
     #[test]
     #[rustfmt::skip::macros(assert_eq)]
     fn u8_u16_u32_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u8, u16, u32)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u8, u16, u32)>(capacity)
                 .unwrap()
                 .size()
         };
@@ -354,37 +357,37 @@ mod tests {
 
     #[test]
     #[rustfmt::skip::macros(assert_eq)]
-    fn u8_u16_u32_to_len() {
-        let to_len = unaligned_to_len::<(u8, u16, u32)>;
+    fn u8_u16_u32_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u8, u16, u32)>;
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
         let usize = size_of::<usize>();
 
         for capacity_in_bytes in 0..(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1)) {
-            assert_eq!(to_len(capacity_in_bytes), 0);
+            assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
-        assert_eq!(1, to_len(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1)));
-        assert_eq!(1, to_len(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1) + 1));
-        assert_eq!(1, to_len(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2) - 1));
+        assert_eq!(1, to_capacity(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1)));
+        assert_eq!(1, to_capacity(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1) + 1));
+        assert_eq!(1, to_capacity(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2) - 1));
 
-        assert_eq!(2, to_len(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2)));
-        assert_eq!(2, to_len(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2) + 1));
-        assert_eq!(2, to_len(usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3) - 1));
+        assert_eq!(2, to_capacity(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2)));
+        assert_eq!(2, to_capacity(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2) + 1));
+        assert_eq!(2, to_capacity(usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3) - 1));
 
-        assert_eq!(3, to_len(usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3)));
+        assert_eq!(3, to_capacity(usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3)));
     }
 
     #[test]
     fn u32_u16_u8_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u32, u16, u8)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u32, u16, u8)>(capacity)
                 .unwrap()
                 .size()
         };
-        let efficient_to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u8, u16, u32)>(len)
+        let efficient_to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u8, u16, u32)>(capacity)
                 .unwrap()
                 .size()
         };
@@ -401,27 +404,27 @@ mod tests {
     }
 
     #[test]
-    fn u32_u16_u8_to_len() {
-        let to_len = unaligned_to_len::<(u32, u16, u8)>;
-        let efficient_to_len = unaligned_to_len::<(u8, u16, u32)>;
+    fn u32_u16_u8_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u32, u16, u8)>;
+        let efficient_to_capacity = unaligned_to_capacity::<(u8, u16, u32)>;
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
-                to_len(capacity_in_bytes),
-                efficient_to_len(capacity_in_bytes)
+                to_capacity(capacity_in_bytes),
+                efficient_to_capacity(capacity_in_bytes)
             );
         }
     }
 
     #[test]
     fn u8_u16_u8_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u8, u16, u8)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u8, u16, u8)>(capacity)
                 .unwrap()
                 .size()
         };
-        let efficient_to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u8, u8, u16)>(len)
+        let efficient_to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u8, u8, u16)>(capacity)
                 .unwrap()
                 .size()
         };
@@ -438,27 +441,27 @@ mod tests {
     }
 
     #[test]
-    fn u8_u16_u8_to_len() {
-        let to_len = unaligned_to_len::<(u8, u16, u8)>;
-        let efficient_to_len = unaligned_to_len::<(u8, u8, u16)>;
+    fn u8_u16_u8_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u8, u16, u8)>;
+        let efficient_to_capacity = unaligned_to_capacity::<(u8, u8, u16)>;
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
-                to_len(capacity_in_bytes),
-                efficient_to_len(capacity_in_bytes)
+                to_capacity(capacity_in_bytes),
+                efficient_to_capacity(capacity_in_bytes)
             );
         }
     }
 
     #[test]
     fn u16_u8_u16_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u16, u8, u16)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u16, u8, u16)>(capacity)
                 .unwrap()
                 .size()
         };
-        let efficient_to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u8, u16, u16)>(len)
+        let efficient_to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u8, u16, u16)>(capacity)
                 .unwrap()
                 .size()
         };
@@ -475,27 +478,27 @@ mod tests {
     }
 
     #[test]
-    fn u16_u8_u16_to_len() {
-        let to_len = unaligned_to_len::<(u16, u8, u16)>;
-        let efficient_to_len = unaligned_to_len::<(u8, u16, u16)>;
+    fn u16_u8_u16_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u16, u8, u16)>;
+        let efficient_to_capacity = unaligned_to_capacity::<(u8, u16, u16)>;
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
-                to_len(capacity_in_bytes),
-                efficient_to_len(capacity_in_bytes)
+                to_capacity(capacity_in_bytes),
+                efficient_to_capacity(capacity_in_bytes)
             );
         }
     }
 
     #[test]
     fn u16_u8_u32_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u16, u8, u32)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u16, u8, u32)>(capacity)
                 .unwrap()
                 .size()
         };
-        let efficient_to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u8, u16, u32)>(len)
+        let efficient_to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u8, u16, u32)>(capacity)
                 .unwrap()
                 .size()
         };
@@ -512,27 +515,27 @@ mod tests {
     }
 
     #[test]
-    fn u16_u8_u32_to_len() {
-        let to_len = unaligned_to_len::<(u16, u8, u32)>;
-        let efficient_to_len = unaligned_to_len::<(u8, u16, u32)>;
+    fn u16_u8_u32_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u16, u8, u32)>;
+        let efficient_to_capacity = unaligned_to_capacity::<(u8, u16, u32)>;
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
-                to_len(capacity_in_bytes),
-                efficient_to_len(capacity_in_bytes)
+                to_capacity(capacity_in_bytes),
+                efficient_to_capacity(capacity_in_bytes)
             );
         }
     }
 
     #[test]
     fn u16_u32_u16_to_capacity_in_bytes() {
-        let to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u16, u32, u16)>(len)
+        let to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u16, u32, u16)>(capacity)
                 .unwrap()
                 .size()
         };
-        let efficient_to_capacity_in_bytes = |len| {
-            buffer_layout_unaligned::<(u16, u16, u32)>(len)
+        let efficient_to_capacity_in_bytes = |capacity| {
+            buffer_layout_unaligned::<(u16, u16, u32)>(capacity)
                 .unwrap()
                 .size()
         };
@@ -549,14 +552,14 @@ mod tests {
     }
 
     #[test]
-    fn u16_u32_u16_to_len() {
-        let to_len = unaligned_to_len::<(u16, u32, u16)>;
-        let efficient_to_len = unaligned_to_len::<(u16, u16, u32)>;
+    fn u16_u32_u16_to_capacity() {
+        let to_capacity = unaligned_to_capacity::<(u16, u32, u16)>;
+        let efficient_to_capacity = unaligned_to_capacity::<(u16, u16, u32)>;
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
-                to_len(capacity_in_bytes),
-                efficient_to_len(capacity_in_bytes)
+                to_capacity(capacity_in_bytes),
+                efficient_to_capacity(capacity_in_bytes)
             );
         }
     }

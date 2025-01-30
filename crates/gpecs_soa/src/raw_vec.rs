@@ -12,7 +12,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{buffer_layout, ptrs, slice_from_raw_parts_mut, to_len, BufferAlign},
+    ptr::{buffer_layout, ptrs, slice_from_raw_parts_mut, to_capacity, BufferAlign},
     slice::SoaSlice,
     soa::Soa,
 };
@@ -258,9 +258,9 @@ where
 
     pub fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr();
-        let len = self.capacity();
+        let capacity = self.capacity();
 
-        unsafe { ptrs::<T>(ptr, len) }
+        unsafe { ptrs::<T>(ptr, capacity) }
     }
 
     #[allow(dead_code)]
@@ -273,7 +273,7 @@ where
         if T::min_size_of_components() == 0 {
             usize::MAX
         } else {
-            to_len::<T>(self.capacity_in_bytes)
+            to_capacity::<T>(self.capacity_in_bytes)
         }
     }
 
@@ -303,11 +303,11 @@ where
         // handle_reserve behind a call, while making sure that this function is likely to be
         // inlined as just a comparison and a call if the comparison fails.
         #[cold]
-        fn do_reserve_and_handle<T>(slf: &mut RawSoaVec<T>, len: usize, additional: usize)
+        fn do_reserve_and_handle<T>(this: &mut RawSoaVec<T>, len: usize, additional: usize)
         where
             T: Soa,
         {
-            if let Err(err) = slf.grow_amortized(len, additional) {
+            if let Err(err) = this.grow_amortized(len, additional) {
                 handle_error(err);
             }
         }
@@ -347,8 +347,8 @@ where
         Ok(())
     }
 
-    pub fn shrink_to_fit(&mut self, cap: usize) {
-        if let Err(err) = self.shrink(cap) {
+    pub fn shrink_to_fit(&mut self, capacity: usize) {
+        if let Err(err) = self.shrink(capacity) {
             handle_error(err);
         }
     }
@@ -360,9 +360,9 @@ where
         new_capacity_in_bytes > self.capacity_in_bytes
     }
 
-    unsafe fn set_ptr_and_cap(&mut self, ptr: NonNull<BufferAlign<T>>, cap: usize) {
+    unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<BufferAlign<T>>, capacity: usize) {
         self.ptr = ptr;
-        self.capacity_in_bytes = buffer_layout::<T>(cap)
+        self.capacity_in_bytes = buffer_layout::<T>(capacity)
             .expect("layout size should not exceed `isize::MAX`")
             .size();
     }
@@ -374,15 +374,15 @@ where
             return Err(CapacityOverflow.into());
         }
 
-        let required_cap = len.checked_add(additional).ok_or(CapacityOverflow)?;
+        let required_capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
 
-        let cap = cmp::max(self.capacity_in_bytes * 2, required_cap);
-        let cap = cmp::max(Self::min_non_zero_cap(), cap);
-        let new_layout = buffer_layout::<T>(cap);
+        let capacity = cmp::max(self.capacity_in_bytes * 2, required_capacity);
+        let capacity = cmp::max(Self::min_non_zero_cap(), capacity);
+        let new_layout = buffer_layout::<T>(capacity);
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
-            self.set_ptr_and_cap(ptr.cast(), cap);
+            self.set_ptr_and_capacity(ptr.cast(), capacity);
         }
         Ok(())
     }
@@ -392,19 +392,19 @@ where
             return Err(CapacityOverflow.into());
         }
 
-        let cap = len.checked_add(additional).ok_or(CapacityOverflow)?;
-        let new_layout = buffer_layout::<T>(cap);
+        let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
+        let new_layout = buffer_layout::<T>(capacity);
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
-            self.set_ptr_and_cap(ptr.cast(), cap);
+            self.set_ptr_and_capacity(ptr.cast(), capacity);
         }
         Ok(())
     }
 
-    fn shrink(&mut self, cap: usize) -> Result<(), TryReserveError> {
+    fn shrink(&mut self, capacity: usize) -> Result<(), TryReserveError> {
         assert!(
-            cap <= self.capacity(),
+            capacity <= self.capacity(),
             "tried to shrink to a larger capacity",
         );
 
@@ -413,16 +413,16 @@ where
             None => return Ok(()),
         };
 
-        if cap == 0 {
+        if capacity == 0 {
             unsafe {
                 dealloc(ptr.as_ptr(), old_layout);
-                self.set_ptr_and_cap(NonNull::dangling(), 0);
+                self.set_ptr_and_capacity(NonNull::dangling(), 0);
             }
             return Ok(());
         }
 
         let ptr = unsafe {
-            let new_layout = match buffer_layout::<T>(cap) {
+            let new_layout = match buffer_layout::<T>(capacity) {
                 Ok(layout) => layout,
                 Err(_) => return Err(CapacityOverflow.into()),
             };
@@ -438,7 +438,7 @@ where
             }
         };
         unsafe {
-            self.set_ptr_and_cap(ptr.cast(), cap);
+            self.set_ptr_and_capacity(ptr.cast(), capacity);
         }
         Ok(())
     }

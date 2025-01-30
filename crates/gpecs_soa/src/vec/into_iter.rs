@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{ptrs, to_len, BufferAlign},
+    ptr::{ptrs, to_capacity, BufferAlign},
     raw_vec::RawSoaVec,
     soa::Soa,
     vec::SoaVec,
@@ -69,9 +69,9 @@ where
 
     fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.buffer.as_ptr().cast();
-        let len = to_len::<T>(self.capacity_in_bytes);
+        let capacity = to_capacity::<T>(self.capacity_in_bytes);
 
-        unsafe { ptrs::<T>(ptr, len) }
+        unsafe { ptrs::<T>(ptr, capacity) }
     }
 
     unsafe fn post_inc_start(&mut self, offset: usize) -> T::Ptrs {

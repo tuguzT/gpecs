@@ -41,11 +41,13 @@ unsafe impl<T> SoaSliceIndex<SoaSlice<T>> for usize
 where
     T: Soa,
 {
-    type Ref<'a> = T::Refs<'a>
+    type Ref<'a>
+        = T::Refs<'a>
     where
         SoaSlice<T>: 'a;
 
-    type RefMut<'a> = T::RefsMut<'a>
+    type RefMut<'a>
+        = T::RefsMut<'a>
     where
         SoaSlice<T>: 'a;
 
@@ -132,11 +134,13 @@ unsafe impl<T> SoaSliceIndex<SoaSlice<T>> for ops::Range<usize>
 where
     T: Soa,
 {
-    type Ref<'a> = T::Slices<'a>
+    type Ref<'a>
+        = T::Slices<'a>
     where
         SoaSlice<T>: 'a;
 
-    type RefMut<'a> = T::SlicesMut<'a>
+    type RefMut<'a>
+        = T::SlicesMut<'a>
     where
         SoaSlice<T>: 'a;
 
@@ -237,11 +241,13 @@ unsafe impl<T> SoaSliceIndex<SoaSlice<T>> for ops::RangeTo<usize>
 where
     T: Soa,
 {
-    type Ref<'a> = T::Slices<'a>
+    type Ref<'a>
+        = T::Slices<'a>
     where
         SoaSlice<T>: 'a;
 
-    type RefMut<'a> = T::SlicesMut<'a>
+    type RefMut<'a>
+        = T::SlicesMut<'a>
     where
         SoaSlice<T>: 'a;
 
@@ -278,11 +284,13 @@ unsafe impl<T> SoaSliceIndex<SoaSlice<T>> for ops::RangeFrom<usize>
 where
     T: Soa,
 {
-    type Ref<'a> = T::Slices<'a>
+    type Ref<'a>
+        = T::Slices<'a>
     where
         SoaSlice<T>: 'a;
 
-    type RefMut<'a> = T::SlicesMut<'a>
+    type RefMut<'a>
+        = T::SlicesMut<'a>
     where
         SoaSlice<T>: 'a;
 
@@ -337,11 +345,13 @@ unsafe impl<T> SoaSliceIndex<SoaSlice<T>> for ops::RangeFull
 where
     T: Soa,
 {
-    type Ref<'a> = T::Slices<'a>
+    type Ref<'a>
+        = T::Slices<'a>
     where
         SoaSlice<T>: 'a;
 
-    type RefMut<'a> = T::SlicesMut<'a>
+    type RefMut<'a>
+        = T::SlicesMut<'a>
     where
         SoaSlice<T>: 'a;
 
@@ -396,11 +406,13 @@ unsafe impl<T> SoaSliceIndex<SoaSlice<T>> for ops::RangeInclusive<usize>
 where
     T: Soa,
 {
-    type Ref<'a> = T::Slices<'a>
+    type Ref<'a>
+        = T::Slices<'a>
     where
         SoaSlice<T>: 'a;
 
-    type RefMut<'a> = T::SlicesMut<'a>
+    type RefMut<'a>
+        = T::SlicesMut<'a>
     where
         SoaSlice<T>: 'a;
 
@@ -449,11 +461,13 @@ unsafe impl<T> SoaSliceIndex<SoaSlice<T>> for ops::RangeToInclusive<usize>
 where
     T: Soa,
 {
-    type Ref<'a> = T::Slices<'a>
+    type Ref<'a>
+        = T::Slices<'a>
     where
         SoaSlice<T>: 'a;
 
-    type RefMut<'a> = T::SlicesMut<'a>
+    type RefMut<'a>
+        = T::SlicesMut<'a>
     where
         SoaSlice<T>: 'a;
 
@@ -561,11 +575,13 @@ unsafe impl<T> SoaSliceIndex<SoaSlice<T>> for (ops::Bound<usize>, ops::Bound<usi
 where
     T: Soa,
 {
-    type Ref<'a> = T::Slices<'a>
+    type Ref<'a>
+        = T::Slices<'a>
     where
         SoaSlice<T>: 'a;
 
-    type RefMut<'a> = T::SlicesMut<'a>
+    type RefMut<'a>
+        = T::SlicesMut<'a>
     where
         SoaSlice<T>: 'a;
 

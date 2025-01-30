@@ -77,22 +77,26 @@ unsafe impl Soa for () {
     type NonNullPtrs = ();
     type Offsets = [usize; 0];
 
-    type Refs<'a>  = ()
+    type Refs<'a>
+        = ()
     where
         Self: 'a;
 
-    type RefsMut<'a>  = ()
+    type RefsMut<'a>
+        = ()
     where
         Self: 'a;
 
     type SlicePtrs = ();
     type SliceMutPtrs = ();
 
-    type Slices<'a>  = ()
+    type Slices<'a>
+        = ()
     where
         Self: 'a;
 
-    type SlicesMut<'a>  = ()
+    type SlicesMut<'a>
+        = ()
     where
         Self: 'a;
 
@@ -175,22 +179,26 @@ macro_rules! soa_impl {
             type NonNullPtrs = ($(::core::ptr::NonNull<$types>,)*);
             type Offsets = [usize; count_idents!($($types,)*)];
 
-            type Refs<'a> = ($(&'a $types,)*)
+            type Refs<'a>
+                = ($(&'a $types,)*)
             where
                 Self: 'a;
 
-            type RefsMut<'a> = ($(&'a mut $types,)*)
+            type RefsMut<'a>
+                = ($(&'a mut $types,)*)
             where
                 Self: 'a;
 
             type SlicePtrs = ($(*const [$types],)*);
             type SliceMutPtrs = ($(*mut [$types],)*);
 
-            type Slices<'a> = ($(&'a [$types],)*)
+            type Slices<'a>
+                = ($(&'a [$types],)*)
             where
                 Self: 'a;
 
-            type SlicesMut<'a> = ($(&'a mut [$types],)*)
+            type SlicesMut<'a>
+                = ($(&'a mut [$types],)*)
             where
                 Self: 'a;
 

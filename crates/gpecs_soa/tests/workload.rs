@@ -13,9 +13,16 @@ struct ZST3 {
 
 #[test]
 fn new() {
-    let vec = SoaVec::<(u32, u16, u8)>::new();
+    type Vec = SoaVec<(u32, u16, u8)>;
+
+    let vec = Vec::new();
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), 0);
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let slice = vec.as_slice();
     assert!(slice.is_empty());
@@ -29,6 +36,11 @@ fn new() {
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), 0);
 
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), 0);
@@ -39,9 +51,16 @@ fn new() {
 
 #[test]
 fn new_zst() {
-    let vec = SoaVec::<(ZST1, ZST2, ZST3)>::new();
+    type Vec = SoaVec<(ZST1, ZST2, ZST3)>;
+
+    let vec = Vec::new();
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), usize::MAX);
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let slice = vec.as_slice();
     assert!(slice.is_empty());
@@ -55,6 +74,11 @@ fn new_zst() {
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), usize::MAX);
 
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), usize::MAX);
@@ -65,9 +89,16 @@ fn new_zst() {
 
 #[test]
 fn with_capacity() {
-    let vec = SoaVec::<(u8, u64, u16)>::with_capacity(10);
+    type Vec = SoaVec<(u8, u64, u16)>;
+
+    let vec = Vec::with_capacity(10);
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 10);
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let slice = vec.as_slice();
     assert!(slice.is_empty());
@@ -81,6 +112,11 @@ fn with_capacity() {
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), 0);
 
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), 0);
@@ -91,9 +127,16 @@ fn with_capacity() {
 
 #[test]
 fn with_capacity_zst() {
-    let vec = SoaVec::<(ZST1, ZST2, ZST3)>::with_capacity(10);
+    type Vec = SoaVec<(ZST1, ZST2, ZST3)>;
+
+    let vec = Vec::with_capacity(10);
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 10);
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let slice = vec.as_slice();
     assert!(slice.is_empty());
@@ -107,6 +150,11 @@ fn with_capacity_zst() {
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), usize::MAX);
 
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), usize::MAX);
@@ -117,10 +165,17 @@ fn with_capacity_zst() {
 
 #[test]
 fn one_item() {
-    let mut vec = SoaVec::<(u8, u32, u16)>::new();
+    type Vec = SoaVec<(u8, u32, u16)>;
+
+    let mut vec = Vec::new();
     vec.push((1, 2, 3));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 1);
@@ -150,6 +205,11 @@ fn one_item() {
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), 0);
 
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), 0);
@@ -160,10 +220,17 @@ fn one_item() {
 
 #[test]
 fn one_item_zst() {
-    let mut vec = SoaVec::<(ZST1, ZST2, ZST3)>::new();
+    type Vec = SoaVec<(ZST1, ZST2, ZST3)>;
+
+    let mut vec = Vec::new();
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 1);
@@ -197,6 +264,11 @@ fn one_item_zst() {
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), usize::MAX);
 
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), usize::MAX);
@@ -207,13 +279,20 @@ fn one_item_zst() {
 
 #[test]
 fn three_items() {
-    let mut vec = SoaVec::<(u16, String, u128)>::new();
+    type Vec = SoaVec<(u16, String, u128)>;
+
+    let mut vec = Vec::new();
     vec.insert(0, (1, "2".to_owned(), 3));
     vec.insert(0, (4, "5".to_owned(), 6));
     vec.insert(1, (7, "8".to_owned(), 9));
 
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 3);
@@ -259,20 +338,40 @@ fn three_items() {
 
     assert_eq!(iter.next_back(), None);
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let (t, u, v) = vec.swap_remove(1);
     assert_eq!((t, u, v), (8, "8".to_owned(), 9));
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let (t, u, v) = vec.pop().expect("multi vector should not be empty");
     assert_eq!((t, u, v), (2, "2".to_owned(), 3));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let (t, u, v) = vec.remove(0);
     assert_eq!((t, u, v), (5, "5".to_owned(), 6));
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     vec.push((0, "0".to_owned(), 0));
     vec.push((0, "0".to_owned(), 0));
@@ -282,14 +381,29 @@ fn three_items() {
     vec.reserve_exact(6);
     assert!(vec.capacity() >= 9);
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     vec.shrink_to(6);
     assert!(vec.capacity() >= 6);
     vec.shrink_to(0);
     assert!(vec.capacity() >= 3);
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     vec.clear();
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     vec.push((1, "2".to_owned(), 3));
     vec.push((4, "5".to_owned(), 6));
@@ -309,6 +423,11 @@ fn three_items() {
         ([2].as_slice(), ["2".to_owned()].as_slice(), [3].as_slice()),
     );
 
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 1);
     assert_eq!(boxed_slice.capacity(), 1);
@@ -318,6 +437,11 @@ fn three_items() {
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), Some((&2, &"2".to_owned(), &3)));
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 1);
@@ -333,13 +457,20 @@ fn three_items() {
 
 #[test]
 fn three_items_zst() {
-    let mut vec = SoaVec::<(ZST1, ZST2, ZST3)>::new();
+    type Vec = SoaVec<(ZST1, ZST2, ZST3)>;
+
+    let mut vec = Vec::new();
     vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
     vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
     vec.insert(1, (ZST1, ZST2(()), ZST3 { empty: () }));
 
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 3);
@@ -378,20 +509,40 @@ fn three_items_zst() {
 
     assert!(iter.next_back().is_none());
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let (t, u, v) = vec.swap_remove(1);
     assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let (t, u, v) = vec.pop().expect("multi vector should not be empty");
     assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     let (t, u, v) = vec.remove(0);
     assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
@@ -401,18 +552,38 @@ fn three_items_zst() {
     vec.reserve_exact(6);
     assert!(vec.capacity() >= 9);
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     vec.shrink_to(6);
     assert!(vec.capacity() >= 6);
     vec.shrink_to(0);
     assert!(vec.capacity() >= 3);
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     vec.clear();
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
 
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let mut idx = 0;
     vec.retain(|_| {
@@ -422,6 +593,11 @@ fn three_items_zst() {
     });
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 3);
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 2);
@@ -438,6 +614,12 @@ fn three_items_zst() {
     let vec = boxed_slice.into_vec();
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 2);
+
+    // TODO leaks memory, fix ASAP
+    // let vec = {
+    //     let (ptr, len, capacity) = vec.into_raw_parts();
+    //     unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    // };
 
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 2);

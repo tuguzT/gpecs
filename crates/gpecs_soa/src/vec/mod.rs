@@ -62,21 +62,21 @@ where
     }
 
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn from_raw_parts(ptr: *mut u8, length: usize, capacity: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: *mut u8, len: usize, capacity: usize) -> Self {
         Self {
             buffer: unsafe { RawSoaVec::from_raw_parts(ptr, capacity) },
-            len: length,
+            len,
         }
     }
 
     pub(crate) const unsafe fn from_capacity_in_bytes(
         ptr: *mut u8,
-        length: usize,
+        len: usize,
         capacity_in_bytes: usize,
     ) -> Self {
         Self {
             buffer: unsafe { RawSoaVec::from_capacity_in_bytes(ptr, capacity_in_bytes) },
-            len: length,
+            len,
         }
     }
 

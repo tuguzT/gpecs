@@ -615,7 +615,8 @@ fn three_items_zst() {
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 2);
 
-    // TODO leaks memory, fix ASAP
+    // TODO leaks memory (because `capacity` in tuple is `0` after calling `into_raw_parts`)
+    //      I guess there is no workaround except of rewriting internal code to not to allocate small box for single `usize` value
     // let vec = {
     //     let (ptr, len, capacity) = vec.into_raw_parts();
     //     unsafe { Vec::from_raw_parts(ptr, len, capacity) }

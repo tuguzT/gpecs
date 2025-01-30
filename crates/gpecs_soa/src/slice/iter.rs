@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{ptrs, BufferAlign},
+    ptr::{ptrs, BufferData},
     soa::Soa,
 };
 
@@ -16,7 +16,7 @@ pub struct Iter<'a, T>
 where
     T: Soa,
 {
-    ptr: NonNull<BufferAlign<T>>,
+    ptr: NonNull<BufferData<T>>,
     capacity: usize,
     start: usize,
     end: usize,
@@ -355,7 +355,7 @@ pub struct IterMut<'a, T>
 where
     T: Soa,
 {
-    ptr: NonNull<BufferAlign<T>>,
+    ptr: NonNull<BufferData<T>>,
     capacity: usize,
     start: usize,
     end: usize,

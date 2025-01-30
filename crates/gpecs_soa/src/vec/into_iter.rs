@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{ptrs, to_capacity, BufferAlign},
+    ptr::{ptrs, to_capacity, BufferData},
     raw_vec::RawSoaVec,
     soa::Soa,
     vec::SoaVec,
@@ -16,7 +16,7 @@ pub struct IntoIter<T>
 where
     T: Soa,
 {
-    buffer: NonNull<BufferAlign<T>>,
+    buffer: NonNull<BufferData<T>>,
     capacity_in_bytes: usize,
     start: usize,
     end: usize,

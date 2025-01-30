@@ -1,5 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
+    mem::MaybeUninit,
     ptr,
 };
 
@@ -11,10 +12,13 @@ pub fn slice_from_raw_parts<T>(data: *const u8, len: usize, capacity: usize) -> 
 where
     T: Soa,
 {
-    let capacity_in_bytes = buffer_layout::<T>(capacity)
-        .expect("layout size should not exceed `isize::MAX`")
-        .size();
-    slice_from_capacity_in_bytes(data, len, capacity_in_bytes)
+    let buffer_layout =
+        buffer_layout::<T>(capacity).expect("layout size should not exceed `isize::MAX`");
+    let core_len = match buffer_layout.size() {
+        0 => len,
+        _ => buffer_layout.size() / size_of::<BufferData<T>>(),
+    };
+    ptr::slice_from_raw_parts(data, core_len) as _
 }
 
 #[allow(clippy::missing_safety_doc)]
@@ -23,44 +27,21 @@ pub fn slice_from_raw_parts_mut<T>(data: *mut u8, len: usize, capacity: usize) -
 where
     T: Soa,
 {
-    let capacity_in_bytes = buffer_layout::<T>(capacity)
-        .expect("layout size should not exceed `isize::MAX`")
-        .size();
-    slice_from_capacity_in_bytes_mut(data, len, capacity_in_bytes)
+    let buffer_layout =
+        buffer_layout::<T>(capacity).expect("layout size should not exceed `isize::MAX`");
+    let core_len = match buffer_layout.size() {
+        0 => len,
+        _ => buffer_layout.size() / size_of::<BufferData<T>>(),
+    };
+    ptr::slice_from_raw_parts(data, core_len) as _
 }
 
-#[inline(always)]
-pub(crate) fn slice_from_capacity_in_bytes<T>(
-    data: *const u8,
-    len: usize,
-    capacity_in_bytes: usize,
-) -> *const SoaSlice<T>
+pub(crate) struct BufferData<T>
 where
     T: Soa,
 {
-    let _ = len;
-    ptr::slice_from_raw_parts(data, capacity_in_bytes) as *const _
-}
-
-#[inline(always)]
-pub(crate) fn slice_from_capacity_in_bytes_mut<T>(
-    data: *mut u8,
-    len: usize,
-    capacity_in_bytes: usize,
-) -> *mut SoaSlice<T>
-where
-    T: Soa,
-{
-    let _ = len;
-    ptr::slice_from_raw_parts_mut(data, capacity_in_bytes) as *mut _
-}
-
-#[repr(transparent)]
-pub(crate) struct BufferAlign<T>
-where
-    T: Soa,
-{
-    align: [(usize, T); 0],
+    _align: [usize; 0],
+    _data: MaybeUninit<T>,
 }
 
 #[inline]
@@ -82,8 +63,19 @@ pub(crate) fn buffer_layout<T>(capacity: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,
 {
-    let unaligned = buffer_layout_unaligned::<T>(capacity)?;
-    Ok(unaligned.pad_to_align())
+    let required = buffer_layout_unaligned::<T>(capacity)?.pad_to_align();
+    let item_layout = Layout::new::<BufferData<T>>()
+        .align_to(required.align())?
+        .pad_to_align();
+    if item_layout.size() == 0 {
+        return Ok(Layout::new::<()>());
+    }
+
+    let layout = Layout::from_size_align(
+        required.size().div_ceil(item_layout.size()) * item_layout.size(),
+        item_layout.align(),
+    )?;
+    Ok(layout.pad_to_align())
 }
 
 #[inline]
@@ -115,10 +107,16 @@ pub(crate) fn to_capacity<T>(capacity_in_bytes: usize) -> usize
 where
     T: Soa,
 {
-    let layout = Layout::from_size_align(capacity_in_bytes, align_of::<BufferAlign<T>>())
-        .expect("layout should be valid");
-    let capacity_in_bytes = layout.pad_to_align().size();
-    unaligned_to_capacity::<T>(capacity_in_bytes)
+    let item_layout = Layout::new::<BufferData<T>>();
+    if item_layout.size() == 0 {
+        return 0;
+    }
+
+    let size = capacity_in_bytes.div_ceil(item_layout.size()) * item_layout.size();
+    let layout = Layout::from_size_align(size, item_layout.align())
+        .expect("layout size should not exceed `isize::MAX`")
+        .pad_to_align();
+    unaligned_to_capacity::<T>(layout.size())
 }
 
 #[inline]

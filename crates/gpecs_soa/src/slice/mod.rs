@@ -7,10 +7,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{
-        ptrs, slice_from_capacity_in_bytes, slice_from_capacity_in_bytes_mut, slice_from_raw_parts,
-        slice_from_raw_parts_mut, to_capacity, BufferAlign,
-    },
+    ptr::{ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, to_capacity, BufferData},
     soa::Soa,
     vec::{IntoIter, SoaVec},
 };
@@ -28,8 +25,7 @@ pub struct SoaSlice<T>
 where
     T: Soa,
 {
-    align: BufferAlign<T>,
-    buffer: [u8],
+    buffer: [BufferData<T>],
 }
 
 impl<T> SoaSlice<T>
@@ -37,41 +33,42 @@ where
     T: Soa,
 {
     #[inline]
-    pub const fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         match self.capacity_in_bytes() {
-            0 => 0,
+            0 => self.buffer.len(),
             _ => unsafe { ptr::read(self.as_ptr().cast()) },
         }
     }
 
     #[inline]
-    pub const fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     #[inline]
-    pub const fn capacity_in_bytes(&self) -> usize {
-        self.buffer.len()
+    pub fn capacity_in_bytes(&self) -> usize {
+        match T::min_size_of_components() {
+            0 => 0,
+            _ => self.buffer.len() * size_of::<BufferData<T>>(),
+        }
     }
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        if T::min_size_of_components() == 0 {
-            usize::MAX
-        } else {
-            let capacity_in_bytes = self.capacity_in_bytes();
-            to_capacity::<T>(capacity_in_bytes)
+        match T::min_size_of_components() {
+            0 => usize::MAX,
+            _ => to_capacity::<T>(self.capacity_in_bytes()),
         }
     }
 
     #[inline]
     pub const fn as_ptr(&self) -> *const u8 {
-        self.buffer.as_ptr()
+        self.buffer.as_ptr().cast()
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.buffer.as_mut_ptr()
+        self.buffer.as_mut_ptr().cast()
     }
 
     #[inline]
@@ -346,8 +343,8 @@ where
     T: Soa,
 {
     fn default() -> Self {
-        let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
-        unsafe { from_capacity_in_bytes(data, 0, 0) }
+        let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
+        unsafe { from_raw_parts(data, 0, 0) }
     }
 }
 
@@ -356,8 +353,8 @@ where
     T: Soa,
 {
     fn default() -> Self {
-        let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
-        unsafe { from_capacity_in_bytes_mut(data, 0, 0) }
+        let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
+        unsafe { from_raw_parts_mut(data, 0, 0) }
     }
 }
 
@@ -366,8 +363,8 @@ where
     T: Soa,
 {
     fn default() -> Self {
-        let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
-        unsafe { Box::from_raw(slice_from_capacity_in_bytes_mut(data, 0, 0)) }
+        let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
+        unsafe { Box::from_raw(slice_from_raw_parts_mut(data, 0, 0)) }
     }
 }
 
@@ -502,28 +499,4 @@ where
     T: Soa,
 {
     unsafe { &mut *slice_from_raw_parts_mut(data, len, capacity) }
-}
-
-#[inline]
-pub(crate) unsafe fn from_capacity_in_bytes<'slice, T>(
-    data: *const u8,
-    len: usize,
-    capacity_in_bytes: usize,
-) -> &'slice SoaSlice<T>
-where
-    T: Soa,
-{
-    unsafe { &*slice_from_capacity_in_bytes(data, len, capacity_in_bytes) }
-}
-
-#[inline]
-pub(crate) unsafe fn from_capacity_in_bytes_mut<'slice, T>(
-    data: *mut u8,
-    len: usize,
-    capacity_in_bytes: usize,
-) -> &'slice mut SoaSlice<T>
-where
-    T: Soa,
-{
-    unsafe { &mut *slice_from_capacity_in_bytes_mut(data, len, capacity_in_bytes) }
 }

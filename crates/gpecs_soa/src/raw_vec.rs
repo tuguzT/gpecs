@@ -12,7 +12,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{buffer_layout, ptrs, slice_from_raw_parts_mut, to_capacity, BufferAlign},
+    ptr::{buffer_layout, ptrs, slice_from_raw_parts_mut, to_capacity, BufferData},
     slice::SoaSlice,
     soa::Soa,
 };
@@ -97,7 +97,7 @@ pub struct RawSoaVec<T>
 where
     T: Soa,
 {
-    ptr: NonNull<BufferAlign<T>>,
+    ptr: NonNull<BufferData<T>>,
     capacity_in_bytes: usize,
 }
 
@@ -292,7 +292,7 @@ where
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
         unsafe {
             let size = self.capacity_in_bytes;
-            let layout = Layout::from_size_align_unchecked(size, align_of::<BufferAlign<T>>());
+            let layout = Layout::from_size_align_unchecked(size, align_of::<BufferData<T>>());
             Some((self.ptr.cast(), layout))
         }
     }
@@ -360,7 +360,7 @@ where
         new_capacity_in_bytes > self.capacity_in_bytes
     }
 
-    unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<BufferAlign<T>>, capacity: usize) {
+    unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<BufferData<T>>, capacity: usize) {
         self.ptr = ptr;
         self.capacity_in_bytes = buffer_layout::<T>(capacity)
             .expect("layout size should not exceed `isize::MAX`")

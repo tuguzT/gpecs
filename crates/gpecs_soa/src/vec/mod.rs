@@ -6,15 +6,15 @@ use core::{
     hash::{self, Hash},
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
-    ptr::{self, addr_of, addr_of_mut},
+    ptr,
 };
 
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{ptrs, slice_from_capacity_in_bytes_mut},
+    ptr::{buffer_layout, ptrs, to_capacity},
     raw_vec::RawSoaVec,
-    slice::{from_capacity_in_bytes, from_capacity_in_bytes_mut, Iter, IterMut, SoaSlice},
+    slice::{from_raw_parts, from_raw_parts_mut, Iter, IterMut, SoaSlice},
     soa::Soa,
 };
 
@@ -198,8 +198,15 @@ where
             return;
         }
 
-        self.move_left(self.len);
-        self.buffer.shrink_to_fit(self.len);
+        let new_capacity = self.len;
+        let new_capacity = {
+            let capacity_in_bytes = buffer_layout::<T>(new_capacity)
+                .expect("layout size should not exceed `isize::MAX`")
+                .size();
+            to_capacity::<T>(capacity_in_bytes)
+        };
+        self.move_left(new_capacity);
+        self.buffer.shrink_to_fit(new_capacity);
     }
 
     pub fn shrink_to(&mut self, min_capacity: usize) {
@@ -208,22 +215,19 @@ where
         }
 
         let new_capacity = cmp::max(self.len, min_capacity);
+        let new_capacity = {
+            let capacity_in_bytes = buffer_layout::<T>(new_capacity)
+                .expect("layout size should not exceed `isize::MAX`")
+                .size();
+            to_capacity::<T>(capacity_in_bytes)
+        };
         self.move_left(new_capacity);
         self.buffer.shrink_to_fit(new_capacity);
     }
 
     pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T>> {
         self.shrink_to_fit();
-        let mut me = ManuallyDrop::new(self);
-
-        if T::min_size_of_components() == 0 && me.len > 0 {
-            let (data, capacity_in_bytes) = match me.capacity_in_bytes() {
-                0 => (Box::into_raw(Box::new(me.len)).cast(), size_of::<usize>()),
-                _ => (me.as_mut_ptr(), me.capacity_in_bytes()),
-            };
-            let slice = slice_from_capacity_in_bytes_mut(data, me.len, capacity_in_bytes);
-            return unsafe { Box::from_raw(slice) };
-        }
+        let me = ManuallyDrop::new(self);
 
         unsafe {
             let buffer = ptr::read(&me.buffer);
@@ -665,11 +669,7 @@ where
     type Target = SoaSlice<T>;
 
     fn deref(&self) -> &Self::Target {
-        let (data, capacity_in_bytes) = match T::min_size_of_components() {
-            0 => (addr_of!(self.len).cast(), size_of::<usize>()),
-            _ => (self.as_ptr(), self.capacity_in_bytes()),
-        };
-        unsafe { from_capacity_in_bytes(data, self.len(), capacity_in_bytes) }
+        unsafe { from_raw_parts(self.as_ptr(), self.len(), self.capacity()) }
     }
 }
 
@@ -678,11 +678,7 @@ where
     T: Soa,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let (data, capacity_in_bytes) = match T::min_size_of_components() {
-            0 => (addr_of_mut!(self.len).cast(), size_of::<usize>()),
-            _ => (self.as_mut_ptr(), self.capacity_in_bytes()),
-        };
-        unsafe { from_capacity_in_bytes_mut(data, self.len(), capacity_in_bytes) }
+        unsafe { from_raw_parts_mut(self.as_mut_ptr(), self.len(), self.capacity()) }
     }
 }
 

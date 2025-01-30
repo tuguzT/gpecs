@@ -430,7 +430,7 @@ fn three_items() {
 
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 1);
-    assert_eq!(boxed_slice.capacity(), 1);
+    assert!(boxed_slice.capacity() >= 1);
     assert_eq!(boxed_slice.get(0), Some((&2, &"2".to_owned(), &3)));
 
     let vec = boxed_slice.into_vec();
@@ -445,7 +445,7 @@ fn three_items() {
 
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 1);
-    assert_eq!(boxed_slice.capacity(), 1);
+    assert!(boxed_slice.capacity() >= 1);
     assert_eq!(boxed_slice.get(0), Some((&2, &"2".to_owned(), &3)));
 
     let mut into_iter = boxed_slice.into_iter();
@@ -615,12 +615,10 @@ fn three_items_zst() {
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 2);
 
-    // TODO leaks memory (because `capacity` in tuple is `0` after calling `into_raw_parts`)
-    //      I guess there is no workaround except of rewriting internal code to not to allocate small box for single `usize` value
-    // let vec = {
-    //     let (ptr, len, capacity) = vec.into_raw_parts();
-    //     unsafe { Vec::from_raw_parts(ptr, len, capacity) }
-    // };
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
 
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 2);

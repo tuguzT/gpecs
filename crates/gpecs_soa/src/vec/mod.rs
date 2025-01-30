@@ -12,9 +12,9 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{ptrs, slice_from_len_in_bytes_mut},
+    ptr::{ptrs, slice_from_capacity_in_bytes_mut},
     raw_vec::RawSoaVec,
-    slice::{from_len_in_bytes, from_len_in_bytes_mut, Iter, IterMut, SoaSlice},
+    slice::{from_capacity_in_bytes, from_capacity_in_bytes_mut, Iter, IterMut, SoaSlice},
     soa::Soa,
 };
 
@@ -217,11 +217,11 @@ where
         let mut me = ManuallyDrop::new(self);
 
         if T::min_size_of_components() == 0 && me.len > 0 {
-            let (data, len_in_bytes) = match me.capacity_in_bytes() {
+            let (data, capacity_in_bytes) = match me.capacity_in_bytes() {
                 0 => (Box::into_raw(Box::new(me.len)).cast(), size_of::<usize>()),
                 _ => (me.as_mut_ptr(), me.capacity_in_bytes()),
             };
-            let slice = slice_from_len_in_bytes_mut(data, len_in_bytes);
+            let slice = slice_from_capacity_in_bytes_mut(data, me.len, capacity_in_bytes);
             return unsafe { Box::from_raw(slice) };
         }
 
@@ -665,11 +665,11 @@ where
     type Target = SoaSlice<T>;
 
     fn deref(&self) -> &Self::Target {
-        let (data, len_in_bytes) = match T::min_size_of_components() {
+        let (data, capacity_in_bytes) = match T::min_size_of_components() {
             0 => (addr_of!(self.len).cast(), size_of::<usize>()),
             _ => (self.as_ptr(), self.capacity_in_bytes()),
         };
-        unsafe { from_len_in_bytes(data, len_in_bytes) }
+        unsafe { from_capacity_in_bytes(data, self.len(), capacity_in_bytes) }
     }
 }
 
@@ -678,11 +678,11 @@ where
     T: Soa,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let (data, len_in_bytes) = match T::min_size_of_components() {
+        let (data, capacity_in_bytes) = match T::min_size_of_components() {
             0 => (addr_of_mut!(self.len).cast(), size_of::<usize>()),
             _ => (self.as_mut_ptr(), self.capacity_in_bytes()),
         };
-        unsafe { from_len_in_bytes_mut(data, len_in_bytes) }
+        unsafe { from_capacity_in_bytes_mut(data, self.len(), capacity_in_bytes) }
     }
 }
 

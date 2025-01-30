@@ -187,7 +187,7 @@ where
 
         let me = ManuallyDrop::new(self);
         unsafe {
-            let slice = slice_from_raw_parts_mut(me.ptr(), len);
+            let slice = slice_from_raw_parts_mut(me.ptr(), len, me.capacity());
             Box::from_raw(slice)
         }
     }

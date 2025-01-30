@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     ptr::{
-        ptrs, slice_from_len_in_bytes, slice_from_len_in_bytes_mut, slice_from_raw_parts,
+        ptrs, slice_from_capacity_in_bytes, slice_from_capacity_in_bytes_mut, slice_from_raw_parts,
         slice_from_raw_parts_mut, to_len, BufferAlign,
     },
     soa::Soa,
@@ -59,8 +59,8 @@ where
         if T::min_size_of_components() == 0 {
             usize::MAX
         } else {
-            let len_in_bytes = self.capacity_in_bytes();
-            to_len::<T>(len_in_bytes)
+            let capacity_in_bytes = self.capacity_in_bytes();
+            to_len::<T>(capacity_in_bytes)
         }
     }
 
@@ -347,7 +347,7 @@ where
 {
     fn default() -> Self {
         let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
-        unsafe { from_len_in_bytes(data, 0) }
+        unsafe { from_capacity_in_bytes(data, 0, 0) }
     }
 }
 
@@ -357,7 +357,7 @@ where
 {
     fn default() -> Self {
         let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
-        unsafe { from_len_in_bytes_mut(data, 0) }
+        unsafe { from_capacity_in_bytes_mut(data, 0, 0) }
     }
 }
 
@@ -367,7 +367,7 @@ where
 {
     fn default() -> Self {
         let data = NonNull::<BufferAlign<T>>::dangling().as_ptr().cast();
-        unsafe { Box::from_raw(slice_from_len_in_bytes_mut(data, 0)) }
+        unsafe { Box::from_raw(slice_from_capacity_in_bytes_mut(data, 0, 0)) }
     }
 }
 
@@ -480,43 +480,50 @@ where
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
-pub unsafe fn from_raw_parts<'slice, T>(data: *const u8, capacity: usize) -> &'slice SoaSlice<T>
+pub unsafe fn from_raw_parts<'slice, T>(
+    data: *const u8,
+    len: usize,
+    capacity: usize,
+) -> &'slice SoaSlice<T>
 where
     T: Soa,
 {
-    unsafe { &*slice_from_raw_parts(data, capacity) }
+    unsafe { &*slice_from_raw_parts(data, len, capacity) }
 }
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts_mut<'slice, T>(
     data: *mut u8,
+    len: usize,
     capacity: usize,
 ) -> &'slice mut SoaSlice<T>
 where
     T: Soa,
 {
-    unsafe { &mut *slice_from_raw_parts_mut(data, capacity) }
+    unsafe { &mut *slice_from_raw_parts_mut(data, len, capacity) }
 }
 
 #[inline]
-pub(crate) unsafe fn from_len_in_bytes<'slice, T>(
+pub(crate) unsafe fn from_capacity_in_bytes<'slice, T>(
     data: *const u8,
-    len_in_bytes: usize,
+    len: usize,
+    capacity_in_bytes: usize,
 ) -> &'slice SoaSlice<T>
 where
     T: Soa,
 {
-    unsafe { &*slice_from_len_in_bytes(data, len_in_bytes) }
+    unsafe { &*slice_from_capacity_in_bytes(data, len, capacity_in_bytes) }
 }
 
 #[inline]
-pub(crate) unsafe fn from_len_in_bytes_mut<'slice, T>(
+pub(crate) unsafe fn from_capacity_in_bytes_mut<'slice, T>(
     data: *mut u8,
-    len_in_bytes: usize,
+    len: usize,
+    capacity_in_bytes: usize,
 ) -> &'slice mut SoaSlice<T>
 where
     T: Soa,
 {
-    unsafe { &mut *slice_from_len_in_bytes_mut(data, len_in_bytes) }
+    unsafe { &mut *slice_from_capacity_in_bytes_mut(data, len, capacity_in_bytes) }
 }

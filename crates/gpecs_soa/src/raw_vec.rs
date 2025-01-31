@@ -12,7 +12,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{buffer_layout, ptrs, slice_from_raw_parts_mut, to_capacity, BufferData},
+    ptr::{buffer_layout, is_zst, ptrs, slice_from_raw_parts_mut, to_capacity, BufferData},
     slice::SoaSlice,
     soa::Soa,
 };
@@ -129,7 +129,7 @@ where
     }
 
     fn try_allocate_in(capacity: usize, init: AllocInit) -> Result<Self, TryReserveError> {
-        if capacity == 0 || T::min_size_of_components() == 0 {
+        if is_zst::<T>() || capacity == 0 {
             return Ok(Self::new());
         }
 
@@ -210,13 +210,9 @@ where
     }
 
     pub unsafe fn from_nonnull(ptr: NonNull<BufferData<T>>, capacity: usize) -> Self {
-        let capacity_in_bytes = if T::min_size_of_components() == 0 {
-            0
-        } else {
-            buffer_layout::<T>(capacity)
-                .expect("layout size should not exceed `isize::MAX`")
-                .size()
-        };
+        let capacity_in_bytes = buffer_layout::<T>(capacity)
+            .expect("layout size should not exceed `isize::MAX`")
+            .size();
 
         Self {
             ptr: ptr.cast(),
@@ -242,23 +238,6 @@ where
         self.ptr.cast()
     }
 
-    #[allow(dead_code)]
-    pub const fn ptr_without_header(&self) -> Option<*mut u8> {
-        if self.capacity_in_bytes == 0 {
-            return None;
-        }
-
-        Some(unsafe { self.ptr().cast::<u8>().byte_add(size_of::<usize>()) })
-    }
-
-    #[allow(dead_code)]
-    pub const fn non_null_without_header(&self) -> Option<NonNull<u8>> {
-        match self.ptr_without_header() {
-            Some(ptr) => Some(unsafe { NonNull::new_unchecked(ptr) }),
-            None => None,
-        }
-    }
-
     pub fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr();
         let capacity = self.capacity();
@@ -273,11 +252,10 @@ where
     }
 
     pub fn capacity(&self) -> usize {
-        if T::min_size_of_components() == 0 {
-            usize::MAX
-        } else {
-            to_capacity::<T>(self.capacity_in_bytes)
+        if is_zst::<T>() {
+            return usize::MAX;
         }
+        to_capacity::<T>(self.capacity_in_bytes)
     }
 
     pub const fn capacity_in_bytes(&self) -> usize {
@@ -373,7 +351,7 @@ where
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
         debug_assert!(additional > 0);
 
-        if T::min_size_of_components() == 0 {
+        if is_zst::<T>() {
             return Err(CapacityOverflow.into());
         }
 
@@ -391,7 +369,7 @@ where
     }
 
     fn grow_exact(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
-        if T::min_size_of_components() == 0 {
+        if is_zst::<T>() {
             return Err(CapacityOverflow.into());
         }
 

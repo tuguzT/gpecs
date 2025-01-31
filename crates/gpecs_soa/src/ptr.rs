@@ -4,7 +4,10 @@ use core::{
     ptr,
 };
 
-use crate::{slice::SoaSlice, soa::Soa};
+use crate::{
+    slice::{SoaSlice, SoaSliceIndex},
+    soa::Soa,
+};
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
@@ -52,12 +55,189 @@ where
     _data: MaybeUninit<T>,
 }
 
+pub trait SoaSlicePtr<T>: Copy + private_slice_ptr::Sealed
+where
+    T: Soa,
+{
+    #[allow(clippy::missing_safety_doc)]
+    unsafe fn len(self) -> usize;
+
+    #[allow(clippy::missing_safety_doc)]
+    #[inline(always)]
+    unsafe fn is_empty(self) -> bool {
+        unsafe { self.len() == 0 }
+    }
+
+    fn capacity(self) -> usize;
+
+    fn capacity_in_bytes(self) -> usize;
+
+    fn as_ptr(self) -> *const BufferData<T>;
+
+    #[allow(clippy::missing_safety_doc)]
+    unsafe fn get_unchecked<I>(self, index: I) -> I::Ptr
+    where
+        I: SoaSliceIndex<SoaSlice<T>>;
+}
+
+impl<T> SoaSlicePtr<T> for *const SoaSlice<T>
+where
+    T: Soa,
+{
+    unsafe fn len(self) -> usize {
+        match self.capacity_in_bytes() {
+            0 => self.into_inner().len(),
+            _ => unsafe { ptr::read(self.as_ptr().cast()) },
+        }
+    }
+
+    fn capacity(self) -> usize {
+        let capacity_in_bytes = self.capacity_in_bytes();
+        to_capacity::<T>(capacity_in_bytes)
+    }
+
+    fn capacity_in_bytes(self) -> usize {
+        let buffer = self.into_inner();
+        buffer.len() * size_of::<BufferData<T>>()
+    }
+
+    fn as_ptr(self) -> *const BufferData<T> {
+        let buffer = self.into_inner();
+        buffer as *const BufferData<T> // should be `<*const [BufferData<T>]>::as_ptr(buffer)`
+    }
+
+    unsafe fn get_unchecked<I>(self, index: I) -> I::Ptr
+    where
+        I: SoaSliceIndex<SoaSlice<T>>,
+    {
+        unsafe { index.get_unchecked(self) }
+    }
+}
+
+pub trait SoaSlicePtrMut<T>: Copy + private_slice_ptr::Sealed
+where
+    T: Soa,
+{
+    #[allow(clippy::missing_safety_doc)]
+    unsafe fn len(self) -> usize;
+
+    #[allow(clippy::missing_safety_doc)]
+    #[inline(always)]
+    unsafe fn is_empty(self) -> bool {
+        unsafe { self.len() == 0 }
+    }
+
+    fn capacity(self) -> usize;
+
+    fn capacity_in_bytes(self) -> usize;
+
+    fn as_mut_ptr(self) -> *mut BufferData<T>;
+
+    #[allow(clippy::missing_safety_doc)]
+    unsafe fn get_unchecked_mut<I>(self, index: I) -> I::MutPtr
+    where
+        I: SoaSliceIndex<SoaSlice<T>>;
+}
+
+impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
+where
+    T: Soa,
+{
+    unsafe fn len(self) -> usize {
+        match self.capacity_in_bytes() {
+            0 => self.into_inner_mut().len(),
+            _ => unsafe { ptr::read(self.as_ptr().cast()) },
+        }
+    }
+
+    fn capacity(self) -> usize {
+        let capacity_in_bytes = self.capacity_in_bytes();
+        to_capacity::<T>(capacity_in_bytes)
+    }
+
+    fn capacity_in_bytes(self) -> usize {
+        let buffer = self.into_inner_mut();
+        buffer.len() * size_of::<BufferData<T>>()
+    }
+
+    fn as_mut_ptr(self) -> *mut BufferData<T> {
+        let buffer = self.into_inner_mut();
+        buffer as *mut BufferData<T> // should be `<*mut [BufferData<T>]>::as_mut_ptr(buffer)`
+    }
+
+    unsafe fn get_unchecked_mut<I>(self, index: I) -> I::MutPtr
+    where
+        I: SoaSliceIndex<SoaSlice<T>>,
+    {
+        unsafe { index.get_unchecked_mut(self) }
+    }
+}
+
+trait SoaSlicePtrIntoInner<T>: Copy
+where
+    T: Soa,
+{
+    fn into_inner(self) -> *const [BufferData<T>];
+}
+
+impl<T> SoaSlicePtrIntoInner<T> for *const SoaSlice<T>
+where
+    T: Soa,
+{
+    fn into_inner(self) -> *const [BufferData<T>] {
+        self as *const [BufferData<T>]
+    }
+}
+
+trait SoaSlicePtrIntoInnerMut<T>: Copy
+where
+    T: Soa,
+{
+    fn into_inner_mut(self) -> *mut [BufferData<T>];
+}
+
+impl<T> SoaSlicePtrIntoInnerMut<T> for *mut SoaSlice<T>
+where
+    T: Soa,
+{
+    fn into_inner_mut(self) -> *mut [BufferData<T>] {
+        self as *mut [BufferData<T>]
+    }
+}
+
+mod private_slice_ptr {
+    use super::{Soa, SoaSlice};
+
+    pub trait Sealed {}
+
+    impl<T> Sealed for *const SoaSlice<T> where T: Soa {}
+    impl<T> Sealed for *mut SoaSlice<T> where T: Soa {}
+}
+
+#[inline]
+#[track_caller]
+pub(crate) fn is_zst<T>() -> bool
+where
+    T: Soa,
+{
+    match (T::min_size_of_components(), size_of::<BufferData<T>>()) {
+        (0, 0) => true,
+        pair => {
+            debug_assert!(
+                !matches!(pair, (_, 0) | (0, _)),
+                "`T::min_size_of_components()` should be `0` if and only if `T` is ZST",
+            );
+            false
+        }
+    }
+}
+
 #[inline]
 fn buffer_layout_unaligned<T>(capacity: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,
 {
-    if T::min_size_of_components() == 0 || capacity == 0 {
+    if is_zst::<T>() || capacity == 0 {
         return Ok(Layout::new::<()>());
     }
 
@@ -79,11 +259,9 @@ where
         return Ok(Layout::new::<()>());
     }
 
-    let layout = Layout::from_size_align(
-        required.size().div_ceil(item_layout.size()) * item_layout.size(),
-        item_layout.align(),
-    )?;
-    Ok(layout.pad_to_align())
+    let size = required.size().div_ceil(item_layout.size()) * item_layout.size();
+    let layout = Layout::from_size_align(size, item_layout.align())?.pad_to_align();
+    Ok(layout)
 }
 
 #[inline]
@@ -91,7 +269,7 @@ fn unaligned_to_capacity<T>(capacity_in_bytes: usize) -> usize
 where
     T: Soa,
 {
-    if T::min_size_of_components() == 0 || capacity_in_bytes < size_of::<usize>() {
+    if is_zst::<T>() || capacity_in_bytes < size_of::<usize>() {
         return 0;
     }
 
@@ -132,7 +310,7 @@ pub(crate) unsafe fn ptrs<T>(ptr: *mut BufferData<T>, capacity: usize) -> T::Mut
 where
     T: Soa,
 {
-    if T::min_size_of_components() == 0 || capacity == 0 {
+    if is_zst::<T>() || capacity == 0 {
         return T::ptrs_dangling();
     }
 

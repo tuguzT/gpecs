@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, to_capacity, BufferData},
+    ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
     soa::Soa,
     vec::{IntoIter, SoaVec},
 };
@@ -34,10 +34,7 @@ where
 {
     #[inline]
     pub fn len(&self) -> usize {
-        match self.capacity_in_bytes() {
-            0 => self.buffer.len(),
-            _ => unsafe { ptr::read(self.as_ptr().cast()) },
-        }
+        unsafe { ptr::from_ref(self).len() }
     }
 
     #[inline]
@@ -47,18 +44,15 @@ where
 
     #[inline]
     pub fn capacity_in_bytes(&self) -> usize {
-        match T::min_size_of_components() {
-            0 => 0,
-            _ => self.buffer.len() * size_of::<BufferData<T>>(),
-        }
+        ptr::from_ref(self).capacity_in_bytes()
     }
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        match T::min_size_of_components() {
-            0 => usize::MAX,
-            _ => to_capacity::<T>(self.capacity_in_bytes()),
+        if is_zst::<T>() {
+            return usize::MAX;
         }
+        ptr::from_ref(self).capacity()
     }
 
     #[inline]
@@ -299,7 +293,7 @@ where
         F: FnOnce(&mut [usize]),
     {
         let len = self.len();
-        if T::min_size_of_components() == 0 || len < 2 {
+        if is_zst::<T>() || len < 2 {
             return;
         }
 

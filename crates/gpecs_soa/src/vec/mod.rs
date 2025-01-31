@@ -12,7 +12,7 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{buffer_layout, ptrs, to_capacity, BufferData},
+    ptr::{actual_capacity, ptrs, BufferData},
     raw_vec::RawSoaVec,
     slice::{from_raw_parts, from_raw_parts_mut, Iter, IterMut, SoaSlice},
     soa::Soa,
@@ -198,13 +198,7 @@ where
             return;
         }
 
-        let new_capacity = self.len;
-        let new_capacity = {
-            let capacity_in_bytes = buffer_layout::<T>(new_capacity)
-                .expect("layout size should not exceed `isize::MAX`")
-                .size();
-            to_capacity::<T>(capacity_in_bytes)
-        };
+        let new_capacity = actual_capacity::<T>(self.len);
         self.move_left(new_capacity);
         self.buffer.shrink_to_fit(new_capacity);
     }
@@ -214,13 +208,7 @@ where
             return;
         }
 
-        let new_capacity = cmp::max(self.len, min_capacity);
-        let new_capacity = {
-            let capacity_in_bytes = buffer_layout::<T>(new_capacity)
-                .expect("layout size should not exceed `isize::MAX`")
-                .size();
-            to_capacity::<T>(capacity_in_bytes)
-        };
+        let new_capacity = actual_capacity::<T>(cmp::max(self.len, min_capacity));
         self.move_left(new_capacity);
         self.buffer.shrink_to_fit(new_capacity);
     }

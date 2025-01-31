@@ -233,6 +233,17 @@ where
 }
 
 #[inline]
+pub(crate) fn actual_capacity<T>(capacity: usize) -> usize
+where
+    T: Soa,
+{
+    let capacity_in_bytes = buffer_layout::<T>(capacity)
+        .expect("layout size should not exceed `isize::MAX`")
+        .size();
+    to_capacity::<T>(capacity_in_bytes)
+}
+
+#[inline]
 fn buffer_layout_unaligned<T>(capacity: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,

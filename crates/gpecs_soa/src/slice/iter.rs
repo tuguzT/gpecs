@@ -30,7 +30,7 @@ where
     #[inline]
     pub(super) fn new(slice: &'a SoaSlice<T>) -> Self {
         let ptr = slice.as_ptr().cast_mut();
-        let ptr = unsafe { NonNull::new_unchecked(ptr) }.cast();
+        let ptr = unsafe { NonNull::new_unchecked(ptr) };
         Self {
             ptr,
             capacity: slice.capacity(),
@@ -49,7 +49,7 @@ where
     }
 
     fn ptrs(&self) -> T::Ptrs {
-        let ptr = self.ptr.as_ptr().cast();
+        let ptr = self.ptr.as_ptr();
         let len = self.capacity;
 
         unsafe {
@@ -369,7 +369,7 @@ where
     #[inline]
     pub(super) fn new(slice: &'a mut SoaSlice<T>) -> Self {
         let ptr = slice.as_mut_ptr();
-        let ptr = unsafe { NonNull::new_unchecked(ptr) }.cast();
+        let ptr = unsafe { NonNull::new_unchecked(ptr) };
         Self {
             ptr,
             capacity: slice.capacity(),
@@ -388,7 +388,7 @@ where
     }
 
     fn ptrs(&self) -> T::MutPtrs {
-        let ptr = self.ptr.as_ptr().cast();
+        let ptr = self.ptr.as_ptr();
         let len = self.capacity;
 
         unsafe { ptrs::<T>(ptr, len) }

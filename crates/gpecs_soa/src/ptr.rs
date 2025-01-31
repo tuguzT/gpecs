@@ -8,7 +8,11 @@ use crate::{slice::SoaSlice, soa::Soa};
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
-pub fn slice_from_raw_parts<T>(data: *const u8, len: usize, capacity: usize) -> *const SoaSlice<T>
+pub fn slice_from_raw_parts<T>(
+    data: *const BufferData<T>,
+    len: usize,
+    capacity: usize,
+) -> *const SoaSlice<T>
 where
     T: Soa,
 {
@@ -23,7 +27,11 @@ where
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
-pub fn slice_from_raw_parts_mut<T>(data: *mut u8, len: usize, capacity: usize) -> *mut SoaSlice<T>
+pub fn slice_from_raw_parts_mut<T>(
+    data: *mut BufferData<T>,
+    len: usize,
+    capacity: usize,
+) -> *mut SoaSlice<T>
 where
     T: Soa,
 {
@@ -33,10 +41,10 @@ where
         0 => len,
         _ => buffer_layout.size() / size_of::<BufferData<T>>(),
     };
-    ptr::slice_from_raw_parts(data, core_len) as _
+    ptr::slice_from_raw_parts_mut(data, core_len) as _
 }
 
-pub(crate) struct BufferData<T>
+pub struct BufferData<T>
 where
     T: Soa,
 {
@@ -120,7 +128,7 @@ where
 }
 
 #[inline]
-pub(crate) unsafe fn ptrs<T>(ptr: *mut u8, capacity: usize) -> T::MutPtrs
+pub(crate) unsafe fn ptrs<T>(ptr: *mut BufferData<T>, capacity: usize) -> T::MutPtrs
 where
     T: Soa,
 {
@@ -129,7 +137,7 @@ where
     }
 
     let initial = Layout::new::<usize>();
-    unsafe { T::ptrs(ptr, initial, capacity) }
+    unsafe { T::ptrs(ptr.cast(), initial, capacity) }
 }
 
 #[cfg(test)]

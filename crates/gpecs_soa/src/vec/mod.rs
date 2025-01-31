@@ -12,7 +12,7 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{buffer_layout, ptrs, to_capacity},
+    ptr::{buffer_layout, ptrs, to_capacity, BufferData},
     raw_vec::RawSoaVec,
     slice::{from_raw_parts, from_raw_parts_mut, Iter, IterMut, SoaSlice},
     soa::Soa,
@@ -62,7 +62,7 @@ where
     }
 
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn from_raw_parts(ptr: *mut u8, len: usize, capacity: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, len: usize, capacity: usize) -> Self {
         Self {
             buffer: unsafe { RawSoaVec::from_raw_parts(ptr, capacity) },
             len,
@@ -70,7 +70,7 @@ where
     }
 
     pub(crate) const unsafe fn from_capacity_in_bytes(
-        ptr: *mut u8,
+        ptr: *mut BufferData<T>,
         len: usize,
         capacity_in_bytes: usize,
     ) -> Self {
@@ -80,7 +80,7 @@ where
         }
     }
 
-    pub fn into_raw_parts(self) -> (*mut u8, usize, usize) {
+    pub fn into_raw_parts(self) -> (*mut BufferData<T>, usize, usize) {
         let mut me = ManuallyDrop::new(self);
         (me.as_mut_ptr(), me.len(), me.capacity())
     }
@@ -259,11 +259,11 @@ where
         self
     }
 
-    pub const fn as_ptr(&self) -> *const u8 {
+    pub const fn as_ptr(&self) -> *const BufferData<T> {
         self.buffer.ptr().cast_const()
     }
 
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub const fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
         self.buffer.ptr()
     }
 

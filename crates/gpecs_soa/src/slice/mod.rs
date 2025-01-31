@@ -62,13 +62,13 @@ where
     }
 
     #[inline]
-    pub const fn as_ptr(&self) -> *const u8 {
-        self.buffer.as_ptr().cast()
+    pub const fn as_ptr(&self) -> *const BufferData<T> {
+        self.buffer.as_ptr()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.buffer.as_mut_ptr().cast()
+    pub const fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
+        self.buffer.as_mut_ptr()
     }
 
     #[inline]
@@ -478,7 +478,7 @@ where
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts<'slice, T>(
-    data: *const u8,
+    data: *const BufferData<T>,
     len: usize,
     capacity: usize,
 ) -> &'slice SoaSlice<T>
@@ -491,7 +491,7 @@ where
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts_mut<'slice, T>(
-    data: *mut u8,
+    data: *mut BufferData<T>,
     len: usize,
     capacity: usize,
 ) -> &'slice mut SoaSlice<T>

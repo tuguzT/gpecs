@@ -28,7 +28,7 @@ where
 {
     pub(super) fn new(vec: SoaVec<T>) -> Self {
         let vec = ManuallyDrop::new(vec);
-        let buffer = vec.buffer.non_null().cast();
+        let buffer = vec.buffer.non_null();
         Self {
             buffer,
             capacity_in_bytes: vec.capacity_in_bytes(),
@@ -68,7 +68,7 @@ where
     }
 
     fn ptrs(&self) -> T::MutPtrs {
-        let ptr = self.buffer.as_ptr().cast();
+        let ptr = self.buffer.as_ptr();
         let capacity = to_capacity::<T>(self.capacity_in_bytes);
 
         unsafe { ptrs::<T>(ptr, capacity) }
@@ -133,7 +133,7 @@ where
                     // let alloc = ManuallyDrop::take(&mut self.0.alloc);
                     // RawVec handles deallocation
                     let _ = RawSoaVec::<T>::from_nonnull_capacity_in_bytes(
-                        self.0.buffer.cast(),
+                        self.0.buffer,
                         self.0.capacity_in_bytes,
                     );
                 }

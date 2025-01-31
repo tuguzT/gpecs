@@ -192,21 +192,24 @@ where
         }
     }
 
-    pub unsafe fn from_raw_parts(ptr: *mut u8, capacity: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, capacity: usize) -> Self {
         unsafe {
             let ptr = NonNull::new_unchecked(ptr);
             Self::from_nonnull(ptr, capacity)
         }
     }
 
-    pub const unsafe fn from_capacity_in_bytes(ptr: *mut u8, capacity_in_bytes: usize) -> Self {
+    pub const unsafe fn from_capacity_in_bytes(
+        ptr: *mut BufferData<T>,
+        capacity_in_bytes: usize,
+    ) -> Self {
         unsafe {
             let ptr = NonNull::new_unchecked(ptr);
             Self::from_nonnull_capacity_in_bytes(ptr, capacity_in_bytes)
         }
     }
 
-    pub unsafe fn from_nonnull(ptr: NonNull<u8>, capacity: usize) -> Self {
+    pub unsafe fn from_nonnull(ptr: NonNull<BufferData<T>>, capacity: usize) -> Self {
         let capacity_in_bytes = if T::min_size_of_components() == 0 {
             0
         } else {
@@ -222,20 +225,20 @@ where
     }
 
     pub const unsafe fn from_nonnull_capacity_in_bytes(
-        ptr: NonNull<u8>,
+        ptr: NonNull<BufferData<T>>,
         capacity_in_bytes: usize,
     ) -> Self {
         Self {
-            ptr: ptr.cast(),
+            ptr,
             capacity_in_bytes,
         }
     }
 
-    pub const fn ptr(&self) -> *mut u8 {
+    pub const fn ptr(&self) -> *mut BufferData<T> {
         self.non_null().as_ptr()
     }
 
-    pub const fn non_null(&self) -> NonNull<u8> {
+    pub const fn non_null(&self) -> NonNull<BufferData<T>> {
         self.ptr.cast()
     }
 
@@ -245,7 +248,7 @@ where
             return None;
         }
 
-        Some(unsafe { self.ptr().byte_add(size_of::<usize>()) })
+        Some(unsafe { self.ptr().cast::<u8>().byte_add(size_of::<usize>()) })
     }
 
     #[allow(dead_code)]

@@ -20,7 +20,7 @@ pub use self::{
 mod index;
 mod iter;
 
-#[repr(C)]
+#[repr(transparent)]
 pub struct SoaSlice<T>
 where
     T: Soa,

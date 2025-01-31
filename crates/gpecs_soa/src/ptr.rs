@@ -88,7 +88,7 @@ where
     unsafe fn len(self) -> usize {
         match self.capacity_in_bytes() {
             0 => self.into_inner().len(),
-            _ => unsafe { ptr::read(self.as_ptr().cast()) },
+            _ => unsafe { ptr::read(self.as_ptr().ptr_to_len()) },
         }
     }
 
@@ -152,7 +152,7 @@ where
     unsafe fn len(self) -> usize {
         match self.capacity_in_bytes() {
             0 => self.into_inner_mut().len(),
-            _ => unsafe { ptr::read(self.as_ptr().cast()) },
+            _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_len_mut()) },
         }
     }
 
@@ -214,6 +214,34 @@ where
     #[inline(always)]
     fn into_inner_mut(self) -> *mut [BufferData<T>] {
         self as *mut [BufferData<T>]
+    }
+}
+
+pub(crate) trait PtrToLen: Copy {
+    fn ptr_to_len(self) -> *const usize;
+}
+
+impl<T> PtrToLen for *const BufferData<T>
+where
+    T: Soa,
+{
+    #[inline(always)]
+    fn ptr_to_len(self) -> *const usize {
+        self.cast()
+    }
+}
+
+pub(crate) trait PtrToLenMut: Copy {
+    fn ptr_to_len_mut(self) -> *mut usize;
+}
+
+impl<T> PtrToLenMut for *mut BufferData<T>
+where
+    T: Soa,
+{
+    #[inline(always)]
+    fn ptr_to_len_mut(self) -> *mut usize {
+        self.cast()
     }
 }
 

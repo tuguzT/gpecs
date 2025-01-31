@@ -12,7 +12,7 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{actual_capacity, ptrs, BufferData},
+    ptr::{actual_capacity, ptrs, BufferData, PtrToLenMut},
     raw_vec::RawSoaVec,
     slice::{from_raw_parts, from_raw_parts_mut, Iter, IterMut, SoaSlice},
     soa::Soa,
@@ -310,7 +310,7 @@ where
         }
 
         unsafe {
-            let len = self.as_mut_ptr().cast();
+            let len = self.as_mut_ptr().ptr_to_len_mut();
             *len = new_len;
         }
     }

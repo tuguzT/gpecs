@@ -326,6 +326,7 @@ where
     T: Soa,
     for<'any> T::Slices<'any>: Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("SoaSlice").field(&slices).finish()
@@ -336,6 +337,7 @@ impl<T> Default for &SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
     fn default() -> Self {
         let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
         unsafe { from_raw_parts(data, 0, 0) }
@@ -346,6 +348,7 @@ impl<T> Default for &mut SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
     fn default() -> Self {
         let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
         unsafe { from_raw_parts_mut(data, 0, 0) }
@@ -356,6 +359,7 @@ impl<T> Default for Box<SoaSlice<T>>
 where
     T: Soa,
 {
+    #[inline]
     fn default() -> Self {
         let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
         unsafe { Box::from_raw(slice_from_raw_parts_mut(data, 0, 0)) }
@@ -366,6 +370,7 @@ impl<T> AsRef<SoaSlice<T>> for SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
     fn as_ref(&self) -> &Self {
         self
     }
@@ -375,6 +380,7 @@ impl<T> AsMut<SoaSlice<T>> for SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
     }
@@ -385,6 +391,7 @@ where
     T: Soa,
     for<'any> T::Slices<'any>: Hash,
 {
+    #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let len = self.len();
         state.write_usize(len);
@@ -398,6 +405,7 @@ impl<T> Drop for SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
     fn drop(&mut self) {
         if self.is_empty() {
             return;
@@ -416,6 +424,7 @@ where
     type Item = T::Refs<'a>;
     type IntoIter = Iter<'a, T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -428,6 +437,7 @@ where
     type Item = T::Refs<'a>;
     type IntoIter = Iter<'a, T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -440,6 +450,7 @@ where
     type Item = T::RefsMut<'a>;
     type IntoIter = IterMut<'a, T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
@@ -452,6 +463,7 @@ where
     type Item = T::RefsMut<'a>;
     type IntoIter = IterMut<'a, T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
@@ -464,6 +476,7 @@ where
     type Item = T;
     type IntoIter = IntoIter<T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.into_vec().into_iter()
     }

@@ -34,6 +34,7 @@ impl<T> SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     pub const fn new() -> Self {
         Self {
             buffer: RawSoaVec::new(),
@@ -41,6 +42,7 @@ where
         }
     }
 
+    #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         let mut me = Self {
             buffer: RawSoaVec::with_capacity(capacity),
@@ -51,6 +53,7 @@ where
         me
     }
 
+    #[inline]
     pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
         let mut me = Self {
             buffer: RawSoaVec::try_with_capacity(capacity)?,
@@ -61,6 +64,7 @@ where
         Ok(me)
     }
 
+    #[inline]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, len: usize, capacity: usize) -> Self {
         Self {
@@ -69,6 +73,7 @@ where
         }
     }
 
+    #[inline]
     pub(crate) const unsafe fn from_capacity_in_bytes(
         ptr: *mut BufferData<T>,
         len: usize,
@@ -80,6 +85,7 @@ where
         }
     }
 
+    #[inline]
     pub fn into_raw_parts(self) -> (*mut BufferData<T>, usize, usize) {
         let mut me = ManuallyDrop::new(self);
         (me.as_mut_ptr(), me.len(), me.capacity())
@@ -239,27 +245,33 @@ where
         }
     }
 
+    #[inline]
     pub fn as_slice(&self) -> &SoaSlice<T> {
         self
     }
 
+    #[inline]
     pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T> {
         self
     }
 
+    #[inline]
     pub const fn as_ptr(&self) -> *const BufferData<T> {
         self.buffer.ptr().cast_const()
     }
 
+    #[inline]
     pub const fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
         self.buffer.ptr()
     }
 
+    #[inline]
     pub fn as_ptrs(&self) -> T::Ptrs {
         let ptrs = self.buffer.ptrs();
         T::ptrs_cast_const(ptrs)
     }
 
+    #[inline]
     pub fn as_mut_ptrs(&mut self) -> T::MutPtrs {
         self.buffer.ptrs()
     }
@@ -282,6 +294,7 @@ where
         unsafe { T::mut_slices_as_refs(slices) }
     }
 
+    #[inline]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         debug_assert!(new_len <= self.capacity());
@@ -290,6 +303,7 @@ where
         self.set_len_in_buffer(new_len);
     }
 
+    #[inline]
     fn set_len_in_buffer(&mut self, new_len: usize) {
         if self.capacity_in_bytes() == 0 {
             return;
@@ -394,6 +408,7 @@ where
         }
     }
 
+    #[inline]
     pub fn retain<F>(&mut self, mut f: F)
     where
         F: FnMut(T::Refs<'_>) -> bool,
@@ -555,6 +570,7 @@ where
         }
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         let slices = self.as_mut_slices();
         let slices = T::mut_slice_refs_as_ptrs(slices);
@@ -571,6 +587,7 @@ where
     T: Soa,
     for<'any> T::Slices<'any>: Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("SoaVec").field(&slices).finish()
@@ -581,6 +598,7 @@ impl<T> Default for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -590,6 +608,7 @@ impl<T> AsRef<SoaVec<T>> for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     fn as_ref(&self) -> &SoaVec<T> {
         self
     }
@@ -599,6 +618,7 @@ impl<T> AsRef<SoaSlice<T>> for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     fn as_ref(&self) -> &SoaSlice<T> {
         self
     }
@@ -608,6 +628,7 @@ impl<T> AsMut<SoaVec<T>> for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     fn as_mut(&mut self) -> &mut SoaVec<T> {
         self
     }
@@ -617,6 +638,7 @@ impl<T> AsMut<SoaSlice<T>> for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     fn as_mut(&mut self) -> &mut SoaSlice<T> {
         self
     }
@@ -626,6 +648,7 @@ impl<T> Borrow<SoaSlice<T>> for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     fn borrow(&self) -> &SoaSlice<T> {
         self
     }
@@ -635,6 +658,7 @@ impl<T> BorrowMut<SoaSlice<T>> for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     fn borrow_mut(&mut self) -> &mut SoaSlice<T> {
         self
     }
@@ -645,6 +669,7 @@ where
     T: Soa,
     for<'any> T::Slices<'any>: Hash,
 {
+    #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         Hash::hash(&**self, state)
     }
@@ -656,6 +681,7 @@ where
 {
     type Target = SoaSlice<T>;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         unsafe { from_raw_parts(self.as_ptr(), self.len(), self.capacity()) }
     }
@@ -665,6 +691,7 @@ impl<T> DerefMut for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { from_raw_parts_mut(self.as_mut_ptr(), self.len(), self.capacity()) }
     }
@@ -677,6 +704,7 @@ where
     type Item = T::Refs<'a>;
     type IntoIter = Iter<'a, T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -689,6 +717,7 @@ where
     type Item = T::RefsMut<'a>;
     type IntoIter = IterMut<'a, T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
@@ -701,6 +730,7 @@ where
     type Item = T;
     type IntoIter = IntoIter<T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         IntoIter::new(self)
     }

@@ -89,7 +89,6 @@ enum AllocInit {
     /// The contents of the new memory are uninitialized.
     Uninitialized,
     /// The new memory is guaranteed to be zeroed.
-    #[allow(dead_code)]
     Zeroed,
 }
 
@@ -110,7 +109,8 @@ where
     //   to round up a request of less than 8 bytes to at least 8 bytes.
     // - 4 if elements are moderate-sized (<= 1 KiB).
     // - 1 otherwise, to avoid wasting too much space for very short Vecs.
-    pub(crate) fn min_non_zero_cap() -> usize {
+    #[inline]
+    fn min_non_zero_cap() -> usize {
         if T::min_size_of_components() == 1 {
             8
         } else if T::min_size_of_components() <= 1024 {
@@ -120,6 +120,7 @@ where
         }
     }
 
+    #[inline]
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -155,6 +156,7 @@ where
         })
     }
 
+    #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         match Self::try_with_capacity(capacity) {
             Ok(me) => me,
@@ -162,10 +164,12 @@ where
         }
     }
 
+    #[inline]
     pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
         Self::try_allocate_in(capacity, AllocInit::Uninitialized)
     }
 
+    #[inline]
     #[allow(dead_code)]
     pub fn with_capacity_zeroed(capacity: usize) -> Self {
         match Self::try_with_capacity_zeroed(capacity) {
@@ -174,11 +178,13 @@ where
         }
     }
 
+    #[inline]
     #[allow(dead_code)]
     pub fn try_with_capacity_zeroed(capacity: usize) -> Result<Self, TryReserveError> {
         Self::try_allocate_in(capacity, AllocInit::Zeroed)
     }
 
+    #[inline]
     pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>> {
         debug_assert!(
             len <= self.capacity(),
@@ -192,6 +198,7 @@ where
         }
     }
 
+    #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, capacity: usize) -> Self {
         unsafe {
             let ptr = NonNull::new_unchecked(ptr);
@@ -199,6 +206,7 @@ where
         }
     }
 
+    #[inline]
     pub const unsafe fn from_capacity_in_bytes(
         ptr: *mut BufferData<T>,
         capacity_in_bytes: usize,
@@ -209,6 +217,7 @@ where
         }
     }
 
+    #[inline]
     pub unsafe fn from_nonnull(ptr: NonNull<BufferData<T>>, capacity: usize) -> Self {
         let capacity_in_bytes = buffer_layout::<T>(capacity)
             .expect("layout size should not exceed `isize::MAX`")
@@ -220,6 +229,7 @@ where
         }
     }
 
+    #[inline]
     pub const unsafe fn from_nonnull_capacity_in_bytes(
         ptr: NonNull<BufferData<T>>,
         capacity_in_bytes: usize,
@@ -230,14 +240,17 @@ where
         }
     }
 
+    #[inline]
     pub const fn ptr(&self) -> *mut BufferData<T> {
         self.non_null().as_ptr()
     }
 
+    #[inline]
     pub const fn non_null(&self) -> NonNull<BufferData<T>> {
         self.ptr.cast()
     }
 
+    #[inline]
     pub fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr();
         let capacity = self.capacity();
@@ -245,12 +258,14 @@ where
         unsafe { ptrs::<T>(ptr, capacity) }
     }
 
+    #[inline]
     #[allow(dead_code)]
     pub fn non_nulls(&self) -> T::NonNullPtrs {
         let ptrs = self.ptrs();
         unsafe { T::ptrs_to_nonnull(ptrs) }
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         if is_zst::<T>() {
             return usize::MAX;
@@ -258,10 +273,12 @@ where
         to_capacity::<T>(self.capacity_in_bytes)
     }
 
+    #[inline(always)]
     pub const fn capacity_in_bytes(&self) -> usize {
         self.capacity_in_bytes
     }
 
+    #[inline]
     const fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
         if self.capacity_in_bytes == 0 {
             return None;
@@ -278,6 +295,7 @@ where
         }
     }
 
+    #[inline]
     pub fn reserve(&mut self, len: usize, additional: usize) {
         // Callers expect this function to be very cheap when there is already sufficient capacity.
         // Therefore, we move all the resizing and error-handling logic from grow_amortized and
@@ -298,12 +316,14 @@ where
         }
     }
 
+    #[inline]
     pub fn grow_one(&mut self) {
         if let Err(err) = self.grow_amortized(self.capacity(), 1) {
             handle_error(err);
         }
     }
 
+    #[inline]
     pub fn try_reserve(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
         if self.needs_to_grow(len, additional) {
             self.grow_amortized(len, additional)?;
@@ -311,12 +331,14 @@ where
         Ok(())
     }
 
+    #[inline]
     pub fn reserve_exact(&mut self, len: usize, additional: usize) {
         if let Err(err) = self.try_reserve_exact(len, additional) {
             handle_error(err);
         }
     }
 
+    #[inline]
     pub fn try_reserve_exact(
         &mut self,
         len: usize,
@@ -328,12 +350,14 @@ where
         Ok(())
     }
 
+    #[inline]
     pub fn shrink_to_fit(&mut self, capacity: usize) {
         if let Err(err) = self.shrink(capacity) {
             handle_error(err);
         }
     }
 
+    #[inline]
     pub fn needs_to_grow(&self, len: usize, additional: usize) -> bool {
         let new_capacity_in_bytes = buffer_layout::<T>(len + additional)
             .expect("layout size should not exceed `isize::MAX`")
@@ -341,6 +365,7 @@ where
         new_capacity_in_bytes > self.capacity_in_bytes
     }
 
+    #[inline]
     unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<BufferData<T>>, capacity: usize) {
         self.ptr = ptr;
         self.capacity_in_bytes = buffer_layout::<T>(capacity)

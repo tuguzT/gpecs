@@ -84,6 +84,7 @@ impl<T> SoaSlicePtr<T> for *const SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
     unsafe fn len(self) -> usize {
         match self.capacity_in_bytes() {
             0 => self.into_inner().len(),
@@ -91,21 +92,25 @@ where
         }
     }
 
+    #[inline]
     fn capacity(self) -> usize {
         let capacity_in_bytes = self.capacity_in_bytes();
         to_capacity::<T>(capacity_in_bytes)
     }
 
+    #[inline]
     fn capacity_in_bytes(self) -> usize {
         let buffer = self.into_inner();
         buffer.len() * size_of::<BufferData<T>>()
     }
 
+    #[inline]
     fn as_ptr(self) -> *const BufferData<T> {
         let buffer = self.into_inner();
         buffer as *const BufferData<T> // should be `<*const [BufferData<T>]>::as_ptr(buffer)`
     }
 
+    #[inline]
     unsafe fn get_unchecked<I>(self, index: I) -> I::Ptr
     where
         I: SoaSliceIndex<SoaSlice<T>>,
@@ -143,6 +148,7 @@ impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
     unsafe fn len(self) -> usize {
         match self.capacity_in_bytes() {
             0 => self.into_inner_mut().len(),
@@ -150,21 +156,25 @@ where
         }
     }
 
+    #[inline]
     fn capacity(self) -> usize {
         let capacity_in_bytes = self.capacity_in_bytes();
         to_capacity::<T>(capacity_in_bytes)
     }
 
+    #[inline]
     fn capacity_in_bytes(self) -> usize {
         let buffer = self.into_inner_mut();
         buffer.len() * size_of::<BufferData<T>>()
     }
 
+    #[inline]
     fn as_mut_ptr(self) -> *mut BufferData<T> {
         let buffer = self.into_inner_mut();
         buffer as *mut BufferData<T> // should be `<*mut [BufferData<T>]>::as_mut_ptr(buffer)`
     }
 
+    #[inline]
     unsafe fn get_unchecked_mut<I>(self, index: I) -> I::MutPtr
     where
         I: SoaSliceIndex<SoaSlice<T>>,
@@ -184,6 +194,7 @@ impl<T> SoaSlicePtrIntoInner<T> for *const SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline(always)]
     fn into_inner(self) -> *const [BufferData<T>] {
         self as *const [BufferData<T>]
     }
@@ -200,6 +211,7 @@ impl<T> SoaSlicePtrIntoInnerMut<T> for *mut SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline(always)]
     fn into_inner_mut(self) -> *mut [BufferData<T>] {
         self as *mut [BufferData<T>]
     }

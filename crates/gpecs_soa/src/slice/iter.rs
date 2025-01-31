@@ -40,14 +40,17 @@ where
         }
     }
 
+    #[inline]
     pub const fn len(&self) -> usize {
         self.end - self.start
     }
 
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     fn ptrs(&self) -> T::Ptrs {
         let ptr = self.ptr.as_ptr();
         let len = self.capacity;
@@ -58,6 +61,7 @@ where
         }
     }
 
+    #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
         let ptrs = self.ptrs();
         let len = self.len();
@@ -69,6 +73,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn post_inc_start(&mut self, offset: usize) -> T::MutPtrs {
         let ptrs = T::ptrs_cast_mut(self.ptrs());
         let ptrs = unsafe { T::ptrs_add_mut(ptrs, self.start) };
@@ -77,6 +82,7 @@ where
         ptrs
     }
 
+    #[inline]
     unsafe fn pre_dec_end(&mut self, offset: usize) -> T::MutPtrs {
         self.end -= offset;
 
@@ -93,6 +99,7 @@ where
     T: Soa,
     for<'any> T::Slices<'any>: Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("Iter").field(&slices).finish()
@@ -103,6 +110,7 @@ impl<T> Default for Iter<'_, T>
 where
     T: Soa,
 {
+    #[inline]
     fn default() -> Self {
         let slice = Default::default();
         Self::new(slice)
@@ -113,6 +121,7 @@ impl<T> Clone for Iter<'_, T>
 where
     T: Soa,
 {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr,
@@ -131,6 +140,7 @@ where
 {
     type Item = T::Refs<'a>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if Iter::is_empty(self) {
             return None;
@@ -144,11 +154,13 @@ where
         }
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
         (len, Some(len))
     }
 
+    #[inline]
     fn count(self) -> usize
     where
         Self: Sized,
@@ -156,6 +168,7 @@ where
         self.len()
     }
 
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         if n >= Iter::len(self) {
             self.start = self.end;
@@ -168,6 +181,7 @@ where
         self.next()
     }
 
+    #[inline]
     fn last(mut self) -> Option<Self::Item>
     where
         Self: Sized,
@@ -213,6 +227,7 @@ where
         acc
     }
 
+    #[inline]
     fn for_each<F>(mut self, mut f: F)
     where
         Self: Sized,
@@ -223,6 +238,7 @@ where
         }
     }
 
+    #[inline]
     fn all<F>(&mut self, mut f: F) -> bool
     where
         Self: Sized,
@@ -236,6 +252,7 @@ where
         true
     }
 
+    #[inline]
     fn any<F>(&mut self, mut f: F) -> bool
     where
         Self: Sized,
@@ -249,6 +266,7 @@ where
         false
     }
 
+    #[inline]
     fn find<P>(&mut self, mut predicate: P) -> Option<Self::Item>
     where
         Self: Sized,
@@ -262,6 +280,7 @@ where
         None
     }
 
+    #[inline]
     fn find_map<B, F>(&mut self, mut f: F) -> Option<B>
     where
         Self: Sized,
@@ -275,6 +294,7 @@ where
         None
     }
 
+    #[inline]
     fn position<P>(&mut self, mut predicate: P) -> Option<usize>
     where
         Self: Sized,
@@ -292,6 +312,7 @@ where
         None
     }
 
+    #[inline]
     fn rposition<P>(&mut self, mut predicate: P) -> Option<usize>
     where
         P: FnMut(Self::Item) -> bool,
@@ -314,6 +335,7 @@ impl<T> DoubleEndedIterator for Iter<'_, T>
 where
     T: Soa,
 {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if Iter::is_empty(self) {
             return None;
@@ -327,6 +349,7 @@ where
         }
     }
 
+    #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         if n >= self.len() {
             self.end = self.start;
@@ -344,6 +367,7 @@ impl<T> ExactSizeIterator for Iter<'_, T>
 where
     T: Soa,
 {
+    #[inline]
     fn len(&self) -> usize {
         Iter::len(self)
     }
@@ -379,14 +403,17 @@ where
         }
     }
 
+    #[inline]
     pub const fn len(&self) -> usize {
         self.end - self.start
     }
 
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr.as_ptr();
         let len = self.capacity;
@@ -394,6 +421,7 @@ where
         unsafe { ptrs::<T>(ptr, len) }
     }
 
+    #[inline]
     pub fn into_slices(self) -> T::SlicesMut<'a> {
         let ptrs = self.ptrs();
         let len = self.len();
@@ -405,6 +433,7 @@ where
         }
     }
 
+    #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
         let ptrs = T::ptrs_cast_const(self.ptrs());
         let len = self.len();
@@ -416,6 +445,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn post_inc_start(&mut self, offset: usize) -> T::MutPtrs {
         let ptrs = self.ptrs();
         let ptrs = unsafe { T::ptrs_add_mut(ptrs, self.start) };
@@ -424,6 +454,7 @@ where
         ptrs
     }
 
+    #[inline]
     unsafe fn pre_dec_end(&mut self, offset: usize) -> T::MutPtrs {
         self.end -= offset;
 
@@ -440,6 +471,7 @@ where
     T: Soa,
     for<'any> T::Slices<'any>: Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("IterMut").field(&slices).finish()
@@ -450,6 +482,7 @@ impl<T> Default for IterMut<'_, T>
 where
     T: Soa,
 {
+    #[inline]
     fn default() -> Self {
         let slice = Default::default();
         Self::new(slice)
@@ -463,6 +496,7 @@ where
 {
     type Item = T::RefsMut<'a>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if IterMut::is_empty(self) {
             return None;
@@ -475,11 +509,13 @@ where
         }
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
         (len, Some(len))
     }
 
+    #[inline]
     fn count(self) -> usize
     where
         Self: Sized,
@@ -487,6 +523,7 @@ where
         self.len()
     }
 
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         if n >= IterMut::len(self) {
             self.start = self.end;
@@ -499,6 +536,7 @@ where
         self.next()
     }
 
+    #[inline]
     fn last(mut self) -> Option<Self::Item>
     where
         Self: Sized,
@@ -544,6 +582,7 @@ where
         acc
     }
 
+    #[inline]
     fn for_each<F>(mut self, mut f: F)
     where
         Self: Sized,
@@ -554,6 +593,7 @@ where
         }
     }
 
+    #[inline]
     fn all<F>(&mut self, mut f: F) -> bool
     where
         Self: Sized,
@@ -567,6 +607,7 @@ where
         true
     }
 
+    #[inline]
     fn any<F>(&mut self, mut f: F) -> bool
     where
         Self: Sized,
@@ -580,6 +621,7 @@ where
         false
     }
 
+    #[inline]
     fn find<P>(&mut self, mut predicate: P) -> Option<Self::Item>
     where
         Self: Sized,
@@ -593,6 +635,7 @@ where
         None
     }
 
+    #[inline]
     fn find_map<B, F>(&mut self, mut f: F) -> Option<B>
     where
         Self: Sized,
@@ -606,6 +649,7 @@ where
         None
     }
 
+    #[inline]
     fn position<P>(&mut self, mut predicate: P) -> Option<usize>
     where
         Self: Sized,
@@ -623,6 +667,7 @@ where
         None
     }
 
+    #[inline]
     fn rposition<P>(&mut self, mut predicate: P) -> Option<usize>
     where
         P: FnMut(Self::Item) -> bool,
@@ -645,6 +690,7 @@ impl<T> DoubleEndedIterator for IterMut<'_, T>
 where
     T: Soa,
 {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if IterMut::is_empty(self) {
             return None;
@@ -657,6 +703,7 @@ where
         }
     }
 
+    #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         if n >= self.len() {
             self.end = self.start;
@@ -674,6 +721,7 @@ impl<T> ExactSizeIterator for IterMut<'_, T>
 where
     T: Soa,
 {
+    #[inline]
     fn len(&self) -> usize {
         IterMut::len(self)
     }

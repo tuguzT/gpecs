@@ -29,7 +29,7 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    fn min_size_of_components() -> usize;
+    fn packed_size_of() -> usize;
     fn buffer_layout_unaligned(
         initial: Layout,
         capacity: usize,
@@ -101,7 +101,7 @@ unsafe impl Soa for () {
         Self: 'a;
 
     #[inline(always)]
-    fn min_size_of_components() -> usize {
+    fn packed_size_of() -> usize {
         size_of::<Self>()
     }
 
@@ -231,8 +231,14 @@ macro_rules! soa_impl {
                 Self: 'a;
 
             #[inline(always)]
-            fn min_size_of_components() -> usize {
-                $(size_of::<$types>() +)* 0
+            fn packed_size_of() -> usize {
+                #[allow(dead_code, non_snake_case)]
+                #[repr(packed)]
+                struct PackedSelf<$($types,)*> {
+                    $($types: $types,)*
+                }
+
+                size_of::<PackedSelf<$($types,)*>>()
             }
 
             fn buffer_layout_unaligned(

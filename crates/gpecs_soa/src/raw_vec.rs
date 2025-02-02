@@ -111,9 +111,9 @@ where
     // - 1 otherwise, to avoid wasting too much space for very short Vecs.
     #[inline]
     fn min_non_zero_cap() -> usize {
-        if T::min_size_of_components() == 1 {
+        if T::packed_size_of() == 1 {
             8
-        } else if T::min_size_of_components() <= 1024 {
+        } else if T::packed_size_of() <= 1024 {
             4
         } else {
             1

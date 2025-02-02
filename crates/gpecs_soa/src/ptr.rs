@@ -260,7 +260,7 @@ pub(crate) fn is_zst<T>() -> bool
 where
     T: Soa,
 {
-    match (T::min_size_of_components(), size_of::<BufferData<T>>()) {
+    match (T::packed_size_of(), size_of::<BufferData<T>>()) {
         (0, 0) => true,
         pair => {
             debug_assert!(
@@ -324,7 +324,7 @@ where
         return 0;
     }
 
-    let max_capacity = (capacity_in_bytes - size_of::<usize>()) / T::min_size_of_components();
+    let max_capacity = (capacity_in_bytes - size_of::<usize>()) / T::packed_size_of();
 
     let mut capacity = max_capacity;
     while {

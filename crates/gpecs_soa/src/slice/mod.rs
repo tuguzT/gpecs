@@ -395,6 +395,11 @@ where
     fn eq(&self, other: &Self) -> bool {
         self.as_slices() == other.as_slices()
     }
+    #[inline]
+    #[allow(clippy::partialeq_ne_impl)]
+    fn ne(&self, other: &Self) -> bool {
+        self.as_slices() != other.as_slices()
+    }
 }
 
 impl<T> Eq for SoaSlice<T>
@@ -402,6 +407,28 @@ where
     T: Soa,
     for<'any> T::Slices<'any>: Eq,
 {
+}
+
+impl<T> PartialOrd for SoaSlice<T>
+where
+    T: Soa,
+    for<'any> T::Slices<'any>: PartialOrd,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
+    }
+}
+
+impl<T> Ord for SoaSlice<T>
+where
+    T: Soa,
+    for<'any> T::Slices<'any>: Ord,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        Ord::cmp(&self.as_slices(), &other.as_slices())
+    }
 }
 
 impl<T> Hash for SoaSlice<T>

@@ -22,6 +22,7 @@ pub use self::into_iter::IntoIter;
 
 mod into_iter;
 mod partial_eq;
+mod partial_ord;
 
 pub struct SoaVec<T>
 where
@@ -670,6 +671,16 @@ where
     T: Soa,
     for<'any> T::Slices<'any>: Eq,
 {
+}
+
+impl<T> Ord for SoaVec<T>
+where
+    T: Soa,
+    for<'any> T::Slices<'any>: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        Ord::cmp(&self.as_slices(), &other.as_slices())
+    }
 }
 
 impl<T> Hash for SoaVec<T>

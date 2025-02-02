@@ -1,12 +1,12 @@
 use gpecs_soa::vec::SoaVec;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct ZST1;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct ZST2(());
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct ZST3 {
     empty: (),
 }
@@ -29,6 +29,8 @@ fn new() {
     assert_eq!(slice.capacity(), 0);
 
     assert_eq!(vec, slice);
+    assert!(vec >= slice);
+    assert!(slice <= vec);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -69,6 +71,8 @@ fn new_zst() {
     assert_eq!(slice.capacity(), usize::MAX);
 
     assert_eq!(vec, slice);
+    assert!(vec >= slice);
+    assert!(slice <= vec);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -109,6 +113,8 @@ fn with_capacity() {
     assert!(slice.capacity() >= 10);
 
     assert_eq!(vec, slice);
+    assert!(vec >= slice);
+    assert!(slice <= vec);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -149,6 +155,8 @@ fn with_capacity_zst() {
     assert!(slice.capacity() >= 10);
 
     assert_eq!(vec, slice);
+    assert!(vec >= slice);
+    assert!(slice <= vec);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -195,6 +203,8 @@ fn one_item() {
     assert_eq!(slice.get(0), Some((&1, &2, &3)));
 
     assert_eq!(vec, slice);
+    assert!(vec >= slice);
+    assert!(slice <= vec);
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -256,6 +266,8 @@ fn one_item_zst() {
     assert_eq!(slice.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     assert_eq!(vec, slice);
+    assert!(vec >= slice);
+    assert!(slice <= vec);
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -330,6 +342,8 @@ fn three_items() {
     );
 
     assert_eq!(vec, slice);
+    assert!(vec >= slice);
+    assert!(slice <= vec);
 
     for (t, _, _) in &mut vec {
         *t += 1;
@@ -510,6 +524,8 @@ fn three_items_zst() {
     );
 
     assert_eq!(vec, slice);
+    assert!(vec >= slice);
+    assert!(slice <= vec);
 
     let mut iter = vec.iter_mut();
     assert_eq!(iter.len(), 3);

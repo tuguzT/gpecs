@@ -6,7 +6,7 @@ macro_rules! __impl_slice_eq {
         impl<T, $($vars)*> PartialEq<$rhs> for $lhs
         where
             T: Soa,
-            for<'a> T::Slices<'a>: PartialEq,
+            for<'any> T::Slices<'any>: PartialEq,
             $($ty: $bound)?
         {
             #[inline]

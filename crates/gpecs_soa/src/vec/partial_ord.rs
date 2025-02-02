@@ -1,0 +1,28 @@
+use super::{Soa, SoaSlice, SoaVec};
+
+// Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
+macro_rules! __impl_slice_ord {
+    ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
+        impl<T, $($vars)*> PartialOrd<$rhs> for $lhs
+        where
+            T: Soa,
+            for<'any> T::Slices<'any>: PartialOrd,
+            $($ty: $bound)?
+        {
+            #[inline]
+            fn partial_cmp(&self, other: &$rhs) -> Option<::core::cmp::Ordering> {
+                PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
+            }
+        }
+    }
+}
+
+__impl_slice_ord! { [] SoaVec<T>, SoaVec<T> }
+
+__impl_slice_ord! { [] SoaVec<T>, SoaSlice<T> }
+__impl_slice_ord! { [] SoaVec<T>, &SoaSlice<T> }
+__impl_slice_ord! { [] SoaVec<T>, &mut SoaSlice<T> }
+
+__impl_slice_ord! { [] SoaSlice<T>, SoaVec<T> }
+__impl_slice_ord! { [] &SoaSlice<T>, SoaVec<T> }
+__impl_slice_ord! { [] &mut SoaSlice<T>, SoaVec<T> }

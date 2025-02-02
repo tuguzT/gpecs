@@ -232,11 +232,8 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             fn packed_size_of() -> usize {
-                #[allow(dead_code, non_snake_case)]
                 #[repr(packed)]
-                struct PackedSelf<$($types,)*> {
-                    $($types: $types,)*
-                }
+                struct PackedSelf<$($types,)*>($($types,)*);
 
                 size_of::<PackedSelf<$($types,)*>>()
             }

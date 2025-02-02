@@ -28,6 +28,8 @@ fn new() {
     assert!(slice.is_empty());
     assert_eq!(slice.capacity(), 0);
 
+    assert_eq!(vec, slice);
+
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), 0);
@@ -65,6 +67,8 @@ fn new_zst() {
     let slice = vec.as_slice();
     assert!(slice.is_empty());
     assert_eq!(slice.capacity(), usize::MAX);
+
+    assert_eq!(vec, slice);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -104,6 +108,8 @@ fn with_capacity() {
     assert!(slice.is_empty());
     assert!(slice.capacity() >= 10);
 
+    assert_eq!(vec, slice);
+
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), 0);
@@ -141,6 +147,8 @@ fn with_capacity_zst() {
     let slice = vec.as_slice();
     assert!(slice.is_empty());
     assert!(slice.capacity() >= 10);
+
+    assert_eq!(vec, slice);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -185,6 +193,8 @@ fn one_item() {
         ([1].as_slice(), [2].as_slice(), [3].as_slice()),
     );
     assert_eq!(slice.get(0), Some((&1, &2, &3)));
+
+    assert_eq!(vec, slice);
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -244,6 +254,8 @@ fn one_item_zst() {
         ),
     );
     assert_eq!(slice.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+
+    assert_eq!(vec, slice);
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -316,6 +328,8 @@ fn three_items() {
             [6, 9, 3].as_slice(),
         )),
     );
+
+    assert_eq!(vec, slice);
 
     for (t, _, _) in &mut vec {
         *t += 1;
@@ -494,6 +508,8 @@ fn three_items_zst() {
             [ZST3 { empty: () }, ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
         )),
     );
+
+    assert_eq!(vec, slice);
 
     let mut iter = vec.iter_mut();
     assert_eq!(iter.len(), 3);

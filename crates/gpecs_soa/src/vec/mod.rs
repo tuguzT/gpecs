@@ -21,6 +21,7 @@ use crate::{
 pub use self::into_iter::IntoIter;
 
 mod into_iter;
+mod partial_eq;
 
 pub struct SoaVec<T>
 where
@@ -662,6 +663,13 @@ where
     fn borrow_mut(&mut self) -> &mut SoaSlice<T> {
         self
     }
+}
+
+impl<T> Eq for SoaVec<T>
+where
+    T: Soa,
+    for<'any> T::Slices<'any>: Eq,
+{
 }
 
 impl<T> Hash for SoaVec<T>

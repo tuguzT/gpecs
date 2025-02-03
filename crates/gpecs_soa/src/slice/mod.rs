@@ -3,12 +3,13 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
+    mem,
     ptr::{self, NonNull},
 };
 
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
-    soa::Soa,
+    soa::{Soa, SoaToOwned},
     vec::{IntoIter, SoaVec},
 };
 
@@ -108,6 +109,58 @@ where
         let capacity_in_bytes = self.capacity_in_bytes();
         let ptr = Box::into_raw(self).cast();
         unsafe { SoaVec::from_capacity_in_bytes(ptr, length, capacity_in_bytes) }
+    }
+
+    #[inline]
+    pub fn to_vec<'me>(&'me self) -> SoaVec<T>
+    where
+        T::Refs<'me>: SoaToOwned<'me, Owned = T>,
+    {
+        struct DropGuard<'a, T>
+        where
+            T: Soa,
+        {
+            vec: &'a mut SoaVec<T>,
+            num_init: usize,
+        }
+
+        impl<T> Drop for DropGuard<'_, T>
+        where
+            T: Soa,
+        {
+            #[inline]
+            fn drop(&mut self) {
+                // SAFETY:
+                // items were marked initialized in the loop below
+                unsafe {
+                    self.vec.set_len(self.num_init);
+                }
+            }
+        }
+
+        let len = self.len();
+        let mut vec = SoaVec::with_capacity(len);
+
+        let mut guard = DropGuard {
+            vec: &mut vec,
+            num_init: 0,
+        };
+        let mut ptrs = guard.vec.as_mut_ptrs();
+        for (index, refs) in self.iter().enumerate() {
+            guard.num_init = index;
+            unsafe {
+                T::ptrs_write(ptrs, refs.to_owned());
+                ptrs = T::ptrs_add_mut(ptrs, 1);
+            }
+        }
+        mem::forget(guard);
+
+        // SAFETY:
+        // the vec was allocated and initialized above to at least this length.
+        unsafe {
+            vec.set_len(len);
+        }
+        vec
     }
 
     #[inline]

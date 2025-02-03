@@ -71,6 +71,18 @@ pub unsafe trait Soa: Sized {
     unsafe fn slices_drop_in_place(slices: Self::SliceMutPtrs);
 }
 
+pub trait SoaToOwned<'a> {
+    type Owned: Soa<Refs<'a> = Self>
+    where
+        Self: 'a;
+
+    fn to_owned(&self) -> Self::Owned;
+
+    fn clone_into(&self, target: &mut Self::Owned) {
+        *target = self.to_owned();
+    }
+}
+
 unsafe impl Soa for () {
     type Ptrs = ();
     type MutPtrs = ();
@@ -173,6 +185,16 @@ unsafe impl Soa for () {
 
     #[inline(always)]
     unsafe fn slices_drop_in_place(_: Self::SliceMutPtrs) {}
+}
+
+impl SoaToOwned<'_> for () {
+    type Owned = ();
+
+    #[inline(always)]
+    fn to_owned(&self) -> Self::Owned {}
+
+    #[inline(always)]
+    fn clone_into(&self, _: &mut Self::Owned) {}
 }
 
 // https://veykril.github.io/tlborm/decl-macros/building-blocks/counting.html#enum-counting
@@ -428,6 +450,27 @@ macro_rules! soa_impl {
             unsafe fn slices_drop_in_place(slices: Self::SliceMutPtrs) {
                 let ($($types,)*) = slices;
                 unsafe { $(::core::ptr::drop_in_place($types);)* }
+            }
+        }
+
+        impl<'a, $($types,)*> SoaToOwned<'a> for ($(&'a $types,)*)
+        where
+            $($types: Clone,)*
+        {
+            type Owned = ($($types,)*);
+
+            #[inline(always)]
+            #[allow(non_snake_case)]
+            fn to_owned(&self) -> Self::Owned {
+                let ($($types,)*) = *self;
+                ($($types.clone(),)*)
+            }
+
+            #[inline(always)]
+            #[allow(non_snake_case)]
+            fn clone_into(&self, target: &mut Self::Owned) {
+                let ($($types,)*) = *self;
+                $(target.$indices.clone_from($types);)*
             }
         }
     };

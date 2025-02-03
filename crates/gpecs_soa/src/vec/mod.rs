@@ -878,6 +878,37 @@ where
     }
 }
 
+impl<T> FromIterator<T> for SoaVec<T>
+where
+    T: Soa,
+{
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        // Unroll the first iteration, as the vector is going to be
+        // expanded on this iteration in every case when the iterable is not
+        // empty, but the loop in extend() is not going to see the
+        // vector being full in the few subsequent loop iterations.
+        // So we get better branch prediction.
+        let mut iter = iter.into_iter();
+        let mut vector = match iter.next() {
+            None => return SoaVec::new(),
+            Some(element) => {
+                let (lower, _) = iter.size_hint();
+                let initial_capacity =
+                    cmp::max(RawSoaVec::<T>::min_non_zero_cap(), lower.saturating_add(1));
+                let mut vector = SoaVec::with_capacity(initial_capacity);
+                unsafe {
+                    // SAFETY: We requested capacity at least 1
+                    T::ptrs_write(vector.as_mut_ptrs(), element);
+                    vector.set_len(1);
+                }
+                vector
+            }
+        };
+        vector.extend(iter);
+        vector
+    }
+}
+
 impl<T> Drop for SoaVec<T>
 where
     T: Soa,

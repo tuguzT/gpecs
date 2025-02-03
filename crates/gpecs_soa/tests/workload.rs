@@ -17,7 +17,7 @@ struct ZST3 {
 fn new() {
     type Vec = SoaVec<(u32, u16, u8)>;
 
-    let vec = Vec::new();
+    let vec = Vec::from_iter([]);
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), 0);
 
@@ -61,7 +61,7 @@ fn new() {
 fn new_zst() {
     type Vec = SoaVec<(ZST1, ZST2, ZST3)>;
 
-    let vec = Vec::new();
+    let vec = Vec::from_iter([]);
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), usize::MAX);
 
@@ -373,7 +373,11 @@ fn one_item_zst() {
 fn three_items() {
     type Vec = SoaVec<(u16, String, u128)>;
 
-    let mut vec = Vec::new();
+    let mut vec = Vec::from_iter(iter::repeat((0, "0".to_owned(), 0)).take(3));
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+
+    vec.truncate(0);
     vec.insert(0, (1, "2".to_owned(), 3));
     vec.insert(0, (4, "5".to_owned(), 6));
     vec.insert(1, (7, "8".to_owned(), 9));
@@ -593,11 +597,7 @@ fn three_items() {
 fn three_items_zst() {
     type Vec = SoaVec<(ZST1, ZST2, ZST3)>;
 
-    let mut vec = Vec::new();
-    vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
-    vec.insert(0, (ZST1, ZST2(()), ZST3 { empty: () }));
-    vec.insert(1, (ZST1, ZST2(()), ZST3 { empty: () }));
-
+    let vec = Vec::from_iter([(ZST1, ZST2(()), ZST3 { empty: () }); 3]);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
 

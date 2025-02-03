@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, vec::Vec};
 use core::{
     cmp,
     fmt::{self, Debug},
@@ -513,6 +513,19 @@ where
         let slices = T::mut_slice_refs_as_ptrs(slices);
         unsafe { T::slices_drop_in_place(slices) }
     }
+}
+
+impl<T> ToOwned for SoaSlice<T>
+where
+    T: Soa,
+    for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T> + 'any,
+{
+    type Owned = SoaVec<T>;
+
+    fn to_owned(&self) -> Self::Owned {
+        self.to_vec()
+    }
+    // TODO implement `clone_into()`
 }
 
 impl<'a, T> IntoIterator for &'a SoaSlice<T>

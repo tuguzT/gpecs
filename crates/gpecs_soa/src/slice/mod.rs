@@ -105,6 +105,32 @@ where
     }
 
     #[inline]
+    pub fn iter(&self) -> Iter<'_, T> {
+        Iter::new(self)
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        IterMut::new(self)
+    }
+
+    #[inline]
+    pub fn contains<'me>(&'me self, value: &T) -> bool
+    where
+        T::Refs<'me>: PartialEq<T>,
+    {
+        self.iter().any(|element| element == *value)
+    }
+
+    #[inline]
+    pub fn contains_by_refs<'me, 'r>(&'me self, refs: T::Refs<'r>) -> bool
+    where
+        T::Refs<'me>: PartialEq<T::Refs<'r>>,
+    {
+        self.iter().any(|element| element == refs)
+    }
+
+    #[inline]
     pub fn into_vec(self: Box<Self>) -> SoaVec<T> {
         let length = self.len();
         let capacity_in_bytes = self.capacity_in_bytes();
@@ -340,16 +366,6 @@ where
             self.swap(src, dst);
             permutation.swap(src, dst);
         }
-    }
-
-    #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
-        Iter::new(self)
-    }
-
-    #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        IterMut::new(self)
     }
 }
 

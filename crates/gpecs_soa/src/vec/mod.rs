@@ -774,6 +774,38 @@ where
     }
 }
 
+impl<T> Extend<T> for SoaVec<T>
+where
+    T: Soa,
+{
+    #[track_caller]
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        // This is the case for a general iterator.
+        //
+        // This function should be the moral equivalent of:
+        //
+        //      for item in iterator {
+        //          self.push(item);
+        //      }
+        let mut iter = iter.into_iter();
+        while let Some(element) = iter.next() {
+            let len = self.len();
+            if len == self.capacity() {
+                let (lower, _) = iter.size_hint();
+                self.reserve(lower.saturating_add(1));
+            }
+            unsafe {
+                let dst = T::ptrs_add_mut(self.as_mut_ptrs(), len);
+                T::ptrs_write(dst, element);
+                // Since next() executes user code which can panic we have to bump the length
+                // after each step.
+                // NB can't overflow since we would have had to alloc the address space
+                self.set_len(len + 1);
+            }
+        }
+    }
+}
+
 impl<'a, T> IntoIterator for &'a SoaVec<T>
 where
     T: Soa,

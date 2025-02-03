@@ -1,3 +1,5 @@
+use core::iter;
+
 use gpecs_soa::vec::SoaVec;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -507,9 +509,7 @@ fn three_items() {
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
 
-    vec.push((0, "0".to_owned(), 0));
-    vec.push((0, "0".to_owned(), 0));
-    vec.push((0, "0".to_owned(), 0));
+    vec.extend(iter::repeat((0, "0".to_owned(), 0)).take(3));
     vec.reserve(1);
     assert!(vec.capacity() >= 4);
     vec.reserve_exact(6);
@@ -715,9 +715,7 @@ fn three_items_zst() {
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
 
-    vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
-    vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
-    vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
+    vec.extend(iter::repeat((ZST1, ZST2(()), ZST3 { empty: () })).take(3));
     vec.reserve(1);
     assert!(vec.capacity() >= 4);
     vec.reserve_exact(6);

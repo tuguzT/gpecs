@@ -807,6 +807,16 @@ where
     }
 }
 
+impl<T> From<Box<SoaSlice<T>>> for SoaVec<T>
+where
+    T: Soa,
+{
+    #[inline]
+    fn from(value: Box<SoaSlice<T>>) -> Self {
+        value.into_vec()
+    }
+}
+
 impl<'me, T> From<&'me SoaSlice<T>> for SoaVec<T>
 where
     T: Soa,

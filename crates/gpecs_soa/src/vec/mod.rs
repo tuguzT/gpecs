@@ -778,6 +778,7 @@ impl<T> Extend<T> for SoaVec<T>
 where
     T: Soa,
 {
+    #[inline]
     #[track_caller]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         // This is the case for a general iterator.
@@ -803,6 +804,28 @@ where
                 self.set_len(len + 1);
             }
         }
+    }
+}
+
+impl<'me, T> From<&'me SoaSlice<T>> for SoaVec<T>
+where
+    T: Soa,
+    T::Refs<'me>: SoaToOwned<'me, Owned = T>,
+{
+    #[inline]
+    fn from(value: &'me SoaSlice<T>) -> Self {
+        value.to_vec()
+    }
+}
+
+impl<'me, T> From<&'me mut SoaSlice<T>> for SoaVec<T>
+where
+    T: Soa,
+    T::Refs<'me>: SoaToOwned<'me, Owned = T>,
+{
+    #[inline]
+    fn from(value: &'me mut SoaSlice<T>) -> Self {
+        value.to_vec()
     }
 }
 

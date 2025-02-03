@@ -221,8 +221,31 @@ fn one_item() {
     assert_eq!(iter.next(), Some((&1, &2, &3)));
     assert_eq!(iter.next(), None);
 
+    vec.extend_from_within(..0);
+    assert_eq!(
+        vec.as_slices(),
+        ([1].as_slice(), [2].as_slice(), [3].as_slice()),
+    );
+
+    vec.extend_from_within(..);
+    assert_eq!(
+        vec.as_slices(),
+        ([1; 2].as_slice(), [2; 2].as_slice(), [3; 2].as_slice()),
+    );
+
+    let (t, u, v) = vec.remove(0);
+    assert_eq!((t, u, v), (1, 2, 3));
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), Some((&1, &2, &3)));
+
     let (t, u, v) = vec.pop().expect("multi vector should not be empty");
     assert_eq!((t, u, v), (1, 2, 3));
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
+
+    vec.extend_from_slice(vec.clone().as_slice());
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
@@ -286,8 +309,39 @@ fn one_item_zst() {
     assert_eq!(iter.next(), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
     assert_eq!(iter.next(), None);
 
+    vec.extend_from_within(..0);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [ZST1].as_slice(),
+            [ZST2(())].as_slice(),
+            [ZST3 { empty: () }].as_slice(),
+        ),
+    );
+
+    vec.extend_from_within(..);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [ZST1; 2].as_slice(),
+            [ZST2(()); 2].as_slice(),
+            [ZST3 { empty: () }; 2].as_slice(),
+        ),
+    );
+
+    let (t, u, v) = vec.remove(0);
+    assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+
     let (t, u, v) = vec.pop().expect("multi vector should not be empty");
     assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
+
+    vec.extend_from_slice(vec.clone().as_slice());
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
@@ -385,6 +439,34 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
+    vec.extend_from_within(1..);
+    assert_eq!(vec.len(), 5);
+    assert!(vec.capacity() >= 5);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [5, 8, 2, 8, 2].as_slice(),
+            [
+                "5".to_owned(),
+                "8".to_owned(),
+                "2".to_owned(),
+                "8".to_owned(),
+                "2".to_owned(),
+            ]
+            .as_slice(),
+            [6, 9, 3, 9, 3].as_slice(),
+        ),
+    );
+    assert_eq!(vec.get(0), Some((&5, &"5".to_owned(), &6)));
+    assert_eq!(vec.get(1), Some((&8, &"8".to_owned(), &9)));
+    assert_eq!(vec.get(2), Some((&2, &"2".to_owned(), &3)));
+    assert_eq!(vec.get(3), Some((&8, &"8".to_owned(), &9)));
+    assert_eq!(vec.get(4), Some((&2, &"2".to_owned(), &3)));
+
+    vec.truncate(3);
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 5);
+
     let (t, u, v) = vec.swap_remove(1);
     assert_eq!((t, u, v), (8, "8".to_owned(), 9));
     assert_eq!(vec.len(), 2);
@@ -414,6 +496,16 @@ fn three_items() {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    vec.extend_from_slice(vec.clone().as_slice());
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
+
+    vec.extend_from_within(..);
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
 
     vec.push((0, "0".to_owned(), 0));
     vec.push((0, "0".to_owned(), 0));
@@ -520,9 +612,9 @@ fn three_items_zst() {
     assert_eq!(
         slice.as_slices(),
         (
-            [ZST1, ZST1, ZST1].as_slice(),
-            [ZST2(()), ZST2(()), ZST2(())].as_slice(),
-            [ZST3 { empty: () }, ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
+            [ZST1; 3].as_slice(),
+            [ZST2(()); 3].as_slice(),
+            [ZST3 { empty: () }; 3].as_slice(),
         ),
     );
     assert_eq!(slice.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
@@ -531,9 +623,9 @@ fn three_items_zst() {
     assert_eq!(
         slice.get(0..),
         Some((
-            [ZST1, ZST1, ZST1].as_slice(),
-            [ZST2(()), ZST2(()), ZST2(())].as_slice(),
-            [ZST3 { empty: () }, ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
+            [ZST1; 3].as_slice(),
+            [ZST2(()); 3].as_slice(),
+            [ZST3 { empty: () }; 3].as_slice(),
         )),
     );
 
@@ -561,6 +653,27 @@ fn three_items_zst() {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    vec.extend_from_within(1..);
+    assert_eq!(vec.len(), 5);
+    assert!(vec.capacity() >= 5);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [ZST1; 5].as_slice(),
+            [ZST2(()); 5].as_slice(),
+            [ZST3 { empty: () }; 5].as_slice(),
+        ),
+    );
+    assert_eq!(vec.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert_eq!(vec.get(1), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert_eq!(vec.get(2), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert_eq!(vec.get(3), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert_eq!(vec.get(4), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+
+    vec.truncate(3);
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 5);
 
     let (t, u, v) = vec.swap_remove(1);
     assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
@@ -591,6 +704,16 @@ fn three_items_zst() {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    vec.extend_from_slice(vec.clone().as_slice());
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
+
+    vec.extend_from_within(..);
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
 
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
@@ -653,9 +776,9 @@ fn three_items_zst() {
     assert_eq!(
         boxed_slice.get(..),
         Some((
-            [ZST1, ZST1].as_slice(),
-            [ZST2(()), ZST2(())].as_slice(),
-            [ZST3 { empty: () }, ZST3 { empty: () }].as_slice(),
+            [ZST1; 2].as_slice(),
+            [ZST2(()); 2].as_slice(),
+            [ZST3 { empty: () }; 2].as_slice(),
         )),
     );
 

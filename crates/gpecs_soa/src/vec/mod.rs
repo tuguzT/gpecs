@@ -5,7 +5,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     mem::ManuallyDrop,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, RangeBounds},
     ptr,
 };
 
@@ -14,7 +14,8 @@ pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 use crate::{
     ptr::{actual_capacity, ptrs, BufferData, PtrToLenMut},
     raw_vec::RawSoaVec,
-    slice::{from_raw_parts, from_raw_parts_mut, Iter, IterMut, SoaSlice},
+    set_len_on_drop::SetLenOnDrop,
+    slice::{from_raw_parts, from_raw_parts_mut, slice_range, Iter, IterMut, SoaSlice},
     soa::{Soa, SoaToOwned},
 };
 
@@ -552,6 +553,51 @@ where
 
             T::ptrs_write(ptrs, values);
             self.set_len(len + 1);
+        }
+    }
+
+    #[track_caller]
+    pub fn extend_from_slice<'other>(&mut self, other: &'other SoaSlice<T>)
+    where
+        T::Refs<'other>: SoaToOwned<'other, Owned = T>,
+    {
+        self.reserve(other.len());
+
+        let ptrs = self.as_mut_ptrs();
+        let mut set_len_on_drop = SetLenOnDrop {
+            local_len: self.len(),
+            vec: self,
+        };
+        for refs in other.iter() {
+            unsafe {
+                let dst = T::ptrs_add_mut(ptrs, set_len_on_drop.local_len);
+                T::ptrs_write(dst, refs.to_owned());
+            }
+            set_len_on_drop.local_len += 1;
+        }
+    }
+
+    #[track_caller]
+    pub fn extend_from_within<R>(&mut self, src: R)
+    where
+        R: RangeBounds<usize>,
+        for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T>,
+    {
+        let range = slice_range(src, ..self.len());
+        self.reserve(range.len());
+
+        let ptrs = self.as_mut_ptrs();
+        let mut set_len_on_drop = SetLenOnDrop {
+            local_len: self.len(),
+            vec: self,
+        };
+        for index in range {
+            let refs = set_len_on_drop.vec.index(index);
+            unsafe {
+                let dst = T::ptrs_add_mut(ptrs, set_len_on_drop.local_len);
+                T::ptrs_write(dst, refs.to_owned());
+            }
+            set_len_on_drop.local_len += 1;
         }
     }
 

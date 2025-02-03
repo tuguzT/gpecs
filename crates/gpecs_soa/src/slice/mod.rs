@@ -3,12 +3,13 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem,
+    mem, ops,
     ptr::{self, NonNull},
 };
 
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
+    set_len_on_drop::SetLenOnDrop,
     soa::{Soa, SoaToOwned},
     vec::{IntoIter, SoaVec},
 };
@@ -116,44 +117,22 @@ where
     where
         T::Refs<'me>: SoaToOwned<'me, Owned = T>,
     {
-        struct DropGuard<'a, T>
-        where
-            T: Soa,
-        {
-            vec: &'a mut SoaVec<T>,
-            num_init: usize,
-        }
-
-        impl<T> Drop for DropGuard<'_, T>
-        where
-            T: Soa,
-        {
-            #[inline]
-            fn drop(&mut self) {
-                // SAFETY:
-                // items were marked initialized in the loop below
-                unsafe {
-                    self.vec.set_len(self.num_init);
-                }
-            }
-        }
-
         let len = self.len();
         let mut vec = SoaVec::with_capacity(len);
 
-        let mut guard = DropGuard {
+        let mut set_len_on_drop = SetLenOnDrop {
             vec: &mut vec,
-            num_init: 0,
+            local_len: 0,
         };
-        let mut ptrs = guard.vec.as_mut_ptrs();
+        let ptrs = set_len_on_drop.vec.as_mut_ptrs();
         for (index, refs) in self.iter().enumerate() {
-            guard.num_init = index;
+            set_len_on_drop.local_len = index;
             unsafe {
-                T::ptrs_write(ptrs, refs.to_owned());
-                ptrs = T::ptrs_add_mut(ptrs, 1);
+                let dst = T::ptrs_add_mut(ptrs, index);
+                T::ptrs_write(dst, refs.to_owned());
             }
         }
-        mem::forget(guard);
+        mem::forget(set_len_on_drop);
 
         // SAFETY:
         // the vec was allocated and initialized above to at least this length.
@@ -618,4 +597,67 @@ where
     T: Soa,
 {
     unsafe { &mut *slice_from_raw_parts_mut(data, len, capacity) }
+}
+
+/// Just a copy of [`core::slice::range`]
+#[track_caller]
+#[must_use]
+pub(crate) fn slice_range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>
+where
+    R: ops::RangeBounds<usize>,
+{
+    let len = bounds.end;
+
+    let start = match range.start_bound() {
+        ops::Bound::Included(&start) => start,
+        ops::Bound::Excluded(start) => start
+            .checked_add(1)
+            .unwrap_or_else(|| slice_start_index_overflow_fail()),
+        ops::Bound::Unbounded => 0,
+    };
+
+    let end = match range.end_bound() {
+        ops::Bound::Included(end) => end
+            .checked_add(1)
+            .unwrap_or_else(|| slice_end_index_overflow_fail()),
+        ops::Bound::Excluded(&end) => end,
+        ops::Bound::Unbounded => len,
+    };
+
+    if start > end {
+        slice_index_order_fail(start, end);
+    }
+    if end > len {
+        slice_end_index_len_fail(end, len);
+    }
+
+    ops::Range { start, end }
+}
+
+#[inline(never)]
+#[cold]
+#[track_caller]
+const fn slice_start_index_overflow_fail() -> ! {
+    panic!("attempted to index slice from after maximum usize");
+}
+
+#[inline(never)]
+#[cold]
+#[track_caller]
+const fn slice_end_index_overflow_fail() -> ! {
+    panic!("attempted to index slice up to maximum usize");
+}
+
+#[inline(never)]
+#[cold]
+#[track_caller]
+fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
+    panic!("range end index {index} out of range for slice of length {len}")
+}
+
+#[inline(never)]
+#[cold]
+#[track_caller]
+fn slice_index_order_fail(index: usize, end: usize) -> ! {
+    panic!("slice index starts at {index} but ends at {end}")
 }

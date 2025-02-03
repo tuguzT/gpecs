@@ -522,6 +522,7 @@ where
 {
     type Owned = SoaVec<T>;
 
+    #[inline]
     fn to_owned(&self) -> Self::Owned {
         self.to_vec()
     }

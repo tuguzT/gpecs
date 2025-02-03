@@ -15,7 +15,7 @@ use crate::{
     ptr::{actual_capacity, ptrs, BufferData, PtrToLenMut},
     raw_vec::RawSoaVec,
     slice::{from_raw_parts, from_raw_parts_mut, Iter, IterMut, SoaSlice},
-    soa::Soa,
+    soa::{Soa, SoaToOwned},
 };
 
 pub use self::into_iter::IntoIter;
@@ -692,6 +692,18 @@ where
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         Hash::hash(&**self, state)
     }
+}
+
+impl<T> Clone for SoaVec<T>
+where
+    T: Soa,
+    for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T> + 'any,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        self.to_vec()
+    }
+    // TODO implement `clone_from()`
 }
 
 impl<T> Deref for SoaVec<T>

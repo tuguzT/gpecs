@@ -32,7 +32,7 @@ fn new() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), slice);
+    assert_eq!(slice.to_owned(), vec.clone());
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -76,7 +76,7 @@ fn new_zst() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), slice);
+    assert_eq!(slice.to_owned(), vec.clone());
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -120,7 +120,7 @@ fn with_capacity() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), slice);
+    assert_eq!(slice.to_owned(), vec.clone());
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -164,7 +164,7 @@ fn with_capacity_zst() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), slice);
+    assert_eq!(slice.to_owned(), vec.clone());
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -214,7 +214,7 @@ fn one_item() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), slice);
+    assert_eq!(slice.to_owned(), vec.clone());
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -279,7 +279,7 @@ fn one_item_zst() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), slice);
+    assert_eq!(slice.to_owned(), vec.clone());
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -357,7 +357,7 @@ fn three_items() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), slice);
+    assert_eq!(slice.to_owned(), vec.clone());
 
     for (t, _, _) in &mut vec {
         *t += 1;
@@ -541,7 +541,7 @@ fn three_items_zst() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), slice);
+    assert_eq!(slice.to_owned(), vec.clone());
 
     let mut iter = vec.iter_mut();
     assert_eq!(iter.len(), 3);

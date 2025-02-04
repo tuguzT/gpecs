@@ -236,6 +236,22 @@ fn one_item() {
         ([1; 2].as_slice(), [2; 2].as_slice(), [3; 2].as_slice()),
     );
 
+    vec.clone_from_slice(Vec::from_iter([Default::default(); 2]).as_slice());
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [Default::default(); 2].as_slice(),
+            [Default::default(); 2].as_slice(),
+            [Default::default(); 2].as_slice(),
+        ),
+    );
+
+    vec.copy_from_slice(Vec::from_iter([(1, 2, 3); 2]).as_slice());
+    assert_eq!(
+        vec.as_slices(),
+        ([1; 2].as_slice(), [2; 2].as_slice(), [3; 2].as_slice()),
+    );
+
     let (t, u, v) = vec.remove(0);
     assert_eq!((t, u, v), (1, 2, 3));
     assert_eq!(vec.len(), 1);
@@ -244,6 +260,12 @@ fn one_item() {
 
     let (t, u, v) = vec.pop().expect("multi vector should not be empty");
     assert_eq!((t, u, v), (1, 2, 3));
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
+
+    let clone = vec.clone();
+    vec.copy_from_slice(clone.as_slice());
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
@@ -423,9 +445,21 @@ fn three_items() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    for (t, _, _) in &mut vec {
+    let mut clone = vec.clone();
+    for (t, _, _) in &mut clone {
         *t += 1;
     }
+    vec.clone_from_slice(clone.as_slice());
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [5, 8, 2].as_slice(),
+            ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
+            [6, 9, 3].as_slice(),
+        ),
+    );
 
     let mut iter = vec.iter_mut();
     assert_eq!(iter.len(), 3);
@@ -509,6 +543,12 @@ fn three_items() {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    let clone = vec.clone();
+    vec.clone_from_slice(clone.as_slice());
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
 
     vec.extend_from_slice(vec.clone().as_slice());
     assert!(vec.is_empty());
@@ -712,6 +752,12 @@ fn three_items_zst() {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    let clone = vec.clone();
+    vec.copy_from_slice(clone.as_slice());
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(vec.get(0), None);
 
     vec.extend_from_slice(vec.clone().as_slice());
     assert!(vec.is_empty());

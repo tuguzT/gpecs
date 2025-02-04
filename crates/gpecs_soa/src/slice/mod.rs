@@ -169,6 +169,67 @@ where
     }
 
     #[inline]
+    #[track_caller]
+    pub fn clone_from_slice<'src>(&mut self, src: &'src SoaSlice<T>)
+    where
+        T::Refs<'src>: SoaToOwned<'src, Owned = T>,
+    {
+        // The panic code path was put into a cold function to not bloat the
+        // call site.
+        #[inline(never)]
+        #[cold]
+        #[track_caller]
+        fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
+            panic!(
+                "source slice length ({}) does not match destination slice length ({})",
+                src_len, dst_len,
+            );
+        }
+
+        let len = self.len();
+        if len != src.len() {
+            len_mismatch_fail(len, src.len());
+        }
+
+        for index in 0..len {
+            let dst = unsafe { T::as_mut_refs(self.get_unchecked_mut(index)) };
+            let src = unsafe { T::as_refs(src.get_unchecked(index)) };
+            src.clone_into_refs(dst);
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn copy_from_slice(&mut self, src: &SoaSlice<T>)
+    where
+        T: Copy,
+    {
+        // The panic code path was put into a cold function to not bloat the
+        // call site.
+        #[inline(never)]
+        #[cold]
+        #[track_caller]
+        fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
+            panic!(
+                "source slice length ({}) does not match destination slice length ({})",
+                src_len, dst_len,
+            );
+        }
+
+        let len = self.len();
+        if len != src.len() {
+            len_mismatch_fail(len, src.len());
+        }
+
+        // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
+        // checked to have the same length. The slices cannot overlap because
+        // mutable references are exclusive.
+        unsafe {
+            T::ptrs_copy_nonoverlapping(src.as_ptrs(), self.as_mut_ptrs(), len);
+        }
+    }
+
+    #[inline]
     pub fn get<I>(&self, index: I) -> Option<I::Ref<'_>>
     where
         I: SoaSliceIndex<Self>,
@@ -203,6 +264,7 @@ where
     }
 
     #[inline]
+    #[track_caller]
     pub fn index<I>(&self, index: I) -> I::Ref<'_>
     where
         I: SoaSliceIndex<Self>,
@@ -211,6 +273,7 @@ where
     }
 
     #[inline]
+    #[track_caller]
     pub fn index_mut<I>(&mut self, index: I) -> I::RefMut<'_>
     where
         I: SoaSliceIndex<Self>,
@@ -221,16 +284,16 @@ where
     #[inline]
     #[track_caller]
     pub fn swap(&mut self, a: usize, b: usize) {
-        let ptrs_a = {
+        let a = {
             let refs = self.index_mut(a);
             T::mut_refs_as_ptrs(refs)
         };
-        let ptrs_b = {
+        let b = {
             let refs = self.index_mut(b);
             T::mut_refs_as_ptrs(refs)
         };
 
-        unsafe { T::ptrs_swap(ptrs_a, ptrs_b) }
+        unsafe { T::ptrs_swap(a, b) }
     }
 
     #[inline]

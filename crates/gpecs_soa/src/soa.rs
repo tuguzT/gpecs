@@ -81,6 +81,14 @@ pub trait SoaToOwned<'a> {
     fn clone_into(&self, target: &mut Self::Owned) {
         *target = self.to_owned();
     }
+
+    fn clone_into_refs(&self, target: <Self::Owned as Soa>::RefsMut<'_>) {
+        let owned = self.to_owned();
+        unsafe {
+            let dst = <Self::Owned as Soa>::mut_refs_as_ptrs(target);
+            <Self::Owned as Soa>::ptrs_write(dst, owned);
+        }
+    }
 }
 
 unsafe impl Soa for () {
@@ -195,6 +203,9 @@ impl SoaToOwned<'_> for () {
 
     #[inline(always)]
     fn clone_into(&self, _: &mut Self::Owned) {}
+
+    #[inline(always)]
+    fn clone_into_refs(&self, _: <Self::Owned as Soa>::RefsMut<'_>) {}
 }
 
 // https://veykril.github.io/tlborm/decl-macros/building-blocks/counting.html#enum-counting
@@ -469,6 +480,13 @@ macro_rules! soa_impl {
             #[inline(always)]
             #[allow(non_snake_case)]
             fn clone_into(&self, target: &mut Self::Owned) {
+                let ($($types,)*) = *self;
+                $(target.$indices.clone_from($types);)*
+            }
+
+            #[inline(always)]
+            #[allow(non_snake_case)]
+            fn clone_into_refs(&self, target: <Self::Owned as Soa>::RefsMut<'_>) {
                 let ($($types,)*) = *self;
                 $(target.$indices.clone_from($types);)*
             }

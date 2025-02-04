@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{borrow::ToOwned, boxed::Box};
 use core::{
     borrow::{Borrow, BorrowMut},
     cmp,
@@ -749,7 +749,10 @@ where
     fn clone(&self) -> Self {
         self.to_vec()
     }
-    // TODO implement `clone_from()`
+
+    fn clone_from(&mut self, source: &Self) {
+        source.as_slice().clone_into(self);
+    }
 }
 
 impl<T> Deref for SoaVec<T>

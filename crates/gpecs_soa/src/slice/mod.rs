@@ -584,7 +584,15 @@ where
     fn to_owned(&self) -> Self::Owned {
         self.to_vec()
     }
-    // TODO implement `clone_into()`
+
+    #[inline]
+    fn clone_into(&self, target: &mut Self::Owned) {
+        // decide if this impl will be better:
+        // https://github.com/rust-lang/rust/blob/019fc4de2f3d49a2ef862d180599194d2be05193/library/alloc/src/slice.rs#L860
+
+        target.clear();
+        target.extend_from_slice(self);
+    }
 }
 
 impl<'a, T> IntoIterator for &'a SoaSlice<T>

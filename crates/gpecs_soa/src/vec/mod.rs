@@ -592,8 +592,8 @@ where
             vec: self,
         };
         for index in range {
-            let refs = set_len_on_drop.vec.index(index);
             unsafe {
+                let refs = T::as_refs(set_len_on_drop.vec.get_unchecked(index));
                 let dst = T::ptrs_add_mut(ptrs, set_len_on_drop.local_len);
                 T::ptrs_write(dst, refs.to_owned());
             }

@@ -1,4 +1,4 @@
-use std::{any::type_name_of_val, hint::black_box};
+use std::{any::type_name, hint::black_box};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use gpecs_soa::prelude::*;
@@ -10,20 +10,24 @@ type Medium = (Small, Small, Small);
 type Big = (Small, Small, [usize; 18], String, String);
 type Large = ([u64; 64],);
 
-fn with_capacity<T, const CAP: usize>()
+fn soa_with_capacity<T, const CAP: usize>()
 where
     T: Soa,
 {
     black_box(SoaVec::<T>::with_capacity(black_box(CAP)));
 }
 
+fn aos_with_capacity<T, const CAP: usize>() {
+    black_box(Vec::<T>::with_capacity(black_box(CAP)));
+}
+
 fn bench_with_capacity<T, const CAP: usize>(c: &mut Criterion)
 where
     T: Soa,
 {
-    let function = with_capacity::<T, CAP>;
-    let id = type_name_of_val(&function);
-    c.bench_function(id, |b| b.iter(function));
+    let mut group = c.benchmark_group(format!("With capacity for `{}`", type_name::<T>()));
+    group.bench_function("SoA (mine)", |b| b.iter(soa_with_capacity::<T, CAP>));
+    group.bench_function("AoS (std)", |b| b.iter(aos_with_capacity::<T, CAP>));
 }
 
 criterion_group!(

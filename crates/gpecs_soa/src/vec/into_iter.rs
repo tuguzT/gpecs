@@ -156,7 +156,7 @@ where
             return;
         }
         let slices = guard.0.as_mut_slices();
-        let slices = T::mut_slice_refs_as_ptrs(slices);
+        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
         unsafe { T::slices_drop_in_place(slices) }
         // now `guard` will be dropped and do the rest
     }

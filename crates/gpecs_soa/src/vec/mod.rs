@@ -19,8 +19,9 @@ use crate::{
     soa::{Soa, SoaToOwned},
 };
 
-pub use self::into_iter::IntoIter;
+pub use self::{drain::Drain, into_iter::IntoIter};
 
+mod drain;
 mod into_iter;
 mod partial_eq;
 mod partial_ord;
@@ -619,9 +620,18 @@ where
     }
 
     #[inline]
+    #[track_caller]
+    pub fn drain<R>(&mut self, range: R) -> Drain<'_, T>
+    where
+        R: RangeBounds<usize>,
+    {
+        Drain::new(self, range)
+    }
+
+    #[inline]
     pub fn clear(&mut self) {
         let slices = self.as_mut_slices();
-        let slices = T::mut_slice_refs_as_ptrs(slices);
+        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
 
         unsafe {
             self.set_len(0);

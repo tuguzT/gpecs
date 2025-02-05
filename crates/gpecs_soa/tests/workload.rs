@@ -507,7 +507,28 @@ fn three_items() {
     assert_eq!(vec.get(3), Some((&8, &"8".to_owned(), &9)));
     assert_eq!(vec.get(4), Some((&2, &"2".to_owned(), &3)));
 
-    vec.truncate(3);
+    {
+        let mut drain = vec.drain(2..4);
+        assert_eq!(drain.len(), 2);
+        assert_eq!(
+            drain.as_slices(),
+            (
+                [2, 8].as_slice(),
+                ["2".to_owned(), "8".to_owned()].as_slice(),
+                [3, 9].as_slice(),
+            )
+        );
+
+        assert_eq!(drain.next_back(), Some((8, "8".to_owned(), 9)));
+        assert_eq!(drain.len(), 1);
+
+        assert_eq!(drain.next(), Some((2, "2".to_owned(), 3)));
+        assert_eq!(drain.len(), 0);
+
+        assert_eq!(drain.next(), None);
+        assert_eq!(drain.next_back(), None);
+    }
+
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 5);
 
@@ -580,6 +601,10 @@ fn three_items() {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    vec.truncate(1);
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 3);
 
     vec.clear();
     assert!(vec.is_empty());
@@ -719,7 +744,28 @@ fn three_items_zst() {
     assert_eq!(vec.get(3), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
     assert_eq!(vec.get(4), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
-    vec.truncate(3);
+    {
+        let mut drain = vec.drain(2..4);
+        assert_eq!(drain.len(), 2);
+        assert_eq!(
+            drain.as_slices(),
+            (
+                [ZST1; 2].as_slice(),
+                [ZST2(()); 2].as_slice(),
+                [ZST3 { empty: () }; 2].as_slice(),
+            ),
+        );
+
+        assert!(drain.next_back().is_some());
+        assert_eq!(drain.len(), 1);
+
+        assert!(drain.next().is_some());
+        assert_eq!(drain.len(), 0);
+
+        assert!(drain.next().is_none());
+        assert!(drain.next_back().is_none());
+    }
+
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 5);
 
@@ -789,6 +835,10 @@ fn three_items_zst() {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    vec.truncate(1);
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 3);
 
     vec.clear();
     assert!(vec.is_empty());

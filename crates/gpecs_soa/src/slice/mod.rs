@@ -568,7 +568,7 @@ where
         }
 
         let slices = self.as_mut_slices();
-        let slices = T::mut_slice_refs_as_ptrs(slices);
+        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
         unsafe { T::slices_drop_in_place(slices) }
     }
 }
@@ -686,7 +686,7 @@ where
     unsafe { &mut *slice_from_raw_parts_mut(data, len, capacity) }
 }
 
-/// Just a copy of [`core::slice::range`]
+/// Just a copy of unstable [`core::slice::range`]
 #[track_caller]
 #[must_use]
 pub(crate) fn slice_range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>

@@ -394,13 +394,13 @@ where
     #[inline]
     unsafe fn get_unchecked(self, slice: *const SoaSlice<T>) -> Self::Ptr {
         let slices = unsafe { (*slice).as_slices() };
-        T::slice_refs_as_ptrs(slices)
+        T::slice_refs_as_slice_ptrs(slices)
     }
 
     #[inline]
     unsafe fn get_unchecked_mut(self, slice: *mut SoaSlice<T>) -> Self::MutPtr {
         let slices = unsafe { (*slice).as_mut_slices() };
-        T::mut_slice_refs_as_ptrs(slices)
+        T::mut_slice_refs_as_slice_ptrs(slices)
     }
 }
 

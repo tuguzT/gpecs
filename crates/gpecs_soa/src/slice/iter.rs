@@ -2,6 +2,7 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
+    ops::Range,
     ptr::NonNull,
 };
 
@@ -14,7 +15,7 @@ use super::SoaSlice;
 
 pub struct Iter<'a, T>
 where
-    T: Soa,
+    T: Soa + 'a,
 {
     ptr: NonNull<BufferData<T>>,
     capacity: usize,
@@ -31,11 +32,28 @@ where
     pub(super) fn new(slice: &'a SoaSlice<T>) -> Self {
         let ptr = slice.as_ptr().cast_mut();
         let ptr = unsafe { NonNull::new_unchecked(ptr) };
+
         Self {
             ptr,
             capacity: slice.capacity(),
             start: 0,
             end: slice.len(),
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub(crate) unsafe fn from_range(slice: &'a SoaSlice<T>, range: Range<usize>) -> Self {
+        let ptr = slice.as_ptr().cast_mut();
+        let ptr = unsafe { NonNull::new_unchecked(ptr) };
+
+        let Range { start, end } = range;
+        Self {
+            ptr,
+            capacity: slice.capacity(),
+            start,
+            end,
             phantom: PhantomData,
         }
     }
@@ -62,7 +80,7 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> T::Slices<'_> {
+    pub fn as_slices(&self) -> T::Slices<'a> {
         let ptrs = self.ptrs();
         let len = self.len();
 
@@ -377,7 +395,7 @@ impl<T> FusedIterator for Iter<'_, T> where T: Soa {}
 
 pub struct IterMut<'a, T>
 where
-    T: Soa,
+    T: Soa + 'a,
 {
     ptr: NonNull<BufferData<T>>,
     capacity: usize,

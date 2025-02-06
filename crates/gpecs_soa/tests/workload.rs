@@ -616,8 +616,10 @@ fn three_items() {
     };
 
     vec.push((1, "2".to_owned(), 3));
-    vec.push((4, "5".to_owned(), 6));
-    vec.push((7, "8".to_owned(), 9));
+    for _ in 0..10 {
+        vec.push((4, "5".to_owned(), 6));
+        vec.push((7, "8".to_owned(), 9));
+    }
     vec.retain_mut(|(x, _, _)| {
         if *x <= 3 {
             *x += 1;
@@ -627,7 +629,7 @@ fn three_items() {
         }
     });
     assert_eq!(vec.len(), 1);
-    assert!(vec.capacity() >= 3);
+    assert!(vec.capacity() >= (1 + 2 * 10));
     assert_eq!(
         vec.as_slices(),
         ([2].as_slice(), ["2".to_owned()].as_slice(), [3].as_slice()),

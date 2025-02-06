@@ -105,9 +105,8 @@ criterion_group!(
     push_many::<Tiny>,
     push_many::<Small>,
     push_many::<Medium>,
-    // TODO fix sudden heap corruption
-    // push_many::<Big>,
-    // push_many::<Large>,
+    push_many::<Big>,
+    push_many::<Large>,
 );
 
 criterion_main!(benches_with_capacity, benches_push_many);

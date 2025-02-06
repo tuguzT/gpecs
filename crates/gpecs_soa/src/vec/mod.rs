@@ -363,8 +363,14 @@ where
             assert_failed(index, len);
         }
 
-        if len == self.capacity() {
+        let capacity = self.capacity();
+        if len == capacity {
             self.buffer.grow_one();
+
+            match capacity {
+                0 => self.set_len_in_buffer(0),
+                _ => self.move_right(capacity),
+            }
         }
 
         unsafe {
@@ -544,8 +550,14 @@ where
 
     pub fn push(&mut self, values: T) {
         let len = self.len();
-        if len == self.capacity() {
+        let capacity = self.capacity();
+        if len == capacity {
             self.buffer.grow_one();
+
+            match capacity {
+                0 => self.set_len_in_buffer(0),
+                _ => self.move_right(capacity),
+            }
         }
 
         unsafe {

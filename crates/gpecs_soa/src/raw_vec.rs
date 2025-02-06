@@ -12,7 +12,10 @@ use core::{
 };
 
 use crate::{
-    ptr::{buffer_layout, is_zst, ptrs, slice_from_raw_parts_mut, to_capacity, BufferData},
+    ptr::{
+        actual_capacity, buffer_layout, is_zst, ptrs, slice_from_raw_parts_mut, to_capacity,
+        BufferData,
+    },
     slice::SoaSlice,
     soa::Soa,
 };
@@ -382,8 +385,9 @@ where
 
         let required_capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
 
-        let capacity = cmp::max(self.capacity_in_bytes * 2, required_capacity);
+        let capacity = cmp::max(self.capacity() * 2, required_capacity);
         let capacity = cmp::max(Self::min_non_zero_cap(), capacity);
+        let capacity = actual_capacity::<T>(capacity);
         let new_layout = buffer_layout::<T>(capacity);
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
@@ -399,6 +403,7 @@ where
         }
 
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
+        let capacity = actual_capacity::<T>(capacity);
         let new_layout = buffer_layout::<T>(capacity);
 
         let ptr = finish_grow(new_layout, self.current_memory())?;

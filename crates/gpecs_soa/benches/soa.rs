@@ -20,14 +20,14 @@ where
     const KB: usize = 1024;
     const CAPACITY_RANGE: [usize; 8] = [0, 1, 10, 100, KB, KB * 2, KB * 4, KB * 8];
 
-    fn soa_with_capacity<T>(capacity: usize)
+    fn soa<T>(capacity: usize)
     where
         T: Soa,
     {
         black_box(SoaVec::<T>::with_capacity(black_box(capacity)));
     }
 
-    fn aos_with_capacity<T>(capacity: usize) {
+    fn aos<T>(capacity: usize) {
         black_box(Vec::<T>::with_capacity(black_box(capacity)));
     }
 
@@ -36,12 +36,12 @@ where
         group.bench_with_input(
             BenchmarkId::new(SOA_FUNCTION_NAME, capacity),
             &capacity,
-            |b, &capacity| b.iter(|| soa_with_capacity::<T>(capacity)),
+            |b, &capacity| b.iter(|| soa::<T>(capacity)),
         );
         group.bench_with_input(
             BenchmarkId::new(AOS_FUNCTION_NAME, capacity),
             &capacity,
-            |b, &capacity| b.iter(|| aos_with_capacity::<T>(capacity)),
+            |b, &capacity| b.iter(|| aos::<T>(capacity)),
         );
     }
 }
@@ -62,7 +62,7 @@ where
 {
     const COUNT_RANGE: [usize; 6] = [0, 1, 10, 100, 1_000, 10_000];
 
-    fn soa_push_many<T>(count: usize)
+    fn soa<T>(count: usize)
     where
         T: Soa + Default,
     {
@@ -73,7 +73,7 @@ where
         black_box(vec);
     }
 
-    fn aos_push_many<T>(count: usize)
+    fn aos<T>(count: usize)
     where
         T: Default,
     {
@@ -89,12 +89,12 @@ where
         group.bench_with_input(
             BenchmarkId::new(SOA_FUNCTION_NAME, count),
             &count,
-            |b, &capacity| b.iter(|| soa_push_many::<T>(capacity)),
+            |b, &count| b.iter(|| soa::<T>(count)),
         );
         group.bench_with_input(
             BenchmarkId::new(AOS_FUNCTION_NAME, count),
             &count,
-            |b, &capacity| b.iter(|| aos_push_many::<T>(capacity)),
+            |b, &count| b.iter(|| aos::<T>(count)),
         );
     }
 }
@@ -109,4 +109,70 @@ criterion_group!(
     push_many::<Large>,
 );
 
-criterion_main!(benches_with_capacity, benches_push_many);
+fn push_many_preallocated<T>(c: &mut Criterion)
+where
+    T: Soa + Default,
+{
+    const COUNT_RANGE: [usize; 6] = [0, 1, 10, 100, 1_000, 10_000];
+
+    fn soa<T>(count: usize, vec: &mut SoaVec<T>)
+    where
+        T: Soa + Default,
+    {
+        for _ in 0..count {
+            vec.push(black_box(T::default()));
+        }
+        black_box(vec);
+    }
+
+    fn aos<T>(count: usize, vec: &mut Vec<T>)
+    where
+        T: Default,
+    {
+        for _ in 0..count {
+            vec.push(black_box(T::default()));
+        }
+        black_box(vec);
+    }
+
+    let group_name = format!("Push many (preallocated) for `{}`", type_name::<T>());
+    let mut group = c.benchmark_group(group_name);
+    for count in COUNT_RANGE {
+        let mut vec = SoaVec::<T>::new();
+        group.bench_with_input(
+            BenchmarkId::new(SOA_FUNCTION_NAME, count),
+            &count,
+            |b, &count| {
+                vec.reserve(count);
+                b.iter(|| soa::<T>(count, &mut vec));
+                vec.clear();
+            },
+        );
+        let mut vec = Vec::<T>::new();
+        group.bench_with_input(
+            BenchmarkId::new(AOS_FUNCTION_NAME, count),
+            &count,
+            |b, &count| {
+                vec.reserve(count);
+                b.iter(|| aos::<T>(count, &mut vec));
+                vec.clear();
+            },
+        );
+    }
+}
+
+criterion_group!(
+    benches_push_many_preallocated,
+    push_many_preallocated::<Zero>,
+    push_many_preallocated::<Tiny>,
+    push_many_preallocated::<Small>,
+    push_many_preallocated::<Medium>,
+    push_many_preallocated::<Big>,
+    push_many_preallocated::<Large>,
+);
+
+criterion_main!(
+    benches_with_capacity,
+    benches_push_many,
+    benches_push_many_preallocated,
+);

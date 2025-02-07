@@ -18,7 +18,7 @@ where
     T: Soa + 'a,
 {
     #[cfg(not(feature = "cache-ptrs"))]
-    ptr: NonNull<BufferData<T>>,
+    buffer: NonNull<BufferData<T>>,
     #[cfg(not(feature = "cache-ptrs"))]
     capacity: usize,
     #[cfg(feature = "cache-ptrs")]
@@ -42,7 +42,7 @@ where
         let Range { start, end } = range;
         Self {
             #[cfg(not(feature = "cache-ptrs"))]
-            ptr: unsafe { NonNull::new_unchecked(slice.as_ptr().cast_mut()) },
+            buffer: unsafe { NonNull::new_unchecked(slice.as_ptr().cast_mut()) },
             #[cfg(not(feature = "cache-ptrs"))]
             capacity: slice.capacity(),
             #[cfg(feature = "cache-ptrs")]
@@ -66,7 +66,7 @@ where
     #[inline]
     #[cfg(not(feature = "cache-ptrs"))]
     fn ptrs(&self) -> T::Ptrs {
-        let ptr = self.ptr.as_ptr();
+        let ptr = self.buffer.as_ptr();
         let capacity = self.capacity;
 
         unsafe {
@@ -146,7 +146,7 @@ where
     fn clone(&self) -> Self {
         Self {
             #[cfg(not(feature = "cache-ptrs"))]
-            ptr: self.ptr,
+            buffer: self.buffer,
             #[cfg(not(feature = "cache-ptrs"))]
             capacity: self.capacity,
             #[cfg(feature = "cache-ptrs")]
@@ -405,7 +405,7 @@ where
     T: Soa + 'a,
 {
     #[cfg(not(feature = "cache-ptrs"))]
-    ptr: NonNull<BufferData<T>>,
+    buffer: NonNull<BufferData<T>>,
     #[cfg(not(feature = "cache-ptrs"))]
     capacity: usize,
     #[cfg(feature = "cache-ptrs")]
@@ -423,7 +423,7 @@ where
     pub(super) fn new(slice: &'a mut SoaSlice<T>) -> Self {
         Self {
             #[cfg(not(feature = "cache-ptrs"))]
-            ptr: unsafe { NonNull::new_unchecked(slice.as_mut_ptr()) },
+            buffer: unsafe { NonNull::new_unchecked(slice.as_mut_ptr()) },
             #[cfg(not(feature = "cache-ptrs"))]
             capacity: slice.capacity(),
             #[cfg(feature = "cache-ptrs")]
@@ -447,7 +447,7 @@ where
     #[inline]
     #[cfg(not(feature = "cache-ptrs"))]
     fn ptrs(&self) -> T::MutPtrs {
-        let ptr = self.ptr.as_ptr();
+        let ptr = self.buffer.as_ptr();
         let len = self.capacity;
 
         unsafe { ptrs::<T>(ptr, len).unwrap_unchecked() }

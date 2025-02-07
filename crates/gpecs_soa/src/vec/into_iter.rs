@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{ptrs, to_capacity, BufferData},
+    ptr::{ptrs, BufferData},
     raw_vec::RawSoaVec,
     soa::Soa,
     vec::SoaVec,
@@ -17,7 +17,7 @@ where
     T: Soa,
 {
     buffer: NonNull<BufferData<T>>,
-    capacity_in_bytes: usize,
+    capacity: usize,
     start: usize,
     end: usize,
 }
@@ -32,7 +32,7 @@ where
         let buffer = vec.buffer.non_null();
         Self {
             buffer,
-            capacity_in_bytes: vec.capacity_in_bytes(),
+            capacity: vec.capacity(),
             start: 0,
             end: vec.len(),
         }
@@ -75,7 +75,7 @@ where
     #[inline]
     fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.buffer.as_ptr();
-        let capacity = to_capacity::<T>(self.capacity_in_bytes);
+        let capacity = self.capacity;
 
         unsafe { ptrs::<T>(ptr, capacity).unwrap_unchecked() }
     }
@@ -119,8 +119,8 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let slice = Default::default();
-        Self::new(slice)
+        let vec = Default::default();
+        Self::new(vec)
     }
 }
 
@@ -142,10 +142,7 @@ where
                     // `IntoIter::alloc` is not used anymore after this and will be dropped by RawVec
                     // let alloc = ManuallyDrop::take(&mut self.0.alloc);
                     // RawVec handles deallocation
-                    let _ = RawSoaVec::<T>::from_nonnull_capacity_in_bytes(
-                        self.0.buffer,
-                        self.0.capacity_in_bytes,
-                    );
+                    let _ = RawSoaVec::<T>::from_nonnull(self.0.buffer, self.0.capacity);
                 }
             }
         }

@@ -42,6 +42,7 @@ pub unsafe trait Soa: Sized {
         capacity: usize,
     ) -> Result<Self::MutPtrs, LayoutError>;
     unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
+    fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs;
 
     fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs;
     fn ptrs_cast_mut(ptrs: Self::Ptrs) -> Self::MutPtrs;
@@ -150,6 +151,8 @@ unsafe impl Soa for () {
     }
     #[inline(always)]
     unsafe fn ptrs_to_nonnull(_: Self::MutPtrs) -> Self::NonNullPtrs {}
+    #[inline(always)]
+    fn nonnull_to_ptrs(_: Self::NonNullPtrs) -> Self::MutPtrs {}
 
     #[inline(always)]
     fn ptrs_cast_const(_: Self::MutPtrs) -> Self::Ptrs {}
@@ -335,6 +338,13 @@ macro_rules! soa_impl {
             unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
                 let ($($types,)*) = ptrs;
                 unsafe { ($(::core::ptr::NonNull::new_unchecked($types),)*) }
+            }
+
+            #[inline(always)]
+            #[allow(non_snake_case)]
+            fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
+                let ($($types,)*) = ptrs;
+                ($($types.as_ptr(),)*)
             }
 
             #[inline(always)]

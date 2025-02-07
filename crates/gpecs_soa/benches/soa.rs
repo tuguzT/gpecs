@@ -138,22 +138,20 @@ where
     let group_name = format!("Push many (preallocated) for `{}`", type_name::<T>());
     let mut group = c.benchmark_group(group_name);
     for count in COUNT_RANGE {
-        let mut vec = SoaVec::<T>::new();
+        let mut vec = SoaVec::<T>::with_capacity(count);
         group.bench_with_input(
             BenchmarkId::new(SOA_FUNCTION_NAME, count),
             &count,
             |b, &count| {
-                vec.reserve(count);
                 b.iter(|| soa::<T>(count, &mut vec));
                 vec.clear();
             },
         );
-        let mut vec = Vec::<T>::new();
+        let mut vec = Vec::<T>::with_capacity(count);
         group.bench_with_input(
             BenchmarkId::new(AOS_FUNCTION_NAME, count),
             &count,
             |b, &count| {
-                vec.reserve(count);
                 b.iter(|| aos::<T>(count, &mut vec));
                 vec.clear();
             },

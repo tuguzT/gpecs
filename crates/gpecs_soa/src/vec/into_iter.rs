@@ -5,12 +5,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::{
-    ptr::{ptrs, BufferData},
-    raw_vec::RawSoaVec,
-    soa::Soa,
-    vec::SoaVec,
-};
+#[cfg(not(feature = "cache-ptrs"))]
+use crate::ptr::ptrs;
+use crate::{ptr::BufferData, raw_vec::RawSoaVec, soa::Soa, vec::SoaVec};
 
 pub struct IntoIter<T>
 where
@@ -18,6 +15,8 @@ where
 {
     buffer: NonNull<BufferData<T>>,
     capacity: usize,
+    #[cfg(feature = "cache-ptrs")]
+    ptrs: T::NonNullPtrs,
     start: usize,
     end: usize,
 }
@@ -28,11 +27,13 @@ where
 {
     #[inline]
     pub(super) fn new(vec: SoaVec<T>) -> Self {
-        let vec = ManuallyDrop::new(vec);
-        let buffer = vec.buffer.non_null();
+        let mut vec = ManuallyDrop::new(vec);
+
         Self {
-            buffer,
+            buffer: unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) },
             capacity: vec.capacity(),
+            #[cfg(feature = "cache-ptrs")]
+            ptrs: unsafe { T::ptrs_to_nonnull(vec.as_mut_ptrs()) },
             start: 0,
             end: vec.len(),
         }
@@ -73,11 +74,18 @@ where
     }
 
     #[inline]
+    #[cfg(not(feature = "cache-ptrs"))]
     fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.buffer.as_ptr();
         let capacity = self.capacity;
 
         unsafe { ptrs::<T>(ptr, capacity).unwrap_unchecked() }
+    }
+
+    #[inline]
+    #[cfg(feature = "cache-ptrs")]
+    fn ptrs(&self) -> T::MutPtrs {
+        T::nonnull_to_ptrs(self.ptrs)
     }
 
     #[inline]

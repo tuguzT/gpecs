@@ -109,7 +109,7 @@ where
         let ptr = slice.as_ptr().cast_mut();
         let capacity = slice.capacity();
         unsafe {
-            let ptrs = ptrs::<T>(ptr, capacity);
+            let ptrs = ptrs::<T>(ptr, capacity).unwrap_unchecked();
             let ptrs = T::ptrs_add_mut(ptrs, self);
             T::ptrs_cast_const(ptrs)
         }
@@ -126,7 +126,7 @@ where
         let ptr = slice.as_mut_ptr();
         let capacity = slice.capacity();
         unsafe {
-            let ptrs = ptrs::<T>(ptr, capacity);
+            let ptrs = ptrs::<T>(ptr, capacity).unwrap_unchecked();
             T::ptrs_add_mut(ptrs, self)
         }
     }
@@ -215,7 +215,8 @@ where
         let ptr = slice.as_ptr().cast_mut();
         let capacity = slice.capacity();
         unsafe {
-            let ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, capacity));
+            let ptrs = ptrs::<T>(ptr, capacity).unwrap_unchecked();
+            let ptrs = T::ptrs_cast_const(ptrs);
             let ptrs = T::ptrs_add(ptrs, self.start);
             let new_len = self.end.unchecked_sub(self.start);
             T::slices_from_raw_parts(ptrs, new_len)
@@ -233,7 +234,7 @@ where
         let ptr = slice.as_mut_ptr();
         let capacity = slice.capacity();
         unsafe {
-            let ptrs = ptrs::<T>(ptr, capacity);
+            let ptrs = ptrs::<T>(ptr, capacity).unwrap_unchecked();
             let ptrs = T::ptrs_add_mut(ptrs, self.start);
             let new_len = self.end.unchecked_sub(self.start);
             T::slices_from_raw_parts_mut(ptrs, new_len)

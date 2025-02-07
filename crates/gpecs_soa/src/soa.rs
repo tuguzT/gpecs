@@ -36,7 +36,11 @@ pub unsafe trait Soa: Sized {
     ) -> Result<(Layout, Self::Offsets), LayoutError>;
 
     fn ptrs_dangling() -> Self::MutPtrs;
-    unsafe fn ptrs(ptr: *mut u8, initial: Layout, capacity: usize) -> Self::MutPtrs;
+    unsafe fn ptrs(
+        ptr: *mut u8,
+        initial: Layout,
+        capacity: usize,
+    ) -> Result<Self::MutPtrs, LayoutError>;
     unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
 
     fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs;
@@ -141,7 +145,9 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn ptrs_dangling() -> Self::MutPtrs {}
     #[inline(always)]
-    unsafe fn ptrs(_: *mut u8, _: Layout, _: usize) -> Self::MutPtrs {}
+    unsafe fn ptrs(_: *mut u8, _: Layout, _: usize) -> Result<Self::MutPtrs, LayoutError> {
+        Ok(())
+    }
     #[inline(always)]
     unsafe fn ptrs_to_nonnull(_: Self::MutPtrs) -> Self::NonNullPtrs {}
 
@@ -318,9 +324,10 @@ macro_rules! soa_impl {
             }
 
             #[inline(always)]
-            unsafe fn ptrs(ptr: *mut u8, initial: Layout, capacity: usize) -> Self::MutPtrs {
-                let (_, offsets) = Self::buffer_layout_unaligned(initial, capacity).expect("layout size should not exceed `isize::MAX`");
-                unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) }
+            unsafe fn ptrs(ptr: *mut u8, initial: Layout, capacity: usize) -> Result<Self::MutPtrs, LayoutError> {
+                let (_, offsets) = Self::buffer_layout_unaligned(initial, capacity)?;
+                let ptrs = unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) };
+                Ok(ptrs)
             }
 
             #[inline(always)]

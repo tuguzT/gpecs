@@ -74,7 +74,7 @@ where
         let len = self.capacity;
 
         unsafe {
-            let ptrs = ptrs::<T>(ptr, len);
+            let ptrs = ptrs::<T>(ptr, len).unwrap_unchecked();
             T::ptrs_cast_const(ptrs)
         }
     }
@@ -436,7 +436,7 @@ where
         let ptr = self.ptr.as_ptr();
         let len = self.capacity;
 
-        unsafe { ptrs::<T>(ptr, len) }
+        unsafe { ptrs::<T>(ptr, len).unwrap_unchecked() }
     }
 
     #[inline]

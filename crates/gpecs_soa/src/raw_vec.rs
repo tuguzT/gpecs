@@ -258,7 +258,7 @@ where
         let ptr = self.ptr();
         let capacity = self.capacity();
 
-        unsafe { ptrs::<T>(ptr, capacity) }
+        unsafe { ptrs::<T>(ptr, capacity).unwrap_unchecked() }
     }
 
     #[inline]

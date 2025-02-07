@@ -357,12 +357,15 @@ where
 }
 
 #[inline]
-pub(crate) unsafe fn ptrs<T>(ptr: *mut BufferData<T>, capacity: usize) -> T::MutPtrs
+pub(crate) unsafe fn ptrs<T>(
+    ptr: *mut BufferData<T>,
+    capacity: usize,
+) -> Result<T::MutPtrs, LayoutError>
 where
     T: Soa,
 {
     if is_zst::<T>() || capacity == 0 {
-        return T::ptrs_dangling();
+        return Ok(T::ptrs_dangling());
     }
 
     let initial = Layout::new::<usize>();

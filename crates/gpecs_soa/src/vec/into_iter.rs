@@ -77,7 +77,7 @@ where
         let ptr = self.buffer.as_ptr();
         let capacity = to_capacity::<T>(self.capacity_in_bytes);
 
-        unsafe { ptrs::<T>(ptr, capacity) }
+        unsafe { ptrs::<T>(ptr, capacity).unwrap_unchecked() }
     }
 
     #[inline]

@@ -123,8 +123,8 @@ where
 
         unsafe {
             let ptr = self.as_mut_ptr();
-            let old_ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity));
-            let new_ptrs = ptrs::<T>(ptr, new_capacity);
+            let old_ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity).unwrap_unchecked());
+            let new_ptrs = ptrs::<T>(ptr, new_capacity).unwrap_unchecked();
 
             T::ptrs_copy_rev(old_ptrs, new_ptrs, self.len());
         }
@@ -138,8 +138,8 @@ where
 
         unsafe {
             let ptr = self.as_mut_ptr();
-            let old_ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity));
-            let new_ptrs = ptrs::<T>(ptr, new_capacity);
+            let old_ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity).unwrap_unchecked());
+            let new_ptrs = ptrs::<T>(ptr, new_capacity).unwrap_unchecked();
 
             T::ptrs_copy(old_ptrs, new_ptrs, self.len());
         }

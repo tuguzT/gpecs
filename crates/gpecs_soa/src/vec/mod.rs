@@ -115,32 +115,38 @@ where
         self.buffer.capacity()
     }
 
+    #[inline]
     fn move_right(&mut self, old_capacity: usize) {
         let new_capacity = self.capacity();
         if new_capacity <= old_capacity {
             return;
         }
 
-        unsafe {
+        let old_ptrs = unsafe {
             let ptr = self.as_mut_ptr();
-            let old_ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity).unwrap_unchecked());
-            let new_ptrs = ptrs::<T>(ptr, new_capacity).unwrap_unchecked();
+            T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity).unwrap_unchecked())
+        };
+        let new_ptrs = self.as_mut_ptrs();
 
+        unsafe {
             T::ptrs_copy_rev(old_ptrs, new_ptrs, self.len());
         }
     }
 
+    #[inline]
     fn move_left(&mut self, new_capacity: usize) {
         let old_capacity = self.capacity();
         if new_capacity >= old_capacity {
             return;
         }
 
-        unsafe {
+        let old_ptrs = self.as_ptrs();
+        let new_ptrs = unsafe {
             let ptr = self.as_mut_ptr();
-            let old_ptrs = T::ptrs_cast_const(ptrs::<T>(ptr, old_capacity).unwrap_unchecked());
-            let new_ptrs = ptrs::<T>(ptr, new_capacity).unwrap_unchecked();
+            ptrs::<T>(ptr, new_capacity).unwrap_unchecked()
+        };
 
+        unsafe {
             T::ptrs_copy(old_ptrs, new_ptrs, self.len());
         }
     }

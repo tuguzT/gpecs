@@ -227,7 +227,7 @@ where
             .size();
 
         Self {
-            ptr: ptr.cast(),
+            ptr,
             capacity_in_bytes,
         }
     }
@@ -250,7 +250,7 @@ where
 
     #[inline]
     pub const fn non_null(&self) -> NonNull<BufferData<T>> {
-        self.ptr.cast()
+        self.ptr
     }
 
     #[inline]

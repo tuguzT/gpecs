@@ -58,12 +58,12 @@ where
     }
 
     #[inline]
-    pub const fn as_ptr(&self) -> *const BufferData<T> {
+    pub fn as_ptr(&self) -> *const BufferData<T> {
         self.buffer.as_ptr()
     }
 
     #[inline]
-    pub const fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
+    pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
         self.buffer.as_mut_ptr()
     }
 
@@ -133,9 +133,9 @@ where
     #[inline]
     pub fn into_vec(self: Box<Self>) -> SoaVec<T> {
         let length = self.len();
-        let capacity_in_bytes = self.capacity_in_bytes();
+        let capacity = self.capacity();
         let ptr = Box::into_raw(self).cast();
-        unsafe { SoaVec::from_capacity_in_bytes(ptr, length, capacity_in_bytes) }
+        unsafe { SoaVec::from_raw_parts(ptr, length, capacity) }
     }
 
     #[inline]

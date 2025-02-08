@@ -39,7 +39,7 @@ where
     T: Soa,
 {
     #[inline]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             buffer: RawSoaVec::new(),
             len: 0,
@@ -78,35 +78,23 @@ where
     }
 
     #[inline]
-    pub(crate) const unsafe fn from_capacity_in_bytes(
-        ptr: *mut BufferData<T>,
-        len: usize,
-        capacity_in_bytes: usize,
-    ) -> Self {
-        Self {
-            buffer: unsafe { RawSoaVec::from_capacity_in_bytes(ptr, capacity_in_bytes) },
-            len,
-        }
-    }
-
-    #[inline]
     pub fn into_raw_parts(self) -> (*mut BufferData<T>, usize, usize) {
         let mut me = ManuallyDrop::new(self);
         (me.as_mut_ptr(), me.len(), me.capacity())
     }
 
     #[inline]
-    pub const fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.len
     }
 
     #[inline]
-    pub const fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     #[inline]
-    pub const fn capacity_in_bytes(&self) -> usize {
+    pub fn capacity_in_bytes(&self) -> usize {
         self.buffer.capacity_in_bytes()
     }
 
@@ -266,12 +254,12 @@ where
     }
 
     #[inline]
-    pub const fn as_ptr(&self) -> *const BufferData<T> {
+    pub fn as_ptr(&self) -> *const BufferData<T> {
         self.buffer.ptr().cast_const()
     }
 
     #[inline]
-    pub const fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
+    pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
         self.buffer.ptr()
     }
 

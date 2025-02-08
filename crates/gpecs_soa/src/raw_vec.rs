@@ -101,6 +101,8 @@ where
 {
     ptr: NonNull<BufferData<T>>,
     capacity_in_bytes: usize,
+    #[cfg(feature = "cache-ptrs")]
+    ptrs: T::NonNullPtrs,
 }
 
 impl<T> RawSoaVec<T>
@@ -125,10 +127,12 @@ where
 
     #[inline]
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             ptr: NonNull::dangling(),
             capacity_in_bytes: 0,
+            #[cfg(feature = "cache-ptrs")]
+            ptrs: unsafe { T::ptrs_to_nonnull(T::ptrs_dangling()) },
         }
     }
 
@@ -137,6 +141,7 @@ where
             return Ok(Self::new());
         }
 
+        let capacity = actual_capacity::<T>(capacity);
         let layout = match buffer_layout::<T>(capacity) {
             Ok(layout) => layout,
             Err(_) => return Err(CapacityOverflow.into()),
@@ -153,9 +158,15 @@ where
             None => return Err(AllocError { layout, non_exhaustive: () }.into()),
         };
 
+        let ptr = ptr.cast();
         Ok(Self {
-            ptr: ptr.cast(),
+            ptr,
             capacity_in_bytes: layout.size(),
+            #[cfg(feature = "cache-ptrs")]
+            ptrs: unsafe {
+                let ptrs = ptrs::<T>(ptr.as_ptr(), capacity).unwrap_unchecked();
+                T::ptrs_to_nonnull(ptrs)
+            },
         })
     }
 
@@ -210,17 +221,6 @@ where
     }
 
     #[inline]
-    pub const unsafe fn from_capacity_in_bytes(
-        ptr: *mut BufferData<T>,
-        capacity_in_bytes: usize,
-    ) -> Self {
-        unsafe {
-            let ptr = NonNull::new_unchecked(ptr);
-            Self::from_nonnull_capacity_in_bytes(ptr, capacity_in_bytes)
-        }
-    }
-
-    #[inline]
     pub unsafe fn from_nonnull(ptr: NonNull<BufferData<T>>, capacity: usize) -> Self {
         let capacity_in_bytes = buffer_layout::<T>(capacity)
             .expect("layout size should not exceed `isize::MAX`")
@@ -229,36 +229,37 @@ where
         Self {
             ptr,
             capacity_in_bytes,
+            #[cfg(feature = "cache-ptrs")]
+            ptrs: unsafe {
+                let ptrs = ptrs::<T>(ptr.as_ptr(), capacity).unwrap_unchecked();
+                T::ptrs_to_nonnull(ptrs)
+            },
         }
     }
 
     #[inline]
-    pub const unsafe fn from_nonnull_capacity_in_bytes(
-        ptr: NonNull<BufferData<T>>,
-        capacity_in_bytes: usize,
-    ) -> Self {
-        Self {
-            ptr,
-            capacity_in_bytes,
-        }
-    }
-
-    #[inline]
-    pub const fn ptr(&self) -> *mut BufferData<T> {
+    pub fn ptr(&self) -> *mut BufferData<T> {
         self.non_null().as_ptr()
     }
 
     #[inline]
-    pub const fn non_null(&self) -> NonNull<BufferData<T>> {
+    pub fn non_null(&self) -> NonNull<BufferData<T>> {
         self.ptr
     }
 
     #[inline]
+    #[cfg(not(feature = "cache-ptrs"))]
     pub fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr();
         let capacity = self.capacity();
 
         unsafe { ptrs::<T>(ptr, capacity).unwrap_unchecked() }
+    }
+
+    #[inline]
+    #[cfg(feature = "cache-ptrs")]
+    pub fn ptrs(&self) -> T::MutPtrs {
+        T::nonnull_to_ptrs(self.ptrs)
     }
 
     #[inline]
@@ -277,7 +278,7 @@ where
     }
 
     #[inline(always)]
-    pub const fn capacity_in_bytes(&self) -> usize {
+    pub fn capacity_in_bytes(&self) -> usize {
         self.capacity_in_bytes
     }
 
@@ -374,6 +375,18 @@ where
         self.capacity_in_bytes = buffer_layout::<T>(capacity)
             .expect("layout size should not exceed `isize::MAX`")
             .size();
+
+        #[cfg(feature = "cache-ptrs")]
+        {
+            self.ptrs = unsafe {
+                let ptrs = if ptr == NonNull::dangling() {
+                    T::ptrs_dangling()
+                } else {
+                    ptrs::<T>(ptr.as_ptr(), capacity).unwrap_unchecked()
+                };
+                T::ptrs_to_nonnull(ptrs)
+            };
+        }
     }
 
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {

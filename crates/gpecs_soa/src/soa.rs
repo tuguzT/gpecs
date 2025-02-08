@@ -9,6 +9,7 @@ pub unsafe trait Soa: Sized {
     type MutPtrs: Copy;
     type NonNullPtrs: Copy;
     type Offsets: AsRef<[usize]>;
+    type Vecs;
 
     type Refs<'a>
     where
@@ -66,6 +67,11 @@ pub unsafe trait Soa: Sized {
     fn mut_refs_as_ptrs(refs: Self::RefsMut<'_>) -> Self::MutPtrs;
     fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_>;
 
+    fn vecs_with_capacity(capacity: usize) -> Self::Vecs;
+    fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs;
+    fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs;
+    unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize);
+
     fn slices_from_raw_parts(ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs;
     fn slices_from_raw_parts_mut(ptrs: Self::MutPtrs, len: usize) -> Self::SliceMutPtrs;
 
@@ -106,6 +112,7 @@ unsafe impl Soa for () {
     type MutPtrs = ();
     type NonNullPtrs = ();
     type Offsets = [usize; 0];
+    type Vecs = ();
 
     type Refs<'a>
         = ()
@@ -199,6 +206,15 @@ unsafe impl Soa for () {
     fn mut_refs_as_refs(_: Self::RefsMut<'_>) -> Self::Refs<'_> {}
 
     #[inline(always)]
+    fn vecs_with_capacity(_: usize) -> Self::Vecs {}
+    #[inline(always)]
+    fn vecs_as_ptrs(_: &Self::Vecs) -> Self::Ptrs {}
+    #[inline(always)]
+    fn mut_vecs_as_ptrs(_: &mut Self::Vecs) -> Self::MutPtrs {}
+    #[inline(always)]
+    unsafe fn vecs_set_len(_: &mut Self::Vecs, _: usize) {}
+
+    #[inline(always)]
     fn slices_from_raw_parts(_: Self::Ptrs, _: usize) -> Self::SlicePtrs {}
     #[inline(always)]
     fn slices_from_raw_parts_mut(_: Self::MutPtrs, _: usize) -> Self::SliceMutPtrs {}
@@ -266,6 +282,7 @@ macro_rules! soa_impl {
             type MutPtrs = ($(*mut $types,)*);
             type NonNullPtrs = ($(::core::ptr::NonNull<$types>,)*);
             type Offsets = [usize; count_idents!($($types,)*)];
+            type Vecs = ($(::alloc::vec::Vec<$types>,)*);
 
             type Refs<'a>
                 = ($(&'a $types,)*)
@@ -465,6 +482,26 @@ macro_rules! soa_impl {
             fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_> {
                 let ($($types,)*) = refs;
                 ($($types,)*)
+            }
+
+            #[inline(always)]
+            fn vecs_with_capacity(capacity: usize) -> Self::Vecs {
+                ($(::alloc::vec::Vec::<$types>::with_capacity(capacity),)*)
+            }
+
+            #[inline(always)]
+            fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs {
+                ($(vecs.$indices.as_ptr(),)*)
+            }
+
+            #[inline(always)]
+            fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs {
+                ($(vecs.$indices.as_mut_ptr(),)*)
+            }
+
+            #[inline(always)]
+            unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize) {
+                unsafe { $(vecs.$indices.set_len(len);)* }
             }
 
             #[inline(always)]

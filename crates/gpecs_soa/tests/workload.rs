@@ -26,9 +26,13 @@ fn new() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
+    assert_eq!(format!("{vec:?}"), "SoaVec(([], [], []))");
+
     let slice = vec.as_slice();
     assert!(slice.is_empty());
     assert_eq!(slice.capacity(), 0);
+
+    assert_eq!(format!("{slice:?}"), "SoaSlice(([], [], []))");
 
     assert_eq!(vec, slice);
     assert!(vec >= slice);
@@ -55,6 +59,8 @@ fn new() {
 
     let into_iter = boxed_slice.into_iter();
     assert!(into_iter.is_empty());
+
+    assert_eq!(format!("{into_iter:?}"), "IntoIter(([], [], []))");
 }
 
 #[test]
@@ -70,9 +76,13 @@ fn new_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
+    assert_eq!(format!("{vec:?}"), "SoaVec(([], [], []))");
+
     let slice = vec.as_slice();
     assert!(slice.is_empty());
     assert_eq!(slice.capacity(), usize::MAX);
+
+    assert_eq!(format!("{slice:?}"), "SoaSlice(([], [], []))");
 
     assert_eq!(vec, slice);
     assert!(vec >= slice);
@@ -99,6 +109,8 @@ fn new_zst() {
 
     let into_iter = boxed_slice.into_iter();
     assert!(into_iter.is_empty());
+
+    assert_eq!(format!("{into_iter:?}"), "IntoIter(([], [], []))");
 }
 
 #[test]
@@ -114,9 +126,13 @@ fn with_capacity() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
+    assert_eq!(format!("{vec:?}"), "SoaVec(([], [], []))");
+
     let slice = vec.as_slice();
     assert!(slice.is_empty());
     assert!(slice.capacity() >= 10);
+
+    assert_eq!(format!("{slice:?}"), "SoaSlice(([], [], []))");
 
     assert_eq!(vec, slice);
     assert!(vec >= slice);
@@ -143,6 +159,8 @@ fn with_capacity() {
 
     let into_iter = boxed_slice.into_iter();
     assert!(into_iter.is_empty());
+
+    assert_eq!(format!("{into_iter:?}"), "IntoIter(([], [], []))");
 }
 
 #[test]
@@ -158,9 +176,13 @@ fn with_capacity_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
+    assert_eq!(format!("{vec:?}"), "SoaVec(([], [], []))");
+
     let slice = vec.as_slice();
     assert!(slice.is_empty());
     assert!(slice.capacity() >= 10);
+
+    assert_eq!(format!("{slice:?}"), "SoaSlice(([], [], []))");
 
     assert_eq!(vec, slice);
     assert!(vec >= slice);
@@ -187,6 +209,8 @@ fn with_capacity_zst() {
 
     let into_iter = boxed_slice.into_iter();
     assert!(into_iter.is_empty());
+
+    assert_eq!(format!("{into_iter:?}"), "IntoIter(([], [], []))");
 }
 
 #[test]
@@ -204,6 +228,8 @@ fn one_item() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
+    assert_eq!(format!("{vec:?}"), "SoaVec(([1], [2], [3]))");
+
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 1);
     assert!(slice.capacity() >= 1);
@@ -212,6 +238,8 @@ fn one_item() {
         ([1].as_slice(), [2].as_slice(), [3].as_slice()),
     );
     assert_eq!(slice.get(0), Some((&1, &2, &3)));
+
+    assert_eq!(format!("{slice:?}"), "SoaSlice(([1], [2], [3]))");
 
     assert_eq!(vec, slice);
     assert!(vec >= slice);
@@ -235,6 +263,7 @@ fn one_item() {
         vec.as_slices(),
         ([1; 2].as_slice(), [2; 2].as_slice(), [3; 2].as_slice()),
     );
+    assert_eq!(format!("{vec:?}"), "SoaVec(([1, 1], [2, 2], [3, 3]))");
 
     vec.clone_from_slice(Vec::from_iter([Default::default(); 2]).as_slice());
     assert_eq!(
@@ -245,6 +274,7 @@ fn one_item() {
             [Default::default(); 2].as_slice(),
         ),
     );
+    assert_eq!(format!("{vec:?}"), "SoaVec(([0, 0], [0, 0], [0, 0]))");
 
     vec.copy_from_slice(Vec::from_iter([(1, 2, 3); 2]).as_slice());
     assert_eq!(
@@ -311,6 +341,11 @@ fn one_item_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
+    assert_eq!(
+        format!("{vec:?}"),
+        "SoaVec(([ZST1], [ZST2(())], [ZST3 { empty: () }]))",
+    );
+
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 1);
     assert!(slice.capacity() >= 1);
@@ -323,6 +358,11 @@ fn one_item_zst() {
         ),
     );
     assert_eq!(slice.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+
+    assert_eq!(
+        format!("{slice:?}"),
+        "SoaSlice(([ZST1], [ZST2(())], [ZST3 { empty: () }]))",
+    );
 
     assert_eq!(vec, slice);
     assert!(vec >= slice);
@@ -353,6 +393,11 @@ fn one_item_zst() {
             [ZST2(()); 2].as_slice(),
             [ZST3 { empty: () }; 2].as_slice(),
         ),
+    );
+
+    assert_eq!(
+        format!("{vec:?}"),
+        "SoaVec(([ZST1, ZST1], [ZST2(()), ZST2(())], [ZST3 { empty: () }, ZST3 { empty: () }]))",
     );
 
     let (t, u, v) = vec.remove(0);
@@ -402,6 +447,11 @@ fn three_items() {
     assert!(vec.capacity() >= 3);
     assert!(vec.contains_by_refs((&0, &"0".to_owned(), &0)));
 
+    assert_eq!(
+        format!("{vec:?}"),
+        r#"SoaVec(([0, 0, 0], ["0", "0", "0"], [0, 0, 0]))"#,
+    );
+
     vec.truncate(0);
     vec.insert(0, (1, "2".to_owned(), 3));
     vec.insert(0, (4, "5".to_owned(), 6));
@@ -415,6 +465,11 @@ fn three_items() {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    assert_eq!(
+        format!("{vec:?}"),
+        r#"SoaVec(([4, 7, 1], ["5", "8", "2"], [6, 9, 3]))"#,
+    );
 
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 3);
@@ -437,6 +492,11 @@ fn three_items() {
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
             [6, 9, 3].as_slice(),
         )),
+    );
+
+    assert_eq!(
+        format!("{slice:?}"),
+        r#"SoaSlice(([4, 7, 1], ["5", "8", "2"], [6, 9, 3]))"#,
     );
 
     assert_eq!(vec, slice);

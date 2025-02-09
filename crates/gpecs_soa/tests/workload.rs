@@ -40,11 +40,12 @@ fn new() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(vecs, (vec![], vec![], vec![]));
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(vecs, (vec![], vec![], vec![]));
+
+    let vec = Vec::from_vecs(vecs);
+    assert!(vec.is_empty());
+    assert_eq!(vec.capacity(), 0);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -96,11 +97,12 @@ fn new_zst() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(vecs, (vec![], vec![], vec![]));
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(vecs, (vec![], vec![], vec![]));
+
+    let vec = Vec::from_vecs(vecs);
+    assert!(vec.is_empty());
+    assert_eq!(vec.capacity(), usize::MAX);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -152,12 +154,6 @@ fn with_capacity() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(vecs, (vec![], vec![], vec![]));
-    }
-
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), 0);
@@ -208,11 +204,12 @@ fn with_capacity_zst() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(vecs, (vec![], vec![], vec![]));
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(vecs, (vec![], vec![], vec![]));
+
+    let vec = Vec::from_vecs(vecs);
+    assert!(vec.is_empty());
+    assert_eq!(vec.capacity(), usize::MAX);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -247,7 +244,7 @@ fn one_item() {
     assert!(vec.capacity() >= 1);
     assert!(vec.contains_by_refs((&1, &2, &3)));
 
-    let mut vec = {
+    let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
@@ -271,11 +268,16 @@ fn one_item() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(vecs, (vec![1], vec![2], vec![3]));
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(vecs, (vec![1], vec![2], vec![3]));
+
+    let mut vec = Vec::from_vecs(vecs);
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 1);
+    assert_eq!(
+        vec.as_slices(),
+        ([1].as_slice(), [2].as_slice(), [3].as_slice()),
+    );
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -335,12 +337,6 @@ fn one_item() {
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(vecs, (vec![], vec![], vec![]));
-    }
-
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
     assert_eq!(boxed_slice.capacity(), 0);
@@ -372,7 +368,7 @@ fn one_item_zst() {
     assert!(vec.capacity() >= 1);
     assert!(vec.contains_by_refs((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
-    let mut vec = {
+    let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
@@ -406,11 +402,20 @@ fn one_item_zst() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(vecs, (vec![ZST1], vec![ZST2(())], vec![ZST3 { empty: () }]));
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(vecs, (vec![ZST1], vec![ZST2(())], vec![ZST3 { empty: () }]));
+
+    let mut vec = Vec::from_vecs(vecs);
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 1);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [ZST1].as_slice(),
+            [ZST2(())].as_slice(),
+            [ZST3 { empty: () }].as_slice(),
+        ),
+    );
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -459,11 +464,16 @@ fn one_item_zst() {
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(vecs, (vec![], vec![], vec![]));
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(vecs, (vec![], vec![], vec![]));
+
+    let vec = Vec::from_vecs(vecs);
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert_eq!(
+        vec.as_slices(),
+        ([].as_slice(), [].as_slice(), [].as_slice()),
+    );
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
@@ -569,18 +579,27 @@ fn three_items() {
         ),
     );
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(
-            vecs,
-            (
-                vec![5, 8, 2],
-                vec!["5".to_owned(), "8".to_owned(), "2".to_owned()],
-                vec![6, 9, 3],
-            ),
-        );
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(
+        vecs,
+        (
+            vec![5, 8, 2],
+            vec!["5".to_owned(), "8".to_owned(), "2".to_owned()],
+            vec![6, 9, 3],
+        ),
+    );
+
+    let mut vec = Vec::from_vecs(vecs);
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [5, 8, 2].as_slice(),
+            ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
+            [6, 9, 3].as_slice(),
+        ),
+    );
 
     let mut iter = vec.iter_mut();
     assert_eq!(iter.len(), 3);
@@ -708,23 +727,37 @@ fn three_items() {
     vec.reserve_exact(6);
     assert!(vec.capacity() >= 9);
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(
-            vecs,
-            (
-                vec![0, 0, 0],
-                vec!["0".to_owned(), "0".to_owned(), "0".to_owned()],
-                vec![0, 0, 0],
-            ),
-        );
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(
+        vecs,
+        (
+            vec![0, 0, 0],
+            vec!["0".to_owned(), "0".to_owned(), "0".to_owned()],
+            vec![0, 0, 0],
+        ),
+    );
+
+    let vec = Vec::from_vecs(vecs);
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [0, 0, 0].as_slice(),
+            ["0".to_owned(), "0".to_owned(), "0".to_owned()].as_slice(),
+            [0, 0, 0].as_slice(),
+        ),
+    );
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    vec.reserve(1);
+    assert!(vec.capacity() >= 4);
+    vec.reserve_exact(6);
+    assert!(vec.capacity() >= 9);
 
     vec.shrink_to(6);
     assert!(vec.capacity() >= 6);
@@ -810,7 +843,7 @@ fn three_items_zst() {
     assert!(vec.capacity() >= 3);
     assert!(vec.contains_by_refs((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
-    let mut vec = {
+    let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
@@ -844,18 +877,27 @@ fn three_items_zst() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(
-            vecs,
-            (
-                vec![ZST1; 3],
-                vec![ZST2(()); 3],
-                vec![ZST3 { empty: () }; 3],
-            ),
-        );
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(
+        vecs,
+        (
+            vec![ZST1; 3],
+            vec![ZST2(()); 3],
+            vec![ZST3 { empty: () }; 3],
+        ),
+    );
+
+    let mut vec = Vec::from_vecs(vecs);
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [ZST1; 3].as_slice(),
+            [ZST2(()); 3].as_slice(),
+            [ZST3 { empty: () }; 3].as_slice(),
+        ),
+    );
 
     let mut iter = vec.iter_mut();
     assert_eq!(iter.len(), 3);
@@ -893,18 +935,27 @@ fn three_items_zst() {
     assert_eq!(vec.get(3), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
     assert_eq!(vec.get(4), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(
-            vecs,
-            (
-                vec![ZST1; 5],
-                vec![ZST2(()); 5],
-                vec![ZST3 { empty: () }; 5],
-            ),
-        );
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(
+        vecs,
+        (
+            vec![ZST1; 5],
+            vec![ZST2(()); 5],
+            vec![ZST3 { empty: () }; 5],
+        ),
+    );
+
+    let mut vec = Vec::from_vecs(vecs);
+    assert_eq!(vec.len(), 5);
+    assert!(vec.capacity() >= 5);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [ZST1; 5].as_slice(),
+            [ZST2(()); 5].as_slice(),
+            [ZST3 { empty: () }; 5].as_slice(),
+        ),
+    );
 
     {
         let mut drain = vec.drain(2..4);
@@ -983,18 +1034,27 @@ fn three_items_zst() {
     vec.reserve_exact(6);
     assert!(vec.capacity() >= 9);
 
-    {
-        let vec = vec.clone();
-        let vecs = vec.into_vecs();
-        assert_eq!(
-            vecs,
-            (
-                vec![ZST1; 3],
-                vec![ZST2(()); 3],
-                vec![ZST3 { empty: () }; 3],
-            ),
-        );
-    }
+    let vecs = vec.into_vecs();
+    assert_eq!(
+        vecs,
+        (
+            vec![ZST1; 3],
+            vec![ZST2(()); 3],
+            vec![ZST3 { empty: () }; 3],
+        ),
+    );
+
+    let vec = Vec::from_vecs(vecs);
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+    assert_eq!(
+        vec.as_slices(),
+        (
+            [ZST1; 3].as_slice(),
+            [ZST2(()); 3].as_slice(),
+            [ZST3 { empty: () }; 3].as_slice(),
+        ),
+    );
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();

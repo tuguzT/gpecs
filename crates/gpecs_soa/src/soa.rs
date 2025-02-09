@@ -70,6 +70,7 @@ pub unsafe trait Soa: Sized {
     fn vecs_with_capacity(capacity: usize) -> Self::Vecs;
     fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs;
     fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs;
+    fn vecs_len(vecs: &Self::Vecs) -> usize;
     unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize);
 
     fn slices_from_raw_parts(ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs;
@@ -212,6 +213,10 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn mut_vecs_as_ptrs(_: &mut Self::Vecs) -> Self::MutPtrs {}
     #[inline(always)]
+    fn vecs_len(_: &Self::Vecs) -> usize {
+        0
+    }
+    #[inline(always)]
     unsafe fn vecs_set_len(_: &mut Self::Vecs, _: usize) {}
 
     #[inline(always)]
@@ -275,6 +280,22 @@ macro_rules! soa_impl {
             const LAYOUTS: [Layout; count_idents!($($types,)*)] = [
                 $(Layout::new::<$types>(),)*
             ];
+            const PERMUTATION: [usize; count_idents!($($types,)*)] = {
+                let mut permutation = [$($indices,)*];
+                let mut i = 1;
+                while i < count_idents!($($types,)*) {
+                    let mut j = i;
+                    while j > 0 && Self::LAYOUTS[j - 1].align() > Self::LAYOUTS[j].align() {
+                        let tmp = permutation[j - 1];
+                        permutation[j - 1] = permutation[j];
+                        permutation[j] = tmp;
+
+                        j -= 1;
+                    }
+                    i += 1;
+                }
+                permutation
+            };
         }
 
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
@@ -319,13 +340,7 @@ macro_rules! soa_impl {
                 initial: Layout,
                 capacity: usize,
             ) -> Result<(Layout, Self::Offsets), LayoutError> {
-                let layouts = SoaTupleConst::<($($types,)*)>::LAYOUTS;
-                let permutation = { // lack of compile-time sorting: hope this gets optimized away
-                    let mut permutation = [$($indices,)*];
-                    permutation.sort_unstable_by_key(|&index| layouts[index].align());
-                    permutation
-                };
-
+                let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
                 let layouts = [$(Layout::array::<$types>(capacity)?,)*];
                 let mut offsets = Self::Offsets::default();
 
@@ -394,18 +409,14 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             unsafe fn ptrs_offset_from(ptrs: Self::Ptrs, origin: Self::Ptrs) -> isize {
-                let offsets: [isize; count_idents!($($types,)*)] = unsafe {
-                    [$(ptrs.$indices.offset_from(origin.$indices),)*]
-                };
+                let offsets = unsafe { [$(ptrs.$indices.offset_from(origin.$indices),)*] };
                 assert!(offsets.iter().all(|&offset| offset == offsets[0]));
                 offsets[0]
             }
 
             #[inline(always)]
             unsafe fn ptrs_offset_from_mut(ptrs: Self::MutPtrs, origin: Self::Ptrs) -> isize {
-                let offsets: [isize; count_idents!($($types,)*)] = unsafe {
-                    [$(ptrs.$indices.offset_from(origin.$indices),)*]
-                };
+                let offsets = unsafe { [$(ptrs.$indices.offset_from(origin.$indices),)*] };
                 assert!(offsets.iter().all(|&offset| offset == offsets[0]));
                 offsets[0]
             }
@@ -417,16 +428,31 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             unsafe fn ptrs_copy(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
-                unsafe { $(::core::ptr::copy(src.$indices, dst.$indices, len);)* }
+                let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
+
+                let closures = ($(|| unsafe { ::core::ptr::copy(src.$indices, dst.$indices, len); },)*);
+                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
+
+                for index in 0..count_idents!($($types,)*) {
+                    closures[permutation[index]]();
+                }
             }
 
             #[inline(always)]
             unsafe fn ptrs_copy_rev(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
-                unsafe { $(::core::ptr::copy(src.$reversed_indices, dst.$reversed_indices, len);)* }
+                let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
+
+                let closures = ($(|| unsafe { ::core::ptr::copy(src.$indices, dst.$indices, len); },)*);
+                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
+
+                for index in (0..count_idents!($($types,)*)).rev() {
+                    closures[permutation[index]]();
+                }
             }
 
             #[inline(always)]
             unsafe fn ptrs_copy_nonoverlapping(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
+                // because source and destination are non-overlapping, we can copy them in any order
                 unsafe { $(::core::ptr::copy_nonoverlapping(src.$indices, dst.$indices, len);)* }
             }
 
@@ -497,6 +523,13 @@ macro_rules! soa_impl {
             #[inline(always)]
             fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs {
                 ($(vecs.$indices.as_mut_ptr(),)*)
+            }
+
+            #[inline(always)]
+            fn vecs_len(vecs: &Self::Vecs) -> usize {
+                let lens = [$(vecs.$indices.len(),)*];
+                assert!(lens.iter().all(|&len| len == lens[0]));
+                lens[0]
             }
 
             #[inline(always)]

@@ -245,6 +245,23 @@ where
         vecs
     }
 
+    pub fn from_vecs(mut vecs: T::Vecs) -> Self {
+        let len = T::vecs_len(&vecs);
+        let mut vec = Self::with_capacity(len);
+
+        unsafe {
+            T::vecs_set_len(&mut vecs, 0);
+        }
+
+        let src = T::vecs_as_ptrs(&vecs);
+        let dst = vec.as_mut_ptrs();
+        unsafe {
+            T::ptrs_copy_nonoverlapping(src, dst, len);
+            vec.set_len(len);
+        }
+        vec
+    }
+
     pub fn truncate(&mut self, len: usize) {
         if len > self.len {
             return;

@@ -275,7 +275,7 @@ struct SoaTupleConst<T> {
 }
 
 macro_rules! soa_impl {
-    ($($types:ident index $indices:tt reversed_index $reversed_indices:tt),* $(,)?) => {
+    ($($types:ident index $indices:tt),* $(,)?) => {
         impl<$($types,)*> SoaTupleConst<($($types,)*)> {
             const LAYOUTS: [Layout; count_idents!($($types,)*)] = [
                 $(Layout::new::<$types>(),)*
@@ -632,115 +632,115 @@ macro_rules! soa_impl {
 }
 
 soa_impl!(
-    A index 0 reversed_index 0,
+    A index 0,
 );
 
 soa_impl!(
-    A index 0 reversed_index 1,
-    B index 1 reversed_index 0,
+    A index 0,
+    B index 1,
 );
 
 soa_impl!(
-    A index 0 reversed_index 2,
-    B index 1 reversed_index 1,
-    C index 2 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
 );
 
 soa_impl!(
-    A index 0 reversed_index 3,
-    B index 1 reversed_index 2,
-    C index 2 reversed_index 1,
-    D index 3 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
 );
 
 soa_impl!(
-    A index 0 reversed_index 4,
-    B index 1 reversed_index 3,
-    C index 2 reversed_index 2,
-    D index 3 reversed_index 1,
-    E index 4 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
 );
 
 soa_impl!(
-    A index 0 reversed_index 5,
-    B index 1 reversed_index 4,
-    C index 2 reversed_index 3,
-    D index 3 reversed_index 2,
-    E index 4 reversed_index 1,
-    F index 5 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
 );
 
 soa_impl!(
-    A index 0 reversed_index 6,
-    B index 1 reversed_index 5,
-    C index 2 reversed_index 4,
-    D index 3 reversed_index 3,
-    E index 4 reversed_index 2,
-    F index 5 reversed_index 1,
-    G index 6 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
 );
 
 soa_impl!(
-    A index 0 reversed_index 7,
-    B index 1 reversed_index 6,
-    C index 2 reversed_index 5,
-    D index 3 reversed_index 4,
-    E index 4 reversed_index 3,
-    F index 5 reversed_index 2,
-    G index 6 reversed_index 1,
-    H index 7 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
 );
 
 soa_impl!(
-    A index 0 reversed_index 8,
-    B index 1 reversed_index 7,
-    C index 2 reversed_index 6,
-    D index 3 reversed_index 5,
-    E index 4 reversed_index 4,
-    F index 5 reversed_index 3,
-    G index 6 reversed_index 2,
-    H index 7 reversed_index 1,
-    I index 8 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+    I index 8,
 );
 
 soa_impl!(
-    A index 0 reversed_index 9,
-    B index 1 reversed_index 8,
-    C index 2 reversed_index 7,
-    D index 3 reversed_index 6,
-    E index 4 reversed_index 5,
-    F index 5 reversed_index 4,
-    G index 6 reversed_index 3,
-    H index 7 reversed_index 2,
-    I index 8 reversed_index 1,
-    J index 9 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+    I index 8,
+    J index 9,
 );
 
 soa_impl!(
-    A index 0  reversed_index 10,
-    B index 1  reversed_index 9,
-    C index 2  reversed_index 8,
-    D index 3  reversed_index 7,
-    E index 4  reversed_index 6,
-    F index 5  reversed_index 5,
-    G index 6  reversed_index 4,
-    H index 7  reversed_index 3,
-    I index 8  reversed_index 2,
-    J index 9  reversed_index 1,
-    K index 10 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+    I index 8,
+    J index 9,
+    K index 10,
 );
 
 soa_impl!(
-    A index 0  reversed_index 11,
-    B index 1  reversed_index 10,
-    C index 2  reversed_index 9,
-    D index 3  reversed_index 8,
-    E index 4  reversed_index 7,
-    F index 5  reversed_index 6,
-    G index 6  reversed_index 5,
-    H index 7  reversed_index 4,
-    I index 8  reversed_index 3,
-    J index 9  reversed_index 2,
-    K index 10 reversed_index 1,
-    L index 11 reversed_index 0,
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+    I index 8,
+    J index 9,
+    K index 10,
+    L index 11,
 );

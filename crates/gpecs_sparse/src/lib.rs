@@ -8,6 +8,7 @@
 extern crate alloc;
 
 pub mod arena;
+pub mod error;
 pub mod item;
 pub mod iter;
 pub mod key;

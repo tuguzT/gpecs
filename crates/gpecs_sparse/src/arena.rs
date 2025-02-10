@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     cmp,
     fmt::{self, Debug, Display},
@@ -16,6 +16,7 @@ use crate::{
         unwrap_sparse_item, unwrap_sparse_item_mut,
     },
     entry::generate_entry_types,
+    error::TryReserveError,
     item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
@@ -121,7 +122,7 @@ where
     ) -> Result<(), TryReserveError> {
         let Self { dense, sparse, .. } = self;
 
-        dense.try_reserve(additional_dense).unwrap(); // TODO convert error type
+        dense.try_reserve(additional_dense)?;
         sparse.try_reserve(additional_sparse)?;
         Ok(())
     }
@@ -134,7 +135,7 @@ where
     ) -> Result<(), TryReserveError> {
         let Self { dense, sparse, .. } = self;
 
-        dense.try_reserve_exact(additional_dense).unwrap(); // TODO convert error type
+        dense.try_reserve_exact(additional_dense)?;
         sparse.try_reserve_exact(additional_sparse)?;
         Ok(())
     }
@@ -384,7 +385,7 @@ where
                 SparseItemKind::Vacant { next_vacant } => {
                     remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
 
-                    dense.try_reserve(1).unwrap(); // TODO convert error type
+                    dense.try_reserve(1)?;
                     dense.push((key, value));
                     sparse[sparse_index] = SparseItem::occupied(dense.len() - 1, key.epoch());
 
@@ -397,7 +398,7 @@ where
                 sparse.try_reserve(new_sparse_len.saturating_sub(sparse.len()))?;
                 extend_sparse(sparse, new_sparse_len, sparse_vacant_head);
 
-                dense.try_reserve(1).unwrap(); // TODO convert error type
+                dense.try_reserve(1)?;
                 dense.push((key, value));
                 sparse[sparse_index] = SparseItem::occupied(dense.len() - 1, key.epoch());
 
@@ -450,7 +451,7 @@ where
             let key = K::new(*sparse_vacant_head, sparse_item.epoch);
             let sparse_item_kind = SparseItemKind::occupied(dense.len());
 
-            dense.try_reserve(1).unwrap(); // TODO convert error type
+            dense.try_reserve(1)?;
             dense.push((key, value));
 
             sparse_item.kind = sparse_item_kind;
@@ -462,7 +463,7 @@ where
         let key = Key::new(*sparse_vacant_head, Default::default());
         let sparse_item = SparseItem::occupied(dense.len(), Default::default());
 
-        dense.try_reserve(1).unwrap(); // TODO convert error type
+        dense.try_reserve(1)?;
         sparse.try_reserve(1)?;
 
         dense.push((key, value));

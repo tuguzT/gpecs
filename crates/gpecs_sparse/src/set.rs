@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     cmp,
     fmt::{self, Debug, Display},
@@ -16,6 +16,7 @@ use crate::{
         unwrap_dense_index_mut, unwrap_dense_value_mut, unwrap_sparse_item_mut,
     },
     entry::generate_entry_types,
+    error::TryReserveError,
     item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
@@ -117,7 +118,7 @@ where
     ) -> Result<(), TryReserveError> {
         let Self { dense, sparse } = self;
 
-        dense.try_reserve(additional_dense).unwrap(); // TODO convert error type
+        dense.try_reserve(additional_dense)?;
         sparse.try_reserve(additional_sparse)?;
         Ok(())
     }
@@ -130,7 +131,7 @@ where
     ) -> Result<(), TryReserveError> {
         let Self { dense, sparse } = self;
 
-        dense.try_reserve_exact(additional_dense).unwrap(); // TODO convert error type
+        dense.try_reserve_exact(additional_dense)?;
         sparse.try_reserve_exact(additional_sparse)?;
         Ok(())
     }
@@ -354,7 +355,7 @@ where
             return Ok(Some(value));
         }
 
-        dense.try_reserve(1).unwrap(); // TODO convert error type
+        dense.try_reserve(1)?;
         dense.push((key, value));
         *sparse_item = SparseItem::occupied(dense.len() - 1, key.epoch());
 

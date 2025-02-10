@@ -655,14 +655,14 @@ where
 #[cold]
 #[inline(never)]
 #[track_caller]
-fn slice_index_usize_fail(len: usize, index: usize) -> ! {
+pub(super) fn slice_index_usize_fail(len: usize, index: usize) -> ! {
     panic!("index out of bounds: the len is {len} but the index is {index}")
 }
 
 #[cold]
 #[inline(never)]
 #[track_caller]
-fn slice_index_order_fail(index: usize, end: usize) -> ! {
+pub(super) fn slice_index_order_fail(index: usize, end: usize) -> ! {
     panic!("slice index starts at {index} but ends at {end}");
 }
 
@@ -675,21 +675,21 @@ fn slice_start_index_len_fail(index: usize, len: usize) -> ! {
 #[cold]
 #[inline(never)]
 #[track_caller]
-fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
+pub(super) fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
     panic!("range end index {index} out of range for slice of length {len}");
 }
 
 #[cold]
 #[inline(never)]
 #[track_caller]
-const fn slice_end_index_overflow_fail() -> ! {
+pub(super) const fn slice_end_index_overflow_fail() -> ! {
     panic!("attempted to index slice up to maximum usize");
 }
 
 #[cold]
 #[inline(never)]
 #[track_caller]
-const fn slice_start_index_overflow_fail() -> ! {
+pub(super) const fn slice_start_index_overflow_fail() -> ! {
     panic!("attempted to index slice from after maximum usize");
 }
 

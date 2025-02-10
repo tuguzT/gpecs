@@ -10,23 +10,6 @@ const fn check_kv_same_len_failed() -> ! {
     panic!("keys and values should have the same length")
 }
 
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn check_kv_same_capacity_failed() -> ! {
-    panic!("keys and values should have the same capacity")
-}
-
-#[inline]
-#[track_caller]
-pub fn match_kv_same_kind<K, V>(key: Option<K>, value: Option<V>) -> Option<(K, V)> {
-    match (key, value) {
-        (Some(key), Some(value)) => Some((key, value)),
-        (None, None) => None,
-        _ => check_kv_same_len_failed(),
-    }
-}
-
 #[inline]
 #[track_caller]
 pub fn unwrap_sparse_item<E>(sparse: &[SparseItem<E>], sparse_index: usize) -> &SparseItem<E> {
@@ -244,13 +227,4 @@ pub const fn check_kv_same_len(keys_len: usize, values_len: usize) {
         return;
     }
     check_kv_same_len_failed()
-}
-
-#[inline]
-#[track_caller]
-pub const fn check_kv_same_capacity(keys_capacity: usize, values_capacity: usize) {
-    if keys_capacity == values_capacity {
-        return;
-    }
-    check_kv_same_capacity_failed()
 }

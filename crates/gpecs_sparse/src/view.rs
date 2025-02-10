@@ -1,8 +1,11 @@
 use core::{
     cmp,
-    fmt::Display,
+    fmt::{self, Debug, Display},
+    hash::{self, Hash},
     ops::{Index, IndexMut},
 };
+
+use gpecs_soa::slice::SoaSlice;
 
 use crate::{
     algo::{
@@ -10,8 +13,8 @@ use crate::{
         sparse_get_with_key, sparse_index, sparse_index_mut, sparse_swap, sparse_swap_keys,
     },
     assert::{
-        check_equal_key, check_kv_same_len, unwrap_dense_index, unwrap_dense_index_mut,
-        unwrap_dense_key, unwrap_dense_key_mut, unwrap_sparse_item, unwrap_sparse_items_pair_mut,
+        check_equal_key, unwrap_dense_index, unwrap_dense_index_mut, unwrap_dense_key,
+        unwrap_dense_key_mut, unwrap_sparse_item, unwrap_sparse_items_pair_mut,
         unwrap_value_from_sparse_index,
     },
     item::SparseItem,
@@ -21,13 +24,11 @@ use crate::{
 
 pub type SparseView<'a, T> = EpochSparseView<'a, usize, T>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EpochSparseView<'a, K, V>
 where
     K: Key,
 {
-    dense_keys: &'a [K],
-    dense_values: &'a [V],
+    dense: &'a SoaSlice<(K, V)>,
     sparse: &'a [SparseItem<K::Epoch>],
 }
 
@@ -36,144 +37,124 @@ where
     K: Key,
 {
     #[inline]
-    pub(crate) const fn new(
-        dense_keys: &'a [K],
-        dense_values: &'a [V],
-        sparse: &'a [SparseItem<K::Epoch>],
-    ) -> Self {
-        check_kv_same_len(dense_keys.len(), dense_values.len());
-        Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        }
+    pub(crate) fn new(dense: &'a SoaSlice<(K, V)>, sparse: &'a [SparseItem<K::Epoch>]) -> Self {
+        Self { dense, sparse }
     }
 
     #[inline]
-    pub const fn len(&self) -> usize {
-        let Self { dense_keys, .. } = self;
-        dense_keys.len()
+    pub fn len(&self) -> usize {
+        let Self { dense, .. } = self;
+        dense.len()
     }
 
     #[inline]
-    pub const fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     #[inline]
-    pub const fn sparse_len(&self) -> usize {
+    pub fn sparse_len(&self) -> usize {
         let Self { sparse, .. } = self;
         sparse.len()
     }
 
     #[inline]
-    pub const fn sparse_is_empty(&self) -> bool {
+    pub fn sparse_is_empty(&self) -> bool {
         self.sparse_len() == 0
     }
 
     #[inline]
-    pub const fn as_slice(&self) -> &'a [V] {
-        let Self { dense_values, .. } = self;
-        dense_values
+    pub fn as_slice(&self) -> &'a [V] {
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_slices();
+        values
     }
 
     #[inline]
-    pub const fn as_ptr(&self) -> *const V {
-        let Self { dense_values, .. } = self;
-        dense_values.as_ptr()
+    pub fn as_ptr(&self) -> *const V {
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_ptrs();
+        values
     }
 
     #[inline]
-    pub const fn as_keys_slice(&self) -> &'a [K] {
-        let Self { dense_keys, .. } = self;
-        dense_keys
+    pub fn as_keys_slice(&self) -> &'a [K] {
+        let Self { dense, .. } = self;
+
+        let (keys, _) = dense.as_slices();
+        keys
     }
 
     #[inline]
-    pub const fn as_keys_ptr(&self) -> *const K {
-        let Self { dense_keys, .. } = self;
-        dense_keys.as_ptr()
+    pub fn as_keys_ptr(&self) -> *const K {
+        let Self { dense, .. } = self;
+
+        let (keys, _) = dense.as_ptrs();
+        keys
     }
 
     #[inline]
-    pub const fn as_sparse_slice(&self) -> &'a [SparseItem<K::Epoch>] {
+    pub fn as_sparse_slice(&self) -> &'a [SparseItem<K::Epoch>] {
         let Self { sparse, .. } = self;
         sparse
     }
 
     #[inline]
-    pub const fn as_sparse_ptr(&self) -> *const SparseItem<K::Epoch> {
+    pub fn as_sparse_ptr(&self) -> *const SparseItem<K::Epoch> {
         let Self { sparse, .. } = self;
         sparse.as_ptr()
     }
 
     #[inline]
     pub fn get(&self, key: K) -> Option<&'a V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_get(dense_keys, dense_values, sparse, key)
     }
 
     #[inline]
     pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, &'a V)> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_get_with_key(dense_keys, dense_values, sparse, sparse_index)
     }
 
     #[inline]
     pub fn get_epoch(&self, sparse_index: usize) -> Option<K::Epoch> {
-        let Self {
-            sparse, dense_keys, ..
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, _) = dense.as_slices();
         sparse_get_epoch(dense_keys, sparse, sparse_index)
     }
 
     #[inline]
     pub fn contains_key(&self, key: K) -> bool {
-        let Self {
-            dense_keys, sparse, ..
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, _) = dense.as_slices();
         sparse_contains_key(dense_keys, sparse, key)
     }
 
     #[inline]
     pub fn keys(&self) -> Keys<'a, K, V> {
-        let Self { dense_keys, .. } = self;
-
-        let keys = dense_keys.iter();
-        Keys::new(keys)
+        let Self { dense, .. } = self;
+        Keys::new(dense.iter())
     }
 
     #[inline]
     pub fn values(&self) -> Values<'a, K, V> {
-        let Self { dense_values, .. } = self;
-
-        let values = dense_values.iter();
-        Values::new(values)
+        let Self { dense, .. } = self;
+        Values::new(dense.iter())
     }
 
     #[inline]
     pub fn iter(&self) -> Iter<'a, K, V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        let keys = dense_keys.iter();
-        let values = dense_values.iter();
-        Iter::new(keys, values)
+        let Self { dense, .. } = self;
+        Iter::new(dense.iter())
     }
 
     #[inline]
@@ -181,13 +162,24 @@ where
     where
         K: Display,
     {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_index(dense_keys, dense_values, sparse, key)
+    }
+}
+
+impl<'a, K, V> Debug for EpochSparseView<'a, K, V>
+where
+    K: Key,
+    K::Epoch: Debug,
+    SoaSlice<(K, V)>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EpochSparseView")
+            .field("dense", &self.dense)
+            .field("sparse", &self.sparse)
+            .finish()
     }
 }
 
@@ -198,8 +190,7 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            dense_keys: Default::default(),
-            dense_values: Default::default(),
+            dense: Default::default(),
             sparse: Default::default(),
         }
     }
@@ -217,6 +208,63 @@ where
 
 impl<K, V> Copy for EpochSparseView<'_, K, V> where K: Key {}
 
+impl<'a, K, V> PartialEq for EpochSparseView<'a, K, V>
+where
+    K: Key,
+    SoaSlice<(K, V)>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.dense == other.dense && self.sparse == other.sparse
+    }
+}
+
+impl<'a, K, V> Eq for EpochSparseView<'a, K, V>
+where
+    K: Key,
+    SoaSlice<(K, V)>: Eq,
+{
+}
+
+impl<'a, K, V> PartialOrd for EpochSparseView<'a, K, V>
+where
+    K: Key,
+    SoaSlice<(K, V)>: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.dense.partial_cmp(&other.dense) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.sparse.partial_cmp(&other.sparse)
+    }
+}
+
+impl<'a, K, V> Ord for EpochSparseView<'a, K, V>
+where
+    K: Key,
+    SoaSlice<(K, V)>: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.dense.cmp(&other.dense) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.sparse.cmp(&other.sparse)
+    }
+}
+
+impl<'a, K, V> Hash for EpochSparseView<'a, K, V>
+where
+    K: Key,
+    K::Epoch: Hash,
+    SoaSlice<(K, V)>: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.dense.hash(state);
+        self.sparse.hash(state);
+    }
+}
+
 impl<K, V> Index<K> for EpochSparseView<'_, K, V>
 where
     K: Key + Display,
@@ -225,12 +273,9 @@ where
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_index(dense_keys, dense_values, sparse, key)
     }
 }
@@ -285,13 +330,11 @@ where
 
 pub type SparseViewMut<'a, T> = EpochSparseViewMut<'a, usize, T>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EpochSparseViewMut<'a, K, V>
 where
     K: Key,
 {
-    dense_keys: &'a mut [K],
-    dense_values: &'a mut [V],
+    dense: &'a mut SoaSlice<(K, V)>,
     sparse: &'a mut [SparseItem<K::Epoch>],
 }
 
@@ -301,22 +344,16 @@ where
 {
     #[inline]
     pub(crate) fn new(
-        dense_keys: &'a mut [K],
-        dense_values: &'a mut [V],
+        dense: &'a mut SoaSlice<(K, V)>,
         sparse: &'a mut [SparseItem<K::Epoch>],
     ) -> Self {
-        check_kv_same_len(dense_keys.len(), dense_values.len());
-        Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        }
+        Self { dense, sparse }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { dense_keys, .. } = self;
-        dense_keys.len()
+        let Self { dense, .. } = self;
+        dense.len()
     }
 
     #[inline]
@@ -337,50 +374,66 @@ where
 
     #[inline]
     pub fn as_slice(&self) -> &[V] {
-        let Self { dense_values, .. } = self;
-        dense_values
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_slices();
+        values
     }
 
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [V] {
-        let Self { dense_values, .. } = self;
-        dense_values
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_mut_slices();
+        values
     }
 
     #[inline]
     pub fn into_slice(self) -> &'a mut [V] {
-        let Self { dense_values, .. } = self;
-        dense_values
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_mut_slices();
+        values
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const V {
-        let Self { dense_values, .. } = self;
-        dense_values.as_ptr()
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_ptrs();
+        values
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut V {
-        let Self { dense_values, .. } = self;
-        dense_values.as_mut_ptr()
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_mut_ptrs();
+        values
     }
 
     #[inline]
     pub fn as_keys_slice(&self) -> &[K] {
-        let Self { dense_keys, .. } = self;
-        dense_keys
+        let Self { dense, .. } = self;
+
+        let (keys, _) = dense.as_slices();
+        keys
     }
 
     #[inline]
     pub fn into_keys_slice(self) -> &'a [K] {
-        let Self { dense_keys, .. } = self;
-        dense_keys
+        let Self { dense, .. } = self;
+
+        let (keys, _) = dense.as_slices();
+        keys
     }
 
     #[inline]
     pub fn as_keys_ptr(&self) -> *const K {
-        let Self { dense_keys, .. } = self;
-        dense_keys.as_ptr()
+        let Self { dense, .. } = self;
+
+        let (keys, _) = dense.as_ptrs();
+        keys
     }
 
     #[inline]
@@ -402,41 +455,23 @@ where
     }
 
     #[inline]
-    #[allow(clippy::type_complexity)]
-    pub fn into_parts(self) -> (&'a [K], &'a mut [V], &'a [SparseItem<K::Epoch>]) {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
-
-        (dense_keys, dense_values, sparse)
-    }
-
-    #[inline]
     pub fn swap(&mut self, first_key: K, second_key: K) {
-        let Self {
-            dense_values,
-            sparse,
-            ..
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (_, dense_values) = dense.as_mut_slices();
         sparse_swap(dense_values, sparse, first_key, second_key)
     }
 
     #[inline]
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
-        let Self {
-            dense_keys, sparse, ..
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, _) = dense.as_mut_slices();
         sparse_swap_keys(dense_keys, sparse, first_key, second_key)
     }
 
     pub fn invalidate_epoch(&mut self, key: K) -> Option<K> {
-        let Self {
-            dense_keys, sparse, ..
-        } = self;
+        let Self { dense, sparse } = self;
 
         let sparse_index = key.sparse_index();
         let sparse_item = sparse
@@ -444,6 +479,7 @@ where
             .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = sparse_item.dense_index()?;
 
+        let (dense_keys, _) = dense.as_mut_slices();
         let dense_key = unwrap_dense_key_mut(dense_keys, dense_index);
         check_equal_key(key, *dense_key);
 
@@ -581,12 +617,9 @@ where
     where
         SortKeys: FnOnce(&mut [K], &[V], &[SparseItem<K::Epoch>]),
     {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_mut_slices();
         sort_keys(dense_keys, dense_values, sparse);
 
         for pos in 0..dense_keys.len() {
@@ -617,155 +650,110 @@ where
 
     #[inline]
     pub fn get(&self, key: K) -> Option<&V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_get(dense_keys, dense_values, sparse, key)
     }
 
     #[inline]
     pub fn into_get(self, key: K) -> Option<&'a V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_get(dense_keys, dense_values, sparse, key)
     }
 
     #[inline]
     pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_mut_slices();
         sparse_get_mut(dense_keys, dense_values, sparse, key)
     }
 
     #[inline]
     pub fn into_get_mut(self, key: K) -> Option<&'a mut V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_mut_slices();
         sparse_get_mut(dense_keys, dense_values, sparse, key)
     }
 
     #[inline]
     pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, &V)> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_get_with_key(dense_keys, dense_values, sparse, sparse_index)
     }
 
     #[inline]
     pub fn get_mut_with_key(&mut self, sparse_index: usize) -> Option<(K, &mut V)> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_mut_slices();
         sparse_get_mut_with_key(dense_keys, dense_values, sparse, sparse_index)
     }
 
     #[inline]
     pub fn into_get_mut_with_key(self, sparse_index: usize) -> Option<(K, &'a mut V)> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_mut_slices();
         sparse_get_mut_with_key(dense_keys, dense_values, sparse, sparse_index)
     }
 
     #[inline]
     pub fn get_epoch(&self, sparse_index: usize) -> Option<K::Epoch> {
-        let Self {
-            sparse, dense_keys, ..
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, _) = dense.as_slices();
         sparse_get_epoch(dense_keys, sparse, sparse_index)
     }
 
     #[inline]
     pub fn contains_key(&self, key: K) -> bool {
-        let Self {
-            dense_keys, sparse, ..
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, _) = dense.as_slices();
         sparse_contains_key(dense_keys, sparse, key)
     }
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, K, V> {
-        let Self { dense_keys, .. } = self;
-
-        let keys = dense_keys.iter();
-        Keys::new(keys)
+        let Self { dense, .. } = self;
+        Keys::new(dense.iter())
     }
 
     #[inline]
     pub fn values(&self) -> Values<'_, K, V> {
-        let Self { dense_values, .. } = self;
-
-        let values = dense_values.iter();
-        Values::new(values)
+        let Self { dense, .. } = self;
+        Values::new(dense.iter())
     }
 
     #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
-        let Self { dense_values, .. } = self;
-
-        let values = dense_values.iter_mut();
-        ValuesMut::new(values)
+        let Self { dense, .. } = self;
+        ValuesMut::new(dense.iter_mut())
     }
 
     #[inline]
     pub fn into_values_mut(self) -> ValuesMut<'a, K, V> {
-        let Self { dense_values, .. } = self;
-
-        let values = dense_values.iter_mut();
-        ValuesMut::new(values)
+        let Self { dense, .. } = self;
+        ValuesMut::new(dense.iter_mut())
     }
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, K, V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        let keys = dense_keys.iter();
-        let values = dense_values.iter();
-        Iter::new(keys, values)
+        let Self { dense, .. } = self;
+        Iter::new(dense.iter())
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        let keys = dense_keys.iter();
-        let values = dense_values.iter_mut();
-        IterMut::new(keys, values)
+        let Self { dense, .. } = self;
+        IterMut::new(dense.iter_mut())
     }
 
     #[inline]
@@ -773,12 +761,9 @@ where
     where
         K: Display,
     {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_index(dense_keys, dense_values, sparse, key)
     }
 
@@ -787,13 +772,24 @@ where
     where
         K: Display,
     {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_mut_slices();
         sparse_index_mut(dense_keys, dense_values, sparse, key)
+    }
+}
+
+impl<'a, K, V> Debug for EpochSparseViewMut<'a, K, V>
+where
+    K: Key,
+    K::Epoch: Debug,
+    SoaSlice<(K, V)>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EpochSparseViewMut")
+            .field("dense", &self.dense)
+            .field("sparse", &self.sparse)
+            .finish()
     }
 }
 
@@ -804,10 +800,66 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            dense_keys: Default::default(),
-            dense_values: Default::default(),
+            dense: Default::default(),
             sparse: Default::default(),
         }
+    }
+}
+
+impl<'a, K, V> PartialEq for EpochSparseViewMut<'a, K, V>
+where
+    K: Key,
+    SoaSlice<(K, V)>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.dense == other.dense && self.sparse == other.sparse
+    }
+}
+
+impl<'a, K, V> Eq for EpochSparseViewMut<'a, K, V>
+where
+    K: Key,
+    SoaSlice<(K, V)>: Eq,
+{
+}
+
+impl<'a, K, V> PartialOrd for EpochSparseViewMut<'a, K, V>
+where
+    K: Key,
+    SoaSlice<(K, V)>: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.dense.partial_cmp(&other.dense) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.sparse.partial_cmp(&other.sparse)
+    }
+}
+
+impl<'a, K, V> Ord for EpochSparseViewMut<'a, K, V>
+where
+    K: Key,
+    SoaSlice<(K, V)>: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.dense.cmp(&other.dense) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.sparse.cmp(&other.sparse)
+    }
+}
+
+impl<'a, K, V> Hash for EpochSparseViewMut<'a, K, V>
+where
+    K: Key,
+    K::Epoch: Hash,
+    SoaSlice<(K, V)>: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.dense.hash(state);
+        self.sparse.hash(state);
     }
 }
 
@@ -819,12 +871,9 @@ where
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_slices();
         sparse_index(dense_keys, dense_values, sparse, key)
     }
 }
@@ -835,12 +884,9 @@ where
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.as_mut_slices();
         sparse_index_mut(dense_keys, dense_values, sparse, key)
     }
 }
@@ -923,15 +969,8 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        let keys = dense_keys.iter();
-        let values = dense_values.iter_mut();
-        IterMut::new(keys, values)
+        let Self { dense, .. } = self;
+        IterMut::new(dense.iter_mut())
     }
 }
 
@@ -941,7 +980,7 @@ where
 {
     #[inline]
     fn from(value: EpochSparseViewMut<'a, K, V>) -> Self {
-        let (dense_keys, dense_values, sparse) = value.into_parts();
-        Self::new(dense_keys, dense_values, sparse)
+        let EpochSparseViewMut { dense, sparse } = value;
+        Self::new(dense, sparse)
     }
 }

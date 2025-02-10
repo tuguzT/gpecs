@@ -1,17 +1,19 @@
 use alloc::{boxed::Box, collections::TryReserveError, vec::Vec};
 use core::{
     cmp,
-    fmt::Display,
+    fmt::{self, Debug, Display},
+    hash::{self, Hash},
     mem::replace,
     ops::{Index, IndexMut},
 };
 
+use gpecs_soa::vec::SoaVec;
+
 use crate::{
     arena,
     assert::{
-        check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_capacity,
-        check_kv_same_len, match_kv_same_kind, unwrap_dense_index_mut, unwrap_dense_value_mut,
-        unwrap_sparse_item_mut,
+        check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_len,
+        unwrap_dense_index_mut, unwrap_dense_value_mut, unwrap_sparse_item_mut,
     },
     entry::generate_entry_types,
     item::{SparseItem, SparseItemKind},
@@ -22,13 +24,11 @@ use crate::{
 
 pub type SparseSet<T> = EpochSparseSet<usize, T>;
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct EpochSparseSet<K, V>
 where
     K: Key,
 {
-    dense_keys: Vec<K>,
-    dense_values: Vec<V>,
+    dense: SoaVec<(K, V)>,
     sparse: Vec<SparseItem<K::Epoch>>,
 }
 
@@ -37,10 +37,9 @@ where
     K: Key,
 {
     #[inline]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            dense_keys: Vec::new(),
-            dense_values: Vec::new(),
+            dense: SoaVec::new(),
             sparse: Vec::new(),
         }
     }
@@ -48,8 +47,7 @@ where
     #[inline]
     pub fn with_capacity(dense: usize, sparse: usize) -> Self {
         Self {
-            dense_keys: Vec::with_capacity(dense),
-            dense_values: Vec::with_capacity(dense),
+            dense: SoaVec::with_capacity(dense),
             sparse: Vec::with_capacity(sparse),
         }
     }
@@ -63,14 +61,8 @@ where
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        check_kv_same_len(dense_keys.len(), dense_values.len());
-        dense_keys.len()
+        let Self { dense, .. } = self;
+        dense.len()
     }
 
     #[inline]
@@ -91,14 +83,8 @@ where
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        check_kv_same_capacity(dense_keys.capacity(), dense_values.capacity());
-        dense_keys.capacity()
+        let Self { dense, .. } = self;
+        dense.capacity()
     }
 
     #[inline]
@@ -109,27 +95,17 @@ where
 
     #[inline]
     pub fn reserve(&mut self, additional_dense: usize, additional_sparse: usize) {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        dense_keys.reserve(additional_dense);
-        dense_values.reserve(additional_dense);
+        dense.reserve(additional_dense);
         sparse.reserve(additional_sparse);
     }
 
     #[inline]
     pub fn reserve_exact(&mut self, additional_dense: usize, additional_sparse: usize) {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        dense_keys.reserve_exact(additional_dense);
-        dense_values.reserve_exact(additional_dense);
+        dense.reserve_exact(additional_dense);
         sparse.reserve_exact(additional_sparse);
     }
 
@@ -139,14 +115,9 @@ where
         additional_dense: usize,
         additional_sparse: usize,
     ) -> Result<(), TryReserveError> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        dense_keys.try_reserve(additional_dense)?;
-        dense_values.try_reserve(additional_dense)?;
+        dense.try_reserve(additional_dense).unwrap(); // TODO convert error type
         sparse.try_reserve(additional_sparse)?;
         Ok(())
     }
@@ -157,41 +128,25 @@ where
         additional_dense: usize,
         additional_sparse: usize,
     ) -> Result<(), TryReserveError> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        dense_keys.try_reserve_exact(additional_dense)?;
-        dense_values.try_reserve_exact(additional_dense)?;
+        dense.try_reserve_exact(additional_dense).unwrap(); // TODO convert error type
         sparse.try_reserve_exact(additional_sparse)?;
         Ok(())
     }
 
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        dense_keys.shrink_to_fit();
-        dense_values.shrink_to_fit();
+        dense.shrink_to_fit();
         sparse.shrink_to_fit();
     }
 
     #[inline]
     pub fn dense_shrink_to_fit(&mut self) {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        dense_keys.shrink_to_fit();
-        dense_values.shrink_to_fit();
+        let Self { dense, .. } = self;
+        dense.shrink_to_fit();
     }
 
     #[inline]
@@ -202,27 +157,16 @@ where
 
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        dense_keys.shrink_to(min_capacity);
-        dense_values.shrink_to(min_capacity);
+        dense.shrink_to(min_capacity);
         sparse.shrink_to(min_capacity);
     }
 
     #[inline]
     pub fn dense_shrink_to(&mut self, min_capacity: usize) {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        dense_keys.shrink_to(min_capacity);
-        dense_values.shrink_to(min_capacity);
+        let Self { dense, .. } = self;
+        dense.shrink_to(min_capacity);
     }
 
     #[inline]
@@ -233,50 +177,66 @@ where
 
     #[inline]
     pub fn as_slice(&self) -> &[V] {
-        let Self { dense_values, .. } = self;
-        dense_values.as_slice()
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_slices();
+        values
     }
 
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [V] {
-        let Self { dense_values, .. } = self;
-        dense_values.as_mut_slice()
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_mut_slices();
+        values
     }
 
     #[inline]
     pub fn into_boxed_slice(self) -> Box<[V]> {
-        let Self { dense_values, .. } = self;
-        dense_values.into_boxed_slice()
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.into_vecs();
+        values.into_boxed_slice()
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const V {
-        let Self { dense_values, .. } = self;
-        dense_values.as_ptr()
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_ptrs();
+        values
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut V {
-        let Self { dense_values, .. } = self;
-        dense_values.as_mut_ptr()
+        let Self { dense, .. } = self;
+
+        let (_, values) = dense.as_mut_ptrs();
+        values
     }
 
     #[inline]
     pub fn as_keys_slice(&self) -> &[K] {
-        let Self { dense_keys, .. } = self;
-        dense_keys.as_slice()
+        let Self { dense, .. } = self;
+
+        let (keys, _) = dense.as_slices();
+        keys
     }
 
     #[inline]
     pub fn into_keys_boxed_slice(self) -> Box<[K]> {
-        let Self { dense_keys, .. } = self;
-        dense_keys.into_boxed_slice()
+        let Self { dense, .. } = self;
+
+        let (keys, _) = dense.into_vecs();
+        keys.into_boxed_slice()
     }
 
     #[inline]
     pub fn as_keys_ptr(&self) -> *const K {
-        let Self { dense_keys, .. } = self;
-        dense_keys.as_ptr()
+        let Self { dense, .. } = self;
+
+        let (keys, _) = dense.as_ptrs();
+        keys
     }
 
     #[inline]
@@ -299,34 +259,21 @@ where
 
     #[inline]
     pub fn as_view(&self) -> EpochSparseView<'_, K, V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
-
-        EpochSparseView::new(dense_keys, dense_values, sparse)
+        let Self { dense, sparse } = self;
+        EpochSparseView::new(dense, sparse)
     }
 
     #[inline]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, K, V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
-
-        EpochSparseViewMut::new(dense_keys, dense_values, sparse)
+        let Self { dense, sparse } = self;
+        EpochSparseViewMut::new(dense, sparse)
     }
 
     #[inline]
     pub fn into_parts(self) -> (Vec<K>, Vec<V>, Vec<SparseItem<K::Epoch>>) {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
+        let (dense_keys, dense_values) = dense.into_vecs();
         (dense_keys, dense_values, sparse)
     }
 
@@ -351,18 +298,13 @@ where
         }
 
         Self {
-            dense_keys: keys,
-            dense_values: values,
+            dense: SoaVec::from_vecs((keys, values)),
             sparse,
         }
     }
 
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
         let sparse_index = key.sparse_index();
         extend_sparse(sparse, sparse_index.saturating_add(1));
@@ -373,6 +315,8 @@ where
         }
 
         if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
+            let (dense_keys, dense_values) = dense.as_mut_slices();
+
             let value_mut = unwrap_dense_value_mut(dense_values, dense_index);
             let value = replace(value_mut, value);
             sparse_item.epoch = key.epoch();
@@ -380,20 +324,14 @@ where
             return Some(value);
         }
 
-        check_kv_same_len(dense_keys.len(), dense_values.len());
-        dense_keys.push(key);
-        dense_values.push(value);
-        *sparse_item = SparseItem::occupied(dense_keys.len() - 1, key.epoch());
+        dense.push((key, value));
+        *sparse_item = SparseItem::occupied(dense.len() - 1, key.epoch());
 
         None
     }
 
     pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryReserveError> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
         let sparse_index = key.sparse_index();
 
@@ -407,6 +345,8 @@ where
         }
 
         if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
+            let (dense_keys, dense_values) = dense.as_mut_slices();
+
             let value_mut = unwrap_dense_value_mut(dense_values, dense_index);
             let value = replace(value_mut, value);
             sparse_item.epoch = key.epoch();
@@ -414,13 +354,9 @@ where
             return Ok(Some(value));
         }
 
-        check_kv_same_len(dense_keys.len(), dense_values.len());
-        dense_keys.try_reserve(1)?;
-        dense_values.try_reserve(1)?;
-
-        dense_keys.push(key);
-        dense_values.push(value);
-        *sparse_item = SparseItem::occupied(dense_keys.len() - 1, key.epoch());
+        dense.try_reserve(1).unwrap(); // TODO convert error type
+        dense.push((key, value));
+        *sparse_item = SparseItem::occupied(dense.len() - 1, key.epoch());
 
         Ok(None)
     }
@@ -468,25 +404,19 @@ where
     }
 
     pub fn swap_remove(&mut self, key: K) -> Option<V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
         let sparse_index = key.sparse_index();
         let dense_index = sparse
             .get(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
             .and_then(SparseItem::dense_index)?;
-        check_dense_index_bounds(dense_index, dense_keys.len());
+        check_dense_index_bounds(dense_index, dense.len());
 
-        check_kv_same_len(dense_keys.len(), dense_values.len());
-        let value = dense_values.swap_remove(dense_index);
-        let dense_key = dense_keys.swap_remove(dense_index);
+        let (dense_key, value) = dense.swap_remove(dense_index);
         check_equal_key(key, dense_key);
 
-        if let Some(swapped_key) = dense_keys.get(dense_index) {
+        if let Some((swapped_key, _)) = dense.get(dense_index) {
             let sparse_index = swapped_key.sparse_index();
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             if let Some(swapped_dense_index) = sparse_item.dense_index_mut() {
@@ -499,25 +429,19 @@ where
     }
 
     pub fn remove(&mut self, key: K) -> Option<V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
         let sparse_index = key.sparse_index();
         let dense_index = sparse
             .get(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
             .and_then(SparseItem::dense_index)?;
-        check_dense_index_bounds(dense_index, dense_keys.len());
+        check_dense_index_bounds(dense_index, dense.len());
 
-        check_kv_same_len(dense_keys.len(), dense_values.len());
-        let value = dense_values.remove(dense_index);
-        let dense_key = dense_keys.remove(dense_index);
+        let (dense_key, value) = dense.remove(dense_index);
         check_equal_key(key, dense_key);
 
-        for key in dense_keys.iter().copied().skip(dense_index) {
+        for (key, _) in dense.iter().skip(dense_index) {
             let sparse_index = key.sparse_index();
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
@@ -529,15 +453,9 @@ where
     }
 
     pub fn pop(&mut self) -> Option<(K, V)> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        let key = dense_keys.pop();
-        let value = dense_values.pop();
-        let (key, value) = match_kv_same_kind(key, value)?;
+        let (key, value) = dense.pop()?;
 
         let sparse_index = key.sparse_index();
         check_key_bounds(sparse_index, sparse.len());
@@ -554,11 +472,10 @@ where
 
     pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
         for dense_index in (dense_len..self.len()).rev() {
-            let key = self.dense_keys[dense_index];
+            let (&key, _) = self.dense.index(dense_index);
             self.remove(key);
         }
-        self.dense_keys.truncate(dense_len);
-        self.dense_values.truncate(dense_len);
+        self.dense.truncate(dense_len);
 
         for sparse_index in sparse_len..self.sparse_len() {
             let epoch = self.sparse[sparse_index].epoch;
@@ -570,20 +487,14 @@ where
 
     #[inline]
     pub fn drain(&mut self) -> Drain<'_, K, V> {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        for key in dense_keys.iter() {
+        for (key, _) in dense.iter() {
             let sparse_index = key.sparse_index();
             sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
         }
-        let keys = dense_keys.drain(..);
-        let values = dense_values.drain(..);
 
-        Drain::new(keys, values)
+        Drain::new(dense.drain(..))
     }
 
     pub fn retain<F>(&mut self, mut f: F)
@@ -591,24 +502,18 @@ where
         F: FnMut(K, &mut V) -> bool,
     {
         let old_len = self.len();
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
         let mut last = 0;
         for curr in 0..old_len {
-            let key = dense_keys[curr];
-            let value = dense_values.index_mut(curr);
+            let (&mut key, value) = dense.index_mut(curr);
             if !f(key, value) {
                 let sparse_index = key.sparse_index();
                 sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
                 continue;
             }
 
-            dense_keys.swap(curr, last);
-            dense_values.swap(curr, last);
+            dense.swap(curr, last);
 
             let sparse_index = key.sparse_index();
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
@@ -618,8 +523,7 @@ where
             last += 1;
         }
 
-        dense_keys.truncate(last);
-        dense_values.truncate(last);
+        dense.truncate(last);
     }
 
     #[inline]
@@ -737,9 +641,7 @@ where
     }
 
     pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
-        let Self {
-            dense_keys, sparse, ..
-        } = self;
+        let Self { dense, sparse } = self;
 
         let sparse_index = key.sparse_index();
         let Some(dense_index) = sparse
@@ -751,38 +653,28 @@ where
             return Entry::Vacant(entry);
         };
 
-        check_dense_index_bounds(dense_index, dense_keys.len());
+        check_dense_index_bounds(dense_index, dense.len());
         let entry = OccupiedEntry::new(key, dense_index, self);
         Entry::Occupied(entry)
     }
 
     #[inline]
     pub fn clear(&mut self) {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
-        for key in dense_keys.iter() {
+        for (key, _) in dense.iter() {
             let sparse_index = key.sparse_index();
             sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
         }
-        dense_keys.clear();
-        dense_values.clear();
+        dense.clear();
     }
 
     #[inline]
     pub fn clear_sparse(&mut self) {
-        let Self {
-            dense_keys,
-            dense_values,
-            sparse,
-        } = self;
+        let Self { dense, sparse } = self;
 
         sparse.clear();
-        dense_keys.clear();
-        dense_values.clear();
+        dense.clear();
     }
 
     #[inline]
@@ -793,10 +685,8 @@ where
 
     #[inline]
     pub fn into_keys(self) -> IntoKeys<K, V> {
-        let Self { dense_keys, .. } = self;
-
-        let keys = dense_keys.into_iter();
-        IntoKeys::new(keys)
+        let Self { dense, .. } = self;
+        IntoKeys::new(dense.into_iter())
     }
 
     #[inline]
@@ -813,10 +703,8 @@ where
 
     #[inline]
     pub fn into_values(self) -> IntoValues<K, V> {
-        let Self { dense_values, .. } = self;
-
-        let values = dense_values.into_iter();
-        IntoValues::new(values)
+        let Self { dense, .. } = self;
+        IntoValues::new(dense.into_iter())
     }
 
     #[inline]
@@ -829,6 +717,102 @@ where
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         let view_mut = self.as_mut_view();
         view_mut.into_iter()
+    }
+}
+
+impl<K, V> Debug for EpochSparseSet<K, V>
+where
+    K: Key,
+    K::Epoch: Debug,
+    SoaVec<(K, V)>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EpochSparseSet")
+            .field("dense", &self.dense)
+            .field("sparse", &self.sparse)
+            .finish()
+    }
+}
+
+impl<K, V> Default for EpochSparseSet<K, V>
+where
+    K: Key,
+{
+    fn default() -> Self {
+        Self {
+            dense: Default::default(),
+            sparse: Default::default(),
+        }
+    }
+}
+
+impl<K, V> PartialEq for EpochSparseSet<K, V>
+where
+    K: Key,
+    SoaVec<(K, V)>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.dense == other.dense && self.sparse == other.sparse
+    }
+}
+
+impl<K, V> Eq for EpochSparseSet<K, V>
+where
+    K: Key,
+    SoaVec<(K, V)>: Eq,
+{
+}
+
+impl<K, V> PartialOrd for EpochSparseSet<K, V>
+where
+    K: Key,
+    SoaVec<(K, V)>: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.dense.partial_cmp(&other.dense) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.sparse.partial_cmp(&other.sparse)
+    }
+}
+
+impl<K, V> Ord for EpochSparseSet<K, V>
+where
+    K: Key,
+    SoaVec<(K, V)>: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.dense.cmp(&other.dense) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.sparse.cmp(&other.sparse)
+    }
+}
+
+impl<K, V> Hash for EpochSparseSet<K, V>
+where
+    K: Key,
+    K::Epoch: Hash,
+    SoaVec<(K, V)>: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.dense.hash(state);
+        self.sparse.hash(state);
+    }
+}
+
+impl<K, V> Clone for EpochSparseSet<K, V>
+where
+    K: Key,
+    SoaVec<(K, V)>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            dense: self.dense.clone(),
+            sparse: self.sparse.clone(),
+        }
     }
 }
 
@@ -934,15 +918,8 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self {
-            dense_keys,
-            dense_values,
-            ..
-        } = self;
-
-        let keys = dense_keys.into_iter();
-        let values = dense_values.into_iter();
-        IntoIter::new(keys, values)
+        let Self { dense, .. } = self;
+        IntoIter::new(dense.into_iter())
     }
 }
 
@@ -982,8 +959,7 @@ where
             .collect();
 
         Self {
-            dense_keys,
-            dense_values,
+            dense: SoaVec::from_vecs((dense_keys, dense_values)),
             sparse,
         }
     }
@@ -1040,8 +1016,7 @@ where
     fn from(value: arena::EpochSparseArena<K, V>) -> Self {
         let (dense_keys, dense_values, sparse) = value.into_parts();
         Self {
-            dense_keys,
-            dense_values,
+            dense: SoaVec::from_vecs((dense_keys, dense_values)),
             sparse,
         }
     }

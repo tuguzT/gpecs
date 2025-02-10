@@ -6,12 +6,18 @@ use core::{
     mem, ops,
     ptr::{self, NonNull},
 };
+use index::slice_index_usize_fail;
 
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
     set_len_on_drop::SetLenOnDrop,
     soa::{Soa, SoaToOwned},
     vec::{IntoIter, SoaVec},
+};
+
+use self::index::{
+    slice_end_index_len_fail, slice_end_index_overflow_fail, slice_index_order_fail,
+    slice_start_index_overflow_fail,
 };
 
 pub use self::{
@@ -284,16 +290,21 @@ where
     #[inline]
     #[track_caller]
     pub fn swap(&mut self, a: usize, b: usize) {
-        let a = {
-            let refs = self.index_mut(a);
-            T::mut_refs_as_ptrs(refs)
-        };
-        let b = {
-            let refs = self.index_mut(b);
-            T::mut_refs_as_ptrs(refs)
-        };
+        let len = self.len();
+        if a >= len {
+            slice_index_usize_fail(len, a);
+        }
+        if b >= len {
+            slice_index_usize_fail(len, b);
+        }
 
-        unsafe { T::ptrs_swap(a, b) }
+        // call `get_unchecked_mut` directly on pointer to avoid creating multiple mutable references
+        let slice = ptr::from_mut(self);
+        unsafe {
+            let a = a.get_unchecked_mut(slice);
+            let b = b.get_unchecked_mut(slice);
+            T::ptrs_swap(a, b)
+        }
     }
 
     #[inline]
@@ -719,32 +730,4 @@ where
     }
 
     ops::Range { start, end }
-}
-
-#[inline(never)]
-#[cold]
-#[track_caller]
-const fn slice_start_index_overflow_fail() -> ! {
-    panic!("attempted to index slice from after maximum usize");
-}
-
-#[inline(never)]
-#[cold]
-#[track_caller]
-const fn slice_end_index_overflow_fail() -> ! {
-    panic!("attempted to index slice up to maximum usize");
-}
-
-#[inline(never)]
-#[cold]
-#[track_caller]
-fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
-    panic!("range end index {index} out of range for slice of length {len}")
-}
-
-#[inline(never)]
-#[cold]
-#[track_caller]
-fn slice_index_order_fail(index: usize, end: usize) -> ! {
-    panic!("slice index starts at {index} but ends at {end}")
 }

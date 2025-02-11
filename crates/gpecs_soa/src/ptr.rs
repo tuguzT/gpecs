@@ -294,8 +294,8 @@ where
         return Ok(Layout::new::<()>());
     }
 
-    let initial = Layout::new::<usize>();
-    let (layout, _) = T::buffer_layout(initial, capacity)?;
+    let (layout, _) = T::buffer_layout(capacity)?;
+    let (layout, _) = Layout::new::<usize>().extend(layout)?;
     Ok(layout)
 }
 
@@ -370,8 +370,14 @@ where
         return Ok(T::ptrs_dangling());
     }
 
-    let initial = Layout::new::<usize>();
-    unsafe { T::ptrs(ptr.cast(), initial, capacity) }
+    let (layout, mut offsets) = T::buffer_layout(capacity)?;
+    let (_, offset) = Layout::new::<usize>().extend(layout)?;
+    for item in offsets.as_mut() {
+        *item += offset;
+    }
+
+    let ptrs = unsafe { T::ptrs(ptr, &offsets) };
+    Ok(ptrs)
 }
 
 #[cfg(test)]

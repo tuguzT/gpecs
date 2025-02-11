@@ -3,28 +3,20 @@ use core::{
     marker::PhantomData,
 };
 
+use crate::ptr::BufferData;
+
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
-    type Offsets: AsRef<[usize]>;
+    type Offsets: AsRef<[usize]> + AsMut<[usize]>;
 
     fn packed_size_of() -> usize;
-    fn buffer_layout(
-        initial: Layout,
-        capacity: usize,
-    ) -> Result<(Layout, Self::Offsets), LayoutError>;
+    fn buffer_layout(capacity: usize) -> Result<(Layout, Self::Offsets), LayoutError>;
 
     type Ptrs: Copy;
     type MutPtrs: Copy;
-    type NonNullPtrs: Copy;
 
     fn ptrs_dangling() -> Self::MutPtrs;
-    unsafe fn ptrs(
-        ptr: *mut u8,
-        initial: Layout,
-        capacity: usize,
-    ) -> Result<Self::MutPtrs, LayoutError>;
-    unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
-    fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs;
+    unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: &Self::Offsets) -> Self::MutPtrs;
 
     fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs;
     fn ptrs_cast_mut(ptrs: Self::Ptrs) -> Self::MutPtrs;
@@ -40,6 +32,11 @@ pub unsafe trait Soa: Sized {
     unsafe fn ptrs_read(src: Self::Ptrs) -> Self;
     unsafe fn ptrs_write(dst: Self::MutPtrs, value: Self);
     unsafe fn ptrs_drop_in_place(ptrs: Self::MutPtrs);
+
+    type NonNullPtrs: Copy;
+
+    unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
+    fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs;
 
     type Refs<'a>
     where
@@ -119,24 +116,17 @@ unsafe impl Soa for () {
     }
 
     #[inline(always)]
-    fn buffer_layout(initial: Layout, _: usize) -> Result<(Layout, Self::Offsets), LayoutError> {
-        Ok((initial, []))
+    fn buffer_layout(_: usize) -> Result<(Layout, Self::Offsets), LayoutError> {
+        Ok((Layout::new::<Self>(), []))
     }
 
     type Ptrs = ();
     type MutPtrs = ();
-    type NonNullPtrs = ();
 
     #[inline(always)]
     fn ptrs_dangling() -> Self::MutPtrs {}
     #[inline(always)]
-    unsafe fn ptrs(_: *mut u8, _: Layout, _: usize) -> Result<Self::MutPtrs, LayoutError> {
-        Ok(())
-    }
-    #[inline(always)]
-    unsafe fn ptrs_to_nonnull(_: Self::MutPtrs) -> Self::NonNullPtrs {}
-    #[inline(always)]
-    fn nonnull_to_ptrs(_: Self::NonNullPtrs) -> Self::MutPtrs {}
+    unsafe fn ptrs(_: *mut BufferData<Self>, _: &Self::Offsets) -> Self::MutPtrs {}
 
     #[inline(always)]
     fn ptrs_cast_const(_: Self::MutPtrs) -> Self::Ptrs {}
@@ -169,6 +159,13 @@ unsafe impl Soa for () {
     unsafe fn ptrs_write(_: Self::MutPtrs, _: Self) {}
     #[inline(always)]
     unsafe fn ptrs_drop_in_place(_: Self::MutPtrs) {}
+
+    type NonNullPtrs = ();
+
+    #[inline(always)]
+    unsafe fn ptrs_to_nonnull(_: Self::MutPtrs) -> Self::NonNullPtrs {}
+    #[inline(always)]
+    fn nonnull_to_ptrs(_: Self::NonNullPtrs) -> Self::MutPtrs {}
 
     type Refs<'a>
         = ()
@@ -310,15 +307,12 @@ macro_rules! soa_impl {
                 size_of::<PackedSelf<$($types,)*>>()
             }
 
-            fn buffer_layout(
-                initial: Layout,
-                capacity: usize,
-            ) -> Result<(Layout, Self::Offsets), LayoutError> {
+            fn buffer_layout(capacity: usize) -> Result<(Layout, Self::Offsets), LayoutError> {
                 let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
                 let layouts = [$(Layout::array::<$types>(capacity)?,)*];
                 let mut offsets = Self::Offsets::default();
 
-                let layout = initial;
+                let layout = Layout::new::<()>();
                 $(
                     let (layout, offset) = layout.extend(layouts[permutation[$indices]])?;
                     offsets[permutation[$indices]] = offset;
@@ -329,32 +323,16 @@ macro_rules! soa_impl {
 
             type Ptrs = ($(*const $types,)*);
             type MutPtrs = ($(*mut $types,)*);
-            type NonNullPtrs = ($(::core::ptr::NonNull<$types>,)*);
 
             #[inline(always)]
             fn ptrs_dangling() -> Self::MutPtrs {
-                ($(::core::ptr::NonNull::<$types>::dangling().as_ptr(),)*)
+                ($(::core::ptr::dangling_mut::<$types>(),)*)
             }
 
             #[inline(always)]
-            unsafe fn ptrs(ptr: *mut u8, initial: Layout, capacity: usize) -> Result<Self::MutPtrs, LayoutError> {
-                let (_, offsets) = Self::buffer_layout(initial, capacity)?;
-                let ptrs = unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) };
-                Ok(ptrs)
-            }
-
-            #[inline(always)]
-            #[allow(non_snake_case)]
-            unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
-                let ($($types,)*) = ptrs;
-                unsafe { ($(::core::ptr::NonNull::new_unchecked($types),)*) }
-            }
-
-            #[inline(always)]
-            #[allow(non_snake_case)]
-            fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
-                let ($($types,)*) = ptrs;
-                ($($types.as_ptr(),)*)
+            unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: &Self::Offsets) -> Self::MutPtrs {
+                let ptr = ptr.cast::<u8>();
+                unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) }
             }
 
             #[inline(always)]
@@ -458,6 +436,22 @@ macro_rules! soa_impl {
             unsafe fn ptrs_drop_in_place(ptrs: Self::MutPtrs) {
                 let ($($types,)*) = ptrs;
                 unsafe { $(::core::ptr::drop_in_place($types);)* }
+            }
+
+            type NonNullPtrs = ($(::core::ptr::NonNull<$types>,)*);
+
+            #[inline(always)]
+            #[allow(non_snake_case)]
+            unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
+                let ($($types,)*) = ptrs;
+                unsafe { ($(::core::ptr::NonNull::new_unchecked($types),)*) }
+            }
+
+            #[inline(always)]
+            #[allow(non_snake_case)]
+            fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
+                let ($($types,)*) = ptrs;
+                ($($types.as_ptr(),)*)
             }
 
             type Refs<'a>

@@ -31,7 +31,7 @@ pub unsafe trait Soa: Sized {
         Self: 'a;
 
     fn packed_size_of() -> usize;
-    fn buffer_layout_unaligned(
+    fn buffer_layout(
         initial: Layout,
         capacity: usize,
     ) -> Result<(Layout, Self::Offsets), LayoutError>;
@@ -144,10 +144,7 @@ unsafe impl Soa for () {
     }
 
     #[inline(always)]
-    fn buffer_layout_unaligned(
-        initial: Layout,
-        _: usize,
-    ) -> Result<(Layout, Self::Offsets), LayoutError> {
+    fn buffer_layout(initial: Layout, _: usize) -> Result<(Layout, Self::Offsets), LayoutError> {
         Ok((initial, []))
     }
 
@@ -336,7 +333,7 @@ macro_rules! soa_impl {
                 size_of::<PackedSelf<$($types,)*>>()
             }
 
-            fn buffer_layout_unaligned(
+            fn buffer_layout(
                 initial: Layout,
                 capacity: usize,
             ) -> Result<(Layout, Self::Offsets), LayoutError> {
@@ -360,7 +357,7 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             unsafe fn ptrs(ptr: *mut u8, initial: Layout, capacity: usize) -> Result<Self::MutPtrs, LayoutError> {
-                let (_, offsets) = Self::buffer_layout_unaligned(initial, capacity)?;
+                let (_, offsets) = Self::buffer_layout(initial, capacity)?;
                 let ptrs = unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) };
                 Ok(ptrs)
             }

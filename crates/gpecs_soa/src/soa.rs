@@ -38,6 +38,14 @@ pub unsafe trait Soa: Sized {
     unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
     fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs;
 
+    type Vecs;
+
+    fn vecs_with_capacity(capacity: usize) -> Self::Vecs;
+    fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs;
+    fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs;
+    fn vecs_len(vecs: &Self::Vecs) -> usize;
+    unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize);
+
     type Refs<'a>
     where
         Self: 'a;
@@ -52,14 +60,6 @@ pub unsafe trait Soa: Sized {
     fn refs_as_ptrs(refs: Self::Refs<'_>) -> Self::Ptrs;
     fn mut_refs_as_ptrs(refs: Self::RefsMut<'_>) -> Self::MutPtrs;
     fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_>;
-
-    type Vecs;
-
-    fn vecs_with_capacity(capacity: usize) -> Self::Vecs;
-    fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs;
-    fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs;
-    fn vecs_len(vecs: &Self::Vecs) -> usize;
-    unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize);
 
     type SlicePtrs: Copy;
     type SliceMutPtrs: Copy;
@@ -167,6 +167,21 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn nonnull_to_ptrs(_: Self::NonNullPtrs) -> Self::MutPtrs {}
 
+    type Vecs = ();
+
+    #[inline(always)]
+    fn vecs_with_capacity(_: usize) -> Self::Vecs {}
+    #[inline(always)]
+    fn vecs_as_ptrs(_: &Self::Vecs) -> Self::Ptrs {}
+    #[inline(always)]
+    fn mut_vecs_as_ptrs(_: &mut Self::Vecs) -> Self::MutPtrs {}
+    #[inline(always)]
+    fn vecs_len(_: &Self::Vecs) -> usize {
+        0
+    }
+    #[inline(always)]
+    unsafe fn vecs_set_len(_: &mut Self::Vecs, _: usize) {}
+
     type Refs<'a>
         = ()
     where
@@ -188,21 +203,6 @@ unsafe impl Soa for () {
     fn mut_refs_as_ptrs(_: Self::RefsMut<'_>) -> Self::MutPtrs {}
     #[inline(always)]
     fn mut_refs_as_refs(_: Self::RefsMut<'_>) -> Self::Refs<'_> {}
-
-    type Vecs = ();
-
-    #[inline(always)]
-    fn vecs_with_capacity(_: usize) -> Self::Vecs {}
-    #[inline(always)]
-    fn vecs_as_ptrs(_: &Self::Vecs) -> Self::Ptrs {}
-    #[inline(always)]
-    fn mut_vecs_as_ptrs(_: &mut Self::Vecs) -> Self::MutPtrs {}
-    #[inline(always)]
-    fn vecs_len(_: &Self::Vecs) -> usize {
-        0
-    }
-    #[inline(always)]
-    unsafe fn vecs_set_len(_: &mut Self::Vecs, _: usize) {}
 
     type SlicePtrs = ();
     type SliceMutPtrs = ();
@@ -454,6 +454,35 @@ macro_rules! soa_impl {
                 ($($types.as_ptr(),)*)
             }
 
+            type Vecs = ($(::alloc::vec::Vec<$types>,)*);
+
+            #[inline(always)]
+            fn vecs_with_capacity(capacity: usize) -> Self::Vecs {
+                ($(::alloc::vec::Vec::<$types>::with_capacity(capacity),)*)
+            }
+
+            #[inline(always)]
+            fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs {
+                ($(vecs.$indices.as_ptr(),)*)
+            }
+
+            #[inline(always)]
+            fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs {
+                ($(vecs.$indices.as_mut_ptr(),)*)
+            }
+
+            #[inline(always)]
+            fn vecs_len(vecs: &Self::Vecs) -> usize {
+                let lens = [$(vecs.$indices.len(),)*];
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
+                lens[0]
+            }
+
+            #[inline(always)]
+            unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize) {
+                unsafe { $(vecs.$indices.set_len(len);)* }
+            }
+
             type Refs<'a>
                 = ($(&'a $types,)*)
             where
@@ -497,35 +526,6 @@ macro_rules! soa_impl {
             fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_> {
                 let ($($types,)*) = refs;
                 ($($types,)*)
-            }
-
-            type Vecs = ($(::alloc::vec::Vec<$types>,)*);
-
-            #[inline(always)]
-            fn vecs_with_capacity(capacity: usize) -> Self::Vecs {
-                ($(::alloc::vec::Vec::<$types>::with_capacity(capacity),)*)
-            }
-
-            #[inline(always)]
-            fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs {
-                ($(vecs.$indices.as_ptr(),)*)
-            }
-
-            #[inline(always)]
-            fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs {
-                ($(vecs.$indices.as_mut_ptr(),)*)
-            }
-
-            #[inline(always)]
-            fn vecs_len(vecs: &Self::Vecs) -> usize {
-                let lens = [$(vecs.$indices.len(),)*];
-                assert!(lens.iter().all(|len| lens[0].eq(len)));
-                lens[0]
-            }
-
-            #[inline(always)]
-            unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize) {
-                unsafe { $(vecs.$indices.set_len(len);)* }
             }
 
             #[inline(always)]

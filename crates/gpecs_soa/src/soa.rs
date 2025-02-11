@@ -5,36 +5,17 @@ use core::{
 
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
-    type Ptrs: Copy;
-    type MutPtrs: Copy;
-    type NonNullPtrs: Copy;
     type Offsets: AsRef<[usize]>;
-    type Vecs;
-
-    type Refs<'a>
-    where
-        Self: 'a;
-
-    type RefsMut<'a>
-    where
-        Self: 'a;
-
-    type SlicePtrs: Copy;
-    type SliceMutPtrs: Copy;
-
-    type Slices<'a>
-    where
-        Self: 'a;
-
-    type SlicesMut<'a>
-    where
-        Self: 'a;
 
     fn packed_size_of() -> usize;
     fn buffer_layout(
         initial: Layout,
         capacity: usize,
     ) -> Result<(Layout, Self::Offsets), LayoutError>;
+
+    type Ptrs: Copy;
+    type MutPtrs: Copy;
+    type NonNullPtrs: Copy;
 
     fn ptrs_dangling() -> Self::MutPtrs;
     unsafe fn ptrs(
@@ -60,6 +41,14 @@ pub unsafe trait Soa: Sized {
     unsafe fn ptrs_write(dst: Self::MutPtrs, value: Self);
     unsafe fn ptrs_drop_in_place(ptrs: Self::MutPtrs);
 
+    type Refs<'a>
+    where
+        Self: 'a;
+
+    type RefsMut<'a>
+    where
+        Self: 'a;
+
     unsafe fn as_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a>;
     unsafe fn as_mut_refs<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a>;
 
@@ -67,14 +56,27 @@ pub unsafe trait Soa: Sized {
     fn mut_refs_as_ptrs(refs: Self::RefsMut<'_>) -> Self::MutPtrs;
     fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_>;
 
+    type Vecs;
+
     fn vecs_with_capacity(capacity: usize) -> Self::Vecs;
     fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs;
     fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs;
     fn vecs_len(vecs: &Self::Vecs) -> usize;
     unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize);
 
+    type SlicePtrs: Copy;
+    type SliceMutPtrs: Copy;
+
     fn slices_from_raw_parts(ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs;
     fn slices_from_raw_parts_mut(ptrs: Self::MutPtrs, len: usize) -> Self::SliceMutPtrs;
+
+    type Slices<'a>
+    where
+        Self: 'a;
+
+    type SlicesMut<'a>
+    where
+        Self: 'a;
 
     unsafe fn slices_as_refs<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a>;
     unsafe fn mut_slices_as_refs<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a>;
@@ -109,34 +111,7 @@ pub trait SoaToOwned<'a> {
 }
 
 unsafe impl Soa for () {
-    type Ptrs = ();
-    type MutPtrs = ();
-    type NonNullPtrs = ();
     type Offsets = [usize; 0];
-    type Vecs = ();
-
-    type Refs<'a>
-        = ()
-    where
-        Self: 'a;
-
-    type RefsMut<'a>
-        = ()
-    where
-        Self: 'a;
-
-    type SlicePtrs = ();
-    type SliceMutPtrs = ();
-
-    type Slices<'a>
-        = ()
-    where
-        Self: 'a;
-
-    type SlicesMut<'a>
-        = ()
-    where
-        Self: 'a;
 
     #[inline(always)]
     fn packed_size_of() -> usize {
@@ -147,6 +122,10 @@ unsafe impl Soa for () {
     fn buffer_layout(initial: Layout, _: usize) -> Result<(Layout, Self::Offsets), LayoutError> {
         Ok((initial, []))
     }
+
+    type Ptrs = ();
+    type MutPtrs = ();
+    type NonNullPtrs = ();
 
     #[inline(always)]
     fn ptrs_dangling() -> Self::MutPtrs {}
@@ -191,6 +170,16 @@ unsafe impl Soa for () {
     #[inline(always)]
     unsafe fn ptrs_drop_in_place(_: Self::MutPtrs) {}
 
+    type Refs<'a>
+        = ()
+    where
+        Self: 'a;
+
+    type RefsMut<'a>
+        = ()
+    where
+        Self: 'a;
+
     #[inline(always)]
     unsafe fn as_refs<'a>(_: Self::Ptrs) -> Self::Refs<'a> {}
     #[inline(always)]
@@ -202,6 +191,8 @@ unsafe impl Soa for () {
     fn mut_refs_as_ptrs(_: Self::RefsMut<'_>) -> Self::MutPtrs {}
     #[inline(always)]
     fn mut_refs_as_refs(_: Self::RefsMut<'_>) -> Self::Refs<'_> {}
+
+    type Vecs = ();
 
     #[inline(always)]
     fn vecs_with_capacity(_: usize) -> Self::Vecs {}
@@ -216,10 +207,23 @@ unsafe impl Soa for () {
     #[inline(always)]
     unsafe fn vecs_set_len(_: &mut Self::Vecs, _: usize) {}
 
+    type SlicePtrs = ();
+    type SliceMutPtrs = ();
+
     #[inline(always)]
     fn slices_from_raw_parts(_: Self::Ptrs, _: usize) -> Self::SlicePtrs {}
     #[inline(always)]
     fn slices_from_raw_parts_mut(_: Self::MutPtrs, _: usize) -> Self::SliceMutPtrs {}
+
+    type Slices<'a>
+        = ()
+    where
+        Self: 'a;
+
+    type SlicesMut<'a>
+        = ()
+    where
+        Self: 'a;
 
     #[inline(always)]
     unsafe fn slices_as_refs<'a>(_: Self::SlicePtrs) -> Self::Slices<'a> {}
@@ -296,34 +300,7 @@ macro_rules! soa_impl {
         }
 
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
-            type Ptrs = ($(*const $types,)*);
-            type MutPtrs = ($(*mut $types,)*);
-            type NonNullPtrs = ($(::core::ptr::NonNull<$types>,)*);
             type Offsets = [usize; count_idents!($($types,)*)];
-            type Vecs = ($(::alloc::vec::Vec<$types>,)*);
-
-            type Refs<'a>
-                = ($(&'a $types,)*)
-            where
-                Self: 'a;
-
-            type RefsMut<'a>
-                = ($(&'a mut $types,)*)
-            where
-                Self: 'a;
-
-            type SlicePtrs = ($(*const [$types],)*);
-            type SliceMutPtrs = ($(*mut [$types],)*);
-
-            type Slices<'a>
-                = ($(&'a [$types],)*)
-            where
-                Self: 'a;
-
-            type SlicesMut<'a>
-                = ($(&'a mut [$types],)*)
-            where
-                Self: 'a;
 
             #[inline(always)]
             fn packed_size_of() -> usize {
@@ -349,6 +326,10 @@ macro_rules! soa_impl {
 
                 Ok((layout, offsets))
             }
+
+            type Ptrs = ($(*const $types,)*);
+            type MutPtrs = ($(*mut $types,)*);
+            type NonNullPtrs = ($(::core::ptr::NonNull<$types>,)*);
 
             #[inline(always)]
             fn ptrs_dangling() -> Self::MutPtrs {
@@ -479,6 +460,16 @@ macro_rules! soa_impl {
                 unsafe { $(::core::ptr::drop_in_place($types);)* }
             }
 
+            type Refs<'a>
+                = ($(&'a $types,)*)
+            where
+                Self: 'a;
+
+            type RefsMut<'a>
+                = ($(&'a mut $types,)*)
+            where
+                Self: 'a;
+
             #[inline(always)]
             #[allow(non_snake_case)]
             unsafe fn as_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a> {
@@ -514,6 +505,8 @@ macro_rules! soa_impl {
                 ($($types,)*)
             }
 
+            type Vecs = ($(::alloc::vec::Vec<$types>,)*);
+
             #[inline(always)]
             fn vecs_with_capacity(capacity: usize) -> Self::Vecs {
                 ($(::alloc::vec::Vec::<$types>::with_capacity(capacity),)*)
@@ -548,12 +541,25 @@ macro_rules! soa_impl {
                 ($(::core::ptr::slice_from_raw_parts($types, len),)*)
             }
 
+            type SlicePtrs = ($(*const [$types],)*);
+            type SliceMutPtrs = ($(*mut [$types],)*);
+
             #[inline(always)]
             #[allow(non_snake_case)]
             fn slices_from_raw_parts_mut(ptrs: Self::MutPtrs, len: usize) -> Self::SliceMutPtrs {
                 let ($($types,)*) = ptrs;
                 ($(::core::ptr::slice_from_raw_parts_mut($types, len),)*)
             }
+
+            type Slices<'a>
+                = ($(&'a [$types],)*)
+            where
+                Self: 'a;
+
+            type SlicesMut<'a>
+                = ($(&'a mut [$types],)*)
+            where
+                Self: 'a;
 
             #[inline(always)]
             #[allow(non_snake_case)]

@@ -7,16 +7,45 @@ use crate::ptr::BufferData;
 
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
-    type Offsets: AsRef<[usize]> + AsMut<[usize]>;
+    type FieldLayouts: AsRef<[Layout]>;
+    type FieldPermutation: AsRef<[usize]>;
 
-    fn packed_size_of() -> usize;
-    fn buffer_layout(capacity: usize) -> Result<(Layout, Self::Offsets), LayoutError>;
+    fn field_layouts() -> Self::FieldLayouts;
+    fn field_permutation() -> Self::FieldPermutation;
+
+    fn packed_size_of() -> usize {
+        let layouts = Self::field_layouts();
+        layouts.as_ref().iter().map(Layout::size).sum()
+    }
+
+    type BufferOffsets: Default + AsRef<[usize]> + AsMut<[usize]>;
+
+    fn buffer_layout(capacity: usize) -> Result<(Layout, Self::BufferOffsets), LayoutError> {
+        let layouts = Self::field_layouts();
+        let permutation = Self::field_permutation();
+
+        let layouts = layouts.as_ref();
+        let permutation = permutation.as_ref();
+        assert_eq!(permutation.len(), layouts.len());
+
+        let mut offsets = Self::BufferOffsets::default();
+        let offsets_mut = offsets.as_mut();
+        assert_eq!(offsets_mut.len(), permutation.len());
+
+        let mut layout = Layout::new::<()>();
+        for &index in permutation {
+            let repeated = repeat_layout(layouts[index], capacity)?;
+            (layout, offsets_mut[index]) = layout.extend(repeated)?;
+        }
+
+        Ok((layout, offsets))
+    }
 
     type Ptrs: Copy;
     type MutPtrs: Copy;
 
     fn ptrs_dangling() -> Self::MutPtrs;
-    unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: &Self::Offsets) -> Self::MutPtrs;
+    unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: &Self::BufferOffsets) -> Self::MutPtrs;
 
     fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs;
     fn ptrs_cast_mut(ptrs: Self::Ptrs) -> Self::MutPtrs;
@@ -107,16 +136,40 @@ pub trait SoaToOwned<'a> {
     }
 }
 
+/// Use this until [`Layout::repeat()`] is stabilized
+fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
+    const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
+        Ok(_) => unreachable!(),
+        Err(err) => err,
+    };
+
+    let layout = layout.pad_to_align();
+    let size = layout.size().checked_mul(n).ok_or(ERR)?;
+    Layout::from_size_align(size, layout.align())
+}
+
 unsafe impl Soa for () {
-    type Offsets = [usize; 0];
+    type FieldLayouts = [Layout; 0];
+    type FieldPermutation = [usize; 0];
+
+    #[inline(always)]
+    fn field_layouts() -> Self::FieldLayouts {
+        []
+    }
+    #[inline(always)]
+    fn field_permutation() -> Self::FieldPermutation {
+        []
+    }
 
     #[inline(always)]
     fn packed_size_of() -> usize {
         size_of::<Self>()
     }
 
+    type BufferOffsets = [usize; 0];
+
     #[inline(always)]
-    fn buffer_layout(_: usize) -> Result<(Layout, Self::Offsets), LayoutError> {
+    fn buffer_layout(_: usize) -> Result<(Layout, Self::BufferOffsets), LayoutError> {
         Ok((Layout::new::<Self>(), []))
     }
 
@@ -126,7 +179,7 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn ptrs_dangling() -> Self::MutPtrs {}
     #[inline(always)]
-    unsafe fn ptrs(_: *mut BufferData<Self>, _: &Self::Offsets) -> Self::MutPtrs {}
+    unsafe fn ptrs(_: *mut BufferData<Self>, _: &Self::BufferOffsets) -> Self::MutPtrs {}
 
     #[inline(always)]
     fn ptrs_cast_const(_: Self::MutPtrs) -> Self::Ptrs {}
@@ -297,7 +350,18 @@ macro_rules! soa_impl {
         }
 
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
-            type Offsets = [usize; count_idents!($($types,)*)];
+            type FieldLayouts = [Layout; count_idents!($($types,)*)];
+            type FieldPermutation = [usize; count_idents!($($types,)*)];
+
+            #[inline(always)]
+            fn field_layouts() -> Self::FieldLayouts {
+                SoaTupleConst::<($($types,)*)>::LAYOUTS
+            }
+
+            #[inline(always)]
+            fn field_permutation() -> Self::FieldPermutation {
+                SoaTupleConst::<($($types,)*)>::PERMUTATION
+            }
 
             #[inline(always)]
             fn packed_size_of() -> usize {
@@ -307,10 +371,12 @@ macro_rules! soa_impl {
                 size_of::<PackedSelf<$($types,)*>>()
             }
 
-            fn buffer_layout(capacity: usize) -> Result<(Layout, Self::Offsets), LayoutError> {
-                let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
+            type BufferOffsets = [usize; count_idents!($($types,)*)];
+
+            fn buffer_layout(capacity: usize) -> Result<(Layout, Self::BufferOffsets), LayoutError> {
                 let layouts = [$(Layout::array::<$types>(capacity)?,)*];
-                let mut offsets = Self::Offsets::default();
+                let permutation = Self::field_permutation();
+                let mut offsets = Self::BufferOffsets::default();
 
                 let layout = Layout::new::<()>();
                 $(
@@ -330,7 +396,7 @@ macro_rules! soa_impl {
             }
 
             #[inline(always)]
-            unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: &Self::Offsets) -> Self::MutPtrs {
+            unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: &Self::BufferOffsets) -> Self::MutPtrs {
                 let ptr = ptr.cast::<u8>();
                 unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) }
             }
@@ -379,7 +445,7 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             unsafe fn ptrs_swap(a: Self::MutPtrs, b: Self::MutPtrs) {
-                let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
+                let permutation = Self::field_permutation();
 
                 let closures = ($(|| unsafe { ::core::ptr::swap(a.$indices, b.$indices); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -391,7 +457,7 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             unsafe fn ptrs_copy(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
-                let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
+                let permutation = Self::field_permutation();
 
                 let closures = ($(|| unsafe { ::core::ptr::copy(src.$indices, dst.$indices, len); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -403,7 +469,7 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             unsafe fn ptrs_copy_rev(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
-                let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
+                let permutation = Self::field_permutation();
 
                 let closures = ($(|| unsafe { ::core::ptr::copy(src.$indices, dst.$indices, len); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];

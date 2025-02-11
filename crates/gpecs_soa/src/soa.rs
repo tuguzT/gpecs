@@ -410,20 +410,27 @@ macro_rules! soa_impl {
             #[inline(always)]
             unsafe fn ptrs_offset_from(ptrs: Self::Ptrs, origin: Self::Ptrs) -> isize {
                 let offsets = unsafe { [$(ptrs.$indices.offset_from(origin.$indices),)*] };
-                assert!(offsets.iter().all(|&offset| offset == offsets[0]));
+                assert!(offsets.iter().all(|offset| offsets[0].eq(offset)));
                 offsets[0]
             }
 
             #[inline(always)]
             unsafe fn ptrs_offset_from_mut(ptrs: Self::MutPtrs, origin: Self::Ptrs) -> isize {
                 let offsets = unsafe { [$(ptrs.$indices.offset_from(origin.$indices),)*] };
-                assert!(offsets.iter().all(|&offset| offset == offsets[0]));
+                assert!(offsets.iter().all(|offset| offsets[0].eq(offset)));
                 offsets[0]
             }
 
             #[inline(always)]
             unsafe fn ptrs_swap(a: Self::MutPtrs, b: Self::MutPtrs) {
-                unsafe { $(::core::ptr::swap(a.$indices, b.$indices);)* }
+                let permutation = SoaTupleConst::<($($types,)*)>::PERMUTATION;
+
+                let closures = ($(|| unsafe { ::core::ptr::swap(a.$indices, b.$indices); },)*);
+                let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
+
+                for index in 0..count_idents!($($types,)*) {
+                    closures[permutation[index]]();
+                }
             }
 
             #[inline(always)]
@@ -528,7 +535,7 @@ macro_rules! soa_impl {
             #[inline(always)]
             fn vecs_len(vecs: &Self::Vecs) -> usize {
                 let lens = [$(vecs.$indices.len(),)*];
-                assert!(lens.iter().all(|&len| len == lens[0]));
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
                 lens[0]
             }
 

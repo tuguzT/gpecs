@@ -1,41 +1,96 @@
 use core::{
     alloc::{Layout, LayoutError},
+    borrow::{Borrow, BorrowMut},
     marker::PhantomData,
+    ops::{Index, IndexMut},
 };
 
 use crate::ptr::BufferData;
 
+pub trait Iter {
+    type Output<'a>: Iterator
+    where
+        Self: 'a;
+
+    fn iter(&self) -> Self::Output<'_>;
+}
+
+impl<T> Iter for T
+where
+    for<'a> &'a T: IntoIterator,
+{
+    type Output<'a>
+        = <&'a T as IntoIterator>::IntoIter
+    where
+        Self: 'a;
+
+    fn iter(&self) -> Self::Output<'_> {
+        self.into_iter()
+    }
+}
+
+pub trait IterMut {
+    type Output<'a>: Iterator
+    where
+        Self: 'a;
+
+    fn iter_mut(&mut self) -> Self::Output<'_>;
+}
+
+impl<T> IterMut for T
+where
+    for<'a> &'a mut T: IntoIterator,
+{
+    type Output<'a>
+        = <&'a mut T as IntoIterator>::IntoIter
+    where
+        Self: 'a;
+
+    fn iter_mut(&mut self) -> Self::Output<'_> {
+        self.into_iter()
+    }
+}
+
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
-    type FieldLayouts: AsRef<[Layout]>;
-    type FieldPermutation: AsRef<[usize]>;
+    type FieldLayouts: Index<usize, Output = Layout>
+        + for<'a> Iter<Output<'a>: ExactSizeIterator<Item: Borrow<Layout>>>;
+
+    type FieldPermutation: Index<usize, Output = usize>
+        + for<'a> Iter<Output<'a>: ExactSizeIterator<Item: Borrow<usize>>>;
 
     fn field_layouts() -> Self::FieldLayouts;
     fn field_permutation() -> Self::FieldPermutation;
 
     fn packed_size_of() -> usize {
         let layouts = Self::field_layouts();
-        layouts.as_ref().iter().map(Layout::size).sum()
+        layouts
+            .iter()
+            .map(|item| {
+                let layout: &Layout = item.borrow();
+                layout.size()
+            })
+            .sum()
     }
 
-    type BufferOffsets: Default + AsRef<[usize]> + AsMut<[usize]>;
+    type BufferOffsets: Default
+        + IndexMut<usize, Output = usize>
+        + for<'a> Iter<Output<'a>: ExactSizeIterator<Item: Borrow<usize>>>
+        + for<'a> IterMut<Output<'a>: ExactSizeIterator<Item: BorrowMut<usize>>>;
 
     fn buffer_layout(capacity: usize) -> Result<(Layout, Self::BufferOffsets), LayoutError> {
         let layouts = Self::field_layouts();
         let permutation = Self::field_permutation();
-
-        let layouts = layouts.as_ref();
-        let permutation = permutation.as_ref();
-        assert_eq!(permutation.len(), layouts.len());
+        assert_eq!(permutation.iter().len(), layouts.iter().len());
 
         let mut offsets = Self::BufferOffsets::default();
-        let offsets_mut = offsets.as_mut();
-        assert_eq!(offsets_mut.len(), permutation.len());
+        assert_eq!(offsets.iter().len(), permutation.iter().len());
 
         let mut layout = Layout::new::<()>();
-        for &index in permutation {
+        for item in permutation.iter() {
+            let &index: &usize = item.borrow();
             let repeated = repeat_layout(layouts[index], capacity)?;
-            (layout, offsets_mut[index]) = layout.extend(repeated)?;
+            (layout, offsets[index]) = layout.extend(repeated)?;
         }
 
         Ok((layout, offsets))

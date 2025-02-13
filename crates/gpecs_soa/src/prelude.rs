@@ -1,1 +1,1 @@
-pub use crate::{slice::SoaSlice, vec::SoaVec, Soa};
+pub use crate::{slice::SoaSlice, traits::Soa, vec::SoaVec};

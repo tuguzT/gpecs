@@ -2,7 +2,7 @@ use core::ops;
 
 use crate::{
     ptr::{ptrs, SoaSlicePtr, SoaSlicePtrMut},
-    soa::Soa,
+    traits::Soa,
 };
 
 use super::SoaSlice;

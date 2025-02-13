@@ -17,7 +17,7 @@ use crate::{
         BufferData,
     },
     slice::SoaSlice,
-    soa::Soa,
+    traits::Soa,
 };
 
 use self::TryReserveErrorKind::*;

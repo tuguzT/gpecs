@@ -11,7 +11,7 @@ use index::slice_index_usize_fail;
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
     set_len_on_drop::SetLenOnDrop,
-    soa::{Soa, SoaToOwned},
+    traits::{Soa, SoaToOwned},
     vec::{IntoIter, SoaVec},
 };
 

@@ -16,7 +16,7 @@ use crate::{
     raw_vec::RawSoaVec,
     set_len_on_drop::SetLenOnDrop,
     slice::{from_raw_parts, from_raw_parts_mut, slice_range, Iter, IterMut, SoaSlice},
-    soa::{Soa, SoaToOwned},
+    traits::{Soa, SoaToOwned},
 };
 
 pub use self::{drain::Drain, into_iter::IntoIter};

@@ -1,5 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
+    borrow::BorrowMut,
     convert::Infallible,
     mem::MaybeUninit,
     ptr,
@@ -7,7 +8,7 @@ use core::{
 
 use crate::{
     slice::{SoaSlice, SoaSliceIndex},
-    soa::Soa,
+    traits::{IterMut, Soa},
 };
 
 #[allow(clippy::missing_safety_doc)]
@@ -371,9 +372,11 @@ where
     }
 
     let (layout, mut offsets) = T::buffer_layout(capacity)?;
-    let (_, offset) = Layout::new::<usize>().extend(layout)?;
-    for item in offsets.as_mut() {
-        *item += offset;
+
+    let (_, offset_from_len) = Layout::new::<usize>().extend(layout)?;
+    for mut item in offsets.iter_mut() {
+        let offset: &mut usize = item.borrow_mut();
+        *offset += offset_from_len;
     }
 
     let ptrs = unsafe { T::ptrs(ptr, &offsets) };

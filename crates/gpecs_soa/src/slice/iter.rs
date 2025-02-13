@@ -9,7 +9,7 @@ use core::{
 
 #[cfg(not(feature = "cache-ptrs"))]
 use crate::ptr::{ptrs, BufferData};
-use crate::soa::Soa;
+use crate::traits::Soa;
 
 use super::SoaSlice;
 

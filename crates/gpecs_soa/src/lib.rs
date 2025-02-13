@@ -7,13 +7,13 @@
 
 extern crate alloc;
 
-pub use self::soa::{Soa, SoaToOwned};
+pub use self::traits::{Soa, SoaToOwned};
 
 pub mod prelude;
 pub mod ptr;
 pub mod slice;
+pub mod traits;
 pub mod vec;
 
 mod raw_vec;
 mod set_len_on_drop;
-mod soa;

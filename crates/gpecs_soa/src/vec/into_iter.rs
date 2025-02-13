@@ -7,7 +7,7 @@ use core::{
 
 #[cfg(not(feature = "cache-ptrs"))]
 use crate::ptr::ptrs;
-use crate::{ptr::BufferData, raw_vec::RawSoaVec, soa::Soa, vec::SoaVec};
+use crate::{ptr::BufferData, raw_vec::RawSoaVec, traits::Soa, vec::SoaVec};
 
 pub struct IntoIter<T>
 where

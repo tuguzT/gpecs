@@ -182,11 +182,17 @@ pub trait SoaToOwned<'a> {
         *target = self.to_owned();
     }
 
-    fn clone_into_refs(&self, target: <Self::Owned as Soa>::RefsMut<'_>) {
+    unsafe fn clone_into_ptrs(&self, target: <Self::Owned as Soa>::MutPtrs) {
         let owned = self.to_owned();
         unsafe {
-            let dst = <Self::Owned as Soa>::mut_refs_as_ptrs(target);
-            <Self::Owned as Soa>::ptrs_write(dst, owned);
+            <Self::Owned as Soa>::ptrs_write(target, owned);
+        }
+    }
+
+    fn clone_into_refs(&self, target: <Self::Owned as Soa>::RefsMut<'_>) {
+        let target = <Self::Owned as Soa>::mut_refs_as_ptrs(target);
+        unsafe {
+            self.clone_into_ptrs(target);
         }
     }
 }
@@ -357,6 +363,9 @@ impl SoaToOwned<'_> for () {
 
     #[inline(always)]
     fn clone_into(&self, _: &mut Self::Owned) {}
+
+    #[inline(always)]
+    unsafe fn clone_into_ptrs(&self, _: <Self::Owned as Soa>::MutPtrs) {}
 
     #[inline(always)]
     fn clone_into_refs(&self, _: <Self::Owned as Soa>::RefsMut<'_>) {}

@@ -78,8 +78,7 @@ where
     #[inline]
     #[cfg(feature = "cache-ptrs")]
     fn ptrs(&self) -> T::Ptrs {
-        let ptrs = self.ptrs.clone();
-        let ptrs = T::nonnull_to_ptrs(ptrs);
+        let ptrs = T::nonnull_to_ptrs(self.ptrs);
         T::ptrs_cast_const(ptrs)
     }
 
@@ -151,7 +150,7 @@ where
             #[cfg(not(feature = "cache-ptrs"))]
             capacity: self.capacity,
             #[cfg(feature = "cache-ptrs")]
-            ptrs: self.ptrs.clone(),
+            ptrs: self.ptrs,
             start: self.start,
             end: self.end,
             phantom: self.phantom,
@@ -457,8 +456,7 @@ where
     #[inline]
     #[cfg(feature = "cache-ptrs")]
     fn ptrs(&self) -> T::MutPtrs {
-        let ptrs = self.ptrs.clone();
-        T::nonnull_to_ptrs(ptrs)
+        T::nonnull_to_ptrs(self.ptrs)
     }
 
     #[inline]

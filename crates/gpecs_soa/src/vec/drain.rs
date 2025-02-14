@@ -197,9 +197,9 @@ where
             // it from the original vec but also avoid creating a &mut to the front since that could
             // invalidate raw pointers to it which some unsafe code might rely on.
             let vec_ptrs = vec.as_mut().as_mut_ptrs();
-            let drop_offset = T::ptrs_offset_from(drop_ptrs, T::ptrs_cast_const(vec_ptrs.clone()))
-                .try_into()
-                .unwrap_unchecked();
+            let drop_offset =
+                usize::try_from(T::ptrs_offset_from(drop_ptrs, T::ptrs_cast_const(vec_ptrs)))
+                    .unwrap_unchecked();
             let to_drop =
                 T::slices_from_raw_parts_mut(T::ptrs_add_mut(vec_ptrs, drop_offset), drop_len);
             T::slices_drop_in_place(to_drop);

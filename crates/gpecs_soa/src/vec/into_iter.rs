@@ -85,8 +85,7 @@ where
     #[inline]
     #[cfg(feature = "cache-ptrs")]
     fn ptrs(&self) -> T::MutPtrs {
-        let ptrs = self.ptrs.clone();
-        T::nonnull_to_ptrs(ptrs)
+        T::nonnull_to_ptrs(self.ptrs)
     }
 
     #[inline]

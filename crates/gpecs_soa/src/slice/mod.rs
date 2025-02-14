@@ -161,7 +161,7 @@ where
             set_len_on_drop.local_len = index;
             unsafe {
                 let dst = T::ptrs_add_mut(ptrs, index);
-                T::ptrs_write(dst, refs.to_owned());
+                refs.clone_into_ptrs(dst);
             }
         }
         mem::forget(set_len_on_drop);
@@ -198,9 +198,11 @@ where
         }
 
         for index in 0..len {
-            let dst = unsafe { T::as_mut_refs(self.get_unchecked_mut(index)) };
-            let src = unsafe { T::as_refs(src.get_unchecked(index)) };
-            src.clone_into_refs(dst);
+            unsafe {
+                let dst = self.get_unchecked_mut(index);
+                let src = T::as_refs(src.get_unchecked(index));
+                src.clone_into_ptrs(dst);
+            }
         }
     }
 

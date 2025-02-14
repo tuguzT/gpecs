@@ -612,7 +612,7 @@ where
         for refs in other.iter() {
             unsafe {
                 let dst = T::ptrs_add_mut(ptrs, set_len_on_drop.local_len);
-                T::ptrs_write(dst, refs.to_owned());
+                refs.clone_into_ptrs(dst);
             }
             set_len_on_drop.local_len += 1;
         }
@@ -636,7 +636,7 @@ where
             unsafe {
                 let refs = T::as_refs(set_len_on_drop.vec.get_unchecked(index));
                 let dst = T::ptrs_add_mut(ptrs, set_len_on_drop.local_len);
-                T::ptrs_write(dst, refs.to_owned());
+                refs.clone_into_ptrs(dst);
             }
             set_len_on_drop.local_len += 1;
         }

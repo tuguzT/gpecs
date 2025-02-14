@@ -363,12 +363,12 @@ where
         unsafe {
             let ptrs = self.as_mut_ptrs();
             let value = {
-                let ptrs = T::ptrs_add_mut(ptrs, index);
+                let ptrs = T::ptrs_add_mut(ptrs.clone(), index);
                 T::ptrs_read(T::ptrs_cast_const(ptrs))
             };
 
             T::ptrs_copy(
-                T::ptrs_add(T::ptrs_cast_const(ptrs), len - 1),
+                T::ptrs_add(T::ptrs_cast_const(ptrs.clone()), len - 1),
                 T::ptrs_add_mut(ptrs, index),
                 1,
             );
@@ -406,8 +406,8 @@ where
             let ptrs = T::ptrs_add_mut(ptrs, index);
 
             if index < len {
-                let src = T::ptrs_cast_const(ptrs);
-                let dst = T::ptrs_add_mut(ptrs, 1);
+                let src = T::ptrs_cast_const(ptrs.clone());
+                let dst = T::ptrs_add_mut(ptrs.clone(), 1);
                 T::ptrs_copy(src, dst, len - index);
             }
             T::ptrs_write(ptrs, elements);
@@ -433,10 +433,10 @@ where
             let ptrs = self.as_mut_ptrs();
             let ptrs = T::ptrs_add_mut(ptrs, index);
 
-            let value = T::ptrs_read(T::ptrs_cast_const(ptrs));
+            let value = T::ptrs_read(T::ptrs_cast_const(ptrs.clone()));
 
             T::ptrs_copy(
-                T::ptrs_add(T::ptrs_cast_const(ptrs), 1),
+                T::ptrs_add(T::ptrs_cast_const(ptrs.clone()), 1),
                 ptrs,
                 len - index - 1,
             );
@@ -497,7 +497,7 @@ where
                     unsafe {
                         let ptrs = self.v.as_mut_ptrs();
                         T::ptrs_copy(
-                            T::ptrs_add(T::ptrs_cast_const(ptrs), self.processed_len),
+                            T::ptrs_add(T::ptrs_cast_const(ptrs.clone()), self.processed_len),
                             T::ptrs_add_mut(ptrs, self.processed_len - self.deleted_cnt),
                             self.original_len - self.processed_len,
                         );
@@ -532,7 +532,7 @@ where
                     T::ptrs_add_mut(ptrs, g.processed_len)
                 };
                 let res = {
-                    let cur = unsafe { T::as_mut_refs(cur) };
+                    let cur = unsafe { T::as_mut_refs(cur.clone()) };
                     !f(cur)
                 };
                 if res {
@@ -611,7 +611,7 @@ where
         };
         for refs in other.iter() {
             unsafe {
-                let dst = T::ptrs_add_mut(ptrs, set_len_on_drop.local_len);
+                let dst = T::ptrs_add_mut(ptrs.clone(), set_len_on_drop.local_len);
                 refs.clone_into_ptrs(dst);
             }
             set_len_on_drop.local_len += 1;
@@ -635,7 +635,7 @@ where
         for index in range {
             unsafe {
                 let refs = T::as_refs(set_len_on_drop.vec.get_unchecked(index));
-                let dst = T::ptrs_add_mut(ptrs, set_len_on_drop.local_len);
+                let dst = T::ptrs_add_mut(ptrs.clone(), set_len_on_drop.local_len);
                 refs.clone_into_ptrs(dst);
             }
             set_len_on_drop.local_len += 1;

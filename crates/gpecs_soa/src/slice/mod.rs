@@ -156,11 +156,11 @@ where
             vec: &mut vec,
             local_len: 0,
         };
-        let ptrs = set_len_on_drop.vec.as_mut_ptrs();
+        let ptrs: T::MutPtrs = set_len_on_drop.vec.as_mut_ptrs();
         for (index, refs) in self.iter().enumerate() {
             set_len_on_drop.local_len = index;
             unsafe {
-                let dst = T::ptrs_add_mut(ptrs, index);
+                let dst = T::ptrs_add_mut(ptrs.clone(), index);
                 refs.clone_into_ptrs(dst);
             }
         }
@@ -201,7 +201,7 @@ where
             unsafe {
                 let dst = self.get_unchecked_mut(index);
                 let src = T::as_refs(src.get_unchecked(index));
-                T::ptrs_drop_in_place(dst);
+                T::ptrs_drop_in_place(dst.clone());
                 src.clone_into_ptrs(dst);
             }
         }
@@ -327,12 +327,12 @@ where
         self.sort_impl(|indices| {
             indices.sort_by(|&a, &b| {
                 let a = unsafe {
-                    let ptrs = T::ptrs_add_mut(ptrs, a);
+                    let ptrs = T::ptrs_add_mut(ptrs.clone(), a);
                     let ptrs = T::ptrs_cast_const(ptrs);
                     T::as_refs(ptrs)
                 };
                 let b = unsafe {
-                    let ptrs = T::ptrs_add_mut(ptrs, b);
+                    let ptrs = T::ptrs_add_mut(ptrs.clone(), b);
                     let ptrs = T::ptrs_cast_const(ptrs);
                     T::as_refs(ptrs)
                 };
@@ -350,7 +350,7 @@ where
         let ptrs = self.as_mut_ptrs();
         self.sort_impl(|indices| {
             indices.sort_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(ptrs, index);
+                let ptrs = T::ptrs_add_mut(ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(ptrs);
                 let refs = T::as_refs(ptrs);
                 f(refs)
@@ -367,7 +367,7 @@ where
         let ptrs = self.as_mut_ptrs();
         self.sort_impl(|indices| {
             indices.sort_by_cached_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(ptrs, index);
+                let ptrs = T::ptrs_add_mut(ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(ptrs);
                 let refs = T::as_refs(ptrs);
                 f(refs)
@@ -392,12 +392,12 @@ where
         self.sort_impl(|indices| {
             indices.sort_unstable_by(|&a, &b| {
                 let a = unsafe {
-                    let ptrs = T::ptrs_add_mut(ptrs, a);
+                    let ptrs = T::ptrs_add_mut(ptrs.clone(), a);
                     let ptrs = T::ptrs_cast_const(ptrs);
                     T::as_refs(ptrs)
                 };
                 let b = unsafe {
-                    let ptrs = T::ptrs_add_mut(ptrs, b);
+                    let ptrs = T::ptrs_add_mut(ptrs.clone(), b);
                     let ptrs = T::ptrs_cast_const(ptrs);
                     T::as_refs(ptrs)
                 };
@@ -415,7 +415,7 @@ where
         let ptrs = self.as_mut_ptrs();
         self.sort_impl(|indices| {
             indices.sort_unstable_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(ptrs, index);
+                let ptrs = T::ptrs_add_mut(ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(ptrs);
                 let refs = T::as_refs(ptrs);
                 f(refs)

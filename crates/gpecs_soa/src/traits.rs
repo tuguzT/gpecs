@@ -96,8 +96,8 @@ pub unsafe trait Soa: Sized {
         Ok((layout, offsets))
     }
 
-    type Ptrs: Copy;
-    type MutPtrs: Copy;
+    type Ptrs: Clone;
+    type MutPtrs: Clone;
 
     fn ptrs_dangling() -> Self::MutPtrs;
     unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: &Self::BufferOffsets) -> Self::MutPtrs;
@@ -117,7 +117,7 @@ pub unsafe trait Soa: Sized {
     unsafe fn ptrs_write(dst: Self::MutPtrs, value: Self);
     unsafe fn ptrs_drop_in_place(ptrs: Self::MutPtrs);
 
-    type NonNullPtrs: Copy;
+    type NonNullPtrs: Clone;
 
     unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
     fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs;
@@ -145,8 +145,8 @@ pub unsafe trait Soa: Sized {
     fn mut_refs_as_ptrs(refs: Self::RefsMut<'_>) -> Self::MutPtrs;
     fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_>;
 
-    type SlicePtrs: Copy;
-    type SliceMutPtrs: Copy;
+    type SlicePtrs: Clone;
+    type SliceMutPtrs: Clone;
 
     fn slices_from_raw_parts(ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs;
     fn slices_from_raw_parts_mut(ptrs: Self::MutPtrs, len: usize) -> Self::SliceMutPtrs;

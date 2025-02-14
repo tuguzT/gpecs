@@ -201,6 +201,7 @@ where
             unsafe {
                 let dst = self.get_unchecked_mut(index);
                 let src = T::as_refs(src.get_unchecked(index));
+                T::ptrs_drop_in_place(dst);
                 src.clone_into_ptrs(dst);
             }
         }

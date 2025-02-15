@@ -1,7 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
     borrow::BorrowMut,
-    convert::Infallible,
     mem::MaybeUninit,
     ptr,
 };
@@ -53,7 +52,6 @@ pub struct BufferData<T>
 where
     T: Soa,
 {
-    pub never: Infallible,
     _align: [usize; 0],
     _data: MaybeUninit<T>,
 }

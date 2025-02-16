@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     slice::{SoaSlice, SoaSliceIndex},
-    traits::{IterMut, Soa},
+    traits::{Soa, SoaIterMut},
 };
 
 #[allow(clippy::missing_safety_doc)]

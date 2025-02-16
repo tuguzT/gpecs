@@ -7,7 +7,7 @@
 
 extern crate alloc;
 
-pub use self::traits::{Soa, SoaToOwned};
+pub use self::traits::Soa;
 
 pub mod prelude;
 pub mod ptr;

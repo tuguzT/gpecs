@@ -7,7 +7,7 @@ use core::{
 
 use crate::ptr::BufferData;
 
-pub trait Iter {
+pub trait SoaIter {
     type Output<'a>: Iterator
     where
         Self: 'a;
@@ -15,7 +15,7 @@ pub trait Iter {
     fn iter(&self) -> Self::Output<'_>;
 }
 
-impl<T> Iter for T
+impl<T> SoaIter for T
 where
     for<'a> &'a T: IntoIterator,
 {
@@ -29,7 +29,7 @@ where
     }
 }
 
-pub trait IterMut {
+pub trait SoaIterMut {
     type Output<'a>: Iterator
     where
         Self: 'a;
@@ -37,7 +37,7 @@ pub trait IterMut {
     fn iter_mut(&mut self) -> Self::Output<'_>;
 }
 
-impl<T> IterMut for T
+impl<T> SoaIterMut for T
 where
     for<'a> &'a mut T: IntoIterator,
 {
@@ -51,13 +51,66 @@ where
     }
 }
 
+pub trait SoaIndex<Idx>
+where
+    Idx: ?Sized,
+{
+    type Ref<'a>
+    where
+        Self: 'a;
+
+    #[track_caller]
+    fn index(&self, index: Idx) -> Self::Ref<'_>;
+}
+
+impl<T, Idx> SoaIndex<Idx> for T
+where
+    T: Index<Idx>,
+    T::Output: 'static,
+{
+    type Ref<'a>
+        = &'a T::Output
+    where
+        Self: 'a;
+
+    fn index(&self, index: Idx) -> Self::Ref<'_> {
+        Index::index(self, index)
+    }
+}
+
+pub trait SoaIndexMut<Idx>
+where
+    Idx: ?Sized,
+{
+    type RefMut<'a>
+    where
+        Self: 'a;
+
+    #[track_caller]
+    fn index_mut(&mut self, index: Idx) -> Self::RefMut<'_>;
+}
+
+impl<T, Idx> SoaIndexMut<Idx> for T
+where
+    T: IndexMut<Idx>,
+    T::Output: 'static,
+{
+    type RefMut<'a>
+        = &'a mut T::Output
+    where
+        Self: 'a;
+
+    fn index_mut(&mut self, index: Idx) -> Self::RefMut<'_> {
+        IndexMut::index_mut(self, index)
+    }
+}
+
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
-    type FieldLayouts: Index<usize, Output = Layout>
-        + for<'a> Iter<Output<'a>: ExactSizeIterator<Item: Borrow<Layout>>>;
+    type FieldLayouts: for<'a> SoaIndex<usize, Ref<'a>: Borrow<Layout>>
+        + for<'a> SoaIter<Output<'a>: ExactSizeIterator<Item: Borrow<Layout>>>;
 
-    type FieldPermutation: Index<usize, Output = usize>
-        + for<'a> Iter<Output<'a>: ExactSizeIterator<Item: Borrow<usize>>>;
+    type FieldPermutation: for<'a> SoaIter<Output<'a>: ExactSizeIterator<Item: Borrow<usize>>>;
 
     fn field_layouts() -> Self::FieldLayouts;
     fn field_permutation() -> Self::FieldPermutation;
@@ -74,9 +127,10 @@ pub unsafe trait Soa: Sized {
     }
 
     type BufferOffsets: Default
-        + IndexMut<usize, Output = usize>
-        + for<'a> Iter<Output<'a>: ExactSizeIterator<Item: Borrow<usize>>>
-        + for<'a> IterMut<Output<'a>: ExactSizeIterator<Item: BorrowMut<usize>>>;
+        + for<'a> SoaIndex<usize, Ref<'a>: Borrow<usize>>
+        + for<'a> SoaIndexMut<usize, RefMut<'a>: BorrowMut<usize>>
+        + for<'a> SoaIter<Output<'a>: ExactSizeIterator<Item: Borrow<usize>>>
+        + for<'a> SoaIterMut<Output<'a>: ExactSizeIterator<Item: BorrowMut<usize>>>;
 
     fn buffer_layout(capacity: usize) -> Result<(Layout, Self::BufferOffsets), LayoutError> {
         let layouts = Self::field_layouts();
@@ -89,8 +143,8 @@ pub unsafe trait Soa: Sized {
         let mut layout = Layout::new::<()>();
         for item in permutation.iter() {
             let &index: &usize = item.borrow();
-            let repeated = repeat_layout(layouts[index], capacity)?;
-            (layout, offsets[index]) = layout.extend(repeated)?;
+            let repeated = repeat_layout(layouts.index(index).borrow(), capacity)?;
+            (layout, *offsets.index_mut(index).borrow_mut()) = layout.extend(repeated)?;
         }
 
         Ok((layout, offsets))
@@ -198,7 +252,7 @@ pub trait SoaToOwned<'a> {
 }
 
 /// Use this until [`Layout::repeat()`] is stabilized
-fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
+fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
     const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
         Ok(_) => unreachable!(),
         Err(err) => err,

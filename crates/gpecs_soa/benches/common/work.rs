@@ -1,38 +1,51 @@
-use std::{any::type_name, array, hint::black_box, slice};
+use std::{any::type_name, array, hint::black_box, iter::Zip, slice};
 
 use criterion::{criterion_group, BenchmarkId, Criterion};
 use gpecs_soa::{prelude::*, slice as soa_slice};
 
-use super::{with_capacity::WithCapacity, *};
+use super::{push_many::Push, *};
 
-pub(super) trait Work: WithCapacity {
+pub(super) trait Work: Push {
     fn work_item(index: usize) -> Self;
 
-    fn soa_prepare_vec(count: usize) -> SoaVec<Self> {
-        let mut vec = Self::soa_with_capacity(count);
+    fn soa_slf_prepare_vec(count: usize) -> SoaVec<Self> {
+        let mut vec = Self::soa_slf_with_capacity(count);
         for index in 0..count {
             let value = black_box(Self::work_item(index));
-            vec.push(value);
+            Self::soa_slf_push(&mut vec, value);
         }
         black_box(vec)
     }
 
-    type SoaIter<'a>: Iterator + Clone;
-    fn soa_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaIter<'_>;
-    fn soa_work(iter: Self::SoaIter<'_>);
+    type SoaSlfIter<'a>: Iterator + Clone;
+    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_>;
+    fn soa_slf_work(iter: Self::SoaSlfIter<'_>);
 
-    fn aos_prepare_vec(count: usize) -> Vec<Self> {
-        let mut vec = Self::aos_with_capacity(count);
+    fn soa_std_prepare_vec(count: usize) -> Self::Vecs {
+        let mut vecs = Self::soa_std_with_capacity(count);
         for index in 0..count {
             let value = black_box(Self::work_item(index));
-            vec.push(value);
+            Self::soa_std_push(&mut vecs, value);
+        }
+        black_box(vecs)
+    }
+
+    type SoaStdIter<'a>: Iterator + Clone;
+    fn soa_std_prepare_iter(data: &Self::Vecs) -> Self::SoaStdIter<'_>;
+    fn soa_std_work(iter: Self::SoaStdIter<'_>);
+
+    fn aos_std_prepare_vec(count: usize) -> Vec<Self> {
+        let mut vec = Self::aos_std_with_capacity(count);
+        for index in 0..count {
+            let value = black_box(Self::work_item(index));
+            Self::aos_std_push(&mut vec, value);
         }
         black_box(vec)
     }
 
-    type AosIter<'a>: Iterator + Clone;
-    fn aos_prepare_iter(data: &[Self]) -> Self::AosIter<'_>;
-    fn aos_work(iter: Self::AosIter<'_>);
+    type AosStdIter<'a>: Iterator + Clone;
+    fn aos_std_prepare_iter(data: &[Self]) -> Self::AosStdIter<'_>;
+    fn aos_std_work(iter: Self::AosStdIter<'_>);
 }
 
 impl Work for Tiny {
@@ -41,13 +54,13 @@ impl Work for Tiny {
         (index.try_into().unwrap(),)
     }
 
-    type SoaIter<'a> = soa_slice::Iter<'a, Self>;
+    type SoaSlfIter<'a> = soa_slice::Iter<'a, Self>;
 
-    fn soa_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaIter<'_> {
+    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_> {
         data.iter()
     }
 
-    fn soa_work(iter: Self::SoaIter<'_>) {
+    fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
         let mut result = 0;
         for (i,) in iter {
             result += *i;
@@ -55,13 +68,28 @@ impl Work for Tiny {
         black_box(result);
     }
 
-    type AosIter<'a> = slice::Iter<'a, Self>;
+    type SoaStdIter<'a> = slice::Iter<'a, u32>;
 
-    fn aos_prepare_iter(data: &[Self]) -> Self::AosIter<'_> {
+    fn soa_std_prepare_iter(data: &Self::Vecs) -> Self::SoaStdIter<'_> {
+        let (values,) = data;
+        values.iter()
+    }
+
+    fn soa_std_work(iter: Self::SoaStdIter<'_>) {
+        let mut result = 0;
+        for i in iter {
+            result += *i;
+        }
+        black_box(result);
+    }
+
+    type AosStdIter<'a> = slice::Iter<'a, Self>;
+
+    fn aos_std_prepare_iter(data: &[Self]) -> Self::AosStdIter<'_> {
         data.iter()
     }
 
-    fn aos_work(iter: Self::AosIter<'_>) {
+    fn aos_std_work(iter: Self::AosStdIter<'_>) {
         let mut result = 0;
         for (i,) in iter {
             result += *i;
@@ -76,13 +104,13 @@ impl Work for Small {
         (1.0 * index, 0.2 * index, -2.3 * index)
     }
 
-    type SoaIter<'a> = soa_slice::Iter<'a, Self>;
+    type SoaSlfIter<'a> = soa_slice::Iter<'a, Self>;
 
-    fn soa_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaIter<'_> {
+    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_> {
         data.iter()
     }
 
-    fn soa_work(iter: Self::SoaIter<'_>) {
+    fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
         let mut result = 0.0;
         for (x, y, _) in iter {
             result += *x + *y;
@@ -90,13 +118,29 @@ impl Work for Small {
         black_box(result);
     }
 
-    type AosIter<'a> = slice::Iter<'a, Self>;
+    type SoaStdIter<'a> =
+        Zip<Zip<slice::Iter<'a, f64>, slice::Iter<'a, f64>>, slice::Iter<'a, f64>>;
 
-    fn aos_prepare_iter(data: &[Self]) -> Self::AosIter<'_> {
+    fn soa_std_prepare_iter(data: &Self::Vecs) -> Self::SoaStdIter<'_> {
+        let (xs, ys, zs) = data;
+        xs.iter().zip(ys.iter()).zip(zs.iter())
+    }
+
+    fn soa_std_work(iter: Self::SoaStdIter<'_>) {
+        let mut result = 0.0;
+        for ((x, y), _) in iter {
+            result += *x + *y;
+        }
+        black_box(result);
+    }
+
+    type AosStdIter<'a> = slice::Iter<'a, Self>;
+
+    fn aos_std_prepare_iter(data: &[Self]) -> Self::AosStdIter<'_> {
         data.iter()
     }
 
-    fn aos_work(iter: Self::AosIter<'_>) {
+    fn aos_std_work(iter: Self::AosStdIter<'_>) {
         let mut result = 0.0;
         for (x, y, _) in iter {
             result += *x + *y;
@@ -117,27 +161,53 @@ impl Work for Big {
         )
     }
 
-    type SoaIter<'a> = soa_slice::Iter<'a, Self>;
+    type SoaSlfIter<'a> = soa_slice::Iter<'a, Self>;
 
-    fn soa_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaIter<'_> {
+    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_> {
         data.iter()
     }
 
-    fn soa_work(iter: Self::SoaIter<'_>) {
+    fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
         let mut result = 0;
-        for (index, (_, _, array, _, hello)) in iter.enumerate() {
+        for (index, (_, _, array, _, str)) in iter.enumerate() {
+            result += index + array.iter().sum::<usize>() + str.len();
+        }
+        black_box(result);
+    }
+
+    type SoaStdIter<'a> = Zip<
+        Zip<
+            Zip<Zip<slice::Iter<'a, Small>, slice::Iter<'a, Small>>, slice::Iter<'a, [usize; 18]>>,
+            slice::Iter<'a, String>,
+        >,
+        slice::Iter<'a, String>,
+    >;
+
+    fn soa_std_prepare_iter(data: &Self::Vecs) -> Self::SoaStdIter<'_> {
+        let (smalls1, smalls2, arrays, strs1, strs2) = data;
+        smalls1
+            .iter()
+            .zip(smalls2.iter())
+            .zip(arrays.iter())
+            .zip(strs1.iter())
+            .zip(strs2.iter())
+    }
+
+    fn soa_std_work(iter: Self::SoaStdIter<'_>) {
+        let mut result = 0;
+        for (index, ((((_, _), array), _), hello)) in iter.enumerate() {
             result += index + array.iter().sum::<usize>() + hello.len();
         }
         black_box(result);
     }
 
-    type AosIter<'a> = slice::Iter<'a, Self>;
+    type AosStdIter<'a> = slice::Iter<'a, Self>;
 
-    fn aos_prepare_iter(data: &[Self]) -> Self::AosIter<'_> {
+    fn aos_std_prepare_iter(data: &[Self]) -> Self::AosStdIter<'_> {
         data.iter()
     }
 
-    fn aos_work(iter: Self::AosIter<'_>) {
+    fn aos_std_work(iter: Self::AosStdIter<'_>) {
         let mut result = 0;
         for (index, (_, _, array, _, hello)) in iter.enumerate() {
             result += index + array.iter().sum::<usize>() + hello.len();
@@ -162,13 +232,13 @@ impl Work for Large {
         )
     }
 
-    type SoaIter<'a> = soa_slice::Iter<'a, Self>;
+    type SoaSlfIter<'a> = soa_slice::Iter<'a, Self>;
 
-    fn soa_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaIter<'_> {
+    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_> {
         data.iter()
     }
 
-    fn soa_work(iter: Self::SoaIter<'_>) {
+    fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
         let mut result = 0;
         for (_, b, _, _, e, f, _, _, i, _) in iter {
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
@@ -178,13 +248,63 @@ impl Work for Large {
         black_box(result);
     }
 
-    type AosIter<'a> = slice::Iter<'a, Self>;
+    type SoaStdIter<'a> = Zip<
+        Zip<
+            Zip<
+                Zip<
+                    Zip<
+                        Zip<
+                            Zip<
+                                Zip<
+                                    Zip<slice::Iter<'a, [u32; 32]>, slice::Iter<'a, [u32; 32]>>,
+                                    slice::Iter<'a, [u32; 32]>,
+                                >,
+                                slice::Iter<'a, [u32; 32]>,
+                            >,
+                            slice::Iter<'a, [u32; 32]>,
+                        >,
+                        slice::Iter<'a, [u32; 32]>,
+                    >,
+                    slice::Iter<'a, [u32; 32]>,
+                >,
+                slice::Iter<'a, [u32; 32]>,
+            >,
+            slice::Iter<'a, [u32; 32]>,
+        >,
+        slice::Iter<'a, [u32; 32]>,
+    >;
 
-    fn aos_prepare_iter(data: &[Self]) -> Self::AosIter<'_> {
+    fn soa_std_prepare_iter(data: &Self::Vecs) -> Self::SoaStdIter<'_> {
+        let (a, b, c, d, e, f, g, h, i, j) = data;
+        a.iter()
+            .zip(b.iter())
+            .zip(c.iter())
+            .zip(d.iter())
+            .zip(e.iter())
+            .zip(f.iter())
+            .zip(g.iter())
+            .zip(h.iter())
+            .zip(i.iter())
+            .zip(j.iter())
+    }
+
+    fn soa_std_work(iter: Self::SoaStdIter<'_>) {
+        let mut result = 0;
+        for (((((((((_, b), _), _), e), f), _), _), i), _) in iter {
+            result += b.iter().max().unwrap() + e.iter().sum::<u32>()
+                - f.iter().min().unwrap()
+                - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
+        }
+        black_box(result);
+    }
+
+    type AosStdIter<'a> = slice::Iter<'a, Self>;
+
+    fn aos_std_prepare_iter(data: &[Self]) -> Self::AosStdIter<'_> {
         data.iter()
     }
 
-    fn aos_work(iter: Self::AosIter<'_>) {
+    fn aos_std_work(iter: Self::AosStdIter<'_>) {
         let mut result = 0;
         for (_, b, _, _, e, f, _, _, i, _) in iter {
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
@@ -203,20 +323,28 @@ where
 
     let mut group = c.benchmark_group(format!("Work for `{}`", type_name::<T>()));
     for count in COUNT_RANGE {
-        let vec = T::soa_prepare_vec(count);
-        let iter = T::soa_prepare_iter(&vec);
+        let vec = T::soa_slf_prepare_vec(count);
+        let iter = T::soa_slf_prepare_iter(&vec);
         group.bench_with_input(
-            BenchmarkId::new(SOA_FUNCTION_NAME, count),
+            BenchmarkId::new(SOA_SLF_FUNCTION_NAME, count),
             &count,
-            |b, _| b.iter(|| T::soa_work(iter.clone())),
+            |b, _| b.iter(|| T::soa_slf_work(iter.clone())),
         );
 
-        let vec = T::aos_prepare_vec(count);
-        let iter = T::aos_prepare_iter(&vec);
+        let vec = T::soa_std_prepare_vec(count);
+        let iter = T::soa_std_prepare_iter(&vec);
         group.bench_with_input(
-            BenchmarkId::new(AOS_FUNCTION_NAME, count),
+            BenchmarkId::new(SOA_STD_FUNCTION_NAME, count),
             &count,
-            |b, _| b.iter(|| T::aos_work(iter.clone())),
+            |b, _| b.iter(|| T::soa_std_work(iter.clone())),
+        );
+
+        let vec = T::aos_std_prepare_vec(count);
+        let iter = T::aos_std_prepare_iter(&vec);
+        group.bench_with_input(
+            BenchmarkId::new(AOS_STD_FUNCTION_NAME, count),
+            &count,
+            |b, _| b.iter(|| T::aos_std_work(iter.clone())),
         );
     }
 }

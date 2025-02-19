@@ -20,5 +20,6 @@ pub type Large = (
     [u32; 32],
 );
 
-pub const SOA_FUNCTION_NAME: &str = "SoA (mine)";
-pub const AOS_FUNCTION_NAME: &str = "AoS (std)";
+pub const SOA_SLF_FUNCTION_NAME: &str = "SoA (mine)";
+pub const SOA_STD_FUNCTION_NAME: &str = "SoA (std)";
+pub const AOS_STD_FUNCTION_NAME: &str = "AoS (std)";

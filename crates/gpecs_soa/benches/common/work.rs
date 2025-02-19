@@ -127,6 +127,55 @@ impl Work for Big {
     }
 }
 
+impl Work for Large {
+    fn work_item() -> Self {
+        (
+            Default::default(),
+            array::from_fn(|_| 17),
+            array::from_fn(|i| i.try_into().unwrap()),
+            array::from_fn(|i| (i % 5 + 1).try_into().unwrap()),
+            array::from_fn(|i| i.pow(2).try_into().unwrap()),
+            Default::default(),
+            array::from_fn(|_| 17),
+            array::from_fn(|i| i.try_into().unwrap()),
+            array::from_fn(|i| (i % 5 + 1).try_into().unwrap()),
+            array::from_fn(|i| i.pow(2).try_into().unwrap()),
+        )
+    }
+
+    type SoaIter<'a> = soa_slice::Iter<'a, Self>;
+
+    fn soa_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaIter<'_> {
+        data.iter()
+    }
+
+    fn soa_work(iter: Self::SoaIter<'_>) {
+        let mut result = 0;
+        for (_, b, _, _, e, f, _, _, i, _) in iter {
+            result += b.iter().max().unwrap() + e.iter().sum::<u32>()
+                - f.iter().min().unwrap()
+                - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
+        }
+        black_box(result);
+    }
+
+    type AosIter<'a> = slice::Iter<'a, Self>;
+
+    fn aos_prepare_iter(data: &[Self]) -> Self::AosIter<'_> {
+        data.iter()
+    }
+
+    fn aos_work(iter: Self::AosIter<'_>) {
+        let mut result = 0;
+        for (_, b, _, _, e, f, _, _, i, _) in iter {
+            result += b.iter().max().unwrap() + e.iter().sum::<u32>()
+                - f.iter().min().unwrap()
+                - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
+        }
+        black_box(result);
+    }
+}
+
 fn work<T>(c: &mut Criterion)
 where
     T: Work,
@@ -167,5 +216,5 @@ criterion_group!(
     work::<Small>,
     // work::<Medium>,
     work::<Big>,
-    // work::<Large>,
+    work::<Large>,
 );

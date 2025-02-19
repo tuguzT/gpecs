@@ -5,35 +5,50 @@ use gpecs_soa::prelude::*;
 
 use super::*;
 
+pub(super) trait WithCapacity: Soa {
+    fn soa_with_capacity(capacity: usize) -> SoaVec<Self> {
+        let capacity = black_box(capacity);
+        let vec = SoaVec::<Self>::with_capacity(capacity);
+        black_box(vec)
+    }
+
+    fn aos_with_capacity(capacity: usize) -> Vec<Self> {
+        let capacity = black_box(capacity);
+        let vec = Vec::<Self>::with_capacity(capacity);
+        black_box(vec)
+    }
+}
+
+impl WithCapacity for Zero {}
+
+impl WithCapacity for Tiny {}
+
+impl WithCapacity for Small {}
+
+impl WithCapacity for Medium {}
+
+impl WithCapacity for Big {}
+
+impl WithCapacity for Large {}
+
 fn with_capacity<T>(c: &mut Criterion)
 where
-    T: Soa,
+    T: WithCapacity,
 {
     const KB: usize = 1024;
     const CAPACITY_RANGE: [usize; 8] = [0, 1, 10, 100, KB, KB * 2, KB * 4, KB * 8];
-
-    fn soa<T>(capacity: usize)
-    where
-        T: Soa,
-    {
-        black_box(SoaVec::<T>::with_capacity(black_box(capacity)));
-    }
-
-    fn aos<T>(capacity: usize) {
-        black_box(Vec::<T>::with_capacity(black_box(capacity)));
-    }
 
     let mut group = c.benchmark_group(format!("With capacity for `{}`", type_name::<T>()));
     for capacity in CAPACITY_RANGE {
         group.bench_with_input(
             BenchmarkId::new(SOA_FUNCTION_NAME, capacity),
             &capacity,
-            |b, &capacity| b.iter(|| soa::<T>(capacity)),
+            |b, &capacity| b.iter(|| T::soa_with_capacity(capacity)),
         );
         group.bench_with_input(
             BenchmarkId::new(AOS_FUNCTION_NAME, capacity),
             &capacity,
-            |b, &capacity| b.iter(|| aos::<T>(capacity)),
+            |b, &capacity| b.iter(|| T::aos_with_capacity(capacity)),
         );
     }
 }

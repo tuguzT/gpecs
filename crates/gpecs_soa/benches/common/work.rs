@@ -1,16 +1,34 @@
-use std::{any::type_name, array, convert::identity, hint::black_box, slice};
+use std::{any::type_name, array, hint::black_box, slice};
 
 use criterion::{criterion_group, BenchmarkId, Criterion};
 use gpecs_soa::{prelude::*, slice as soa_slice};
 
-use super::*;
+use super::{with_capacity::WithCapacity, *};
 
-trait Work: Soa {
-    fn work_item() -> Self;
+pub(super) trait Work: WithCapacity {
+    fn work_item(index: usize) -> Self;
+
+    fn soa_prepare_vec(count: usize) -> SoaVec<Self> {
+        let mut vec = Self::soa_with_capacity(count);
+        for index in 0..count {
+            let value = black_box(Self::work_item(index));
+            vec.push(value);
+        }
+        black_box(vec)
+    }
 
     type SoaIter<'a>: Iterator + Clone;
     fn soa_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaIter<'_>;
     fn soa_work(iter: Self::SoaIter<'_>);
+
+    fn aos_prepare_vec(count: usize) -> Vec<Self> {
+        let mut vec = Self::aos_with_capacity(count);
+        for index in 0..count {
+            let value = black_box(Self::work_item(index));
+            vec.push(value);
+        }
+        black_box(vec)
+    }
 
     type AosIter<'a>: Iterator + Clone;
     fn aos_prepare_iter(data: &[Self]) -> Self::AosIter<'_>;
@@ -19,8 +37,8 @@ trait Work: Soa {
 
 impl Work for Tiny {
     #[inline]
-    fn work_item() -> Self {
-        (1,)
+    fn work_item(index: usize) -> Self {
+        (index.try_into().unwrap(),)
     }
 
     type SoaIter<'a> = soa_slice::Iter<'a, Self>;
@@ -53,8 +71,9 @@ impl Work for Tiny {
 }
 
 impl Work for Small {
-    fn work_item() -> Self {
-        (1.0, 0.2, -2.3)
+    fn work_item(index: usize) -> Self {
+        let index = (index + 1) as f64;
+        (1.0 * index, 0.2 * index, -2.3 * index)
     }
 
     type SoaIter<'a> = soa_slice::Iter<'a, Self>;
@@ -87,14 +106,14 @@ impl Work for Small {
 }
 
 impl Work for Big {
-    fn work_item() -> Self {
-        let small = Small::work_item();
+    fn work_item(index: usize) -> Self {
+        let small = Small::work_item(index);
         (
             small,
             small,
-            array::from_fn(identity),
+            array::from_fn(|i| i + index),
             "".to_owned(),
-            "Hello, World".to_owned(),
+            "Hello, World\n".to_owned(),
         )
     }
 
@@ -128,15 +147,15 @@ impl Work for Big {
 }
 
 impl Work for Large {
-    fn work_item() -> Self {
+    fn work_item(index: usize) -> Self {
         (
             Default::default(),
-            array::from_fn(|_| 17),
+            array::from_fn(|_| index.try_into().unwrap()),
             array::from_fn(|i| i.try_into().unwrap()),
             array::from_fn(|i| (i % 5 + 1).try_into().unwrap()),
             array::from_fn(|i| i.pow(2).try_into().unwrap()),
             Default::default(),
-            array::from_fn(|_| 17),
+            array::from_fn(|_| index.try_into().unwrap()),
             array::from_fn(|i| i.try_into().unwrap()),
             array::from_fn(|i| (i % 5 + 1).try_into().unwrap()),
             array::from_fn(|i| i.pow(2).try_into().unwrap()),
@@ -184,11 +203,7 @@ where
 
     let mut group = c.benchmark_group(format!("Work for `{}`", type_name::<T>()));
     for count in COUNT_RANGE {
-        let mut vec = SoaVec::<T>::with_capacity(count);
-        for _ in 0..count {
-            let value = black_box(T::work_item());
-            vec.push(value);
-        }
+        let vec = T::soa_prepare_vec(count);
         let iter = T::soa_prepare_iter(&vec);
         group.bench_with_input(
             BenchmarkId::new(SOA_FUNCTION_NAME, count),
@@ -196,11 +211,7 @@ where
             |b, _| b.iter(|| T::soa_work(iter.clone())),
         );
 
-        let mut vec = Vec::<T>::with_capacity(count);
-        for _ in 0..count {
-            let value = black_box(T::work_item());
-            vec.push(value);
-        }
+        let vec = T::aos_prepare_vec(count);
         let iter = T::aos_prepare_iter(&vec);
         group.bench_with_input(
             BenchmarkId::new(AOS_FUNCTION_NAME, count),

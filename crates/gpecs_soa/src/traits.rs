@@ -252,14 +252,17 @@ pub trait SoaToOwned<'a> {
 }
 
 /// Use this until [`Layout::repeat()`] is stabilized
-fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
+const fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
     const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
         Ok(_) => unreachable!(),
         Err(err) => err,
     };
 
     let layout = layout.pad_to_align();
-    let size = layout.size().checked_mul(n).ok_or(ERR)?;
+    let size = match layout.size().checked_mul(n) {
+        Some(v) => v,
+        None => return Err(ERR),
+    };
     Layout::from_size_align(size, layout.align())
 }
 

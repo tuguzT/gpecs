@@ -12,10 +12,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{
-        actual_capacity, buffer_layout, is_zst, ptrs, slice_from_raw_parts_mut, to_capacity,
-        BufferData,
-    },
+    ptr::{buffer_layout, is_zst, ptrs, slice_from_raw_parts_mut, to_capacity, BufferData},
     slice::SoaSlice,
     traits::Soa,
 };
@@ -141,11 +138,11 @@ where
             return Ok(Self::new());
         }
 
-        let capacity = actual_capacity::<T>(capacity);
         let layout = match buffer_layout::<T>(capacity) {
             Ok(layout) => layout,
             Err(_) => return Err(CapacityOverflow.into()),
         };
+        let capacity = to_capacity::<T>(layout.size());
         alloc_guard(layout.size())?;
 
         let ptr = match init {
@@ -400,11 +397,11 @@ where
 
         let capacity = cmp::max(self.capacity() * 2, required_capacity);
         let capacity = cmp::max(Self::min_non_zero_cap(), capacity);
-        let capacity = actual_capacity::<T>(capacity);
-        let new_layout = buffer_layout::<T>(capacity);
+        let new_layout = buffer_layout::<T>(capacity).map_err(|_| CapacityOverflow)?;
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
+            let capacity = to_capacity::<T>(new_layout.size());
             self.set_ptr_and_capacity(ptr.cast(), capacity);
         }
         Ok(())
@@ -416,11 +413,11 @@ where
         }
 
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
-        let capacity = actual_capacity::<T>(capacity);
-        let new_layout = buffer_layout::<T>(capacity);
+        let new_layout = buffer_layout::<T>(capacity).map_err(|_| CapacityOverflow)?;
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
+            let capacity = to_capacity::<T>(new_layout.size());
             self.set_ptr_and_capacity(ptr.cast(), capacity);
         }
         Ok(())
@@ -484,12 +481,9 @@ unsafe impl<T> Sync for RawSoaVec<T> where T: Soa + Sync {}
 
 #[inline(never)]
 fn finish_grow(
-    new_layout: Result<Layout, LayoutError>,
+    new_layout: Layout,
     current_memory: Option<(NonNull<u8>, Layout)>,
 ) -> Result<NonNull<u8>, TryReserveError> {
-    // Check for the error here to minimize the size of `RawVec::grow_*`.
-    let new_layout = new_layout.map_err(|_| CapacityOverflow)?;
-
     alloc_guard(new_layout.size())?;
 
     let ptr = if let Some((ptr, old_layout)) = current_memory {

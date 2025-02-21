@@ -1,8 +1,11 @@
+use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
     borrow::{Borrow, BorrowMut},
     marker::PhantomData,
     ops::{Index, IndexMut},
+    ptr::{self, NonNull},
+    slice,
 };
 
 use crate::ptr::BufferData;
@@ -267,16 +270,16 @@ const fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError>
 }
 
 unsafe impl Soa for () {
-    type FieldLayouts = [Layout; 0];
-    type FieldPermutation = [usize; 0];
+    type FieldLayouts = [Layout; 1];
+    type FieldPermutation = [usize; 1];
 
     #[inline(always)]
     fn field_layouts() -> Self::FieldLayouts {
-        []
+        [Layout::new::<Self>()]
     }
     #[inline(always)]
     fn field_permutation() -> Self::FieldPermutation {
-        []
+        [0]
     }
 
     #[inline(always)]
@@ -284,135 +287,228 @@ unsafe impl Soa for () {
         size_of::<Self>()
     }
 
-    type BufferOffsets = [usize; 0];
+    type BufferOffsets = [usize; 1];
 
     #[inline(always)]
     fn buffer_layout(_: usize) -> Result<(Layout, Self::BufferOffsets), LayoutError> {
-        Ok((Layout::new::<Self>(), []))
+        Ok((Layout::new::<Self>(), [0]))
     }
 
-    type Ptrs = ();
-    type MutPtrs = ();
+    type Ptrs = *const Self;
+    type MutPtrs = *mut Self;
 
     #[inline(always)]
-    fn ptrs_dangling() -> Self::MutPtrs {}
-    #[inline(always)]
-    unsafe fn ptrs(_: *mut BufferData<Self>, _: &Self::BufferOffsets) -> Self::MutPtrs {}
-
-    #[inline(always)]
-    fn ptrs_cast_const(_: Self::MutPtrs) -> Self::Ptrs {}
-    #[inline(always)]
-    fn ptrs_cast_mut(_: Self::Ptrs) -> Self::MutPtrs {}
-
-    #[inline(always)]
-    unsafe fn ptrs_add(_: Self::Ptrs, _: usize) -> Self::Ptrs {}
-    #[inline(always)]
-    unsafe fn ptrs_add_mut(_: Self::MutPtrs, _: usize) -> Self::MutPtrs {}
-    #[inline(always)]
-    unsafe fn ptrs_offset_from(_: Self::Ptrs, _: Self::Ptrs) -> isize {
-        0
+    fn ptrs_dangling() -> Self::MutPtrs {
+        ptr::dangling_mut()
     }
+
     #[inline(always)]
-    unsafe fn ptrs_offset_from_mut(_: Self::MutPtrs, _: Self::Ptrs) -> isize {
-        0
+    unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: &Self::BufferOffsets) -> Self::MutPtrs {
+        let ptr = ptr.cast::<u8>();
+        unsafe { ptr.add(offsets[0]).cast() }
     }
-    #[inline(always)]
-    unsafe fn ptrs_swap(_: Self::MutPtrs, _: Self::MutPtrs) {}
-    #[inline(always)]
-    unsafe fn ptrs_copy(_: Self::Ptrs, _: Self::MutPtrs, _: usize) {}
-    #[inline(always)]
-    unsafe fn ptrs_copy_rev(_: Self::Ptrs, _: Self::MutPtrs, _: usize) {}
-    #[inline(always)]
-    unsafe fn ptrs_copy_nonoverlapping(_: Self::Ptrs, _: Self::MutPtrs, _: usize) {}
-    #[inline(always)]
-    unsafe fn ptrs_read(_: Self::Ptrs) -> Self {}
-    #[inline(always)]
-    unsafe fn ptrs_write(_: Self::MutPtrs, _: Self) {}
-    #[inline(always)]
-    unsafe fn ptrs_drop_in_place(_: Self::MutPtrs) {}
-
-    type NonNullPtrs = ();
 
     #[inline(always)]
-    unsafe fn ptrs_to_nonnull(_: Self::MutPtrs) -> Self::NonNullPtrs {}
-    #[inline(always)]
-    fn nonnull_to_ptrs(_: Self::NonNullPtrs) -> Self::MutPtrs {}
-
-    type Vecs = ();
-
-    #[inline(always)]
-    fn vecs_with_capacity(_: usize) -> Self::Vecs {}
-    #[inline(always)]
-    fn vecs_as_ptrs(_: &Self::Vecs) -> Self::Ptrs {}
-    #[inline(always)]
-    fn mut_vecs_as_ptrs(_: &mut Self::Vecs) -> Self::MutPtrs {}
-    #[inline(always)]
-    fn vecs_len(_: &Self::Vecs) -> usize {
-        0
+    fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs {
+        ptrs.cast_const()
     }
+
     #[inline(always)]
-    unsafe fn vecs_set_len(_: &mut Self::Vecs, _: usize) {}
+    fn ptrs_cast_mut(ptrs: Self::Ptrs) -> Self::MutPtrs {
+        ptrs.cast_mut()
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_add(ptrs: Self::Ptrs, offset: usize) -> Self::Ptrs {
+        unsafe { ptrs.add(offset) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_add_mut(ptrs: Self::MutPtrs, offset: usize) -> Self::MutPtrs {
+        unsafe { ptrs.add(offset) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_offset_from(ptrs: Self::Ptrs, origin: Self::Ptrs) -> isize {
+        unsafe { ptrs.offset_from(origin) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_offset_from_mut(ptrs: Self::MutPtrs, origin: Self::Ptrs) -> isize {
+        unsafe { ptrs.offset_from(origin) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_swap(a: Self::MutPtrs, b: Self::MutPtrs) {
+        unsafe { ptr::swap(a, b) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_copy(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
+        unsafe { ptr::copy(src, dst, len) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_copy_rev(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
+        unsafe { ptr::copy(src, dst, len) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_copy_nonoverlapping(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
+        unsafe { ptr::copy_nonoverlapping(src, dst, len) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_read(ptrs: Self::Ptrs) -> Self {
+        unsafe { ptr::read(ptrs) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_write(ptrs: Self::MutPtrs, value: Self) {
+        unsafe { ptr::write(ptrs, value) }
+    }
+
+    #[inline(always)]
+    unsafe fn ptrs_drop_in_place(ptrs: Self::MutPtrs) {
+        unsafe { ptr::drop_in_place(ptrs) }
+    }
+
+    type NonNullPtrs = NonNull<Self>;
+
+    #[inline(always)]
+    unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
+        unsafe { NonNull::new_unchecked(ptrs) }
+    }
+
+    #[inline(always)]
+    fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
+        ptrs.as_ptr()
+    }
+
+    type Vecs = Vec<Self>;
+
+    #[inline(always)]
+    fn vecs_with_capacity(capacity: usize) -> Self::Vecs {
+        Vec::with_capacity(capacity)
+    }
+
+    #[inline(always)]
+    fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs {
+        vecs.as_ptr()
+    }
+
+    #[inline(always)]
+    fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs {
+        vecs.as_mut_ptr()
+    }
+
+    #[inline(always)]
+    fn vecs_len(vecs: &Self::Vecs) -> usize {
+        vecs.len()
+    }
+
+    #[inline(always)]
+    unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize) {
+        unsafe {
+            vecs.set_len(len);
+        }
+    }
 
     type Refs<'a>
-        = ()
+        = &'a Self
     where
         Self: 'a;
 
     type RefsMut<'a>
-        = ()
+        = &'a mut Self
     where
         Self: 'a;
 
     #[inline(always)]
-    unsafe fn as_refs<'a>(_: Self::Ptrs) -> Self::Refs<'a> {}
-    #[inline(always)]
-    unsafe fn as_mut_refs<'a>(_: Self::MutPtrs) -> Self::RefsMut<'a> {}
+    unsafe fn as_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a> {
+        unsafe { &*ptrs }
+    }
 
     #[inline(always)]
-    fn refs_as_ptrs(_: Self::Refs<'_>) -> Self::Ptrs {}
-    #[inline(always)]
-    fn mut_refs_as_ptrs(_: Self::RefsMut<'_>) -> Self::MutPtrs {}
-    #[inline(always)]
-    fn mut_refs_as_refs(_: Self::RefsMut<'_>) -> Self::Refs<'_> {}
-
-    type SlicePtrs = ();
-    type SliceMutPtrs = ();
+    unsafe fn as_mut_refs<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a> {
+        unsafe { &mut *ptrs }
+    }
 
     #[inline(always)]
-    fn slices_from_raw_parts(_: Self::Ptrs, _: usize) -> Self::SlicePtrs {}
+    fn refs_as_ptrs(refs: Self::Refs<'_>) -> Self::Ptrs {
+        ptr::from_ref(refs)
+    }
+
     #[inline(always)]
-    fn slices_from_raw_parts_mut(_: Self::MutPtrs, _: usize) -> Self::SliceMutPtrs {}
+    fn mut_refs_as_ptrs(refs: Self::RefsMut<'_>) -> Self::MutPtrs {
+        ptr::from_mut(refs)
+    }
+
+    #[inline(always)]
+    fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_> {
+        &*refs
+    }
+
+    type SlicePtrs = *const [Self];
+    type SliceMutPtrs = *mut [Self];
+
+    #[inline(always)]
+    fn slices_from_raw_parts(ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs {
+        ptr::slice_from_raw_parts(ptrs, len)
+    }
+
+    #[inline(always)]
+    fn slices_from_raw_parts_mut(ptrs: Self::MutPtrs, len: usize) -> Self::SliceMutPtrs {
+        ptr::slice_from_raw_parts_mut(ptrs, len)
+    }
 
     type Slices<'a>
-        = ()
+        = &'a [Self]
     where
         Self: 'a;
 
     type SlicesMut<'a>
-        = ()
+        = &'a mut [Self]
     where
         Self: 'a;
 
     #[inline(always)]
-    unsafe fn slices_as_refs<'a>(_: Self::SlicePtrs) -> Self::Slices<'a> {}
-    #[inline(always)]
-    unsafe fn mut_slices_as_refs<'a>(_: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {}
+    unsafe fn slices_as_refs<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
+        unsafe { slice::from_raw_parts(slices.cast(), slices.len()) }
+    }
 
     #[inline(always)]
-    fn slice_refs_as_slice_ptrs(_: Self::Slices<'_>) -> Self::SlicePtrs {}
-    #[inline(always)]
-    fn mut_slice_refs_as_slice_ptrs(_: Self::SlicesMut<'_>) -> Self::SliceMutPtrs {}
+    unsafe fn mut_slices_as_refs<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
+        unsafe { slice::from_raw_parts_mut(slices.cast(), slices.len()) }
+    }
 
     #[inline(always)]
-    fn slice_refs_as_ptrs(_: Self::Slices<'_>) -> Self::Ptrs {}
-    #[inline(always)]
-    fn mut_slice_refs_as_ptrs(_: Self::SlicesMut<'_>) -> Self::MutPtrs {}
+    fn slice_refs_as_slice_ptrs(slices: Self::Slices<'_>) -> Self::SlicePtrs {
+        ptr::from_ref(slices)
+    }
 
     #[inline(always)]
-    unsafe fn slices_drop_in_place(_: Self::SliceMutPtrs) {}
+    fn mut_slice_refs_as_slice_ptrs(slices: Self::SlicesMut<'_>) -> Self::SliceMutPtrs {
+        ptr::from_mut(slices)
+    }
+
+    #[inline(always)]
+    fn slice_refs_as_ptrs(slices: Self::Slices<'_>) -> Self::Ptrs {
+        slices.as_ptr()
+    }
+
+    #[inline(always)]
+    fn mut_slice_refs_as_ptrs(slices: Self::SlicesMut<'_>) -> Self::MutPtrs {
+        slices.as_mut_ptr()
+    }
+
+    #[inline(always)]
+    unsafe fn slices_drop_in_place(slices: Self::SliceMutPtrs) {
+        unsafe { ptr::drop_in_place(slices) }
+    }
 }
 
-impl SoaToOwned<'_> for () {
+impl<'a> SoaToOwned<'a> for &'a () {
     type Owned = ();
 
     #[inline(always)]
@@ -494,6 +590,7 @@ macro_rules! soa_impl {
 
             type BufferOffsets = [usize; count_idents!($($types,)*)];
 
+            #[inline(always)]
             fn buffer_layout(capacity: usize) -> Result<(Layout, Self::BufferOffsets), LayoutError> {
                 let layouts = [$(Layout::array::<$types>(capacity)?,)*];
                 let permutation = Self::field_permutation();
@@ -513,7 +610,7 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             fn ptrs_dangling() -> Self::MutPtrs {
-                ($(::core::ptr::dangling_mut::<$types>(),)*)
+                ($(ptr::dangling_mut::<$types>(),)*)
             }
 
             #[inline(always)]
@@ -523,31 +620,23 @@ macro_rules! soa_impl {
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs {
-                let ($($types,)*) = ptrs;
-                ($($types.cast_const(),)*)
+                ($(ptrs.$indices.cast_const(),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn ptrs_cast_mut(ptrs: Self::Ptrs) -> Self::MutPtrs {
-                let ($($types,)*) = ptrs;
-                ($($types.cast_mut(),)*)
+                ($(ptrs.$indices.cast_mut(),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn ptrs_add(ptrs: Self::Ptrs, offset: usize) -> Self::Ptrs {
-                let ($($types,)*) = ptrs;
-                unsafe { ($($types.add(offset),)*) }
+                unsafe { ($(ptrs.$indices.add(offset),)*) }
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn ptrs_add_mut(ptrs: Self::MutPtrs, offset: usize) -> Self::MutPtrs {
-                let ($($types,)*) = ptrs;
-                unsafe { ($($types.add(offset),)*) }
+                unsafe { ($(ptrs.$indices.add(offset),)*) }
             }
 
             #[inline(always)]
@@ -568,7 +657,7 @@ macro_rules! soa_impl {
             unsafe fn ptrs_swap(a: Self::MutPtrs, b: Self::MutPtrs) {
                 let permutation = Self::field_permutation();
 
-                let closures = ($(|| unsafe { ::core::ptr::swap(a.$indices, b.$indices); },)*);
+                let closures = ($(|| unsafe { ptr::swap(a.$indices, b.$indices); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in 0..count_idents!($($types,)*) {
@@ -580,7 +669,7 @@ macro_rules! soa_impl {
             unsafe fn ptrs_copy(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
                 let permutation = Self::field_permutation();
 
-                let closures = ($(|| unsafe { ::core::ptr::copy(src.$indices, dst.$indices, len); },)*);
+                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in 0..count_idents!($($types,)*) {
@@ -592,7 +681,7 @@ macro_rules! soa_impl {
             unsafe fn ptrs_copy_rev(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
                 let permutation = Self::field_permutation();
 
-                let closures = ($(|| unsafe { ::core::ptr::copy(src.$indices, dst.$indices, len); },)*);
+                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in (0..count_idents!($($types,)*)).rev() {
@@ -603,49 +692,41 @@ macro_rules! soa_impl {
             #[inline(always)]
             unsafe fn ptrs_copy_nonoverlapping(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
                 // because source and destination are non-overlapping, we can copy them in any order
-                unsafe { $(::core::ptr::copy_nonoverlapping(src.$indices, dst.$indices, len);)* }
+                unsafe { $(ptr::copy_nonoverlapping(src.$indices, dst.$indices, len);)* }
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn ptrs_read(ptrs: Self::Ptrs) -> Self {
-                let ($($types,)*) = ptrs;
-                unsafe { ($(::core::ptr::read($types),)*) }
+                unsafe { ($(ptr::read(ptrs.$indices),)*) }
             }
 
             #[inline(always)]
             unsafe fn ptrs_write(dst: Self::MutPtrs, value: Self) {
-                unsafe { $(::core::ptr::write(dst.$indices, value.$indices);)* }
+                unsafe { $(ptr::write(dst.$indices, value.$indices);)* }
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn ptrs_drop_in_place(ptrs: Self::MutPtrs) {
-                let ($($types,)*) = ptrs;
-                unsafe { $(::core::ptr::drop_in_place($types);)* }
+                unsafe { $(ptr::drop_in_place(ptrs.$indices);)* }
             }
 
-            type NonNullPtrs = ($(::core::ptr::NonNull<$types>,)*);
+            type NonNullPtrs = ($(NonNull<$types>,)*);
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
-                let ($($types,)*) = ptrs;
-                unsafe { ($(::core::ptr::NonNull::new_unchecked($types),)*) }
+                unsafe { ($(NonNull::new_unchecked(ptrs.$indices),)*) }
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
-                let ($($types,)*) = ptrs;
-                ($($types.as_ptr(),)*)
+                ($(ptrs.$indices.as_ptr(),)*)
             }
 
-            type Vecs = ($(::alloc::vec::Vec<$types>,)*);
+            type Vecs = ($(Vec<$types>,)*);
 
             #[inline(always)]
             fn vecs_with_capacity(capacity: usize) -> Self::Vecs {
-                ($(::alloc::vec::Vec::<$types>::with_capacity(capacity),)*)
+                ($(Vec::<$types>::with_capacity(capacity),)*)
             }
 
             #[inline(always)]
@@ -681,55 +762,41 @@ macro_rules! soa_impl {
                 Self: 'a;
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn as_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a> {
-                let ($($types,)*) = ptrs;
-                unsafe { ($(&*$types,)*) }
+                unsafe { ($(&*ptrs.$indices,)*) }
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn as_mut_refs<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a> {
-                let ($($types,)*) = ptrs;
-                unsafe { ($(&mut *$types,)*) }
+                unsafe { ($(&mut *ptrs.$indices,)*) }
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn refs_as_ptrs(refs: Self::Refs<'_>) -> Self::Ptrs {
-                let ($($types,)*) = refs;
-                ($($types,)*)
+                ($(ptr::from_ref(refs.$indices),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn mut_refs_as_ptrs(refs: Self::RefsMut<'_>) -> Self::MutPtrs {
-                let ($($types,)*) = refs;
-                ($($types,)*)
+                ($(ptr::from_mut(refs.$indices),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_> {
-                let ($($types,)*) = refs;
-                ($($types,)*)
+                ($(&*refs.$indices,)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn slices_from_raw_parts(ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs {
-                let ($($types,)*) = ptrs;
-                ($(::core::ptr::slice_from_raw_parts($types, len),)*)
+                ($(ptr::slice_from_raw_parts(ptrs.$indices, len),)*)
             }
 
             type SlicePtrs = ($(*const [$types],)*);
             type SliceMutPtrs = ($(*mut [$types],)*);
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn slices_from_raw_parts_mut(ptrs: Self::MutPtrs, len: usize) -> Self::SliceMutPtrs {
-                let ($($types,)*) = ptrs;
-                ($(::core::ptr::slice_from_raw_parts_mut($types, len),)*)
+                ($(ptr::slice_from_raw_parts_mut(ptrs.$indices, len),)*)
             }
 
             type Slices<'a>
@@ -743,52 +810,48 @@ macro_rules! soa_impl {
                 Self: 'a;
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn slices_as_refs<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
-                let ($($types,)*) = slices;
-                unsafe { ($(::core::slice::from_raw_parts($types.cast(), $types.len()),)*) }
+                let len = {
+                    let lens = [$(slices.$indices.len(),)*];
+                    assert!(lens.iter().all(|len| lens[0].eq(len)));
+                    lens[0]
+                };
+                unsafe { ($(slice::from_raw_parts(slices.$indices.cast(), len),)*) }
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn mut_slices_as_refs<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
-                let ($($types,)*) = slices;
-                unsafe { ($(::core::slice::from_raw_parts_mut($types.cast(), $types.len()),)*) }
+                let len = {
+                    let lens = [$(slices.$indices.len(),)*];
+                    assert!(lens.iter().all(|len| lens[0].eq(len)));
+                    lens[0]
+                };
+                unsafe { ($(slice::from_raw_parts_mut(slices.$indices.cast(), len),)*) }
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn slice_refs_as_slice_ptrs(slices: Self::Slices<'_>) -> Self::SlicePtrs {
-                let ($($types,)*) = slices;
-                ($($types,)*)
+                ($(ptr::from_ref(slices.$indices),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn mut_slice_refs_as_slice_ptrs(slices: Self::SlicesMut<'_>) -> Self::SliceMutPtrs {
-                let ($($types,)*) = slices;
-                ($($types,)*)
+                ($(ptr::from_mut(slices.$indices),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn slice_refs_as_ptrs(slices: Self::Slices<'_>) -> Self::Ptrs {
-                let ($($types,)*) = slices;
-                ($($types.as_ptr(),)*)
+                ($(slices.$indices.as_ptr(),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn mut_slice_refs_as_ptrs(slices: Self::SlicesMut<'_>) -> Self::MutPtrs {
-                let ($($types,)*) = slices;
-                ($($types.as_mut_ptr(),)*)
+                ($(slices.$indices.as_mut_ptr(),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             unsafe fn slices_drop_in_place(slices: Self::SliceMutPtrs) {
-                let ($($types,)*) = slices;
-                unsafe { $(::core::ptr::drop_in_place($types);)* }
+                unsafe { $(ptr::drop_in_place(slices.$indices);)* }
             }
         }
 
@@ -799,24 +862,18 @@ macro_rules! soa_impl {
             type Owned = ($($types,)*);
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn to_owned(&self) -> Self::Owned {
-                let ($($types,)*) = *self;
-                ($($types.clone(),)*)
+                ($(self.$indices.clone(),)*)
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn clone_into(&self, target: &mut Self::Owned) {
-                let ($($types,)*) = *self;
-                $(target.$indices.clone_from($types);)*
+                $(target.$indices.clone_from(self.$indices);)*
             }
 
             #[inline(always)]
-            #[allow(non_snake_case)]
             fn clone_into_refs(&self, target: <Self::Owned as Soa>::RefsMut<'_>) {
-                let ($($types,)*) = *self;
-                $(target.$indices.clone_from($types);)*
+                $(target.$indices.clone_from(self.$indices);)*
             }
         }
     };

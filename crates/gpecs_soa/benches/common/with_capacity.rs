@@ -23,7 +23,7 @@ pub(super) trait WithCapacity: Soa {
 
 impl WithCapacity for Zero {
     fn soa_std_with_capacity(capacity: usize) -> Self::Vecs {
-        Self::aos_std_with_capacity(capacity);
+        Self::aos_std_with_capacity(capacity)
     }
 }
 

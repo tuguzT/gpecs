@@ -255,13 +255,10 @@ where
 {
     match (T::packed_size_of(), size_of::<BufferData<T>>()) {
         (0, 0) => true,
-        pair => {
-            debug_assert!(
-                !matches!(pair, (_, 0) | (0, _)),
-                "`T::min_size_of_components()` should be `0` if and only if `T` is ZST",
-            );
-            false
+        (a, b) if a == 0 || b == 0 => {
+            panic!("packed size of `T` should be `0` if and only if `T` is zero-sized type")
         }
+        _ => false,
     }
 }
 

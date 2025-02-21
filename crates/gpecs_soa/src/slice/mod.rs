@@ -51,11 +51,6 @@ where
     }
 
     #[inline]
-    pub fn capacity_in_bytes(&self) -> usize {
-        ptr::from_ref(self).capacity_in_bytes()
-    }
-
-    #[inline]
     pub fn capacity(&self) -> usize {
         if is_zst::<T>() {
             return usize::MAX;

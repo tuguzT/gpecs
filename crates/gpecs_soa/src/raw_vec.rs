@@ -97,7 +97,7 @@ where
     T: Soa,
 {
     ptr: NonNull<BufferData<T>>,
-    capacity_in_bytes: usize,
+    capacity: usize,
     #[cfg(feature = "cache-ptrs")]
     ptrs: T::NonNullPtrs,
 }
@@ -127,7 +127,7 @@ where
     pub fn new() -> Self {
         Self {
             ptr: NonNull::dangling(),
-            capacity_in_bytes: 0,
+            capacity: 0,
             #[cfg(feature = "cache-ptrs")]
             ptrs: unsafe { T::ptrs_to_nonnull(T::ptrs_dangling()) },
         }
@@ -158,7 +158,7 @@ where
         let ptr = ptr.cast();
         Ok(Self {
             ptr,
-            capacity_in_bytes: layout.size(),
+            capacity,
             #[cfg(feature = "cache-ptrs")]
             ptrs: unsafe {
                 let ptrs = ptrs::<T>(ptr.as_ptr(), capacity).unwrap_unchecked();
@@ -219,13 +219,9 @@ where
 
     #[inline]
     pub unsafe fn from_nonnull(ptr: NonNull<BufferData<T>>, capacity: usize) -> Self {
-        let capacity_in_bytes = buffer_layout::<T>(capacity)
-            .expect("layout size should not exceed `isize::MAX`")
-            .size();
-
         Self {
             ptr,
-            capacity_in_bytes,
+            capacity,
             #[cfg(feature = "cache-ptrs")]
             ptrs: unsafe {
                 let ptrs = ptrs::<T>(ptr.as_ptr(), capacity).unwrap_unchecked();
@@ -271,17 +267,12 @@ where
         if is_zst::<T>() {
             return usize::MAX;
         }
-        to_capacity::<T>(self.capacity_in_bytes)
-    }
-
-    #[inline(always)]
-    pub fn capacity_in_bytes(&self) -> usize {
-        self.capacity_in_bytes
+        self.capacity
     }
 
     #[inline]
-    const fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
-        if self.capacity_in_bytes == 0 {
+    fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
+        if is_zst::<T>() || self.capacity == 0 {
             return None;
         }
 
@@ -290,8 +281,7 @@ where
         // has already been allocated so we know it can't overflow and currently Rust does not
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
         unsafe {
-            let size = self.capacity_in_bytes;
-            let layout = Layout::from_size_align_unchecked(size, align_of::<BufferData<T>>());
+            let layout = buffer_layout::<T>(self.capacity).unwrap_unchecked();
             Some((self.ptr.cast(), layout))
         }
     }
@@ -360,18 +350,13 @@ where
 
     #[inline]
     pub fn needs_to_grow(&self, len: usize, additional: usize) -> bool {
-        let new_capacity_in_bytes = buffer_layout::<T>(len + additional)
-            .expect("layout size should not exceed `isize::MAX`")
-            .size();
-        new_capacity_in_bytes > self.capacity_in_bytes
+        additional > self.capacity.wrapping_sub(len)
     }
 
     #[inline]
     unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<BufferData<T>>, capacity: usize) {
         self.ptr = ptr;
-        self.capacity_in_bytes = buffer_layout::<T>(capacity)
-            .expect("layout size should not exceed `isize::MAX`")
-            .size();
+        self.capacity = capacity;
 
         #[cfg(feature = "cache-ptrs")]
         {

@@ -71,8 +71,6 @@ where
 
     fn capacity(self) -> usize;
 
-    fn capacity_in_bytes(self) -> usize;
-
     fn as_ptr(self) -> *const BufferData<T>;
 
     #[allow(clippy::missing_safety_doc)]
@@ -87,7 +85,7 @@ where
 {
     #[inline]
     unsafe fn len(self) -> usize {
-        match self.capacity_in_bytes() {
+        match capacity_in_bytes(self) {
             0 => self.into_inner().len(),
             _ => unsafe { ptr::read(self.as_ptr().ptr_to_len()) },
         }
@@ -95,14 +93,8 @@ where
 
     #[inline]
     fn capacity(self) -> usize {
-        let capacity_in_bytes = self.capacity_in_bytes();
+        let capacity_in_bytes = capacity_in_bytes(self);
         to_capacity::<T>(capacity_in_bytes)
-    }
-
-    #[inline]
-    fn capacity_in_bytes(self) -> usize {
-        let buffer = self.into_inner();
-        buffer.len() * size_of::<BufferData<T>>()
     }
 
     #[inline]
@@ -135,8 +127,6 @@ where
 
     fn capacity(self) -> usize;
 
-    fn capacity_in_bytes(self) -> usize;
-
     fn as_mut_ptr(self) -> *mut BufferData<T>;
 
     #[allow(clippy::missing_safety_doc)]
@@ -151,7 +141,7 @@ where
 {
     #[inline]
     unsafe fn len(self) -> usize {
-        match self.capacity_in_bytes() {
+        match capacity_in_bytes(self) {
             0 => self.into_inner_mut().len(),
             _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_len_mut()) },
         }
@@ -159,14 +149,8 @@ where
 
     #[inline]
     fn capacity(self) -> usize {
-        let capacity_in_bytes = self.capacity_in_bytes();
+        let capacity_in_bytes = capacity_in_bytes(self);
         to_capacity::<T>(capacity_in_bytes)
-    }
-
-    #[inline]
-    fn capacity_in_bytes(self) -> usize {
-        let buffer = self.into_inner_mut();
-        buffer.len() * size_of::<BufferData<T>>()
     }
 
     #[inline]
@@ -182,6 +166,14 @@ where
     {
         unsafe { index.get_unchecked_mut(self) }
     }
+}
+
+fn capacity_in_bytes<T>(ptr: *const SoaSlice<T>) -> usize
+where
+    T: Soa,
+{
+    let buffer = ptr.into_inner();
+    buffer.len() * size_of::<BufferData<T>>()
 }
 
 trait SoaSlicePtrIntoInner<T>: Copy

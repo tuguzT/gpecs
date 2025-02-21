@@ -12,7 +12,7 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{actual_capacity, ptrs, BufferData, PtrToLenMut},
+    ptr::{actual_capacity, is_zst, ptrs, BufferData, PtrToLenMut},
     raw_vec::RawSoaVec,
     set_len_on_drop::SetLenOnDrop,
     slice::{from_raw_parts, from_raw_parts_mut, slice_range, Iter, IterMut, SoaSlice},
@@ -91,11 +91,6 @@ where
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    #[inline]
-    pub fn capacity_in_bytes(&self) -> usize {
-        self.buffer.capacity_in_bytes()
     }
 
     #[inline]
@@ -337,7 +332,7 @@ where
 
     #[inline]
     fn set_len_in_buffer(&mut self, new_len: usize) {
-        if self.capacity_in_bytes() == 0 {
+        if is_zst::<T>() || self.capacity() == 0 {
             return;
         }
 

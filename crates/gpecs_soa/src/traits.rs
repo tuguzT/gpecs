@@ -153,6 +153,23 @@ pub unsafe trait Soa: Sized {
         Ok((layout, offsets))
     }
 
+    fn capacity_from(buffer_layout: Layout) -> usize {
+        let max_capacity = buffer_layout
+            .size()
+            .checked_div(Self::packed_size_of())
+            .unwrap_or_default();
+
+        let mut capacity = max_capacity;
+        while {
+            let (layout, _) = Self::buffer_layout(capacity)
+                .expect("new buffer layout should be smaller than the input one");
+            layout.size() > buffer_layout.size()
+        } {
+            capacity -= 1;
+        }
+        capacity
+    }
+
     type Ptrs: Copy;
     type MutPtrs: Copy;
 
@@ -292,6 +309,11 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn buffer_layout(_: usize) -> Result<(Layout, Self::BufferOffsets), LayoutError> {
         Ok((Layout::new::<Self>(), [0]))
+    }
+
+    #[inline(always)]
+    fn capacity_from(_: Layout) -> usize {
+        usize::MAX
     }
 
     type Ptrs = *const Self;

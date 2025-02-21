@@ -12,7 +12,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{buffer_layout, is_zst, ptrs, slice_from_raw_parts_mut, to_capacity, BufferData},
+    ptr::{buffer_layout, capacity_from, is_zst, ptrs, slice_from_raw_parts_mut, BufferData},
     slice::SoaSlice,
     traits::Soa,
 };
@@ -142,7 +142,7 @@ where
             Ok(layout) => layout,
             Err(_) => return Err(CapacityOverflow.into()),
         };
-        let capacity = to_capacity::<T>(layout.size());
+        let capacity = capacity_from::<T>(layout);
         alloc_guard(layout.size())?;
 
         let ptr = match init {
@@ -386,7 +386,7 @@ where
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
-            let capacity = to_capacity::<T>(new_layout.size());
+            let capacity = capacity_from::<T>(new_layout);
             self.set_ptr_and_capacity(ptr.cast(), capacity);
         }
         Ok(())
@@ -402,7 +402,7 @@ where
 
         let ptr = finish_grow(new_layout, self.current_memory())?;
         unsafe {
-            let capacity = to_capacity::<T>(new_layout.size());
+            let capacity = capacity_from::<T>(new_layout);
             self.set_ptr_and_capacity(ptr.cast(), capacity);
         }
         Ok(())

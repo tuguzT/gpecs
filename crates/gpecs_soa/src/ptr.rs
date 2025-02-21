@@ -20,11 +20,12 @@ pub fn slice_from_raw_parts<T>(
 where
     T: Soa,
 {
-    let buffer_layout =
-        buffer_layout::<T>(capacity).expect("layout size should not exceed `isize::MAX`");
-    let core_len = match buffer_layout.size() {
-        0 => len,
-        _ => buffer_layout.size() / size_of::<BufferData<T>>(),
+    let core_len = if is_zst::<T>() || capacity == 0 {
+        len
+    } else {
+        let buffer_layout =
+            buffer_layout::<T>(capacity).expect("layout size should not exceed `isize::MAX`");
+        buffer_layout.size() / size_of::<BufferData<T>>()
     };
     ptr::slice_from_raw_parts(data, core_len) as _
 }
@@ -39,11 +40,12 @@ pub fn slice_from_raw_parts_mut<T>(
 where
     T: Soa,
 {
-    let buffer_layout =
-        buffer_layout::<T>(capacity).expect("layout size should not exceed `isize::MAX`");
-    let core_len = match buffer_layout.size() {
-        0 => len,
-        _ => buffer_layout.size() / size_of::<BufferData<T>>(),
+    let core_len = if is_zst::<T>() || capacity == 0 {
+        len
+    } else {
+        let buffer_layout =
+            buffer_layout::<T>(capacity).expect("layout size should not exceed `isize::MAX`");
+        buffer_layout.size() / size_of::<BufferData<T>>()
     };
     ptr::slice_from_raw_parts_mut(data, core_len) as _
 }
@@ -85,7 +87,7 @@ where
 {
     #[inline]
     unsafe fn len(self) -> usize {
-        match capacity_in_bytes(self) {
+        match slice_buffer_layout(self).size() {
             0 => self.into_inner().len(),
             _ => unsafe { ptr::read(self.as_ptr().ptr_to_len()) },
         }
@@ -93,8 +95,8 @@ where
 
     #[inline]
     fn capacity(self) -> usize {
-        let capacity_in_bytes = capacity_in_bytes(self);
-        to_capacity::<T>(capacity_in_bytes)
+        let buffer_layout = slice_buffer_layout(self);
+        capacity_from::<T>(buffer_layout)
     }
 
     #[inline]
@@ -141,7 +143,7 @@ where
 {
     #[inline]
     unsafe fn len(self) -> usize {
-        match capacity_in_bytes(self) {
+        match slice_buffer_layout(self).size() {
             0 => self.into_inner_mut().len(),
             _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_len_mut()) },
         }
@@ -149,8 +151,8 @@ where
 
     #[inline]
     fn capacity(self) -> usize {
-        let capacity_in_bytes = capacity_in_bytes(self);
-        to_capacity::<T>(capacity_in_bytes)
+        let buffer_layout = slice_buffer_layout(self);
+        capacity_from::<T>(buffer_layout)
     }
 
     #[inline]
@@ -168,12 +170,15 @@ where
     }
 }
 
-fn capacity_in_bytes<T>(ptr: *const SoaSlice<T>) -> usize
+fn slice_buffer_layout<T>(ptr: *const SoaSlice<T>) -> Layout
 where
     T: Soa,
 {
     let buffer = ptr.into_inner();
-    buffer.len() * size_of::<BufferData<T>>()
+
+    let size = buffer.len() * size_of::<BufferData<T>>();
+    let align = align_of::<BufferData<T>>();
+    Layout::from_size_align(size, align).expect("layout size should not exceed `isize::MAX`")
 }
 
 trait SoaSlicePtrIntoInner<T>: Copy
@@ -267,10 +272,9 @@ pub(crate) fn actual_capacity<T>(capacity: usize) -> usize
 where
     T: Soa,
 {
-    let capacity_in_bytes = buffer_layout::<T>(capacity)
-        .expect("layout size should not exceed `isize::MAX`")
-        .size();
-    to_capacity::<T>(capacity_in_bytes)
+    let buffer_layout =
+        buffer_layout::<T>(capacity).expect("layout size should not exceed `isize::MAX`");
+    capacity_from::<T>(buffer_layout)
 }
 
 #[inline]
@@ -292,58 +296,51 @@ pub(crate) fn buffer_layout<T>(capacity: usize) -> Result<Layout, LayoutError>
 where
     T: Soa,
 {
-    let required = buffer_layout_not_padded::<T>(capacity)?.pad_to_align();
-    let item_layout = Layout::new::<BufferData<T>>()
-        .align_to(required.align())?
-        .pad_to_align();
-    if item_layout.size() == 0 {
+    if is_zst::<T>() || capacity == 0 {
         return Ok(Layout::new::<()>());
     }
 
-    let size = required.size().div_ceil(item_layout.size()) * item_layout.size();
+    let required = buffer_layout_not_padded::<T>(capacity)?.pad_to_align();
+    let capacity_in_bytes = required.size();
+
+    let item_layout = Layout::new::<BufferData<T>>();
+    let size = capacity_in_bytes.div_ceil(item_layout.size()) * item_layout.size();
     let layout = Layout::from_size_align(size, item_layout.align())?.pad_to_align();
+
     Ok(layout)
 }
 
 #[inline]
-fn to_capacity_not_padded<T>(capacity_in_bytes: usize) -> usize
+fn capacity_from_not_padded<T>(buffer_layout: Layout) -> usize
 where
     T: Soa,
 {
-    if is_zst::<T>() || capacity_in_bytes < size_of::<usize>() {
+    if is_zst::<T>() || buffer_layout.size() < size_of::<usize>() {
         return 0;
     }
 
-    let max_capacity = (capacity_in_bytes - size_of::<usize>()) / T::packed_size_of();
-
-    let mut capacity = max_capacity;
-    while {
-        // this variable is not inlined (in debug builds) only for better debugging experience
-        let to_capacity_in_bytes = buffer_layout_not_padded::<T>(capacity)
-            .expect("layout size should not exceed `isize::MAX`")
-            .size();
-        to_capacity_in_bytes > capacity_in_bytes
-    } {
-        capacity -= 1;
-    }
-    capacity
+    let size = buffer_layout.size() - size_of::<usize>();
+    let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
+        .expect("layout size should not exceed `isize::MAX`");
+    T::capacity_from(buffer_layout)
 }
 
 #[inline]
-pub(crate) fn to_capacity<T>(capacity_in_bytes: usize) -> usize
+pub(crate) fn capacity_from<T>(buffer_layout: Layout) -> usize
 where
     T: Soa,
 {
-    let item_layout = Layout::new::<BufferData<T>>();
-    if item_layout.size() == 0 {
+    if is_zst::<T>() || buffer_layout.size() < size_of::<usize>() {
         return 0;
     }
 
-    let size = capacity_in_bytes.div_ceil(item_layout.size()) * item_layout.size();
-    let layout = Layout::from_size_align(size, item_layout.align())
+    let item_layout = Layout::new::<BufferData<T>>();
+    let size = buffer_layout.size().div_ceil(item_layout.size()) * item_layout.size();
+    let buffer_layout = Layout::from_size_align(size, item_layout.align())
         .expect("layout size should not exceed `isize::MAX`")
         .pad_to_align();
-    to_capacity_not_padded::<T>(layout.size())
+
+    capacity_from_not_padded::<T>(buffer_layout)
 }
 
 #[inline]
@@ -375,7 +372,9 @@ where
 mod tests {
     use core::alloc::Layout;
 
-    use super::{buffer_layout_not_padded, to_capacity_not_padded};
+    use crate::ptr::BufferData;
+
+    use super::{buffer_layout_not_padded, capacity_from_not_padded};
 
     #[test]
     fn u8_u8_u8_to_capacity_in_bytes() {
@@ -401,7 +400,11 @@ mod tests {
 
     #[test]
     fn u8_u8_u8_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u8, u8, u8)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u8, u8, u8)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u8, u8, u8)>(buffer_layout)
+        };
         let usize = size_of::<usize>();
         let u8 = size_of::<u8>();
 
@@ -448,7 +451,11 @@ mod tests {
 
     #[test]
     fn u16_u16_u16_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u16, u16, u16)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u16, u16, u16)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u16, u16, u16)>(buffer_layout)
+        };
         let usize = size_of::<usize>();
         let u16 = size_of::<u16>();
 
@@ -494,7 +501,11 @@ mod tests {
 
     #[test]
     fn u32_u32_u32_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u32, u32, u32)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u32, u32, u32)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u32, u32, u32)>(buffer_layout)
+        };
         let u32 = size_of::<u32>();
         let aligned_bytes = Layout::new::<usize>()
             .align_to(align_of::<u32>())
@@ -544,7 +555,11 @@ mod tests {
 
     #[test]
     fn u64_u64_u64_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u64, u64, u64)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u64, u64, u64)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u64, u64, u64)>(buffer_layout)
+        };
         let u64 = size_of::<u64>();
         let aligned_bytes = Layout::new::<usize>()
             .align_to(align_of::<u64>())
@@ -594,13 +609,18 @@ mod tests {
     #[test]
     #[rustfmt::skip::macros(assert_eq)]
     fn u8_u16_u32_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u8, u16, u32)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u8, u16, u32)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u8, u16, u32)>(buffer_layout)
+        };
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
         let usize = size_of::<usize>();
 
         for capacity_in_bytes in 0..(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1)) {
+            dbg!(capacity_in_bytes);
             assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
@@ -641,13 +661,21 @@ mod tests {
 
     #[test]
     fn u32_u16_u8_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u32, u16, u8)>;
-        let efficient_to_capacity = to_capacity_not_padded::<(u8, u16, u32)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u32, u16, u8)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u32, u16, u8)>(buffer_layout)
+        };
+        let efficient_to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u8, u16, u32)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u8, u16, u32)>(buffer_layout)
+        };
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
                 to_capacity(capacity_in_bytes),
-                efficient_to_capacity(capacity_in_bytes)
+                efficient_to_capacity(capacity_in_bytes),
             );
         }
     }
@@ -678,13 +706,21 @@ mod tests {
 
     #[test]
     fn u8_u16_u8_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u8, u16, u8)>;
-        let efficient_to_capacity = to_capacity_not_padded::<(u8, u8, u16)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u8, u16, u8)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u8, u16, u8)>(buffer_layout)
+        };
+        let efficient_to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u8, u8, u16)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u8, u8, u16)>(buffer_layout)
+        };
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
                 to_capacity(capacity_in_bytes),
-                efficient_to_capacity(capacity_in_bytes)
+                efficient_to_capacity(capacity_in_bytes),
             );
         }
     }
@@ -715,13 +751,21 @@ mod tests {
 
     #[test]
     fn u16_u8_u16_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u16, u8, u16)>;
-        let efficient_to_capacity = to_capacity_not_padded::<(u8, u16, u16)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u16, u8, u16)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u16, u8, u16)>(buffer_layout)
+        };
+        let efficient_to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u8, u16, u16)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u8, u16, u16)>(buffer_layout)
+        };
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
                 to_capacity(capacity_in_bytes),
-                efficient_to_capacity(capacity_in_bytes)
+                efficient_to_capacity(capacity_in_bytes),
             );
         }
     }
@@ -752,13 +796,21 @@ mod tests {
 
     #[test]
     fn u16_u8_u32_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u16, u8, u32)>;
-        let efficient_to_capacity = to_capacity_not_padded::<(u8, u16, u32)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u16, u8, u32)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u16, u8, u32)>(buffer_layout)
+        };
+        let efficient_to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u8, u16, u32)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u8, u16, u32)>(buffer_layout)
+        };
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
                 to_capacity(capacity_in_bytes),
-                efficient_to_capacity(capacity_in_bytes)
+                efficient_to_capacity(capacity_in_bytes),
             );
         }
     }
@@ -789,13 +841,21 @@ mod tests {
 
     #[test]
     fn u16_u32_u16_to_capacity() {
-        let to_capacity = to_capacity_not_padded::<(u16, u32, u16)>;
-        let efficient_to_capacity = to_capacity_not_padded::<(u16, u16, u32)>;
+        let to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u16, u32, u16)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u16, u32, u16)>(buffer_layout)
+        };
+        let efficient_to_capacity = |capacity_in_bytes| {
+            let align = align_of::<BufferData<(u16, u16, u32)>>();
+            let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
+            capacity_from_not_padded::<(u16, u16, u32)>(buffer_layout)
+        };
 
         for capacity_in_bytes in 0..128 {
             assert_eq!(
                 to_capacity(capacity_in_bytes),
-                efficient_to_capacity(capacity_in_bytes)
+                efficient_to_capacity(capacity_in_bytes),
             );
         }
     }

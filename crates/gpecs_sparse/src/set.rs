@@ -971,14 +971,12 @@ where
     K: Key,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
-        let iter = iter.into_iter();
-        let iter_len = {
-            let (lower, upper) = iter.size_hint();
-            upper.unwrap_or(lower)
-        };
-        self.reserve(iter_len, iter_len);
-
-        for (key, value) in iter {
+        let mut iter = iter.into_iter();
+        while let Some((key, value)) = iter.next() {
+            if self.len() == self.capacity() {
+                let (lower, _) = iter.size_hint();
+                self.reserve(lower.saturating_add(1), 0);
+            }
             self.insert(key, value);
         }
     }
@@ -989,17 +987,16 @@ where
     K: Key,
 {
     fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
-        let iter = iter.into_iter();
-        let iter_len = {
-            let (lower, upper) = iter.size_hint();
-            upper.unwrap_or(lower)
-        };
-        self.reserve(iter_len, iter_len);
-
         // I could have used `push` here, but it would search for a vacant sparse item
         // multiple times from the beginning of a sparse
         let mut maybe_vacant_keys = 0..self.sparse.len();
-        for value in iter {
+
+        let mut iter = iter.into_iter();
+        while let Some(value) = iter.next() {
+            if self.len() == self.capacity() {
+                let (lower, _) = iter.size_hint();
+                self.reserve(lower.saturating_add(1), lower.saturating_add(1));
+            }
             let sparse_index = maybe_vacant_keys
                 .find(|&key| self.sparse[key].is_vacant())
                 .unwrap_or(self.sparse.len());
@@ -2514,6 +2511,13 @@ mod tests {
 
         assert_eq!(sparse_set.keys().as_slice(), &[2, 1, 5, 3, 0, 8]);
         assert_eq!(sparse_set.values().as_slice(), &[42, 42, 69, 228, 666, 69]);
+
+        assert_eq!(sparse_set.get(2), Some(&42));
+        assert_eq!(sparse_set.get(1), Some(&42));
+        assert_eq!(sparse_set.get(5), Some(&69));
+        assert_eq!(sparse_set.get(3), Some(&228));
+        assert_eq!(sparse_set.get(0), Some(&666));
+        assert_eq!(sparse_set.get(8), Some(&69));
     }
 
     #[test]
@@ -2528,6 +2532,13 @@ mod tests {
 
         assert_eq!(sparse_set.keys().as_slice(), &[2, 1, 4, 0, 3, 5]);
         assert_eq!(sparse_set.values().as_slice(), &[34, 42, 69, 228, 666, 201]);
+
+        assert_eq!(sparse_set.get(2), Some(&34));
+        assert_eq!(sparse_set.get(1), Some(&42));
+        assert_eq!(sparse_set.get(4), Some(&69));
+        assert_eq!(sparse_set.get(0), Some(&228));
+        assert_eq!(sparse_set.get(3), Some(&666));
+        assert_eq!(sparse_set.get(5), Some(&201));
     }
 
     #[test]

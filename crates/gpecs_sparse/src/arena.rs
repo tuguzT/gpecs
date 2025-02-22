@@ -1107,14 +1107,12 @@ where
     K: Key,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
-        let iter = iter.into_iter();
-        let iter_len = {
-            let (lower, upper) = iter.size_hint();
-            upper.unwrap_or(lower)
-        };
-        self.reserve(iter_len, iter_len);
-
-        for (key, value) in iter {
+        let mut iter = iter.into_iter();
+        while let Some((key, value)) = iter.next() {
+            if self.len() == self.capacity() {
+                let (lower, _) = iter.size_hint();
+                self.reserve(lower.saturating_add(1), 0);
+            }
             self.insert(key, value);
         }
     }
@@ -1125,14 +1123,12 @@ where
     K: Key,
 {
     fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
-        let iter = iter.into_iter();
-        let iter_len = {
-            let (lower, upper) = iter.size_hint();
-            upper.unwrap_or(lower)
-        };
-        self.reserve(iter_len, iter_len);
-
-        for value in iter {
+        let mut iter = iter.into_iter();
+        while let Some(value) = iter.next() {
+            if self.len() == self.capacity() {
+                let (lower, _) = iter.size_hint();
+                self.reserve(lower.saturating_add(1), lower.saturating_add(1));
+            }
             self.push(value);
         }
     }
@@ -2722,8 +2718,15 @@ mod tests {
         assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 5, 3, 0, 8]);
         assert_eq!(
             sparse_arena.values().as_slice(),
-            &[42, 42, 69, 228, 666, 69]
+            &[42, 42, 69, 228, 666, 69],
         );
+
+        assert_eq!(sparse_arena.get(2), Some(&42));
+        assert_eq!(sparse_arena.get(1), Some(&42));
+        assert_eq!(sparse_arena.get(5), Some(&69));
+        assert_eq!(sparse_arena.get(3), Some(&228));
+        assert_eq!(sparse_arena.get(0), Some(&666));
+        assert_eq!(sparse_arena.get(8), Some(&69));
     }
 
     #[test]
@@ -2739,8 +2742,15 @@ mod tests {
         assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 4, 3, 0, 5]);
         assert_eq!(
             sparse_arena.values().as_slice(),
-            &[34, 42, 69, 228, 666, 201]
+            &[34, 42, 69, 228, 666, 201],
         );
+
+        assert_eq!(sparse_arena.get(2), Some(&34));
+        assert_eq!(sparse_arena.get(1), Some(&42));
+        assert_eq!(sparse_arena.get(4), Some(&69));
+        assert_eq!(sparse_arena.get(3), Some(&228));
+        assert_eq!(sparse_arena.get(0), Some(&666));
+        assert_eq!(sparse_arena.get(5), Some(&201));
     }
 
     #[test]

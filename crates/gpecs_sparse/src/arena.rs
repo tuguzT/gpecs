@@ -11,9 +11,9 @@ use gpecs_soa::vec::SoaVec;
 
 use crate::{
     assert::{
-        check_dense_index_bounds, check_equal_key, check_key_bounds, check_kv_same_len,
-        unwrap_dense_index_mut, unwrap_dense_value_mut, unwrap_next_vacant, unwrap_next_vacant_mut,
-        unwrap_sparse_item, unwrap_sparse_item_mut,
+        check_dense_index_bounds, check_equal_key, check_key_bounds, unwrap_dense_index_mut,
+        unwrap_dense_value_mut, unwrap_next_vacant, unwrap_next_vacant_mut, unwrap_sparse_item,
+        unwrap_sparse_item_mut,
     },
     entry::generate_entry_types,
     error::TryReserveError,
@@ -275,26 +275,15 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (Vec<K>, Vec<V>, Vec<SparseItem<K::Epoch>>) {
+    pub fn into_parts(self) -> (SoaVec<(K, V)>, Vec<SparseItem<K::Epoch>>) {
         let Self { dense, sparse, .. } = self;
-
-        let (dense_keys, dense_values) = dense.into_vecs();
-        (dense_keys, dense_values, sparse)
+        (dense, sparse)
     }
 
-    pub fn from_parts(
-        mut keys: Vec<K>,
-        mut values: Vec<V>,
-        mut sparse: Vec<SparseItem<K::Epoch>>,
-    ) -> Self {
-        keys.dedup_by_key(|key| key.sparse_index());
-        values.truncate(keys.len());
-        keys.truncate(values.len());
-        check_kv_same_len(keys.len(), values.len());
-
+    pub fn from_parts(dense: SoaVec<(K, V)>, mut sparse: Vec<SparseItem<K::Epoch>>) -> Self {
         sparse.clear();
         let mut sparse_vacant_head = 0;
-        for (dense_index, key) in keys.iter().enumerate() {
+        for (dense_index, (key, _)) in dense.iter().enumerate() {
             let sparse_index = key.sparse_index();
             let epoch = key.epoch();
             let item = SparseItem::occupied(dense_index, epoch);
@@ -316,7 +305,7 @@ where
         }
 
         Self {
-            dense: SoaVec::from_vecs((keys, values)),
+            dense,
             sparse,
             sparse_vacant_head,
         }
@@ -1140,8 +1129,8 @@ where
 {
     #[inline]
     fn from(value: set::EpochSparseSet<K, V>) -> Self {
-        let (keys, values, sparse) = value.into_parts();
-        Self::from_parts(keys, values, sparse)
+        let (dense, sparse) = value.into_parts();
+        Self::from_parts(dense, sparse)
     }
 }
 
@@ -1266,12 +1255,11 @@ mod tests {
     fn empty_parts() {
         let sparse_arena = SparseArena::<i32>::new();
 
-        let (keys, values, sparse) = sparse_arena.into_parts();
-        assert_eq!(keys.len(), 0);
-        assert_eq!(values.len(), 0);
+        let (dense, sparse) = sparse_arena.into_parts();
+        assert_eq!(dense.len(), 0);
         assert_eq!(sparse.len(), 0);
 
-        let sparse_arena = SparseArena::from_parts(keys, values, sparse);
+        let sparse_arena = SparseArena::from_parts(dense, sparse);
         assert_eq!(sparse_arena.len(), 0);
     }
 
@@ -1639,7 +1627,8 @@ mod tests {
         let mut sparse_arena = SparseArena::new();
         sparse_arena.insert(2, 42);
 
-        let (keys, values, sparse) = sparse_arena.into_parts();
+        let (dense, sparse) = sparse_arena.into_parts();
+        let (keys, values) = dense.as_slices();
         assert_eq!(keys, &[2]);
         assert_eq!(values, &[42]);
         assert_eq!(
@@ -1651,7 +1640,7 @@ mod tests {
             ]
         );
 
-        let sparse_arena = SparseArena::from_parts(keys, values, sparse);
+        let sparse_arena = SparseArena::from_parts(dense, sparse);
         assert_eq!(sparse_arena.len(), 1);
         assert_eq!(sparse_arena.as_slice(), &[42]);
         assert_eq!(sparse_arena.as_keys_slice(), &[2]);
@@ -2167,7 +2156,8 @@ mod tests {
         sparse_arena.insert(1, 42);
         sparse_arena.insert(5, 69);
 
-        let (mut keys, values, sparse) = sparse_arena.into_parts();
+        let (mut dense, sparse) = sparse_arena.into_parts();
+        let (keys, values) = dense.as_slices();
         assert_eq!(keys, &[2, 1, 5]);
         assert_eq!(values, &[34, 42, 69]);
         assert_eq!(
@@ -2182,12 +2172,12 @@ mod tests {
             ]
         );
 
-        keys.swap_remove(0);
-        let sparse_arena = SparseArena::from_parts(keys, values, sparse);
+        dense.swap_remove(0);
+        let sparse_arena = SparseArena::from_parts(dense, sparse);
         assert_eq!(sparse_arena.len(), 2);
-        assert_eq!(sparse_arena.as_slice(), &[34, 42]);
+        assert_eq!(sparse_arena.as_slice(), &[69, 42]);
         assert_eq!(sparse_arena.as_keys_slice(), &[5, 1]);
-        assert_eq!(sparse_arena.get(5), Some(&34));
+        assert_eq!(sparse_arena.get(5), Some(&69));
     }
 
     #[test]

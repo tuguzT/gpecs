@@ -3,13 +3,6 @@ use crate::{
     item::{SparseItem, SparseItemKind},
 };
 
-#[cold]
-#[track_caller]
-#[inline(never)]
-const fn check_kv_same_len_failed() -> ! {
-    panic!("keys and values should have the same length")
-}
-
 #[inline]
 #[track_caller]
 pub fn unwrap_sparse_item<E>(sparse: &[SparseItem<E>], sparse_index: usize) -> &SparseItem<E> {
@@ -218,13 +211,4 @@ where
         return;
     }
     check_equal_key_failed()
-}
-
-#[inline]
-#[track_caller]
-pub const fn check_kv_same_len(keys_len: usize, values_len: usize) {
-    if keys_len == values_len {
-        return;
-    }
-    check_kv_same_len_failed()
 }

@@ -110,6 +110,11 @@ where
 
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
+    /// Array of layouts for each field.
+    ///
+    /// Safety requirements:
+    /// - sum of layouts' sizes should be less or equal to the size of self
+    /// - alignment of each layout should be less or equal to the alignment of self
     type FieldLayouts: for<'a> SoaIndex<usize, Ref<'a>: Borrow<Layout>>
         + for<'a> SoaIter<Output<'a>: ExactSizeIterator<Item: Borrow<Layout>>>;
 
@@ -117,17 +122,6 @@ pub unsafe trait Soa: Sized {
 
     fn field_layouts() -> Self::FieldLayouts;
     fn field_permutation() -> Self::FieldPermutation;
-
-    fn packed_size_of() -> usize {
-        let layouts = Self::field_layouts();
-        layouts
-            .iter()
-            .map(|item| {
-                let layout: &Layout = item.borrow();
-                layout.size()
-            })
-            .sum()
-    }
 
     type BufferOffsets: Default
         + for<'a> SoaIndex<usize, Ref<'a>: Borrow<usize>>
@@ -154,9 +148,16 @@ pub unsafe trait Soa: Sized {
     }
 
     fn capacity_from(buffer_layout: Layout) -> usize {
+        let packed_size = Self::field_layouts()
+            .iter()
+            .map(|item| {
+                let layout: &Layout = item.borrow();
+                layout.size()
+            })
+            .sum();
         let max_capacity = buffer_layout
             .size()
-            .checked_div(Self::packed_size_of())
+            .checked_div(packed_size)
             .unwrap_or_default();
 
         let mut capacity = max_capacity;
@@ -297,11 +298,6 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn field_permutation() -> Self::FieldPermutation {
         [0]
-    }
-
-    #[inline(always)]
-    fn packed_size_of() -> usize {
-        size_of::<Self>()
     }
 
     type BufferOffsets = [usize; 1];
@@ -600,14 +596,6 @@ macro_rules! soa_impl {
             #[inline(always)]
             fn field_permutation() -> Self::FieldPermutation {
                 SoaTupleConst::<($($types,)*)>::PERMUTATION
-            }
-
-            #[inline(always)]
-            fn packed_size_of() -> usize {
-                #[repr(packed)]
-                struct PackedSelf<$($types,)*>($($types,)*);
-
-                size_of::<PackedSelf<$($types,)*>>()
             }
 
             type BufferOffsets = [usize; count_idents!($($types,)*)];

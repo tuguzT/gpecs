@@ -258,13 +258,7 @@ pub(crate) fn is_zst<T>() -> bool
 where
     T: Soa,
 {
-    match (T::packed_size_of(), size_of::<BufferData<T>>()) {
-        (0, 0) => true,
-        (a, b) if a == 0 || b == 0 => {
-            panic!("packed size of `T` should be `0` if and only if `T` is zero-sized type")
-        }
-        _ => false,
-    }
+    size_of::<BufferData<T>>() == 0
 }
 
 #[inline]

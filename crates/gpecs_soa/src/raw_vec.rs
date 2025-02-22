@@ -113,12 +113,14 @@ where
     // - 1 otherwise, to avoid wasting too much space for very short Vecs.
     #[inline]
     pub fn min_non_zero_cap() -> usize {
-        if T::packed_size_of() == 1 {
-            8
-        } else if T::packed_size_of() <= 1024 {
-            4
-        } else {
-            1
+        const SIZE: usize = 4096; // 4 KiB
+
+        let buffer_layout = Layout::from_size_align(SIZE, align_of::<BufferData<T>>())
+            .expect("layout size should not exceed `isize::MAX`");
+        match T::capacity_from(buffer_layout) {
+            SIZE => 8,
+            4.. => 4,
+            _ => 1,
         }
     }
 

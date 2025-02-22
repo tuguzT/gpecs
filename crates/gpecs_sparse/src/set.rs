@@ -975,7 +975,7 @@ where
     fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
         // I could have used `push` here, but it would search for a vacant sparse item
         // multiple times from the beginning of a sparse
-        let mut maybe_vacant_keys = 0..self.sparse.len();
+        let mut maybe_vacant_keys = (0..self.sparse.len()).fuse();
 
         let mut iter = iter.into_iter();
         while let Some(value) = iter.next() {

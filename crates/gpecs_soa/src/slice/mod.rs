@@ -11,7 +11,7 @@ use index::slice_index_usize_fail;
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
     set_len_on_drop::SetLenOnDrop,
-    traits::{Soa, SoaIndex, SoaIndexMut, SoaToOwned},
+    traits::{Soa, SoaToOwned},
     vec::{IntoIter, SoaVec},
 };
 
@@ -601,38 +601,6 @@ where
 
         target.clear();
         target.extend_from_slice(self);
-    }
-}
-
-impl<T, I> SoaIndex<I> for SoaSlice<T>
-where
-    T: Soa,
-    I: SoaSliceIndex<Self>,
-{
-    type Ref<'a>
-        = I::Ref<'a>
-    where
-        Self: 'a;
-
-    #[inline(always)]
-    fn index(&self, index: I) -> Self::Ref<'_> {
-        SoaSlice::index(self, index)
-    }
-}
-
-impl<T, I> SoaIndexMut<I> for SoaSlice<T>
-where
-    T: Soa,
-    I: SoaSliceIndex<Self>,
-{
-    type RefMut<'a>
-        = I::RefMut<'a>
-    where
-        Self: 'a;
-
-    #[inline(always)]
-    fn index_mut(&mut self, index: I) -> Self::RefMut<'_> {
-        SoaSlice::index_mut(self, index)
     }
 }
 

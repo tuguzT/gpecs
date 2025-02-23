@@ -353,7 +353,7 @@ where
     let (_, offset_from_len) = Layout::new::<usize>().extend(layout)?;
     let offsets = offsets.into_iter().map(|offset| offset + offset_from_len);
 
-    let ptrs = unsafe { T::ptrs(ptr, offsets) };
+    let ptrs = unsafe { T::ptrs(ptr.cast(), offsets) };
     Ok(ptrs)
 }
 

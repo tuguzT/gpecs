@@ -8,8 +8,6 @@ use core::{
     slice,
 };
 
-use crate::ptr::BufferData;
-
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
     /// Collection of layouts for each field.
@@ -66,10 +64,7 @@ pub unsafe trait Soa: Sized {
     type MutPtrs: Copy;
 
     fn ptrs_dangling() -> Self::MutPtrs;
-    unsafe fn ptrs(
-        ptr: *mut BufferData<Self>,
-        offsets: impl IntoIterator<Item = usize>,
-    ) -> Self::MutPtrs;
+    unsafe fn ptrs(ptr: *mut u8, offsets: impl IntoIterator<Item = usize>) -> Self::MutPtrs;
 
     fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs;
     fn ptrs_cast_mut(ptrs: Self::Ptrs) -> Self::MutPtrs;
@@ -119,6 +114,9 @@ pub unsafe trait Soa: Sized {
 
     fn slices_from_raw_parts(ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs;
     fn slices_from_raw_parts_mut(ptrs: Self::MutPtrs, len: usize) -> Self::SliceMutPtrs;
+
+    fn slices_len(slices: Self::SlicePtrs) -> usize;
+    fn slices_len_mut(slices: Self::SliceMutPtrs) -> usize;
 
     type Slices<'a>
     where
@@ -209,11 +207,7 @@ unsafe impl Soa for () {
 
     #[track_caller]
     #[inline(always)]
-    unsafe fn ptrs(
-        ptr: *mut BufferData<Self>,
-        offsets: impl IntoIterator<Item = usize>,
-    ) -> Self::MutPtrs {
-        let ptr = ptr.cast::<u8>();
+    unsafe fn ptrs(ptr: *mut u8, offsets: impl IntoIterator<Item = usize>) -> Self::MutPtrs {
         let offsets: [usize; 1] = collect_array(offsets);
         unsafe { ptr.add(offsets[0]).cast() }
     }
@@ -372,6 +366,16 @@ unsafe impl Soa for () {
         ptr::slice_from_raw_parts_mut(ptrs, len)
     }
 
+    #[inline(always)]
+    fn slices_len(slices: Self::SlicePtrs) -> usize {
+        slices.len()
+    }
+
+    #[inline(always)]
+    fn slices_len_mut(slices: Self::SliceMutPtrs) -> usize {
+        slices.len()
+    }
+
     type Slices<'a>
         = &'a [Self]
     where
@@ -384,12 +388,12 @@ unsafe impl Soa for () {
 
     #[inline(always)]
     unsafe fn slices_as_refs<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
-        unsafe { slice::from_raw_parts(slices.cast(), slices.len()) }
+        unsafe { slice::from_raw_parts(slices.cast(), Self::slices_len(slices)) }
     }
 
     #[inline(always)]
     unsafe fn mut_slices_as_refs<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
-        unsafe { slice::from_raw_parts_mut(slices.cast(), slices.len()) }
+        unsafe { slice::from_raw_parts_mut(slices.cast(), Self::slices_len_mut(slices)) }
     }
 
     #[inline(always)]
@@ -530,9 +534,8 @@ macro_rules! soa_impl {
 
             #[track_caller]
             #[inline(always)]
-            unsafe fn ptrs(ptr: *mut BufferData<Self>, offsets: impl IntoIterator<Item = usize>) -> Self::MutPtrs {
+            unsafe fn ptrs(ptr: *mut u8, offsets: impl IntoIterator<Item = usize>) -> Self::MutPtrs {
                 let offsets: [usize; count_idents!($($types,)*)] = collect_array(offsets);
-                let ptr = ptr.cast::<u8>();
                 unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) }
             }
 
@@ -716,6 +719,20 @@ macro_rules! soa_impl {
                 ($(ptr::slice_from_raw_parts_mut(ptrs.$indices, len),)*)
             }
 
+            #[inline(always)]
+            fn slices_len(slices: Self::SlicePtrs) -> usize {
+                let lens = [$(slices.$indices.len(),)*];
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
+                lens[0]
+            }
+
+            #[inline(always)]
+            fn slices_len_mut(slices: Self::SliceMutPtrs) -> usize {
+                let lens = [$(slices.$indices.len(),)*];
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
+                lens[0]
+            }
+
             type Slices<'a>
                 = ($(&'a [$types],)*)
             where
@@ -728,22 +745,12 @@ macro_rules! soa_impl {
 
             #[inline(always)]
             unsafe fn slices_as_refs<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
-                let len = {
-                    let lens = [$(slices.$indices.len(),)*];
-                    assert!(lens.iter().all(|len| lens[0].eq(len)));
-                    lens[0]
-                };
-                unsafe { ($(slice::from_raw_parts(slices.$indices.cast(), len),)*) }
+                unsafe { ($(slice::from_raw_parts(slices.$indices.cast(), Self::slices_len(slices)),)*) }
             }
 
             #[inline(always)]
             unsafe fn mut_slices_as_refs<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
-                let len = {
-                    let lens = [$(slices.$indices.len(),)*];
-                    assert!(lens.iter().all(|len| lens[0].eq(len)));
-                    lens[0]
-                };
-                unsafe { ($(slice::from_raw_parts_mut(slices.$indices.cast(), len),)*) }
+                unsafe { ($(slice::from_raw_parts_mut(slices.$indices.cast(), Self::slices_len_mut(slices)),)*) }
             }
 
             #[inline(always)]

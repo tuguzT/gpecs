@@ -1,5 +1,5 @@
 use crate::{
-    algo::get_pair_mut,
+    algo::get_pair,
     item::{SparseItem, SparseItemKind},
 };
 
@@ -124,7 +124,7 @@ pub fn unwrap_dense_value_pair_mut<T>(
     first_index: usize,
     second_index: usize,
 ) -> (&mut T, &mut T) {
-    let Some(pair) = get_pair_mut(values, first_index, second_index) else {
+    let Some(pair) = get_pair(values, first_index, second_index) else {
         unwrap_dense_value_pair_mut_failed()
     };
     pair
@@ -144,7 +144,7 @@ pub fn unwrap_sparse_items_pair_mut<E>(
     first_index: usize,
     second_index: usize,
 ) -> (&mut SparseItem<E>, &mut SparseItem<E>) {
-    let Some(pair) = get_pair_mut(sparse, first_index, second_index) else {
+    let Some(pair) = get_pair(sparse, first_index, second_index) else {
         unwrap_sparse_items_pair_mut_failed()
     };
     pair

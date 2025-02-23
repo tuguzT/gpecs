@@ -1,4 +1,4 @@
-use core::{fmt::Display, mem::swap};
+use core::{fmt::Display, mem::swap, ops};
 
 use crate::{
     assert::{
@@ -9,12 +9,46 @@ use crate::{
     key::Key,
 };
 
-pub fn get_pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> Option<(&mut T, &mut T)> {
+// https://stackoverflow.com/a/73428605/14928295
+fn get_range<T>(
+    iterator: impl IntoIterator<Item = T>,
+    range: impl ops::RangeBounds<usize>,
+) -> impl Iterator<Item = T> {
+    let start_bound = match range.start_bound() {
+        ops::Bound::Included(&num) => num,
+        ops::Bound::Excluded(&num) => num + 1,
+        ops::Bound::Unbounded => 0,
+    };
+
+    let mut end_bound = match range.end_bound() {
+        ops::Bound::Included(&num) => Some(num + 1),
+        ops::Bound::Excluded(&num) => Some(num),
+        ops::Bound::Unbounded => None,
+    };
+
+    iterator
+        .into_iter()
+        .take_while(move |_| {
+            if let Some(num) = &mut end_bound {
+                if *num == 0 {
+                    false
+                } else {
+                    *num -= 1;
+                    true
+                }
+            } else {
+                true
+            }
+        })
+        .skip(start_bound)
+}
+
+pub fn get_pair<T>(iter: impl IntoIterator<Item = T>, a: usize, b: usize) -> Option<(T, T)> {
     let (first, second) = (usize::min(a, b), usize::max(a, b));
 
-    let [first, .., second] = slice.get_mut(first..=second)? else {
-        return None;
-    };
+    let mut iter = get_range(iter, first..=second);
+    let first = iter.next()?;
+    let second = iter.last()?;
 
     let pair = if a < b {
         (first, second)
@@ -67,7 +101,7 @@ pub fn sparse_swap_keys<K>(
 {
     let first_index = first_key.sparse_index();
     let second_index = second_key.sparse_index();
-    let Some((first_item, second_item)) = get_pair_mut(sparse, first_index, second_index) else {
+    let Some((first_item, second_item)) = get_pair(sparse, first_index, second_index) else {
         return;
     };
 

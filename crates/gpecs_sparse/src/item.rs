@@ -41,7 +41,7 @@ impl<E> SparseItem<E> {
     }
 
     #[inline]
-    pub fn kind_mut(&mut self) -> &mut SparseItemKind {
+    pub const fn kind_mut(&mut self) -> &mut SparseItemKind {
         let Self { kind, .. } = self;
         kind
     }
@@ -53,7 +53,7 @@ impl<E> SparseItem<E> {
     }
 
     #[inline]
-    pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
+    pub const fn dense_index_mut(&mut self) -> Option<&mut usize> {
         let Self { kind, .. } = self;
         kind.dense_index_mut()
     }
@@ -65,7 +65,7 @@ impl<E> SparseItem<E> {
     }
 
     #[inline]
-    pub fn next_vacant_mut(&mut self) -> Option<&mut usize> {
+    pub const fn next_vacant_mut(&mut self) -> Option<&mut usize> {
         let Self { kind, .. } = self;
         kind.next_vacant_mut()
     }
@@ -107,7 +107,7 @@ impl SparseItemKind {
     }
 
     #[inline]
-    pub fn dense_index_mut(&mut self) -> Option<&mut usize> {
+    pub const fn dense_index_mut(&mut self) -> Option<&mut usize> {
         match self {
             Self::Occupied { dense_index } => Some(dense_index),
             Self::Vacant { .. } => None,
@@ -123,7 +123,7 @@ impl SparseItemKind {
     }
 
     #[inline]
-    pub fn next_vacant_mut(&mut self) -> Option<&mut usize> {
+    pub const fn next_vacant_mut(&mut self) -> Option<&mut usize> {
         match self {
             Self::Occupied { .. } => None,
             Self::Vacant { next_vacant } => Some(next_vacant),

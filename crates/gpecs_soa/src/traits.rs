@@ -102,8 +102,8 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    unsafe fn as_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a>;
-    unsafe fn as_mut_refs<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a>;
+    unsafe fn ptrs_to_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a>;
+    unsafe fn ptrs_to_refs_mut<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a>;
 
     fn refs_as_ptrs(refs: Self::Refs<'_>) -> Self::Ptrs;
     fn mut_refs_as_ptrs(refs: Self::RefsMut<'_>) -> Self::MutPtrs;
@@ -126,11 +126,12 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    unsafe fn slices_as_refs<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a>;
-    unsafe fn mut_slices_as_refs<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a>;
+    unsafe fn slice_ptrs_to_slices<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a>;
+    unsafe fn slice_ptrs_to_slices_mut<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a>;
 
     fn slice_refs_as_slice_ptrs(slices: Self::Slices<'_>) -> Self::SlicePtrs;
     fn mut_slice_refs_as_slice_ptrs(slices: Self::SlicesMut<'_>) -> Self::SliceMutPtrs;
+    fn mut_slices_as_slices(slices: Self::SlicesMut<'_>) -> Self::Slices<'_>;
 
     fn slice_refs_as_ptrs(slices: Self::Slices<'_>) -> Self::Ptrs;
     fn mut_slice_refs_as_ptrs(slices: Self::SlicesMut<'_>) -> Self::MutPtrs;
@@ -329,12 +330,12 @@ unsafe impl Soa for () {
         Self: 'a;
 
     #[inline(always)]
-    unsafe fn as_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a> {
+    unsafe fn ptrs_to_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a> {
         unsafe { &*ptrs }
     }
 
     #[inline(always)]
-    unsafe fn as_mut_refs<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a> {
+    unsafe fn ptrs_to_refs_mut<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a> {
         unsafe { &mut *ptrs }
     }
 
@@ -387,12 +388,12 @@ unsafe impl Soa for () {
         Self: 'a;
 
     #[inline(always)]
-    unsafe fn slices_as_refs<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
+    unsafe fn slice_ptrs_to_slices<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
         unsafe { slice::from_raw_parts(slices.cast(), Self::slices_len(slices)) }
     }
 
     #[inline(always)]
-    unsafe fn mut_slices_as_refs<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
+    unsafe fn slice_ptrs_to_slices_mut<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
         unsafe { slice::from_raw_parts_mut(slices.cast(), Self::slices_len_mut(slices)) }
     }
 
@@ -404,6 +405,11 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn mut_slice_refs_as_slice_ptrs(slices: Self::SlicesMut<'_>) -> Self::SliceMutPtrs {
         ptr::from_mut(slices)
+    }
+
+    #[inline(always)]
+    fn mut_slices_as_slices(slices: Self::SlicesMut<'_>) -> Self::Slices<'_> {
+        &*slices
     }
 
     #[inline(always)]
@@ -682,12 +688,12 @@ macro_rules! soa_impl {
                 Self: 'a;
 
             #[inline(always)]
-            unsafe fn as_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a> {
+            unsafe fn ptrs_to_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a> {
                 unsafe { ($(&*ptrs.$indices,)*) }
             }
 
             #[inline(always)]
-            unsafe fn as_mut_refs<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a> {
+            unsafe fn ptrs_to_refs_mut<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a> {
                 unsafe { ($(&mut *ptrs.$indices,)*) }
             }
 
@@ -744,12 +750,12 @@ macro_rules! soa_impl {
                 Self: 'a;
 
             #[inline(always)]
-            unsafe fn slices_as_refs<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
+            unsafe fn slice_ptrs_to_slices<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
                 unsafe { ($(slice::from_raw_parts(slices.$indices.cast(), Self::slices_len(slices)),)*) }
             }
 
             #[inline(always)]
-            unsafe fn mut_slices_as_refs<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
+            unsafe fn slice_ptrs_to_slices_mut<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
                 unsafe { ($(slice::from_raw_parts_mut(slices.$indices.cast(), Self::slices_len_mut(slices)),)*) }
             }
 
@@ -761,6 +767,11 @@ macro_rules! soa_impl {
             #[inline(always)]
             fn mut_slice_refs_as_slice_ptrs(slices: Self::SlicesMut<'_>) -> Self::SliceMutPtrs {
                 ($(ptr::from_mut(slices.$indices),)*)
+            }
+
+            #[inline(always)]
+            fn mut_slices_as_slices(slices: Self::SlicesMut<'_>) -> Self::Slices<'_> {
+                ($(&*slices.$indices,)*)
             }
 
             #[inline(always)]

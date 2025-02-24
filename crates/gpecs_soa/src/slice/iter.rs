@@ -90,7 +90,7 @@ where
         unsafe {
             let ptrs = T::ptrs_add(ptrs, self.start);
             let slices = T::slices_from_raw_parts(ptrs, len);
-            T::slices_as_refs(slices)
+            T::slice_ptrs_to_slices(slices)
         }
     }
 
@@ -174,7 +174,7 @@ where
         unsafe {
             let ptrs = self.post_inc_start(1);
             let ptrs = T::ptrs_cast_const(ptrs);
-            let refs = T::as_refs(ptrs);
+            let refs = T::ptrs_to_refs(ptrs);
             Some(refs)
         }
     }
@@ -238,7 +238,7 @@ where
             let ptrs = self.ptrs();
             let item = unsafe {
                 let ptrs = T::ptrs_add(ptrs, i);
-                T::as_refs(ptrs)
+                T::ptrs_to_refs(ptrs)
             };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
@@ -369,7 +369,7 @@ where
         unsafe {
             let ptrs = self.pre_dec_end(1);
             let ptrs = T::ptrs_cast_const(ptrs);
-            let refs = T::as_refs(ptrs);
+            let refs = T::ptrs_to_refs(ptrs);
             Some(refs)
         }
     }
@@ -467,7 +467,7 @@ where
         unsafe {
             let ptrs = T::ptrs_add_mut(ptrs, self.start);
             let slices = T::slices_from_raw_parts_mut(ptrs, len);
-            T::mut_slices_as_refs(slices)
+            T::slice_ptrs_to_slices_mut(slices)
         }
     }
 
@@ -479,7 +479,7 @@ where
         unsafe {
             let ptrs = T::ptrs_add(ptrs, self.start);
             let slices = T::slices_from_raw_parts(ptrs, len);
-            T::slices_as_refs(slices)
+            T::slice_ptrs_to_slices(slices)
         }
     }
 
@@ -542,7 +542,7 @@ where
 
         unsafe {
             let ptrs = self.post_inc_start(1);
-            let refs = T::as_mut_refs(ptrs);
+            let refs = T::ptrs_to_refs_mut(ptrs);
             Some(refs)
         }
     }
@@ -606,7 +606,7 @@ where
             let ptrs = self.ptrs();
             let item = unsafe {
                 let ptrs = T::ptrs_add_mut(ptrs, i);
-                T::as_mut_refs(ptrs)
+                T::ptrs_to_refs_mut(ptrs)
             };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
@@ -736,7 +736,7 @@ where
 
         unsafe {
             let ptrs = self.pre_dec_end(1);
-            let refs = T::as_mut_refs(ptrs);
+            let refs = T::ptrs_to_refs_mut(ptrs);
             Some(refs)
         }
     }

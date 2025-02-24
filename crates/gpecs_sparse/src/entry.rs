@@ -1,12 +1,14 @@
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
-    mem::replace,
 };
+
+use gpecs_soa::{mem::replace as soa_replace, Soa};
 
 use crate::{
     arena::EpochSparseArena,
-    assert::{unwrap_dense_value, unwrap_dense_value_mut},
+    assert::unwrap_dense,
+    iter::{Values, ValuesMut},
     key::Key,
     set::EpochSparseSet,
 };
@@ -14,6 +16,7 @@ use crate::{
 pub struct OccupiedEntry<'a, K, V, C>
 where
     K: Key,
+    V: Soa,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     key: K,
@@ -24,7 +27,8 @@ where
 
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
 where
-    K: Key,
+    K: Key + 'a,
+    V: Soa,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -38,45 +42,45 @@ where
     }
 
     #[inline]
-    pub fn get(&self) -> &V {
+    pub fn get(&self) -> V::Refs<'_> {
         let Self {
             dense_index,
             container,
             ..
         } = self;
 
-        let values = container.dense_values();
-        unwrap_dense_value(values, *dense_index)
+        let values = container.values();
+        unwrap_dense(values, *dense_index)
     }
 
     #[inline]
-    pub fn get_mut(&mut self) -> &mut V {
+    pub fn get_mut(&mut self) -> V::RefsMut<'_> {
         let Self {
             dense_index,
             container,
             ..
         } = self;
 
-        let values = container.dense_values_mut();
-        unwrap_dense_value_mut(values, *dense_index)
+        let values = container.values_mut();
+        unwrap_dense(values, *dense_index)
     }
 
     #[inline]
-    pub fn into_mut(self) -> &'a mut V {
+    pub fn into_mut(self) -> V::RefsMut<'a> {
         let Self {
             dense_index,
             container,
             ..
         } = self;
 
-        let values = container.dense_values_mut();
-        unwrap_dense_value_mut(values, dense_index)
+        let values = container.values_mut();
+        unwrap_dense(values, dense_index)
     }
 
     #[inline]
     pub fn insert(&mut self, value: V) -> V {
         let previous = self.get_mut();
-        replace(previous, value)
+        soa_replace(previous, value)
     }
 
     #[inline]
@@ -117,13 +121,14 @@ where
 impl<K, V, C> Debug for OccupiedEntry<'_, K, V, C>
 where
     K: Key + Debug,
-    V: Debug,
+    V: Soa,
     C: EpochSparseContainer<K, V> + ?Sized,
+    for<'a> V::Refs<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
 
-        let value = self.get();
+        let value = &self.get();
         f.debug_struct("OccupiedEntry")
             .field("key", key)
             .field("value", value)
@@ -134,6 +139,7 @@ where
 pub struct VacantEntry<'a, K, V, C>
 where
     K: Key,
+    V: Soa,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     key: K,
@@ -143,7 +149,8 @@ where
 
 impl<'a, K, V, C> VacantEntry<'a, K, V, C>
 where
-    K: Key,
+    K: Key + 'a,
+    V: Soa,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -168,12 +175,12 @@ where
     }
 
     #[inline]
-    pub fn insert(self, value: V) -> &'a mut V {
+    pub fn insert(self, value: V) -> V::RefsMut<'a> {
         let Self { key, container, .. } = self;
 
         container.insert(key, value);
 
-        let value = container.dense_values_mut().last_mut();
+        let value = container.values_mut().last();
         unwrap_entry_value(value)
     }
 
@@ -186,7 +193,7 @@ where
         } = self;
 
         container.insert(key, value);
-        let dense_index = container.dense_values().len() - 1;
+        let dense_index = container.values().len() - 1;
 
         OccupiedEntry {
             key,
@@ -200,6 +207,7 @@ where
 impl<K, V, C> Debug for VacantEntry<'_, K, V, C>
 where
     K: Key + Debug,
+    V: Soa,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -227,10 +235,11 @@ fn unwrap_entry_value<T>(value: Option<T>) -> T {
 pub trait EpochSparseContainer<K, V>
 where
     K: Key,
+    V: Soa,
 {
-    fn dense_values(&self) -> &[V];
+    fn values(&self) -> Values<'_, K, V>;
 
-    fn dense_values_mut(&mut self) -> &mut [V];
+    fn values_mut(&mut self) -> ValuesMut<'_, K, V>;
 
     fn insert(&mut self, key: K, value: V) -> Option<V>;
 
@@ -242,15 +251,16 @@ where
 impl<K, V> EpochSparseContainer<K, V> for EpochSparseSet<K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
-    fn dense_values(&self) -> &[V] {
-        self.as_slice()
+    fn values(&self) -> Values<'_, K, V> {
+        EpochSparseSet::values(self)
     }
 
     #[inline]
-    fn dense_values_mut(&mut self) -> &mut [V] {
-        self.as_mut_slice()
+    fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+        EpochSparseSet::values_mut(self)
     }
 
     #[inline]
@@ -272,15 +282,16 @@ where
 impl<K, V> EpochSparseContainer<K, V> for EpochSparseArena<K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
-    fn dense_values(&self) -> &[V] {
-        self.as_slice()
+    fn values(&self) -> Values<'_, K, V> {
+        EpochSparseArena::values(self)
     }
 
     #[inline]
-    fn dense_values_mut(&mut self) -> &mut [V] {
-        self.as_mut_slice()
+    fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+        EpochSparseArena::values_mut(self)
     }
 
     #[inline]
@@ -304,6 +315,7 @@ macro_rules! generate_entry_types {
         pub enum Entry<'a, K, V>
         where
             K: $crate::key::Key,
+            V: gpecs_soa::traits::Soa,
         {
             Occupied(OccupiedEntry<'a, K, V>),
             Vacant(VacantEntry<'a, K, V>),
@@ -312,6 +324,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> Entry<'a, K, V>
         where
             K: $crate::key::Key,
+            V: gpecs_soa::traits::Soa,
         {
             #[inline]
             pub const fn is_occupied(&self) -> bool {
@@ -332,7 +345,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get(&self) -> Option<&V> {
+            pub fn get(&self) -> Option<V::Refs<'_>> {
                 match self {
                     Self::Occupied(entry) => Some(entry.get()),
                     Self::Vacant(_) => None,
@@ -340,7 +353,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get_mut(&mut self) -> Option<&mut V> {
+            pub fn get_mut(&mut self) -> Option<V::RefsMut<'_>> {
                 match self {
                     Self::Occupied(entry) => Some(entry.get_mut()),
                     Self::Vacant(_) => None,
@@ -350,7 +363,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn and_modify<F>(self, f: F) -> Self
             where
-                F: FnOnce(&mut V),
+                F: FnOnce(V::RefsMut<'_>),
             {
                 match self {
                     Self::Occupied(mut entry) => {
@@ -362,7 +375,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_insert(self, default: V) -> &'a mut V {
+            pub fn or_insert(self, default: V) -> V::RefsMut<'a> {
                 match self {
                     Self::Occupied(entry) => entry.into_mut(),
                     Self::Vacant(entry) => entry.insert(default),
@@ -370,7 +383,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_insert_with<F>(self, default: F) -> &'a mut V
+            pub fn or_insert_with<F>(self, default: F) -> V::RefsMut<'a>
             where
                 F: FnOnce() -> V,
             {
@@ -381,7 +394,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_default(self) -> &'a mut V
+            pub fn or_default(self) -> V::RefsMut<'a>
             where
                 V: Default,
             {
@@ -417,10 +430,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<'a, K, V> core::fmt::Debug for Entry<'a, K, V>
+        impl<K, V> core::fmt::Debug for Entry<'_, K, V>
         where
-            K: core::fmt::Debug + $crate::key::Key,
-            V: core::fmt::Debug,
+            K: $crate::key::Key + core::fmt::Debug,
+            V: gpecs_soa::traits::Soa + core::fmt::Debug,
+            for<'a> V::Refs<'a>: Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
@@ -434,6 +448,7 @@ macro_rules! generate_entry_types {
         pub struct OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
+            V: gpecs_soa::traits::Soa,
         {
             inner: $crate::entry::OccupiedEntry<'a, K, V, $container>,
         }
@@ -441,6 +456,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
+            V: gpecs_soa::traits::Soa,
         {
             #[inline]
             fn new(key: K, dense_index: usize, container: &'a mut $container) -> Self {
@@ -449,19 +465,19 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get(&self) -> &V {
+            pub fn get(&self) -> V::Refs<'_> {
                 let Self { inner } = self;
                 inner.get()
             }
 
             #[inline]
-            pub fn get_mut(&mut self) -> &mut V {
+            pub fn get_mut(&mut self) -> V::RefsMut<'_> {
                 let Self { inner } = self;
                 inner.get_mut()
             }
 
             #[inline]
-            pub fn into_mut(self) -> &'a mut V {
+            pub fn into_mut(self) -> V::RefsMut<'a> {
                 let Self { inner } = self;
                 inner.into_mut()
             }
@@ -497,10 +513,11 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<'a, K, V> core::fmt::Debug for OccupiedEntry<'a, K, V>
+        impl<K, V> core::fmt::Debug for OccupiedEntry<'_, K, V>
         where
-            K: core::fmt::Debug + $crate::key::Key,
-            V: core::fmt::Debug,
+            K: $crate::key::Key + core::fmt::Debug,
+            V: gpecs_soa::traits::Soa + core::fmt::Debug,
+            for<'a> V::Refs<'a>: core::fmt::Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;
@@ -512,6 +529,7 @@ macro_rules! generate_entry_types {
         pub struct VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
+            V: gpecs_soa::traits::Soa,
         {
             inner: $crate::entry::VacantEntry<'a, K, V, $container>,
         }
@@ -519,6 +537,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
+            V: gpecs_soa::traits::Soa,
         {
             #[inline]
             fn new(key: K, container: &'a mut $container) -> Self {
@@ -539,7 +558,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn insert(self, value: V) -> &'a mut V {
+            pub fn insert(self, value: V) -> V::RefsMut<'a> {
                 let Self { inner } = self;
                 inner.insert(value)
             }
@@ -553,7 +572,8 @@ macro_rules! generate_entry_types {
 
         impl<'a, K, V> core::fmt::Debug for VacantEntry<'a, K, V>
         where
-            K: core::fmt::Debug + $crate::key::Key,
+            K: $crate::key::Key + core::fmt::Debug,
+            V: gpecs_soa::traits::Soa,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;

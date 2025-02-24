@@ -59,7 +59,7 @@ where
 
         unsafe {
             let ptrs = self.get_unchecked(slice);
-            let refs = T::as_refs(ptrs);
+            let refs = T::ptrs_to_refs(ptrs);
             Some(refs)
         }
     }
@@ -72,7 +72,7 @@ where
 
         unsafe {
             let ptrs = self.get_unchecked_mut(slice);
-            let refs = T::as_mut_refs(ptrs);
+            let refs = T::ptrs_to_refs_mut(ptrs);
             Some(refs)
         }
     }
@@ -154,7 +154,7 @@ where
 
         unsafe {
             let slices = self.get_unchecked(slice);
-            let slices = T::slices_as_refs(slices);
+            let slices = T::slice_ptrs_to_slices(slices);
             Some(slices)
         }
     }
@@ -167,7 +167,7 @@ where
 
         unsafe {
             let slices = self.get_unchecked_mut(slice);
-            let slices = T::mut_slices_as_refs(slices);
+            let slices = T::slice_ptrs_to_slices_mut(slices);
             Some(slices)
         }
     }
@@ -182,7 +182,7 @@ where
 
         unsafe {
             let slices = self.get_unchecked(slice);
-            T::slices_as_refs(slices)
+            T::slice_ptrs_to_slices(slices)
         }
     }
 
@@ -196,7 +196,7 @@ where
 
         unsafe {
             let slices = self.get_unchecked_mut(slice);
-            T::mut_slices_as_refs(slices)
+            T::slice_ptrs_to_slices_mut(slices)
         }
     }
 
@@ -323,7 +323,7 @@ where
 
         unsafe {
             let slices = self.get_unchecked(slice);
-            T::slices_as_refs(slices)
+            T::slice_ptrs_to_slices(slices)
         }
     }
 
@@ -335,7 +335,7 @@ where
 
         unsafe {
             let slices = self.get_unchecked_mut(slice);
-            T::mut_slices_as_refs(slices)
+            T::slice_ptrs_to_slices_mut(slices)
         }
     }
 

@@ -5,7 +5,7 @@ use core::{
     ops::{Index, IndexMut},
 };
 
-use gpecs_soa::slice::SoaSlice;
+use gpecs_soa::{mem::swap as soa_swap, slice::SoaSlice, traits::Soa};
 
 use crate::{
     algo::{
@@ -13,13 +13,14 @@ use crate::{
         sparse_get_with_key, sparse_index, sparse_index_mut, sparse_swap, sparse_swap_keys,
     },
     assert::{
-        check_equal_key, unwrap_dense_index, unwrap_dense_index_mut, unwrap_dense_key,
-        unwrap_dense_key_mut, unwrap_sparse_item, unwrap_sparse_items_pair_mut,
-        unwrap_value_from_sparse_index,
+        check_dense_index_bounds_failed, check_equal_key, unwrap_dense, unwrap_dense_index,
+        unwrap_dense_index_mut, unwrap_dense_pair, unwrap_sparse_item,
+        unwrap_sparse_items_pair_mut,
     },
     item::SparseItem,
     iter::{Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
+    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueSlices, KeyValueSlicesMut},
 };
 
 pub type SparseView<'a, T> = EpochSparseView<'a, usize, T>;
@@ -27,17 +28,22 @@ pub type SparseView<'a, T> = EpochSparseView<'a, usize, T>;
 pub struct EpochSparseView<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
-    dense: &'a SoaSlice<(K, V)>,
+    dense: &'a SoaSlice<KeyValuePair<K, V>>,
     sparse: &'a [SparseItem<K::Epoch>],
 }
 
 impl<'a, K, V> EpochSparseView<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
-    pub(crate) fn new(dense: &'a SoaSlice<(K, V)>, sparse: &'a [SparseItem<K::Epoch>]) -> Self {
+    pub(crate) fn new(
+        dense: &'a SoaSlice<KeyValuePair<K, V>>,
+        sparse: &'a [SparseItem<K::Epoch>],
+    ) -> Self {
         Self { dense, sparse }
     }
 
@@ -64,26 +70,26 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &'a [V] {
+    pub fn as_slices(&self) -> V::Slices<'_> {
         let Self { dense, .. } = self;
 
-        let (_, values) = dense.as_slices();
+        let KeyValueSlices { values, .. } = dense.as_slices();
         values
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const V {
+    pub fn as_ptrs(&self) -> V::Ptrs {
         let Self { dense, .. } = self;
 
-        let (_, values) = dense.as_ptrs();
-        values
+        let KeyValuePtrs { value, .. } = dense.as_ptrs();
+        value
     }
 
     #[inline]
     pub fn as_keys_slice(&self) -> &'a [K] {
         let Self { dense, .. } = self;
 
-        let (keys, _) = dense.as_slices();
+        let KeyValueSlices { keys, .. } = dense.as_slices();
         keys
     }
 
@@ -91,8 +97,8 @@ where
     pub fn as_keys_ptr(&self) -> *const K {
         let Self { dense, .. } = self;
 
-        let (keys, _) = dense.as_ptrs();
-        keys
+        let KeyValuePtrs { key, .. } = dense.as_ptrs();
+        key
     }
 
     #[inline]
@@ -108,35 +114,43 @@ where
     }
 
     #[inline]
-    pub fn get(&self, key: K) -> Option<&'a V> {
+    pub fn get(&self, key: K) -> Option<V::Refs<'_>> {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_get(dense_keys, dense_values, sparse, key)
+        sparse_get(dense, sparse, key)
     }
 
     #[inline]
-    pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, &'a V)> {
+    pub fn into_get(self, key: K) -> Option<V::Refs<'a>> {
         let Self { dense, sparse } = self;
+        sparse_get(dense, sparse, key)
+    }
 
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_get_with_key(dense_keys, dense_values, sparse, sparse_index)
+    #[inline]
+    pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, V::Refs<'_>)> {
+        let Self { dense, sparse } = self;
+        sparse_get_with_key(dense, sparse, sparse_index)
+    }
+
+    #[inline]
+    pub fn into_get_with_key(self, sparse_index: usize) -> Option<(K, V::Refs<'a>)> {
+        let Self { dense, sparse } = self;
+        sparse_get_with_key(dense, sparse, sparse_index)
     }
 
     #[inline]
     pub fn get_epoch(&self, sparse_index: usize) -> Option<K::Epoch> {
         let Self { dense, sparse } = self;
 
-        let (dense_keys, _) = dense.as_slices();
-        sparse_get_epoch(dense_keys, sparse, sparse_index)
+        let KeyValueSlices { keys, .. } = dense.as_slices();
+        sparse_get_epoch(keys, sparse, sparse_index)
     }
 
     #[inline]
     pub fn contains_key(&self, key: K) -> bool {
         let Self { dense, sparse } = self;
 
-        let (dense_keys, _) = dense.as_slices();
-        sparse_contains_key(dense_keys, sparse, key)
+        let KeyValueSlices { keys, .. } = dense.as_slices();
+        sparse_contains_key(keys, sparse, key)
     }
 
     #[inline]
@@ -158,22 +172,30 @@ where
     }
 
     #[inline]
-    pub fn into_index(self, key: K) -> &'a V
+    pub fn index(&self, key: K) -> V::Refs<'_>
     where
         K: Display,
     {
         let Self { dense, sparse } = self;
+        sparse_index(dense, sparse, key)
+    }
 
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_index(dense_keys, dense_values, sparse, key)
+    #[inline]
+    pub fn into_index(self, key: K) -> V::Refs<'a>
+    where
+        K: Display,
+    {
+        let Self { dense, sparse } = self;
+        sparse_index(dense, sparse, key)
     }
 }
 
 impl<'a, K, V> Debug for EpochSparseView<'a, K, V>
 where
     K: Key,
+    V: Soa,
     K::Epoch: Debug,
-    SoaSlice<(K, V)>: Debug,
+    SoaSlice<KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EpochSparseView")
@@ -186,6 +208,7 @@ where
 impl<K, V> Default for EpochSparseView<'_, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
     fn default() -> Self {
@@ -199,6 +222,7 @@ where
 impl<K, V> Clone for EpochSparseView<'_, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -206,12 +230,18 @@ where
     }
 }
 
-impl<K, V> Copy for EpochSparseView<'_, K, V> where K: Key {}
+impl<K, V> Copy for EpochSparseView<'_, K, V>
+where
+    K: Key,
+    V: Soa,
+{
+}
 
 impl<'a, K, V> PartialEq for EpochSparseView<'a, K, V>
 where
     K: Key,
-    SoaSlice<(K, V)>: PartialEq,
+    V: Soa,
+    SoaSlice<KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.dense == other.dense && self.sparse == other.sparse
@@ -221,14 +251,16 @@ where
 impl<'a, K, V> Eq for EpochSparseView<'a, K, V>
 where
     K: Key,
-    SoaSlice<(K, V)>: Eq,
+    V: Soa,
+    SoaSlice<KeyValuePair<K, V>>: Eq,
 {
 }
 
 impl<'a, K, V> PartialOrd for EpochSparseView<'a, K, V>
 where
     K: Key,
-    SoaSlice<(K, V)>: PartialOrd,
+    V: Soa,
+    SoaSlice<KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.dense.partial_cmp(&other.dense) {
@@ -242,7 +274,8 @@ where
 impl<'a, K, V> Ord for EpochSparseView<'a, K, V>
 where
     K: Key,
-    SoaSlice<(K, V)>: Ord,
+    V: Soa,
+    SoaSlice<KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.dense.cmp(&other.dense) {
@@ -256,8 +289,9 @@ where
 impl<'a, K, V> Hash for EpochSparseView<'a, K, V>
 where
     K: Key,
+    V: Soa,
     K::Epoch: Hash,
-    SoaSlice<(K, V)>: Hash,
+    SoaSlice<KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.dense.hash(state);
@@ -265,34 +299,47 @@ where
     }
 }
 
-impl<K, V> Index<K> for EpochSparseView<'_, K, V>
+impl<T, K, V> Index<K> for EpochSparseView<'_, K, V>
 where
     K: Key + Display,
+    for<'a> V: Soa<Refs<'a> = &'a T> + 'a,
 {
-    type Output = V;
+    type Output = T;
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_index(dense_keys, dense_values, sparse, key)
+        sparse_index(dense, sparse, key)
     }
 }
 
-impl<K, V> AsRef<[V]> for EpochSparseView<'_, K, V>
+impl<T, K, V> AsRef<[T]> for EpochSparseView<'_, K, V>
 where
     K: Key,
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
 {
     #[inline]
-    fn as_ref(&self) -> &[V] {
-        self.as_slice()
+    fn as_ref(&self) -> &[T] {
+        self.as_slices()
+    }
+}
+
+impl<K, V> AsRef<SoaSlice<KeyValuePair<K, V>>> for EpochSparseView<'_, K, V>
+where
+    K: Key,
+    V: Soa,
+{
+    #[inline]
+    fn as_ref(&self) -> &SoaSlice<KeyValuePair<K, V>> {
+        let Self { dense, .. } = self;
+        dense
     }
 }
 
 impl<'a, K, V> AsRef<EpochSparseView<'a, K, V>> for EpochSparseView<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
     fn as_ref(&self) -> &EpochSparseView<'a, K, V> {
@@ -303,8 +350,9 @@ where
 impl<'a, K, V> IntoIterator for &EpochSparseView<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
-    type Item = (&'a K, &'a V);
+    type Item = (&'a K, V::Refs<'a>);
 
     type IntoIter = Iter<'a, K, V>;
 
@@ -317,8 +365,9 @@ where
 impl<'a, K, V> IntoIterator for EpochSparseView<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
-    type Item = (&'a K, &'a V);
+    type Item = (&'a K, V::Refs<'a>);
 
     type IntoIter = Iter<'a, K, V>;
 
@@ -333,18 +382,20 @@ pub type SparseViewMut<'a, T> = EpochSparseViewMut<'a, usize, T>;
 pub struct EpochSparseViewMut<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
-    dense: &'a mut SoaSlice<(K, V)>,
+    dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
     sparse: &'a mut [SparseItem<K::Epoch>],
 }
 
 impl<'a, K, V> EpochSparseViewMut<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
     pub(crate) fn new(
-        dense: &'a mut SoaSlice<(K, V)>,
+        dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
         sparse: &'a mut [SparseItem<K::Epoch>],
     ) -> Self {
         Self { dense, sparse }
@@ -373,50 +424,50 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[V] {
+    pub fn as_slices(&self) -> V::Slices<'_> {
         let Self { dense, .. } = self;
 
-        let (_, values) = dense.as_slices();
+        let KeyValueSlices { values, .. } = dense.as_slices();
         values
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [V] {
+    pub fn as_mut_slices(&mut self) -> V::SlicesMut<'_> {
         let Self { dense, .. } = self;
 
-        let (_, values) = dense.as_mut_slices();
+        let KeyValueSlicesMut { values, .. } = dense.as_mut_slices();
         values
     }
 
     #[inline]
-    pub fn into_slice(self) -> &'a mut [V] {
+    pub fn into_slices(self) -> V::SlicesMut<'a> {
         let Self { dense, .. } = self;
 
-        let (_, values) = dense.as_mut_slices();
+        let KeyValueSlicesMut { values, .. } = dense.as_mut_slices();
         values
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const V {
+    pub fn as_ptrs(&self) -> V::Ptrs {
         let Self { dense, .. } = self;
 
-        let (_, values) = dense.as_ptrs();
-        values
+        let KeyValuePtrs { value, .. } = dense.as_ptrs();
+        value
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut V {
+    pub fn as_mut_ptrs(&mut self) -> V::MutPtrs {
         let Self { dense, .. } = self;
 
-        let (_, values) = dense.as_mut_ptrs();
-        values
+        let KeyValueMutPtrs { value, .. } = dense.as_mut_ptrs();
+        value
     }
 
     #[inline]
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { dense, .. } = self;
 
-        let (keys, _) = dense.as_slices();
+        let KeyValueSlices { keys, .. } = dense.as_slices();
         keys
     }
 
@@ -424,7 +475,7 @@ where
     pub fn into_keys_slice(self) -> &'a [K] {
         let Self { dense, .. } = self;
 
-        let (keys, _) = dense.as_slices();
+        let KeyValueSlices { keys, .. } = dense.as_slices();
         keys
     }
 
@@ -432,8 +483,8 @@ where
     pub fn as_keys_ptr(&self) -> *const K {
         let Self { dense, .. } = self;
 
-        let (keys, _) = dense.as_ptrs();
-        keys
+        let KeyValuePtrs { key, .. } = dense.as_ptrs();
+        key
     }
 
     #[inline]
@@ -458,16 +509,16 @@ where
     pub fn swap(&mut self, first_key: K, second_key: K) {
         let Self { dense, sparse } = self;
 
-        let (_, dense_values) = dense.as_mut_slices();
-        sparse_swap(dense_values, sparse, first_key, second_key)
+        let dense = dense.iter_mut().map(|item| item.value);
+        sparse_swap::<K, V>(dense, sparse, first_key, second_key)
     }
 
     #[inline]
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
         let Self { dense, sparse } = self;
 
-        let (dense_keys, _) = dense.as_mut_slices();
-        sparse_swap_keys(dense_keys, sparse, first_key, second_key)
+        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        sparse_swap_keys(keys, sparse, first_key, second_key)
     }
 
     pub fn invalidate_epoch(&mut self, key: K) -> Option<K> {
@@ -479,8 +530,8 @@ where
             .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = sparse_item.dense_index()?;
 
-        let (dense_keys, _) = dense.as_mut_slices();
-        let dense_key = unwrap_dense_key_mut(dense_keys, dense_index);
+        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        let dense_key = unwrap_dense(keys, dense_index);
         check_equal_key(key, *dense_key);
 
         sparse_item.epoch = sparse_item.epoch.next();
@@ -492,34 +543,44 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        V: Ord,
+        for<'any> V::Refs<'any>: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
+        self.sort_impl(|dense, sparse| {
+            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
+
+            let len = keys.len();
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
-                unwrap_value_from_sparse_index(sparse_index, values, sparse)
+                unsafe_unwrap_dense_from_sparse_index::<V, _>(sparse_index, values, len, sparse)
             })
         });
     }
 
     #[inline]
     pub fn sort_keys(&mut self) {
-        self.sort_impl(|keys, _, _| keys.sort());
+        self.sort_impl(|dense, _| dense.as_mut_slices().keys.sort());
     }
 
     #[inline]
     pub fn sort_by<F>(&mut self, mut f: F)
     where
-        F: FnMut((K, &V), (K, &V)) -> cmp::Ordering,
+        F: FnMut((K, V::Refs<'_>), (K, V::Refs<'_>)) -> cmp::Ordering,
     {
-        self.sort_impl(|keys, values, sparse| {
+        self.sort_impl(|dense, sparse| {
+            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
+
+            let len = keys.len();
             keys.sort_by(|&lhs_key, &rhs_key| {
                 let lhs_index = lhs_key.sparse_index();
-                let lhs_value = unwrap_value_from_sparse_index(lhs_index, values, sparse);
+                let lhs_value =
+                    unsafe_unwrap_dense_from_sparse_index::<V, _>(lhs_index, values, len, sparse);
                 let lhs = (lhs_key, lhs_value);
 
                 let rhs_index = rhs_key.sparse_index();
-                let rhs_value = unwrap_value_from_sparse_index(rhs_index, values, sparse);
+                let rhs_value =
+                    unsafe_unwrap_dense_from_sparse_index::<V, _>(rhs_index, values, len, sparse);
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
@@ -530,13 +591,22 @@ where
     #[inline]
     pub fn sort_by_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, &V)) -> T,
+        F: FnMut((K, V::Refs<'_>)) -> T,
         T: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
+        self.sort_impl(|dense, sparse| {
+            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
+
+            let len = keys.len();
             keys.sort_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
+                let value = unsafe_unwrap_dense_from_sparse_index::<V, _>(
+                    sparse_index,
+                    values,
+                    len,
+                    sparse,
+                );
                 f((key, value))
             })
         });
@@ -545,13 +615,22 @@ where
     #[inline]
     pub fn sort_by_cached_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, &V)) -> T,
+        F: FnMut((K, V::Refs<'_>)) -> T,
         T: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
+        self.sort_impl(|dense, sparse| {
+            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
+
+            let len = keys.len();
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
+                let value = unsafe_unwrap_dense_from_sparse_index::<V, _>(
+                    sparse_index,
+                    values,
+                    len,
+                    sparse,
+                );
                 f((key, value))
             })
         });
@@ -560,34 +639,44 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        V: Ord,
+        for<'any> V::Refs<'any>: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
+        self.sort_impl(|dense, sparse| {
+            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
+
+            let len = keys.len();
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                unwrap_value_from_sparse_index(sparse_index, values, sparse)
+                unsafe_unwrap_dense_from_sparse_index::<V, _>(sparse_index, values, len, sparse)
             })
         });
     }
 
     #[inline]
     pub fn sort_keys_unstable(&mut self) {
-        self.sort_impl(|keys, _, _| keys.sort_unstable());
+        self.sort_impl(|dense, _| dense.as_mut_slices().keys.sort_unstable());
     }
 
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, mut f: F)
     where
-        F: FnMut((K, &V), (K, &V)) -> cmp::Ordering,
+        F: FnMut((K, V::Refs<'_>), (K, V::Refs<'_>)) -> cmp::Ordering,
     {
-        self.sort_impl(|keys, values, sparse| {
+        self.sort_impl(|dense, sparse| {
+            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
+
+            let len = keys.len();
             keys.sort_unstable_by(|&lhs_key, &rhs_key| {
                 let lhs_index = lhs_key.sparse_index();
-                let lhs_value = unwrap_value_from_sparse_index(lhs_index, values, sparse);
+                let lhs_value =
+                    unsafe_unwrap_dense_from_sparse_index::<V, _>(lhs_index, values, len, sparse);
                 let lhs = (lhs_key, lhs_value);
 
                 let rhs_index = rhs_key.sparse_index();
-                let rhs_value = unwrap_value_from_sparse_index(rhs_index, values, sparse);
+                let rhs_value =
+                    unsafe_unwrap_dense_from_sparse_index::<V, _>(rhs_index, values, len, sparse);
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
@@ -598,13 +687,22 @@ where
     #[inline]
     pub fn sort_unstable_by_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, &V)) -> T,
+        F: FnMut((K, V::Refs<'_>)) -> T,
         T: Ord,
     {
-        self.sort_impl(|keys, values, sparse| {
+        self.sort_impl(|dense, sparse| {
+            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
+
+            let len = keys.len();
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unwrap_value_from_sparse_index(sparse_index, values, sparse);
+                let value = unsafe_unwrap_dense_from_sparse_index::<V, _>(
+                    sparse_index,
+                    values,
+                    len,
+                    sparse,
+                );
                 f((key, value))
             })
         });
@@ -615,31 +713,37 @@ where
     // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
     fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
     where
-        SortKeys: FnOnce(&mut [K], &[V], &[SparseItem<K::Epoch>]),
+        SortKeys: FnOnce(&mut SoaSlice<KeyValuePair<K, V>>, &[SparseItem<K::Epoch>]),
     {
         let Self { dense, sparse } = self;
+        sort_keys(dense, sparse);
 
-        let (dense_keys, dense_values) = dense.as_mut_slices();
-        sort_keys(dense_keys, dense_values, sparse);
-
-        for pos in 0..dense_keys.len() {
+        // TODO fix multiple re-borrows somehow (maybe with special iterator type created from slices?)
+        // let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+        for pos in 0..dense.len() {
             let mut curr = pos;
             let mut next = {
-                let sparse_index = unwrap_dense_key(dense_keys, curr).sparse_index();
+                let keys = &*dense.as_mut_slices().keys;
+                let sparse_index = unwrap_dense(keys, curr).sparse_index();
                 let sparse_item = unwrap_sparse_item(sparse, sparse_index);
                 unwrap_dense_index(sparse_item.kind())
             };
 
             while curr != next {
                 let (curr_item, next_item) = {
-                    let first_index = unwrap_dense_key(dense_keys, curr).sparse_index();
-                    let second_index = unwrap_dense_key(dense_keys, next).sparse_index();
+                    let keys = &*dense.as_mut_slices().keys;
+                    let first_index = unwrap_dense(keys, curr).sparse_index();
+                    let second_index = unwrap_dense(keys, next).sparse_index();
                     unwrap_sparse_items_pair_mut(sparse, first_index, second_index)
                 };
                 let curr_dense_index = unwrap_dense_index_mut(curr_item.kind_mut());
                 let next_dense_index = unwrap_dense_index_mut(next_item.kind_mut());
 
-                dense_values.swap(*curr_dense_index, *next_dense_index);
+                if curr_dense_index != next_dense_index {
+                    let (curr_refs, next_refs) =
+                        unwrap_dense_pair(dense.iter_mut(), *curr_dense_index, *next_dense_index);
+                    soa_swap::<V>(curr_refs.value, next_refs.value);
+                }
 
                 *curr_dense_index = curr;
                 curr = next;
@@ -649,75 +753,67 @@ where
     }
 
     #[inline]
-    pub fn get(&self, key: K) -> Option<&V> {
+    pub fn get(&self, key: K) -> Option<V::Refs<'_>> {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_get(dense_keys, dense_values, sparse, key)
+        sparse_get(dense, sparse, key)
     }
 
     #[inline]
-    pub fn into_get(self, key: K) -> Option<&'a V> {
+    pub fn into_get(self, key: K) -> Option<V::Refs<'a>> {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_get(dense_keys, dense_values, sparse, key)
+        sparse_get(dense, sparse, key)
     }
 
     #[inline]
-    pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
+    pub fn get_mut(&mut self, key: K) -> Option<V::RefsMut<'_>> {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_mut_slices();
-        sparse_get_mut(dense_keys, dense_values, sparse, key)
+        sparse_get_mut(dense, sparse, key)
     }
 
     #[inline]
-    pub fn into_get_mut(self, key: K) -> Option<&'a mut V> {
+    pub fn into_get_mut(self, key: K) -> Option<V::RefsMut<'a>> {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_mut_slices();
-        sparse_get_mut(dense_keys, dense_values, sparse, key)
+        sparse_get_mut(dense, sparse, key)
     }
 
     #[inline]
-    pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, &V)> {
+    pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, V::Refs<'_>)> {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_get_with_key(dense_keys, dense_values, sparse, sparse_index)
+        sparse_get_with_key(dense, sparse, sparse_index)
     }
 
     #[inline]
-    pub fn get_mut_with_key(&mut self, sparse_index: usize) -> Option<(K, &mut V)> {
+    pub fn into_get_with_key(self, sparse_index: usize) -> Option<(K, V::Refs<'a>)> {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_mut_slices();
-        sparse_get_mut_with_key(dense_keys, dense_values, sparse, sparse_index)
+        sparse_get_with_key(dense, sparse, sparse_index)
     }
 
     #[inline]
-    pub fn into_get_mut_with_key(self, sparse_index: usize) -> Option<(K, &'a mut V)> {
+    pub fn get_mut_with_key(&mut self, sparse_index: usize) -> Option<(K, V::RefsMut<'_>)> {
         let Self { dense, sparse } = self;
+        sparse_get_mut_with_key(dense, sparse, sparse_index)
+    }
 
-        let (dense_keys, dense_values) = dense.as_mut_slices();
-        sparse_get_mut_with_key(dense_keys, dense_values, sparse, sparse_index)
+    #[inline]
+    pub fn into_get_mut_with_key(self, sparse_index: usize) -> Option<(K, V::RefsMut<'a>)> {
+        let Self { dense, sparse } = self;
+        sparse_get_mut_with_key(dense, sparse, sparse_index)
     }
 
     #[inline]
     pub fn get_epoch(&self, sparse_index: usize) -> Option<K::Epoch> {
         let Self { dense, sparse } = self;
 
-        let (dense_keys, _) = dense.as_slices();
-        sparse_get_epoch(dense_keys, sparse, sparse_index)
+        let KeyValueSlices { keys, .. } = dense.as_slices();
+        sparse_get_epoch(keys, sparse, sparse_index)
     }
 
     #[inline]
     pub fn contains_key(&self, key: K) -> bool {
         let Self { dense, sparse } = self;
 
-        let (dense_keys, _) = dense.as_slices();
-        sparse_contains_key(dense_keys, sparse, key)
+        let KeyValueSlices { keys, .. } = dense.as_slices();
+        sparse_contains_key(keys, sparse, key)
     }
 
     #[inline]
@@ -757,33 +853,48 @@ where
     }
 
     #[inline]
-    pub fn into_index(self, key: K) -> &'a V
+    pub fn index(&self, key: K) -> V::Refs<'_>
     where
         K: Display,
     {
         let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_index(dense_keys, dense_values, sparse, key)
+        sparse_index(dense, sparse, key)
     }
 
     #[inline]
-    pub fn into_index_mut(self, key: K) -> &'a mut V
+    pub fn into_index(self, key: K) -> V::Refs<'a>
     where
         K: Display,
     {
         let Self { dense, sparse } = self;
+        sparse_index(dense, sparse, key)
+    }
 
-        let (dense_keys, dense_values) = dense.as_mut_slices();
-        sparse_index_mut(dense_keys, dense_values, sparse, key)
+    #[inline]
+    pub fn index_mut(&mut self, key: K) -> V::RefsMut<'_>
+    where
+        K: Display,
+    {
+        let Self { dense, sparse } = self;
+        sparse_index_mut(dense, sparse, key)
+    }
+
+    #[inline]
+    pub fn into_index_mut(self, key: K) -> V::RefsMut<'a>
+    where
+        K: Display,
+    {
+        let Self { dense, sparse } = self;
+        sparse_index_mut(dense, sparse, key)
     }
 }
 
 impl<'a, K, V> Debug for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
+    V: Soa,
     K::Epoch: Debug,
-    SoaSlice<(K, V)>: Debug,
+    SoaSlice<KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EpochSparseViewMut")
@@ -796,6 +907,7 @@ where
 impl<K, V> Default for EpochSparseViewMut<'_, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
     fn default() -> Self {
@@ -809,7 +921,8 @@ where
 impl<'a, K, V> PartialEq for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
-    SoaSlice<(K, V)>: PartialEq,
+    V: Soa,
+    SoaSlice<KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.dense == other.dense && self.sparse == other.sparse
@@ -819,14 +932,16 @@ where
 impl<'a, K, V> Eq for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
-    SoaSlice<(K, V)>: Eq,
+    V: Soa,
+    SoaSlice<KeyValuePair<K, V>>: Eq,
 {
 }
 
 impl<'a, K, V> PartialOrd for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
-    SoaSlice<(K, V)>: PartialOrd,
+    V: Soa,
+    SoaSlice<KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.dense.partial_cmp(&other.dense) {
@@ -840,7 +955,8 @@ where
 impl<'a, K, V> Ord for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
-    SoaSlice<(K, V)>: Ord,
+    V: Soa,
+    SoaSlice<KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.dense.cmp(&other.dense) {
@@ -854,8 +970,9 @@ where
 impl<'a, K, V> Hash for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
+    V: Soa,
     K::Epoch: Hash,
-    SoaSlice<(K, V)>: Hash,
+    SoaSlice<KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.dense.hash(state);
@@ -863,57 +980,68 @@ where
     }
 }
 
-impl<K, V> Index<K> for EpochSparseViewMut<'_, K, V>
+impl<T, K, V> Index<K> for EpochSparseViewMut<'_, K, V>
 where
     K: Key + Display,
+    for<'a> V: Soa<Refs<'a> = &'a T> + 'a,
 {
-    type Output = V;
+    type Output = T;
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_slices();
-        sparse_index(dense_keys, dense_values, sparse, key)
+        EpochSparseViewMut::index(self, key)
     }
 }
 
-impl<K, V> IndexMut<K> for EpochSparseViewMut<'_, K, V>
+impl<T, K, V> IndexMut<K> for EpochSparseViewMut<'_, K, V>
 where
     K: Key + Display,
+    for<'a> V: Soa<Refs<'a> = &'a T, RefsMut<'a> = &'a mut T> + 'a,
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        let Self { dense, sparse } = self;
-
-        let (dense_keys, dense_values) = dense.as_mut_slices();
-        sparse_index_mut(dense_keys, dense_values, sparse, key)
+        self.index_mut(key)
     }
 }
 
-impl<K, V> AsRef<[V]> for EpochSparseViewMut<'_, K, V>
+impl<T, K, V> AsRef<[T]> for EpochSparseViewMut<'_, K, V>
 where
     K: Key,
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
 {
     #[inline]
-    fn as_ref(&self) -> &[V] {
-        self.as_slice()
+    fn as_ref(&self) -> &[T] {
+        self.as_slices()
     }
 }
 
-impl<K, V> AsMut<[V]> for EpochSparseViewMut<'_, K, V>
+impl<K, V> AsRef<SoaSlice<KeyValuePair<K, V>>> for EpochSparseViewMut<'_, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [V] {
-        self.as_mut_slice()
+    fn as_ref(&self) -> &SoaSlice<KeyValuePair<K, V>> {
+        let Self { dense, .. } = self;
+        dense
+    }
+}
+
+impl<T, K, V> AsMut<[T]> for EpochSparseViewMut<'_, K, V>
+where
+    K: Key,
+    for<'a> V: Soa<SlicesMut<'a> = &'a mut [T]> + 'a,
+{
+    #[inline]
+    fn as_mut(&mut self) -> &mut [T] {
+        self.as_mut_slices()
     }
 }
 
 impl<'a, K, V> AsRef<EpochSparseViewMut<'a, K, V>> for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
     fn as_ref(&self) -> &EpochSparseViewMut<'a, K, V> {
@@ -924,6 +1052,7 @@ where
 impl<'a, K, V> AsMut<EpochSparseViewMut<'a, K, V>> for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut EpochSparseViewMut<'a, K, V> {
@@ -934,8 +1063,9 @@ where
 impl<'a, K, V> IntoIterator for &'a EpochSparseViewMut<'_, K, V>
 where
     K: Key,
+    V: Soa,
 {
-    type Item = (&'a K, &'a V);
+    type Item = (&'a K, V::Refs<'a>);
 
     type IntoIter = Iter<'a, K, V>;
 
@@ -948,8 +1078,9 @@ where
 impl<'a, K, V> IntoIterator for &'a mut EpochSparseViewMut<'_, K, V>
 where
     K: Key,
+    V: Soa,
 {
-    type Item = (&'a K, &'a mut V);
+    type Item = (&'a K, V::RefsMut<'a>);
 
     type IntoIter = IterMut<'a, K, V>;
 
@@ -962,8 +1093,9 @@ where
 impl<'a, K, V> IntoIterator for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
-    type Item = (&'a K, &'a mut V);
+    type Item = (&'a K, V::RefsMut<'a>);
 
     type IntoIter = IterMut<'a, K, V>;
 
@@ -977,10 +1109,36 @@ where
 impl<'a, K, V> From<EpochSparseViewMut<'a, K, V>> for EpochSparseView<'a, K, V>
 where
     K: Key,
+    V: Soa,
 {
     #[inline]
     fn from(value: EpochSparseViewMut<'a, K, V>) -> Self {
         let EpochSparseViewMut { dense, sparse } = value;
         Self::new(dense, sparse)
+    }
+}
+
+// TODO replace with safe variant
+#[inline]
+#[track_caller]
+pub fn unsafe_unwrap_dense_from_sparse_index<'a, T, E>(
+    sparse_index: usize,
+    dense: T::Ptrs,
+    dense_len: usize,
+    sparse: &[SparseItem<E>],
+) -> T::Refs<'a>
+where
+    T: Soa,
+{
+    let sparse_item = unwrap_sparse_item(sparse, sparse_index);
+    let dense_index = unwrap_dense_index(&sparse_item.kind);
+    if dense_index >= dense_len {
+        check_dense_index_bounds_failed()
+    }
+
+    #[allow(unsafe_code)]
+    unsafe {
+        let ptrs = T::ptrs_add(dense, dense_index);
+        T::ptrs_to_refs(ptrs)
     }
 }

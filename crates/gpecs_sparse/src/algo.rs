@@ -1,12 +1,12 @@
 use core::{fmt::Display, mem::swap, ops};
 
+use gpecs_soa::{mem::swap as soa_swap, slice::SoaSlice, Soa};
+
 use crate::{
-    assert::{
-        check_dense_index_bounds, check_equal_key, unwrap_dense_key, unwrap_dense_value,
-        unwrap_dense_value_mut, unwrap_dense_value_pair_mut,
-    },
+    assert::{check_dense_index_bounds, check_equal_key, unwrap_dense, unwrap_dense_pair},
     item::{SparseItem, SparseItemKind},
     key::Key,
+    pair::KeyValuePair,
 };
 
 // https://stackoverflow.com/a/73428605/14928295
@@ -58,13 +58,14 @@ pub fn get_pair<T>(iter: impl IntoIterator<Item = T>, a: usize, b: usize) -> Opt
     Some(pair)
 }
 
-pub fn sparse_swap<K, V>(
-    dense: &mut [V],
+pub fn sparse_swap<'a, K, V>(
+    dense: impl IntoIterator<Item = V::RefsMut<'a>>,
     sparse: &mut [SparseItem<K::Epoch>],
     first_key: K,
     second_key: K,
 ) where
     K: Key,
+    V: Soa + 'a,
 {
     let first_index = first_key.sparse_index();
     let second_index = second_key.sparse_index();
@@ -87,8 +88,8 @@ pub fn sparse_swap<K, V>(
         return;
     };
 
-    let (first_value, second_value) = unwrap_dense_value_pair_mut(dense, first_index, second_index);
-    swap(first_value, second_value);
+    let (first_value, second_value) = unwrap_dense_pair(dense, first_index, second_index);
+    soa_swap::<V>(first_value, second_value);
 }
 
 pub fn sparse_swap_keys<K>(
@@ -118,19 +119,19 @@ pub fn sparse_swap_keys<K>(
         return;
     };
 
-    let (first_key, second_key) = unwrap_dense_value_pair_mut(dense, first_index, second_index);
+    let (first_key, second_key) = unwrap_dense_pair(dense, first_index, second_index);
     swap(first_item, second_item);
     swap(first_key, second_key);
 }
 
 pub fn sparse_get<'a, K, V>(
-    dense_keys: &[K],
-    dense_values: &'a [V],
+    dense: &'a SoaSlice<KeyValuePair<K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     key: K,
-) -> Option<&'a V>
+) -> Option<V::Refs<'a>>
 where
     K: Key,
+    V: Soa,
 {
     let sparse_index = key.sparse_index();
     let sparse_item = sparse
@@ -138,9 +139,8 @@ where
         .take_if(|item| item.epoch == key.epoch())?;
     let dense_index = sparse_item.dense_index()?;
 
-    let value = unwrap_dense_value(dense_values, dense_index);
-    let dense_key = unwrap_dense_key(dense_keys, dense_index);
-    check_equal_key(key, *dense_key);
+    let (&dense_key, value) = unwrap_dense(dense, dense_index).into();
+    check_equal_key(key, dense_key);
 
     Some(value)
 }
@@ -158,28 +158,28 @@ where
 #[inline]
 #[track_caller]
 pub fn sparse_index<'a, K, V>(
-    dense_keys: &[K],
-    dense_values: &'a [V],
+    dense: &'a SoaSlice<KeyValuePair<K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     key: K,
-) -> &'a V
+) -> V::Refs<'a>
 where
     K: Key + Display,
+    V: Soa,
 {
-    match sparse_get(dense_keys, dense_values, sparse, key) {
+    match sparse_get(dense, sparse, key) {
         Some(value) => value,
         None => sparse_index_failed(&key),
     }
 }
 
 pub fn sparse_get_mut<'a, K, V>(
-    dense_keys: &[K],
-    dense_values: &'a mut [V],
+    dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     key: K,
-) -> Option<&'a mut V>
+) -> Option<V::RefsMut<'a>>
 where
     K: Key,
+    V: Soa,
 {
     let sparse_index = key.sparse_index();
     let sparse_item = sparse
@@ -187,9 +187,8 @@ where
         .take_if(|item| item.epoch == key.epoch())?;
     let dense_index = sparse_item.dense_index()?;
 
-    let value = unwrap_dense_value_mut(dense_values, dense_index);
-    let dense_key = unwrap_dense_key(dense_keys, dense_index);
-    check_equal_key(key, *dense_key);
+    let (&mut dense_key, value) = unwrap_dense(dense, dense_index).into();
+    check_equal_key(key, dense_key);
 
     Some(value)
 }
@@ -197,53 +196,51 @@ where
 #[inline]
 #[track_caller]
 pub fn sparse_index_mut<'a, K, V>(
-    dense_keys: &[K],
-    dense_values: &'a mut [V],
+    dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     key: K,
-) -> &'a mut V
+) -> V::RefsMut<'a>
 where
     K: Key + Display,
+    V: Soa,
 {
-    match sparse_get_mut(dense_keys, dense_values, sparse, key) {
+    match sparse_get_mut(dense, sparse, key) {
         Some(value) => value,
         None => sparse_index_failed(&key),
     }
 }
 
 pub fn sparse_get_with_key<'a, K, V>(
-    dense_keys: &[K],
-    dense_values: &'a [V],
+    dense: &'a SoaSlice<KeyValuePair<K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     sparse_index: usize,
-) -> Option<(K, &'a V)>
+) -> Option<(K, V::Refs<'a>)>
 where
     K: Key,
+    V: Soa,
 {
     let sparse_item = sparse.get(sparse_index)?;
     let dense_index = sparse_item.dense_index()?;
 
-    let value = unwrap_dense_value(dense_values, dense_index);
-    let key = *unwrap_dense_key(dense_keys, dense_index);
+    let (&key, value) = unwrap_dense(dense, dense_index).into();
     check_equal_key(key, K::new(sparse_index, sparse_item.epoch));
 
     Some((key, value))
 }
 
 pub fn sparse_get_mut_with_key<'a, K, V>(
-    dense_keys: &[K],
-    dense_values: &'a mut [V],
+    dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     sparse_index: usize,
-) -> Option<(K, &'a mut V)>
+) -> Option<(K, V::RefsMut<'a>)>
 where
     K: Key,
+    V: Soa,
 {
     let sparse_item = sparse.get(sparse_index)?;
     let dense_index = sparse_item.dense_index()?;
 
-    let value = unwrap_dense_value_mut(dense_values, dense_index);
-    let key = *unwrap_dense_key(dense_keys, dense_index);
+    let (&mut key, value) = unwrap_dense(dense, dense_index).into();
     check_equal_key(key, K::new(sparse_index, sparse_item.epoch));
 
     Some((key, value))
@@ -260,7 +257,7 @@ where
     let sparse_item = sparse.get(sparse_index)?;
     let epoch = sparse_item.epoch;
     if let Some(dense_index) = sparse_item.dense_index() {
-        let key = *unwrap_dense_key(dense_keys, dense_index);
+        let key = *unwrap_dense(dense_keys, dense_index);
         check_equal_key(key, K::new(sparse_index, epoch));
     }
 

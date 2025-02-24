@@ -3,16 +3,24 @@ use core::{
     iter::FusedIterator,
 };
 
-use gpecs_soa::{slice, vec};
+use gpecs_soa::{slice, traits::Soa, vec};
+
+use crate::pair::{KeyValuePair, KeyValueRefs, KeyValueRefsMut, KeyValueSlices, KeyValueSlicesMut};
 
 #[repr(transparent)]
-pub struct Keys<'a, K, V> {
-    inner: slice::Iter<'a, (K, V)>,
+pub struct Keys<'a, K, V>
+where
+    V: Soa,
+{
+    inner: slice::Iter<'a, KeyValuePair<K, V>>,
 }
 
-impl<'a, K, V> Keys<'a, K, V> {
+impl<'a, K, V> Keys<'a, K, V>
+where
+    V: Soa,
+{
     #[inline]
-    pub(crate) fn new(inner: slice::Iter<'a, (K, V)>) -> Self {
+    pub(crate) fn new(inner: slice::Iter<'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -20,7 +28,7 @@ impl<'a, K, V> Keys<'a, K, V> {
     pub fn as_slice(&self) -> &'a [K] {
         let Self { inner } = self;
 
-        let (keys, _) = inner.as_slices();
+        let KeyValueSlices { keys, .. } = inner.as_slices();
         keys
     }
 }
@@ -28,6 +36,7 @@ impl<'a, K, V> Keys<'a, K, V> {
 impl<K, V> Debug for Keys<'_, K, V>
 where
     K: Debug,
+    V: Soa,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice();
@@ -35,7 +44,10 @@ where
     }
 }
 
-impl<K, V> Default for Keys<'_, K, V> {
+impl<K, V> Default for Keys<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn default() -> Self {
         Self {
@@ -44,7 +56,10 @@ impl<K, V> Default for Keys<'_, K, V> {
     }
 }
 
-impl<K, V> Clone for Keys<'_, K, V> {
+impl<K, V> Clone for Keys<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -53,20 +68,26 @@ impl<K, V> Clone for Keys<'_, K, V> {
     }
 }
 
-impl<K, V> AsRef<[K]> for Keys<'_, K, V> {
+impl<K, V> AsRef<[K]> for Keys<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn as_ref(&self) -> &[K] {
         self.as_slice()
     }
 }
 
-impl<'a, K, V> Iterator for Keys<'a, K, V> {
+impl<'a, K, V> Iterator for Keys<'a, K, V>
+where
+    V: Soa,
+{
     type Item = &'a K;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(key, _)| key)
+        inner.next().map(|KeyValueRefs { key, .. }| key)
     }
 
     #[inline]
@@ -90,13 +111,13 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|(key, _)| key)
+        inner.last().map(|KeyValueRefs { key, .. }| key)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(key, _)| key)
+        inner.nth(n).map(|KeyValueRefs { key, .. }| key)
     }
 
     #[inline]
@@ -106,7 +127,7 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|(key, _)| f(key))
+        inner.for_each(|KeyValueRefs { key, .. }| f(key))
     }
 
     #[inline]
@@ -116,7 +137,7 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, (key, _)| f(acc, key))
+        inner.fold(init, |acc, KeyValueRefs { key, .. }| f(acc, key))
     }
 
     #[inline]
@@ -126,7 +147,7 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.all(|(key, _)| f(key))
+        inner.all(|KeyValueRefs { key, .. }| f(key))
     }
 
     #[inline]
@@ -136,7 +157,7 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.any(|(key, _)| f(key))
+        inner.any(|KeyValueRefs { key, .. }| f(key))
     }
 
     #[inline]
@@ -146,7 +167,9 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         P: FnMut(&Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.find(|(key, _)| predicate(key)).map(|(key, _)| key)
+        inner
+            .find(|KeyValueRefs { key, .. }| predicate(key))
+            .map(|KeyValueRefs { key, .. }| key)
     }
 
     #[inline]
@@ -156,7 +179,7 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         F: FnMut(Self::Item) -> Option<B>,
     {
         let Self { inner } = self;
-        inner.find_map(|(key, _)| f(key))
+        inner.find_map(|KeyValueRefs { key, .. }| f(key))
     }
 
     #[inline]
@@ -166,7 +189,7 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.position(|(key, _)| predicate(key))
+        inner.position(|KeyValueRefs { key, .. }| predicate(key))
     }
 
     #[inline]
@@ -176,25 +199,31 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.rposition(|(key, _)| predicate(key))
+        inner.rposition(|KeyValueRefs { key, .. }| predicate(key))
     }
 }
 
-impl<K, V> DoubleEndedIterator for Keys<'_, K, V> {
+impl<K, V> DoubleEndedIterator for Keys<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(key, _)| key)
+        inner.next_back().map(|KeyValueRefs { key, .. }| key)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(key, _)| key)
+        inner.nth_back(n).map(|KeyValueRefs { key, .. }| key)
     }
 }
 
-impl<K, V> ExactSizeIterator for Keys<'_, K, V> {
+impl<K, V> ExactSizeIterator for Keys<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -202,16 +231,22 @@ impl<K, V> ExactSizeIterator for Keys<'_, K, V> {
     }
 }
 
-impl<K, V> FusedIterator for Keys<'_, K, V> {}
+impl<K, V> FusedIterator for Keys<'_, K, V> where V: Soa {}
 
 #[repr(transparent)]
-pub struct IntoKeys<K, V> {
-    inner: vec::IntoIter<(K, V)>,
+pub struct IntoKeys<K, V>
+where
+    V: Soa,
+{
+    inner: vec::IntoIter<KeyValuePair<K, V>>,
 }
 
-impl<K, V> IntoKeys<K, V> {
+impl<K, V> IntoKeys<K, V>
+where
+    V: Soa,
+{
     #[inline]
-    pub(crate) fn new(inner: vec::IntoIter<(K, V)>) -> Self {
+    pub(crate) fn new(inner: vec::IntoIter<KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -219,7 +254,7 @@ impl<K, V> IntoKeys<K, V> {
     pub fn as_slice(&self) -> &[K] {
         let Self { inner } = self;
 
-        let (keys, _) = inner.as_slices();
+        let KeyValueSlices { keys, .. } = inner.as_slices();
         keys
     }
 
@@ -227,7 +262,7 @@ impl<K, V> IntoKeys<K, V> {
     pub fn as_mut_slice(&mut self) -> &mut [K] {
         let Self { inner } = self;
 
-        let (keys, _) = inner.as_mut_slices();
+        let KeyValueSlicesMut { keys, .. } = inner.as_mut_slices();
         keys
     }
 }
@@ -235,6 +270,7 @@ impl<K, V> IntoKeys<K, V> {
 impl<K, V> Debug for IntoKeys<K, V>
 where
     K: Debug,
+    V: Soa,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice();
@@ -242,7 +278,10 @@ where
     }
 }
 
-impl<K, V> Default for IntoKeys<K, V> {
+impl<K, V> Default for IntoKeys<K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn default() -> Self {
         Self {
@@ -253,7 +292,8 @@ impl<K, V> Default for IntoKeys<K, V> {
 
 impl<K, V> Clone for IntoKeys<K, V>
 where
-    vec::IntoIter<(K, V)>: Clone,
+    V: Soa,
+    vec::IntoIter<KeyValuePair<K, V>>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -263,27 +303,36 @@ where
     }
 }
 
-impl<K, V> AsRef<[K]> for IntoKeys<K, V> {
+impl<K, V> AsRef<[K]> for IntoKeys<K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn as_ref(&self) -> &[K] {
         self.as_slice()
     }
 }
 
-impl<K, V> AsMut<[K]> for IntoKeys<K, V> {
+impl<K, V> AsMut<[K]> for IntoKeys<K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn as_mut(&mut self) -> &mut [K] {
         self.as_mut_slice()
     }
 }
 
-impl<K, V> Iterator for IntoKeys<K, V> {
+impl<K, V> Iterator for IntoKeys<K, V>
+where
+    V: Soa,
+{
     type Item = K;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(key, _)| key)
+        inner.next().map(|KeyValuePair { key, .. }| key)
     }
 
     #[inline]
@@ -308,50 +357,63 @@ impl<K, V> Iterator for IntoKeys<K, V> {
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, (key, _)| f(acc, key))
+        inner.fold(init, |acc, KeyValuePair { key, .. }| f(acc, key))
     }
 }
 
-impl<K, V> DoubleEndedIterator for IntoKeys<K, V> {
+impl<K, V> DoubleEndedIterator for IntoKeys<K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(key, _)| key)
+        inner.next_back().map(|KeyValuePair { key, .. }| key)
     }
 }
 
-impl<K, V> ExactSizeIterator for IntoKeys<K, V> {
+impl<K, V> ExactSizeIterator for IntoKeys<K, V>
+where
+    V: Soa,
+{
     fn len(&self) -> usize {
         let Self { inner } = self;
         inner.len()
     }
 }
 
-impl<K, V> FusedIterator for IntoKeys<K, V> {}
+impl<K, V> FusedIterator for IntoKeys<K, V> where V: Soa {}
 
 #[repr(transparent)]
-pub struct Values<'a, K, V> {
-    inner: slice::Iter<'a, (K, V)>,
+pub struct Values<'a, K, V>
+where
+    V: Soa,
+{
+    inner: slice::Iter<'a, KeyValuePair<K, V>>,
 }
 
-impl<'a, K, V> Values<'a, K, V> {
+impl<'a, K, V> Values<'a, K, V>
+where
+    V: Soa,
+{
     #[inline]
-    pub(crate) fn new(inner: slice::Iter<'a, (K, V)>) -> Self {
+    pub(crate) fn new(inner: slice::Iter<'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &'a [V] {
+    pub fn as_slice(&self) -> V::Slices<'a> {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices();
+        let KeyValueSlices { values, .. } = inner.as_slices();
         values
     }
 }
 
 impl<K, V> Debug for Values<'_, K, V>
 where
-    V: Debug,
+    V: Soa,
+    for<'a> V::Slices<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
@@ -359,7 +421,10 @@ where
     }
 }
 
-impl<K, V> Default for Values<'_, K, V> {
+impl<K, V> Default for Values<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn default() -> Self {
         Self {
@@ -368,7 +433,10 @@ impl<K, V> Default for Values<'_, K, V> {
     }
 }
 
-impl<K, V> Clone for Values<'_, K, V> {
+impl<K, V> Clone for Values<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -377,20 +445,26 @@ impl<K, V> Clone for Values<'_, K, V> {
     }
 }
 
-impl<K, V> AsRef<[V]> for Values<'_, K, V> {
+impl<T, K, V> AsRef<[T]> for Values<'_, K, V>
+where
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+{
     #[inline]
-    fn as_ref(&self) -> &[V] {
+    fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<'a, K, V> Iterator for Values<'a, K, V> {
-    type Item = &'a V;
+impl<'a, K, V> Iterator for Values<'a, K, V>
+where
+    V: Soa,
+{
+    type Item = V::Refs<'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(_, value)| value)
+        inner.next().map(|KeyValueRefs { value, .. }| value)
     }
 
     #[inline]
@@ -414,13 +488,13 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|(_, value)| value)
+        inner.last().map(|KeyValueRefs { value, .. }| value)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(_, value)| value)
+        inner.nth(n).map(|KeyValueRefs { value, .. }| value)
     }
 
     #[inline]
@@ -430,7 +504,7 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|(_, value)| f(value))
+        inner.for_each(|KeyValueRefs { value, .. }| f(value))
     }
 
     #[inline]
@@ -440,7 +514,7 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, (_, value)| f(acc, value))
+        inner.fold(init, |acc, KeyValueRefs { value, .. }| f(acc, value))
     }
 
     #[inline]
@@ -450,7 +524,7 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.all(|(_, value)| f(value))
+        inner.all(|KeyValueRefs { value, .. }| f(value))
     }
 
     #[inline]
@@ -460,7 +534,7 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.any(|(_, value)| f(value))
+        inner.any(|KeyValueRefs { value, .. }| f(value))
     }
 
     #[inline]
@@ -471,8 +545,8 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
     {
         let Self { inner } = self;
         inner
-            .find(|(_, value)| predicate(value))
-            .map(|(_, value)| value)
+            .find(|KeyValueRefs { value, .. }| predicate(value))
+            .map(|KeyValueRefs { value, .. }| value)
     }
 
     #[inline]
@@ -482,7 +556,7 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         F: FnMut(Self::Item) -> Option<B>,
     {
         let Self { inner } = self;
-        inner.find_map(|(_, value)| f(value))
+        inner.find_map(|KeyValueRefs { value, .. }| f(value))
     }
 
     #[inline]
@@ -492,7 +566,7 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.position(|(_, value)| predicate(value))
+        inner.position(|KeyValueRefs { value, .. }| predicate(value))
     }
 
     #[inline]
@@ -502,25 +576,31 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.rposition(|(_, value)| predicate(value))
+        inner.rposition(|KeyValueRefs { value, .. }| predicate(value))
     }
 }
 
-impl<K, V> DoubleEndedIterator for Values<'_, K, V> {
+impl<K, V> DoubleEndedIterator for Values<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(_, value)| value)
+        inner.next_back().map(|KeyValueRefs { value, .. }| value)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(_, value)| value)
+        inner.nth_back(n).map(|KeyValueRefs { value, .. }| value)
     }
 }
 
-impl<K, V> ExactSizeIterator for Values<'_, K, V> {
+impl<K, V> ExactSizeIterator for Values<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -528,39 +608,46 @@ impl<K, V> ExactSizeIterator for Values<'_, K, V> {
     }
 }
 
-impl<K, V> FusedIterator for Values<'_, K, V> {}
+impl<K, V> FusedIterator for Values<'_, K, V> where V: Soa {}
 
 #[repr(transparent)]
-pub struct ValuesMut<'a, K, V> {
-    inner: slice::IterMut<'a, (K, V)>,
+pub struct ValuesMut<'a, K, V>
+where
+    V: Soa,
+{
+    inner: slice::IterMut<'a, KeyValuePair<K, V>>,
 }
 
-impl<'a, K, V> ValuesMut<'a, K, V> {
+impl<'a, K, V> ValuesMut<'a, K, V>
+where
+    V: Soa,
+{
     #[inline]
-    pub(crate) fn new(inner: slice::IterMut<'a, (K, V)>) -> Self {
+    pub(crate) fn new(inner: slice::IterMut<'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub fn into_slice(self) -> &'a [V] {
+    pub fn into_slice(self) -> V::SlicesMut<'a> {
         let Self { inner } = self;
 
-        let (_, values) = inner.into_slices();
+        let KeyValueSlicesMut { values, .. } = inner.into_slices();
         values
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[V] {
+    pub fn as_slice(&self) -> V::Slices<'_> {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices();
+        let KeyValueSlices { values, .. } = inner.as_slices();
         values
     }
 }
 
 impl<K, V> Debug for ValuesMut<'_, K, V>
 where
-    V: Debug,
+    V: Soa,
+    for<'a> V::Slices<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
@@ -568,7 +655,10 @@ where
     }
 }
 
-impl<K, V> Default for ValuesMut<'_, K, V> {
+impl<K, V> Default for ValuesMut<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn default() -> Self {
         Self {
@@ -577,20 +667,26 @@ impl<K, V> Default for ValuesMut<'_, K, V> {
     }
 }
 
-impl<K, V> AsRef<[V]> for ValuesMut<'_, K, V> {
+impl<T, K, V> AsRef<[T]> for ValuesMut<'_, K, V>
+where
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+{
     #[inline]
-    fn as_ref(&self) -> &[V] {
+    fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
-    type Item = &'a mut V;
+impl<'a, K, V> Iterator for ValuesMut<'a, K, V>
+where
+    V: Soa,
+{
+    type Item = V::RefsMut<'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(_, value)| value)
+        inner.next().map(|KeyValueRefsMut { value, .. }| value)
     }
 
     #[inline]
@@ -614,13 +710,13 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|(_, value)| value)
+        inner.last().map(|KeyValueRefsMut { value, .. }| value)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(_, value)| value)
+        inner.nth(n).map(|KeyValueRefsMut { value, .. }| value)
     }
 
     #[inline]
@@ -630,7 +726,7 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|(_, value)| f(value))
+        inner.for_each(|KeyValueRefsMut { value, .. }| f(value))
     }
 
     #[inline]
@@ -640,7 +736,7 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, (_, value)| f(acc, value))
+        inner.fold(init, |acc, KeyValueRefsMut { value, .. }| f(acc, value))
     }
 
     #[inline]
@@ -650,7 +746,7 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.all(|(_, value)| f(value))
+        inner.all(|KeyValueRefsMut { value, .. }| f(value))
     }
 
     #[inline]
@@ -660,7 +756,7 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.any(|(_, value)| f(value))
+        inner.any(|KeyValueRefsMut { value, .. }| f(value))
     }
 
     #[inline]
@@ -671,8 +767,8 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
     {
         let Self { inner } = self;
         inner
-            .find(|(_, value)| predicate(value))
-            .map(|(_, value)| value)
+            .find(|KeyValueRefsMut { value, .. }| predicate(value))
+            .map(|KeyValueRefsMut { value, .. }| value)
     }
 
     #[inline]
@@ -682,7 +778,7 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
         F: FnMut(Self::Item) -> Option<B>,
     {
         let Self { inner } = self;
-        inner.find_map(|(_, value)| f(value))
+        inner.find_map(|KeyValueRefsMut { value, .. }| f(value))
     }
 
     #[inline]
@@ -692,7 +788,7 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.position(|(_, value)| predicate(value))
+        inner.position(|KeyValueRefsMut { value, .. }| predicate(value))
     }
 
     #[inline]
@@ -702,25 +798,31 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.rposition(|(_, value)| predicate(value))
+        inner.rposition(|KeyValueRefsMut { value, .. }| predicate(value))
     }
 }
 
-impl<K, V> DoubleEndedIterator for ValuesMut<'_, K, V> {
+impl<K, V> DoubleEndedIterator for ValuesMut<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(_, value)| value)
+        inner.next_back().map(|KeyValueRefsMut { value, .. }| value)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(_, value)| value)
+        inner.nth_back(n).map(|KeyValueRefsMut { value, .. }| value)
     }
 }
 
-impl<K, V> ExactSizeIterator for ValuesMut<'_, K, V> {
+impl<K, V> ExactSizeIterator for ValuesMut<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -728,39 +830,46 @@ impl<K, V> ExactSizeIterator for ValuesMut<'_, K, V> {
     }
 }
 
-impl<K, V> FusedIterator for ValuesMut<'_, K, V> {}
+impl<K, V> FusedIterator for ValuesMut<'_, K, V> where V: Soa {}
 
 #[repr(transparent)]
-pub struct IntoValues<K, V> {
-    inner: vec::IntoIter<(K, V)>,
+pub struct IntoValues<K, V>
+where
+    V: Soa,
+{
+    inner: vec::IntoIter<KeyValuePair<K, V>>,
 }
 
-impl<K, V> IntoValues<K, V> {
+impl<K, V> IntoValues<K, V>
+where
+    V: Soa,
+{
     #[inline]
-    pub(crate) fn new(inner: vec::IntoIter<(K, V)>) -> Self {
+    pub(crate) fn new(inner: vec::IntoIter<KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[V] {
+    pub fn as_slice(&self) -> V::Slices<'_> {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices();
+        let KeyValueSlices { values, .. } = inner.as_slices();
         values
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [V] {
+    pub fn as_mut_slice(&mut self) -> V::SlicesMut<'_> {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_mut_slices();
+        let KeyValueSlicesMut { values, .. } = inner.as_mut_slices();
         values
     }
 }
 
 impl<K, V> Debug for IntoValues<K, V>
 where
-    V: Debug,
+    V: Soa,
+    for<'a> V::Slices<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
@@ -768,7 +877,10 @@ where
     }
 }
 
-impl<K, V> Default for IntoValues<K, V> {
+impl<K, V> Default for IntoValues<K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn default() -> Self {
         Self {
@@ -779,7 +891,8 @@ impl<K, V> Default for IntoValues<K, V> {
 
 impl<K, V> Clone for IntoValues<K, V>
 where
-    vec::IntoIter<(K, V)>: Clone,
+    V: Soa,
+    vec::IntoIter<KeyValuePair<K, V>>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -789,27 +902,36 @@ where
     }
 }
 
-impl<K, V> AsRef<[V]> for IntoValues<K, V> {
+impl<T, K, V> AsRef<[T]> for IntoValues<K, V>
+where
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+{
     #[inline]
-    fn as_ref(&self) -> &[V] {
+    fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<K, V> AsMut<[V]> for IntoValues<K, V> {
+impl<T, K, V> AsMut<[T]> for IntoValues<K, V>
+where
+    for<'a> V: Soa<SlicesMut<'a> = &'a mut [T]> + 'a,
+{
     #[inline]
-    fn as_mut(&mut self) -> &mut [V] {
+    fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<K, V> Iterator for IntoValues<K, V> {
+impl<K, V> Iterator for IntoValues<K, V>
+where
+    V: Soa,
+{
     type Item = V;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(_, value)| value)
+        inner.next().map(|KeyValuePair { value, .. }| value)
     }
 
     #[inline]
@@ -834,34 +956,46 @@ impl<K, V> Iterator for IntoValues<K, V> {
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, (_, value)| f(acc, value))
+        inner.fold(init, |acc, KeyValuePair { value, .. }| f(acc, value))
     }
 }
 
-impl<K, V> DoubleEndedIterator for IntoValues<K, V> {
+impl<K, V> DoubleEndedIterator for IntoValues<K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(_, value)| value)
+        inner.next_back().map(|KeyValuePair { value, .. }| value)
     }
 }
 
-impl<K, V> ExactSizeIterator for IntoValues<K, V> {
+impl<K, V> ExactSizeIterator for IntoValues<K, V>
+where
+    V: Soa,
+{
     fn len(&self) -> usize {
         let Self { inner } = self;
         inner.len()
     }
 }
 
-impl<K, V> FusedIterator for IntoValues<K, V> {}
+impl<K, V> FusedIterator for IntoValues<K, V> where V: Soa {}
 
-pub struct Iter<'a, K, V> {
-    inner: slice::Iter<'a, (K, V)>,
+pub struct Iter<'a, K, V>
+where
+    V: Soa,
+{
+    inner: slice::Iter<'a, KeyValuePair<K, V>>,
 }
 
-impl<'a, K, V> Iter<'a, K, V> {
+impl<'a, K, V> Iter<'a, K, V>
+where
+    V: Soa,
+{
     #[inline]
-    pub(crate) fn new(inner: slice::Iter<'a, (K, V)>) -> Self {
+    pub(crate) fn new(inner: slice::Iter<'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -869,34 +1003,35 @@ impl<'a, K, V> Iter<'a, K, V> {
     pub fn as_keys_slice(&self) -> &'a [K] {
         let Self { inner } = self;
 
-        let (keys, _) = inner.as_slices();
+        let KeyValueSlices { keys, .. } = inner.as_slices();
         keys
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> &'a [V] {
+    pub fn as_values_slice(&self) -> V::Slices<'a> {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices();
+        let KeyValueSlices { values, .. } = inner.as_slices();
         values
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&'a [K], &'a [V]) {
+    pub fn as_slices(&self) -> (&'a [K], V::Slices<'a>) {
         let Self { inner } = self;
-        inner.as_slices()
+
+        let KeyValueSlices { keys, values } = inner.as_slices();
+        (keys, values)
     }
 }
 
 impl<K, V> Debug for Iter<'_, K, V>
 where
     K: Debug,
-    V: Debug,
+    V: Soa,
+    for<'a> V::Slices<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner } = self;
-
-        let (keys, values) = inner.as_slices();
+        let (keys, values) = self.as_slices();
         f.debug_struct("Iter")
             .field("keys", &keys)
             .field("values", &values)
@@ -904,7 +1039,10 @@ where
     }
 }
 
-impl<K, V> Default for Iter<'_, K, V> {
+impl<K, V> Default for Iter<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn default() -> Self {
         Self {
@@ -913,7 +1051,10 @@ impl<K, V> Default for Iter<'_, K, V> {
     }
 }
 
-impl<K, V> Clone for Iter<'_, K, V> {
+impl<K, V> Clone for Iter<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -922,20 +1063,26 @@ impl<K, V> Clone for Iter<'_, K, V> {
     }
 }
 
-impl<K, V> AsRef<[V]> for Iter<'_, K, V> {
+impl<T, K, V> AsRef<[T]> for Iter<'_, K, V>
+where
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+{
     #[inline]
-    fn as_ref(&self) -> &[V] {
+    fn as_ref(&self) -> &[T] {
         self.as_values_slice()
     }
 }
 
-impl<'a, K, V> Iterator for Iter<'a, K, V> {
-    type Item = (&'a K, &'a V);
+impl<'a, K, V> Iterator for Iter<'a, K, V>
+where
+    V: Soa,
+{
+    type Item = (&'a K, V::Refs<'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next()
+        inner.next().map(|KeyValueRefs { key, value }| (key, value))
     }
 
     #[inline]
@@ -959,41 +1106,51 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last()
+        inner.last().map(|KeyValueRefs { key, value }| (key, value))
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n)
+        inner.nth(n).map(|KeyValueRefs { key, value }| (key, value))
     }
 
     #[inline]
-    fn for_each<F>(self, f: F)
+    fn for_each<F>(self, mut f: F)
     where
         Self: Sized,
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(f)
+        inner.for_each(|KeyValueRefs { key, value }| f((key, value)))
     }
 }
 
-impl<K, V> DoubleEndedIterator for Iter<'_, K, V> {
+impl<K, V> DoubleEndedIterator for Iter<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back()
+        inner
+            .next_back()
+            .map(|KeyValueRefs { key, value }| (key, value))
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n)
+        inner
+            .nth_back(n)
+            .map(|KeyValueRefs { key, value }| (key, value))
     }
 }
 
-impl<K, V> ExactSizeIterator for Iter<'_, K, V> {
+impl<K, V> ExactSizeIterator for Iter<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -1001,15 +1158,21 @@ impl<K, V> ExactSizeIterator for Iter<'_, K, V> {
     }
 }
 
-impl<K, V> FusedIterator for Iter<'_, K, V> {}
+impl<K, V> FusedIterator for Iter<'_, K, V> where V: Soa {}
 
-pub struct IterMut<'a, K, V> {
-    inner: slice::IterMut<'a, (K, V)>,
+pub struct IterMut<'a, K, V>
+where
+    V: Soa,
+{
+    inner: slice::IterMut<'a, KeyValuePair<K, V>>,
 }
 
-impl<'a, K, V> IterMut<'a, K, V> {
+impl<'a, K, V> IterMut<'a, K, V>
+where
+    V: Soa,
+{
     #[inline]
-    pub(crate) fn new(inner: slice::IterMut<'a, (K, V)>) -> Self {
+    pub(crate) fn new(inner: slice::IterMut<'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -1017,7 +1180,7 @@ impl<'a, K, V> IterMut<'a, K, V> {
     pub fn into_keys_slice(self) -> &'a [K] {
         let Self { inner } = self;
 
-        let (keys, _) = inner.into_slices();
+        let KeyValueSlicesMut { keys, .. } = inner.into_slices();
         keys
     }
 
@@ -1025,39 +1188,39 @@ impl<'a, K, V> IterMut<'a, K, V> {
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { inner } = self;
 
-        let (keys, _) = inner.as_slices();
+        let KeyValueSlices { keys, .. } = inner.as_slices();
         keys
     }
 
     #[inline]
-    pub fn into_values_slice(self) -> &'a mut [V] {
+    pub fn into_values_slice(self) -> V::SlicesMut<'a> {
         let Self { inner } = self;
 
-        let (_, values) = inner.into_slices();
+        let KeyValueSlicesMut { values, .. } = inner.into_slices();
         values
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> &[V] {
+    pub fn as_values_slice(&self) -> V::Slices<'_> {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices();
+        let KeyValueSlices { values, .. } = inner.as_slices();
         values
     }
 
     #[inline]
-    pub fn into_slices(self) -> (&'a [K], &'a mut [V]) {
+    pub fn into_slices(self) -> (&'a [K], V::SlicesMut<'a>) {
         let Self { inner } = self;
 
-        let (keys, values) = inner.into_slices();
+        let KeyValueSlicesMut { keys, values } = inner.into_slices();
         (keys, values)
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[K], &[V]) {
+    pub fn as_slices(&self) -> (&[K], V::Slices<'_>) {
         let Self { inner } = self;
 
-        let (keys, values) = inner.as_slices();
+        let KeyValueSlices { keys, values } = inner.as_slices();
         (keys, values)
     }
 }
@@ -1065,12 +1228,11 @@ impl<'a, K, V> IterMut<'a, K, V> {
 impl<K, V> Debug for IterMut<'_, K, V>
 where
     K: Debug,
-    V: Debug,
+    V: Soa,
+    for<'a> V::Slices<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner } = self;
-
-        let (keys, values) = inner.as_slices();
+        let (keys, values) = self.as_slices();
         f.debug_struct("IterMut")
             .field("keys", &keys)
             .field("values", &values)
@@ -1078,7 +1240,10 @@ where
     }
 }
 
-impl<K, V> Default for IterMut<'_, K, V> {
+impl<K, V> Default for IterMut<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn default() -> Self {
         Self {
@@ -1087,20 +1252,28 @@ impl<K, V> Default for IterMut<'_, K, V> {
     }
 }
 
-impl<K, V> AsRef<[V]> for IterMut<'_, K, V> {
+impl<T, K, V> AsRef<[T]> for IterMut<'_, K, V>
+where
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+{
     #[inline]
-    fn as_ref(&self) -> &[V] {
+    fn as_ref(&self) -> &[T] {
         self.as_values_slice()
     }
 }
 
-impl<'a, K, V> Iterator for IterMut<'a, K, V> {
-    type Item = (&'a K, &'a mut V);
+impl<'a, K, V> Iterator for IterMut<'a, K, V>
+where
+    V: Soa,
+{
+    type Item = (&'a K, V::RefsMut<'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(key, value)| (&*key, value))
+        inner
+            .next()
+            .map(|KeyValueRefsMut { key, value }| (&*key, value))
     }
 
     #[inline]
@@ -1124,13 +1297,17 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|(key, value)| (&*key, value))
+        inner
+            .last()
+            .map(|KeyValueRefsMut { key, value }| (&*key, value))
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(key, value)| (&*key, value))
+        inner
+            .nth(n)
+            .map(|KeyValueRefsMut { key, value }| (&*key, value))
     }
 
     #[inline]
@@ -1140,25 +1317,35 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|(key, value)| f((&*key, value)))
+        inner.for_each(|KeyValueRefsMut { key, value }| f((&*key, value)))
     }
 }
 
-impl<K, V> DoubleEndedIterator for IterMut<'_, K, V> {
+impl<K, V> DoubleEndedIterator for IterMut<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(key, value)| (&*key, value))
+        inner
+            .next_back()
+            .map(|KeyValueRefsMut { key, value }| (&*key, value))
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(key, value)| (&*key, value))
+        inner
+            .nth_back(n)
+            .map(|KeyValueRefsMut { key, value }| (&*key, value))
     }
 }
 
-impl<K, V> ExactSizeIterator for IterMut<'_, K, V> {
+impl<K, V> ExactSizeIterator for IterMut<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -1166,15 +1353,21 @@ impl<K, V> ExactSizeIterator for IterMut<'_, K, V> {
     }
 }
 
-impl<K, V> FusedIterator for IterMut<'_, K, V> {}
+impl<K, V> FusedIterator for IterMut<'_, K, V> where V: Soa {}
 
-pub struct IntoIter<K, V> {
-    inner: vec::IntoIter<(K, V)>,
+pub struct IntoIter<K, V>
+where
+    V: Soa,
+{
+    inner: vec::IntoIter<KeyValuePair<K, V>>,
 }
 
-impl<K, V> IntoIter<K, V> {
+impl<K, V> IntoIter<K, V>
+where
+    V: Soa,
+{
     #[inline]
-    pub(crate) fn new(inner: vec::IntoIter<(K, V)>) -> Self {
+    pub(crate) fn new(inner: vec::IntoIter<KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -1182,7 +1375,7 @@ impl<K, V> IntoIter<K, V> {
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { inner } = self;
 
-        let (keys, _) = inner.as_slices();
+        let KeyValueSlices { keys, .. } = inner.as_slices();
         keys
     }
 
@@ -1190,48 +1383,51 @@ impl<K, V> IntoIter<K, V> {
     pub fn as_keys_mut_slice(&mut self) -> &mut [K] {
         let Self { inner } = self;
 
-        let (keys, _) = inner.as_mut_slices();
+        let KeyValueSlicesMut { keys, .. } = inner.as_mut_slices();
         keys
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> &[V] {
+    pub fn as_values_slice(&self) -> V::Slices<'_> {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices();
+        let KeyValueSlices { values, .. } = inner.as_slices();
         values
     }
 
     #[inline]
-    pub fn as_values_mut_slice(&mut self) -> &mut [V] {
+    pub fn as_values_mut_slice(&mut self) -> V::SlicesMut<'_> {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_mut_slices();
+        let KeyValueSlicesMut { values, .. } = inner.as_mut_slices();
         values
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[K], &[V]) {
+    pub fn as_slices(&self) -> (&[K], V::Slices<'_>) {
         let Self { inner } = self;
-        inner.as_slices()
+
+        let KeyValueSlices { keys, values } = inner.as_slices();
+        (keys, values)
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&mut [K], &mut [V]) {
+    pub fn as_mut_slices(&mut self) -> (&mut [K], V::SlicesMut<'_>) {
         let Self { inner } = self;
-        inner.as_mut_slices()
+
+        let KeyValueSlicesMut { keys, values } = inner.as_mut_slices();
+        (keys, values)
     }
 }
 
 impl<K, V> Debug for IntoIter<K, V>
 where
     K: Debug,
-    V: Debug,
+    V: Soa,
+    for<'a> V::Slices<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner } = self;
-
-        let (keys, values) = inner.as_slices();
+        let (keys, values) = self.as_slices();
         f.debug_struct("IntoIter")
             .field("keys", &keys)
             .field("values", &values)
@@ -1239,7 +1435,10 @@ where
     }
 }
 
-impl<K, V> Default for IntoIter<K, V> {
+impl<K, V> Default for IntoIter<K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn default() -> Self {
         Self {
@@ -1250,7 +1449,8 @@ impl<K, V> Default for IntoIter<K, V> {
 
 impl<K, V> Clone for IntoIter<K, V>
 where
-    vec::IntoIter<(K, V)>: Clone,
+    V: Soa,
+    vec::IntoIter<KeyValuePair<K, V>>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1260,27 +1460,36 @@ where
     }
 }
 
-impl<K, V> AsRef<[V]> for IntoIter<K, V> {
+impl<T, K, V> AsRef<[T]> for IntoIter<K, V>
+where
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+{
     #[inline]
-    fn as_ref(&self) -> &[V] {
+    fn as_ref(&self) -> &[T] {
         self.as_values_slice()
     }
 }
 
-impl<K, V> AsMut<[V]> for IntoIter<K, V> {
+impl<T, K, V> AsMut<[T]> for IntoIter<K, V>
+where
+    for<'a> V: Soa<SlicesMut<'a> = &'a mut [T]> + 'a,
+{
     #[inline]
-    fn as_mut(&mut self) -> &mut [V] {
+    fn as_mut(&mut self) -> &mut [T] {
         self.as_values_mut_slice()
     }
 }
 
-impl<K, V> Iterator for IntoIter<K, V> {
+impl<K, V> Iterator for IntoIter<K, V>
+where
+    V: Soa,
+{
     type Item = (K, V);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next()
+        inner.next().map(Into::into)
     }
 
     #[inline]
@@ -1299,31 +1508,67 @@ impl<K, V> Iterator for IntoIter<K, V> {
     }
 }
 
-impl<K, V> DoubleEndedIterator for IntoIter<K, V> {
+impl<K, V> DoubleEndedIterator for IntoIter<K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back()
+        inner.next_back().map(Into::into)
     }
 }
 
-impl<K, V> ExactSizeIterator for IntoIter<K, V> {
+impl<K, V> ExactSizeIterator for IntoIter<K, V>
+where
+    V: Soa,
+{
     fn len(&self) -> usize {
         let Self { inner } = self;
         inner.len()
     }
 }
 
-impl<K, V> FusedIterator for IntoIter<K, V> {}
+impl<K, V> FusedIterator for IntoIter<K, V> where V: Soa {}
 
-pub struct Drain<'a, K, V> {
-    inner: vec::Drain<'a, (K, V)>,
+pub struct Drain<'a, K, V>
+where
+    V: Soa,
+{
+    inner: vec::Drain<'a, KeyValuePair<K, V>>,
+}
+
+impl<'a, K, V> Drain<'a, K, V>
+where
+    V: Soa,
+{
+    #[inline]
+    pub(crate) fn new(inner: vec::Drain<'a, KeyValuePair<K, V>>) -> Self {
+        Self { inner }
+    }
+
+    #[inline]
+    pub fn as_keys_slice(&self) -> &[K] {
+        let Self { inner } = self;
+
+        let KeyValueSlices { keys, .. } = inner.as_slices();
+        keys
+    }
+
+    #[inline]
+    pub fn as_values_slice(&self) -> V::Slices<'_> {
+        let Self { inner } = self;
+
+        let KeyValueSlices { values, .. } = inner.as_slices();
+        values
+    }
 }
 
 impl<K, V> Debug for Drain<'_, K, V>
 where
     K: Debug,
-    V: Debug,
+    V: Soa,
+    for<'a> V::Slices<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_keys_slice();
@@ -1335,43 +1580,26 @@ where
     }
 }
 
-impl<'a, K, V> Drain<'a, K, V> {
+impl<T, K, V> AsRef<[T]> for Drain<'_, K, V>
+where
+    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+{
     #[inline]
-    pub(crate) fn new(inner: vec::Drain<'a, (K, V)>) -> Self {
-        Self { inner }
-    }
-
-    #[inline]
-    pub fn as_keys_slice(&self) -> &[K] {
-        let Self { inner } = self;
-
-        let (keys, _) = inner.as_slices();
-        keys
-    }
-
-    #[inline]
-    pub fn as_values_slice(&self) -> &[V] {
-        let Self { inner } = self;
-
-        let (_, values) = inner.as_slices();
-        values
-    }
-}
-
-impl<K, V> AsRef<[V]> for Drain<'_, K, V> {
-    #[inline]
-    fn as_ref(&self) -> &[V] {
+    fn as_ref(&self) -> &[T] {
         self.as_values_slice()
     }
 }
 
-impl<K, V> Iterator for Drain<'_, K, V> {
+impl<K, V> Iterator for Drain<'_, K, V>
+where
+    V: Soa,
+{
     type Item = (K, V);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next()
+        inner.next().map(Into::into)
     }
 
     #[inline]
@@ -1381,19 +1609,25 @@ impl<K, V> Iterator for Drain<'_, K, V> {
     }
 }
 
-impl<K, V> DoubleEndedIterator for Drain<'_, K, V> {
+impl<K, V> DoubleEndedIterator for Drain<'_, K, V>
+where
+    V: Soa,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back()
+        inner.next_back().map(Into::into)
     }
 }
 
-impl<K, V> ExactSizeIterator for Drain<'_, K, V> {
+impl<K, V> ExactSizeIterator for Drain<'_, K, V>
+where
+    V: Soa,
+{
     fn len(&self) -> usize {
         let Self { inner } = self;
         inner.len()
     }
 }
 
-impl<K, V> FusedIterator for Drain<'_, K, V> {}
+impl<K, V> FusedIterator for Drain<'_, K, V> where V: Soa {}

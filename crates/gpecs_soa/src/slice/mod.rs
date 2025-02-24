@@ -93,7 +93,7 @@ where
         let len = self.len();
 
         let slices = T::slices_from_raw_parts(ptrs, len);
-        unsafe { T::slices_as_refs(slices) }
+        unsafe { T::slice_ptrs_to_slices(slices) }
     }
 
     #[inline]
@@ -102,7 +102,7 @@ where
         let len = self.len();
 
         let slices = T::slices_from_raw_parts_mut(ptrs, len);
-        unsafe { T::mut_slices_as_refs(slices) }
+        unsafe { T::slice_ptrs_to_slices_mut(slices) }
     }
 
     #[inline]
@@ -195,7 +195,7 @@ where
         for index in 0..len {
             unsafe {
                 let dst = self.get_unchecked_mut(index);
-                let src = T::as_refs(src.get_unchecked(index));
+                let src = T::ptrs_to_refs(src.get_unchecked(index));
                 T::ptrs_drop_in_place(dst);
                 src.clone_into_ptrs(dst);
             }
@@ -324,12 +324,12 @@ where
                 let a = unsafe {
                     let ptrs = T::ptrs_add_mut(ptrs, a);
                     let ptrs = T::ptrs_cast_const(ptrs);
-                    T::as_refs(ptrs)
+                    T::ptrs_to_refs(ptrs)
                 };
                 let b = unsafe {
                     let ptrs = T::ptrs_add_mut(ptrs, b);
                     let ptrs = T::ptrs_cast_const(ptrs);
-                    T::as_refs(ptrs)
+                    T::ptrs_to_refs(ptrs)
                 };
                 compare(a, b)
             })
@@ -347,7 +347,7 @@ where
             indices.sort_by_key(|&index| unsafe {
                 let ptrs = T::ptrs_add_mut(ptrs, index);
                 let ptrs = T::ptrs_cast_const(ptrs);
-                let refs = T::as_refs(ptrs);
+                let refs = T::ptrs_to_refs(ptrs);
                 f(refs)
             })
         })
@@ -364,7 +364,7 @@ where
             indices.sort_by_cached_key(|&index| unsafe {
                 let ptrs = T::ptrs_add_mut(ptrs, index);
                 let ptrs = T::ptrs_cast_const(ptrs);
-                let refs = T::as_refs(ptrs);
+                let refs = T::ptrs_to_refs(ptrs);
                 f(refs)
             })
         })
@@ -389,12 +389,12 @@ where
                 let a = unsafe {
                     let ptrs = T::ptrs_add_mut(ptrs, a);
                     let ptrs = T::ptrs_cast_const(ptrs);
-                    T::as_refs(ptrs)
+                    T::ptrs_to_refs(ptrs)
                 };
                 let b = unsafe {
                     let ptrs = T::ptrs_add_mut(ptrs, b);
                     let ptrs = T::ptrs_cast_const(ptrs);
-                    T::as_refs(ptrs)
+                    T::ptrs_to_refs(ptrs)
                 };
                 compare(a, b)
             })
@@ -412,7 +412,7 @@ where
             indices.sort_unstable_by_key(|&index| unsafe {
                 let ptrs = T::ptrs_add_mut(ptrs, index);
                 let ptrs = T::ptrs_cast_const(ptrs);
-                let refs = T::as_refs(ptrs);
+                let refs = T::ptrs_to_refs(ptrs);
                 f(refs)
             })
         })

@@ -309,7 +309,7 @@ where
         let len = self.len();
 
         let slices = T::slices_from_raw_parts(ptrs, len);
-        unsafe { T::slices_as_refs(slices) }
+        unsafe { T::slice_ptrs_to_slices(slices) }
     }
 
     #[inline]
@@ -318,7 +318,7 @@ where
         let len = self.len();
 
         let slices = T::slices_from_raw_parts_mut(ptrs, len);
-        unsafe { T::mut_slices_as_refs(slices) }
+        unsafe { T::slice_ptrs_to_slices_mut(slices) }
     }
 
     #[inline]
@@ -527,7 +527,7 @@ where
                     T::ptrs_add_mut(ptrs, g.processed_len)
                 };
                 let res = {
-                    let cur = unsafe { T::as_mut_refs(cur) };
+                    let cur = unsafe { T::ptrs_to_refs_mut(cur) };
                     !f(cur)
                 };
                 if res {
@@ -629,7 +629,7 @@ where
         };
         for index in range {
             unsafe {
-                let refs = T::as_refs(set_len_on_drop.vec.get_unchecked(index));
+                let refs = T::ptrs_to_refs(set_len_on_drop.vec.get_unchecked(index));
                 let dst = T::ptrs_add_mut(ptrs, set_len_on_drop.local_len);
                 refs.clone_into_ptrs(dst);
             }

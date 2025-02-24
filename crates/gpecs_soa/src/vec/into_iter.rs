@@ -57,7 +57,7 @@ where
         unsafe {
             let ptrs = T::ptrs_add(ptrs, self.start);
             let slices = T::slices_from_raw_parts(ptrs, len);
-            T::slices_as_refs(slices)
+            T::slice_ptrs_to_slices(slices)
         }
     }
 
@@ -69,7 +69,7 @@ where
         unsafe {
             let ptrs = T::ptrs_add_mut(ptrs, self.start);
             let slices = T::slices_from_raw_parts_mut(ptrs, len);
-            T::mut_slices_as_refs(slices)
+            T::slice_ptrs_to_slices_mut(slices)
         }
     }
 

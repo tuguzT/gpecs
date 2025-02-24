@@ -67,7 +67,7 @@ pub const fn unwrap_next_vacant(kind: &SparseItemKind) -> usize {
 
 #[inline]
 #[track_caller]
-pub fn unwrap_next_vacant_mut(kind: &mut SparseItemKind) -> &mut usize {
+pub const fn unwrap_next_vacant_mut(kind: &mut SparseItemKind) -> &mut usize {
     let Some(next_vacant) = kind.next_vacant_mut() else {
         unwrap_next_vacant_failed()
     };
@@ -76,38 +76,11 @@ pub fn unwrap_next_vacant_mut(kind: &mut SparseItemKind) -> &mut usize {
 
 #[inline]
 #[track_caller]
-pub fn unwrap_dense_key<K>(keys: &[K], dense_index: usize) -> &K {
-    let Some(dense_key) = keys.get(dense_index) else {
-        check_dense_index_bounds_failed();
+pub fn unwrap_dense<T>(dense: impl IntoIterator<Item = T>, dense_index: usize) -> T {
+    let Some(item) = dense.into_iter().nth(dense_index) else {
+        check_dense_index_bounds_failed()
     };
-    dense_key
-}
-
-#[inline]
-#[track_caller]
-pub fn unwrap_dense_key_mut<K>(keys: &mut [K], dense_index: usize) -> &mut K {
-    let Some(dense_key) = keys.get_mut(dense_index) else {
-        check_dense_index_bounds_failed();
-    };
-    dense_key
-}
-
-#[inline]
-#[track_caller]
-pub fn unwrap_dense_value<T>(values: &[T], dense_index: usize) -> &T {
-    let Some(dense_value) = values.get(dense_index) else {
-        check_dense_index_bounds_failed();
-    };
-    dense_value
-}
-
-#[inline]
-#[track_caller]
-pub fn unwrap_dense_value_mut<T>(values: &mut [T], dense_index: usize) -> &mut T {
-    let Some(dense_value) = values.get_mut(dense_index) else {
-        check_dense_index_bounds_failed();
-    };
-    dense_value
+    item
 }
 
 #[cold]
@@ -119,12 +92,12 @@ const fn unwrap_dense_value_pair_mut_failed() -> ! {
 
 #[inline]
 #[track_caller]
-pub fn unwrap_dense_value_pair_mut<T>(
-    values: &mut [T],
+pub fn unwrap_dense_pair<T>(
+    iter: impl IntoIterator<Item = T>,
     first_index: usize,
     second_index: usize,
-) -> (&mut T, &mut T) {
-    let Some(pair) = get_pair(values, first_index, second_index) else {
+) -> (T, T) {
+    let Some(pair) = get_pair(iter, first_index, second_index) else {
         unwrap_dense_value_pair_mut_failed()
     };
     pair
@@ -150,22 +123,23 @@ pub fn unwrap_sparse_items_pair_mut<E>(
     pair
 }
 
-#[inline]
-#[track_caller]
-pub fn unwrap_value_from_sparse_index<'a, T, E>(
-    sparse_index: usize,
-    values: &'a [T],
-    sparse: &[SparseItem<E>],
-) -> &'a T {
-    let sparse_item = unwrap_sparse_item(sparse, sparse_index);
-    let dense_index = unwrap_dense_index(&sparse_item.kind);
-    unwrap_dense_value(values, dense_index)
-}
+// TODO uncomment this when issues of `view` module will be resolved
+// #[inline]
+// #[track_caller]
+// pub fn unwrap_dense_from_sparse_index<T, E>(
+//     sparse_index: usize,
+//     dense: impl IntoIterator<Item = T>,
+//     sparse: &[SparseItem<E>],
+// ) -> T {
+//     let sparse_item = unwrap_sparse_item(sparse, sparse_index);
+//     let dense_index = unwrap_dense_index(&sparse_item.kind);
+//     unwrap_dense(dense, dense_index)
+// }
 
 #[cold]
 #[track_caller]
 #[inline(never)]
-const fn check_dense_index_bounds_failed() -> ! {
+pub const fn check_dense_index_bounds_failed() -> ! {
     panic!("index from sparse should be in bounds of dense")
 }
 

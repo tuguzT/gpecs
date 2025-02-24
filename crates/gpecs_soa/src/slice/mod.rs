@@ -3,10 +3,10 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem, ops,
+    mem,
+    ops::{self, Index, IndexMut},
     ptr::{self, NonNull},
 };
-use index::slice_index_usize_fail;
 
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
@@ -17,7 +17,7 @@ use crate::{
 
 use self::index::{
     slice_end_index_len_fail, slice_end_index_overflow_fail, slice_index_order_fail,
-    slice_start_index_overflow_fail,
+    slice_index_usize_fail, slice_start_index_overflow_fail,
 };
 
 pub use self::{
@@ -496,6 +496,15 @@ where
     }
 }
 
+impl<T, U> AsRef<[U]> for SoaSlice<T>
+where
+    for<'a> T: Soa<Slices<'a> = &'a [U]> + 'a,
+{
+    fn as_ref(&self) -> &[U] {
+        self.as_slices()
+    }
+}
+
 impl<T> AsMut<SoaSlice<T>> for SoaSlice<T>
 where
     T: Soa,
@@ -503,6 +512,15 @@ where
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
+    }
+}
+
+impl<T, U> AsMut<[U]> for SoaSlice<T>
+where
+    for<'a> T: Soa<SlicesMut<'a> = &'a mut [U]> + 'a,
+{
+    fn as_mut(&mut self) -> &mut [U] {
+        self.as_mut_slices()
     }
 }
 
@@ -601,6 +619,62 @@ where
 
         target.clear();
         target.extend_from_slice(self);
+    }
+}
+
+pub(crate) trait IndexHelper<'a, S>
+where
+    Self: SoaSliceIndex<S, Ref<'a> = &'a Self::Output>,
+    S: ?Sized + 'a,
+{
+    type Output: ?Sized + 'a;
+}
+
+impl<'a, S, I, U> IndexHelper<'a, S> for I
+where
+    U: ?Sized + 'a,
+    S: ?Sized + 'a,
+    I: SoaSliceIndex<S, Ref<'a> = &'a U>,
+{
+    type Output = U;
+}
+
+impl<T, U, I> Index<I> for SoaSlice<T>
+where
+    T: Soa,
+    U: ?Sized,
+    for<'a> I: IndexHelper<'a, Self, Output = U>,
+{
+    type Output = U;
+
+    fn index(&self, index: I) -> &Self::Output {
+        SoaSlice::index(self, index)
+    }
+}
+
+pub(crate) trait IndexHelperMut<'a, S>
+where
+    Self: IndexHelper<'a, S> + SoaSliceIndex<S, RefMut<'a> = &'a mut Self::Output>,
+    S: ?Sized + 'a,
+{
+}
+
+impl<'a, S, I, U> IndexHelperMut<'a, S> for I
+where
+    U: ?Sized + 'a,
+    S: ?Sized + 'a,
+    I: IndexHelper<'a, S, Output = U> + SoaSliceIndex<S, RefMut<'a> = &'a mut U>,
+{
+}
+
+impl<T, U, I> IndexMut<I> for SoaSlice<T>
+where
+    T: Soa,
+    U: ?Sized,
+    for<'a> I: IndexHelperMut<'a, Self, Output = U>,
+{
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        SoaSlice::index_mut(self, index)
     }
 }
 

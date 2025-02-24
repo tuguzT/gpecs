@@ -3,7 +3,7 @@ use core::{
     cmp,
     fmt::{self, Debug, Display},
     hash::{self, Hash},
-    ops::{Index, IndexMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
 };
 
 use gpecs_soa::{mem::replace as soa_replace, slice::SoaSlice, traits::Soa, vec::SoaVec};
@@ -467,7 +467,7 @@ where
 
     pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
         for dense_index in (dense_len..self.len()).rev() {
-            let (&key, _) = self.dense.index(dense_index).into();
+            let (&key, _) = self.dense.deref().index(dense_index).into();
             self.remove(key);
         }
         self.dense.truncate(dense_len);
@@ -501,7 +501,7 @@ where
 
         let mut last = 0;
         for curr in 0..old_len {
-            let (&mut key, value) = dense.index_mut(curr).into();
+            let (&mut key, value) = dense.deref_mut().index_mut(curr).into();
             if !f(key, value) {
                 let sparse_index = key.sparse_index();
                 sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
@@ -834,6 +834,17 @@ where
             dense: self.dense.clone(),
             sparse: self.sparse.clone(),
         }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        let Self { dense, sparse } = self;
+        let Self {
+            dense: source_dense,
+            sparse: source_sparse,
+        } = source;
+
+        dense.clone_from(source_dense);
+        sparse.clone_from(source_sparse);
     }
 }
 

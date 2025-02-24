@@ -109,6 +109,15 @@ where
 unsafe impl<T> Send for IntoIter<T> where T: Soa + Send {}
 unsafe impl<T> Sync for IntoIter<T> where T: Soa + Sync {}
 
+impl<T, U> AsRef<[U]> for IntoIter<T>
+where
+    for<'a> T: Soa<Slices<'a> = &'a [U]> + 'a,
+{
+    fn as_ref(&self) -> &[U] {
+        self.as_slices()
+    }
+}
+
 impl<T> Debug for IntoIter<T>
 where
     T: Soa,

@@ -115,6 +115,15 @@ where
 unsafe impl<T> Send for Iter<'_, T> where T: Soa + Send {}
 unsafe impl<T> Sync for Iter<'_, T> where T: Soa + Sync {}
 
+impl<T, U> AsRef<[U]> for Iter<'_, T>
+where
+    for<'a> T: Soa<Slices<'a> = &'a [U]> + 'a,
+{
+    fn as_ref(&self) -> &[U] {
+        self.as_slices()
+    }
+}
+
 impl<T> Debug for Iter<'_, T>
 where
     T: Soa,
@@ -503,6 +512,15 @@ where
 
 unsafe impl<T> Send for IterMut<'_, T> where T: Soa + Send {}
 unsafe impl<T> Sync for IterMut<'_, T> where T: Soa + Sync {}
+
+impl<T, U> AsRef<[U]> for IterMut<'_, T>
+where
+    for<'a> T: Soa<Slices<'a> = &'a [U]> + 'a,
+{
+    fn as_ref(&self) -> &[U] {
+        self.as_slices()
+    }
+}
 
 impl<T> Debug for IterMut<'_, T>
 where

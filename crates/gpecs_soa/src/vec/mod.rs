@@ -5,7 +5,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     mem::ManuallyDrop,
-    ops::{Deref, DerefMut, RangeBounds},
+    ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
     ptr,
 };
 
@@ -15,7 +15,10 @@ use crate::{
     ptr::{actual_capacity, is_zst, ptrs, BufferData, PtrToLenMut},
     raw_vec::RawSoaVec,
     set_len_on_drop::SetLenOnDrop,
-    slice::{from_raw_parts, from_raw_parts_mut, slice_range, Iter, IterMut, SoaSlice},
+    slice::{
+        from_raw_parts, from_raw_parts_mut, slice_range, IndexHelper, IndexHelperMut, Iter,
+        IterMut, SoaSlice,
+    },
     traits::{Soa, SoaToOwned},
 };
 
@@ -819,6 +822,30 @@ where
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { from_raw_parts_mut(self.as_mut_ptr(), self.len(), self.capacity()) }
+    }
+}
+
+impl<T, U, I> Index<I> for SoaVec<T>
+where
+    T: Soa,
+    U: ?Sized,
+    for<'a> I: IndexHelper<'a, SoaSlice<T>, Output = U>,
+{
+    type Output = U;
+
+    fn index(&self, index: I) -> &Self::Output {
+        Index::index(&**self, index)
+    }
+}
+
+impl<T, U, I> IndexMut<I> for SoaVec<T>
+where
+    T: Soa,
+    U: ?Sized,
+    for<'a> I: IndexHelperMut<'a, SoaSlice<T>, Output = U>,
+{
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        IndexMut::index_mut(&mut **self, index)
     }
 }
 

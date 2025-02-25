@@ -17,7 +17,7 @@ use crate::{
     set_len_on_drop::SetLenOnDrop,
     slice::{
         from_raw_parts, from_raw_parts_mut, slice_range, IndexHelper, IndexHelperMut, Iter,
-        IterMut, SoaSlice,
+        IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
     },
     traits::{Soa, SoaToOwned},
 };
@@ -322,6 +322,18 @@ where
 
         let slices = T::slices_from_raw_parts_mut(ptrs, len);
         unsafe { T::slice_ptrs_to_slices_mut(slices) }
+    }
+
+    #[inline]
+    pub fn slices(&self) -> SoaSlices<'_, T> {
+        let slices = self.as_slices();
+        SoaSlices::new(slices)
+    }
+
+    #[inline]
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, T> {
+        let slices = self.as_mut_slices();
+        SoaSlicesMut::new(slices)
     }
 
     #[inline]

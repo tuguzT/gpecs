@@ -77,6 +77,15 @@ where
 unsafe impl<T> Send for Drain<'_, T> where T: Soa + Send {}
 unsafe impl<T> Sync for Drain<'_, T> where T: Soa + Sync {}
 
+impl<T, U> AsRef<[U]> for Drain<'_, T>
+where
+    for<'a> T: Soa<Slices<'a> = &'a [U]> + 'a,
+{
+    fn as_ref(&self) -> &[U] {
+        self.as_slices()
+    }
+}
+
 impl<T> Debug for Drain<'_, T>
 where
     T: Soa,

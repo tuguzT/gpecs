@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     ptr::is_zst,
-    slice::{slice_range, Iter},
+    slice::{slice_range, Iter, SoaSlices},
 };
 
 use super::{Soa, SoaVec};
@@ -52,13 +52,17 @@ where
         unsafe {
             let mut vec = NonNull::from(vec);
 
+            // index before setting length, otherwise range is invalid
+            let slices = vec.as_ref().index(range);
+            let slices = SoaSlices::new(slices);
+
             // set self.vec length's to start, to be safe in case Drain is leaked
             vec.as_mut().set_len(start);
-            let iter = Iter::from_range(vec.as_ref().as_slice(), range);
+
             Self {
                 tail_start: end,
                 tail_len: len - end,
-                iter,
+                iter: Iter::new(slices),
                 vec,
             }
         }

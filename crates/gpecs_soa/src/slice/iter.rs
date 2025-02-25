@@ -1,27 +1,17 @@
-#[cfg(not(feature = "cache-ptrs"))]
-use core::ptr::NonNull;
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
-    ops::Range,
 };
 
-#[cfg(not(feature = "cache-ptrs"))]
-use crate::ptr::{ptrs, BufferData};
 use crate::traits::Soa;
 
-use super::SoaSlice;
+use super::{SoaSlices, SoaSlicesMut};
 
 pub struct Iter<'a, T>
 where
     T: Soa + 'a,
 {
-    #[cfg(not(feature = "cache-ptrs"))]
-    buffer: NonNull<BufferData<T>>,
-    #[cfg(not(feature = "cache-ptrs"))]
-    capacity: usize,
-    #[cfg(feature = "cache-ptrs")]
     ptrs: T::NonNullPtrs,
     start: usize,
     end: usize,
@@ -33,22 +23,12 @@ where
     T: Soa,
 {
     #[inline]
-    pub(super) fn new(slice: &'a SoaSlice<T>) -> Self {
-        unsafe { Self::from_range(slice, 0..slice.len()) }
-    }
-
-    #[inline]
-    pub(crate) unsafe fn from_range(slice: &'a SoaSlice<T>, range: Range<usize>) -> Self {
-        let Range { start, end } = range;
+    pub(crate) fn new(slices: SoaSlices<'a, T>) -> Self {
+        let (ptrs, len) = slices.into_parts();
         Self {
-            #[cfg(not(feature = "cache-ptrs"))]
-            buffer: unsafe { NonNull::new_unchecked(slice.as_ptr().cast_mut()) },
-            #[cfg(not(feature = "cache-ptrs"))]
-            capacity: slice.capacity(),
-            #[cfg(feature = "cache-ptrs")]
-            ptrs: unsafe { T::ptrs_to_nonnull(T::ptrs_cast_mut(slice.as_ptrs())) },
-            start,
-            end,
+            ptrs: unsafe { T::ptrs_to_nonnull(T::ptrs_cast_mut(ptrs)) },
+            start: 0,
+            end: len,
             phantom: PhantomData,
         }
     }
@@ -63,20 +43,6 @@ where
         self.len() == 0
     }
 
-    #[inline]
-    #[cfg(not(feature = "cache-ptrs"))]
-    fn ptrs(&self) -> T::Ptrs {
-        let ptr = self.buffer.as_ptr();
-        let capacity = self.capacity;
-
-        unsafe {
-            let ptrs = ptrs::<T>(ptr, capacity).unwrap_unchecked();
-            T::ptrs_cast_const(ptrs)
-        }
-    }
-
-    #[inline]
-    #[cfg(feature = "cache-ptrs")]
     fn ptrs(&self) -> T::Ptrs {
         let ptrs = T::nonnull_to_ptrs(self.ptrs);
         T::ptrs_cast_const(ptrs)
@@ -154,11 +120,6 @@ where
     #[inline]
     fn clone(&self) -> Self {
         Self {
-            #[cfg(not(feature = "cache-ptrs"))]
-            buffer: self.buffer,
-            #[cfg(not(feature = "cache-ptrs"))]
-            capacity: self.capacity,
-            #[cfg(feature = "cache-ptrs")]
             ptrs: self.ptrs,
             start: self.start,
             end: self.end,
@@ -413,11 +374,6 @@ pub struct IterMut<'a, T>
 where
     T: Soa + 'a,
 {
-    #[cfg(not(feature = "cache-ptrs"))]
-    buffer: NonNull<BufferData<T>>,
-    #[cfg(not(feature = "cache-ptrs"))]
-    capacity: usize,
-    #[cfg(feature = "cache-ptrs")]
     ptrs: T::NonNullPtrs,
     start: usize,
     end: usize,
@@ -429,16 +385,12 @@ where
     T: Soa,
 {
     #[inline]
-    pub(super) fn new(slice: &'a mut SoaSlice<T>) -> Self {
+    pub(super) fn new(slices: SoaSlicesMut<'a, T>) -> Self {
+        let (ptrs, len) = slices.into_parts();
         Self {
-            #[cfg(not(feature = "cache-ptrs"))]
-            buffer: unsafe { NonNull::new_unchecked(slice.as_mut_ptr()) },
-            #[cfg(not(feature = "cache-ptrs"))]
-            capacity: slice.capacity(),
-            #[cfg(feature = "cache-ptrs")]
-            ptrs: unsafe { T::ptrs_to_nonnull(slice.as_mut_ptrs()) },
+            ptrs: unsafe { T::ptrs_to_nonnull(ptrs) },
             start: 0,
-            end: slice.len(),
+            end: len,
             phantom: PhantomData,
         }
     }
@@ -453,17 +405,6 @@ where
         self.len() == 0
     }
 
-    #[inline]
-    #[cfg(not(feature = "cache-ptrs"))]
-    fn ptrs(&self) -> T::MutPtrs {
-        let ptr = self.buffer.as_ptr();
-        let len = self.capacity;
-
-        unsafe { ptrs::<T>(ptr, len).unwrap_unchecked() }
-    }
-
-    #[inline]
-    #[cfg(feature = "cache-ptrs")]
     fn ptrs(&self) -> T::MutPtrs {
         T::nonnull_to_ptrs(self.ptrs)
     }

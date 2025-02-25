@@ -123,18 +123,17 @@ pub fn unwrap_sparse_items_pair_mut<E>(
     pair
 }
 
-// TODO uncomment this when issues of `view` module will be resolved
-// #[inline]
-// #[track_caller]
-// pub fn unwrap_dense_from_sparse_index<T, E>(
-//     sparse_index: usize,
-//     dense: impl IntoIterator<Item = T>,
-//     sparse: &[SparseItem<E>],
-// ) -> T {
-//     let sparse_item = unwrap_sparse_item(sparse, sparse_index);
-//     let dense_index = unwrap_dense_index(&sparse_item.kind);
-//     unwrap_dense(dense, dense_index)
-// }
+#[inline]
+#[track_caller]
+pub fn unwrap_dense_from_sparse_index<T, E>(
+    sparse_index: usize,
+    dense: impl IntoIterator<Item = T>,
+    sparse: &[SparseItem<E>],
+) -> T {
+    let sparse_item = unwrap_sparse_item(sparse, sparse_index);
+    let dense_index = unwrap_dense_index(&sparse_item.kind);
+    unwrap_dense(dense, dense_index)
+}
 
 #[cold]
 #[track_caller]

@@ -4,10 +4,7 @@ use core::{
     ptr,
 };
 
-use crate::{
-    slice::{SoaSlice, SoaSliceIndex},
-    traits::Soa,
-};
+use crate::{slice::SoaSlice, traits::Soa};
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
@@ -73,11 +70,6 @@ where
     fn capacity(self) -> usize;
 
     fn as_ptr(self) -> *const BufferData<T>;
-
-    #[allow(clippy::missing_safety_doc)]
-    unsafe fn get_unchecked<I>(self, index: I) -> I::Ptr
-    where
-        I: SoaSliceIndex<SoaSlice<T>>;
 }
 
 impl<T> SoaSlicePtr<T> for *const SoaSlice<T>
@@ -101,15 +93,7 @@ where
     #[inline]
     fn as_ptr(self) -> *const BufferData<T> {
         let buffer = self.into_inner();
-        buffer as *const BufferData<T> // should be `<*const [BufferData<T>]>::as_ptr(buffer)`
-    }
-
-    #[inline]
-    unsafe fn get_unchecked<I>(self, index: I) -> I::Ptr
-    where
-        I: SoaSliceIndex<SoaSlice<T>>,
-    {
-        unsafe { index.get_unchecked(self) }
+        buffer as *const BufferData<T> // should be `<*const [BufferData<T>]>::as_ptr(buffer)` but it's unstable
     }
 }
 
@@ -129,11 +113,6 @@ where
     fn capacity(self) -> usize;
 
     fn as_mut_ptr(self) -> *mut BufferData<T>;
-
-    #[allow(clippy::missing_safety_doc)]
-    unsafe fn get_unchecked_mut<I>(self, index: I) -> I::MutPtr
-    where
-        I: SoaSliceIndex<SoaSlice<T>>;
 }
 
 impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
@@ -157,15 +136,7 @@ where
     #[inline]
     fn as_mut_ptr(self) -> *mut BufferData<T> {
         let buffer = self.into_inner_mut();
-        buffer as *mut BufferData<T> // should be `<*mut [BufferData<T>]>::as_mut_ptr(buffer)`
-    }
-
-    #[inline]
-    unsafe fn get_unchecked_mut<I>(self, index: I) -> I::MutPtr
-    where
-        I: SoaSliceIndex<SoaSlice<T>>,
-    {
-        unsafe { index.get_unchecked_mut(self) }
+        buffer as *mut BufferData<T> // should be `<*mut [BufferData<T>]>::as_mut_ptr(buffer)` but it's unstable
     }
 }
 

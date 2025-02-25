@@ -829,7 +829,7 @@ impl<T, U, I> Index<I> for SoaVec<T>
 where
     T: Soa,
     U: ?Sized,
-    for<'a> I: IndexHelper<'a, SoaSlice<T>, Output = U>,
+    for<'a> I: IndexHelper<'a, T, Output = U>,
 {
     type Output = U;
 
@@ -842,7 +842,7 @@ impl<T, U, I> IndexMut<I> for SoaVec<T>
 where
     T: Soa,
     U: ?Sized,
-    for<'a> I: IndexHelperMut<'a, SoaSlice<T>, Output = U>,
+    for<'a> I: IndexHelperMut<'a, T, Output = U>,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         IndexMut::index_mut(&mut **self, index)

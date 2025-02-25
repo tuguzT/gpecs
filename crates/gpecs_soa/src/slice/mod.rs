@@ -1,16 +1,14 @@
-use alloc::{borrow::ToOwned, boxed::Box, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box};
 use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem,
     ops::{self, Index, IndexMut},
     ptr::{self, NonNull},
 };
 
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
-    set_len_on_drop::SetLenOnDrop,
     traits::{Soa, SoaToOwned},
     vec::{IntoIter, SoaVec},
 };
@@ -23,10 +21,12 @@ use self::index::{
 pub use self::{
     index::SoaSliceIndex,
     iter::{Iter, IterMut},
+    slices::{SoaSlices, SoaSlicesMut},
 };
 
 mod index;
 mod iter;
+mod slices;
 
 #[repr(transparent)]
 pub struct SoaSlice<T>
@@ -106,13 +106,25 @@ where
     }
 
     #[inline]
+    pub fn slices(&self) -> SoaSlices<'_, T> {
+        let slices = self.as_slices();
+        SoaSlices::new(slices)
+    }
+
+    #[inline]
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, T> {
+        let slices = self.as_mut_slices();
+        SoaSlicesMut::new(slices)
+    }
+
+    #[inline]
     pub fn iter(&self) -> Iter<'_, T> {
-        Iter::new(self)
+        self.slices().into_iter()
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        IterMut::new(self)
+        self.slices_mut().into_iter()
     }
 
     #[inline]
@@ -120,7 +132,7 @@ where
     where
         T::Refs<'me>: PartialEq<T>,
     {
-        self.iter().any(|element| element == *value)
+        self.slices().contains(value)
     }
 
     #[inline]
@@ -128,7 +140,7 @@ where
     where
         T::Refs<'me>: PartialEq<T::Refs<'r>>,
     {
-        self.iter().any(|element| element == refs)
+        self.slices().contains_by_refs(refs)
     }
 
     #[inline]
@@ -144,29 +156,7 @@ where
     where
         T::Refs<'me>: SoaToOwned<'me, Owned = T>,
     {
-        let len = self.len();
-        let mut vec = SoaVec::with_capacity(len);
-
-        let mut set_len_on_drop = SetLenOnDrop {
-            vec: &mut vec,
-            local_len: 0,
-        };
-        let ptrs = set_len_on_drop.vec.as_mut_ptrs();
-        for (index, refs) in self.iter().enumerate() {
-            set_len_on_drop.local_len = index;
-            unsafe {
-                let dst = T::ptrs_add_mut(ptrs, index);
-                refs.clone_into_ptrs(dst);
-            }
-        }
-        mem::forget(set_len_on_drop);
-
-        // SAFETY:
-        // the vec was allocated and initialized above to at least this length.
-        unsafe {
-            vec.set_len(len);
-        }
-        vec
+        self.slices().to_vec()
     }
 
     #[inline]
@@ -175,31 +165,8 @@ where
     where
         T::Refs<'src>: SoaToOwned<'src, Owned = T>,
     {
-        // The panic code path was put into a cold function to not bloat the
-        // call site.
-        #[inline(never)]
-        #[cold]
-        #[track_caller]
-        fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
-            panic!(
-                "source slice length ({}) does not match destination slice length ({})",
-                src_len, dst_len,
-            );
-        }
-
-        let len = self.len();
-        if len != src.len() {
-            len_mismatch_fail(len, src.len());
-        }
-
-        for index in 0..len {
-            unsafe {
-                let dst = self.get_unchecked_mut(index);
-                let src = T::ptrs_to_refs(src.get_unchecked(index));
-                T::ptrs_drop_in_place(dst);
-                src.clone_into_ptrs(dst);
-            }
-        }
+        let src = src.slices();
+        self.slices_mut().clone_from_slices(src);
     }
 
     #[inline]
@@ -208,101 +175,66 @@ where
     where
         T: Copy,
     {
-        // The panic code path was put into a cold function to not bloat the
-        // call site.
-        #[inline(never)]
-        #[cold]
-        #[track_caller]
-        fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
-            panic!(
-                "source slice length ({}) does not match destination slice length ({})",
-                src_len, dst_len,
-            );
-        }
-
-        let len = self.len();
-        if len != src.len() {
-            len_mismatch_fail(len, src.len());
-        }
-
-        // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
-        // checked to have the same length. The slices cannot overlap because
-        // mutable references are exclusive.
-        unsafe {
-            T::ptrs_copy_nonoverlapping(src.as_ptrs(), self.as_mut_ptrs(), len);
-        }
+        let src = src.slices();
+        self.slices_mut().copy_from_slices(src);
     }
 
     #[inline]
-    pub fn get<I>(&self, index: I) -> Option<I::Ref<'_>>
+    pub fn get<I>(&self, index: I) -> Option<I::Refs<'_>>
     where
-        I: SoaSliceIndex<Self>,
+        I: SoaSliceIndex<T>,
     {
-        index.get(self)
+        self.slices().into_get(index)
     }
 
     #[inline]
-    pub fn get_mut<I>(&mut self, index: I) -> Option<I::RefMut<'_>>
+    pub fn get_mut<I>(&mut self, index: I) -> Option<I::RefsMut<'_>>
     where
-        I: SoaSliceIndex<Self>,
+        I: SoaSliceIndex<T>,
     {
-        index.get_mut(self)
+        self.slices_mut().into_get_mut(index)
     }
 
     #[inline]
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptr
+    pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs
     where
-        I: SoaSliceIndex<Self>,
+        I: SoaSliceIndex<T>,
     {
-        unsafe { index.get_unchecked(self) }
+        unsafe { self.slices().get_unchecked(index) }
     }
 
     #[inline]
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> I::MutPtr
+    pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> I::MutPtrs
     where
-        I: SoaSliceIndex<Self>,
+        I: SoaSliceIndex<T>,
     {
-        unsafe { index.get_unchecked_mut(self) }
+        unsafe { self.slices_mut().get_unchecked_mut(index) }
     }
 
     #[inline]
     #[track_caller]
-    pub fn index<I>(&self, index: I) -> I::Ref<'_>
+    pub fn index<I>(&self, index: I) -> I::Refs<'_>
     where
-        I: SoaSliceIndex<Self>,
+        I: SoaSliceIndex<T>,
     {
-        index.index(self)
+        self.slices().into_index(index)
     }
 
     #[inline]
     #[track_caller]
-    pub fn index_mut<I>(&mut self, index: I) -> I::RefMut<'_>
+    pub fn index_mut<I>(&mut self, index: I) -> I::RefsMut<'_>
     where
-        I: SoaSliceIndex<Self>,
+        I: SoaSliceIndex<T>,
     {
-        index.index_mut(self)
+        self.slices_mut().into_index_mut(index)
     }
 
     #[inline]
     #[track_caller]
     pub fn swap(&mut self, a: usize, b: usize) {
-        let len = self.len();
-        if a >= len {
-            slice_index_usize_fail(len, a);
-        }
-        if b >= len {
-            slice_index_usize_fail(len, b);
-        }
-
-        // call `get_unchecked_mut` directly on pointer to avoid creating multiple mutable references
-        let slice = ptr::from_mut(self);
-        unsafe {
-            let a = a.get_unchecked_mut(slice);
-            let b = b.get_unchecked_mut(slice);
-            T::ptrs_swap(a, b)
-        }
+        self.slices_mut().swap(a, b);
     }
 
     #[inline]
@@ -310,64 +242,33 @@ where
     where
         for<'any> T::Refs<'any>: Ord,
     {
-        self.sort_by(|a, b| Ord::cmp(&a, &b))
+        self.slices_mut().sort();
     }
 
     #[inline]
-    pub fn sort_by<F>(&mut self, mut compare: F)
+    pub fn sort_by<F>(&mut self, compare: F)
     where
         for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
-        let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|indices| {
-            indices.sort_by(|&a, &b| {
-                let a = unsafe {
-                    let ptrs = T::ptrs_add_mut(ptrs, a);
-                    let ptrs = T::ptrs_cast_const(ptrs);
-                    T::ptrs_to_refs(ptrs)
-                };
-                let b = unsafe {
-                    let ptrs = T::ptrs_add_mut(ptrs, b);
-                    let ptrs = T::ptrs_cast_const(ptrs);
-                    T::ptrs_to_refs(ptrs)
-                };
-                compare(a, b)
-            })
-        })
+        self.slices_mut().sort_by(compare);
     }
 
     #[inline]
-    pub fn sort_by_key<K, F>(&mut self, mut f: F)
+    pub fn sort_by_key<K, F>(&mut self, f: F)
     where
         F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
-        let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|indices| {
-            indices.sort_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(ptrs, index);
-                let ptrs = T::ptrs_cast_const(ptrs);
-                let refs = T::ptrs_to_refs(ptrs);
-                f(refs)
-            })
-        })
+        self.slices_mut().sort_by_key(f);
     }
 
     #[inline]
-    pub fn sort_by_cached_key<K, F>(&mut self, mut f: F)
+    pub fn sort_by_cached_key<K, F>(&mut self, f: F)
     where
         F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
-        let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|indices| {
-            indices.sort_by_cached_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(ptrs, index);
-                let ptrs = T::ptrs_cast_const(ptrs);
-                let refs = T::ptrs_to_refs(ptrs);
-                f(refs)
-            })
-        })
+        self.slices_mut().sort_by_cached_key(f);
     }
 
     #[inline]
@@ -375,69 +276,24 @@ where
     where
         for<'any> T::Refs<'any>: Ord,
     {
-        self.sort_unstable_by(|a, b| Ord::cmp(&a, &b))
+        self.slices_mut().sort_unstable();
     }
 
     #[inline]
-    pub fn sort_unstable_by<F>(&mut self, mut compare: F)
+    pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
         for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
-        let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|indices| {
-            indices.sort_unstable_by(|&a, &b| {
-                let a = unsafe {
-                    let ptrs = T::ptrs_add_mut(ptrs, a);
-                    let ptrs = T::ptrs_cast_const(ptrs);
-                    T::ptrs_to_refs(ptrs)
-                };
-                let b = unsafe {
-                    let ptrs = T::ptrs_add_mut(ptrs, b);
-                    let ptrs = T::ptrs_cast_const(ptrs);
-                    T::ptrs_to_refs(ptrs)
-                };
-                compare(a, b)
-            })
-        })
+        self.slices_mut().sort_unstable_by(compare);
     }
 
     #[inline]
-    pub fn sort_unstable_by_key<K, F>(&mut self, mut f: F)
+    pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
         F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
-        let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|indices| {
-            indices.sort_unstable_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(ptrs, index);
-                let ptrs = T::ptrs_cast_const(ptrs);
-                let refs = T::ptrs_to_refs(ptrs);
-                f(refs)
-            })
-        })
-    }
-
-    fn sort_impl<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut [usize]),
-    {
-        let len = self.len();
-        if is_zst::<T>() || len < 2 {
-            return;
-        }
-
-        let mut permutation: Vec<_> = (0..len).collect();
-        f(&mut permutation);
-
-        for src in 0..len {
-            let dst = permutation[src];
-            if src == dst {
-                continue;
-            }
-            self.swap(src, dst);
-            permutation.swap(src, dst);
-        }
+        self.slices_mut().sort_unstable_by_key(f);
     }
 }
 
@@ -622,19 +478,19 @@ where
     }
 }
 
-pub(crate) trait IndexHelper<'a, S>
+pub(crate) trait IndexHelper<'a, T>
 where
-    Self: SoaSliceIndex<S, Ref<'a> = &'a Self::Output>,
-    S: ?Sized + 'a,
+    Self: SoaSliceIndex<T, Refs<'a> = &'a Self::Output>,
+    T: Soa + 'a,
 {
     type Output: ?Sized + 'a;
 }
 
-impl<'a, S, I, U> IndexHelper<'a, S> for I
+impl<'a, T, I, U> IndexHelper<'a, T> for I
 where
     U: ?Sized + 'a,
-    S: ?Sized + 'a,
-    I: SoaSliceIndex<S, Ref<'a> = &'a U>,
+    T: Soa + 'a,
+    I: SoaSliceIndex<T, Refs<'a> = &'a U>,
 {
     type Output = U;
 }
@@ -643,7 +499,7 @@ impl<T, U, I> Index<I> for SoaSlice<T>
 where
     T: Soa,
     U: ?Sized,
-    for<'a> I: IndexHelper<'a, Self, Output = U>,
+    for<'a> I: IndexHelper<'a, T, Output = U>,
 {
     type Output = U;
 
@@ -652,18 +508,18 @@ where
     }
 }
 
-pub(crate) trait IndexHelperMut<'a, S>
+pub(crate) trait IndexHelperMut<'a, T>
 where
-    Self: IndexHelper<'a, S> + SoaSliceIndex<S, RefMut<'a> = &'a mut Self::Output>,
-    S: ?Sized + 'a,
+    Self: IndexHelper<'a, T> + SoaSliceIndex<T, RefsMut<'a> = &'a mut Self::Output>,
+    T: Soa + 'a,
 {
 }
 
-impl<'a, S, I, U> IndexHelperMut<'a, S> for I
+impl<'a, T, I, U> IndexHelperMut<'a, T> for I
 where
     U: ?Sized + 'a,
-    S: ?Sized + 'a,
-    I: IndexHelper<'a, S, Output = U> + SoaSliceIndex<S, RefMut<'a> = &'a mut U>,
+    T: Soa + 'a,
+    I: IndexHelper<'a, T, Output = U> + SoaSliceIndex<T, RefsMut<'a> = &'a mut U>,
 {
 }
 
@@ -671,7 +527,7 @@ impl<T, U, I> IndexMut<I> for SoaSlice<T>
 where
     T: Soa,
     U: ?Sized,
-    for<'a> I: IndexHelperMut<'a, Self, Output = U>,
+    for<'a> I: IndexHelperMut<'a, T, Output = U>,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         SoaSlice::index_mut(self, index)

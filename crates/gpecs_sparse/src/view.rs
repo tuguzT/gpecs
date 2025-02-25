@@ -5,7 +5,10 @@ use core::{
     ops::{Index, IndexMut},
 };
 
-use gpecs_soa::{mem::swap as soa_swap, slice::SoaSlice, traits::Soa};
+use gpecs_soa::{
+    slice::{SoaSlice, SoaSlices, SoaSlicesMut},
+    traits::Soa,
+};
 
 use crate::{
     algo::{
@@ -13,9 +16,8 @@ use crate::{
         sparse_get_with_key, sparse_index, sparse_index_mut, sparse_swap, sparse_swap_keys,
     },
     assert::{
-        check_dense_index_bounds_failed, check_equal_key, unwrap_dense, unwrap_dense_index,
-        unwrap_dense_index_mut, unwrap_dense_pair, unwrap_sparse_item,
-        unwrap_sparse_items_pair_mut,
+        check_equal_key, unwrap_dense, unwrap_dense_from_sparse_index, unwrap_dense_index,
+        unwrap_dense_index_mut, unwrap_sparse_item, unwrap_sparse_items_pair_mut,
     },
     item::SparseItem,
     iter::{Iter, IterMut, Keys, Values, ValuesMut},
@@ -545,21 +547,17 @@ where
     where
         for<'any> V::Refs<'any>: Ord,
     {
-        self.sort_impl(|dense, sparse| {
-            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
-
-            let len = keys.len();
+        self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
-                unsafe_unwrap_dense_from_sparse_index::<V, _>(sparse_index, values, len, sparse)
+                unwrap_dense_from_sparse_index(sparse_index, values, sparse)
             })
         });
     }
 
     #[inline]
     pub fn sort_keys(&mut self) {
-        self.sort_impl(|dense, _| dense.as_mut_slices().keys.sort());
+        self.sort_impl(|keys, _, _| keys.sort());
     }
 
     #[inline]
@@ -567,20 +565,14 @@ where
     where
         F: FnMut((K, V::Refs<'_>), (K, V::Refs<'_>)) -> cmp::Ordering,
     {
-        self.sort_impl(|dense, sparse| {
-            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
-
-            let len = keys.len();
+        self.sort_impl(|keys, values, sparse| {
             keys.sort_by(|&lhs_key, &rhs_key| {
                 let lhs_index = lhs_key.sparse_index();
-                let lhs_value =
-                    unsafe_unwrap_dense_from_sparse_index::<V, _>(lhs_index, values, len, sparse);
+                let lhs_value = unwrap_dense_from_sparse_index(lhs_index, values, sparse);
                 let lhs = (lhs_key, lhs_value);
 
                 let rhs_index = rhs_key.sparse_index();
-                let rhs_value =
-                    unsafe_unwrap_dense_from_sparse_index::<V, _>(rhs_index, values, len, sparse);
+                let rhs_value = unwrap_dense_from_sparse_index(rhs_index, values, sparse);
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
@@ -594,19 +586,10 @@ where
         F: FnMut((K, V::Refs<'_>)) -> T,
         T: Ord,
     {
-        self.sort_impl(|dense, sparse| {
-            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
-
-            let len = keys.len();
+        self.sort_impl(|keys, values, sparse| {
             keys.sort_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unsafe_unwrap_dense_from_sparse_index::<V, _>(
-                    sparse_index,
-                    values,
-                    len,
-                    sparse,
-                );
+                let value = unwrap_dense_from_sparse_index(sparse_index, values, sparse);
                 f((key, value))
             })
         });
@@ -618,19 +601,10 @@ where
         F: FnMut((K, V::Refs<'_>)) -> T,
         T: Ord,
     {
-        self.sort_impl(|dense, sparse| {
-            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
-
-            let len = keys.len();
+        self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unsafe_unwrap_dense_from_sparse_index::<V, _>(
-                    sparse_index,
-                    values,
-                    len,
-                    sparse,
-                );
+                let value = unwrap_dense_from_sparse_index(sparse_index, values, sparse);
                 f((key, value))
             })
         });
@@ -641,21 +615,17 @@ where
     where
         for<'any> V::Refs<'any>: Ord,
     {
-        self.sort_impl(|dense, sparse| {
-            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
-
-            let len = keys.len();
+        self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                unsafe_unwrap_dense_from_sparse_index::<V, _>(sparse_index, values, len, sparse)
+                unwrap_dense_from_sparse_index(sparse_index, values, sparse)
             })
         });
     }
 
     #[inline]
     pub fn sort_keys_unstable(&mut self) {
-        self.sort_impl(|dense, _| dense.as_mut_slices().keys.sort_unstable());
+        self.sort_impl(|keys, _, _| keys.sort_unstable());
     }
 
     #[inline]
@@ -663,20 +633,14 @@ where
     where
         F: FnMut((K, V::Refs<'_>), (K, V::Refs<'_>)) -> cmp::Ordering,
     {
-        self.sort_impl(|dense, sparse| {
-            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
-
-            let len = keys.len();
+        self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by(|&lhs_key, &rhs_key| {
                 let lhs_index = lhs_key.sparse_index();
-                let lhs_value =
-                    unsafe_unwrap_dense_from_sparse_index::<V, _>(lhs_index, values, len, sparse);
+                let lhs_value = unwrap_dense_from_sparse_index(lhs_index, values, sparse);
                 let lhs = (lhs_key, lhs_value);
 
                 let rhs_index = rhs_key.sparse_index();
-                let rhs_value =
-                    unsafe_unwrap_dense_from_sparse_index::<V, _>(rhs_index, values, len, sparse);
+                let rhs_value = unwrap_dense_from_sparse_index(rhs_index, values, sparse);
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
@@ -690,19 +654,10 @@ where
         F: FnMut((K, V::Refs<'_>)) -> T,
         T: Ord,
     {
-        self.sort_impl(|dense, sparse| {
-            let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-            let values = V::slice_refs_as_ptrs(V::mut_slices_as_slices(values));
-
-            let len = keys.len();
+        self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unsafe_unwrap_dense_from_sparse_index::<V, _>(
-                    sparse_index,
-                    values,
-                    len,
-                    sparse,
-                );
+                let value = unwrap_dense_from_sparse_index(sparse_index, values, sparse);
                 f((key, value))
             })
         });
@@ -713,17 +668,18 @@ where
     // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
     fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
     where
-        SortKeys: FnOnce(&mut SoaSlice<KeyValuePair<K, V>>, &[SparseItem<K::Epoch>]),
+        SortKeys: FnOnce(&mut [K], SoaSlices<'_, V>, &[SparseItem<K::Epoch>]),
     {
         let Self { dense, sparse } = self;
-        sort_keys(dense, sparse);
+        let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
+        let mut values = SoaSlicesMut::new(values);
 
-        // TODO fix multiple re-borrows somehow (maybe with special iterator type created from slices?)
-        // let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-        for pos in 0..dense.len() {
+        sort_keys(keys, values.into(), sparse);
+
+        let keys = &keys[..];
+        for pos in 0..keys.len() {
             let mut curr = pos;
             let mut next = {
-                let keys = &*dense.as_mut_slices().keys;
                 let sparse_index = unwrap_dense(keys, curr).sparse_index();
                 let sparse_item = unwrap_sparse_item(sparse, sparse_index);
                 unwrap_dense_index(sparse_item.kind())
@@ -731,19 +687,13 @@ where
 
             while curr != next {
                 let (curr_item, next_item) = {
-                    let keys = &*dense.as_mut_slices().keys;
                     let first_index = unwrap_dense(keys, curr).sparse_index();
                     let second_index = unwrap_dense(keys, next).sparse_index();
                     unwrap_sparse_items_pair_mut(sparse, first_index, second_index)
                 };
                 let curr_dense_index = unwrap_dense_index_mut(curr_item.kind_mut());
                 let next_dense_index = unwrap_dense_index_mut(next_item.kind_mut());
-
-                if curr_dense_index != next_dense_index {
-                    let (curr_refs, next_refs) =
-                        unwrap_dense_pair(dense.iter_mut(), *curr_dense_index, *next_dense_index);
-                    soa_swap::<V>(curr_refs.value, next_refs.value);
-                }
+                values.swap(*curr_dense_index, *next_dense_index);
 
                 *curr_dense_index = curr;
                 curr = next;
@@ -1115,30 +1065,5 @@ where
     fn from(value: EpochSparseViewMut<'a, K, V>) -> Self {
         let EpochSparseViewMut { dense, sparse } = value;
         Self::new(dense, sparse)
-    }
-}
-
-// TODO replace with safe variant
-#[inline]
-#[track_caller]
-pub fn unsafe_unwrap_dense_from_sparse_index<'a, T, E>(
-    sparse_index: usize,
-    dense: T::Ptrs,
-    dense_len: usize,
-    sparse: &[SparseItem<E>],
-) -> T::Refs<'a>
-where
-    T: Soa,
-{
-    let sparse_item = unwrap_sparse_item(sparse, sparse_index);
-    let dense_index = unwrap_dense_index(&sparse_item.kind);
-    if dense_index >= dense_len {
-        check_dense_index_bounds_failed()
-    }
-
-    #[allow(unsafe_code)]
-    unsafe {
-        let ptrs = T::ptrs_add(dense, dense_index);
-        T::ptrs_to_refs(ptrs)
     }
 }

@@ -20,12 +20,14 @@ pub struct KeyValuePair<K, V> {
 }
 
 impl<K, V> KeyValuePair<K, V> {
+    #[inline]
     pub const fn new(key: K, value: V) -> Self {
         Self { key, value }
     }
 }
 
 impl<K, V> From<(K, V)> for KeyValuePair<K, V> {
+    #[inline]
     fn from(value: (K, V)) -> Self {
         let (key, value) = value;
         Self { key, value }
@@ -33,6 +35,7 @@ impl<K, V> From<(K, V)> for KeyValuePair<K, V> {
 }
 
 impl<K, V> From<KeyValuePair<K, V>> for (K, V) {
+    #[inline]
     fn from(value: KeyValuePair<K, V>) -> Self {
         let KeyValuePair { key, value } = value;
         (key, value)
@@ -46,10 +49,12 @@ where
 {
     type FieldLayouts = KeyValueFieldLayouts<K, V>;
 
+    #[inline]
     fn field_layouts() -> Self::FieldLayouts {
         Default::default()
     }
 
+    #[inline]
     fn buffer_layout(
         capacity: usize,
     ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
@@ -72,6 +77,7 @@ where
 
     type MutPtrs = KeyValueMutPtrs<K, V>;
 
+    #[inline]
     fn ptrs_dangling() -> Self::MutPtrs {
         KeyValueMutPtrs {
             key: ptr::dangling_mut(),
@@ -79,6 +85,7 @@ where
         }
     }
 
+    #[inline]
     #[track_caller]
     unsafe fn ptrs(ptr: *mut u8, offsets: impl IntoIterator<Item = usize>) -> Self::MutPtrs {
         let mut offsets = offsets.into_iter();
@@ -92,6 +99,7 @@ where
         }
     }
 
+    #[inline]
     fn ptrs_cast_const(ptrs: Self::MutPtrs) -> Self::Ptrs {
         let KeyValueMutPtrs { key, value } = ptrs;
         KeyValuePtrs {
@@ -100,6 +108,7 @@ where
         }
     }
 
+    #[inline]
     fn ptrs_cast_mut(ptrs: Self::Ptrs) -> Self::MutPtrs {
         let KeyValuePtrs { key, value } = ptrs;
         KeyValueMutPtrs {
@@ -108,6 +117,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_add(ptrs: Self::Ptrs, offset: usize) -> Self::Ptrs {
         let KeyValuePtrs { key, value } = ptrs;
         KeyValuePtrs {
@@ -116,6 +126,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_add_mut(ptrs: Self::MutPtrs, offset: usize) -> Self::MutPtrs {
         let KeyValueMutPtrs { key, value } = ptrs;
         KeyValueMutPtrs {
@@ -124,6 +135,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_offset_from(ptrs: Self::Ptrs, origin: Self::Ptrs) -> isize {
         let KeyValuePtrs { key, value } = ptrs;
         let KeyValuePtrs {
@@ -138,6 +150,7 @@ where
         key_offset
     }
 
+    #[inline]
     unsafe fn ptrs_offset_from_mut(ptrs: Self::MutPtrs, origin: Self::Ptrs) -> isize {
         let KeyValueMutPtrs { key, value } = ptrs;
         let KeyValuePtrs {
@@ -152,6 +165,7 @@ where
         key_offset
     }
 
+    #[inline]
     unsafe fn ptrs_swap(a: Self::MutPtrs, b: Self::MutPtrs) {
         let KeyValueMutPtrs {
             key: a_key,
@@ -168,6 +182,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_copy(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
         let KeyValuePtrs {
             key: src_key,
@@ -184,6 +199,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_copy_rev(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
         let KeyValuePtrs {
             key: src_key,
@@ -200,6 +216,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_copy_nonoverlapping(src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
         let KeyValuePtrs {
             key: src_key,
@@ -216,6 +233,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_read(src: Self::Ptrs) -> Self {
         let KeyValuePtrs { key, value } = src;
         Self {
@@ -224,6 +242,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_write(dst: Self::MutPtrs, value: Self) {
         let KeyValueMutPtrs {
             key: key_ptr,
@@ -237,6 +256,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_drop_in_place(ptrs: Self::MutPtrs) {
         let KeyValueMutPtrs { key, value } = ptrs;
 
@@ -248,6 +268,7 @@ where
 
     type NonNullPtrs = KeyValueNonNullPtrs<K, V>;
 
+    #[inline]
     unsafe fn ptrs_to_nonnull(ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
         let KeyValueMutPtrs { key, value } = ptrs;
         KeyValueNonNullPtrs {
@@ -256,6 +277,7 @@ where
         }
     }
 
+    #[inline]
     fn nonnull_to_ptrs(ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
         let KeyValueNonNullPtrs { key, value } = ptrs;
         KeyValueMutPtrs {
@@ -266,6 +288,7 @@ where
 
     type Vecs = KeyValueVecs<K, V>;
 
+    #[inline]
     fn vecs_with_capacity(capacity: usize) -> Self::Vecs {
         KeyValueVecs {
             keys: Vec::with_capacity(capacity),
@@ -273,6 +296,7 @@ where
         }
     }
 
+    #[inline]
     fn vecs_as_ptrs(vecs: &Self::Vecs) -> Self::Ptrs {
         let KeyValueVecs { keys, values } = vecs;
         KeyValuePtrs {
@@ -281,6 +305,7 @@ where
         }
     }
 
+    #[inline]
     fn mut_vecs_as_ptrs(vecs: &mut Self::Vecs) -> Self::MutPtrs {
         let KeyValueVecs { keys, values } = vecs;
         KeyValueMutPtrs {
@@ -289,6 +314,8 @@ where
         }
     }
 
+    #[inline]
+    #[track_caller]
     fn vecs_len(vecs: &Self::Vecs) -> usize {
         let KeyValueVecs { keys, values } = vecs;
 
@@ -298,6 +325,7 @@ where
         keys_len
     }
 
+    #[inline]
     unsafe fn vecs_set_len(vecs: &mut Self::Vecs, len: usize) {
         let KeyValueVecs { keys, values } = vecs;
 
@@ -317,6 +345,7 @@ where
     where
         Self: 'a;
 
+    #[inline]
     unsafe fn ptrs_to_refs<'a>(ptrs: Self::Ptrs) -> Self::Refs<'a> {
         let KeyValuePtrs { key, value } = ptrs;
         KeyValueRefs {
@@ -325,6 +354,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn ptrs_to_refs_mut<'a>(ptrs: Self::MutPtrs) -> Self::RefsMut<'a> {
         let KeyValueMutPtrs { key, value } = ptrs;
         KeyValueRefsMut {
@@ -333,6 +363,7 @@ where
         }
     }
 
+    #[inline]
     fn refs_as_ptrs(refs: Self::Refs<'_>) -> Self::Ptrs {
         let KeyValueRefs { key, value } = refs;
         KeyValuePtrs {
@@ -341,6 +372,7 @@ where
         }
     }
 
+    #[inline]
     fn mut_refs_as_ptrs(refs: Self::RefsMut<'_>) -> Self::MutPtrs {
         let KeyValueRefsMut { key, value } = refs;
         KeyValueMutPtrs {
@@ -349,6 +381,7 @@ where
         }
     }
 
+    #[inline]
     fn mut_refs_as_refs(refs: Self::RefsMut<'_>) -> Self::Refs<'_> {
         let KeyValueRefsMut { key, value } = refs;
         KeyValueRefs {
@@ -361,6 +394,7 @@ where
 
     type SliceMutPtrs = KeyValueSliceMutPtrs<K, V>;
 
+    #[inline]
     fn slices_from_raw_parts(ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs {
         let KeyValuePtrs { key, value } = ptrs;
         KeyValueSlicePtrs {
@@ -369,6 +403,7 @@ where
         }
     }
 
+    #[inline]
     fn slices_from_raw_parts_mut(ptrs: Self::MutPtrs, len: usize) -> Self::SliceMutPtrs {
         let KeyValueMutPtrs { key, value } = ptrs;
         KeyValueSliceMutPtrs {
@@ -377,22 +412,60 @@ where
         }
     }
 
-    fn slices_len(slices: Self::SlicePtrs) -> usize {
+    #[inline]
+    fn slice_ptrs_cast_const(slices: Self::SliceMutPtrs) -> Self::SlicePtrs {
+        let KeyValueSliceMutPtrs { keys, values } = slices;
+        KeyValueSlicePtrs {
+            keys: keys.cast_const(),
+            values: V::slice_ptrs_cast_const(values),
+        }
+    }
+
+    #[inline]
+    fn slice_ptrs_cast_mut(slices: Self::SlicePtrs) -> Self::SliceMutPtrs {
+        let KeyValueSlicePtrs { keys, values } = slices;
+        KeyValueSliceMutPtrs {
+            keys: keys.cast_mut(),
+            values: V::slice_ptrs_cast_mut(values),
+        }
+    }
+
+    #[inline]
+    fn slice_ptrs_len(slices: Self::SlicePtrs) -> usize {
         let KeyValueSlicePtrs { keys, values } = slices;
 
         let keys_len = keys.len();
-        let values_len = V::slices_len(values);
+        let values_len = V::slice_ptrs_len(values);
         assert_eq!(keys_len, values_len);
         keys_len
     }
 
-    fn slices_len_mut(slices: Self::SliceMutPtrs) -> usize {
+    #[inline]
+    fn slice_ptrs_len_mut(slices: Self::SliceMutPtrs) -> usize {
         let KeyValueSliceMutPtrs { keys, values } = slices;
 
         let keys_len = keys.len();
-        let values_len = V::slices_len_mut(values);
+        let values_len = V::slice_ptrs_len_mut(values);
         assert_eq!(keys_len, values_len);
         keys_len
+    }
+
+    #[inline]
+    fn slice_ptrs_as_ptrs(slices: Self::SlicePtrs) -> Self::Ptrs {
+        let KeyValueSlicePtrs { keys, values } = slices;
+        KeyValuePtrs {
+            key: keys.cast(), // should be `keys.as_ptr()` but it's unstable
+            value: V::slice_ptrs_as_ptrs(values),
+        }
+    }
+
+    #[inline]
+    fn mut_slice_ptrs_as_ptrs(slices: Self::SliceMutPtrs) -> Self::MutPtrs {
+        let KeyValueSliceMutPtrs { keys, values } = slices;
+        KeyValueMutPtrs {
+            key: keys.cast(), // should be `keys.as_mut_ptr()` but it's unstable
+            value: V::mut_slice_ptrs_as_ptrs(values),
+        }
     }
 
     type Slices<'a>
@@ -405,22 +478,49 @@ where
     where
         Self: 'a;
 
+    #[inline]
     unsafe fn slice_ptrs_to_slices<'a>(slices: Self::SlicePtrs) -> Self::Slices<'a> {
         let KeyValueSlicePtrs { keys, values } = slices;
         KeyValueSlices {
-            keys: unsafe { slice::from_raw_parts(keys.cast(), Self::slices_len(slices)) },
+            keys: unsafe { slice::from_raw_parts(keys.cast(), Self::slice_ptrs_len(slices)) },
             values: unsafe { V::slice_ptrs_to_slices(values) },
         }
     }
 
+    #[inline]
     unsafe fn slice_ptrs_to_slices_mut<'a>(slices: Self::SliceMutPtrs) -> Self::SlicesMut<'a> {
         let KeyValueSliceMutPtrs { keys, values } = slices;
         KeyValueSlicesMut {
-            keys: unsafe { slice::from_raw_parts_mut(keys.cast(), Self::slices_len_mut(slices)) },
+            keys: unsafe {
+                slice::from_raw_parts_mut(keys.cast(), Self::slice_ptrs_len_mut(slices))
+            },
             values: unsafe { V::slice_ptrs_to_slices_mut(values) },
         }
     }
 
+    #[inline]
+    #[track_caller]
+    fn slices_len(slices: &Self::Slices<'_>) -> usize {
+        let KeyValueSlices { keys, values } = slices;
+
+        let keys_len = keys.len();
+        let values_len = V::slices_len(values);
+        assert_eq!(keys_len, values_len);
+        keys_len
+    }
+
+    #[inline]
+    #[track_caller]
+    fn slices_len_mut(slices: &Self::SlicesMut<'_>) -> usize {
+        let KeyValueSlicesMut { keys, values } = slices;
+
+        let keys_len = keys.len();
+        let values_len = V::slices_len_mut(values);
+        assert_eq!(keys_len, values_len);
+        keys_len
+    }
+
+    #[inline]
     fn slice_refs_as_slice_ptrs(slices: Self::Slices<'_>) -> Self::SlicePtrs {
         let KeyValueSlices { keys, values } = slices;
         KeyValueSlicePtrs {
@@ -429,6 +529,7 @@ where
         }
     }
 
+    #[inline]
     fn mut_slice_refs_as_slice_ptrs(slices: Self::SlicesMut<'_>) -> Self::SliceMutPtrs {
         let KeyValueSlicesMut { keys, values } = slices;
         KeyValueSliceMutPtrs {
@@ -437,6 +538,7 @@ where
         }
     }
 
+    #[inline]
     fn mut_slices_as_slices(slices: Self::SlicesMut<'_>) -> Self::Slices<'_> {
         let KeyValueSlicesMut { keys, values } = slices;
         KeyValueSlices {
@@ -445,6 +547,7 @@ where
         }
     }
 
+    #[inline]
     fn slice_refs_as_ptrs(slices: Self::Slices<'_>) -> Self::Ptrs {
         let KeyValueSlices { keys, values } = slices;
         KeyValuePtrs {
@@ -453,6 +556,7 @@ where
         }
     }
 
+    #[inline]
     fn mut_slice_refs_as_ptrs(slices: Self::SlicesMut<'_>) -> Self::MutPtrs {
         let KeyValueSlicesMut { keys, values } = slices;
         KeyValueMutPtrs {
@@ -461,6 +565,7 @@ where
         }
     }
 
+    #[inline]
     unsafe fn slices_drop_in_place(slices: Self::SliceMutPtrs) {
         let KeyValueSliceMutPtrs { keys, values } = slices;
 
@@ -497,6 +602,7 @@ impl<K, V> Default for KeyValueFieldLayouts<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn default() -> Self {
         Self {
             key_layout: Layout::new::<K>(),
@@ -597,6 +703,7 @@ impl<K, V> From<(*const K, V::Ptrs)> for KeyValuePtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: (*const K, V::Ptrs)) -> Self {
         let (key, value) = value;
         Self { key, value }
@@ -607,6 +714,7 @@ impl<K, V> From<KeyValuePtrs<K, V>> for (*const K, V::Ptrs)
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: KeyValuePtrs<K, V>) -> Self {
         let KeyValuePtrs { key, value } = value;
         (key, value)
@@ -705,6 +813,7 @@ impl<K, V> From<(*mut K, V::MutPtrs)> for KeyValueMutPtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: (*mut K, V::MutPtrs)) -> Self {
         let (key, value) = value;
         Self { key, value }
@@ -715,6 +824,7 @@ impl<K, V> From<KeyValueMutPtrs<K, V>> for (*mut K, V::MutPtrs)
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: KeyValueMutPtrs<K, V>) -> Self {
         let KeyValueMutPtrs { key, value } = value;
         (key, value)
@@ -794,6 +904,7 @@ impl<K, V> Clone for KeyValueMutPtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn clone(&self) -> Self {
         *self
     }
@@ -813,6 +924,7 @@ impl<K, V> From<(NonNull<K>, V::NonNullPtrs)> for KeyValueNonNullPtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: (NonNull<K>, V::NonNullPtrs)) -> Self {
         let (key, value) = value;
         Self { key, value }
@@ -823,6 +935,7 @@ impl<K, V> From<KeyValueNonNullPtrs<K, V>> for (NonNull<K>, V::NonNullPtrs)
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: KeyValueNonNullPtrs<K, V>) -> Self {
         let KeyValueNonNullPtrs { key, value } = value;
         (key, value)
@@ -902,6 +1015,7 @@ impl<K, V> Clone for KeyValueNonNullPtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn clone(&self) -> Self {
         *self
     }
@@ -921,6 +1035,7 @@ impl<K, V> From<(Vec<K>, V::Vecs)> for KeyValueVecs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: (Vec<K>, V::Vecs)) -> Self {
         let (keys, values) = value;
         Self { keys, values }
@@ -931,6 +1046,7 @@ impl<K, V> From<KeyValueVecs<K, V>> for (Vec<K>, V::Vecs)
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: KeyValueVecs<K, V>) -> Self {
         let KeyValueVecs { keys, values } = value;
         (keys, values)
@@ -956,6 +1072,7 @@ where
     V: Soa,
     V::Vecs: Default,
 {
+    #[inline]
     fn default() -> Self {
         Self {
             keys: Default::default(),
@@ -1031,6 +1148,7 @@ where
     V: Soa,
     V::Vecs: Clone,
 {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             keys: self.keys.clone(),
@@ -1053,6 +1171,7 @@ where
     K: 'a,
     V: Soa + 'a,
 {
+    #[inline]
     fn from(value: (&'a K, V::Refs<'a>)) -> Self {
         let (key, value) = value;
         Self { key, value }
@@ -1064,6 +1183,7 @@ where
     K: 'a,
     V: Soa + 'a,
 {
+    #[inline]
     fn from(value: KeyValueRefs<'a, K, V>) -> Self {
         let KeyValueRefs { key, value } = value;
         (key, value)
@@ -1151,6 +1271,7 @@ where
     V: Soa + 'a,
     V::Refs<'a>: Clone,
 {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             key: self.key,
@@ -1181,6 +1302,7 @@ where
     K: 'a,
     V: Soa + 'a,
 {
+    #[inline]
     fn from(value: (&'a mut K, V::RefsMut<'a>)) -> Self {
         let (key, value) = value;
         Self { key, value }
@@ -1192,6 +1314,7 @@ where
     K: 'a,
     V: Soa + 'a,
 {
+    #[inline]
     fn from(value: KeyValueRefsMut<'a, K, V>) -> Self {
         let KeyValueRefsMut { key, value } = value;
         (key, value)
@@ -1285,6 +1408,7 @@ impl<K, V> From<(*const [K], V::SlicePtrs)> for KeyValueSlicePtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: (*const [K], V::SlicePtrs)) -> Self {
         let (keys, values) = value;
         Self { keys, values }
@@ -1295,6 +1419,7 @@ impl<K, V> From<KeyValueSlicePtrs<K, V>> for (*const [K], V::SlicePtrs)
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: KeyValueSlicePtrs<K, V>) -> Self {
         let KeyValueSlicePtrs { keys, values } = value;
         (keys, values)
@@ -1377,6 +1502,7 @@ impl<K, V> Clone for KeyValueSlicePtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn clone(&self) -> Self {
         *self
     }
@@ -1396,6 +1522,7 @@ impl<K, V> From<(*mut [K], V::SliceMutPtrs)> for KeyValueSliceMutPtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: (*mut [K], V::SliceMutPtrs)) -> Self {
         let (keys, values) = value;
         Self { keys, values }
@@ -1406,6 +1533,7 @@ impl<K, V> From<KeyValueSliceMutPtrs<K, V>> for (*mut [K], V::SliceMutPtrs)
 where
     V: Soa,
 {
+    #[inline]
     fn from(value: KeyValueSliceMutPtrs<K, V>) -> Self {
         let KeyValueSliceMutPtrs { keys, values } = value;
         (keys, values)
@@ -1488,6 +1616,7 @@ impl<K, V> Clone for KeyValueSliceMutPtrs<K, V>
 where
     V: Soa,
 {
+    #[inline]
     fn clone(&self) -> Self {
         *self
     }
@@ -1509,6 +1638,7 @@ where
     K: 'a,
     V: Soa + 'a,
 {
+    #[inline]
     fn from(value: (&'a [K], V::Slices<'a>)) -> Self {
         let (keys, values) = value;
         Self { keys, values }
@@ -1520,6 +1650,7 @@ where
     K: 'a,
     V: Soa + 'a,
 {
+    #[inline]
     fn from(value: KeyValueSlices<'a, K, V>) -> Self {
         let KeyValueSlices { keys, values } = value;
         (keys, values)
@@ -1546,6 +1677,7 @@ where
     V: Soa + 'a,
     V::Slices<'a>: Default,
 {
+    #[inline]
     fn default() -> Self {
         Self {
             keys: Default::default(),
@@ -1621,6 +1753,7 @@ where
     V: Soa + 'a,
     V::Slices<'a>: Clone,
 {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             keys: self.keys,
@@ -1651,6 +1784,7 @@ where
     K: 'a,
     V: Soa + 'a,
 {
+    #[inline]
     fn from(value: (&'a mut [K], V::SlicesMut<'a>)) -> Self {
         let (keys, values) = value;
         Self { keys, values }
@@ -1662,6 +1796,7 @@ where
     K: 'a,
     V: Soa + 'a,
 {
+    #[inline]
     fn from(value: KeyValueSlicesMut<'a, K, V>) -> Self {
         let KeyValueSlicesMut { keys, values } = value;
         (keys, values)
@@ -1688,6 +1823,7 @@ where
     V: Soa + 'a,
     V::SlicesMut<'a>: Default,
 {
+    #[inline]
     fn default() -> Self {
         Self {
             keys: Default::default(),

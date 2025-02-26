@@ -14,6 +14,7 @@ use rspirv::{
     dr::{Block, Function, Module},
 };
 
+pub mod asymptotic;
 pub mod tmm;
 
 #[derive(Debug, Clone, Copy)]

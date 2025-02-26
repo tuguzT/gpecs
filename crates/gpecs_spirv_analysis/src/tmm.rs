@@ -7,8 +7,10 @@ use std::{
     time::Duration,
 };
 
+use crate::asymptotic::Expr;
+
 /// The important characteristics of a highly-threaded, many-core architecture
-/// on which algorithms are executed.
+/// on which algorithms (or programs) are executed.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct ArchParams {
     /// *L* - time for a global memory access.
@@ -44,22 +46,19 @@ pub struct ArchParams {
 
 /// The parameters of the algorithm (or program)
 /// which is executed on a highly-threaded, many-core architecture.
-pub struct Params {
+pub struct ProgramParams {
     /// *T1* - the work, or total number of operations.
     ///
     /// The total number of operations that the program must perform (including fast memory accesses).
-    // TODO should be an expression with links to SPIR-V ids
-    pub work: usize,
+    pub work: Expr,
     /// *T∞* - the span, or the number of operations on the critical path.
-    // TODO should be an expression with links to SPIR-V ids
-    pub span: usize,
+    pub span: Expr,
     /// *M* - number of global memory operations.
     ///
     /// Note that this is the total number of operations, not total number of accesses.
     /// Since many-core machines often transfer data in large chunks, multiple
     /// memory accesses can combine into one memory transfer.
-    // TODO should be an expression with links to SPIR-V ids
-    pub global_memory_accesses: usize,
+    pub global_memory_accesses: Expr,
     /// *τ* - number of threads per core.
     ///
     /// There is an assumption that the work is perfectly distributed among cores.

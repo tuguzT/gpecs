@@ -14,6 +14,8 @@ use rspirv::{
     dr::{Block, Function, Module},
 };
 
+pub mod tmm;
+
 #[derive(Debug, Clone, Copy)]
 pub struct WorkError;
 

@@ -1,6 +1,6 @@
 use std::{
     fmt::{self, Display},
-    ops::{Add, Div, Mul, Rem, Sub},
+    ops::{Add, Div, Mul, Not, Rem, Sub},
 };
 
 use rspirv::spirv::Word;
@@ -173,20 +173,77 @@ where
 
 impl Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use BinaryOperator::*;
+        use UnaryOperator::*;
+
         match self {
-            Expr::Const(value) => value.fmt(f),
-            Expr::Id(id) => write!(f, "%{id}"),
-            Expr::Unary { op, arg } => match op {
-                UnaryOperator::Log => write!(f, "log({arg})"),
-                UnaryOperator::Factorial => write!(f, "({arg})!"),
+            Self::Const(value) => value.fmt(f),
+            Self::Id(id) => write!(f, "%{id}"),
+            Self::Unary { op, arg } => match op {
+                Log => write!(f, "log({arg})"),
+                Factorial => match arg.as_ref() {
+                    Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{arg}!"),
+                    Self::Binary { .. } => write!(f, "({arg})!"),
+                },
             },
-            Expr::Binary { op, lhs, rhs } => match op {
-                BinaryOperator::Add => write!(f, "({lhs}) + ({rhs})"),
-                BinaryOperator::Sub => write!(f, "({lhs}) - ({rhs})"),
-                BinaryOperator::Mul => write!(f, "({lhs}) * ({rhs})"),
-                BinaryOperator::Div => write!(f, "({lhs}) / ({rhs})"),
-                BinaryOperator::Rem => write!(f, "({lhs}) % ({rhs})"),
-                BinaryOperator::Pow => write!(f, "({lhs}) ^ ({rhs})"),
+            Self::Binary { op, lhs, rhs } => match op {
+                Add => write!(f, "{lhs} + {rhs}"),
+                Sub => {
+                    match lhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{lhs}"),
+                        Self::Binary { op, .. } if matches!(op, Rem).not() => write!(f, "{lhs}"),
+                        Self::Binary { .. } => write!(f, "({lhs})"),
+                    }?;
+                    write!(f, " - ")?;
+                    match rhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{rhs}"),
+                        Self::Binary { .. } => write!(f, "({rhs})"),
+                    }
+                }
+                Mul => {
+                    match lhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{lhs}"),
+                        Self::Binary { .. } => write!(f, "({lhs})"),
+                    }?;
+                    write!(f, " * ")?;
+                    match rhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{rhs}"),
+                        Self::Binary { .. } => write!(f, "({rhs})"),
+                    }
+                }
+                Div => {
+                    match lhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{lhs}"),
+                        Self::Binary { .. } => write!(f, "({lhs})"),
+                    }?;
+                    write!(f, " / ")?;
+                    match rhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{rhs}"),
+                        Self::Binary { .. } => write!(f, "({rhs})"),
+                    }
+                }
+                Rem => {
+                    match lhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{lhs}"),
+                        Self::Binary { .. } => write!(f, "({lhs})"),
+                    }?;
+                    write!(f, " % ")?;
+                    match rhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{rhs}"),
+                        Self::Binary { .. } => write!(f, "({rhs})"),
+                    }
+                }
+                Pow => {
+                    match lhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{lhs}"),
+                        Self::Binary { .. } => write!(f, "({lhs})"),
+                    }?;
+                    write!(f, " ^ ")?;
+                    match rhs.as_ref() {
+                        Self::Const(_) | Self::Id(_) | Self::Unary { .. } => write!(f, "{rhs}"),
+                        Self::Binary { .. } => write!(f, "({rhs})"),
+                    }
+                }
             },
         }
     }
@@ -202,27 +259,54 @@ mod tests {
         assert_eq!("%10", expr.to_string());
 
         let expr = expr + 1.0;
-        assert_eq!("(%10) + (1)", expr.to_string());
+        assert_eq!("%10 + 1", expr.to_string());
+
+        let expr = Expr::Id(15).pow(2.0);
+        assert_eq!("%15 ^ 2", expr.to_string());
+
+        let expr = expr - 3.0;
+        assert_eq!("%15 ^ 2 - 3", expr.to_string());
 
         let expr = Expr::Id(1) * 2;
-        assert_eq!("(%1) * (2)", expr.to_string());
+        assert_eq!("%1 * 2", expr.to_string());
+
+        let expr = expr - 3.0;
+        assert_eq!("%1 * 2 - 3", expr.to_string());
 
         let expr = expr / 3;
-        assert_eq!("((%1) * (2)) / (3)", expr.to_string());
+        assert_eq!("(%1 * 2 - 3) / 3", expr.to_string());
 
         let expr = expr % 4;
-        assert_eq!("(((%1) * (2)) / (3)) % (4)", expr.to_string());
+        assert_eq!("((%1 * 2 - 3) / 3) % 4", expr.to_string());
 
         let expr = Expr::from(5.0).pow(3.0);
-        assert_eq!("(5) ^ (3)", expr.to_string());
+        assert_eq!("5 ^ 3", expr.to_string());
 
         let expr = expr.factorial();
-        assert_eq!("((5) ^ (3))!", expr.to_string());
+        assert_eq!("(5 ^ 3)!", expr.to_string());
+
+        let expr = Expr::Id(1).factorial();
+        assert_eq!("%1!", expr.to_string());
+
+        let expr = expr.log();
+        assert_eq!("log(%1!)", expr.to_string());
+
+        let expr = (Expr::from(3.0) - Expr::Id(3)).log();
+        assert_eq!("log(3 - %3)", expr.to_string());
 
         let expr = Expr::from(2.0).log();
         assert_eq!("log(2)", expr.to_string());
 
-        let expr = Expr::Id(1) - (Expr::from(1.0) - 3.0);
-        assert_eq!("(%1) - ((1) - (3))", expr.to_string());
+        let expr = expr.factorial();
+        assert_eq!("log(2)!", expr.to_string());
+
+        let expr = expr.factorial();
+        assert_eq!("log(2)!!", expr.to_string());
+
+        let expr = Expr::Id(1) - Expr::from(1.0).factorial();
+        assert_eq!("%1 - 1!", expr.to_string());
+
+        let expr = Expr::Id(1) - 1 - (Expr::from(1.0) + 3.0);
+        assert_eq!("%1 - 1 - (1 + 3)", expr.to_string());
     }
 }

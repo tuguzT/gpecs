@@ -21,7 +21,7 @@ pub enum BinaryOperator {
     Pow,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Const(f64),
     Id(Word),
@@ -160,6 +160,9 @@ where
         Box::new(value.into())
     }
 }
+
+// impl PartialEq for Expr {
+// }
 
 // impl PartialOrd for Expr {
 //     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {

@@ -7,11 +7,11 @@ pub type Id = EpochKey;
 pub type TryReserveError = gpecs_sparse::error::TryReserveError;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct IdStorage {
+pub struct IdRegistry {
     inner: EpochSparseArena<Id, ()>,
 }
 
-impl IdStorage {
+impl IdRegistry {
     #[inline]
     pub fn new() -> Self {
         let inner = EpochSparseArena::new();
@@ -173,24 +173,22 @@ impl IdStorage {
     }
 }
 
-impl From<Vec<Id>> for IdStorage {
+impl From<Vec<Id>> for IdRegistry {
     #[inline]
     fn from(value: Vec<Id>) -> Self {
-        let dense = value.into_iter().map(|id| (id, ()).into()).collect();
-        let inner = EpochSparseArena::from_parts(dense, Vec::new());
-        Self { inner }
+        value.into_iter().collect()
     }
 }
 
-impl From<IdStorage> for Vec<Id> {
+impl From<IdRegistry> for Vec<Id> {
     #[inline]
-    fn from(storage: IdStorage) -> Self {
-        let IdStorage { inner } = storage;
+    fn from(storage: IdRegistry) -> Self {
+        let IdRegistry { inner } = storage;
         inner.into_keys_vec()
     }
 }
 
-impl Clone for IdStorage {
+impl Clone for IdRegistry {
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -206,28 +204,28 @@ impl Clone for IdStorage {
     }
 }
 
-impl AsRef<[Id]> for IdStorage {
+impl AsRef<[Id]> for IdRegistry {
     #[inline]
     fn as_ref(&self) -> &[Id] {
         self.as_slice()
     }
 }
 
-impl AsRef<IdStorage> for IdStorage {
+impl AsRef<IdRegistry> for IdRegistry {
     #[inline]
-    fn as_ref(&self) -> &IdStorage {
+    fn as_ref(&self) -> &IdRegistry {
         self
     }
 }
 
-impl AsMut<IdStorage> for IdStorage {
+impl AsMut<IdRegistry> for IdRegistry {
     #[inline]
-    fn as_mut(&mut self) -> &mut IdStorage {
+    fn as_mut(&mut self) -> &mut IdRegistry {
         self
     }
 }
 
-impl Deref for IdStorage {
+impl Deref for IdRegistry {
     type Target = [Id];
 
     #[inline]
@@ -236,7 +234,7 @@ impl Deref for IdStorage {
     }
 }
 
-impl<'a> IntoIterator for &'a IdStorage {
+impl<'a> IntoIterator for &'a IdRegistry {
     type Item = &'a Id;
     type IntoIter = Iter<'a, Id>;
 
@@ -246,7 +244,7 @@ impl<'a> IntoIterator for &'a IdStorage {
     }
 }
 
-impl IntoIterator for IdStorage {
+impl IntoIterator for IdRegistry {
     type Item = Id;
     type IntoIter = IntoIter<Id>;
 
@@ -257,7 +255,7 @@ impl IntoIterator for IdStorage {
     }
 }
 
-impl FromIterator<Id> for IdStorage {
+impl FromIterator<Id> for IdRegistry {
     #[inline]
     fn from_iter<T: IntoIterator<Item = Id>>(iter: T) -> Self {
         let inner = iter.into_iter().map(|id| (id, ())).collect();
@@ -265,7 +263,7 @@ impl FromIterator<Id> for IdStorage {
     }
 }
 
-impl Extend<Id> for IdStorage {
+impl Extend<Id> for IdRegistry {
     #[inline]
     fn extend<T: IntoIterator<Item = Id>>(&mut self, iter: T) {
         let Self { inner } = self;

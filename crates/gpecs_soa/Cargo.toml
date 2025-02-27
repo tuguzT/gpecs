@@ -9,10 +9,6 @@ edition.workspace = true
 [dev-dependencies]
 criterion = { workspace = true }
 
-[features]
-default = ["cache-ptrs"]
-cache-ptrs = []
-
 [[bench]]
 name = "soa"
 harness = false

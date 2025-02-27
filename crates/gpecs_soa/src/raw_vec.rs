@@ -98,8 +98,6 @@ where
 {
     ptr: NonNull<BufferData<T>>,
     capacity: usize,
-    #[cfg(feature = "cache-ptrs")]
-    ptrs: T::NonNullPtrs,
 }
 
 impl<T> RawSoaVec<T>
@@ -130,8 +128,6 @@ where
         Self {
             ptr: NonNull::dangling(),
             capacity: 0,
-            #[cfg(feature = "cache-ptrs")]
-            ptrs: unsafe { T::ptrs_to_nonnull(T::ptrs_dangling()) },
         }
     }
 
@@ -158,15 +154,7 @@ where
         };
 
         let ptr = ptr.cast();
-        Ok(Self {
-            ptr,
-            capacity,
-            #[cfg(feature = "cache-ptrs")]
-            ptrs: unsafe {
-                let ptrs = ptrs::<T>(ptr.as_ptr(), capacity).unwrap_unchecked();
-                T::ptrs_to_nonnull(ptrs)
-            },
-        })
+        Ok(Self { ptr, capacity })
     }
 
     #[inline]
@@ -221,15 +209,7 @@ where
 
     #[inline]
     pub unsafe fn from_nonnull(ptr: NonNull<BufferData<T>>, capacity: usize) -> Self {
-        Self {
-            ptr,
-            capacity,
-            #[cfg(feature = "cache-ptrs")]
-            ptrs: unsafe {
-                let ptrs = ptrs::<T>(ptr.as_ptr(), capacity).unwrap_unchecked();
-                T::ptrs_to_nonnull(ptrs)
-            },
-        }
+        Self { ptr, capacity }
     }
 
     #[inline]
@@ -243,18 +223,11 @@ where
     }
 
     #[inline]
-    #[cfg(not(feature = "cache-ptrs"))]
     pub fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr();
         let capacity = self.capacity();
 
         unsafe { ptrs::<T>(ptr, capacity).unwrap_unchecked() }
-    }
-
-    #[inline]
-    #[cfg(feature = "cache-ptrs")]
-    pub fn ptrs(&self) -> T::MutPtrs {
-        T::nonnull_to_ptrs(self.ptrs)
     }
 
     #[inline]
@@ -359,18 +332,6 @@ where
     unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<BufferData<T>>, capacity: usize) {
         self.ptr = ptr;
         self.capacity = capacity;
-
-        #[cfg(feature = "cache-ptrs")]
-        {
-            self.ptrs = unsafe {
-                let ptrs = if ptr == NonNull::dangling() {
-                    T::ptrs_dangling()
-                } else {
-                    ptrs::<T>(ptr.as_ptr(), capacity).unwrap_unchecked()
-                };
-                T::ptrs_to_nonnull(ptrs)
-            };
-        }
     }
 
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {

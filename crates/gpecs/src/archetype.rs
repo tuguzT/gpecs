@@ -1,16 +1,12 @@
-use std::{
-    any::{Any, TypeId},
-    collections::HashSet,
-};
+use std::{any::Any, collections::BTreeSet};
 
 use gpecs_sparse::set::EpochSparseSet;
 
-use crate::{id::Id, soa::Soa};
+use crate::{component::ComponentId, id::Id, soa::Soa};
 
 pub struct Archetype {
-    // TODO: replace type ID identifier for FFI and GPU
     #[allow(dead_code)]
-    component_ids: HashSet<TypeId>,
+    component_ids: BTreeSet<ComponentId>,
     erased_storage: Box<dyn ErasedStorage>,
 }
 

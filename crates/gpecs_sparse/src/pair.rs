@@ -11,7 +11,7 @@ use core::{
     slice,
 };
 
-use crate::soa::traits::Soa;
+use crate::soa::traits::{Soa, SoaToOwned};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct KeyValuePair<K, V> {
@@ -1286,6 +1286,37 @@ where
     V: Soa + 'a,
     V::Refs<'a>: Copy,
 {
+}
+
+impl<'a, K, V> SoaToOwned<'a> for KeyValueRefs<'a, K, V>
+where
+    K: Clone,
+    V: Soa,
+    V::Refs<'a>: SoaToOwned<'a, Owned = V>,
+{
+    type Owned
+        = KeyValuePair<K, V>
+    where
+        Self: 'a;
+
+    fn to_owned(&self) -> Self::Owned {
+        let Self { key, value } = self;
+        KeyValuePair {
+            key: (*key).clone(),
+            value: value.to_owned(),
+        }
+    }
+
+    fn clone_into(&self, target: &mut Self::Owned) {
+        let Self { key, value } = self;
+        let KeyValuePair {
+            key: target_key,
+            value: target_value,
+        } = target;
+
+        target_key.clone_from(key);
+        value.clone_into(target_value);
+    }
 }
 
 pub struct KeyValueRefsMut<'a, K, V>

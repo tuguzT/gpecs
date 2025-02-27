@@ -166,20 +166,25 @@ where
 
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
-        let Self { dense, sparse, .. } = self;
+        self.truncate(min_capacity, min_capacity);
 
+        let Self { dense, sparse, .. } = self;
         dense.shrink_to(min_capacity);
         sparse.shrink_to(min_capacity);
     }
 
     #[inline]
     pub fn dense_shrink_to(&mut self, min_capacity: usize) {
+        self.truncate(min_capacity, usize::MAX);
+
         let Self { dense, .. } = self;
         dense.shrink_to(min_capacity);
     }
 
     #[inline]
     pub fn sparse_shrink_to(&mut self, min_capacity: usize) {
+        self.truncate(usize::MAX, min_capacity);
+
         let Self { sparse, .. } = self;
         sparse.shrink_to(min_capacity);
     }

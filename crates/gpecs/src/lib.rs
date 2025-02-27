@@ -5,5 +5,8 @@
 #![forbid(unsafe_code)]
 // TODO `#![no_std]` with `alloc` enabled
 
+pub use gpecs_sparse::soa;
+
+pub mod archetype;
 pub mod id;
 pub mod prelude;

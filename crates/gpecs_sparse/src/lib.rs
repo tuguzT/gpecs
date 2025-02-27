@@ -8,6 +8,8 @@
 
 extern crate alloc;
 
+pub use gpecs_soa as soa;
+
 pub mod arena;
 pub mod error;
 pub mod item;

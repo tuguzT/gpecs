@@ -3,9 +3,10 @@ use core::{
     iter::FusedIterator,
 };
 
-use gpecs_soa::{slice, traits::Soa, vec};
-
-use crate::pair::{KeyValuePair, KeyValueRefs, KeyValueRefsMut, KeyValueSlices, KeyValueSlicesMut};
+use crate::{
+    pair::{KeyValuePair, KeyValueRefs, KeyValueRefsMut, KeyValueSlices, KeyValueSlicesMut},
+    soa::{slice, traits::Soa, vec},
+};
 
 #[repr(transparent)]
 pub struct Keys<'a, K, V>

@@ -10,5 +10,6 @@ edition = "2021"
 
 [workspace.dependencies]
 gpecs_soa = { path = "crates/gpecs_soa" }
+gpecs_sparse = { path = "crates/gpecs_sparse" }
 rspirv = { version = "0.12" }
 criterion = { version = "0.5", features = ["html_reports"] }

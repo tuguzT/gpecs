@@ -11,7 +11,7 @@ use core::{
     slice,
 };
 
-use gpecs_soa::Soa;
+use crate::soa::traits::Soa;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct KeyValuePair<K, V> {

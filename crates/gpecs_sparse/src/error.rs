@@ -1,10 +1,10 @@
+use alloc::collections::TryReserveError as AllocError;
 use core::{
     error::Error,
     fmt::{self, Display},
 };
 
-use alloc::collections::TryReserveError as AllocError;
-use gpecs_soa::vec::TryReserveError as SoaError;
+use crate::soa::vec::TryReserveError as SoaError;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum TryReserveError {

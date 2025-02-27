@@ -1,12 +1,11 @@
 use core::{fmt::Display, mem::swap, ops};
 
-use gpecs_soa::{mem::swap as soa_swap, slice::SoaSlice, Soa};
-
 use crate::{
     assert::{check_dense_index_bounds, check_equal_key, unwrap_dense, unwrap_dense_pair},
     item::{SparseItem, SparseItemKind},
     key::Key,
     pair::KeyValuePair,
+    soa::{mem::swap as soa_swap, slice::SoaSlice, Soa},
 };
 
 // https://stackoverflow.com/a/73428605/14928295

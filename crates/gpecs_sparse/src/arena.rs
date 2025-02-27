@@ -6,8 +6,6 @@ use core::{
     ops::{Deref, DerefMut, Index, IndexMut},
 };
 
-use gpecs_soa::{mem::replace as soa_replace, slice::SoaSlice, traits::Soa, vec::SoaVec};
-
 use crate::{
     assert::{
         check_dense_index_bounds, check_equal_key, check_key_bounds, unwrap_dense,
@@ -24,6 +22,7 @@ use crate::{
         KeyValueSlicesMut, KeyValueVecs,
     },
     set,
+    soa::{mem::replace as soa_replace, slice::SoaSlice, traits::Soa, vec::SoaVec},
     view::{EpochSparseView, EpochSparseViewMut},
 };
 

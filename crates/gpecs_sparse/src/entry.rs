@@ -3,14 +3,13 @@ use core::{
     marker::PhantomData,
 };
 
-use gpecs_soa::{mem::replace as soa_replace, Soa};
-
 use crate::{
     arena::EpochSparseArena,
     assert::unwrap_dense,
     iter::{Values, ValuesMut},
     key::Key,
     set::EpochSparseSet,
+    soa::{mem::replace as soa_replace, Soa},
 };
 
 pub struct OccupiedEntry<'a, K, V, C>

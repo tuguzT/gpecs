@@ -5,11 +5,6 @@ use core::{
     ops::{Index, IndexMut},
 };
 
-use gpecs_soa::{
-    slice::{SoaSlice, SoaSlices, SoaSlicesMut},
-    traits::Soa,
-};
-
 use crate::{
     algo::{
         sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_mut, sparse_get_mut_with_key,
@@ -23,6 +18,10 @@ use crate::{
     iter::{Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueSlices, KeyValueSlicesMut},
+    soa::{
+        slice::{SoaSlice, SoaSlices, SoaSlicesMut},
+        traits::Soa,
+    },
 };
 
 pub type SparseView<'a, T> = EpochSparseView<'a, usize, T>;

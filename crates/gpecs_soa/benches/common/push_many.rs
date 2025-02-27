@@ -9,12 +9,10 @@ pub(super) trait Push: WithCapacity {
     fn soa_slf_push(vec: &mut SoaVec<Self>, value: Self) {
         let value = black_box(value);
         vec.push(value);
-        black_box(vec);
     }
 
     fn soa_slf_clear(vec: &mut SoaVec<Self>) {
         vec.clear();
-        black_box(vec);
     }
 
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self);
@@ -24,23 +22,21 @@ pub(super) trait Push: WithCapacity {
     fn aos_std_push(vec: &mut Vec<Self>, value: Self) {
         let value = black_box(value);
         vec.push(value);
-        black_box(vec);
     }
 
     fn aos_std_clear(vec: &mut Vec<Self>) {
         vec.clear();
-        black_box(vec);
     }
 }
 
 impl Push for Zero {
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self) {
-        black_box(value);
-        black_box(vecs);
+        let value = black_box(value);
+        vecs.push(value);
     }
 
     fn soa_std_clear(vecs: &mut Self::Vecs) {
-        black_box(vecs);
+        vecs.clear();
     }
 }
 
@@ -54,7 +50,6 @@ impl Push for Tiny {
     fn soa_std_clear(vecs: &mut Self::Vecs) {
         let (values,) = vecs;
         values.clear();
-        black_box(vecs);
     }
 }
 
@@ -72,7 +67,6 @@ impl Push for Small {
         xs.clear();
         ys.clear();
         zs.clear();
-        black_box(vecs);
     }
 }
 
@@ -90,7 +84,6 @@ impl Push for Medium {
         smalls1.clear();
         smalls2.clear();
         smalls3.clear();
-        black_box(vecs);
     }
 }
 
@@ -112,7 +105,6 @@ impl Push for Big {
         arrays.clear();
         strs1.clear();
         strs2.clear();
-        black_box(vecs);
     }
 }
 

@@ -46,12 +46,14 @@ where
     ptr::slice_from_raw_parts_mut(data, core_len) as _
 }
 
+/// Special type which is used internally to properly allocate a buffer in memory
+/// respecting the size and alignment of [`SizeAlign`][`Soa::SizeAlign`] associated type of `T`.
 pub struct BufferData<T>
 where
     T: Soa,
 {
-    _align: [usize; 0],
-    _data: MaybeUninit<T>,
+    _required_align: [usize; 0],
+    _size_align: MaybeUninit<T::SizeAlign>,
 }
 
 pub trait SoaSlicePtr<T>: Copy + private_slice_ptr::Sealed

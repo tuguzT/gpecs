@@ -12,7 +12,7 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{actual_capacity, is_zst, ptrs, BufferData, PtrToLenMut},
+    ptr::{actual_capacity, is_zst, ptrs, BufferData, BufferDataPtrMut},
     raw_vec::RawSoaVec,
     set_len_on_drop::SetLenOnDrop,
     slice::{
@@ -353,7 +353,7 @@ where
 
         unsafe {
             let len = self.as_mut_ptr().ptr_to_len_mut();
-            *len = new_len;
+            ptr::write(len, new_len);
         }
     }
 

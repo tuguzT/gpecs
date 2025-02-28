@@ -1,6 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
-    mem::MaybeUninit,
+    mem::{offset_of, MaybeUninit},
     ptr,
 };
 
@@ -121,16 +121,14 @@ where
 {
     #[inline]
     unsafe fn len(self) -> usize {
-        match slice_buffer_layout(self).size() {
-            0 => self.into_inner_mut().len(),
-            _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_len_mut()) },
-        }
+        let this = self.cast_const();
+        unsafe { this.len() }
     }
 
     #[inline]
     fn capacity(self) -> usize {
-        let buffer_layout = slice_buffer_layout(self);
-        capacity_from::<T>(buffer_layout)
+        let this = self.cast_const();
+        this.capacity()
     }
 
     #[inline]
@@ -185,31 +183,50 @@ where
     }
 }
 
-pub(crate) trait PtrToLen: Copy {
-    fn ptr_to_len(self) -> *const usize;
-}
-
-impl<T> PtrToLen for *const BufferData<T>
+#[repr(C)]
+pub(crate) struct BufferPrefix<T>
 where
     T: Soa,
 {
-    #[inline(always)]
-    fn ptr_to_len(self) -> *const usize {
-        self.cast()
+    pub len: usize,
+    _align: [BufferData<T>; 0],
+}
+
+pub(crate) trait BufferDataPtr<T>: Copy
+where
+    T: Soa,
+{
+    unsafe fn ptr_to_len(self) -> *const usize;
+}
+
+impl<T> BufferDataPtr<T> for *const BufferData<T>
+where
+    T: Soa,
+{
+    #[inline]
+    unsafe fn ptr_to_len(self) -> *const usize {
+        let prefix = self.cast::<u8>();
+        let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
+        len.cast()
     }
 }
 
-pub(crate) trait PtrToLenMut: Copy {
-    fn ptr_to_len_mut(self) -> *mut usize;
-}
-
-impl<T> PtrToLenMut for *mut BufferData<T>
+pub(crate) trait BufferDataPtrMut<T>: Copy
 where
     T: Soa,
 {
-    #[inline(always)]
-    fn ptr_to_len_mut(self) -> *mut usize {
-        self.cast()
+    unsafe fn ptr_to_len_mut(self) -> *mut usize;
+}
+
+impl<T> BufferDataPtrMut<T> for *mut BufferData<T>
+where
+    T: Soa,
+{
+    #[inline]
+    unsafe fn ptr_to_len_mut(self) -> *mut usize {
+        let prefix = self.cast::<u8>();
+        let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
+        len.cast()
     }
 }
 
@@ -251,7 +268,10 @@ where
     }
 
     let (layout, _) = T::buffer_layout(capacity)?;
-    let (layout, _) = Layout::new::<usize>().extend(layout)?;
+
+    let prefix_layout = Layout::new::<BufferPrefix<T>>();
+    let (layout, _) = prefix_layout.extend(layout)?;
+
     Ok(layout)
 }
 
@@ -279,11 +299,12 @@ fn capacity_from_not_padded<T>(buffer_layout: Layout) -> usize
 where
     T: Soa,
 {
-    if is_zst::<T>() || buffer_layout.size() < size_of::<usize>() {
+    let size_of_prefix = size_of::<BufferPrefix<T>>();
+    if is_zst::<T>() || buffer_layout.size() < size_of_prefix {
         return 0;
     }
 
-    let size = buffer_layout.size() - size_of::<usize>();
+    let size = buffer_layout.size() - size_of_prefix;
     let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
         .expect("layout size should not exceed `isize::MAX`");
     T::capacity_from(buffer_layout)
@@ -294,7 +315,8 @@ pub(crate) fn capacity_from<T>(buffer_layout: Layout) -> usize
 where
     T: Soa,
 {
-    if is_zst::<T>() || buffer_layout.size() < size_of::<usize>() {
+    let size_of_prefix = size_of::<BufferPrefix<T>>();
+    if is_zst::<T>() || buffer_layout.size() < size_of_prefix {
         return 0;
     }
 
@@ -321,8 +343,11 @@ where
 
     let (layout, offsets) = T::buffer_layout(capacity)?;
 
-    let (_, offset_from_len) = Layout::new::<usize>().extend(layout)?;
-    let offsets = offsets.into_iter().map(|offset| offset + offset_from_len);
+    let prefix_layout = Layout::new::<BufferPrefix<T>>();
+    let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
+    let offsets = offsets
+        .into_iter()
+        .map(|offset| offset + offset_from_prefix);
 
     let ptrs = unsafe { T::ptrs(ptr.cast(), offsets) };
     Ok(ptrs)
@@ -333,7 +358,7 @@ where
 mod tests {
     use core::alloc::Layout;
 
-    use crate::ptr::BufferData;
+    use crate::ptr::{BufferData, BufferPrefix};
 
     use super::{buffer_layout_not_padded, capacity_from_not_padded};
 
@@ -344,19 +369,19 @@ mod tests {
                 .unwrap()
                 .size()
         };
-        let usize = size_of::<usize>();
+        let prefix = size_of::<BufferPrefix<(u8, u8, u8)>>();
         let u8 = size_of::<u8>();
 
         assert_eq!(to_capacity_in_bytes(0), 0);
-        assert_eq!(to_capacity_in_bytes(1), usize + 3 * u8 * 1);
-        assert_eq!(to_capacity_in_bytes(2), usize + 3 * u8 * 2);
-        assert_eq!(to_capacity_in_bytes(3), usize + 3 * u8 * 3);
-        assert_eq!(to_capacity_in_bytes(4), usize + 3 * u8 * 4);
-        assert_eq!(to_capacity_in_bytes(5), usize + 3 * u8 * 5);
-        assert_eq!(to_capacity_in_bytes(6), usize + 3 * u8 * 6);
-        assert_eq!(to_capacity_in_bytes(7), usize + 3 * u8 * 7);
-        assert_eq!(to_capacity_in_bytes(8), usize + 3 * u8 * 8);
-        assert_eq!(to_capacity_in_bytes(9), usize + 3 * u8 * 9);
+        assert_eq!(to_capacity_in_bytes(1), prefix + 3 * u8 * 1);
+        assert_eq!(to_capacity_in_bytes(2), prefix + 3 * u8 * 2);
+        assert_eq!(to_capacity_in_bytes(3), prefix + 3 * u8 * 3);
+        assert_eq!(to_capacity_in_bytes(4), prefix + 3 * u8 * 4);
+        assert_eq!(to_capacity_in_bytes(5), prefix + 3 * u8 * 5);
+        assert_eq!(to_capacity_in_bytes(6), prefix + 3 * u8 * 6);
+        assert_eq!(to_capacity_in_bytes(7), prefix + 3 * u8 * 7);
+        assert_eq!(to_capacity_in_bytes(8), prefix + 3 * u8 * 8);
+        assert_eq!(to_capacity_in_bytes(9), prefix + 3 * u8 * 9);
     }
 
     #[test]
@@ -366,26 +391,26 @@ mod tests {
             let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
             capacity_from_not_padded::<(u8, u8, u8)>(buffer_layout)
         };
-        let usize = size_of::<usize>();
+        let prefix = size_of::<BufferPrefix<(u8, u8, u8)>>();
         let u8 = size_of::<u8>();
 
-        for capacity_in_bytes in 0..(usize + 3 * u8 * 1) {
+        for capacity_in_bytes in 0..(prefix + 3 * u8 * 1) {
             assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
-        assert_eq!(1, to_capacity(usize + 3 * u8 * 1));
-        assert_eq!(1, to_capacity(usize + 3 * u8 * 1 + 1));
-        assert_eq!(1, to_capacity(usize + 3 * u8 * 2 - 1));
+        assert_eq!(1, to_capacity(prefix + 3 * u8 * 1));
+        assert_eq!(1, to_capacity(prefix + 3 * u8 * 1 + 1));
+        assert_eq!(1, to_capacity(prefix + 3 * u8 * 2 - 1));
 
-        assert_eq!(2, to_capacity(usize + 3 * u8 * 2));
-        assert_eq!(2, to_capacity(usize + 3 * u8 * 2 + 1));
-        assert_eq!(2, to_capacity(usize + 3 * u8 * 3 - 1));
+        assert_eq!(2, to_capacity(prefix + 3 * u8 * 2));
+        assert_eq!(2, to_capacity(prefix + 3 * u8 * 2 + 1));
+        assert_eq!(2, to_capacity(prefix + 3 * u8 * 3 - 1));
 
-        assert_eq!(3, to_capacity(usize + 3 * u8 * 3));
-        assert_eq!(3, to_capacity(usize + 3 * u8 * 3 + 1));
-        assert_eq!(3, to_capacity(usize + 3 * u8 * 4 - 1));
+        assert_eq!(3, to_capacity(prefix + 3 * u8 * 3));
+        assert_eq!(3, to_capacity(prefix + 3 * u8 * 3 + 1));
+        assert_eq!(3, to_capacity(prefix + 3 * u8 * 4 - 1));
 
-        assert_eq!(4, to_capacity(usize + 3 * u8 * 4));
+        assert_eq!(4, to_capacity(prefix + 3 * u8 * 4));
     }
 
     #[test]
@@ -395,19 +420,19 @@ mod tests {
                 .unwrap()
                 .size()
         };
-        let usize = size_of::<usize>();
+        let prefix = size_of::<BufferPrefix<(u16, u16, u16)>>();
         let u16 = size_of::<u16>();
 
         assert_eq!(to_capacity_in_bytes(0), 0);
-        assert_eq!(to_capacity_in_bytes(1), usize + 3 * u16 * 1);
-        assert_eq!(to_capacity_in_bytes(2), usize + 3 * u16 * 2);
-        assert_eq!(to_capacity_in_bytes(3), usize + 3 * u16 * 3);
-        assert_eq!(to_capacity_in_bytes(4), usize + 3 * u16 * 4);
-        assert_eq!(to_capacity_in_bytes(5), usize + 3 * u16 * 5);
-        assert_eq!(to_capacity_in_bytes(6), usize + 3 * u16 * 6);
-        assert_eq!(to_capacity_in_bytes(7), usize + 3 * u16 * 7);
-        assert_eq!(to_capacity_in_bytes(8), usize + 3 * u16 * 8);
-        assert_eq!(to_capacity_in_bytes(9), usize + 3 * u16 * 9);
+        assert_eq!(to_capacity_in_bytes(1), prefix + 3 * u16 * 1);
+        assert_eq!(to_capacity_in_bytes(2), prefix + 3 * u16 * 2);
+        assert_eq!(to_capacity_in_bytes(3), prefix + 3 * u16 * 3);
+        assert_eq!(to_capacity_in_bytes(4), prefix + 3 * u16 * 4);
+        assert_eq!(to_capacity_in_bytes(5), prefix + 3 * u16 * 5);
+        assert_eq!(to_capacity_in_bytes(6), prefix + 3 * u16 * 6);
+        assert_eq!(to_capacity_in_bytes(7), prefix + 3 * u16 * 7);
+        assert_eq!(to_capacity_in_bytes(8), prefix + 3 * u16 * 8);
+        assert_eq!(to_capacity_in_bytes(9), prefix + 3 * u16 * 9);
     }
 
     #[test]
@@ -417,22 +442,22 @@ mod tests {
             let buffer_layout = Layout::from_size_align(capacity_in_bytes, align).unwrap();
             capacity_from_not_padded::<(u16, u16, u16)>(buffer_layout)
         };
-        let usize = size_of::<usize>();
+        let prefix = size_of::<BufferPrefix<(u16, u16, u16)>>();
         let u16 = size_of::<u16>();
 
-        for capacity_in_bytes in 0..(usize + 3 * u16 * 1) {
+        for capacity_in_bytes in 0..(prefix + 3 * u16 * 1) {
             assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
-        assert_eq!(1, to_capacity(usize + 3 * u16 * 1));
-        assert_eq!(1, to_capacity(usize + 3 * u16 * 1 + 1));
-        assert_eq!(1, to_capacity(usize + 3 * u16 * 2 - 1));
+        assert_eq!(1, to_capacity(prefix + 3 * u16 * 1));
+        assert_eq!(1, to_capacity(prefix + 3 * u16 * 1 + 1));
+        assert_eq!(1, to_capacity(prefix + 3 * u16 * 2 - 1));
 
-        assert_eq!(2, to_capacity(usize + 3 * u16 * 2));
-        assert_eq!(2, to_capacity(usize + 3 * u16 * 2 + 1));
-        assert_eq!(2, to_capacity(usize + 3 * u16 * 3 - 1));
+        assert_eq!(2, to_capacity(prefix + 3 * u16 * 2));
+        assert_eq!(2, to_capacity(prefix + 3 * u16 * 2 + 1));
+        assert_eq!(2, to_capacity(prefix + 3 * u16 * 3 - 1));
 
-        assert_eq!(3, to_capacity(usize + 3 * u16 * 3));
+        assert_eq!(3, to_capacity(prefix + 3 * u16 * 3));
     }
 
     #[test]
@@ -443,7 +468,7 @@ mod tests {
                 .size()
         };
         let u32 = size_of::<u32>();
-        let aligned_bytes = Layout::new::<usize>()
+        let aligned_bytes = Layout::new::<BufferPrefix<(u32, u32, u32)>>()
             .align_to(align_of::<u32>())
             .unwrap()
             .pad_to_align()
@@ -468,7 +493,7 @@ mod tests {
             capacity_from_not_padded::<(u32, u32, u32)>(buffer_layout)
         };
         let u32 = size_of::<u32>();
-        let aligned_bytes = Layout::new::<usize>()
+        let aligned_bytes = Layout::new::<BufferPrefix<(u32, u32, u32)>>()
             .align_to(align_of::<u32>())
             .unwrap()
             .pad_to_align()
@@ -497,7 +522,7 @@ mod tests {
                 .size()
         };
         let u64 = size_of::<u64>();
-        let aligned_bytes = Layout::new::<usize>()
+        let aligned_bytes = Layout::new::<BufferPrefix<(u64, u64, u64)>>()
             .align_to(align_of::<u64>())
             .unwrap()
             .pad_to_align()
@@ -522,7 +547,7 @@ mod tests {
             capacity_from_not_padded::<(u64, u64, u64)>(buffer_layout)
         };
         let u64 = size_of::<u64>();
-        let aligned_bytes = Layout::new::<usize>()
+        let aligned_bytes = Layout::new::<BufferPrefix<(u64, u64, u64)>>()
             .align_to(align_of::<u64>())
             .unwrap()
             .pad_to_align()
@@ -554,17 +579,17 @@ mod tests {
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
-        let usize = size_of::<usize>();
+        let prefix = size_of::<BufferPrefix<(u8, u16, u32)>>();
 
         assert_eq!(to_capacity_in_bytes(0), 0);
-        assert_eq!(to_capacity_in_bytes(1), usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1));
-        assert_eq!(to_capacity_in_bytes(2), usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2));
-        assert_eq!(to_capacity_in_bytes(3), usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3));
-        assert_eq!(to_capacity_in_bytes(4), usize + (u8 * 4) + 0 + (u16 * 4) + 0 + (u32 * 4));
-        assert_eq!(to_capacity_in_bytes(5), usize + (u8 * 5) + 1 + (u16 * 5) + 0 + (u32 * 5));
-        assert_eq!(to_capacity_in_bytes(6), usize + (u8 * 6) + 0 + (u16 * 6) + 2 + (u32 * 6));
-        assert_eq!(to_capacity_in_bytes(7), usize + (u8 * 7) + 1 + (u16 * 7) + 2 + (u32 * 7));
-        assert_eq!(to_capacity_in_bytes(8), usize + (u8 * 8) + 0 + (u16 * 8) + 0 + (u32 * 8));
+        assert_eq!(to_capacity_in_bytes(1), prefix + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1));
+        assert_eq!(to_capacity_in_bytes(2), prefix + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2));
+        assert_eq!(to_capacity_in_bytes(3), prefix + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3));
+        assert_eq!(to_capacity_in_bytes(4), prefix + (u8 * 4) + 0 + (u16 * 4) + 0 + (u32 * 4));
+        assert_eq!(to_capacity_in_bytes(5), prefix + (u8 * 5) + 1 + (u16 * 5) + 0 + (u32 * 5));
+        assert_eq!(to_capacity_in_bytes(6), prefix + (u8 * 6) + 0 + (u16 * 6) + 2 + (u32 * 6));
+        assert_eq!(to_capacity_in_bytes(7), prefix + (u8 * 7) + 1 + (u16 * 7) + 2 + (u32 * 7));
+        assert_eq!(to_capacity_in_bytes(8), prefix + (u8 * 8) + 0 + (u16 * 8) + 0 + (u32 * 8));
     }
 
     #[test]
@@ -578,22 +603,22 @@ mod tests {
         let u8 = size_of::<u8>();
         let u16 = size_of::<u16>();
         let u32 = size_of::<u32>();
-        let usize = size_of::<usize>();
+        let prefix = size_of::<BufferPrefix<(u8, u16, u32)>>();
 
-        for capacity_in_bytes in 0..(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1)) {
+        for capacity_in_bytes in 0..(prefix + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1)) {
             dbg!(capacity_in_bytes);
             assert_eq!(to_capacity(capacity_in_bytes), 0);
         }
 
-        assert_eq!(1, to_capacity(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1)));
-        assert_eq!(1, to_capacity(usize + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1) + 1));
-        assert_eq!(1, to_capacity(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2) - 1));
+        assert_eq!(1, to_capacity(prefix + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1)));
+        assert_eq!(1, to_capacity(prefix + (u8 * 1) + 1 + (u16 * 1) + 0 + (u32 * 1) + 1));
+        assert_eq!(1, to_capacity(prefix + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2) - 1));
 
-        assert_eq!(2, to_capacity(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2)));
-        assert_eq!(2, to_capacity(usize + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2) + 1));
-        assert_eq!(2, to_capacity(usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3) - 1));
+        assert_eq!(2, to_capacity(prefix + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2)));
+        assert_eq!(2, to_capacity(prefix + (u8 * 2) + 0 + (u16 * 2) + 2 + (u32 * 2) + 1));
+        assert_eq!(2, to_capacity(prefix + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3) - 1));
 
-        assert_eq!(3, to_capacity(usize + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3)));
+        assert_eq!(3, to_capacity(prefix + (u8 * 3) + 1 + (u16 * 3) + 2 + (u32 * 3)));
     }
 
     #[test]

@@ -73,12 +73,11 @@ where
     #[inline]
     pub fn with_context_and_capacity(context: T::Context, capacity: usize) -> Self {
         let mut me = Self {
-            buffer: RawSoaVec::with_capacity(capacity),
+            buffer: RawSoaVec::with_capacity(context, capacity),
             len: 0,
         };
 
         me.set_len_in_buffer(0);
-        me.set_context_in_buffer(context);
         me
     }
 
@@ -88,12 +87,11 @@ where
         capacity: usize,
     ) -> Result<Self, TryReserveError> {
         let mut me = Self {
-            buffer: RawSoaVec::try_with_capacity(capacity)?,
+            buffer: RawSoaVec::try_with_capacity(context, capacity)?,
             len: 0,
         };
 
         me.set_len_in_buffer(0);
-        me.set_context_in_buffer(context);
         Ok(me)
     }
 
@@ -129,8 +127,7 @@ where
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        let ptr = self.as_ptr();
-        unsafe { &*ptr.ptr_to_context() }
+        self.buffer.context()
     }
 
     #[inline]
@@ -396,14 +393,6 @@ where
         unsafe {
             let len = self.as_mut_ptr().ptr_to_len_mut();
             ptr::write(len, new_len);
-        }
-    }
-
-    #[inline]
-    fn set_context_in_buffer(&mut self, context: T::Context) {
-        unsafe {
-            let dst = self.as_mut_ptr().ptr_to_context_mut();
-            ptr::write(dst, context);
         }
     }
 

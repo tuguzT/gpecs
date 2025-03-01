@@ -8,13 +8,13 @@ use core::{
     error::Error,
     fmt::{self, Display},
     mem::ManuallyDrop,
-    ptr::NonNull,
+    ptr::{self, NonNull},
 };
 
 use crate::{
     ptr::{
         buffer_layout, capacity_from, is_zst, ptrs, should_allocate, slice_from_raw_parts_mut,
-        BufferData,
+        BufferData, BufferDataPtr, BufferDataPtrMut,
     },
     slice::SoaSlice,
     traits::Soa,
@@ -126,7 +126,11 @@ where
     }
 
     #[must_use]
-    fn try_allocate_in(capacity: usize, init: AllocInit) -> Result<Self, TryReserveError> {
+    fn try_allocate_in(
+        context: T::Context,
+        capacity: usize,
+        init: AllocInit,
+    ) -> Result<Self, TryReserveError> {
         if !should_allocate::<T>(capacity) {
             let this = Self {
                 ptr: NonNull::dangling(),
@@ -152,14 +156,18 @@ where
             None => return Err(AllocError { layout, non_exhaustive: () }.into()),
         };
 
-        let ptr = ptr.cast();
+        let ptr: NonNull<BufferData<_>> = ptr.cast();
+        unsafe {
+            let dst = ptr.as_ptr().ptr_to_context_mut();
+            ptr::write(dst, context);
+        }
         Ok(Self { ptr, capacity })
     }
 
     #[inline]
     #[must_use]
-    pub fn with_capacity(capacity: usize) -> Self {
-        match Self::try_with_capacity(capacity) {
+    pub fn with_capacity(context: T::Context, capacity: usize) -> Self {
+        match Self::try_with_capacity(context, capacity) {
             Ok(me) => me,
             Err(err) => handle_error(err),
         }
@@ -167,15 +175,18 @@ where
 
     #[inline]
     #[must_use]
-    pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
-        Self::try_allocate_in(capacity, AllocInit::Uninitialized)
+    pub fn try_with_capacity(
+        context: T::Context,
+        capacity: usize,
+    ) -> Result<Self, TryReserveError> {
+        Self::try_allocate_in(context, capacity, AllocInit::Uninitialized)
     }
 
     #[inline]
     #[must_use]
     #[allow(dead_code)]
-    pub fn with_capacity_zeroed(capacity: usize) -> Self {
-        match Self::try_with_capacity_zeroed(capacity) {
+    pub fn with_capacity_zeroed(context: T::Context, capacity: usize) -> Self {
+        match Self::try_with_capacity_zeroed(context, capacity) {
             Ok(me) => me,
             Err(err) => handle_error(err),
         }
@@ -184,8 +195,11 @@ where
     #[inline]
     #[must_use]
     #[allow(dead_code)]
-    pub fn try_with_capacity_zeroed(capacity: usize) -> Result<Self, TryReserveError> {
-        Self::try_allocate_in(capacity, AllocInit::Zeroed)
+    pub fn try_with_capacity_zeroed(
+        context: T::Context,
+        capacity: usize,
+    ) -> Result<Self, TryReserveError> {
+        Self::try_allocate_in(context, capacity, AllocInit::Zeroed)
     }
 
     #[inline]
@@ -226,6 +240,12 @@ where
     #[inline]
     pub fn non_null(&self) -> NonNull<BufferData<T>> {
         self.ptr
+    }
+
+    #[inline]
+    pub fn context(&self) -> &T::Context {
+        let ptr = self.ptr().cast_const();
+        unsafe { &*ptr.ptr_to_context() }
     }
 
     #[inline]

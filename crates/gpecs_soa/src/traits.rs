@@ -12,7 +12,7 @@ use core::{
 pub unsafe trait Soa: Sized {
     /// Special type used to properly allocate the buffer in memory.
     ///
-    /// Most of the time, this should be the same as [`Self`](`Soa`).
+    /// Most of the time, this should be the same as `Self`.
     /// This is true for such implementations which store all the fields of self.
     type SizeAlign;
 
@@ -25,12 +25,16 @@ pub unsafe trait Soa: Sized {
     /// Collection of layouts for each field.
     ///
     /// Safety requirements:
-    /// - sum of layouts' sizes should be less or equal to the size of [`Self::SizeAlign`](`Soa::SizeAlign`)
-    /// - alignment of each layout should be less or equal to the alignment of [`Self::SizeAlign`](`Soa::SizeAlign`)
+    /// - sum of layouts' sizes should be less or equal to the size of [`SizeAlign`](`Soa::SizeAlign`)
+    /// - alignment of each layout should be less or equal to the alignment of [`SizeAlign`](`Soa::SizeAlign`)
     type FieldLayouts: IntoIterator<Item: Borrow<Layout>>;
 
     fn field_layouts() -> Self::FieldLayouts;
 
+    /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
+    ///
+    /// This layout should not include [`Context`](`Soa::Context`),
+    /// as it is handled by the crate itself.
     fn buffer_layout(
         capacity: usize,
     ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
@@ -48,6 +52,7 @@ pub unsafe trait Soa: Sized {
         Ok((layout, offsets))
     }
 
+    /// Retrieves maximum number of fields that can be stored inside of a buffer with given layout.
     fn capacity_from(buffer_layout: Layout) -> usize {
         let packed_size = Self::field_layouts()
             .into_iter()

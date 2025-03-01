@@ -38,10 +38,10 @@ fn new() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(vecs, (vec![], vec![], vec![]));
 
-    let vec = Vec::from_vecs(vecs);
+    let vec = Vec::from_vecs(context, vecs);
     assert!(vec.is_empty());
 
     let boxed_slice = vec.into_boxed_slice();
@@ -91,10 +91,10 @@ fn new_zst() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(vecs, (vec![], vec![], vec![]));
 
-    let vec = Vec::from_vecs(vecs);
+    let vec = Vec::from_vecs(context, vecs);
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), usize::MAX);
 
@@ -195,10 +195,10 @@ fn with_capacity_zst() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(vecs, (vec![], vec![], vec![]));
 
-    let vec = Vec::from_vecs(vecs);
+    let vec = Vec::from_vecs(context, vecs);
     assert!(vec.is_empty());
     assert_eq!(vec.capacity(), usize::MAX);
 
@@ -259,10 +259,10 @@ fn one_item() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(vecs, (vec![1], vec![2], vec![3]));
 
-    let mut vec = Vec::from_vecs(vecs);
+    let mut vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
@@ -390,10 +390,10 @@ fn one_item_zst() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(vecs, (vec![ZST1], vec![ZST2(())], vec![ZST3 { empty: () }]));
 
-    let mut vec = Vec::from_vecs(vecs);
+    let mut vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
@@ -452,10 +452,10 @@ fn one_item_zst() {
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(vecs, (vec![], vec![], vec![]));
 
-    let vec = Vec::from_vecs(vecs);
+    let vec = Vec::from_vecs(context, vecs);
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert_eq!(
@@ -567,7 +567,7 @@ fn three_items() {
         ),
     );
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(
         vecs,
         (
@@ -577,7 +577,7 @@ fn three_items() {
         ),
     );
 
-    let mut vec = Vec::from_vecs(vecs);
+    let mut vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
     assert_eq!(
@@ -715,7 +715,7 @@ fn three_items() {
     vec.reserve_exact(6);
     assert!(vec.capacity() >= 9);
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(
         vecs,
         (
@@ -725,7 +725,7 @@ fn three_items() {
         ),
     );
 
-    let vec = Vec::from_vecs(vecs);
+    let vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
     assert_eq!(
@@ -865,7 +865,7 @@ fn three_items_zst() {
 
     assert_eq!(slice.to_owned(), vec.clone());
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(
         vecs,
         (
@@ -875,7 +875,7 @@ fn three_items_zst() {
         ),
     );
 
-    let mut vec = Vec::from_vecs(vecs);
+    let mut vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
     assert_eq!(
@@ -923,7 +923,7 @@ fn three_items_zst() {
     assert_eq!(vec.get(3), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
     assert_eq!(vec.get(4), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(
         vecs,
         (
@@ -933,7 +933,7 @@ fn three_items_zst() {
         ),
     );
 
-    let mut vec = Vec::from_vecs(vecs);
+    let mut vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
     assert_eq!(
@@ -1022,7 +1022,7 @@ fn three_items_zst() {
     vec.reserve_exact(6);
     assert!(vec.capacity() >= 9);
 
-    let vecs = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     assert_eq!(
         vecs,
         (
@@ -1032,7 +1032,7 @@ fn three_items_zst() {
         ),
     );
 
-    let vec = Vec::from_vecs(vecs);
+    let vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
     assert_eq!(

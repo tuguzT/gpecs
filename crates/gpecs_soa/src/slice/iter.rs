@@ -24,7 +24,7 @@ where
 {
     #[inline]
     pub(crate) fn new(slices: SoaSlices<'a, T>) -> Self {
-        let (ptrs, len) = slices.into_parts();
+        let (_, ptrs, len) = slices.into_parts();
         Self {
             ptrs: unsafe { T::ptrs_to_nonnull(T::ptrs_cast_mut(ptrs)) },
             start: 0,
@@ -108,8 +108,12 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let slice = Default::default();
-        Self::new(slice)
+        Self {
+            ptrs: unsafe { T::ptrs_to_nonnull(T::ptrs_dangling()) },
+            start: 0,
+            end: 0,
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -386,7 +390,7 @@ where
 {
     #[inline]
     pub(super) fn new(slices: SoaSlicesMut<'a, T>) -> Self {
-        let (ptrs, len) = slices.into_parts();
+        let (_, ptrs, len) = slices.into_parts();
         Self {
             ptrs: unsafe { T::ptrs_to_nonnull(ptrs) },
             start: 0,
@@ -481,8 +485,12 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let slice = Default::default();
-        Self::new(slice)
+        Self {
+            ptrs: unsafe { T::ptrs_to_nonnull(T::ptrs_dangling()) },
+            start: 0,
+            end: 0,
+            phantom: PhantomData,
+        }
     }
 }
 

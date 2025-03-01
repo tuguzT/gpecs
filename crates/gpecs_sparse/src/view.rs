@@ -19,7 +19,7 @@ use crate::{
     key::{Epoch, Key},
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueSlices, KeyValueSlicesMut},
     soa::{
-        slice::{SoaSlice, SoaSlices, SoaSlicesMut},
+        slice::{Iter as SoaIter, SoaSlice, SoaSlicesMut},
         traits::Soa,
     },
 };
@@ -549,7 +549,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
-                unwrap_dense_from_sparse_index(sparse_index, values, sparse)
+                unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse)
             })
         });
     }
@@ -567,11 +567,11 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by(|&lhs_key, &rhs_key| {
                 let lhs_index = lhs_key.sparse_index();
-                let lhs_value = unwrap_dense_from_sparse_index(lhs_index, values, sparse);
+                let lhs_value = unwrap_dense_from_sparse_index(lhs_index, values.clone(), sparse);
                 let lhs = (lhs_key, lhs_value);
 
                 let rhs_index = rhs_key.sparse_index();
-                let rhs_value = unwrap_dense_from_sparse_index(rhs_index, values, sparse);
+                let rhs_value = unwrap_dense_from_sparse_index(rhs_index, values.clone(), sparse);
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
@@ -588,7 +588,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unwrap_dense_from_sparse_index(sparse_index, values, sparse);
+                let value = unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse);
                 f((key, value))
             })
         });
@@ -603,7 +603,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unwrap_dense_from_sparse_index(sparse_index, values, sparse);
+                let value = unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse);
                 f((key, value))
             })
         });
@@ -617,7 +617,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                unwrap_dense_from_sparse_index(sparse_index, values, sparse)
+                unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse)
             })
         });
     }
@@ -635,11 +635,11 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by(|&lhs_key, &rhs_key| {
                 let lhs_index = lhs_key.sparse_index();
-                let lhs_value = unwrap_dense_from_sparse_index(lhs_index, values, sparse);
+                let lhs_value = unwrap_dense_from_sparse_index(lhs_index, values.clone(), sparse);
                 let lhs = (lhs_key, lhs_value);
 
                 let rhs_index = rhs_key.sparse_index();
-                let rhs_value = unwrap_dense_from_sparse_index(rhs_index, values, sparse);
+                let rhs_value = unwrap_dense_from_sparse_index(rhs_index, values.clone(), sparse);
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
@@ -656,7 +656,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value = unwrap_dense_from_sparse_index(sparse_index, values, sparse);
+                let value = unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse);
                 f((key, value))
             })
         });
@@ -667,13 +667,15 @@ where
     // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
     fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
     where
-        SortKeys: FnOnce(&mut [K], SoaSlices<'_, V>, &[SparseItem<K::Epoch>]),
+        SortKeys: FnOnce(&mut [K], SoaIter<V>, &[SparseItem<K::Epoch>]),
     {
         let Self { dense, sparse } = self;
-        let KeyValueSlicesMut { keys, values } = dense.as_mut_slices();
-        let mut values = SoaSlicesMut::new(values);
 
-        sort_keys(keys, values.into(), sparse);
+        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let KeyValueSlicesMut { keys, values } = slices;
+        let mut values = SoaSlicesMut::new(context, values);
+
+        sort_keys(keys, values.iter(), sparse);
 
         let keys = &keys[..];
         for pos in 0..keys.len() {

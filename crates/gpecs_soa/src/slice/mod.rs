@@ -41,6 +41,11 @@ where
     T: Soa,
 {
     #[inline]
+    pub fn context(&self) -> &T::Context {
+        unsafe { ptr::from_ref(self).context() }
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         unsafe { ptr::from_ref(self).len() }
     }
@@ -107,14 +112,17 @@ where
 
     #[inline]
     pub fn slices(&self) -> SoaSlices<'_, T> {
+        let context = self.context();
         let slices = self.as_slices();
-        SoaSlices::new(slices)
+        SoaSlices::new(context, slices)
     }
 
     #[inline]
     pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, T> {
-        let slices = self.as_mut_slices();
-        SoaSlicesMut::new(slices)
+        let ptrs = self.as_mut_ptrs();
+        let context = self.context();
+        let len = self.len();
+        unsafe { SoaSlicesMut::from_parts(context, ptrs, len) }
     }
 
     #[inline]
@@ -155,6 +163,7 @@ where
     pub fn to_vec<'me>(&'me self) -> SoaVec<T>
     where
         T::Refs<'me>: SoaToOwned<'me, Owned = T>,
+        T::Context: Clone,
     {
         self.slices().to_vec()
     }
@@ -459,6 +468,7 @@ where
 impl<T> ToOwned for SoaSlice<T>
 where
     T: Soa,
+    T::Context: Clone,
     for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T> + 'any,
 {
     type Owned = SoaVec<T>;

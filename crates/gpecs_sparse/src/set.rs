@@ -42,7 +42,10 @@ where
     V: Soa,
 {
     #[inline]
-    pub fn new() -> Self {
+    pub fn new() -> Self
+    where
+        V::Context: Default,
+    {
         Self {
             dense: SoaVec::new(),
             sparse: Vec::new(),
@@ -50,7 +53,18 @@ where
     }
 
     #[inline]
-    pub fn with_capacity(dense: usize, sparse: usize) -> Self {
+    pub fn with_context(context: V::Context) -> Self {
+        Self {
+            dense: SoaVec::with_context(context),
+            sparse: Vec::new(),
+        }
+    }
+
+    #[inline]
+    pub fn with_capacity(dense: usize, sparse: usize) -> Self
+    where
+        V::Context: Default,
+    {
         Self {
             dense: SoaVec::with_capacity(dense),
             sparse: Vec::with_capacity(sparse),
@@ -58,8 +72,30 @@ where
     }
 
     #[inline]
-    pub fn try_with_capacity(dense: usize, sparse: usize) -> Result<Self, TryReserveError> {
+    pub fn with_context_and_capacity(context: V::Context, dense: usize, sparse: usize) -> Self {
+        Self {
+            dense: SoaVec::with_context_and_capacity(context, dense),
+            sparse: Vec::with_capacity(sparse),
+        }
+    }
+
+    #[inline]
+    pub fn try_with_capacity(dense: usize, sparse: usize) -> Result<Self, TryReserveError>
+    where
+        V::Context: Default,
+    {
         let mut me = Self::new();
+        me.try_reserve(dense, sparse)?;
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn try_with_context_and_capacity(
+        context: V::Context,
+        dense: usize,
+        sparse: usize,
+    ) -> Result<Self, TryReserveError> {
+        let mut me = Self::with_context(context);
         me.try_reserve(dense, sparse)?;
         Ok(me)
     }
@@ -202,11 +238,11 @@ where
     }
 
     #[inline]
-    pub fn into_vecs(self) -> V::Vecs {
+    pub fn into_vecs(self) -> (V::Context, V::Vecs) {
         let Self { dense, .. } = self;
 
-        let KeyValueVecs { values, .. } = dense.into_vecs();
-        values
+        let (context, KeyValueVecs { values, .. }) = dense.into_vecs();
+        (context, values)
     }
 
     #[inline]
@@ -237,7 +273,7 @@ where
     pub fn into_keys_vec(self) -> Vec<K> {
         let Self { dense, .. } = self;
 
-        let KeyValueVecs { keys, .. } = dense.into_vecs();
+        let (_, KeyValueVecs { keys, .. }) = dense.into_vecs();
         keys
     }
 
@@ -756,6 +792,7 @@ impl<K, V> Default for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa,
+    V::Context: Default,
 {
     fn default() -> Self {
         Self {
@@ -983,6 +1020,7 @@ impl<K, V> FromIterator<KeyValuePair<K, V>> for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa,
+    V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = KeyValuePair<K, V>>>(iter: I) -> Self {
         let iter = iter.into_iter();
@@ -1004,6 +1042,7 @@ impl<K, V> FromIterator<(K, V)> for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa,
+    V::Context: Default,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         iter.into_iter().map(KeyValuePair::from).collect()
@@ -1014,6 +1053,7 @@ impl<K, V> FromIterator<V> for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa,
+    V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
         let dense: SoaVec<_> = iter

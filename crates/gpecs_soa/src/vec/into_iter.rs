@@ -2,10 +2,15 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::ManuallyDrop,
-    ptr::NonNull,
+    ptr::{self, NonNull},
 };
 
-use crate::{ptr::BufferData, raw_vec::RawSoaVec, traits::Soa, vec::SoaVec};
+use crate::{
+    ptr::{BufferData, BufferDataPtrMut},
+    raw_vec::RawSoaVec,
+    traits::Soa,
+    vec::SoaVec,
+};
 
 pub struct IntoIter<T>
 where
@@ -119,6 +124,7 @@ where
 impl<T> Default for IntoIter<T>
 where
     T: Soa,
+    T::Context: Default,
 {
     #[inline]
     fn default() -> Self {
@@ -151,6 +157,11 @@ where
         }
 
         let guard = DropGuard(self);
+        unsafe {
+            let context = guard.0.buffer.as_ptr().ptr_to_context_mut();
+            ptr::drop_in_place(context);
+        }
+
         // destroy the remaining elements
         if IntoIter::is_empty(guard.0) {
             return;

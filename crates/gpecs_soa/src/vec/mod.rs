@@ -12,7 +12,7 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{actual_capacity, ptrs, should_allocate, BufferData, BufferDataPtrMut},
+    ptr::{actual_capacity, ptrs, should_allocate, BufferData, BufferDataPtr, BufferDataPtrMut},
     raw_vec::RawSoaVec,
     set_len_on_drop::SetLenOnDrop,
     slice::{
@@ -42,29 +42,58 @@ where
     T: Soa,
 {
     #[inline]
-    pub fn new() -> Self {
+    pub fn new() -> Self
+    where
+        T::Context: Default,
+    {
         Self::with_capacity(0)
     }
 
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub fn with_context(context: T::Context) -> Self {
+        Self::with_context_and_capacity(context, 0)
+    }
+
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self
+    where
+        T::Context: Default,
+    {
+        Self::with_context_and_capacity(Default::default(), capacity)
+    }
+
+    #[inline]
+    pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError>
+    where
+        T::Context: Default,
+    {
+        Self::try_with_context_and_capacity(Default::default(), capacity)
+    }
+
+    #[inline]
+    pub fn with_context_and_capacity(context: T::Context, capacity: usize) -> Self {
         let mut me = Self {
             buffer: RawSoaVec::with_capacity(capacity),
             len: 0,
         };
 
         me.set_len_in_buffer(0);
+        me.set_context_in_buffer(context);
         me
     }
 
     #[inline]
-    pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
+    pub fn try_with_context_and_capacity(
+        context: T::Context,
+        capacity: usize,
+    ) -> Result<Self, TryReserveError> {
         let mut me = Self {
             buffer: RawSoaVec::try_with_capacity(capacity)?,
             len: 0,
         };
 
         me.set_len_in_buffer(0);
+        me.set_context_in_buffer(context);
         Ok(me)
     }
 
@@ -96,6 +125,12 @@ where
     #[inline]
     pub fn capacity(&self) -> usize {
         self.buffer.capacity()
+    }
+
+    #[inline]
+    pub fn context(&self) -> &T::Context {
+        let ptr = self.as_ptr();
+        unsafe { &*ptr.ptr_to_context() }
     }
 
     #[inline]
@@ -223,7 +258,7 @@ where
         }
     }
 
-    pub fn into_vecs(mut self) -> T::Vecs {
+    pub fn into_vecs(mut self) -> (T::Context, T::Vecs) {
         let len = self.len();
         let mut vecs = T::vecs_with_capacity(len);
 
@@ -237,12 +272,20 @@ where
             T::ptrs_copy_nonoverlapping(src, dst, len);
             T::vecs_set_len(&mut vecs, len);
         }
-        vecs
+
+        let context = unsafe {
+            let context = self.as_ptr().ptr_to_context();
+            ptr::read(context)
+        };
+
+        let me = ManuallyDrop::new(self);
+        let _buffer = unsafe { ptr::read(&me.buffer) };
+        (context, vecs)
     }
 
-    pub fn from_vecs(mut vecs: T::Vecs) -> Self {
+    pub fn from_vecs(context: T::Context, mut vecs: T::Vecs) -> Self {
         let len = T::vecs_len(&vecs);
-        let mut vec = Self::with_capacity(len);
+        let mut vec = Self::with_context_and_capacity(context, len);
 
         unsafe {
             T::vecs_set_len(&mut vecs, 0);
@@ -323,14 +366,16 @@ where
 
     #[inline]
     pub fn slices(&self) -> SoaSlices<'_, T> {
+        let context = self.context();
         let slices = self.as_slices();
-        SoaSlices::new(slices)
+        SoaSlices::new(context, slices)
     }
 
     #[inline]
     pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, T> {
+        let context = unsafe { &*self.as_ptr().ptr_to_context() };
         let slices = self.as_mut_slices();
-        SoaSlicesMut::new(slices)
+        SoaSlicesMut::new(context, slices)
     }
 
     #[inline]
@@ -351,6 +396,14 @@ where
         unsafe {
             let len = self.as_mut_ptr().ptr_to_len_mut();
             ptr::write(len, new_len);
+        }
+    }
+
+    #[inline]
+    fn set_context_in_buffer(&mut self, context: T::Context) {
+        unsafe {
+            let dst = self.as_mut_ptr().ptr_to_context_mut();
+            ptr::write(dst, context);
         }
     }
 
@@ -702,6 +755,7 @@ where
 impl<T> Default for SoaVec<T>
 where
     T: Soa,
+    T::Context: Default,
 {
     #[inline]
     fn default() -> Self {
@@ -800,6 +854,7 @@ where
 impl<T> Clone for SoaVec<T>
 where
     T: Soa,
+    T::Context: Clone,
     for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T> + 'any,
 {
     #[inline]
@@ -904,6 +959,7 @@ where
 impl<'me, T> From<&'me SoaSlice<T>> for SoaVec<T>
 where
     T: Soa,
+    T::Context: Clone,
     T::Refs<'me>: SoaToOwned<'me, Owned = T>,
 {
     #[inline]
@@ -915,6 +971,7 @@ where
 impl<'me, T> From<&'me mut SoaSlice<T>> for SoaVec<T>
 where
     T: Soa,
+    T::Context: Clone,
     T::Refs<'me>: SoaToOwned<'me, Owned = T>,
 {
     #[inline]
@@ -965,6 +1022,7 @@ where
 impl<T> FromIterator<T> for SoaVec<T>
 where
     T: Soa,
+    T::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         // Unroll the first iteration, as the vector is going to be
@@ -998,6 +1056,11 @@ where
     T: Soa,
 {
     fn drop(&mut self) {
+        unsafe {
+            let context = self.as_mut_ptr().ptr_to_context_mut();
+            ptr::drop_in_place(context);
+        }
+
         if self.is_empty() {
             return;
         }

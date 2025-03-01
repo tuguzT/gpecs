@@ -5,7 +5,7 @@ use gpecs_soa::prelude::*;
 
 use super::*;
 
-pub(super) trait WithCapacity: Soa {
+pub(super) trait WithCapacity: Soa<Context: Default> {
     fn soa_slf_with_capacity(capacity: usize) -> SoaVec<Self> {
         let capacity = black_box(capacity);
         let vec = SoaVec::<Self>::with_capacity(capacity);

@@ -2,7 +2,6 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    marker::PhantomData,
     mem,
     ops::{Index, IndexMut},
 };
@@ -22,9 +21,9 @@ pub struct SoaSlices<'a, T>
 where
     T: Soa + 'a,
 {
+    context: &'a T::Context,
     ptrs: T::Ptrs,
     len: usize,
-    phantom: PhantomData<T::Slices<'a>>,
 }
 
 impl<'a, T> SoaSlices<'a, T>
@@ -32,12 +31,12 @@ where
     T: Soa,
 {
     #[inline]
-    pub fn new(slices: T::Slices<'a>) -> Self {
+    pub fn new(context: &'a T::Context, slices: T::Slices<'a>) -> Self {
         let slices = T::slice_refs_as_slice_ptrs(slices);
         Self {
+            context,
             ptrs: T::slice_ptrs_as_ptrs(slices),
             len: T::slice_ptrs_len(slices),
-            phantom: PhantomData,
         }
     }
 
@@ -49,6 +48,12 @@ where
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    #[inline]
+    pub fn context(&self) -> &T::Context {
+        let Self { context, .. } = self;
+        context
     }
 
     #[inline]
@@ -74,18 +79,14 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (T::Ptrs, usize) {
-        let Self { ptrs, len, .. } = self;
-        (ptrs, len)
+    pub fn into_parts(self) -> (&'a T::Context, T::Ptrs, usize) {
+        let Self { context, ptrs, len } = self;
+        (context, ptrs, len)
     }
 
     #[inline]
-    pub unsafe fn from_parts(ptrs: T::Ptrs, len: usize) -> Self {
-        Self {
-            ptrs,
-            len,
-            phantom: PhantomData,
-        }
+    pub unsafe fn from_parts(context: &'a T::Context, ptrs: T::Ptrs, len: usize) -> Self {
+        Self { context, ptrs, len }
     }
 
     #[inline]
@@ -163,9 +164,11 @@ where
     pub fn to_vec(&self) -> SoaVec<T>
     where
         T::Refs<'a>: SoaToOwned<'a, Owned = T>,
+        T::Context: Clone,
     {
         let len = self.len();
-        let mut vec = SoaVec::with_capacity(len);
+        let context = self.context().clone();
+        let mut vec = SoaVec::with_context_and_capacity(context, len);
 
         let mut set_len_on_drop = SetLenOnDrop {
             vec: &mut vec,
@@ -199,16 +202,6 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("SoaSlices").field(&slices).finish()
-    }
-}
-
-impl<T> Default for SoaSlices<'_, T>
-where
-    T: Soa,
-{
-    fn default() -> Self {
-        let ptrs = T::ptrs_cast_const(T::ptrs_dangling());
-        unsafe { Self::from_parts(ptrs, 0) }
     }
 }
 
@@ -346,9 +339,9 @@ pub struct SoaSlicesMut<'a, T>
 where
     T: Soa + 'a,
 {
+    context: &'a T::Context,
     ptrs: T::MutPtrs,
     len: usize,
-    phantom: PhantomData<T::SlicesMut<'a>>,
 }
 
 impl<'a, T> SoaSlicesMut<'a, T>
@@ -356,12 +349,12 @@ where
     T: Soa,
 {
     #[inline]
-    pub fn new(slices: T::SlicesMut<'a>) -> Self {
+    pub fn new(context: &'a T::Context, slices: T::SlicesMut<'a>) -> Self {
         let slices = T::mut_slice_refs_as_slice_ptrs(slices);
         Self {
+            context,
             ptrs: T::mut_slice_ptrs_as_ptrs(slices),
             len: T::slice_ptrs_len_mut(slices),
-            phantom: PhantomData,
         }
     }
 
@@ -376,6 +369,12 @@ where
     }
 
     #[inline]
+    pub fn context(&self) -> &T::Context {
+        let Self { context, .. } = self;
+        context
+    }
+
+    #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
         let Self { ptrs, len, .. } = *self;
 
@@ -386,18 +385,32 @@ where
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_> {
-        let Self { ptrs, len, .. } = *self;
+        let (_, slices) = self.as_mut_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_mut_slices_with_context(&mut self) -> (&T::Context, T::SlicesMut<'_>) {
+        let Self { context, ptrs, len } = *self;
 
         let slices = T::slices_from_raw_parts_mut(ptrs, len);
-        unsafe { T::slice_ptrs_to_slices_mut(slices) }
+        let slices = unsafe { T::slice_ptrs_to_slices_mut(slices) };
+        (context, slices)
     }
 
     #[inline]
     pub fn into_slices(self) -> T::SlicesMut<'a> {
-        let Self { ptrs, len, .. } = self;
+        let (_, slices) = self.into_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn into_slices_with_context(self) -> (&'a T::Context, T::SlicesMut<'a>) {
+        let Self { context, ptrs, len } = self;
 
         let slices = T::slices_from_raw_parts_mut(ptrs, len);
-        unsafe { T::slice_ptrs_to_slices_mut(slices) }
+        let slices = unsafe { T::slice_ptrs_to_slices_mut(slices) };
+        (context, slices)
     }
 
     #[inline]
@@ -413,18 +426,14 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (T::MutPtrs, usize) {
-        let Self { ptrs, len, .. } = self;
-        (ptrs, len)
+    pub fn into_parts(self) -> (&'a T::Context, T::MutPtrs, usize) {
+        let Self { context, ptrs, len } = self;
+        (context, ptrs, len)
     }
 
     #[inline]
-    pub unsafe fn from_parts(ptrs: T::MutPtrs, len: usize) -> Self {
-        Self {
-            ptrs,
-            len,
-            phantom: PhantomData,
-        }
+    pub unsafe fn from_parts(context: &'a T::Context, ptrs: T::MutPtrs, len: usize) -> Self {
+        Self { context, ptrs, len }
     }
 
     #[inline]
@@ -527,12 +536,16 @@ where
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, T> {
-        Iter::new((*self).into())
+        let Self { context, ptrs, len } = *self;
+        let slices = unsafe { SoaSlices::from_parts(context, T::ptrs_cast_const(ptrs), len) };
+        Iter::new(slices)
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        IterMut::new(*self)
+        let Self { context, ptrs, len } = *self;
+        let slices = unsafe { Self::from_parts(context, ptrs, len) };
+        IterMut::new(slices)
     }
 
     #[inline]
@@ -540,8 +553,9 @@ where
     where
         T::Refs<'a>: PartialEq<T>,
     {
-        let this = SoaSlices::from(*self);
-        this.contains(value)
+        let Self { context, ptrs, len } = *self;
+        let slices = unsafe { SoaSlices::from_parts(context, T::ptrs_cast_const(ptrs), len) };
+        slices.contains(value)
     }
 
     #[inline]
@@ -549,24 +563,32 @@ where
     where
         T::Refs<'a>: PartialEq<T::Refs<'r>>,
     {
-        let this = SoaSlices::from(*self);
-        this.contains_by_refs(refs)
+        let Self { context, ptrs, len } = *self;
+        let slices = unsafe { SoaSlices::<T>::from_parts(context, T::ptrs_cast_const(ptrs), len) };
+        slices.contains_by_refs(refs)
     }
 
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
         T::Refs<'a>: SoaToOwned<'a, Owned = T>,
+        T::Context: Clone,
     {
         let len = self.len();
-        let mut vec = SoaVec::with_capacity(len);
+        let context = self.context().clone();
+        let mut vec = SoaVec::with_context_and_capacity(context, len);
 
         let mut set_len_on_drop = SetLenOnDrop {
             vec: &mut vec,
             local_len: 0,
         };
         let ptrs = set_len_on_drop.vec.as_mut_ptrs();
-        for (index, refs) in SoaSlices::from(*self).into_iter().enumerate() {
+
+        let slices = {
+            let Self { context, ptrs, len } = *self;
+            unsafe { SoaSlices::<T>::from_parts(context, T::ptrs_cast_const(ptrs), len) }
+        };
+        for (index, refs) in slices.into_iter().enumerate() {
             set_len_on_drop.local_len = index;
             unsafe {
                 let dst = T::ptrs_add_mut(ptrs, index);
@@ -794,12 +816,8 @@ where
     T: Soa,
 {
     fn from(slices: SoaSlicesMut<'a, T>) -> Self {
-        let SoaSlicesMut { ptrs, len, .. } = slices;
-        Self {
-            ptrs: T::ptrs_cast_const(ptrs),
-            len,
-            phantom: PhantomData,
-        }
+        let SoaSlicesMut { context, ptrs, len } = slices;
+        unsafe { Self::from_parts(context, T::ptrs_cast_const(ptrs), len) }
     }
 }
 
@@ -812,16 +830,6 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("SoaSlices").field(&slices).finish()
-    }
-}
-
-impl<T> Default for SoaSlicesMut<'_, T>
-where
-    T: Soa,
-{
-    fn default() -> Self {
-        let ptrs = T::ptrs_dangling();
-        unsafe { Self::from_parts(ptrs, 0) }
     }
 }
 
@@ -923,17 +931,6 @@ where
         slices.hash(state);
     }
 }
-
-impl<T> Clone for SoaSlicesMut<'_, T>
-where
-    T: Soa,
-{
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for SoaSlicesMut<'_, T> where T: Soa {}
 
 impl<T, U, I> Index<I> for SoaSlicesMut<'_, T>
 where

@@ -282,6 +282,7 @@ where
 impl<K, V> Default for IntoKeys<K, V>
 where
     V: Soa,
+    V::Context: Default,
 {
     #[inline]
     fn default() -> Self {
@@ -881,6 +882,7 @@ where
 impl<K, V> Default for IntoValues<K, V>
 where
     V: Soa,
+    V::Context: Default,
 {
     #[inline]
     fn default() -> Self {
@@ -1439,6 +1441,7 @@ where
 impl<K, V> Default for IntoIter<K, V>
 where
     V: Soa,
+    V::Context: Default,
 {
     #[inline]
     fn default() -> Self {

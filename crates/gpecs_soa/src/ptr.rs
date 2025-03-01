@@ -66,6 +66,9 @@ where
     T: Soa,
 {
     #[allow(clippy::missing_safety_doc)]
+    unsafe fn context<'a>(self) -> &'a T::Context;
+
+    #[allow(clippy::missing_safety_doc)]
     unsafe fn len(self) -> usize;
 
     #[allow(clippy::missing_safety_doc)]
@@ -83,6 +86,12 @@ impl<T> SoaSlicePtr<T> for *const SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
+    unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
+        let buffer = self.as_ptr();
+        unsafe { &*buffer.ptr_to_context() }
+    }
+
     #[inline]
     unsafe fn len(self) -> usize {
         let buffer_layout = slice_buffer_layout(self);
@@ -110,6 +119,9 @@ where
     T: Soa,
 {
     #[allow(clippy::missing_safety_doc)]
+    unsafe fn context<'a>(self) -> &'a T::Context;
+
+    #[allow(clippy::missing_safety_doc)]
     unsafe fn len(self) -> usize;
 
     #[allow(clippy::missing_safety_doc)]
@@ -127,6 +139,12 @@ impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
 where
     T: Soa,
 {
+    #[inline]
+    unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
+        let this = self.cast_const();
+        unsafe { this.context() }
+    }
+
     #[inline]
     unsafe fn len(self) -> usize {
         let this = self.cast_const();
@@ -191,6 +209,7 @@ where
     }
 }
 
+#[repr(C)]
 pub(crate) struct BufferPrefix<T>
 where
     T: Soa,
@@ -201,20 +220,24 @@ where
 }
 
 const _: () = {
-    const fn assert_data_prefix_align<T>()
+    const fn assert_safety_preconditions<T>()
     where
         T: Soa,
     {
+        assert!(
+            offset_of!(BufferPrefix<T>, context) == 0,
+            "context should be located at the beginning of the buffer prefix",
+        );
         assert!(
             align_of::<BufferData<T>>() == align_of::<BufferPrefix<T>>(),
             "alignment of buffer data and prefix should be the same",
         );
     }
 
-    assert_data_prefix_align::<()>();
-    assert_data_prefix_align::<(u8, u8, u8)>();
-    assert_data_prefix_align::<(u8, u32, u16)>();
-    assert_data_prefix_align::<(u128,)>();
+    assert_safety_preconditions::<()>();
+    assert_safety_preconditions::<(u8, u8, u8)>();
+    assert_safety_preconditions::<(u8, u32, u16)>();
+    assert_safety_preconditions::<(u128,)>();
 };
 
 pub(crate) trait BufferDataPtr<T>: Copy
@@ -222,7 +245,7 @@ where
     T: Soa,
 {
     unsafe fn ptr_to_len(self) -> *const usize;
-    unsafe fn ptr_to_context(self) -> *const T::Context;
+    fn ptr_to_context(self) -> *const T::Context;
 }
 
 impl<T> BufferDataPtr<T> for *const BufferData<T>
@@ -236,11 +259,9 @@ where
         len.cast()
     }
 
-    #[inline]
-    unsafe fn ptr_to_context(self) -> *const T::Context {
-        let prefix = self.cast::<u8>();
-        let context = unsafe { prefix.add(offset_of!(BufferPrefix<T>, context)) };
-        context.cast()
+    #[inline(always)]
+    fn ptr_to_context(self) -> *const T::Context {
+        self.cast()
     }
 }
 
@@ -263,11 +284,9 @@ where
         len.cast()
     }
 
-    #[inline]
+    #[inline(always)]
     fn ptr_to_context_mut(self) -> *mut T::Context {
-        let prefix = self.cast::<u8>();
-        let context = unsafe { prefix.add(offset_of!(BufferPrefix<T>, context)) };
-        context.cast()
+        self.cast()
     }
 }
 

@@ -53,8 +53,9 @@ where
             let mut vec = NonNull::from(vec);
 
             // index before setting length, otherwise range is invalid
+            let context = vec.as_ref().context();
             let slices = vec.as_ref().index(range);
-            let slices = SoaSlices::new(slices);
+            let slices = SoaSlices::new(context, slices);
 
             // set self.vec length's to start, to be safe in case Drain is leaked
             vec.as_mut().set_len(start);

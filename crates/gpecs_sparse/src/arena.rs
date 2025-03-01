@@ -22,7 +22,12 @@ use crate::{
         KeyValueSlicesMut, KeyValueVecs,
     },
     set,
-    soa::{mem::replace as soa_replace, slice::SoaSlice, traits::Soa, vec::SoaVec},
+    soa::{
+        mem::replace as soa_replace,
+        slice::{SoaSlice, SoaSlices, SoaSlicesMut},
+        traits::Soa,
+        vec::SoaVec,
+    },
     view::{EpochSparseView, EpochSparseViewMut},
 };
 
@@ -244,6 +249,24 @@ where
     }
 
     #[inline]
+    pub fn slices(&self) -> SoaSlices<'_, V> {
+        let Self { dense, .. } = self;
+
+        let (context, slices) = dense.slices().into_slices_with_context();
+        let KeyValueSlices { values, .. } = slices;
+        SoaSlices::new(context, values)
+    }
+
+    #[inline]
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, V> {
+        let Self { dense, .. } = self;
+
+        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let KeyValueSlicesMut { values, .. } = slices;
+        SoaSlicesMut::new(context, values)
+    }
+
+    #[inline]
     pub fn into_vecs(self) -> (V::Context, V::Vecs) {
         let Self { dense, .. } = self;
 
@@ -372,9 +395,11 @@ where
         match sparse.get_mut(sparse_index) {
             Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
                 SparseItemKind::Occupied { dense_index } => {
+                    let (context, dense) = dense.slices_mut().into_slices_with_context();
+                    let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
                     let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
 
-                    let value = soa_replace(dense_value, value);
+                    let value = soa_replace(context, dense_value, value);
                     sparse_item.epoch = key.epoch();
                     *dense_key = key;
 
@@ -413,9 +438,11 @@ where
         match sparse.get_mut(sparse_index) {
             Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
                 SparseItemKind::Occupied { dense_index } => {
+                    let (context, dense) = dense.slices_mut().into_slices_with_context();
+                    let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
                     let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
 
-                    let value = soa_replace(dense_value, value);
+                    let value = soa_replace(context, dense_value, value);
                     sparse_item.epoch = key.epoch();
                     *dense_key = key;
 

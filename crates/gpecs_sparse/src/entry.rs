@@ -6,7 +6,6 @@ use core::{
 use crate::{
     arena::EpochSparseArena,
     assert::unwrap_dense,
-    iter::{Values, ValuesMut},
     key::Key,
     set::EpochSparseSet,
     soa::{mem::replace as soa_replace, Soa},
@@ -48,7 +47,7 @@ where
             ..
         } = self;
 
-        let values = container.values();
+        let values = container.slices();
         unwrap_dense(values, *dense_index)
     }
 
@@ -60,7 +59,7 @@ where
             ..
         } = self;
 
-        let values = container.values_mut();
+        let values = container.slices_mut();
         unwrap_dense(values, *dense_index)
     }
 
@@ -72,14 +71,22 @@ where
             ..
         } = self;
 
-        let values = container.values_mut();
+        let values = container.slices_mut();
         unwrap_dense(values, dense_index)
     }
 
     #[inline]
     pub fn insert(&mut self, value: V) -> V {
-        let previous = self.get_mut();
-        soa_replace(previous, value)
+        let Self {
+            dense_index,
+            container,
+            ..
+        } = self;
+
+        let (context, values) = container.slices_mut().into_slices_with_context();
+        let values = SoaSlicesMut::<V>::new(context, values);
+        let previous = unwrap_dense(values, *dense_index);
+        soa_replace(context, previous, value)
     }
 
     #[inline]
@@ -179,7 +186,7 @@ where
 
         container.insert(key, value);
 
-        let value = container.values_mut().last();
+        let value = container.slices_mut().into_iter().last();
         unwrap_entry_value(value)
     }
 
@@ -192,7 +199,7 @@ where
         } = self;
 
         container.insert(key, value);
-        let dense_index = container.values().len() - 1;
+        let dense_index = container.slices().len() - 1;
 
         OccupiedEntry {
             key,
@@ -236,9 +243,9 @@ where
     K: Key,
     V: Soa,
 {
-    fn values(&self) -> Values<'_, K, V>;
+    fn slices(&self) -> SoaSlices<'_, V>;
 
-    fn values_mut(&mut self) -> ValuesMut<'_, K, V>;
+    fn slices_mut(&mut self) -> SoaSlicesMut<'_, V>;
 
     fn insert(&mut self, key: K, value: V) -> Option<V>;
 
@@ -253,13 +260,13 @@ where
     V: Soa,
 {
     #[inline]
-    fn values(&self) -> Values<'_, K, V> {
-        EpochSparseSet::values(self)
+    fn slices(&self) -> SoaSlices<'_, V> {
+        EpochSparseSet::slices(self)
     }
 
     #[inline]
-    fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
-        EpochSparseSet::values_mut(self)
+    fn slices_mut(&mut self) -> SoaSlicesMut<'_, V> {
+        EpochSparseSet::slices_mut(self)
     }
 
     #[inline]
@@ -284,13 +291,13 @@ where
     V: Soa,
 {
     #[inline]
-    fn values(&self) -> Values<'_, K, V> {
-        EpochSparseArena::values(self)
+    fn slices(&self) -> SoaSlices<'_, V> {
+        EpochSparseArena::slices(self)
     }
 
     #[inline]
-    fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
-        EpochSparseArena::values_mut(self)
+    fn slices_mut(&mut self) -> SoaSlicesMut<'_, V> {
+        EpochSparseArena::slices_mut(self)
     }
 
     #[inline]
@@ -583,3 +590,4 @@ macro_rules! generate_entry_types {
 }
 
 pub(crate) use generate_entry_types;
+use gpecs_soa::slice::{SoaSlices, SoaSlicesMut};

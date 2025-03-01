@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{BufferData, BufferDataPtrMut},
+    ptr::{BufferData, BufferDataPtr, BufferDataPtrMut},
     raw_vec::RawSoaVec,
     traits::Soa,
     vec::SoaVec,
@@ -31,58 +31,71 @@ where
     pub(super) fn new(vec: SoaVec<T>) -> Self {
         let mut vec = ManuallyDrop::new(vec);
 
+        let buffer = vec.as_mut_ptr();
+        let ptrs = vec.as_mut_ptrs();
+        let context = vec.context();
         Self {
-            buffer: unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) },
+            buffer: unsafe { NonNull::new_unchecked(buffer) },
             capacity: vec.capacity(),
-            ptrs: unsafe { T::ptrs_to_nonnull(vec.as_mut_ptrs()) },
+            ptrs: unsafe { T::ptrs_to_nonnull(context, ptrs) },
             start: 0,
             end: vec.len(),
         }
     }
 
     #[inline]
-    pub const fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.end - self.start
     }
 
     #[inline]
-    pub const fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     #[inline]
+    pub fn context(&self) -> &T::Context {
+        let buffer = self.buffer.as_ptr().cast_const();
+        unsafe { &*buffer.ptr_to_context() }
+    }
+
+    #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
-        let ptrs = T::ptrs_cast_const(self.ptrs());
+        let context = self.context();
+        let ptrs = T::ptrs_cast_const(context, self.ptrs());
         let len = self.len();
 
         unsafe {
-            let ptrs = T::ptrs_add(ptrs, self.start);
-            let slices = T::slices_from_raw_parts(ptrs, len);
-            T::slice_ptrs_to_slices(slices)
+            let ptrs = T::ptrs_add(context, ptrs, self.start);
+            let slices = T::slices_from_raw_parts(context, ptrs, len);
+            T::slice_ptrs_to_slices(context, slices)
         }
     }
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_> {
+        let context = self.context();
         let ptrs = self.ptrs();
         let len = self.len();
 
         unsafe {
-            let ptrs = T::ptrs_add_mut(ptrs, self.start);
-            let slices = T::slices_from_raw_parts_mut(ptrs, len);
-            T::slice_ptrs_to_slices_mut(slices)
+            let ptrs = T::ptrs_add_mut(context, ptrs, self.start);
+            let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+            T::slice_ptrs_to_slices_mut(context, slices)
         }
     }
 
     #[inline]
     fn ptrs(&self) -> T::MutPtrs {
-        T::nonnull_to_ptrs(self.ptrs)
+        let context = self.context();
+        T::nonnull_to_ptrs(context, self.ptrs)
     }
 
     #[inline]
     unsafe fn post_inc_start(&mut self, offset: usize) -> T::Ptrs {
-        let ptrs = T::ptrs_cast_const(self.ptrs());
-        let ptrs = unsafe { T::ptrs_add(ptrs, self.start) };
+        let context = self.context();
+        let ptrs = T::ptrs_cast_const(context, self.ptrs());
+        let ptrs = unsafe { T::ptrs_add(context, ptrs, self.start) };
 
         self.start += offset;
         ptrs
@@ -92,8 +105,9 @@ where
     unsafe fn pre_dec_end(&mut self, offset: usize) -> T::Ptrs {
         self.end -= offset;
 
-        let ptrs = T::ptrs_cast_const(self.ptrs());
-        unsafe { T::ptrs_add(ptrs, self.end) }
+        let context = self.context();
+        let ptrs = T::ptrs_cast_const(context, self.ptrs());
+        unsafe { T::ptrs_add(context, ptrs, self.end) }
     }
 }
 
@@ -157,18 +171,19 @@ where
         }
 
         let guard = DropGuard(self);
+
+        // destroy the remaining elements
+        if !IntoIter::is_empty(guard.0) {
+            let context = ptr::from_ref(guard.0.context());
+            let slices = guard.0.as_mut_slices();
+            let slices = T::mut_slice_refs_as_slice_ptrs(unsafe { &*context }, slices);
+            unsafe { T::slices_drop_in_place(&*context, slices) }
+        }
+
         unsafe {
             let context = guard.0.buffer.as_ptr().ptr_to_context_mut();
             ptr::drop_in_place(context);
         }
-
-        // destroy the remaining elements
-        if IntoIter::is_empty(guard.0) {
-            return;
-        }
-        let slices = guard.0.as_mut_slices();
-        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
-        unsafe { T::slices_drop_in_place(slices) }
         // now `guard` will be dropped and do the rest
     }
 }
@@ -188,7 +203,8 @@ where
 
         unsafe {
             let ptrs = self.post_inc_start(1);
-            let item = T::ptrs_read(ptrs);
+            let context = self.context();
+            let item = T::ptrs_read(context, ptrs);
             Some(item)
         }
     }
@@ -249,10 +265,11 @@ where
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
-            let ptrs = T::ptrs_cast_const(self.ptrs());
+            let context = self.context();
+            let ptrs = T::ptrs_cast_const(context, self.ptrs());
             let item = unsafe {
-                let ptrs = T::ptrs_add(ptrs, i);
-                T::ptrs_read(ptrs)
+                let ptrs = T::ptrs_add(context, ptrs, i);
+                T::ptrs_read(context, ptrs)
             };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
@@ -382,7 +399,8 @@ where
 
         unsafe {
             let ptrs = self.pre_dec_end(1);
-            let item = T::ptrs_read(ptrs);
+            let context = self.context();
+            let item = T::ptrs_read(context, ptrs);
             Some(item)
         }
     }

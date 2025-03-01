@@ -113,12 +113,12 @@ where
     // - 4 if elements are moderate-sized (<= 1 KiB).
     // - 1 otherwise, to avoid wasting too much space for very short Vecs.
     #[inline]
-    pub fn min_non_zero_cap() -> usize {
+    pub fn min_non_zero_cap(context: &T::Context) -> usize {
         const SIZE: usize = 4096; // 4 KiB
 
         let buffer_layout = Layout::from_size_align(SIZE, align_of::<BufferData<T>>())
             .expect("layout size should not exceed `isize::MAX`");
-        match T::capacity_from(buffer_layout) {
+        match T::capacity_from(context, buffer_layout) {
             SIZE => 8,
             4.. => 4,
             _ => 1,
@@ -139,11 +139,11 @@ where
             return Ok(this);
         }
 
-        let layout = match buffer_layout::<T>(capacity) {
+        let layout = match buffer_layout::<T>(&context, capacity) {
             Ok(layout) => layout,
             Err(_) => return Err(CapacityOverflow.into()),
         };
-        let capacity = capacity_from::<T>(layout);
+        let capacity = capacity_from::<T>(&context, layout);
         alloc_guard(layout.size())?;
 
         let ptr = match init {
@@ -251,16 +251,17 @@ where
     #[inline]
     pub fn ptrs(&self) -> T::MutPtrs {
         let ptr = self.ptr();
+        let context = self.context();
         let capacity = self.capacity();
-
-        unsafe { ptrs::<T>(ptr, capacity).unwrap_unchecked() }
+        unsafe { ptrs::<T>(context, ptr, capacity).unwrap_unchecked() }
     }
 
     #[inline]
     #[allow(dead_code)]
     pub fn non_nulls(&self) -> T::NonNullPtrs {
         let ptrs = self.ptrs();
-        unsafe { T::ptrs_to_nonnull(ptrs) }
+        let context = self.context();
+        unsafe { T::ptrs_to_nonnull(context, ptrs) }
     }
 
     #[inline]
@@ -281,8 +282,9 @@ where
         // and could hypothetically handle differences between stride and size, but this memory
         // has already been allocated so we know it can't overflow and currently Rust does not
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
+        let context = self.context();
         unsafe {
-            let layout = buffer_layout::<T>(self.capacity).unwrap_unchecked();
+            let layout = buffer_layout::<T>(context, self.capacity).unwrap_unchecked();
             Some((self.ptr.cast(), layout))
         }
     }
@@ -367,16 +369,18 @@ where
             return Err(CapacityOverflow.into());
         }
 
+        let context = self.context();
         let required_capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
 
         let capacity = cmp::max(self.capacity() * 2, required_capacity);
-        let capacity = cmp::max(Self::min_non_zero_cap(), capacity);
-        let new_layout = buffer_layout::<T>(capacity).map_err(|_| CapacityOverflow)?;
+        let capacity = cmp::max(Self::min_non_zero_cap(context), capacity);
+        let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
-        let ptr = finish_grow(new_layout, self.current_memory())?;
+        let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, self.current_memory())?.cast();
         unsafe {
-            let capacity = capacity_from::<T>(new_layout);
-            self.set_ptr_and_capacity(ptr.cast(), capacity);
+            let context_ptr = ptr.as_ptr().cast_const().ptr_to_context();
+            let capacity = capacity_from::<T>(&*context_ptr, new_layout);
+            self.set_ptr_and_capacity(ptr, capacity);
         }
         Ok(())
     }
@@ -386,13 +390,15 @@ where
             return Err(CapacityOverflow.into());
         }
 
+        let context = self.context();
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
-        let new_layout = buffer_layout::<T>(capacity).map_err(|_| CapacityOverflow)?;
+        let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
-        let ptr = finish_grow(new_layout, self.current_memory())?;
+        let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, self.current_memory())?.cast();
         unsafe {
-            let capacity = capacity_from::<T>(new_layout);
-            self.set_ptr_and_capacity(ptr.cast(), capacity);
+            let context_ptr = ptr.as_ptr().cast_const().ptr_to_context();
+            let capacity = capacity_from::<T>(&*context_ptr, new_layout);
+            self.set_ptr_and_capacity(ptr, capacity);
         }
         Ok(())
     }
@@ -408,7 +414,8 @@ where
             None => return Ok(()),
         };
 
-        let new_layout = match buffer_layout::<T>(capacity) {
+        let context = self.context();
+        let new_layout = match buffer_layout::<T>(context, capacity) {
             Ok(layout) => layout,
             Err(_) => return Err(CapacityOverflow.into()),
         };

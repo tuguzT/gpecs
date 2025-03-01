@@ -510,8 +510,10 @@ where
     pub fn swap(&mut self, first_key: K, second_key: K) {
         let Self { dense, sparse } = self;
 
-        let dense = dense.iter_mut().map(|item| item.value);
-        sparse_swap::<K, V>(dense, sparse, first_key, second_key)
+        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let KeyValueSlicesMut { values, .. } = slices;
+        let dense = SoaSlicesMut::<V>::new(context, values);
+        sparse_swap::<K, V>(context, dense, sparse, first_key, second_key)
     }
 
     #[inline]

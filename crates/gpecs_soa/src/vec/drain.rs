@@ -1,9 +1,8 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem,
     ops::{Range, RangeBounds},
-    ptr::NonNull,
+    ptr::{self, NonNull},
 };
 
 use crate::{
@@ -70,6 +69,11 @@ where
     }
 
     #[inline]
+    pub fn context(&self) -> &T::Context {
+        self.iter.context()
+    }
+
+    #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
         self.iter.as_slices()
     }
@@ -106,9 +110,11 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter
-            .next()
-            .map(|refs| unsafe { T::ptrs_read(T::refs_as_ptrs(refs)) })
+        let context = ptr::from_ref(self.iter.context());
+        self.iter.next().map(|refs| unsafe {
+            let context = &*context;
+            T::ptrs_read(context, T::refs_as_ptrs(context, refs))
+        })
     }
 
     #[inline]
@@ -123,9 +129,11 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter
-            .next_back()
-            .map(|refs| unsafe { T::ptrs_read(T::refs_as_ptrs(refs)) })
+        let context = ptr::from_ref(self.iter.context());
+        self.iter.next_back().map(|refs| unsafe {
+            let context = &*context;
+            T::ptrs_read(context, T::refs_as_ptrs(context, refs))
+        })
     }
 }
 
@@ -165,17 +173,21 @@ where
                     let start = source_vec.len();
                     let tail = self.0.tail_start;
                     if tail != start {
-                        let src = T::ptrs_add(source_vec.as_ptrs(), tail);
-                        let dst = T::ptrs_add_mut(source_vec.as_mut_ptrs(), start);
-                        T::ptrs_copy(src, dst, self.0.tail_len);
+                        let src = source_vec.as_ptrs();
+                        let dst = source_vec.as_mut_ptrs();
+                        let context = source_vec.context();
+
+                        let src = T::ptrs_add(context, src, tail);
+                        let dst = T::ptrs_add_mut(context, dst, start);
+                        T::ptrs_copy(context, src, dst, self.0.tail_len);
                     }
                     source_vec.set_len(start + self.0.tail_len);
                 }
             }
         }
 
-        let iter = mem::take(&mut self.iter);
-        let drop_len = iter.len();
+        let drop_len = self.iter.len();
+        let slices = self.iter.as_slices();
 
         let mut vec = self.vec;
 
@@ -199,24 +211,28 @@ where
             return;
         }
 
-        // as_ptrs() must only be called when iter.len() is > 0 because
-        // it also gets touched by vec::Splice which may turn it into a dangling pointer
-        // which would make it and the vec pointer point to different allocations which would
-        // lead to invalid pointer arithmetic below.
-        let drop_ptrs = T::slice_refs_as_ptrs(iter.as_slices());
-
         unsafe {
+            let vec_ptrs = vec.as_mut().as_mut_ptrs();
+            let context = vec.as_ref().context();
+
+            // as_ptrs() must only be called when iter.len() is > 0 because
+            // it also gets touched by vec::Splice which may turn it into a dangling pointer
+            // which would make it and the vec pointer point to different allocations which would
+            // lead to invalid pointer arithmetic below.
+            let drop_ptrs = T::slice_refs_as_ptrs(context, slices);
+
             // drop_ptrs comes from an Iter which only gives us slices but for drop_in_place
             // a pointer with mutable provenance is necessary. Therefore we must reconstruct
             // it from the original vec but also avoid creating a &mut to the front since that could
             // invalidate raw pointers to it which some unsafe code might rely on.
-            let vec_ptrs = vec.as_mut().as_mut_ptrs();
-            let drop_offset =
-                usize::try_from(T::ptrs_offset_from(drop_ptrs, T::ptrs_cast_const(vec_ptrs)))
-                    .unwrap_unchecked();
-            let to_drop =
-                T::slices_from_raw_parts_mut(T::ptrs_add_mut(vec_ptrs, drop_offset), drop_len);
-            T::slices_drop_in_place(to_drop);
+            let origin = T::ptrs_cast_const(context, vec_ptrs);
+
+            let drop_offset = T::ptrs_offset_from(context, drop_ptrs, origin);
+            let drop_offset = usize::try_from(drop_offset).unwrap_unchecked();
+
+            let ptrs = T::ptrs_add_mut(context, vec_ptrs, drop_offset);
+            let to_drop = T::slices_from_raw_parts_mut(context, ptrs, drop_len);
+            T::slices_drop_in_place(context, to_drop);
         }
     }
 }

@@ -60,7 +60,7 @@ where
         if is_zst::<T>() {
             return usize::MAX;
         }
-        ptr::from_ref(self).capacity()
+        unsafe { ptr::from_ref(self).capacity() }
     }
 
     #[inline]
@@ -76,38 +76,41 @@ where
     #[inline]
     pub fn as_ptrs(&self) -> T::Ptrs {
         let ptr = self.as_ptr().cast_mut();
+        let context = self.context();
         let len = self.capacity();
 
         unsafe {
-            let ptrs = ptrs::<T>(ptr, len).unwrap_unchecked();
-            T::ptrs_cast_const(ptrs)
+            let ptrs = ptrs::<T>(context, ptr, len).unwrap_unchecked();
+            T::ptrs_cast_const(context, ptrs)
         }
     }
 
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> T::MutPtrs {
         let ptr = self.as_mut_ptr();
+        let context = self.context();
         let len = self.capacity();
-
-        unsafe { ptrs::<T>(ptr, len).unwrap_unchecked() }
+        unsafe { ptrs::<T>(context, ptr, len).unwrap_unchecked() }
     }
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
         let ptrs = self.as_ptrs();
         let len = self.len();
+        let context = self.context();
 
-        let slices = T::slices_from_raw_parts(ptrs, len);
-        unsafe { T::slice_ptrs_to_slices(slices) }
+        let slices = T::slices_from_raw_parts(context, ptrs, len);
+        unsafe { T::slice_ptrs_to_slices(context, slices) }
     }
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_> {
         let ptrs = self.as_mut_ptrs();
         let len = self.len();
+        let context = self.context();
 
-        let slices = T::slices_from_raw_parts_mut(ptrs, len);
-        unsafe { T::slice_ptrs_to_slices_mut(slices) }
+        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        unsafe { T::slice_ptrs_to_slices_mut(context, slices) }
     }
 
     #[inline]
@@ -459,9 +462,13 @@ where
             return;
         }
 
+        let context = ptr::from_ref(self.context());
         let slices = self.as_mut_slices();
-        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
-        unsafe { T::slices_drop_in_place(slices) }
+        unsafe {
+            let context = &*context;
+            let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
+            T::slices_drop_in_place(&*context, slices);
+        }
     }
 }
 

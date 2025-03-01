@@ -15,21 +15,29 @@ where
     where
         T: 'a;
 
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>>;
+    fn get<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>>;
 
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>>;
+    fn get_mut<'a>(
+        self,
+        context: &T::Context,
+        slices: T::SlicesMut<'a>,
+    ) -> Option<Self::RefsMut<'a>>;
 
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a>;
+    fn index<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a>;
 
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a>;
+    fn index_mut<'a>(self, context: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a>;
 
     type Ptrs;
 
     type MutPtrs;
 
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs;
+    unsafe fn get_unchecked(self, context: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs;
 
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs;
+    unsafe fn get_unchecked_mut(
+        self,
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Self::MutPtrs;
 }
 
 unsafe impl<T> SoaSliceIndex<T> for usize
@@ -47,48 +55,52 @@ where
         T: 'a;
 
     #[inline]
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
-        let slices = T::slice_refs_as_slice_ptrs(slices);
-        let len = T::slice_ptrs_len(slices);
+    fn get<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
+        let slices = T::slice_refs_as_slice_ptrs(context, slices);
+        let len = T::slice_ptrs_len(context, slices);
         if self >= len {
             return None;
         }
 
         unsafe {
-            let ptrs = SoaSliceIndex::<T>::get_unchecked(self, slices);
-            let refs = T::ptrs_to_refs(ptrs);
+            let ptrs = SoaSliceIndex::<T>::get_unchecked(self, context, slices);
+            let refs = T::ptrs_to_refs(context, ptrs);
             Some(refs)
         }
     }
 
     #[inline]
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
-        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
-        let len = T::slice_ptrs_len_mut(slices);
+    fn get_mut<'a>(
+        self,
+        context: &T::Context,
+        slices: T::SlicesMut<'a>,
+    ) -> Option<Self::RefsMut<'a>> {
+        let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
+        let len = T::slice_ptrs_len_mut(context, slices);
         if self >= len {
             return None;
         }
 
         unsafe {
-            let ptrs = SoaSliceIndex::<T>::get_unchecked_mut(self, slices);
-            let refs = T::ptrs_to_refs_mut(ptrs);
+            let ptrs = SoaSliceIndex::<T>::get_unchecked_mut(self, context, slices);
+            let refs = T::ptrs_to_refs_mut(context, ptrs);
             Some(refs)
         }
     }
 
     #[inline]
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a> {
-        let len = T::slices_len(&slices);
-        match SoaSliceIndex::<T>::get(self, slices) {
+    fn index<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a> {
+        let len = T::slices_len(context, &slices);
+        match SoaSliceIndex::<T>::get(self, context, slices) {
             Some(value) => value,
             None => slice_index_usize_fail(len, self),
         }
     }
 
     #[inline]
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
-        let len = T::slices_len_mut(&slices);
-        match SoaSliceIndex::<T>::get_mut(self, slices) {
+    fn index_mut<'a>(self, context: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
+        let len = T::slices_len_mut(context, &slices);
+        match SoaSliceIndex::<T>::get_mut(self, context, slices) {
             Some(value) => value,
             None => slice_index_usize_fail(len, self),
         }
@@ -98,26 +110,30 @@ where
 
     type MutPtrs = T::MutPtrs;
 
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs {
-        let len = T::slice_ptrs_len(slices);
+    unsafe fn get_unchecked(self, context: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs {
+        let len = T::slice_ptrs_len(context, slices);
         debug_assert!(
             self < len,
             "slice::get_unchecked requires that the index is within the slice",
         );
 
-        let ptrs = T::slice_ptrs_as_ptrs(slices);
-        unsafe { T::ptrs_add(ptrs, self) }
+        let ptrs = T::slice_ptrs_as_ptrs(context, slices);
+        unsafe { T::ptrs_add(context, ptrs, self) }
     }
 
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs {
-        let len = T::slice_ptrs_len_mut(slices);
+    unsafe fn get_unchecked_mut(
+        self,
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Self::MutPtrs {
+        let len = T::slice_ptrs_len_mut(context, slices);
         debug_assert!(
             self < len,
             "slice::get_unchecked_mut requires that the index is within the slice",
         );
 
-        let ptrs = T::mut_slice_ptrs_as_ptrs(slices);
-        unsafe { T::ptrs_add_mut(ptrs, self) }
+        let ptrs = T::mut_slice_ptrs_as_ptrs(context, slices);
+        unsafe { T::ptrs_add_mut(context, ptrs, self) }
     }
 }
 
@@ -136,64 +152,68 @@ where
         T: 'a;
 
     #[inline]
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
-        let slices = T::slice_refs_as_slice_ptrs(slices);
-        let len = T::slice_ptrs_len(slices);
+    fn get<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
+        let slices = T::slice_refs_as_slice_ptrs(context, slices);
+        let len = T::slice_ptrs_len(context, slices);
         if self.start > self.end || self.end > len {
             return None;
         }
 
         unsafe {
-            let slices = SoaSliceIndex::<T>::get_unchecked(self, slices);
-            let slices = T::slice_ptrs_to_slices(slices);
+            let slices = SoaSliceIndex::<T>::get_unchecked(self, context, slices);
+            let slices = T::slice_ptrs_to_slices(context, slices);
             Some(slices)
         }
     }
 
     #[inline]
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
-        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
-        let len = T::slice_ptrs_len_mut(slices);
+    fn get_mut<'a>(
+        self,
+        context: &T::Context,
+        slices: T::SlicesMut<'a>,
+    ) -> Option<Self::RefsMut<'a>> {
+        let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
+        let len = T::slice_ptrs_len_mut(context, slices);
         if self.start > self.end || self.end > len {
             return None;
         }
 
         unsafe {
-            let slices = SoaSliceIndex::<T>::get_unchecked_mut(self, slices);
-            let slices = T::slice_ptrs_to_slices_mut(slices);
+            let slices = SoaSliceIndex::<T>::get_unchecked_mut(self, context, slices);
+            let slices = T::slice_ptrs_to_slices_mut(context, slices);
             Some(slices)
         }
     }
 
     #[inline]
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a> {
-        let len = T::slices_len(&slices);
+    fn index<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a> {
+        let len = T::slices_len(context, &slices);
         if self.start > self.end {
             slice_index_order_fail(self.start, self.end);
         } else if self.end > len {
             slice_end_index_len_fail(self.end, len);
         }
 
-        let slices = T::slice_refs_as_slice_ptrs(slices);
+        let slices = T::slice_refs_as_slice_ptrs(context, slices);
         unsafe {
-            let slices = SoaSliceIndex::<T>::get_unchecked(self, slices);
-            T::slice_ptrs_to_slices(slices)
+            let slices = SoaSliceIndex::<T>::get_unchecked(self, context, slices);
+            T::slice_ptrs_to_slices(context, slices)
         }
     }
 
     #[inline]
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
-        let len = T::slices_len_mut(&slices);
+    fn index_mut<'a>(self, context: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
+        let len = T::slices_len_mut(context, &slices);
         if self.start > self.end {
             slice_index_order_fail(self.start, self.end);
         } else if self.end > len {
             slice_end_index_len_fail(self.end, len);
         }
 
-        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
+        let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
         unsafe {
-            let slices = SoaSliceIndex::<T>::get_unchecked_mut(self, slices);
-            T::slice_ptrs_to_slices_mut(slices)
+            let slices = SoaSliceIndex::<T>::get_unchecked_mut(self, context, slices);
+            T::slice_ptrs_to_slices_mut(context, slices)
         }
     }
 
@@ -201,33 +221,37 @@ where
 
     type MutPtrs = T::SliceMutPtrs;
 
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs {
-        let len = T::slice_ptrs_len(slices);
+    unsafe fn get_unchecked(self, context: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs {
+        let len = T::slice_ptrs_len(context, slices);
         debug_assert!(
             self.end >= self.start && self.end <= len,
             "slice::get_unchecked requires that the range is within the slice",
         );
 
-        let ptrs = T::slice_ptrs_as_ptrs(slices);
+        let ptrs = T::slice_ptrs_as_ptrs(context, slices);
         unsafe {
-            let ptrs = T::ptrs_add(ptrs, self.start);
+            let ptrs = T::ptrs_add(context, ptrs, self.start);
             let new_len = self.end.unchecked_sub(self.start);
-            T::slices_from_raw_parts(ptrs, new_len)
+            T::slices_from_raw_parts(context, ptrs, new_len)
         }
     }
 
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs {
-        let len = T::slice_ptrs_len_mut(slices);
+    unsafe fn get_unchecked_mut(
+        self,
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Self::MutPtrs {
+        let len = T::slice_ptrs_len_mut(context, slices);
         debug_assert!(
             self.end >= self.start && self.end <= len,
             "slice::get_unchecked_mut requires that the range is within the slice",
         );
 
-        let ptrs = T::mut_slice_ptrs_as_ptrs(slices);
+        let ptrs = T::mut_slice_ptrs_as_ptrs(context, slices);
         unsafe {
-            let ptrs = T::ptrs_add_mut(ptrs, self.start);
+            let ptrs = T::ptrs_add_mut(context, ptrs, self.start);
             let new_len = self.end.unchecked_sub(self.start);
-            T::slices_from_raw_parts_mut(ptrs, new_len)
+            T::slices_from_raw_parts_mut(context, ptrs, new_len)
         }
     }
 }
@@ -247,23 +271,27 @@ where
         T: 'a;
 
     #[inline]
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
-        SoaSliceIndex::<T>::get(0..self.end, slices)
+    fn get<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
+        SoaSliceIndex::<T>::get(0..self.end, context, slices)
     }
 
     #[inline]
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
-        SoaSliceIndex::<T>::get_mut(0..self.end, slices)
+    fn get_mut<'a>(
+        self,
+        context: &T::Context,
+        slices: T::SlicesMut<'a>,
+    ) -> Option<Self::RefsMut<'a>> {
+        SoaSliceIndex::<T>::get_mut(0..self.end, context, slices)
     }
 
     #[inline]
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a> {
-        SoaSliceIndex::<T>::index(0..self.end, slices)
+    fn index<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a> {
+        SoaSliceIndex::<T>::index(0..self.end, context, slices)
     }
 
     #[inline]
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
-        SoaSliceIndex::<T>::index_mut(0..self.end, slices)
+    fn index_mut<'a>(self, context: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
+        SoaSliceIndex::<T>::index_mut(0..self.end, context, slices)
     }
 
     type Ptrs = T::SlicePtrs;
@@ -271,13 +299,17 @@ where
     type MutPtrs = T::SliceMutPtrs;
 
     #[inline]
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs {
-        unsafe { SoaSliceIndex::<T>::get_unchecked(0..self.end, slices) }
+    unsafe fn get_unchecked(self, context: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs {
+        unsafe { SoaSliceIndex::<T>::get_unchecked(0..self.end, context, slices) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs {
-        unsafe { SoaSliceIndex::<T>::get_unchecked_mut(0..self.end, slices) }
+    unsafe fn get_unchecked_mut(
+        self,
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Self::MutPtrs {
+        unsafe { SoaSliceIndex::<T>::get_unchecked_mut(0..self.end, context, slices) }
     }
 }
 
@@ -296,42 +328,46 @@ where
         T: 'a;
 
     #[inline]
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
-        let len = T::slices_len(&slices);
-        SoaSliceIndex::<T>::get(self.start..len, slices)
+    fn get<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
+        let len = T::slices_len(context, &slices);
+        SoaSliceIndex::<T>::get(self.start..len, context, slices)
     }
 
     #[inline]
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
-        let len = T::slices_len_mut(&slices);
-        SoaSliceIndex::<T>::get_mut(self.start..len, slices)
+    fn get_mut<'a>(
+        self,
+        context: &T::Context,
+        slices: T::SlicesMut<'a>,
+    ) -> Option<Self::RefsMut<'a>> {
+        let len = T::slices_len_mut(context, &slices);
+        SoaSliceIndex::<T>::get_mut(self.start..len, context, slices)
     }
 
     #[inline]
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a> {
-        let len = T::slices_len(&slices);
+    fn index<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a> {
+        let len = T::slices_len(context, &slices);
         if self.start > len {
             slice_start_index_len_fail(self.start, len);
         }
 
-        let slices = T::slice_refs_as_slice_ptrs(slices);
+        let slices = T::slice_refs_as_slice_ptrs(context, slices);
         unsafe {
-            let slices = SoaSliceIndex::<T>::get_unchecked(self, slices);
-            T::slice_ptrs_to_slices(slices)
+            let slices = SoaSliceIndex::<T>::get_unchecked(self, context, slices);
+            T::slice_ptrs_to_slices(context, slices)
         }
     }
 
     #[inline]
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
-        let len = T::slices_len_mut(&slices);
+    fn index_mut<'a>(self, context: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
+        let len = T::slices_len_mut(context, &slices);
         if self.start > len {
             slice_start_index_len_fail(self.start, len);
         }
 
-        let slices = T::mut_slice_refs_as_slice_ptrs(slices);
+        let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
         unsafe {
-            let slices = SoaSliceIndex::<T>::get_unchecked_mut(self, slices);
-            T::slice_ptrs_to_slices_mut(slices)
+            let slices = SoaSliceIndex::<T>::get_unchecked_mut(self, context, slices);
+            T::slice_ptrs_to_slices_mut(context, slices)
         }
     }
 
@@ -340,15 +376,19 @@ where
     type MutPtrs = T::SliceMutPtrs;
 
     #[inline]
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs {
-        let len = T::slice_ptrs_len(slices);
-        unsafe { SoaSliceIndex::<T>::get_unchecked(self.start..len, slices) }
+    unsafe fn get_unchecked(self, context: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs {
+        let len = T::slice_ptrs_len(context, slices);
+        unsafe { SoaSliceIndex::<T>::get_unchecked(self.start..len, context, slices) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs {
-        let len = T::slice_ptrs_len_mut(slices);
-        unsafe { SoaSliceIndex::<T>::get_unchecked_mut(self.start..len, slices) }
+    unsafe fn get_unchecked_mut(
+        self,
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Self::MutPtrs {
+        let len = T::slice_ptrs_len_mut(context, slices);
+        unsafe { SoaSliceIndex::<T>::get_unchecked_mut(self.start..len, context, slices) }
     }
 }
 
@@ -367,22 +407,22 @@ where
         T: 'a;
 
     #[inline]
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
+    fn get<'a>(self, _: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
         Some(slices)
     }
 
     #[inline]
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
+    fn get_mut<'a>(self, _: &T::Context, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
         Some(slices)
     }
 
     #[inline]
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a> {
+    fn index<'a>(self, _: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a> {
         slices
     }
 
     #[inline]
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
+    fn index_mut<'a>(self, _: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
         slices
     }
 
@@ -391,12 +431,12 @@ where
     type MutPtrs = T::SliceMutPtrs;
 
     #[inline]
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs {
+    unsafe fn get_unchecked(self, _: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs {
         slices
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs {
+    unsafe fn get_unchecked_mut(self, _: &T::Context, slices: T::SliceMutPtrs) -> Self::MutPtrs {
         slices
     }
 }
@@ -433,35 +473,39 @@ where
         T: 'a;
 
     #[inline]
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
+    fn get<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
         if *self.end() == usize::MAX {
             return None;
         }
-        SoaSliceIndex::<T>::get(range_into_slice_range(self), slices)
+        SoaSliceIndex::<T>::get(range_into_slice_range(self), context, slices)
     }
 
     #[inline]
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
+    fn get_mut<'a>(
+        self,
+        context: &T::Context,
+        slices: T::SlicesMut<'a>,
+    ) -> Option<Self::RefsMut<'a>> {
         if *self.end() == usize::MAX {
             return None;
         }
-        SoaSliceIndex::<T>::get_mut(range_into_slice_range(self), slices)
+        SoaSliceIndex::<T>::get_mut(range_into_slice_range(self), context, slices)
     }
 
     #[inline]
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a> {
+    fn index<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a> {
         if *self.end() == usize::MAX {
             slice_end_index_overflow_fail();
         }
-        SoaSliceIndex::<T>::index(range_into_slice_range(self), slices)
+        SoaSliceIndex::<T>::index(range_into_slice_range(self), context, slices)
     }
 
     #[inline]
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
+    fn index_mut<'a>(self, context: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
         if *self.end() == usize::MAX {
             slice_end_index_overflow_fail();
         }
-        SoaSliceIndex::<T>::index_mut(range_into_slice_range(self), slices)
+        SoaSliceIndex::<T>::index_mut(range_into_slice_range(self), context, slices)
     }
 
     type Ptrs = T::SlicePtrs;
@@ -469,13 +513,19 @@ where
     type MutPtrs = T::SliceMutPtrs;
 
     #[inline]
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs {
-        unsafe { SoaSliceIndex::<T>::get_unchecked(range_into_slice_range(self), slices) }
+    unsafe fn get_unchecked(self, context: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs {
+        unsafe { SoaSliceIndex::<T>::get_unchecked(range_into_slice_range(self), context, slices) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs {
-        unsafe { SoaSliceIndex::<T>::get_unchecked_mut(range_into_slice_range(self), slices) }
+    unsafe fn get_unchecked_mut(
+        self,
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Self::MutPtrs {
+        unsafe {
+            SoaSliceIndex::<T>::get_unchecked_mut(range_into_slice_range(self), context, slices)
+        }
     }
 }
 
@@ -494,23 +544,27 @@ where
         T: 'a;
 
     #[inline]
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
-        SoaSliceIndex::<T>::get(0..=self.end, slices)
+    fn get<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
+        SoaSliceIndex::<T>::get(0..=self.end, context, slices)
     }
 
     #[inline]
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
-        SoaSliceIndex::<T>::get_mut(0..=self.end, slices)
+    fn get_mut<'a>(
+        self,
+        context: &T::Context,
+        slices: T::SlicesMut<'a>,
+    ) -> Option<Self::RefsMut<'a>> {
+        SoaSliceIndex::<T>::get_mut(0..=self.end, context, slices)
     }
 
     #[inline]
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a> {
-        SoaSliceIndex::<T>::index(0..=self.end, slices)
+    fn index<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a> {
+        SoaSliceIndex::<T>::index(0..=self.end, context, slices)
     }
 
     #[inline]
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
-        SoaSliceIndex::<T>::index_mut(0..=self.end, slices)
+    fn index_mut<'a>(self, context: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
+        SoaSliceIndex::<T>::index_mut(0..=self.end, context, slices)
     }
 
     type Ptrs = T::SlicePtrs;
@@ -518,13 +572,17 @@ where
     type MutPtrs = T::SliceMutPtrs;
 
     #[inline]
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs {
-        unsafe { SoaSliceIndex::<T>::get_unchecked(0..=self.end, slices) }
+    unsafe fn get_unchecked(self, context: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs {
+        unsafe { SoaSliceIndex::<T>::get_unchecked(0..=self.end, context, slices) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs {
-        unsafe { SoaSliceIndex::<T>::get_unchecked_mut(0..=self.end, slices) }
+    unsafe fn get_unchecked_mut(
+        self,
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Self::MutPtrs {
+        unsafe { SoaSliceIndex::<T>::get_unchecked_mut(0..=self.end, context, slices) }
     }
 }
 
@@ -614,27 +672,31 @@ where
         T: 'a;
 
     #[inline]
-    fn get<'a>(self, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
-        let len = T::slices_len(&slices);
-        SoaSliceIndex::<T>::get(into_range(len, self)?, slices)
+    fn get<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Option<Self::Refs<'a>> {
+        let len = T::slices_len(context, &slices);
+        SoaSliceIndex::<T>::get(into_range(len, self)?, context, slices)
     }
 
     #[inline]
-    fn get_mut<'a>(self, slices: T::SlicesMut<'a>) -> Option<Self::RefsMut<'a>> {
-        let len = T::slices_len_mut(&slices);
-        SoaSliceIndex::<T>::get_mut(into_range(len, self)?, slices)
+    fn get_mut<'a>(
+        self,
+        context: &T::Context,
+        slices: T::SlicesMut<'a>,
+    ) -> Option<Self::RefsMut<'a>> {
+        let len = T::slices_len_mut(context, &slices);
+        SoaSliceIndex::<T>::get_mut(into_range(len, self)?, context, slices)
     }
 
     #[inline]
-    fn index<'a>(self, slices: T::Slices<'a>) -> Self::Refs<'a> {
-        let len = T::slices_len(&slices);
-        SoaSliceIndex::<T>::index(into_slice_range(len, self), slices)
+    fn index<'a>(self, context: &T::Context, slices: T::Slices<'a>) -> Self::Refs<'a> {
+        let len = T::slices_len(context, &slices);
+        SoaSliceIndex::<T>::index(into_slice_range(len, self), context, slices)
     }
 
     #[inline]
-    fn index_mut<'a>(self, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
-        let len = T::slices_len_mut(&slices);
-        SoaSliceIndex::<T>::index_mut(into_slice_range(len, self), slices)
+    fn index_mut<'a>(self, context: &T::Context, slices: T::SlicesMut<'a>) -> Self::RefsMut<'a> {
+        let len = T::slices_len_mut(context, &slices);
+        SoaSliceIndex::<T>::index_mut(into_slice_range(len, self), context, slices)
     }
 
     type Ptrs = T::SlicePtrs;
@@ -642,15 +704,23 @@ where
     type MutPtrs = T::SliceMutPtrs;
 
     #[inline]
-    unsafe fn get_unchecked(self, slices: T::SlicePtrs) -> Self::Ptrs {
-        let len = T::slice_ptrs_len(slices);
-        unsafe { SoaSliceIndex::<T>::get_unchecked(into_range_unchecked(len, self), slices) }
+    unsafe fn get_unchecked(self, context: &T::Context, slices: T::SlicePtrs) -> Self::Ptrs {
+        let len = T::slice_ptrs_len(context, slices);
+        unsafe {
+            SoaSliceIndex::<T>::get_unchecked(into_range_unchecked(len, self), context, slices)
+        }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slices: T::SliceMutPtrs) -> Self::MutPtrs {
-        let len = T::slice_ptrs_len_mut(slices);
-        unsafe { SoaSliceIndex::<T>::get_unchecked_mut(into_range_unchecked(len, self), slices) }
+    unsafe fn get_unchecked_mut(
+        self,
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Self::MutPtrs {
+        let len = T::slice_ptrs_len_mut(context, slices);
+        unsafe {
+            SoaSliceIndex::<T>::get_unchecked_mut(into_range_unchecked(len, self), context, slices)
+        }
     }
 }
 

@@ -1,5 +1,7 @@
 use core::{fmt::Display, mem::swap, ops};
 
+use gpecs_soa::slice::SoaSlicesMut;
+
 use crate::{
     assert::{check_dense_index_bounds, check_equal_key, unwrap_dense, unwrap_dense_pair},
     item::{SparseItem, SparseItemKind},
@@ -58,7 +60,8 @@ pub fn get_pair<T>(iter: impl IntoIterator<Item = T>, a: usize, b: usize) -> Opt
 }
 
 pub fn sparse_swap<'a, K, V>(
-    dense: impl IntoIterator<Item = V::RefsMut<'a>>,
+    context: &V::Context,
+    dense: SoaSlicesMut<'a, V>,
     sparse: &mut [SparseItem<K::Epoch>],
     first_key: K,
     second_key: K,
@@ -88,7 +91,7 @@ pub fn sparse_swap<'a, K, V>(
     };
 
     let (first_value, second_value) = unwrap_dense_pair(dense, first_index, second_index);
-    soa_swap::<V>(first_value, second_value);
+    soa_swap::<V>(context, first_value, second_value);
 }
 
 pub fn sparse_swap_keys<K>(

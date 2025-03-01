@@ -45,18 +45,6 @@ where
     }
 }
 
-impl<K, V> Default for Keys<'_, K, V>
-where
-    V: Soa,
-{
-    #[inline]
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-        }
-    }
-}
-
 impl<K, V> Clone for Keys<'_, K, V>
 where
     V: Soa,
@@ -423,18 +411,6 @@ where
     }
 }
 
-impl<K, V> Default for Values<'_, K, V>
-where
-    V: Soa,
-{
-    #[inline]
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-        }
-    }
-}
-
 impl<K, V> Clone for Values<'_, K, V>
 where
     V: Soa,
@@ -654,18 +630,6 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
         f.debug_tuple("ValuesMut").field(values).finish()
-    }
-}
-
-impl<K, V> Default for ValuesMut<'_, K, V>
-where
-    V: Soa,
-{
-    #[inline]
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-        }
     }
 }
 
@@ -1042,18 +1006,6 @@ where
     }
 }
 
-impl<K, V> Default for Iter<'_, K, V>
-where
-    V: Soa,
-{
-    #[inline]
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-        }
-    }
-}
-
 impl<K, V> Clone for Iter<'_, K, V>
 where
     V: Soa,
@@ -1240,18 +1192,6 @@ where
             .field("keys", &keys)
             .field("values", &values)
             .finish()
-    }
-}
-
-impl<K, V> Default for IterMut<'_, K, V>
-where
-    V: Soa,
-{
-    #[inline]
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-        }
     }
 }
 

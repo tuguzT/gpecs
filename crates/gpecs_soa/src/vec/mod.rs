@@ -12,7 +12,7 @@ use core::{
 pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{actual_capacity, is_zst, ptrs, BufferData, BufferDataPtrMut},
+    ptr::{actual_capacity, ptrs, should_allocate, BufferData, BufferDataPtrMut},
     raw_vec::RawSoaVec,
     set_len_on_drop::SetLenOnDrop,
     slice::{
@@ -43,10 +43,7 @@ where
 {
     #[inline]
     pub fn new() -> Self {
-        Self {
-            buffer: RawSoaVec::new(),
-            len: 0,
-        }
+        Self::with_capacity(0)
     }
 
     #[inline]
@@ -347,7 +344,7 @@ where
 
     #[inline]
     fn set_len_in_buffer(&mut self, new_len: usize) {
-        if is_zst::<T>() || self.capacity() == 0 {
+        if !should_allocate::<T>(self.capacity()) {
             return;
         }
 

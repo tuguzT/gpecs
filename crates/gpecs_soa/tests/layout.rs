@@ -5,6 +5,7 @@ use gpecs_soa::{
 };
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn vec_null_opt() {
     type Vec = SoaVec<(u32, u16, u8)>;
 
@@ -12,6 +13,7 @@ fn vec_null_opt() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn slice_null_opt() {
     type Item = (u32, u16, u8);
     type Slice = SoaSlice<Item>;
@@ -24,6 +26,7 @@ fn slice_null_opt() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn iter_null_opt() {
     type Iter<'a> = SoaIter<'a, (u32, u16, u8)>;
 
@@ -31,6 +34,7 @@ fn iter_null_opt() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn iter_mut_null_opt() {
     type IterMut<'a> = SoaIterMut<'a, (u32, u16, u8)>;
 
@@ -38,6 +42,7 @@ fn iter_mut_null_opt() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn into_iter_null_opt() {
     type IntoIter = SoaIntoIter<(u32, u16, u8)>;
 

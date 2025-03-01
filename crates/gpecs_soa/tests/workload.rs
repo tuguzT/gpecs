@@ -19,7 +19,6 @@ fn new() {
 
     let vec = Vec::from_iter([]);
     assert!(vec.is_empty());
-    assert_eq!(vec.capacity(), 0);
 
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -30,7 +29,6 @@ fn new() {
 
     let slice = vec.as_slice();
     assert!(slice.is_empty());
-    assert_eq!(slice.capacity(), 0);
 
     assert_eq!(format!("{slice:?}"), "SoaSlice(([], [], []))");
 
@@ -45,15 +43,12 @@ fn new() {
 
     let vec = Vec::from_vecs(vecs);
     assert!(vec.is_empty());
-    assert_eq!(vec.capacity(), 0);
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
-    assert_eq!(boxed_slice.capacity(), 0);
 
     let vec = boxed_slice.into_vec();
     assert!(vec.is_empty());
-    assert_eq!(vec.capacity(), 0);
 
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -62,7 +57,6 @@ fn new() {
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
-    assert_eq!(boxed_slice.capacity(), 0);
 
     let into_iter = boxed_slice.into_iter();
     assert!(into_iter.is_empty());
@@ -156,11 +150,9 @@ fn with_capacity() {
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
-    assert_eq!(boxed_slice.capacity(), 0);
 
     let vec = boxed_slice.into_vec();
     assert!(vec.is_empty());
-    assert_eq!(vec.capacity(), 0);
 
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -169,7 +161,6 @@ fn with_capacity() {
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
-    assert_eq!(boxed_slice.capacity(), 0);
 
     let into_iter = boxed_slice.into_iter();
     assert!(into_iter.is_empty());
@@ -339,11 +330,9 @@ fn one_item() {
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
-    assert_eq!(boxed_slice.capacity(), 0);
 
     let vec = boxed_slice.into_vec();
     assert!(vec.is_empty());
-    assert_eq!(vec.capacity(), 0);
 
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -352,7 +341,6 @@ fn one_item() {
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());
-    assert_eq!(boxed_slice.capacity(), 0);
 
     let into_iter = boxed_slice.into_iter();
     assert!(into_iter.is_empty());

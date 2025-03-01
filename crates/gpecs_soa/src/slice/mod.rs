@@ -145,10 +145,10 @@ where
 
     #[inline]
     pub fn into_vec(self: Box<Self>) -> SoaVec<T> {
-        let length = self.len();
+        let len = self.len();
         let capacity = self.capacity();
         let ptr = Box::into_raw(self).cast();
-        unsafe { SoaVec::from_raw_parts(ptr, length, capacity) }
+        unsafe { SoaVec::from_raw_parts(ptr, len, capacity) }
     }
 
     #[inline]

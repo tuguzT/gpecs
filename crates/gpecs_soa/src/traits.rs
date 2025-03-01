@@ -12,15 +12,21 @@ use core::{
 pub unsafe trait Soa: Sized {
     /// Special type used to properly allocate the buffer in memory.
     ///
-    /// Most of the time, this should be the same as [`Self`].
+    /// Most of the time, this should be the same as [`Self`](`Soa`).
     /// This is true for such implementations which store all the fields of self.
     type SizeAlign;
+
+    /// Type of context used to perform all operations of this trait.
+    ///
+    /// Most of the time, this should be [unit](prim@unit) type.
+    /// This is true for all the types with fields' size and alignment known at compile-time.
+    type Context;
 
     /// Collection of layouts for each field.
     ///
     /// Safety requirements:
-    /// - sum of layouts' sizes should be less or equal to the size of [`Self::SizeAlign`][`Soa::SizeAlign`]
-    /// - alignment of each layout should be less or equal to the alignment of [`Self::SizeAlign`][`Soa::SizeAlign`]
+    /// - sum of layouts' sizes should be less or equal to the size of [`Self::SizeAlign`](`Soa::SizeAlign`)
+    /// - alignment of each layout should be less or equal to the alignment of [`Self::SizeAlign`](`Soa::SizeAlign`)
     type FieldLayouts: IntoIterator<Item: Borrow<Layout>>;
 
     fn field_layouts() -> Self::FieldLayouts;
@@ -197,6 +203,7 @@ const fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError>
 
 unsafe impl Soa for () {
     type SizeAlign = Self;
+    type Context = ();
     type FieldLayouts = [Layout; 1];
 
     #[inline(always)]
@@ -559,6 +566,7 @@ macro_rules! soa_impl {
 
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
             type SizeAlign = Self;
+            type Context = ();
             type FieldLayouts = [Layout; count_idents!($($types,)*)];
 
             #[inline(always)]

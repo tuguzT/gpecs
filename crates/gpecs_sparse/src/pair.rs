@@ -48,6 +48,7 @@ where
     V: Soa,
 {
     type SizeAlign = Self;
+    type Context = V::Context;
     type FieldLayouts = KeyValueFieldLayouts<K, V>;
 
     #[inline]

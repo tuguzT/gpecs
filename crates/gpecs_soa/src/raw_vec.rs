@@ -12,7 +12,10 @@ use core::{
 };
 
 use crate::{
-    ptr::{buffer_layout, capacity_from, is_zst, ptrs, slice_from_raw_parts_mut, BufferData},
+    ptr::{
+        buffer_layout, capacity_from, is_zst, ptrs, should_allocate, slice_from_raw_parts_mut,
+        BufferData,
+    },
     slice::SoaSlice,
     traits::Soa,
 };
@@ -122,18 +125,14 @@ where
         }
     }
 
-    #[inline]
     #[must_use]
-    pub fn new() -> Self {
-        Self {
-            ptr: NonNull::dangling(),
-            capacity: 0,
-        }
-    }
-
     fn try_allocate_in(capacity: usize, init: AllocInit) -> Result<Self, TryReserveError> {
-        if is_zst::<T>() || capacity == 0 {
-            return Ok(Self::new());
+        if !should_allocate::<T>(capacity) {
+            let this = Self {
+                ptr: NonNull::dangling(),
+                capacity: 0,
+            };
+            return Ok(this);
         }
 
         let layout = match buffer_layout::<T>(capacity) {
@@ -158,6 +157,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         match Self::try_with_capacity(capacity) {
             Ok(me) => me,
@@ -166,11 +166,13 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError> {
         Self::try_allocate_in(capacity, AllocInit::Uninitialized)
     }
 
     #[inline]
+    #[must_use]
     #[allow(dead_code)]
     pub fn with_capacity_zeroed(capacity: usize) -> Self {
         match Self::try_with_capacity_zeroed(capacity) {
@@ -180,16 +182,18 @@ where
     }
 
     #[inline]
+    #[must_use]
     #[allow(dead_code)]
     pub fn try_with_capacity_zeroed(capacity: usize) -> Result<Self, TryReserveError> {
         Self::try_allocate_in(capacity, AllocInit::Zeroed)
     }
 
     #[inline]
+    #[must_use]
     pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>> {
         debug_assert!(
             len <= self.capacity(),
-            "`len` must be smaller than or equal to `self.capacity()`"
+            "`len` must be smaller than or equal to `self.capacity()`",
         );
 
         let me = ManuallyDrop::new(self);
@@ -200,6 +204,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, capacity: usize) -> Self {
         unsafe {
             let ptr = NonNull::new_unchecked(ptr);
@@ -208,6 +213,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub unsafe fn from_nonnull(ptr: NonNull<BufferData<T>>, capacity: usize) -> Self {
         Self { ptr, capacity }
     }
@@ -247,7 +253,7 @@ where
 
     #[inline]
     fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
-        if is_zst::<T>() || self.capacity == 0 {
+        if !should_allocate::<T>(self.capacity) {
             return None;
         }
 
@@ -382,7 +388,11 @@ where
             None => return Ok(()),
         };
 
-        if capacity == 0 {
+        let new_layout = match buffer_layout::<T>(capacity) {
+            Ok(layout) => layout,
+            Err(_) => return Err(CapacityOverflow.into()),
+        };
+        if new_layout.size() == 0 {
             unsafe {
                 dealloc(ptr.as_ptr(), old_layout);
                 self.set_ptr_and_capacity(NonNull::dangling(), 0);
@@ -390,21 +400,11 @@ where
             return Ok(());
         }
 
-        let ptr = unsafe {
-            let new_layout = match buffer_layout::<T>(capacity) {
-                Ok(layout) => layout,
-                Err(_) => return Err(CapacityOverflow.into()),
-            };
-            if new_layout.size() == 0 {
-                return Ok(());
-            }
-
-            let ptr = realloc(ptr.as_ptr(), old_layout, new_layout.size());
-            match NonNull::new(ptr) {
-                Some(ptr) => ptr,
-                #[rustfmt::skip]
-                None => return Err(AllocError { layout: new_layout, non_exhaustive: () }.into()),
-            }
+        let ptr = unsafe { realloc(ptr.as_ptr(), old_layout, new_layout.size()) };
+        let ptr = match NonNull::new(ptr) {
+            Some(ptr) => ptr,
+            #[rustfmt::skip]
+            None => return Err(AllocError { layout: new_layout, non_exhaustive: () }.into()),
         };
         unsafe {
             self.set_ptr_and_capacity(ptr.cast(), capacity);

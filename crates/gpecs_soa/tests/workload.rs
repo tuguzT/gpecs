@@ -1,6 +1,9 @@
-use core::iter;
+use std::{alloc::Layout, iter};
 
-use gpecs_soa::vec::SoaVec;
+use gpecs_soa::{
+    r#dyn::{DynSoa, DynSoaContext},
+    vec::SoaVec,
+};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 struct ZST1;
@@ -119,6 +122,58 @@ fn new_zst() {
     assert!(into_iter.is_empty());
 
     assert_eq!(format!("{into_iter:?}"), "IntoIter(([], [], []))");
+}
+
+#[test]
+fn new_dyn() {
+    type Vec = SoaVec<DynSoa<u16>>;
+
+    let context = DynSoaContext::new([Layout::new::<u8>()]);
+    let vec = Vec::with_context(context);
+    assert!(vec.is_empty());
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    assert_eq!(format!("{vec:?}"), "SoaVec(DynSoaSlices([[]]))");
+
+    let slice = vec.as_slice();
+    assert!(slice.is_empty());
+
+    assert_eq!(format!("{slice:?}"), "SoaSlice(DynSoaSlices([[]]))");
+
+    // assert_eq!(vec, slice);
+    // assert!(vec >= slice);
+    // assert!(slice <= vec);
+
+    // assert_eq!(slice.to_owned(), vec.clone());
+
+    // let (context, vecs) = vec.into_vecs();
+    // assert_eq!(vecs, (vec![], vec![], vec![]));
+
+    // let vec = Vec::from_vecs(context, vecs);
+    // assert!(vec.is_empty());
+
+    let boxed_slice = vec.into_boxed_slice();
+    assert!(boxed_slice.is_empty());
+
+    let vec = boxed_slice.into_vec();
+    assert!(vec.is_empty());
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let boxed_slice = vec.into_boxed_slice();
+    assert!(boxed_slice.is_empty());
+
+    let into_iter = boxed_slice.into_iter();
+    assert!(into_iter.is_empty());
+
+    assert_eq!(format!("{into_iter:?}"), "IntoIter(DynSoaSlices([[]]))");
 }
 
 #[test]

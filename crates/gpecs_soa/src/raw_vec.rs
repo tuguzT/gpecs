@@ -446,7 +446,12 @@ where
 {
     fn drop(&mut self) {
         if let Some((ptr, layout)) = self.current_memory() {
-            unsafe { dealloc(ptr.as_ptr(), layout) }
+            unsafe {
+                // will be dropped at the end of the block
+                let _context = ptr::read(self.ptr().cast_const().ptr_to_context());
+
+                dealloc(ptr.as_ptr(), layout);
+            }
         }
     }
 }

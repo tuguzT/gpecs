@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{
     alloc::Layout,
+    borrow::Borrow,
     fmt::{self, Debug},
     iter,
     marker::PhantomData,
@@ -39,10 +40,37 @@ pub struct DynSoaContext<SizeAlign> {
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
+impl<SizeAlign> DynSoaContext<SizeAlign> {
+    #[inline]
+    pub fn new<I>(field_layouts: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Borrow<Layout>,
+    {
+        let field_layouts = field_layouts
+            .into_iter()
+            .map(|item| {
+                let layout: &Layout = item.borrow();
+
+                let input_align = layout.align();
+                let max_align = align_of::<SizeAlign>();
+                assert!(
+                    input_align <= max_align,
+                    "input alignment must be less than or equal to {max_align}, but got {input_align}",
+                );
+                layout.clone()
+            })
+            .collect();
+        Self {
+            field_layouts,
+            phantom: PhantomData,
+        }
+    }
+}
 impl<SizeAlign> Debug for DynSoaContext<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaContext")
-            .field("field_layouts", &self.field_layouts)
+        f.debug_tuple("DynSoaContext")
+            .field(&self.field_layouts)
             .finish()
     }
 }
@@ -65,9 +93,7 @@ pub struct DynSoaPtrs<SizeAlign> {
 
 impl<SizeAlign> Debug for DynSoaPtrs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaPtrs")
-            .field("ptrs", &self.ptrs)
-            .finish()
+        f.debug_tuple("DynSoaPtrs").field(&self.ptrs).finish()
     }
 }
 
@@ -89,9 +115,7 @@ pub struct DynSoaMutPtrs<SizeAlign> {
 
 impl<SizeAlign> Debug for DynSoaMutPtrs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaMutPtrs")
-            .field("ptrs", &self.ptrs)
-            .finish()
+        f.debug_tuple("DynSoaMutPtrs").field(&self.ptrs).finish()
     }
 }
 
@@ -113,8 +137,8 @@ pub struct DynSoaNonNullPtrs<SizeAlign> {
 
 impl<SizeAlign> Debug for DynSoaNonNullPtrs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaNonNullPtrs")
-            .field("ptrs", &self.ptrs)
+        f.debug_tuple("DynSoaNonNullPtrs")
+            .field(&self.ptrs)
             .finish()
     }
 }
@@ -138,9 +162,7 @@ pub struct DynSoaVecs<SizeAlign> {
 
 impl<SizeAlign> Debug for DynSoaVecs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaVecs")
-            .field("vecs", &self.vecs)
-            .finish()
+        f.debug_tuple("DynSoaVecs").field(&self.vecs).finish()
     }
 }
 
@@ -165,9 +187,7 @@ where
 
 impl<'a, SizeAlign> Debug for DynSoaRefs<'a, SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaRefs")
-            .field("refs", &self.refs)
-            .finish()
+        f.debug_tuple("DynSoaRefs").field(&self.refs).finish()
     }
 }
 
@@ -192,9 +212,7 @@ where
 
 impl<'a, SizeAlign> Debug for DynSoaRefsMut<'a, SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaRefsMut")
-            .field("refs", &self.refs)
-            .finish()
+        f.debug_tuple("DynSoaRefsMut").field(&self.refs).finish()
     }
 }
 
@@ -208,8 +226,8 @@ pub struct DynSoaSlicePtrs<SizeAlign> {
 
 impl<SizeAlign> Debug for DynSoaSlicePtrs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaSlicePtrs")
-            .field("slices", &self.slices)
+        f.debug_tuple("DynSoaSlicePtrs")
+            .field(&self.slices)
             .finish()
     }
 }
@@ -233,8 +251,8 @@ pub struct DynSoaSliceMutPtrs<SizeAlign> {
 
 impl<SizeAlign> Debug for DynSoaSliceMutPtrs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaSliceMutPtrs")
-            .field("slices", &self.slices)
+        f.debug_tuple("DynSoaSliceMutPtrs")
+            .field(&self.slices)
             .finish()
     }
 }
@@ -261,9 +279,7 @@ where
 
 impl<'a, SizeAlign> Debug for DynSoaSlices<'a, SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaSlices")
-            .field("slices", &self.slices)
-            .finish()
+        f.debug_tuple("DynSoaSlices").field(&self.slices).finish()
     }
 }
 
@@ -289,8 +305,8 @@ where
 
 impl<'a, SizeAlign> Debug for DynSoaSlicesMut<'a, SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaSlicesMut")
-            .field("slices", &self.slices)
+        f.debug_tuple("DynSoaSlicesMut")
+            .field(&self.slices)
             .finish()
     }
 }

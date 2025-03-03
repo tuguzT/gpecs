@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{BufferData, BufferDataPtr, BufferDataPtrMut},
+    ptr::{BufferData, BufferDataPtr},
     raw_vec::RawSoaVec,
     traits::Soa,
     vec::SoaVec,
@@ -173,17 +173,14 @@ where
         let guard = DropGuard(self);
 
         // destroy the remaining elements
-        if !IntoIter::is_empty(guard.0) {
-            let context = ptr::from_ref(guard.0.context());
-            let slices = guard.0.as_mut_slices();
-            let slices = T::mut_slice_refs_as_slice_ptrs(unsafe { &*context }, slices);
-            unsafe { T::slices_drop_in_place(&*context, slices) }
+        if IntoIter::is_empty(guard.0) {
+            return;
         }
 
-        unsafe {
-            let context = guard.0.buffer.as_ptr().ptr_to_context_mut();
-            ptr::drop_in_place(context);
-        }
+        let context = ptr::from_ref(guard.0.context());
+        let slices = guard.0.as_mut_slices();
+        let slices = T::mut_slice_refs_as_slice_ptrs(unsafe { &*context }, slices);
+        unsafe { T::slices_drop_in_place(&*context, slices) }
         // now `guard` will be dropped and do the rest
     }
 }

@@ -1091,18 +1091,15 @@ where
     T: Soa,
 {
     fn drop(&mut self) {
-        if !self.is_empty() {
-            let ptrs = self.as_mut_ptrs();
-            let len = self.len();
-            let context = self.context();
-
-            let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-            unsafe { T::slices_drop_in_place(context, slices) }
+        if self.is_empty() {
+            return;
         }
 
-        unsafe {
-            let context = self.as_mut_ptr().ptr_to_context_mut();
-            ptr::drop_in_place(context);
-        }
+        let ptrs = self.as_mut_ptrs();
+        let len = self.len();
+        let context = self.context();
+
+        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        unsafe { T::slices_drop_in_place(context, slices) }
     }
 }

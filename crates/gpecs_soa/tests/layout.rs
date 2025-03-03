@@ -1,5 +1,8 @@
+use std::alloc::Layout;
+
 use gpecs_soa::{
     prelude::*,
+    r#dyn::DynSoaContext,
     slice::{Iter as SoaIter, IterMut as SoaIterMut},
     vec::IntoIter as SoaIntoIter,
 };
@@ -47,4 +50,19 @@ fn into_iter_null_opt() {
     type IntoIter = SoaIntoIter<(u32, u16, u8)>;
 
     assert_eq!(size_of::<Option<IntoIter>>(), size_of::<IntoIter>());
+}
+
+#[test]
+#[cfg_attr(miri, ignore)]
+fn dyn_context() {
+    let field_layouts = [Layout::new::<u8>(), Layout::new::<i16>()];
+    let _context = DynSoaContext::<i16>::new(field_layouts);
+}
+
+#[test]
+#[should_panic = "input alignment must be less than or equal to 1, but got 2"]
+#[cfg_attr(miri, ignore)]
+fn dyn_context_fail() {
+    let field_layouts = [Layout::new::<u8>(), Layout::new::<i16>()];
+    let _context = DynSoaContext::<u8>::new(field_layouts);
 }

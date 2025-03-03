@@ -60,7 +60,7 @@ where
     fn buffer_layout(
         context: &Self::Context,
         capacity: usize,
-    ) -> Result<(Layout, impl '_ + IntoIterator<Item = usize>), LayoutError> {
+    ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
         let (mut layout, offsets) = V::buffer_layout(context, capacity)?;
 
         let keys = Layout::array::<K>(capacity)?;

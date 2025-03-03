@@ -39,7 +39,7 @@ pub unsafe trait Soa: Sized {
     fn buffer_layout(
         context: &Self::Context,
         capacity: usize,
-    ) -> Result<(Layout, impl '_ + IntoIterator<Item = usize>), LayoutError> {
+    ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
         let mut layout = Layout::new::<()>();
         let offsets = Self::field_layouts(context)
             .into_iter()
@@ -717,7 +717,7 @@ macro_rules! soa_impl {
             fn buffer_layout(
                 _: &Self::Context,
                 capacity: usize,
-            ) -> Result<(Layout, impl '_ + IntoIterator<Item = usize>), LayoutError> {
+            ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
                 let layouts = [$(Layout::array::<$types>(capacity)?,)*];
                 let permutation = SoaTupleHelper::<($($types,)*)>::PERMUTATION;
                 let mut offsets: [usize; count_idents!($($types,)*)] = Default::default();

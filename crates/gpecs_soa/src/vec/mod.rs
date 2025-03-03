@@ -277,13 +277,9 @@ where
             T::vecs_set_len(context, &mut vecs, len);
         }
 
-        let context = unsafe {
-            let context = self.as_ptr().ptr_to_context();
-            ptr::read(context)
-        };
-
         let me = ManuallyDrop::new(self);
-        let _buffer = unsafe { ptr::read(&me.buffer) };
+        let buffer = unsafe { ptr::read(&me.buffer) };
+        let context = buffer.drop_buffer();
         (context, vecs)
     }
 

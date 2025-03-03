@@ -150,11 +150,11 @@ fn new_dyn() {
 
     // assert_eq!(slice.to_owned(), vec.clone());
 
-    // let (context, vecs) = vec.into_vecs();
+    let (context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, (vec![], vec![], vec![]));
 
-    // let vec = Vec::from_vecs(context, vecs);
-    // assert!(vec.is_empty());
+    let vec = Vec::from_vecs(context, vecs);
+    assert!(vec.is_empty());
 
     let boxed_slice = vec.into_boxed_slice();
     assert!(boxed_slice.is_empty());

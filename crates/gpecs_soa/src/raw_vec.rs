@@ -273,7 +273,19 @@ where
     }
 
     #[inline]
-    fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
+    pub fn drop_buffer(self) -> T::Context {
+        let me = ManuallyDrop::new(self);
+        let context = unsafe { ptr::read(me.ptr().cast_const().ptr_to_context()) };
+        if let Some((ptr, layout)) = me.current_memory(&context) {
+            unsafe {
+                dealloc(ptr.as_ptr(), layout);
+            }
+        }
+        context
+    }
+
+    #[inline]
+    fn current_memory(&self, context: &T::Context) -> Option<(NonNull<u8>, Layout)> {
         if !should_allocate::<T>(self.capacity) {
             return None;
         }
@@ -282,7 +294,6 @@ where
         // and could hypothetically handle differences between stride and size, but this memory
         // has already been allocated so we know it can't overflow and currently Rust does not
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
-        let context = self.context();
         unsafe {
             let layout = buffer_layout::<T>(context, self.capacity).unwrap_unchecked();
             Some((self.ptr.cast(), layout))
@@ -376,7 +387,8 @@ where
         let capacity = cmp::max(Self::min_non_zero_cap(context), capacity);
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
-        let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, self.current_memory())?.cast();
+        let ptr: NonNull<BufferData<_>> =
+            finish_grow(new_layout, self.current_memory(context))?.cast();
         unsafe {
             let context_ptr = ptr.as_ptr().cast_const().ptr_to_context();
             let capacity = capacity_from::<T>(&*context_ptr, new_layout);
@@ -394,7 +406,8 @@ where
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
-        let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, self.current_memory())?.cast();
+        let ptr: NonNull<BufferData<_>> =
+            finish_grow(new_layout, self.current_memory(context))?.cast();
         unsafe {
             let context_ptr = ptr.as_ptr().cast_const().ptr_to_context();
             let capacity = capacity_from::<T>(&*context_ptr, new_layout);
@@ -409,12 +422,12 @@ where
             "tried to shrink to a larger capacity",
         );
 
-        let (ptr, old_layout) = match self.current_memory() {
+        let context = self.context();
+        let (ptr, old_layout) = match self.current_memory(context) {
             Some(mem) => mem,
             None => return Ok(()),
         };
 
-        let context = self.context();
         let new_layout = match buffer_layout::<T>(context, capacity) {
             Ok(layout) => layout,
             Err(_) => return Err(CapacityOverflow.into()),
@@ -445,11 +458,9 @@ where
     T: Soa,
 {
     fn drop(&mut self) {
-        if let Some((ptr, layout)) = self.current_memory() {
+        let context = unsafe { ptr::read(self.ptr().cast_const().ptr_to_context()) };
+        if let Some((ptr, layout)) = self.current_memory(&context) {
             unsafe {
-                // will be dropped at the end of the block
-                let _context = ptr::read(self.ptr().cast_const().ptr_to_context());
-
                 dealloc(ptr.as_ptr(), layout);
             }
         }

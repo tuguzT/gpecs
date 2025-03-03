@@ -624,9 +624,6 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         assert_eq!(src.len(), dst.len());
 
         for ((field_layout, src), dst) in field_layouts.iter().zip(src).zip(dst) {
-            assert_eq!(field_layout.size(), src.len());
-            assert_eq!(src.len(), dst.len());
-
             let src = src.cast::<u8>();
             let dst = dst.cast();
 

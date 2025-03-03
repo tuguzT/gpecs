@@ -149,6 +149,14 @@ fn new_dyn() {
     // assert!(slice <= vec);
 
     // assert_eq!(slice.to_owned(), vec.clone());
+    {
+        let vec = slice.to_owned();
+        assert!(vec.is_empty());
+    }
+    {
+        let vec = vec.clone();
+        assert!(vec.is_empty());
+    }
 
     let (context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, (vec![], vec![], vec![]));

@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{
     alloc::Layout,
+    fmt::{self, Debug},
     iter,
     marker::PhantomData,
     ptr::{self, NonNull},
@@ -11,24 +12,63 @@ use crate::traits::Soa;
 
 type DynField = Box<[u8]>;
 
-#[derive(Debug, Clone)]
 pub struct DynSoa<SizeAlign> {
     fields: Box<[DynField]>,
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
-#[derive(Debug, Clone)]
+impl<SizeAlign> Debug for DynSoa<SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoa")
+            .field("fields", &self.fields)
+            .finish()
+    }
+}
+
+impl<SizeAlign> Clone for DynSoa<SizeAlign> {
+    fn clone(&self) -> Self {
+        Self {
+            fields: self.fields.clone(),
+            phantom: self.phantom.clone(),
+        }
+    }
+}
+
 pub struct DynSoaContext<SizeAlign> {
     field_layouts: Box<[Layout]>,
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
+impl<SizeAlign> Debug for DynSoaContext<SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaContext")
+            .field("field_layouts", &self.field_layouts)
+            .finish()
+    }
+}
+
+impl<SizeAlign> Clone for DynSoaContext<SizeAlign> {
+    fn clone(&self) -> Self {
+        Self {
+            field_layouts: self.field_layouts.clone(),
+            phantom: self.phantom.clone(),
+        }
+    }
+}
+
 type DynFieldPtr = *const [u8];
 
-#[derive(Debug)]
 pub struct DynSoaPtrs<SizeAlign> {
     ptrs: Box<[DynFieldPtr]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> Debug for DynSoaPtrs<SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaPtrs")
+            .field("ptrs", &self.ptrs)
+            .finish()
+    }
 }
 
 impl<SizeAlign> Clone for DynSoaPtrs<SizeAlign> {
@@ -42,10 +82,17 @@ impl<SizeAlign> Clone for DynSoaPtrs<SizeAlign> {
 
 type DynFieldPtrMut = *mut [u8];
 
-#[derive(Debug)]
 pub struct DynSoaMutPtrs<SizeAlign> {
     ptrs: Box<[DynFieldPtrMut]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> Debug for DynSoaMutPtrs<SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaMutPtrs")
+            .field("ptrs", &self.ptrs)
+            .finish()
+    }
 }
 
 impl<SizeAlign> Clone for DynSoaMutPtrs<SizeAlign> {
@@ -59,10 +106,17 @@ impl<SizeAlign> Clone for DynSoaMutPtrs<SizeAlign> {
 
 type DynFieldNonNullPtr = NonNull<[u8]>;
 
-#[derive(Debug)]
 pub struct DynSoaNonNullPtrs<SizeAlign> {
     ptrs: Box<[DynFieldNonNullPtr]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> Debug for DynSoaNonNullPtrs<SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaNonNullPtrs")
+            .field("ptrs", &self.ptrs)
+            .finish()
+    }
 }
 
 impl<SizeAlign> Clone for DynSoaNonNullPtrs<SizeAlign> {
@@ -77,10 +131,17 @@ impl<SizeAlign> Clone for DynSoaNonNullPtrs<SizeAlign> {
 // data is stored inline in a single buffer
 type DynFieldVec = Vec<u8>;
 
-#[derive(Debug)]
 pub struct DynSoaVecs<SizeAlign> {
     vecs: Box<[DynFieldVec]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> Debug for DynSoaVecs<SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaVecs")
+            .field("vecs", &self.vecs)
+            .finish()
+    }
 }
 
 impl<SizeAlign> Clone for DynSoaVecs<SizeAlign> {
@@ -94,13 +155,20 @@ impl<SizeAlign> Clone for DynSoaVecs<SizeAlign> {
 
 type DynFieldRef<'a> = &'a [u8];
 
-#[derive(Debug)]
 pub struct DynSoaRefs<'a, SizeAlign>
 where
     SizeAlign: 'a,
 {
     refs: Box<[DynFieldRef<'a>]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<'a, SizeAlign> Debug for DynSoaRefs<'a, SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaRefs")
+            .field("refs", &self.refs)
+            .finish()
+    }
 }
 
 impl<'a, SizeAlign> Clone for DynSoaRefs<'a, SizeAlign> {
@@ -114,7 +182,6 @@ impl<'a, SizeAlign> Clone for DynSoaRefs<'a, SizeAlign> {
 
 type DynFieldRefMut<'a> = &'a mut [u8];
 
-#[derive(Debug)]
 pub struct DynSoaRefsMut<'a, SizeAlign>
 where
     SizeAlign: 'a,
@@ -123,13 +190,28 @@ where
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
+impl<'a, SizeAlign> Debug for DynSoaRefsMut<'a, SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaRefsMut")
+            .field("refs", &self.refs)
+            .finish()
+    }
+}
+
 // data is stored inline in a single buffer
 type DynFieldSlicePtr = *const [u8];
 
-#[derive(Debug)]
 pub struct DynSoaSlicePtrs<SizeAlign> {
     slices: Box<[DynFieldSlicePtr]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> Debug for DynSoaSlicePtrs<SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaSlicePtrs")
+            .field("slices", &self.slices)
+            .finish()
+    }
 }
 
 impl<SizeAlign> Clone for DynSoaSlicePtrs<SizeAlign> {
@@ -144,10 +226,17 @@ impl<SizeAlign> Clone for DynSoaSlicePtrs<SizeAlign> {
 // data is stored inline in a single buffer
 type DynFieldSliceMutPtr = *mut [u8];
 
-#[derive(Debug)]
 pub struct DynSoaSliceMutPtrs<SizeAlign> {
     slices: Box<[DynFieldSliceMutPtr]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> Debug for DynSoaSliceMutPtrs<SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaSliceMutPtrs")
+            .field("slices", &self.slices)
+            .finish()
+    }
 }
 
 impl<SizeAlign> Clone for DynSoaSliceMutPtrs<SizeAlign> {
@@ -162,13 +251,20 @@ impl<SizeAlign> Clone for DynSoaSliceMutPtrs<SizeAlign> {
 // data is stored inline in a single buffer
 type DynFieldSliceRef<'a> = &'a [u8];
 
-#[derive(Debug)]
 pub struct DynSoaSlices<'a, SizeAlign>
 where
     SizeAlign: 'a,
 {
     slices: Box<[DynFieldSliceRef<'a>]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<'a, SizeAlign> Debug for DynSoaSlices<'a, SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaSlices")
+            .field("slices", &self.slices)
+            .finish()
+    }
 }
 
 impl<'a, SizeAlign> Clone for DynSoaSlices<'a, SizeAlign> {
@@ -183,13 +279,20 @@ impl<'a, SizeAlign> Clone for DynSoaSlices<'a, SizeAlign> {
 // data is stored inline in a single buffer
 type DynFieldSliceRefMut<'a> = &'a mut [u8];
 
-#[derive(Debug)]
 pub struct DynSoaSlicesMut<'a, SizeAlign>
 where
     SizeAlign: 'a,
 {
     slices: Box<[DynFieldSliceRefMut<'a>]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<'a, SizeAlign> Debug for DynSoaSlicesMut<'a, SizeAlign> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DynSoaSlicesMut")
+            .field("slices", &self.slices)
+            .finish()
+    }
 }
 
 unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {

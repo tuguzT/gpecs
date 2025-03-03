@@ -4,7 +4,6 @@ use core::{
     fmt::{self, Debug},
     iter,
     marker::PhantomData,
-    mem::ManuallyDrop,
     ptr::{self, NonNull},
     slice,
 };
@@ -12,10 +11,9 @@ use core::{
 use crate::traits::Soa;
 
 type DynField = Box<[u8]>;
-type DynDropFn = Option<unsafe fn(*mut [u8])>;
 
 pub struct DynSoa<SizeAlign> {
-    fields: Box<[(DynField, DynDropFn)]>,
+    fields: Box<[DynField]>,
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
@@ -36,22 +34,8 @@ impl<SizeAlign> Clone for DynSoa<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Drop for DynSoa<SizeAlign> {
-    fn drop(&mut self) {
-        let Self { fields, .. } = self;
-
-        for (field, drop) in fields {
-            let Some(drop) = drop else { continue };
-            let ptr = field.as_mut();
-            unsafe {
-                drop(ptr);
-            }
-        }
-    }
-}
-
 pub struct DynSoaContext<SizeAlign> {
-    field_layouts: Box<[(Layout, DynDropFn)]>,
+    field_layouts: Box<[Layout]>,
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
@@ -316,12 +300,11 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
 
     type Context = DynSoaContext<SizeAlign>;
 
-    type FieldLayouts<'a> =
-        iter::Map<slice::Iter<'a, (Layout, DynDropFn)>, fn(&'a (Layout, DynDropFn)) -> &'a Layout>;
+    type FieldLayouts<'a> = &'a [Layout];
 
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
         let DynSoaContext { field_layouts, .. } = context;
-        field_layouts.iter().map(|(field_layout, _)| field_layout)
+        field_layouts.as_ref()
     }
 
     type Ptrs = DynSoaPtrs<SizeAlign>;
@@ -338,7 +321,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs: Box<[_]> = field_layouts
             .iter()
             .zip(offsets)
-            .map(|((field_layout, _), offset)| unsafe {
+            .map(|(field_layout, offset)| unsafe {
                 let data = ptr.add(offset);
                 let len = field_layout.size();
                 ptr::slice_from_raw_parts_mut(data, len)
@@ -357,7 +340,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
 
         let ptrs = field_layouts
             .iter()
-            .map(|(field_layout, _)| {
+            .map(|field_layout| {
                 let data = ptr::without_provenance_mut(field_layout.align());
                 let len = field_layout.size();
                 ptr::slice_from_raw_parts_mut(data, len)
@@ -406,7 +389,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|((field_layout, _), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
 
                 let count = offset * field_layout.pad_to_align().size();
@@ -434,7 +417,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|((field_layout, _), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
 
                 let count = offset * field_layout.pad_to_align().size();
@@ -466,7 +449,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
                 .iter()
                 .zip(ptrs)
                 .zip(origin)
-                .map(|(((field_layout, _), ptr), origin)| {
+                .map(|((field_layout, ptr), origin)| {
                     assert_eq!(field_layout.size(), ptr.len());
                     assert_eq!(ptr.len(), origin.len());
 
@@ -502,7 +485,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
                 .iter()
                 .zip(ptrs)
                 .zip(origin)
-                .map(|(((field_layout, _), ptr), origin)| {
+                .map(|((field_layout, ptr), origin)| {
                     assert_eq!(field_layout.size(), ptr.len());
                     assert_eq!(ptr.len(), origin.len());
 
@@ -530,7 +513,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         assert_eq!(a.len(), b.len());
 
         let mut temp = Vec::new();
-        for (((field_layout, _), a), b) in field_layouts.iter().zip(a).zip(b) {
+        for ((field_layout, a), b) in field_layouts.iter().zip(a).zip(b) {
             assert_eq!(field_layout.size(), a.len());
             assert_eq!(a.len(), b.len());
 
@@ -559,7 +542,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         assert_eq!(src.len(), dst.len());
 
         let mut temp = Vec::new();
-        for (((field_layout, _), src), dst) in field_layouts.iter().zip(src).zip(dst) {
+        for ((field_layout, src), dst) in field_layouts.iter().zip(src).zip(dst) {
             assert_eq!(field_layout.size(), src.len());
             assert_eq!(src.len(), dst.len());
 
@@ -592,7 +575,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         assert_eq!(src.len(), dst.len());
 
         let mut temp = Vec::new();
-        for (((field_layout, _), src), dst) in field_layouts.iter().zip(src).zip(dst).rev() {
+        for ((field_layout, src), dst) in field_layouts.iter().zip(src).zip(dst).rev() {
             assert_eq!(field_layout.size(), src.len());
             assert_eq!(src.len(), dst.len());
 
@@ -624,7 +607,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         assert_eq!(field_layouts.len(), src.len());
         assert_eq!(src.len(), dst.len());
 
-        for (((field_layout, _), src), dst) in field_layouts.iter().zip(src).zip(dst) {
+        for ((field_layout, src), dst) in field_layouts.iter().zip(src).zip(dst) {
             assert_eq!(field_layout.size(), src.len());
             assert_eq!(src.len(), dst.len());
 
@@ -647,16 +630,15 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let fields = field_layouts
             .iter()
             .zip(src)
-            .map(|((field_layout, drop), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
 
                 let len = ptr.len();
                 let mut field = Box::new_uninit_slice(len);
-                let field = unsafe {
+                unsafe {
                     ptr::copy_nonoverlapping(ptr.cast(), field.as_mut_ptr(), len);
                     field.assume_init()
-                };
-                (field, *drop)
+                }
             })
             .collect();
         Self {
@@ -668,14 +650,12 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
         let DynSoaContext { field_layouts, .. } = context;
         let DynSoaMutPtrs { ptrs: dst, .. } = dst;
-
-        let value = ManuallyDrop::new(value);
-        let fields = unsafe { ptr::read(&value.fields) };
+        let Self { fields, .. } = value;
 
         assert_eq!(field_layouts.len(), dst.len());
         assert_eq!(dst.len(), fields.len());
 
-        for (((field_layout, _), dst), (field, _)) in field_layouts.iter().zip(dst).zip(fields) {
+        for ((field_layout, dst), field) in field_layouts.iter().zip(dst).zip(fields) {
             assert_eq!(field_layout.size(), dst.len());
             assert_eq!(dst.len(), field.len());
 
@@ -691,15 +671,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let DynSoaMutPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
-
-        for ((field_layout, drop), ptr) in field_layouts.iter().zip(ptrs) {
-            assert_eq!(field_layout.size(), ptr.len());
-
-            let Some(drop) = drop else { continue };
-            unsafe {
-                drop(ptr);
-            }
-        }
+        // TODO: call drop function pointers (when they are added in context)
     }
 
     type NonNullPtrs = DynSoaNonNullPtrs<SizeAlign>;
@@ -713,7 +685,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|((field_layout, _), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
                 unsafe { NonNull::new_unchecked(ptr) }
             })
@@ -733,7 +705,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|((field_layout, _), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
                 ptr.as_ptr()
             })
@@ -765,7 +737,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(vecs)
-            .map(|((field_layout, _), vec)| {
+            .map(|(field_layout, vec)| {
                 assert_eq!(vec.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 ptr::from_ref(vec.as_slice())
             })
@@ -785,7 +757,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(vecs)
-            .map(|((field_layout, _), vec)| {
+            .map(|(field_layout, vec)| {
                 assert_eq!(vec.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 ptr::from_mut(vec.as_mut_slice())
             })
@@ -840,7 +812,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let refs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|((field_layout, _), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
                 unsafe { slice::from_raw_parts(ptr.cast(), ptr.len()) }
             })
@@ -863,7 +835,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let refs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|((field_layout, _), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
                 unsafe { slice::from_raw_parts_mut(ptr.cast(), ptr.len()) }
             })
@@ -883,7 +855,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(refs)
-            .map(|((field_layout, _), r#ref)| {
+            .map(|(field_layout, r#ref)| {
                 assert_eq!(field_layout.size(), r#ref.len());
                 ptr::from_ref(r#ref)
             })
@@ -903,7 +875,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(refs)
-            .map(|((field_layout, _), r#ref)| {
+            .map(|(field_layout, r#ref)| {
                 assert_eq!(field_layout.size(), r#ref.len());
                 ptr::from_mut(r#ref)
             })
@@ -923,7 +895,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let refs = field_layouts
             .iter()
             .zip(refs)
-            .map(|((field_layout, _), r#ref)| {
+            .map(|(field_layout, r#ref)| {
                 assert_eq!(field_layout.size(), r#ref.len());
                 &*r#ref
             })
@@ -951,7 +923,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|((field_layout, _), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
 
                 let data = ptr.cast();
@@ -978,7 +950,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|((field_layout, _), ptr)| {
+            .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
 
                 let data = ptr.cast();
@@ -1004,7 +976,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 slice.cast_const()
             })
@@ -1024,7 +996,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 slice.cast_mut()
             })
@@ -1044,7 +1016,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let mut lens = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 slice.len().checked_div(field_layout.size()).unwrap_or(0)
             });
@@ -1062,7 +1034,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let mut lens = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 slice.len().checked_div(field_layout.size()).unwrap_or(0)
             });
@@ -1080,7 +1052,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
 
                 let data = slice.cast();
@@ -1106,7 +1078,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
 
                 let data = slice.cast();
@@ -1142,7 +1114,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 unsafe { slice::from_raw_parts(slice.cast(), slice.len()) }
             })
@@ -1165,7 +1137,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 unsafe { slice::from_raw_parts_mut(slice.cast(), slice.len()) }
             })
@@ -1185,7 +1157,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let mut lens = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 slice.len().checked_div(field_layout.size()).unwrap_or(0)
             });
@@ -1203,7 +1175,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let mut lens = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 slice.len().checked_div(field_layout.size()).unwrap_or(0)
             });
@@ -1224,7 +1196,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 ptr::from_ref(slice)
             })
@@ -1247,7 +1219,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 ptr::from_mut(slice)
             })
@@ -1270,7 +1242,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 &*slice
             })
@@ -1290,7 +1262,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 ptr::slice_from_raw_parts(slice.as_ptr(), field_layout.size())
             })
@@ -1313,7 +1285,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|((field_layout, _), slice)| {
+            .map(|(field_layout, slice)| {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
                 ptr::slice_from_raw_parts_mut(slice.as_mut_ptr(), field_layout.size())
             })
@@ -1329,24 +1301,6 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let DynSoaSliceMutPtrs { slices, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
-
-        for ((field_layout, drop), slice) in field_layouts.iter().zip(slices) {
-            assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-
-            let Some(drop) = drop else { continue };
-
-            // stepping manually instead of using `step_by` to avoid panics on ZSTs
-            let len = slice.len();
-            let len = len.checked_div(field_layout.size()).unwrap_or(len);
-            for index in 0..len {
-                let offset = index * field_layout.size();
-                unsafe {
-                    let data = slice.cast::<u8>().add(offset);
-                    let len = field_layout.size();
-                    let ptr = ptr::slice_from_raw_parts_mut(data, len);
-                    drop(ptr);
-                }
-            }
-        }
+        // TODO: call drop function pointers on all the fields (when they are added in context)
     }
 }

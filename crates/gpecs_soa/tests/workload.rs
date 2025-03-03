@@ -289,6 +289,69 @@ fn with_capacity_zst() {
 }
 
 #[test]
+fn with_capacity_dyn() {
+    type Vec = SoaVec<DynSoa<(u8, u64, u16)>>;
+
+    let context = DynSoaContext::new([
+        Layout::new::<u8>(),
+        Layout::new::<u64>(),
+        Layout::new::<u16>(),
+    ]);
+    let vec = Vec::with_context_and_capacity(context, 10);
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 10);
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    assert_eq!(format!("{vec:?}"), "SoaVec(DynSoaSlices([[], [], []]))");
+
+    let slice = vec.as_slice();
+    assert!(slice.is_empty());
+    assert!(slice.capacity() >= 10);
+
+    assert_eq!(format!("{slice:?}"), "SoaSlice(DynSoaSlices([[], [], []]))");
+
+    // assert_eq!(vec, slice);
+    // assert!(vec >= slice);
+    // assert!(slice <= vec);
+
+    // assert_eq!(slice.to_owned(), vec.clone());
+    {
+        let vec = slice.to_owned();
+        assert!(vec.is_empty());
+    }
+    {
+        let vec = vec.clone();
+        assert!(vec.is_empty());
+    }
+
+    let boxed_slice = vec.into_boxed_slice();
+    assert!(boxed_slice.is_empty());
+
+    let vec = boxed_slice.into_vec();
+    assert!(vec.is_empty());
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let boxed_slice = vec.into_boxed_slice();
+    assert!(boxed_slice.is_empty());
+
+    let into_iter = boxed_slice.into_iter();
+    assert!(into_iter.is_empty());
+
+    assert_eq!(
+        format!("{into_iter:?}"),
+        "IntoIter(DynSoaSlices([[], [], []]))",
+    );
+}
+
+#[test]
 fn one_item() {
     type Vec = SoaVec<(u8, u32, u16)>;
 

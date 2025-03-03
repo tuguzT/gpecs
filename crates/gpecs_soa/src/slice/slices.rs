@@ -35,7 +35,7 @@ where
         let slices = T::slice_refs_as_slice_ptrs(context, slices);
         Self {
             context,
-            ptrs: T::slice_ptrs_as_ptrs(context, slices),
+            ptrs: T::slice_ptrs_as_ptrs(context, slices.clone()),
             len: T::slice_ptrs_len(context, slices),
         }
     }
@@ -58,17 +58,25 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
-        let Self { context, ptrs, len } = *self;
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
 
-        let slices = T::slices_from_raw_parts(context, ptrs, len);
+        let slices = T::slices_from_raw_parts(context, ptrs.clone(), len);
         unsafe { T::slice_ptrs_to_slices(context, slices) }
     }
 
     #[inline]
     pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_>) {
-        let Self { context, ptrs, len } = *self;
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
 
-        let slices = T::slices_from_raw_parts(context, ptrs, len);
+        let slices = T::slices_from_raw_parts(context, ptrs.clone(), len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -92,8 +100,8 @@ where
 
     #[inline]
     pub fn as_ptrs(&self) -> T::Ptrs {
-        let Self { ptrs, .. } = *self;
-        ptrs
+        let Self { ptrs, .. } = self;
+        ptrs.clone()
     }
 
     #[inline]
@@ -158,7 +166,7 @@ where
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, T> {
-        Iter::new(*self)
+        Iter::new(self.clone())
     }
 
     #[inline]
@@ -166,7 +174,7 @@ where
     where
         T::Refs<'a>: PartialEq<T>,
     {
-        let mut iter = (*self).into_iter();
+        let mut iter = self.clone().into_iter();
         iter.any(|item| item == *value)
     }
 
@@ -175,7 +183,7 @@ where
     where
         T::Refs<'a>: PartialEq<T::Refs<'r>>,
     {
-        let mut iter = (*self).into_iter();
+        let mut iter = self.clone().into_iter();
         iter.any(|item| item == refs)
     }
 
@@ -193,12 +201,12 @@ where
             vec: &mut vec,
             local_len: 0,
         };
-        let ptrs = set_len_on_drop.vec.as_mut_ptrs();
+        let ptrs: T::MutPtrs = set_len_on_drop.vec.as_mut_ptrs();
         let context = set_len_on_drop.vec.context();
-        for (index, refs) in (*self).into_iter().enumerate() {
+        for (index, refs) in self.clone().into_iter().enumerate() {
             set_len_on_drop.local_len = index;
             unsafe {
-                let dst = T::ptrs_add_mut(context, ptrs, index);
+                let dst = T::ptrs_add_mut(context, ptrs.clone(), index);
                 refs.clone_into_ptrs(context, dst);
             }
         }
@@ -310,11 +318,20 @@ where
     T: Soa,
 {
     fn clone(&self) -> Self {
-        *self
+        Self {
+            context: self.context,
+            ptrs: self.ptrs.clone(),
+            len: self.len,
+        }
     }
 }
 
-impl<T> Copy for SoaSlices<'_, T> where T: Soa {}
+impl<T> Copy for SoaSlices<'_, T>
+where
+    T: Soa,
+    T::Ptrs: Copy,
+{
+}
 
 impl<T, U, I> Index<I> for SoaSlices<'_, T>
 where
@@ -373,7 +390,7 @@ where
         let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
         Self {
             context,
-            ptrs: T::mut_slice_ptrs_as_ptrs(context, slices),
+            ptrs: T::mut_slice_ptrs_as_ptrs(context, slices.clone()),
             len: T::slice_ptrs_len_mut(context, slices),
         }
     }
@@ -396,18 +413,26 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
-        let Self { context, ptrs, len } = *self;
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        let slices = T::slices_from_raw_parts_mut(context, ptrs.clone(), len);
         let slices = T::slice_ptrs_cast_const(context, slices);
         unsafe { T::slice_ptrs_to_slices(context, slices) }
     }
 
     #[inline]
     pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_>) {
-        let Self { context, ptrs, len } = *self;
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        let slices = T::slices_from_raw_parts_mut(context, ptrs.clone(), len);
         let slices = T::slice_ptrs_cast_const(context, slices);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
@@ -421,9 +446,13 @@ where
 
     #[inline]
     pub fn as_mut_slices_with_context(&mut self) -> (&T::Context, T::SlicesMut<'_>) {
-        let Self { context, ptrs, len } = *self;
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        let slices = T::slices_from_raw_parts_mut(context, ptrs.clone(), len);
         let slices = unsafe { T::slice_ptrs_to_slices_mut(context, slices) };
         (context, slices)
     }
@@ -445,14 +474,16 @@ where
 
     #[inline]
     pub fn as_ptrs(&self) -> T::Ptrs {
-        let Self { context, ptrs, .. } = *self;
-        T::ptrs_cast_const(context, ptrs)
+        let Self {
+            context, ref ptrs, ..
+        } = *self;
+        T::ptrs_cast_const(context, ptrs.clone())
     }
 
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> T::MutPtrs {
-        let Self { ptrs, .. } = *self;
-        ptrs
+        let Self { ptrs, .. } = self;
+        ptrs.clone()
     }
 
     #[inline]
@@ -568,9 +599,14 @@ where
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, T> {
-        let Self { context, ptrs, len } = *self;
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
+
         let slices = unsafe {
-            let ptrs = T::ptrs_cast_const(context, ptrs);
+            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
             SoaSlices::from_parts(context, ptrs, len)
         };
         Iter::new(slices)
@@ -578,8 +614,13 @@ where
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        let Self { context, ptrs, len } = *self;
-        let slices = unsafe { Self::from_parts(context, ptrs, len) };
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
+
+        let slices = unsafe { Self::from_parts(context, ptrs.clone(), len) };
         IterMut::new(slices)
     }
 
@@ -588,9 +629,14 @@ where
     where
         T::Refs<'a>: PartialEq<T>,
     {
-        let Self { context, ptrs, len } = *self;
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
+
         let slices = unsafe {
-            let ptrs = T::ptrs_cast_const(context, ptrs);
+            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
             SoaSlices::from_parts(context, ptrs, len)
         };
         slices.contains(value)
@@ -601,9 +647,14 @@ where
     where
         T::Refs<'a>: PartialEq<T::Refs<'r>>,
     {
-        let Self { context, ptrs, len } = *self;
+        let Self {
+            context,
+            ref ptrs,
+            len,
+        } = *self;
+
         let slices = unsafe {
-            let ptrs = T::ptrs_cast_const(context, ptrs);
+            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
             SoaSlices::<T>::from_parts(context, ptrs, len)
         };
         slices.contains_by_refs(refs)
@@ -623,17 +674,22 @@ where
             vec: &mut vec,
             local_len: 0,
         };
-        let ptrs = set_len_on_drop.vec.as_mut_ptrs();
+        let ptrs: T::MutPtrs = set_len_on_drop.vec.as_mut_ptrs();
         let context = set_len_on_drop.vec.context();
 
         let slices = {
-            let Self { context, ptrs, len } = *self;
-            unsafe { SoaSlices::<T>::from_parts(context, T::ptrs_cast_const(context, ptrs), len) }
+            let Self {
+                context,
+                ref ptrs,
+                len,
+            } = *self;
+            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
+            unsafe { SoaSlices::<T>::from_parts(context, ptrs, len) }
         };
         for (index, refs) in slices.into_iter().enumerate() {
             set_len_on_drop.local_len = index;
             unsafe {
-                let dst = T::ptrs_add_mut(context, ptrs, index);
+                let dst = T::ptrs_add_mut(context, ptrs.clone(), index);
                 refs.clone_into_ptrs(context, dst);
             }
         }
@@ -663,7 +719,7 @@ where
                 let dst = self.get_unchecked_mut(index);
                 let context = self.context();
                 let src = T::ptrs_to_refs(context, src.get_unchecked(index));
-                T::ptrs_drop_in_place(context, dst);
+                T::ptrs_drop_in_place(context, dst.clone());
                 src.clone_into_ptrs(context, dst);
             }
         }
@@ -705,7 +761,7 @@ where
         let (context, slices) = self.as_mut_slices_with_context();
         let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
         unsafe {
-            let a = SoaSliceIndex::<T>::get_unchecked_mut(a, context, slices);
+            let a = SoaSliceIndex::<T>::get_unchecked_mut(a, context, slices.clone());
             let b = SoaSliceIndex::<T>::get_unchecked_mut(b, context, slices);
             T::ptrs_swap(context, a, b)
         }
@@ -728,12 +784,12 @@ where
         self.sort_impl(|context, indices| {
             indices.sort_by(|&a, &b| {
                 let a = unsafe {
-                    let ptrs = T::ptrs_add_mut(context, ptrs, a);
+                    let ptrs = T::ptrs_add_mut(context, ptrs.clone(), a);
                     let ptrs = T::ptrs_cast_const(context, ptrs);
                     T::ptrs_to_refs(context, ptrs)
                 };
                 let b = unsafe {
-                    let ptrs = T::ptrs_add_mut(context, ptrs, b);
+                    let ptrs = T::ptrs_add_mut(context, ptrs.clone(), b);
                     let ptrs = T::ptrs_cast_const(context, ptrs);
                     T::ptrs_to_refs(context, ptrs)
                 };
@@ -751,7 +807,7 @@ where
         let ptrs = self.as_mut_ptrs();
         self.sort_impl(|context, indices| {
             indices.sort_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(context, ptrs, index);
+                let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
@@ -768,7 +824,7 @@ where
         let ptrs = self.as_mut_ptrs();
         self.sort_impl(|context, indices| {
             indices.sort_by_cached_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(context, ptrs, index);
+                let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
@@ -793,12 +849,12 @@ where
         self.sort_impl(|context, indices| {
             indices.sort_unstable_by(|&a, &b| {
                 let a = unsafe {
-                    let ptrs = T::ptrs_add_mut(context, ptrs, a);
+                    let ptrs = T::ptrs_add_mut(context, ptrs.clone(), a);
                     let ptrs = T::ptrs_cast_const(context, ptrs);
                     T::ptrs_to_refs(context, ptrs)
                 };
                 let b = unsafe {
-                    let ptrs = T::ptrs_add_mut(context, ptrs, b);
+                    let ptrs = T::ptrs_add_mut(context, ptrs.clone(), b);
                     let ptrs = T::ptrs_cast_const(context, ptrs);
                     T::ptrs_to_refs(context, ptrs)
                 };
@@ -816,7 +872,7 @@ where
         let ptrs = self.as_mut_ptrs();
         self.sort_impl(|context, indices| {
             indices.sort_unstable_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(context, ptrs, index);
+                let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)

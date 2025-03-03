@@ -88,7 +88,7 @@ where
     #[inline]
     fn ptrs(&self) -> T::MutPtrs {
         let context = self.context();
-        T::nonnull_to_ptrs(context, self.ptrs)
+        T::nonnull_to_ptrs(context, self.ptrs.clone())
     }
 
     #[inline]

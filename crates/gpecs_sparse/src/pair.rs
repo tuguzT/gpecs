@@ -533,7 +533,7 @@ where
         context: &Self::Context,
         slices: Self::SlicePtrs,
     ) -> Self::Slices<'a> {
-        let KeyValueSlicePtrs { keys, values } = slices;
+        let KeyValueSlicePtrs { keys, values } = slices.clone();
 
         let len = Self::slice_ptrs_len(context, slices);
         KeyValueSlices {
@@ -547,7 +547,7 @@ where
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicesMut<'a> {
-        let KeyValueSliceMutPtrs { keys, values } = slices;
+        let KeyValueSliceMutPtrs { keys, values } = slices.clone();
 
         let len = Self::slice_ptrs_len_mut(context, slices);
         KeyValueSlicesMut {
@@ -867,11 +867,19 @@ where
     V: Soa,
 {
     fn clone(&self) -> Self {
-        *self
+        Self {
+            key: self.key,
+            value: self.value.clone(),
+        }
     }
 }
 
-impl<K, V> Copy for KeyValuePtrs<K, V> where V: Soa {}
+impl<K, V> Copy for KeyValuePtrs<K, V>
+where
+    V: Soa,
+    V::Ptrs: Copy,
+{
+}
 
 pub struct KeyValueMutPtrs<K, V>
 where
@@ -978,11 +986,19 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        *self
+        Self {
+            key: self.key,
+            value: self.value.clone(),
+        }
     }
 }
 
-impl<K, V> Copy for KeyValueMutPtrs<K, V> where V: Soa {}
+impl<K, V> Copy for KeyValueMutPtrs<K, V>
+where
+    V: Soa,
+    V::MutPtrs: Copy,
+{
+}
 
 pub struct KeyValueNonNullPtrs<K, V>
 where
@@ -1089,11 +1105,19 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        *self
+        Self {
+            key: self.key,
+            value: self.value.clone(),
+        }
     }
 }
 
-impl<K, V> Copy for KeyValueNonNullPtrs<K, V> where V: Soa {}
+impl<K, V> Copy for KeyValueNonNullPtrs<K, V>
+where
+    V: Soa,
+    V::NonNullPtrs: Copy,
+{
+}
 
 pub struct KeyValueVecs<K, V>
 where
@@ -1607,11 +1631,19 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        *self
+        Self {
+            keys: self.keys,
+            values: self.values.clone(),
+        }
     }
 }
 
-impl<K, V> Copy for KeyValueSlicePtrs<K, V> where V: Soa {}
+impl<K, V> Copy for KeyValueSlicePtrs<K, V>
+where
+    V: Soa,
+    V::SlicePtrs: Copy,
+{
+}
 
 pub struct KeyValueSliceMutPtrs<K, V>
 where
@@ -1721,11 +1753,19 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        *self
+        Self {
+            keys: self.keys,
+            values: self.values.clone(),
+        }
     }
 }
 
-impl<K, V> Copy for KeyValueSliceMutPtrs<K, V> where V: Soa {}
+impl<K, V> Copy for KeyValueSliceMutPtrs<K, V>
+where
+    V: Soa,
+    V::SliceMutPtrs: Copy,
+{
+}
 
 pub struct KeyValueSlices<'a, K, V>
 where

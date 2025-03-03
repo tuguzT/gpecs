@@ -49,7 +49,7 @@ where
 
     fn ptrs(&self) -> T::Ptrs {
         let context = self.context();
-        let ptrs = T::nonnull_to_ptrs(context, self.ptrs);
+        let ptrs = T::nonnull_to_ptrs(context, self.ptrs.clone());
         T::ptrs_cast_const(context, ptrs)
     }
 
@@ -118,7 +118,7 @@ where
     fn clone(&self) -> Self {
         Self {
             context: self.context,
-            ptrs: self.ptrs,
+            ptrs: self.ptrs.clone(),
             start: self.start,
             end: self.end,
         }
@@ -412,7 +412,7 @@ where
 
     fn ptrs(&self) -> T::MutPtrs {
         let context = self.context();
-        T::nonnull_to_ptrs(context, self.ptrs)
+        T::nonnull_to_ptrs(context, self.ptrs.clone())
     }
 
     #[inline]

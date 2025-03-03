@@ -429,13 +429,13 @@ where
             let ptrs = self.as_mut_ptrs();
             let context = self.context();
             let value = {
-                let ptrs = T::ptrs_add_mut(context, ptrs, index);
+                let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
                 T::ptrs_read(context, T::ptrs_cast_const(context, ptrs))
             };
 
             T::ptrs_copy(
                 context,
-                T::ptrs_add(context, T::ptrs_cast_const(context, ptrs), len - 1),
+                T::ptrs_add(context, T::ptrs_cast_const(context, ptrs.clone()), len - 1),
                 T::ptrs_add_mut(context, ptrs, index),
                 1,
             );
@@ -474,8 +474,8 @@ where
             let ptrs = T::ptrs_add_mut(context, ptrs, index);
 
             if index < len {
-                let src = T::ptrs_cast_const(context, ptrs);
-                let dst = T::ptrs_add_mut(context, ptrs, 1);
+                let src = T::ptrs_cast_const(context, ptrs.clone());
+                let dst = T::ptrs_add_mut(context, ptrs.clone(), 1);
                 T::ptrs_copy(context, src, dst, len - index);
             }
             T::ptrs_write(context, ptrs, elements);
@@ -502,11 +502,11 @@ where
             let context = self.context();
             let ptrs = T::ptrs_add_mut(context, ptrs, index);
 
-            let value = T::ptrs_read(context, T::ptrs_cast_const(context, ptrs));
+            let value = T::ptrs_read(context, T::ptrs_cast_const(context, ptrs.clone()));
 
             T::ptrs_copy(
                 context,
-                T::ptrs_add(context, T::ptrs_cast_const(context, ptrs), 1),
+                T::ptrs_add(context, T::ptrs_cast_const(context, ptrs.clone()), 1),
                 ptrs,
                 len - index - 1,
             );
@@ -573,7 +573,7 @@ where
                             context,
                             T::ptrs_add(
                                 context,
-                                T::ptrs_cast_const(context, ptrs),
+                                T::ptrs_cast_const(context, ptrs.clone()),
                                 self.processed_len,
                             ),
                             T::ptrs_add_mut(context, ptrs, self.processed_len - self.deleted_cnt),
@@ -609,7 +609,7 @@ where
                 // SAFETY: Unchecked element must be valid.
                 let cur = unsafe { T::ptrs_add_mut(context, ptrs, g.processed_len) };
                 let res = {
-                    let cur = unsafe { T::ptrs_to_refs_mut(context, cur) };
+                    let cur = unsafe { T::ptrs_to_refs_mut(context, cur.clone()) };
                     !f(cur)
                 };
                 if res {
@@ -694,7 +694,7 @@ where
         let context = set_len_on_drop.vec.context();
         for refs in other.iter() {
             unsafe {
-                let dst = T::ptrs_add_mut(context, ptrs, set_len_on_drop.local_len);
+                let dst = T::ptrs_add_mut(context, ptrs.clone(), set_len_on_drop.local_len);
                 refs.clone_into_ptrs(context, dst);
             }
             set_len_on_drop.local_len += 1;
@@ -720,7 +720,7 @@ where
         for index in range {
             unsafe {
                 let refs = T::ptrs_to_refs(context, set_len_on_drop.vec.get_unchecked(index));
-                let dst = T::ptrs_add_mut(context, ptrs, set_len_on_drop.local_len);
+                let dst = T::ptrs_add_mut(context, ptrs.clone(), set_len_on_drop.local_len);
                 refs.clone_into_ptrs(context, dst);
             }
             set_len_on_drop.local_len += 1;

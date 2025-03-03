@@ -225,7 +225,7 @@ where
             // a pointer with mutable provenance is necessary. Therefore we must reconstruct
             // it from the original vec but also avoid creating a &mut to the front since that could
             // invalidate raw pointers to it which some unsafe code might rely on.
-            let origin = T::ptrs_cast_const(context, vec_ptrs);
+            let origin = T::ptrs_cast_const(context, vec_ptrs.clone());
 
             let drop_offset = T::ptrs_offset_from(context, drop_ptrs, origin);
             let drop_offset = usize::try_from(drop_offset).unwrap_unchecked();

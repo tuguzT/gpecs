@@ -34,6 +34,7 @@ pub unsafe trait Soa: Sized {
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_>;
 
     /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
+    /// Also returns offsets of each field in the buffer (in bytes).
     ///
     /// This layout should not include [`Context`](`Soa::Context`),
     /// as it is handled by the crate itself.
@@ -80,9 +81,11 @@ pub unsafe trait Soa: Sized {
         capacity
     }
 
-    type Ptrs: Copy;
-    type MutPtrs: Copy;
+    type Ptrs: Clone;
+    type MutPtrs: Clone;
 
+    /// Creates a collection of pointers to each field from a given pointer.
+    /// by provided offsets (in bytes).
     unsafe fn ptrs(
         context: &Self::Context,
         ptr: *mut u8,
@@ -138,7 +141,7 @@ pub unsafe trait Soa: Sized {
 
     unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs);
 
-    type NonNullPtrs: Copy;
+    type NonNullPtrs: Clone;
 
     unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs;
     fn nonnull_to_ptrs(context: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs;
@@ -170,8 +173,8 @@ pub unsafe trait Soa: Sized {
     fn mut_refs_as_ptrs(context: &Self::Context, refs: Self::RefsMut<'_>) -> Self::MutPtrs;
     fn mut_refs_as_refs<'a>(context: &Self::Context, refs: Self::RefsMut<'a>) -> Self::Refs<'a>;
 
-    type SlicePtrs: Copy;
-    type SliceMutPtrs: Copy;
+    type SlicePtrs: Clone;
+    type SliceMutPtrs: Clone;
 
     fn slices_from_raw_parts(
         context: &Self::Context,

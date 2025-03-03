@@ -11,7 +11,7 @@ where
     // such that the old value is not duplicated. Nothing is dropped and
     // nothing here can panic.
     unsafe {
-        let result = T::ptrs_read(context, T::ptrs_cast_const(context, dest));
+        let result = T::ptrs_read(context, T::ptrs_cast_const(context, dest.clone()));
         T::ptrs_write(context, dest, src);
         result
     }

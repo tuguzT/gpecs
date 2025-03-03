@@ -2,7 +2,9 @@ use alloc::{boxed::Box, vec::Vec};
 use core::{
     alloc::Layout,
     borrow::Borrow,
+    cmp,
     fmt::{self, Debug},
+    hash::{self, Hash},
     iter,
     marker::PhantomData,
     ptr::{self, NonNull},
@@ -74,6 +76,21 @@ impl<SizeAlign> Debug for DynSoaContext<SizeAlign> {
     }
 }
 
+impl<SizeAlign> PartialEq for DynSoaContext<SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.field_layouts == other.field_layouts && self.phantom == other.phantom
+    }
+}
+
+impl<SizeAlign> Eq for DynSoaContext<SizeAlign> {}
+
+impl<SizeAlign> Hash for DynSoaContext<SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.field_layouts.hash(state);
+        self.phantom.hash(state);
+    }
+}
+
 impl<SizeAlign> Clone for DynSoaContext<SizeAlign> {
     fn clone(&self) -> Self {
         Self {
@@ -96,6 +113,41 @@ impl<SizeAlign> Debug for DynSoaPtrs<SizeAlign> {
     }
 }
 
+impl<SizeAlign> PartialEq for DynSoaPtrs<SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ptrs == other.ptrs && self.phantom == other.phantom
+    }
+}
+
+impl<SizeAlign> Eq for DynSoaPtrs<SizeAlign> {}
+
+impl<SizeAlign> PartialOrd for DynSoaPtrs<SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.ptrs.partial_cmp(&other.ptrs) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Ord for DynSoaPtrs<SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.ptrs.cmp(&other.ptrs) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Hash for DynSoaPtrs<SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.ptrs.hash(state);
+        self.phantom.hash(state);
+    }
+}
+
 impl<SizeAlign> Clone for DynSoaPtrs<SizeAlign> {
     fn clone(&self) -> Self {
         Self {
@@ -115,6 +167,41 @@ pub struct DynSoaMutPtrs<SizeAlign> {
 impl<SizeAlign> Debug for DynSoaMutPtrs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaMutPtrs").field(&self.ptrs).finish()
+    }
+}
+
+impl<SizeAlign> PartialEq for DynSoaMutPtrs<SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ptrs == other.ptrs && self.phantom == other.phantom
+    }
+}
+
+impl<SizeAlign> Eq for DynSoaMutPtrs<SizeAlign> {}
+
+impl<SizeAlign> PartialOrd for DynSoaMutPtrs<SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.ptrs.partial_cmp(&other.ptrs) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Ord for DynSoaMutPtrs<SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.ptrs.cmp(&other.ptrs) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Hash for DynSoaMutPtrs<SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.ptrs.hash(state);
+        self.phantom.hash(state);
     }
 }
 
@@ -142,6 +229,41 @@ impl<SizeAlign> Debug for DynSoaNonNullPtrs<SizeAlign> {
     }
 }
 
+impl<SizeAlign> PartialEq for DynSoaNonNullPtrs<SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ptrs == other.ptrs && self.phantom == other.phantom
+    }
+}
+
+impl<SizeAlign> Eq for DynSoaNonNullPtrs<SizeAlign> {}
+
+impl<SizeAlign> PartialOrd for DynSoaNonNullPtrs<SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.ptrs.partial_cmp(&other.ptrs) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Ord for DynSoaNonNullPtrs<SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.ptrs.cmp(&other.ptrs) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Hash for DynSoaNonNullPtrs<SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.ptrs.hash(state);
+        self.phantom.hash(state);
+    }
+}
+
 impl<SizeAlign> Clone for DynSoaNonNullPtrs<SizeAlign> {
     fn clone(&self) -> Self {
         Self {
@@ -162,6 +284,41 @@ pub struct DynSoaVecs<SizeAlign> {
 impl<SizeAlign> Debug for DynSoaVecs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaVecs").field(&self.vecs).finish()
+    }
+}
+
+impl<SizeAlign> PartialEq for DynSoaVecs<SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.vecs == other.vecs && self.phantom == other.phantom
+    }
+}
+
+impl<SizeAlign> Eq for DynSoaVecs<SizeAlign> {}
+
+impl<SizeAlign> PartialOrd for DynSoaVecs<SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.vecs.partial_cmp(&other.vecs) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Ord for DynSoaVecs<SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.vecs.cmp(&other.vecs) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Hash for DynSoaVecs<SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.vecs.hash(state);
+        self.phantom.hash(state);
     }
 }
 
@@ -187,6 +344,41 @@ where
 impl<'a, SizeAlign> Debug for DynSoaRefs<'a, SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaRefs").field(&self.refs).finish()
+    }
+}
+
+impl<'a, SizeAlign> PartialEq for DynSoaRefs<'a, SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.refs == other.refs && self.phantom == other.phantom
+    }
+}
+
+impl<'a, SizeAlign> Eq for DynSoaRefs<'a, SizeAlign> {}
+
+impl<'a, SizeAlign> PartialOrd for DynSoaRefs<'a, SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.refs.partial_cmp(&other.refs) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<'a, SizeAlign> Ord for DynSoaRefs<'a, SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.refs.cmp(&other.refs) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<'a, SizeAlign> Hash for DynSoaRefs<'a, SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.refs.hash(state);
+        self.phantom.hash(state);
     }
 }
 
@@ -235,6 +427,41 @@ impl<'a, SizeAlign> Debug for DynSoaRefsMut<'a, SizeAlign> {
     }
 }
 
+impl<'a, SizeAlign> PartialEq for DynSoaRefsMut<'a, SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.refs == other.refs && self.phantom == other.phantom
+    }
+}
+
+impl<'a, SizeAlign> Eq for DynSoaRefsMut<'a, SizeAlign> {}
+
+impl<'a, SizeAlign> PartialOrd for DynSoaRefsMut<'a, SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.refs.partial_cmp(&other.refs) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<'a, SizeAlign> Ord for DynSoaRefsMut<'a, SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.refs.cmp(&other.refs) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<'a, SizeAlign> Hash for DynSoaRefsMut<'a, SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.refs.hash(state);
+        self.phantom.hash(state);
+    }
+}
+
 // data is stored inline in a single buffer
 type DynFieldSlicePtr = *const [u8];
 
@@ -248,6 +475,41 @@ impl<SizeAlign> Debug for DynSoaSlicePtrs<SizeAlign> {
         f.debug_tuple("DynSoaSlicePtrs")
             .field(&self.slices)
             .finish()
+    }
+}
+
+impl<SizeAlign> PartialEq for DynSoaSlicePtrs<SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.slices == other.slices && self.phantom == other.phantom
+    }
+}
+
+impl<SizeAlign> Eq for DynSoaSlicePtrs<SizeAlign> {}
+
+impl<SizeAlign> PartialOrd for DynSoaSlicePtrs<SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.slices.partial_cmp(&other.slices) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Ord for DynSoaSlicePtrs<SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.slices.cmp(&other.slices) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Hash for DynSoaSlicePtrs<SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.slices.hash(state);
+        self.phantom.hash(state);
     }
 }
 
@@ -273,6 +535,41 @@ impl<SizeAlign> Debug for DynSoaSliceMutPtrs<SizeAlign> {
         f.debug_tuple("DynSoaSliceMutPtrs")
             .field(&self.slices)
             .finish()
+    }
+}
+
+impl<SizeAlign> PartialEq for DynSoaSliceMutPtrs<SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.slices == other.slices && self.phantom == other.phantom
+    }
+}
+
+impl<SizeAlign> Eq for DynSoaSliceMutPtrs<SizeAlign> {}
+
+impl<SizeAlign> PartialOrd for DynSoaSliceMutPtrs<SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.slices.partial_cmp(&other.slices) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Ord for DynSoaSliceMutPtrs<SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.slices.cmp(&other.slices) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<SizeAlign> Hash for DynSoaSliceMutPtrs<SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.slices.hash(state);
+        self.phantom.hash(state);
     }
 }
 
@@ -302,6 +599,41 @@ impl<'a, SizeAlign> Debug for DynSoaSlices<'a, SizeAlign> {
     }
 }
 
+impl<'a, SizeAlign> PartialEq for DynSoaSlices<'a, SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.slices == other.slices && self.phantom == other.phantom
+    }
+}
+
+impl<'a, SizeAlign> Eq for DynSoaSlices<'a, SizeAlign> {}
+
+impl<'a, SizeAlign> PartialOrd for DynSoaSlices<'a, SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.slices.partial_cmp(&other.slices) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<'a, SizeAlign> Ord for DynSoaSlices<'a, SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.slices.cmp(&other.slices) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<'a, SizeAlign> Hash for DynSoaSlices<'a, SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.slices.hash(state);
+        self.phantom.hash(state);
+    }
+}
+
 impl<'a, SizeAlign> Clone for DynSoaSlices<'a, SizeAlign> {
     fn clone(&self) -> Self {
         Self {
@@ -327,6 +659,41 @@ impl<'a, SizeAlign> Debug for DynSoaSlicesMut<'a, SizeAlign> {
         f.debug_tuple("DynSoaSlicesMut")
             .field(&self.slices)
             .finish()
+    }
+}
+
+impl<'a, SizeAlign> PartialEq for DynSoaSlicesMut<'a, SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.slices == other.slices && self.phantom == other.phantom
+    }
+}
+
+impl<'a, SizeAlign> Eq for DynSoaSlicesMut<'a, SizeAlign> {}
+
+impl<'a, SizeAlign> PartialOrd for DynSoaSlicesMut<'a, SizeAlign> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.slices.partial_cmp(&other.slices) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<'a, SizeAlign> Ord for DynSoaSlicesMut<'a, SizeAlign> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.slices.cmp(&other.slices) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.phantom.cmp(&other.phantom)
+    }
+}
+
+impl<'a, SizeAlign> Hash for DynSoaSlicesMut<'a, SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.slices.hash(state);
+        self.phantom.hash(state);
     }
 }
 

@@ -49,11 +49,7 @@ where
 {
     type SizeAlign = Self;
     type Context = V::Context;
-
-    type FieldLayouts<'a>
-        = KeyValueFieldLayouts<'a, K, V>
-    where
-        V::Context: 'a;
+    type FieldLayouts<'a> = KeyValueFieldLayouts<'a, K, V>;
 
     #[inline]
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
@@ -649,7 +645,6 @@ where
 pub struct KeyValueFieldLayouts<'a, K, V>
 where
     V: Soa,
-    V::Context: 'a,
 {
     key_layout: Layout,
     key_phantom: PhantomData<fn() -> K>,
@@ -659,7 +654,6 @@ where
 impl<'a, K, V> KeyValueFieldLayouts<'a, K, V>
 where
     V: Soa,
-    V::Context: 'a,
 {
     #[inline]
     pub fn new(context: &'a V::Context) -> Self {

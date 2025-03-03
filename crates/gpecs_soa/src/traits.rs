@@ -27,9 +27,7 @@ pub unsafe trait Soa: Sized {
     /// Safety requirements:
     /// - sum of layouts' sizes should be less or equal to the size of [`SizeAlign`](`Soa::SizeAlign`)
     /// - alignment of each layout should be less or equal to the alignment of [`SizeAlign`](`Soa::SizeAlign`)
-    type FieldLayouts<'a>: IntoIterator<Item: Borrow<Layout>>
-    where
-        Self::Context: 'a;
+    type FieldLayouts<'a>: IntoIterator<Item: Borrow<Layout>>;
 
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_>;
 

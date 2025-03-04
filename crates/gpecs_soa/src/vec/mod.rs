@@ -441,7 +441,7 @@ where
         }
     }
 
-    pub fn insert(&mut self, index: usize, elements: T) {
+    pub fn insert(&mut self, index: usize, value: T) {
         #[cold]
         #[inline(never)]
         #[track_caller]
@@ -474,7 +474,7 @@ where
                 let dst = T::ptrs_add_mut(context, ptrs.clone(), 1);
                 T::ptrs_copy(context, src, dst, len - index);
             }
-            T::ptrs_write(context, ptrs, elements);
+            T::ptrs_write(context, ptrs, value);
 
             self.set_len(len + 1);
         }
@@ -652,7 +652,7 @@ where
         drop(g);
     }
 
-    pub fn push(&mut self, values: T) {
+    pub fn push(&mut self, value: T) {
         let len = self.len();
         let capacity = self.capacity();
         if len == capacity {
@@ -669,7 +669,7 @@ where
             let context = self.context();
             let ptrs = T::ptrs_add_mut(context, ptrs, len);
 
-            T::ptrs_write(context, ptrs, values);
+            T::ptrs_write(context, ptrs, value);
             self.set_len(len + 1);
         }
     }

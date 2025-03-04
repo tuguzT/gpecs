@@ -1,4 +1,4 @@
-use std::{alloc::Layout, iter};
+use std::{alloc::Layout, iter, ptr, slice, u64};
 
 use gpecs_soa::{
     r#dyn::{DynSoa, DynSoaContext},
@@ -610,6 +610,67 @@ fn one_item_zst() {
 
     let into_iter = boxed_slice.into_iter();
     assert!(into_iter.is_empty());
+}
+
+#[test]
+fn one_item_dyn() {
+    type Vec = SoaVec<DynSoa<(u8, u64, u16)>>;
+
+    let field_layouts = [
+        Layout::new::<u8>(),
+        Layout::new::<u64>(),
+        Layout::new::<u16>(),
+    ];
+
+    let u8 = 1u8;
+    let u64 = 2u64;
+    let u16 = 3u16;
+
+    let u8_slice = unsafe {
+        let data = ptr::from_ref(&u8).cast();
+        let len = size_of_val(&u8);
+        slice::from_raw_parts(data, len)
+    };
+    let u64_slice = unsafe {
+        let data = ptr::from_ref(&u64).cast();
+        let len = size_of_val(&u64);
+        slice::from_raw_parts(data, len)
+    };
+    let u16_slice = unsafe {
+        let data = ptr::from_ref(&u16).cast();
+        let len = size_of_val(&u16);
+        slice::from_raw_parts(data, len)
+    };
+
+    let value = DynSoa::new([
+        (u8_slice, field_layouts[0]),
+        (u64_slice, field_layouts[1]),
+        (u16_slice, field_layouts[2]),
+    ]);
+    assert_eq!(
+        format!("{value:?}"),
+        format!("DynSoa([{u8_slice:?}, {u64_slice:?}, {u16_slice:?}])"),
+    );
+
+    let context = DynSoaContext::new(field_layouts);
+    let mut vec = Vec::with_context(context);
+
+    vec.push(value);
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 1);
+    // assert!(vec.contains_by_refs((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    assert_eq!(
+        format!("{vec:?}"),
+        format!("SoaVec(DynSoaSlices([{u8_slice:?}, {u64_slice:?}, {u16_slice:?}]))"),
+    );
+
+    // TODO: more tests
 }
 
 #[test]
@@ -1258,4 +1319,78 @@ fn three_items_zst() {
     assert_eq!(into_iter.next(), Some((ZST1, ZST2(()), ZST3 { empty: () })));
     assert_eq!(into_iter.next_back(), None);
     assert_eq!(into_iter.next(), None);
+}
+
+#[test]
+fn three_items_dyn() {
+    type Vec = SoaVec<DynSoa<(u8, u64, u16)>>;
+
+    let field_layouts = [
+        Layout::new::<u8>(),
+        Layout::new::<u64>(),
+        Layout::new::<u16>(),
+    ];
+
+    let u8 = 1u8;
+    let u64 = 2u64;
+    let u16 = 3u16;
+
+    let u8_slice = unsafe {
+        let data = ptr::from_ref(&u8).cast();
+        let len = size_of_val(&u8);
+        slice::from_raw_parts(data, len)
+    };
+    let u64_slice = unsafe {
+        let data = ptr::from_ref(&u64).cast();
+        let len = size_of_val(&u64);
+        slice::from_raw_parts(data, len)
+    };
+    let u16_slice = unsafe {
+        let data = ptr::from_ref(&u16).cast();
+        let len = size_of_val(&u16);
+        slice::from_raw_parts(data, len)
+    };
+
+    let context = DynSoaContext::new(field_layouts);
+    let mut vec = Vec::with_context(context);
+
+    vec.extend(
+        iter::repeat_with(|| {
+            DynSoa::new([
+                (u8_slice, field_layouts[0]),
+                (u64_slice, field_layouts[1]),
+                (u16_slice, field_layouts[2]),
+            ])
+        })
+        .take(3),
+    );
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+
+    let u8s = [u8; 3];
+    let u64s = [u64; 3];
+    let u16s = [u16; 3];
+
+    let u8s_slice: &[u8] = unsafe {
+        let data = ptr::from_ref(&u8s).cast();
+        let len = size_of_val(&u8s);
+        slice::from_raw_parts(data, len)
+    };
+    let u64s_slice: &[u8] = unsafe {
+        let data = ptr::from_ref(&u64s).cast();
+        let len = size_of_val(&u64s);
+        slice::from_raw_parts(data, len)
+    };
+    let u16s_slice: &[u8] = unsafe {
+        let data = ptr::from_ref(&u16s).cast();
+        let len = size_of_val(&u16s);
+        slice::from_raw_parts(data, len)
+    };
+
+    assert_eq!(
+        format!("{vec:?}"),
+        format!("SoaVec(DynSoaSlices([{u8s_slice:?}, {u64s_slice:?}, {u16s_slice:?}]))"),
+    );
+
+    // TODO: more tests
 }

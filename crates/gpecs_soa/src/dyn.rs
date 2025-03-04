@@ -18,17 +18,77 @@ union Byte<SizeAlign> {
     _size_align: ManuallyDrop<MaybeUninit<SizeAlign>>,
 }
 
-type DynFields<SizeAlign> = Box<Byte<SizeAlign>>;
+type DynFields<SizeAlign> = Box<[Byte<SizeAlign>]>;
 
 pub struct DynSoa<SizeAlign> {
-    field_buffer: DynFields<SizeAlign>,
-    field_layouts: Box<[Layout]>,
+    buffer: DynFields<SizeAlign>,
+    layouts: Box<[Layout]>,
+}
+
+impl<SizeAlign> DynSoa<SizeAlign> {
+    #[inline]
+    pub fn new<'a, I>(fields: I) -> Self
+    where
+        I: IntoIterator<Item = (&'a [u8], Layout)>,
+    {
+        let (fields, layouts): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
+        let context = DynSoaContext {
+            field_layouts: layouts.into_boxed_slice(),
+            phantom: PhantomData,
+        };
+        let refs = DynSoaRefs {
+            refs: fields.into_boxed_slice(),
+            phantom: PhantomData,
+        };
+        let src = Self::refs_as_ptrs(&context, refs);
+
+        unsafe { Self::ptrs_read(&context, src) }
+    }
+
+    #[inline]
+    pub fn as_refs(&self) -> DynSoaRefs<'_, SizeAlign> {
+        let Self { buffer, layouts } = self;
+        let context = DynSoaContext {
+            field_layouts: layouts.clone(),
+            phantom: PhantomData,
+        };
+
+        let (buffer_layout, offsets) =
+            Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+        assert_eq!(buffer_len, buffer.len());
+
+        unsafe {
+            let ptrs = Self::ptrs(&context, buffer.as_ptr().cast_mut().cast(), offsets);
+            let ptrs = Self::ptrs_cast_const(&context, ptrs);
+            Self::ptrs_to_refs(&context, ptrs)
+        }
+    }
+
+    #[inline]
+    pub fn as_refs_mut(&mut self) -> DynSoaRefsMut<'_, SizeAlign> {
+        let Self { buffer, layouts } = self;
+        let context = DynSoaContext {
+            field_layouts: layouts.clone(),
+            phantom: PhantomData,
+        };
+
+        let (buffer_layout, offsets) =
+            Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+        assert_eq!(buffer_len, buffer.len());
+
+        unsafe {
+            let ptrs = Self::ptrs(&context, buffer.as_mut_ptr().cast(), offsets);
+            Self::ptrs_to_refs_mut(&context, ptrs)
+        }
+    }
 }
 
 impl<SizeAlign> Debug for DynSoa<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let _ = f;
-        todo!("debug field regions (byte slices)")
+        let DynSoaRefs { refs, .. } = self.as_refs();
+        f.debug_tuple("DynSoa").field(&refs).finish()
     }
 }
 
@@ -789,7 +849,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
                     let field_size = field_layout
                         .size()
                         .try_into()
-                        .expect("size of layout should be less than `isize::MAX`");
+                        .expect("layout size should not exceed `isize::MAX`");
                     offset
                         .checked_div(field_size)
                         .expect("self should not be a ZST")
@@ -825,7 +885,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
                     let field_size = field_layout
                         .size()
                         .try_into()
-                        .expect("size of layout should be less than `isize::MAX`");
+                        .expect("layout size should not exceed `isize::MAX`");
                     offset
                         .checked_div(field_size)
                         .expect("self should not be a ZST")
@@ -952,54 +1012,46 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
 
     unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs) -> Self {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs: src, .. } = src;
+        assert_eq!(field_layouts.len(), src.ptrs.len());
 
-        assert_eq!(field_layouts.len(), src.len());
+        let buffer = {
+            let (buffer_layout, offsets) = Self::buffer_layout(context, 1)
+                .expect("layout size should not exceed `isize::MAX`");
+            let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+            let mut buffer = Box::new_uninit_slice(buffer_len);
+            unsafe {
+                let dst = Self::ptrs(context, buffer.as_mut_ptr().cast(), offsets);
+                Self::ptrs_copy_nonoverlapping(context, src, dst, 1);
+                buffer.assume_init()
+            }
+        };
 
-        // let fields = field_layouts
-        //     .iter()
-        //     .zip(src)
-        //     .map(|(field_layout, ptr)| {
-        //         assert_eq!(field_layout.size(), ptr.len());
-
-        //         let len = ptr.len();
-        //         let mut field = Box::new_uninit_slice(len);
-        //         unsafe {
-        //             ptr::copy_nonoverlapping(ptr.cast(), field.as_mut_ptr(), len);
-        //             field.assume_init()
-        //         }
-        //     })
-        //     .collect();
-        // Self {
-        //     fields,
-        //     phantom: PhantomData,
-        // }
-        todo!()
+        Self {
+            buffer,
+            layouts: field_layouts.clone(),
+        }
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs: dst, .. } = dst;
         let Self {
-            field_buffer,
-            field_layouts: value_field_layouts,
+            buffer,
+            layouts: value_field_layouts,
         } = value;
 
-        assert_eq!(field_layouts.len(), dst.len());
+        assert_eq!(field_layouts.len(), dst.ptrs.len());
         assert_eq!(field_layouts.as_ref(), value_field_layouts.as_ref());
-        // assert_eq!(dst.len(), fields.len());
-        let _ = field_buffer;
 
-        // for ((field_layout, dst), field) in field_layouts.iter().zip(dst).zip(fields) {
-        //     assert_eq!(field_layout.size(), dst.len());
-        //     assert_eq!(dst.len(), field.len());
+        let (buffer_layout, offsets) =
+            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+        assert_eq!(buffer_len, buffer.len());
 
-        //     let len = field_layout.size();
-        //     unsafe {
-        //         ptr::copy_nonoverlapping(field.as_ptr(), dst.cast(), len);
-        //     }
-        // }
-        todo!()
+        unsafe {
+            let src = Self::ptrs(context, buffer.as_ptr().cast_mut().cast(), offsets);
+            let src = Self::ptrs_cast_const(context, src);
+            Self::ptrs_copy_nonoverlapping(context, src, dst, 1);
+        }
     }
 
     unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs) {

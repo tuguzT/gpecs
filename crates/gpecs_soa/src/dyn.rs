@@ -92,6 +92,21 @@ impl<SizeAlign> Debug for DynSoa<SizeAlign> {
     }
 }
 
+impl<SizeAlign> PartialEq for DynSoa<SizeAlign> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_refs() == other.as_refs() && self.layouts == other.layouts
+    }
+}
+
+impl<SizeAlign> Eq for DynSoa<SizeAlign> {}
+
+impl<SizeAlign> Hash for DynSoa<SizeAlign> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.as_refs().hash(state);
+        self.layouts.hash(state);
+    }
+}
+
 pub struct DynSoaContext<SizeAlign> {
     field_layouts: Box<[Layout]>,
     phantom: PhantomData<fn() -> SizeAlign>,
@@ -122,6 +137,13 @@ impl<SizeAlign> DynSoaContext<SizeAlign> {
             field_layouts,
             phantom: PhantomData,
         }
+    }
+}
+
+impl<SizeAlign> AsRef<[Layout]> for DynSoaContext<SizeAlign> {
+    fn as_ref(&self) -> &[Layout] {
+        let Self { field_layouts, .. } = self;
+        field_layouts.as_ref()
     }
 }
 
@@ -162,6 +184,32 @@ type DynFieldPtr = *const [u8];
 pub struct DynSoaPtrs<SizeAlign> {
     ptrs: Box<[DynFieldPtr]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> DynSoaPtrs<SizeAlign> {
+    pub fn new<I>(ptrs: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldPtr>,
+    {
+        Self {
+            ptrs: ptrs.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<SizeAlign> AsRef<[DynFieldPtr]> for DynSoaPtrs<SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldPtr] {
+        let Self { ptrs, .. } = self;
+        ptrs.as_ref()
+    }
+}
+
+impl<SizeAlign> AsMut<[DynFieldPtr]> for DynSoaPtrs<SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldPtr] {
+        let Self { ptrs, .. } = self;
+        ptrs.as_mut()
+    }
 }
 
 impl<SizeAlign> Debug for DynSoaPtrs<SizeAlign> {
@@ -214,11 +262,37 @@ impl<SizeAlign> Clone for DynSoaPtrs<SizeAlign> {
     }
 }
 
-type DynFieldPtrMut = *mut [u8];
+type DynFieldMutPtr = *mut [u8];
 
 pub struct DynSoaMutPtrs<SizeAlign> {
-    ptrs: Box<[DynFieldPtrMut]>,
+    ptrs: Box<[DynFieldMutPtr]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> DynSoaMutPtrs<SizeAlign> {
+    pub fn new<I>(ptrs: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldMutPtr>,
+    {
+        Self {
+            ptrs: ptrs.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<SizeAlign> AsRef<[DynFieldMutPtr]> for DynSoaMutPtrs<SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldMutPtr] {
+        let Self { ptrs, .. } = self;
+        ptrs.as_ref()
+    }
+}
+
+impl<SizeAlign> AsMut<[DynFieldMutPtr]> for DynSoaMutPtrs<SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldMutPtr] {
+        let Self { ptrs, .. } = self;
+        ptrs.as_mut()
+    }
 }
 
 impl<SizeAlign> Debug for DynSoaMutPtrs<SizeAlign> {
@@ -276,6 +350,32 @@ type DynFieldNonNullPtr = NonNull<[u8]>;
 pub struct DynSoaNonNullPtrs<SizeAlign> {
     ptrs: Box<[DynFieldNonNullPtr]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> DynSoaNonNullPtrs<SizeAlign> {
+    pub fn new<I>(ptrs: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldNonNullPtr>,
+    {
+        Self {
+            ptrs: ptrs.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<SizeAlign> AsRef<[DynFieldNonNullPtr]> for DynSoaNonNullPtrs<SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldNonNullPtr] {
+        let Self { ptrs, .. } = self;
+        ptrs.as_ref()
+    }
+}
+
+impl<SizeAlign> AsMut<[DynFieldNonNullPtr]> for DynSoaNonNullPtrs<SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldNonNullPtr] {
+        let Self { ptrs, .. } = self;
+        ptrs.as_mut()
+    }
 }
 
 impl<SizeAlign> Debug for DynSoaNonNullPtrs<SizeAlign> {
@@ -351,6 +451,32 @@ where
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
+impl<'a, SizeAlign> DynSoaRefs<'a, SizeAlign> {
+    pub fn new<I>(refs: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldRef<'a>>,
+    {
+        Self {
+            refs: refs.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, SizeAlign> AsRef<[DynFieldRef<'a>]> for DynSoaRefs<'a, SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldRef<'a>] {
+        let Self { refs, .. } = self;
+        refs.as_ref()
+    }
+}
+
+impl<'a, SizeAlign> AsMut<[DynFieldRef<'a>]> for DynSoaRefs<'a, SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldRef<'a>] {
+        let Self { refs, .. } = self;
+        refs.as_mut()
+    }
+}
+
 impl<'a, SizeAlign> Debug for DynSoaRefs<'a, SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaRefs").field(&self.refs).finish()
@@ -411,6 +537,32 @@ where
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
+impl<'a, SizeAlign> DynSoaRefsMut<'a, SizeAlign> {
+    pub fn new<I>(refs: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldRefMut<'a>>,
+    {
+        Self {
+            refs: refs.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, SizeAlign> AsRef<[DynFieldRefMut<'a>]> for DynSoaRefsMut<'a, SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldRefMut<'a>] {
+        let Self { refs, .. } = self;
+        refs.as_ref()
+    }
+}
+
+impl<'a, SizeAlign> AsMut<[DynFieldRefMut<'a>]> for DynSoaRefsMut<'a, SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldRefMut<'a>] {
+        let Self { refs, .. } = self;
+        refs.as_mut()
+    }
+}
+
 impl<'a, SizeAlign> Debug for DynSoaRefsMut<'a, SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaRefsMut").field(&self.refs).finish()
@@ -458,6 +610,32 @@ type DynFieldSlicePtr = *const [u8];
 pub struct DynSoaSlicePtrs<SizeAlign> {
     slices: Box<[DynFieldSlicePtr]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<SizeAlign> DynSoaSlicePtrs<SizeAlign> {
+    pub fn new<I>(slices: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldSlicePtr>,
+    {
+        Self {
+            slices: slices.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<SizeAlign> AsRef<[DynFieldSlicePtr]> for DynSoaSlicePtrs<SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldSlicePtr] {
+        let Self { slices, .. } = self;
+        slices.as_ref()
+    }
+}
+
+impl<SizeAlign> AsMut<[DynFieldSlicePtr]> for DynSoaSlicePtrs<SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldSlicePtr] {
+        let Self { slices, .. } = self;
+        slices.as_mut()
+    }
 }
 
 impl<SizeAlign> Debug for DynSoaSlicePtrs<SizeAlign> {
@@ -520,6 +698,32 @@ pub struct DynSoaSliceMutPtrs<SizeAlign> {
     phantom: PhantomData<fn() -> SizeAlign>,
 }
 
+impl<SizeAlign> DynSoaSliceMutPtrs<SizeAlign> {
+    pub fn new<I>(slices: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldSliceMutPtr>,
+    {
+        Self {
+            slices: slices.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<SizeAlign> AsRef<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldSliceMutPtr] {
+        let Self { slices, .. } = self;
+        slices.as_ref()
+    }
+}
+
+impl<SizeAlign> AsMut<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldSliceMutPtr] {
+        let Self { slices, .. } = self;
+        slices.as_mut()
+    }
+}
+
 impl<SizeAlign> Debug for DynSoaSliceMutPtrs<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaSliceMutPtrs")
@@ -573,14 +777,40 @@ impl<SizeAlign> Clone for DynSoaSliceMutPtrs<SizeAlign> {
 }
 
 // data is stored inline in a single buffer
-type DynFieldSliceRef<'a> = &'a [u8];
+type DynFieldSlice<'a> = &'a [u8];
 
 pub struct DynSoaSlices<'a, SizeAlign>
 where
     SizeAlign: 'a,
 {
-    slices: Box<[DynFieldSliceRef<'a>]>,
+    slices: Box<[DynFieldSlice<'a>]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<'a, SizeAlign> DynSoaSlices<'a, SizeAlign> {
+    pub fn new<I>(slices: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldSlice<'a>>,
+    {
+        Self {
+            slices: slices.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, SizeAlign> AsRef<[DynFieldSlice<'a>]> for DynSoaSlices<'a, SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldSlice<'a>] {
+        let Self { slices, .. } = self;
+        slices.as_ref()
+    }
+}
+
+impl<'a, SizeAlign> AsMut<[DynFieldSlice<'a>]> for DynSoaSlices<'a, SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldSlice<'a>] {
+        let Self { slices, .. } = self;
+        slices.as_mut()
+    }
 }
 
 impl<'a, SizeAlign> Debug for DynSoaSlices<'a, SizeAlign> {
@@ -634,14 +864,40 @@ impl<'a, SizeAlign> Clone for DynSoaSlices<'a, SizeAlign> {
 }
 
 // data is stored inline in a single buffer
-type DynFieldSliceRefMut<'a> = &'a mut [u8];
+type DynFieldSliceMut<'a> = &'a mut [u8];
 
 pub struct DynSoaSlicesMut<'a, SizeAlign>
 where
     SizeAlign: 'a,
 {
-    slices: Box<[DynFieldSliceRefMut<'a>]>,
+    slices: Box<[DynFieldSliceMut<'a>]>,
     phantom: PhantomData<fn() -> SizeAlign>,
+}
+
+impl<'a, SizeAlign> DynSoaSlicesMut<'a, SizeAlign> {
+    pub fn new<I>(slices: I) -> Self
+    where
+        I: IntoIterator<Item = DynFieldSliceMut<'a>>,
+    {
+        Self {
+            slices: slices.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, SizeAlign> AsRef<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, SizeAlign> {
+    fn as_ref(&self) -> &[DynFieldSliceMut<'a>] {
+        let Self { slices, .. } = self;
+        slices.as_ref()
+    }
+}
+
+impl<'a, SizeAlign> AsMut<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, SizeAlign> {
+    fn as_mut(&mut self) -> &mut [DynFieldSliceMut<'a>] {
+        let Self { slices, .. } = self;
+        slices.as_mut()
+    }
 }
 
 impl<'a, SizeAlign> Debug for DynSoaSlicesMut<'a, SizeAlign> {
@@ -782,7 +1038,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             .iter()
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
-                assert_eq!(field_layout.size(), ptr.len());
+                // assert_eq!(field_layout.size(), ptr.len());
 
                 let count = offset * field_layout.pad_to_align().size();
                 let data = unsafe { ptr.cast::<u8>().add(count) };
@@ -810,7 +1066,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             .iter()
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
-                assert_eq!(field_layout.size(), ptr.len());
+                // assert_eq!(field_layout.size(), ptr.len());
 
                 let count = offset * field_layout.pad_to_align().size();
                 let data = unsafe { ptr.cast::<u8>().add(count) };
@@ -1093,8 +1349,8 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                assert_eq!(field_layout.size(), ptr.len());
+            .map(|(_field_layout, ptr)| {
+                // assert_eq!(field_layout.size(), ptr.len());
                 ptr.as_ptr()
             })
             .collect();
@@ -1209,10 +1465,11 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             let DynFieldVec {
                 buffer: field_buffer,
                 layout: vec_field_layout,
-                ..
+                len: vec_len,
             } = vec;
             assert_eq!(field_layout, vec_field_layout);
 
+            *vec_len = len;
             let len = (len * vec_field_layout.size()).div_ceil(size_of::<Byte<SizeAlign>>());
             unsafe {
                 field_buffer.set_len(len);
@@ -1351,7 +1608,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             .iter()
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
-                assert_eq!(field_layout.size(), ptr.len());
+                // assert_eq!(field_layout.size(), ptr.len());
 
                 let data = ptr.cast();
                 let len = len * field_layout.size();

@@ -11,7 +11,7 @@ use core::{
     slice,
 };
 
-use crate::traits::{Soa, SoaToOwned};
+use crate::traits::Soa;
 
 type DynField = Box<[u8]>;
 
@@ -23,15 +23,6 @@ pub struct DynSoa<SizeAlign> {
 impl<SizeAlign> Debug for DynSoa<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoa").field(&self.fields).finish()
-    }
-}
-
-impl<SizeAlign> Clone for DynSoa<SizeAlign> {
-    fn clone(&self) -> Self {
-        Self {
-            fields: self.fields.clone(),
-            phantom: self.phantom.clone(),
-        }
     }
 }
 
@@ -387,26 +378,6 @@ impl<'a, SizeAlign> Clone for DynSoaRefs<'a, SizeAlign> {
         Self {
             refs: self.refs.clone(),
             phantom: self.phantom.clone(),
-        }
-    }
-}
-
-impl<'a, SizeAlign> SoaToOwned<'a> for DynSoaRefs<'a, SizeAlign> {
-    type Owned
-        = DynSoa<SizeAlign>
-    where
-        Self: 'a;
-
-    fn to_owned(&self) -> Self::Owned {
-        let Self { refs, .. } = self;
-
-        let fields = refs
-            .iter()
-            .map(|field| field.to_vec().into_boxed_slice())
-            .collect();
-        DynSoa {
-            fields,
-            phantom: PhantomData,
         }
     }
 }

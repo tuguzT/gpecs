@@ -152,7 +152,7 @@ fn new_dyn() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), vec.clone());
+    assert!(slice.to_owned().is_empty());
 
     let (context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, (vec![], vec![], vec![]));
@@ -322,7 +322,7 @@ fn with_capacity_dyn() {
     assert!(vec >= slice);
     assert!(slice <= vec);
 
-    assert_eq!(slice.to_owned(), vec.clone());
+    assert!(slice.to_owned().is_empty());
 
     let (context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, (vec![], vec![], vec![]));

@@ -137,7 +137,11 @@ pub unsafe trait Soa: Sized {
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self);
 
-    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs);
+    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs) {
+        let ptrs = Self::ptrs_cast_const(context, ptrs);
+        let value = unsafe { Self::ptrs_read(context, ptrs) };
+        drop(value);
+    }
 
     type NonNullPtrs: Clone;
 
@@ -246,7 +250,16 @@ pub unsafe trait Soa: Sized {
         slices: Self::SlicesMut<'_>,
     ) -> Self::MutPtrs;
 
-    unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs);
+    unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs) {
+        let len = Self::slice_ptrs_len_mut(context, slices.clone());
+        let ptrs = Self::mut_slice_ptrs_as_ptrs(context, slices);
+        for index in 0..len {
+            unsafe {
+                let ptrs = Self::ptrs_add_mut(context, ptrs.clone(), index);
+                Self::ptrs_drop_in_place(context, ptrs);
+            }
+        }
+    }
 }
 
 pub trait SoaToOwned<'a> {

@@ -1310,14 +1310,6 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         }
     }
 
-    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs) {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
-
-        assert_eq!(field_layouts.len(), ptrs.len());
-        // TODO: call drop function pointers (when they are added in context)
-    }
-
     type NonNullPtrs = DynSoaNonNullPtrs<SizeAlign>;
 
     unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
@@ -1978,13 +1970,5 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             ptrs,
             phantom: PhantomData,
         }
-    }
-
-    unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs) {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSliceMutPtrs { slices, .. } = slices;
-
-        assert_eq!(field_layouts.len(), slices.len());
-        // TODO: call drop function pointers on all the fields (when they are added in context)
     }
 }

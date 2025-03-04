@@ -439,7 +439,7 @@ fn one_item() {
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), Some((&1, &2, &3)));
 
-    let (t, u, v) = vec.pop().expect("multi vector should not be empty");
+    let (t, u, v) = vec.pop().expect("vector should not be empty");
     assert_eq!((t, u, v), (1, 2, 3));
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
@@ -569,7 +569,7 @@ fn one_item_zst() {
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
-    let (t, u, v) = vec.pop().expect("multi vector should not be empty");
+    let (t, u, v) = vec.pop().expect("vector should not be empty");
     assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
@@ -710,7 +710,7 @@ fn one_item_dyn() {
     assert_eq!(iter.next_back(), Some(refs.clone()));
     assert_eq!(iter.next(), None);
 
-    let value = vec.pop().expect("multi vector should not be empty");
+    let value = vec.pop().expect("vector should not be empty");
     assert_eq!(value, DynSoa::new(fields));
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
@@ -926,7 +926,7 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let (t, u, v) = vec.pop().expect("multi vector should not be empty");
+    let (t, u, v) = vec.pop().expect("vector should not be empty");
     assert_eq!((t, u, v), (2, "2".to_owned(), 3));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
@@ -1235,7 +1235,7 @@ fn three_items_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let (t, u, v) = vec.pop().expect("multi vector should not be empty");
+    let (t, u, v) = vec.pop().expect("vector should not be empty");
     assert_eq!((t, u, v), (ZST1, ZST2(()), ZST3 { empty: () }));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
@@ -1614,38 +1614,186 @@ fn three_items_dyn() {
     let (context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, ..);
 
-    let vec = Vec::from_vecs(context, vecs);
+    let mut vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
     assert_eq!(vec.as_slices(), slices.clone());
 
+    for mut refs in &mut vec {
+        let [_, u64_bytes, u16_bytes] = refs.as_mut() else {
+            panic!("expected 3 fields");
+        };
+        assert_eq!(u64_bytes.len(), 8);
+
+        let u64 = unsafe { &mut *u64_bytes.as_mut_ptr().cast::<u64>() };
+        let u16 = unsafe { &*u16_bytes.as_mut_ptr().cast::<u16>() };
+        *u64 += u64::from(*u16);
+    }
+
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 3);
 
+    let i5_plus_6 = 11_u64;
+    let i5_plus_6_bytes = unsafe {
+        let data = ptr::from_ref(&i5_plus_6).cast();
+        let len = size_of_val(&i5_plus_6);
+        slice::from_raw_parts(data, len)
+    };
     assert_eq!(
         iter.next(),
-        Some(DynSoaRefs::new([i4_bytes, i5_bytes, i6_bytes])),
+        Some(DynSoaRefs::new([i4_bytes, i5_plus_6_bytes, i6_bytes])),
     );
     assert_eq!(iter.len(), 2);
 
+    let i2_plus_3 = 5_u64;
+    let i2_plus_3_bytes = unsafe {
+        let data = ptr::from_ref(&i2_plus_3).cast();
+        let len = size_of_val(&i2_plus_3);
+        slice::from_raw_parts(data, len)
+    };
     assert_eq!(
         iter.next_back(),
-        Some(DynSoaRefs::new([i1_bytes, i2_bytes, i3_bytes])),
+        Some(DynSoaRefs::new([i1_bytes, i2_plus_3_bytes, i3_bytes])),
     );
     assert_eq!(iter.len(), 1);
 
+    let i8_plus_9 = 17_u64;
+    let i8_plus_9_bytes = unsafe {
+        let data = ptr::from_ref(&i8_plus_9).cast();
+        let len = size_of_val(&i8_plus_9);
+        slice::from_raw_parts(data, len)
+    };
     assert_eq!(
         iter.next(),
-        Some(DynSoaRefs::new([i7_bytes, i8_bytes, i9_bytes])),
+        Some(DynSoaRefs::new([i7_bytes, i8_plus_9_bytes, i9_bytes])),
     );
     assert_eq!(iter.len(), 0);
 
     assert_eq!(iter.next_back(), None);
 
-    let mut _vec = {
+    let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
+
+    vec.push(DynSoa::new([
+        (i7_bytes, field_layouts[0]),
+        (i8_plus_9_bytes, field_layouts[1]),
+        (i9_bytes, field_layouts[2]),
+    ]));
+    vec.push(DynSoa::new([
+        (i1_bytes, field_layouts[0]),
+        (i2_plus_3_bytes, field_layouts[1]),
+        (i3_bytes, field_layouts[2]),
+    ]));
+    assert_eq!(vec.len(), 5);
+    assert!(vec.capacity() >= 5);
+
+    assert_eq!(
+        vec.get(0),
+        Some(DynSoaRefs::new([i4_bytes, i5_plus_6_bytes, i6_bytes])),
+    );
+    assert_eq!(
+        vec.get(1),
+        Some(DynSoaRefs::new([i7_bytes, i8_plus_9_bytes, i9_bytes])),
+    );
+    assert_eq!(
+        vec.get(2),
+        Some(DynSoaRefs::new([i1_bytes, i2_plus_3_bytes, i3_bytes])),
+    );
+    assert_eq!(
+        vec.get(3),
+        Some(DynSoaRefs::new([i7_bytes, i8_plus_9_bytes, i9_bytes])),
+    );
+    assert_eq!(
+        vec.get(4),
+        Some(DynSoaRefs::new([i1_bytes, i2_plus_3_bytes, i3_bytes])),
+    );
+
+    {
+        let mut drain = vec.drain(2..4);
+        assert_eq!(drain.len(), 2);
+
+        assert_eq!(
+            drain.next_back(),
+            Some(DynSoa::new([
+                (i7_bytes, field_layouts[0]),
+                (i8_plus_9_bytes, field_layouts[1]),
+                (i9_bytes, field_layouts[2]),
+            ])),
+        );
+        assert_eq!(drain.len(), 1);
+
+        assert_eq!(
+            drain.next(),
+            Some(DynSoa::new([
+                (i1_bytes, field_layouts[0]),
+                (i2_plus_3_bytes, field_layouts[1]),
+                (i3_bytes, field_layouts[2]),
+            ])),
+        );
+        assert_eq!(drain.len(), 0);
+
+        assert_eq!(drain.next(), None);
+        assert_eq!(drain.next_back(), None);
+    }
+
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 5);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let value = vec.swap_remove(1);
+    assert_eq!(
+        value,
+        DynSoa::new([
+            (i7_bytes, field_layouts[0]),
+            (i8_plus_9_bytes, field_layouts[1]),
+            (i9_bytes, field_layouts[2]),
+        ]),
+    );
+    assert_eq!(vec.len(), 2);
+    assert!(vec.capacity() >= 3);
+    assert!(!vec.contains_by_refs(DynSoaRefs::new([i7_bytes, i8_plus_9_bytes, i9_bytes])));
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let value = vec.pop().expect("vector should not be empty");
+    assert_eq!(
+        value,
+        DynSoa::new([
+            (i1_bytes, field_layouts[0]),
+            (i2_plus_3_bytes, field_layouts[1]),
+            (i3_bytes, field_layouts[2]),
+        ]),
+    );
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 3);
+    assert!(!vec.contains_by_refs(DynSoaRefs::new([i1_bytes, i2_plus_3_bytes, i3_bytes])));
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let value = vec.remove(0);
+    assert_eq!(
+        value,
+        DynSoa::new([
+            (i4_bytes, field_layouts[0]),
+            (i5_plus_6_bytes, field_layouts[1]),
+            (i6_bytes, field_layouts[2]),
+        ]),
+    );
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 3);
+    assert!(!vec.contains_by_refs(DynSoaRefs::new([i4_bytes, i5_plus_6_bytes, i6_bytes])));
 
     // TODO: more tests
 }

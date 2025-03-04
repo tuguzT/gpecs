@@ -1624,6 +1624,7 @@ fn three_items_dyn() {
             panic!("expected 3 fields");
         };
         assert_eq!(u64_bytes.len(), 8);
+        assert_eq!(u16_bytes.len(), 2);
 
         let u64 = unsafe { &mut *u64_bytes.as_mut_ptr().cast::<u64>() };
         let u16 = unsafe { &*u16_bytes.as_mut_ptr().cast::<u16>() };
@@ -1795,5 +1796,134 @@ fn three_items_dyn() {
     assert!(vec.capacity() >= 3);
     assert!(!vec.contains_by_refs(DynSoaRefs::new([i4_bytes, i5_plus_6_bytes, i6_bytes])));
 
-    // TODO: more tests
+    let fields = [
+        (i0_u8_bytes, field_layouts[0]),
+        (i0_u64_bytes, field_layouts[1]),
+        (i0_u16_bytes, field_layouts[2]),
+    ];
+    vec.extend(iter::repeat_with(|| DynSoa::new(fields)).take(3));
+    vec.reserve(1);
+    assert!(vec.capacity() >= 4);
+    vec.reserve_exact(6);
+    assert!(vec.capacity() >= 9);
+
+    vec.shrink_to(6);
+    assert!(vec.capacity() >= 6);
+    vec.shrink_to(0);
+    assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    vec.truncate(1);
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 3);
+
+    vec.clear();
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let fields = [
+        (i1_bytes, field_layouts[0]),
+        (i2_bytes, field_layouts[1]),
+        (i3_bytes, field_layouts[2]),
+    ];
+    vec.push(DynSoa::new(fields));
+    for _ in 0..10 {
+        let fields = [
+            (i4_bytes, field_layouts[0]),
+            (i5_bytes, field_layouts[1]),
+            (i6_bytes, field_layouts[2]),
+        ];
+        vec.push(DynSoa::new(fields));
+
+        let fields = [
+            (i7_bytes, field_layouts[0]),
+            (i8_bytes, field_layouts[1]),
+            (i9_bytes, field_layouts[2]),
+        ];
+        vec.push(DynSoa::new(fields));
+    }
+    vec.retain_mut(|mut refs| {
+        let [x, _, _] = refs.as_mut() else {
+            panic!("expected 3 fields");
+        };
+        assert_eq!(x.len(), 1);
+
+        let x = unsafe { &mut *x.as_mut_ptr().cast::<u8>() };
+        if *x <= 3 {
+            *x += 1;
+            true
+        } else {
+            false
+        }
+    });
+
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= (1 + 2 * 10));
+
+    let i2_u8 = 2_u8;
+    let i2_u8_bytes = unsafe {
+        let data = ptr::from_ref(&i2_u8).cast();
+        let len = size_of_val(&i2_u8);
+        slice::from_raw_parts(data, len)
+    };
+    assert_eq!(
+        vec.as_slices(),
+        DynSoaSlices::new([i2_u8_bytes, i2_bytes, i3_bytes]),
+    );
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let boxed_slice = vec.into_boxed_slice();
+    assert_eq!(boxed_slice.len(), 1);
+    assert!(boxed_slice.capacity() >= 1);
+    assert_eq!(
+        boxed_slice.get(0),
+        Some(DynSoaRefs::new([i2_u8_bytes, i2_bytes, i3_bytes])),
+    );
+
+    let vec = boxed_slice.into_vec();
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 1);
+    assert_eq!(
+        vec.get(0),
+        Some(DynSoaRefs::new([i2_u8_bytes, i2_bytes, i3_bytes])),
+    );
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let boxed_slice = vec.into_boxed_slice();
+    assert_eq!(boxed_slice.len(), 1);
+    assert!(boxed_slice.capacity() >= 1);
+    assert_eq!(
+        boxed_slice.get(0),
+        Some(DynSoaRefs::new([i2_u8_bytes, i2_bytes, i3_bytes])),
+    );
+
+    let mut into_iter = boxed_slice.into_iter();
+    assert_eq!(into_iter.len(), 1);
+    assert_eq!(
+        into_iter.next_back(),
+        Some(DynSoa::new([
+            (i2_u8_bytes, field_layouts[0]),
+            (i2_bytes, field_layouts[1]),
+            (i3_bytes, field_layouts[2]),
+        ])),
+    );
+    assert_eq!(into_iter.next(), None);
+    assert_eq!(into_iter.next_back(), None);
 }

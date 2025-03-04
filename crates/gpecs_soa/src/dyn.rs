@@ -5,24 +5,30 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    iter,
     marker::PhantomData,
+    mem::{ManuallyDrop, MaybeUninit},
     ptr::{self, NonNull},
     slice,
 };
 
 use crate::traits::Soa;
 
-type DynField = Box<[u8]>;
+union Byte<SizeAlign> {
+    _byte: u8,
+    _size_align: ManuallyDrop<MaybeUninit<SizeAlign>>,
+}
+
+type DynFields<SizeAlign> = Box<Byte<SizeAlign>>;
 
 pub struct DynSoa<SizeAlign> {
-    fields: Box<[DynField]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    field_buffer: DynFields<SizeAlign>,
+    field_layouts: Box<[Layout]>,
 }
 
 impl<SizeAlign> Debug for DynSoa<SizeAlign> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoa").field(&self.fields).finish()
+        let _ = f;
+        todo!("debug field regions (byte slices)")
     }
 }
 
@@ -265,61 +271,14 @@ impl<SizeAlign> Clone for DynSoaNonNullPtrs<SizeAlign> {
 }
 
 // data is stored inline in a single buffer
-type DynFieldVec = Vec<u8>;
+struct DynFieldVec<SizeAlign> {
+    buffer: Vec<Byte<SizeAlign>>,
+    layout: Layout,
+    len: usize,
+}
 
 pub struct DynSoaVecs<SizeAlign> {
-    vecs: Box<[DynFieldVec]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
-}
-
-impl<SizeAlign> Debug for DynSoaVecs<SizeAlign> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaVecs").field(&self.vecs).finish()
-    }
-}
-
-impl<SizeAlign> PartialEq for DynSoaVecs<SizeAlign> {
-    fn eq(&self, other: &Self) -> bool {
-        self.vecs == other.vecs && self.phantom == other.phantom
-    }
-}
-
-impl<SizeAlign> Eq for DynSoaVecs<SizeAlign> {}
-
-impl<SizeAlign> PartialOrd for DynSoaVecs<SizeAlign> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.vecs.partial_cmp(&other.vecs) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.phantom.partial_cmp(&other.phantom)
-    }
-}
-
-impl<SizeAlign> Ord for DynSoaVecs<SizeAlign> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.vecs.cmp(&other.vecs) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        self.phantom.cmp(&other.phantom)
-    }
-}
-
-impl<SizeAlign> Hash for DynSoaVecs<SizeAlign> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.vecs.hash(state);
-        self.phantom.hash(state);
-    }
-}
-
-impl<SizeAlign> Clone for DynSoaVecs<SizeAlign> {
-    fn clone(&self) -> Self {
-        Self {
-            vecs: self.vecs.clone(),
-            phantom: self.phantom.clone(),
-        }
-    }
+    vecs: Box<[DynFieldVec<SizeAlign>]>,
 }
 
 type DynFieldRef<'a> = &'a [u8];
@@ -997,43 +956,50 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
 
         assert_eq!(field_layouts.len(), src.len());
 
-        let fields = field_layouts
-            .iter()
-            .zip(src)
-            .map(|(field_layout, ptr)| {
-                assert_eq!(field_layout.size(), ptr.len());
+        // let fields = field_layouts
+        //     .iter()
+        //     .zip(src)
+        //     .map(|(field_layout, ptr)| {
+        //         assert_eq!(field_layout.size(), ptr.len());
 
-                let len = ptr.len();
-                let mut field = Box::new_uninit_slice(len);
-                unsafe {
-                    ptr::copy_nonoverlapping(ptr.cast(), field.as_mut_ptr(), len);
-                    field.assume_init()
-                }
-            })
-            .collect();
-        Self {
-            fields,
-            phantom: PhantomData,
-        }
+        //         let len = ptr.len();
+        //         let mut field = Box::new_uninit_slice(len);
+        //         unsafe {
+        //             ptr::copy_nonoverlapping(ptr.cast(), field.as_mut_ptr(), len);
+        //             field.assume_init()
+        //         }
+        //     })
+        //     .collect();
+        // Self {
+        //     fields,
+        //     phantom: PhantomData,
+        // }
+        todo!()
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
         let DynSoaContext { field_layouts, .. } = context;
         let DynSoaMutPtrs { ptrs: dst, .. } = dst;
-        let Self { fields, .. } = value;
+        let Self {
+            field_buffer,
+            field_layouts: value_field_layouts,
+        } = value;
 
         assert_eq!(field_layouts.len(), dst.len());
-        assert_eq!(dst.len(), fields.len());
+        assert_eq!(field_layouts.as_ref(), value_field_layouts.as_ref());
+        // assert_eq!(dst.len(), fields.len());
+        let _ = field_buffer;
 
-        for ((field_layout, dst), field) in field_layouts.iter().zip(dst).zip(fields) {
-            assert_eq!(field_layout.size(), dst.len());
-            assert_eq!(dst.len(), field.len());
+        // for ((field_layout, dst), field) in field_layouts.iter().zip(dst).zip(fields) {
+        //     assert_eq!(field_layout.size(), dst.len());
+        //     assert_eq!(dst.len(), field.len());
 
-            let len = field_layout.size();
-            unsafe {
-                ptr::copy_nonoverlapping(field.as_ptr(), dst.cast(), len);
-            }
-        }
+        //     let len = field_layout.size();
+        //     unsafe {
+        //         ptr::copy_nonoverlapping(field.as_ptr(), dst.cast(), len);
+        //     }
+        // }
+        todo!()
     }
 
     unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs) {
@@ -1091,11 +1057,20 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
     fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
         let DynSoaContext { field_layouts, .. } = context;
 
-        let vecs = iter::repeat_n(Vec::with_capacity(capacity), field_layouts.len()).collect();
-        DynSoaVecs {
-            vecs,
-            phantom: PhantomData,
-        }
+        // let vecs = iter::repeat_n(Vec::with_capacity(capacity), field_layouts.len()).collect();
+        let vecs = field_layouts
+            .iter()
+            .map(|field_layout| {
+                let capacity =
+                    (capacity * field_layout.size()).div_ceil(size_of::<Byte<SizeAlign>>());
+                DynFieldVec {
+                    buffer: Vec::with_capacity(capacity),
+                    layout: field_layout.clone(),
+                    len: 0,
+                }
+            })
+            .collect();
+        DynSoaVecs { vecs }
     }
 
     fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
@@ -1108,8 +1083,15 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             .iter()
             .zip(vecs)
             .map(|(field_layout, vec)| {
-                assert_eq!(vec.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                ptr::from_ref(vec.as_slice())
+                let DynFieldVec {
+                    buffer,
+                    layout: vec_field_layout,
+                    ..
+                } = vec;
+                assert_eq!(field_layout, vec_field_layout);
+
+                let data = buffer.as_ptr().cast();
+                ptr::slice_from_raw_parts(data, field_layout.size())
             })
             .collect();
         DynSoaPtrs {
@@ -1128,8 +1110,15 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             .iter()
             .zip(vecs)
             .map(|(field_layout, vec)| {
-                assert_eq!(vec.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                ptr::from_mut(vec.as_mut_slice())
+                let DynFieldVec {
+                    buffer,
+                    layout: vec_field_layout,
+                    ..
+                } = vec;
+                assert_eq!(field_layout, vec_field_layout);
+
+                let data = buffer.as_mut_ptr().cast();
+                ptr::slice_from_raw_parts_mut(data, field_layout.size())
             })
             .collect();
         DynSoaMutPtrs {
@@ -1144,7 +1133,15 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
 
         assert_eq!(field_layouts.len(), vecs.len());
 
-        let mut lens = vecs.iter().map(Vec::len);
+        let mut lens = field_layouts.iter().zip(vecs).map(|(field_layout, vec)| {
+            let DynFieldVec {
+                layout: vec_field_layout,
+                len,
+                ..
+            } = vec;
+            assert_eq!(field_layout, vec_field_layout);
+            *len
+        });
         let len = lens.next().unwrap_or(0);
         assert!(lens.all(|item| item == len));
         len
@@ -1156,9 +1153,17 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
 
         assert_eq!(field_layouts.len(), vecs.len());
 
-        for vec in vecs {
+        for (field_layout, vec) in field_layouts.iter().zip(vecs) {
+            let DynFieldVec {
+                buffer: field_buffer,
+                layout: vec_field_layout,
+                ..
+            } = vec;
+            assert_eq!(field_layout, vec_field_layout);
+
+            let len = (len * vec_field_layout.size()).div_ceil(size_of::<Byte<SizeAlign>>());
             unsafe {
-                vec.set_len(len);
+                field_buffer.set_len(len);
             }
         }
     }

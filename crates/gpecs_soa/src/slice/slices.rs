@@ -6,7 +6,7 @@ use core::{
     ops::{Index, IndexMut},
 };
 
-use alloc::vec::Vec;
+use alloc::boxed::Box;
 
 use crate::{
     ptr::is_zst,
@@ -889,7 +889,7 @@ where
             return;
         }
 
-        let mut permutation: Vec<_> = (0..len).collect();
+        let mut permutation: Box<_> = (0..len).collect();
         f(self.context(), &mut permutation);
 
         for src in 0..len {

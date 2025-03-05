@@ -2,7 +2,7 @@ use std::alloc::Layout;
 
 use gpecs_soa::{
     prelude::*,
-    r#dyn::{DynSoa, DynSoaContext},
+    r#dyn::{DynSoa, DynSoaContext, DynSoaRefs},
     slice::{Iter as SoaIter, IterMut as SoaIterMut},
     vec::IntoIter as SoaIntoIter,
 };
@@ -125,4 +125,8 @@ fn dyn_value() {
 
     let value = unsafe { dyn_value.into::<(u32, u16, u8)>(&context) };
     assert_eq!(value, (i1, i2, i3));
+
+    let refs = (&i1, &i2, &i3);
+    let refs = DynSoaRefs::from::<(u32, u16, u8)>(&context, refs);
+    assert_eq!(refs.as_ref(), [i3_bytes, i2_bytes, i1_bytes]);
 }

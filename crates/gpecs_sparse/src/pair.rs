@@ -107,6 +107,58 @@ where
     }
 
     #[inline]
+    fn ptrs_erase(
+        context: &Self::Context,
+        ptrs: Self::Ptrs,
+    ) -> impl IntoIterator<Item = *const u8> {
+        let KeyValuePtrs { key, value } = ptrs;
+        iter::once(key.cast()).chain(V::ptrs_erase(context, value))
+    }
+
+    #[inline]
+    fn ptrs_erase_mut(
+        context: &Self::Context,
+        ptrs: Self::MutPtrs,
+    ) -> impl IntoIterator<Item = *mut u8> {
+        let KeyValueMutPtrs { key, value } = ptrs;
+        iter::once(key.cast()).chain(V::ptrs_erase_mut(context, value))
+    }
+
+    #[inline]
+    #[track_caller]
+    fn ptrs_restore(
+        context: &Self::Context,
+        ptrs: impl IntoIterator<Item = *const u8>,
+    ) -> Self::Ptrs {
+        let mut ptrs = ptrs.into_iter();
+        let key = ptrs
+            .next()
+            .expect("iterator should have at least one element");
+
+        KeyValuePtrs {
+            key: key.cast(),
+            value: V::ptrs_restore(context, ptrs),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    fn ptrs_restore_mut(
+        context: &Self::Context,
+        ptrs: impl IntoIterator<Item = *mut u8>,
+    ) -> Self::MutPtrs {
+        let mut ptrs = ptrs.into_iter();
+        let key = ptrs
+            .next()
+            .expect("iterator should have at least one element");
+
+        KeyValueMutPtrs {
+            key: key.cast(),
+            value: V::ptrs_restore_mut(context, ptrs),
+        }
+    }
+
+    #[inline]
     fn ptrs_cast_const(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs {
         let KeyValueMutPtrs { key, value } = ptrs;
         KeyValuePtrs {

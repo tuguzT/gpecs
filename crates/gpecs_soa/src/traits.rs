@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     alloc::{Layout, LayoutError},
     array,
@@ -51,7 +51,7 @@ pub unsafe trait Soa: Sized {
                 (layout, offset) = layout.extend(repeated)?;
                 Ok(offset)
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Box<[_]>, _>>()?;
 
         Ok((layout, offsets))
     }
@@ -93,6 +93,24 @@ pub unsafe trait Soa: Sized {
     ) -> Self::MutPtrs;
 
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs;
+
+    fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs)
+        -> impl IntoIterator<Item = *const u8>;
+
+    fn ptrs_erase_mut(
+        context: &Self::Context,
+        ptrs: Self::MutPtrs,
+    ) -> impl IntoIterator<Item = *mut u8>;
+
+    fn ptrs_restore(
+        context: &Self::Context,
+        ptrs: impl IntoIterator<Item = *const u8>,
+    ) -> Self::Ptrs;
+
+    fn ptrs_restore_mut(
+        context: &Self::Context,
+        ptrs: impl IntoIterator<Item = *mut u8>,
+    ) -> Self::MutPtrs;
 
     fn ptrs_cast_const(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs;
     fn ptrs_cast_mut(context: &Self::Context, ptrs: Self::Ptrs) -> Self::MutPtrs;
@@ -353,6 +371,33 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {
         ptr::dangling_mut()
+    }
+
+    #[inline(always)]
+    fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> impl IntoIterator<Item = *const u8> {
+        Some(ptrs.cast())
+    }
+
+    #[inline(always)]
+    fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> impl IntoIterator<Item = *mut u8> {
+        Some(ptrs.cast())
+    }
+
+    #[track_caller]
+    #[inline(always)]
+    fn ptrs_restore(_: &Self::Context, ptrs: impl IntoIterator<Item = *const u8>) -> Self::Ptrs {
+        let ptrs: [*const u8; 1] = collect_array(ptrs);
+        ptrs[0].cast()
+    }
+
+    #[track_caller]
+    #[inline(always)]
+    fn ptrs_restore_mut(
+        _: &Self::Context,
+        ptrs: impl IntoIterator<Item = *mut u8>,
+    ) -> Self::MutPtrs {
+        let ptrs: [*mut u8; 1] = collect_array(ptrs);
+        ptrs[0].cast()
     }
 
     #[inline(always)]
@@ -763,6 +808,28 @@ macro_rules! soa_impl {
             #[inline(always)]
             fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {
                 ($(ptr::dangling_mut::<$types>(),)*)
+            }
+
+            #[inline(always)]
+            fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> impl IntoIterator<Item = *const u8> {
+                [$(ptrs.$indices.cast(),)*]
+            }
+
+            #[inline(always)]
+            fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> impl IntoIterator<Item = *mut u8> {
+                [$(ptrs.$indices.cast(),)*]
+            }
+
+            #[inline(always)]
+            fn ptrs_restore(_: &Self::Context, ptrs: impl IntoIterator<Item = *const u8>) -> Self::Ptrs {
+                let ptrs: [*const u8; count_idents!($($types,)*)] = collect_array(ptrs);
+                ($(ptrs[$indices].cast(),)*)
+            }
+
+            #[inline(always)]
+            fn ptrs_restore_mut(_: &Self::Context, ptrs: impl IntoIterator<Item = *mut u8>) -> Self::MutPtrs {
+                let ptrs: [*mut u8; count_idents!($($types,)*)] = collect_array(ptrs);
+                ($(ptrs[$indices].cast(),)*)
             }
 
             #[inline(always)]

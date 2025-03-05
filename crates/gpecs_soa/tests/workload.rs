@@ -141,12 +141,18 @@ fn new_dyn() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    assert_eq!(format!("{vec:?}"), "SoaVec(DynSoaSlices([[], [], []]))");
+    assert_eq!(
+        format!("{vec:?}"),
+        "SoaVec(DynSoaSlices { len: 0, slices: [[], [], []] })",
+    );
 
     let slice = vec.as_slice();
     assert!(slice.is_empty());
 
-    assert_eq!(format!("{slice:?}"), "SoaSlice(DynSoaSlices([[], [], []]))");
+    assert_eq!(
+        format!("{slice:?}"),
+        "SoaSlice(DynSoaSlices { len: 0, slices: [[], [], []] })",
+    );
 
     assert_eq!(vec, slice);
     assert!(vec >= slice);
@@ -179,7 +185,7 @@ fn new_dyn() {
 
     assert_eq!(
         format!("{into_iter:?}"),
-        "IntoIter(DynSoaSlices([[], [], []]))",
+        "IntoIter(DynSoaSlices { len: 0, slices: [[], [], []] })",
     );
 }
 
@@ -310,13 +316,19 @@ fn with_capacity_dyn() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    assert_eq!(format!("{vec:?}"), "SoaVec(DynSoaSlices([[], [], []]))");
+    assert_eq!(
+        format!("{vec:?}"),
+        "SoaVec(DynSoaSlices { len: 0, slices: [[], [], []] })",
+    );
 
     let slice = vec.as_slice();
     assert!(slice.is_empty());
     assert!(slice.capacity() >= 10);
 
-    assert_eq!(format!("{slice:?}"), "SoaSlice(DynSoaSlices([[], [], []]))");
+    assert_eq!(
+        format!("{slice:?}"),
+        "SoaSlice(DynSoaSlices { len: 0, slices: [[], [], []] })",
+    );
 
     assert_eq!(vec, slice);
     assert!(vec >= slice);
@@ -349,7 +361,7 @@ fn with_capacity_dyn() {
 
     assert_eq!(
         format!("{into_iter:?}"),
-        "IntoIter(DynSoaSlices([[], [], []]))",
+        "IntoIter(DynSoaSlices { len: 0, slices: [[], [], []] })",
     );
 }
 
@@ -658,18 +670,18 @@ fn one_item_dyn() {
 
     assert_eq!(
         format!("{vec:?}"),
-        format!("SoaVec(DynSoaSlices([{u8_bytes:?}, {u16_bytes:?}, {u64_bytes:?}]))"),
+        format!("SoaVec(DynSoaSlices {{ len: 1, slices: [{u8_bytes:?}, {u16_bytes:?}, {u64_bytes:?}] }})"),
     );
 
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 1);
     assert!(slice.capacity() >= 1);
-    assert_eq!(slice.as_slices(), DynSoaSlices::new(fields));
+    assert_eq!(slice.as_slices(), DynSoaSlices::new(1, fields));
     assert_eq!(slice.get(0), Some(refs.clone()));
 
     assert_eq!(
         format!("{slice:?}"),
-        format!("SoaSlice(DynSoaSlices([{u8_bytes:?}, {u16_bytes:?}, {u64_bytes:?}]))"),
+        format!("SoaSlice(DynSoaSlices {{ len: 1, slices: [{u8_bytes:?}, {u16_bytes:?}, {u64_bytes:?}] }})"),
     );
 
     assert_eq!(vec, slice);
@@ -684,7 +696,7 @@ fn one_item_dyn() {
     let mut vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
-    assert_eq!(vec.as_slices(), DynSoaSlices::new(fields));
+    assert_eq!(vec.as_slices(), DynSoaSlices::new(1, fields));
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -703,7 +715,7 @@ fn one_item_dyn() {
 
     assert_eq!(
         format!("{vec:?}"),
-        format!("SoaVec(DynSoaSlices([[], [], []]))"),
+        format!("SoaVec(DynSoaSlices {{ len: 0, slices: [[], [], []] }})"),
     );
 
     let boxed_slice = vec.into_boxed_slice();
@@ -1425,11 +1437,11 @@ fn three_items_dyn() {
 
     assert_eq!(
         vec.as_slices(),
-        DynSoaSlices::new([i0_u8s_bytes, i0_u64s_bytes, i0_u16s_bytes]),
+        DynSoaSlices::new(3, [i0_u8s_bytes, i0_u64s_bytes, i0_u16s_bytes]),
     );
     assert_eq!(
         format!("{vec:?}"),
-        format!("SoaVec(DynSoaSlices([{i0_u8s_bytes:?}, {i0_u64s_bytes:?}, {i0_u16s_bytes:?}]))"),
+        format!("SoaVec(DynSoaSlices {{ len: 3, slices: [{i0_u8s_bytes:?}, {i0_u64s_bytes:?}, {i0_u16s_bytes:?}] }})"),
     );
 
     vec.truncate(0);
@@ -1504,11 +1516,11 @@ fn three_items_dyn() {
 
     assert_eq!(
         vec.as_slices(),
-        DynSoaSlices::new([i471_bytes, i582_bytes, i693_bytes]),
+        DynSoaSlices::new(3, [i471_bytes, i582_bytes, i693_bytes]),
     );
     assert_eq!(
         format!("{vec:?}"),
-        format!("SoaVec(DynSoaSlices([{i471_bytes:?}, {i582_bytes:?}, {i693_bytes:?}]))"),
+        format!("SoaVec(DynSoaSlices {{ len: 3, slices: [{i471_bytes:?}, {i582_bytes:?}, {i693_bytes:?}] }})"),
     );
 
     let vec = {
@@ -1520,7 +1532,7 @@ fn three_items_dyn() {
     assert_eq!(slice.len(), 3);
     assert!(slice.capacity() >= 3);
 
-    let slices = DynSoaSlices::new([i471_bytes, i582_bytes, i693_bytes]);
+    let slices = DynSoaSlices::new(3, [i471_bytes, i582_bytes, i693_bytes]);
     assert_eq!(slice.as_slices(), slices.clone());
 
     assert_eq!(
@@ -1548,7 +1560,7 @@ fn three_items_dyn() {
 
     assert_eq!(
         format!("{slice:?}"),
-        format!("SoaSlice(DynSoaSlices([{i471_bytes:?}, {i582_bytes:?}, {i693_bytes:?}]))"),
+        format!("SoaSlice(DynSoaSlices {{ len: 3, slices: [{i471_bytes:?}, {i582_bytes:?}, {i693_bytes:?}] }})"),
     );
 
     assert_eq!(vec, slice);
@@ -1826,7 +1838,7 @@ fn three_items_dyn() {
     let i2_u8_bytes = i2_u8_bytes.as_slice();
     assert_eq!(
         vec.as_slices(),
-        DynSoaSlices::new([i2_u8_bytes, i2_bytes, i3_bytes]),
+        DynSoaSlices::new(1, [i2_u8_bytes, i2_bytes, i3_bytes]),
     );
 
     let vec = {

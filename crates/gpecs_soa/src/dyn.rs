@@ -724,10 +724,10 @@ impl<Fields> Clone for DynSoaNonNullPtrs<Fields> {
 struct DynFieldVec<Fields> {
     buffer: Vec<Byte<Fields>>,
     layout: Layout,
-    len: usize,
 }
 
 pub struct DynSoaVecs<Fields> {
+    len: usize,
     vecs: Box<[DynFieldVec<Fields>]>,
 }
 
@@ -998,16 +998,19 @@ unsafe impl<'a, Fields> Sync for DynSoaRefsMut<'a, Fields> where Fields: Sync {}
 type DynFieldSlicePtr = *const [u8];
 
 pub struct DynSoaSlicePtrs<Fields> {
+    len: usize,
     slices: Box<[DynFieldSlicePtr]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<Fields> DynSoaSlicePtrs<Fields> {
-    pub fn new<I>(slices: I) -> Self
+    pub fn new<I>(len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSlicePtr>,
     {
+        // TODO: pass context and make length checks
         Self {
+            len,
             slices: slices.into_iter().collect(),
             phantom: PhantomData,
         }
@@ -1030,15 +1033,16 @@ impl<Fields> AsMut<[DynFieldSlicePtr]> for DynSoaSlicePtrs<Fields> {
 
 impl<Fields> Debug for DynSoaSlicePtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaSlicePtrs")
-            .field(&self.slices)
+        f.debug_struct("DynSoaSlicePtrs")
+            .field("len", &self.len)
+            .field("slices", &self.slices)
             .finish()
     }
 }
 
 impl<Fields> PartialEq for DynSoaSlicePtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
-        self.slices == other.slices && self.phantom == other.phantom
+        self.len == other.len && self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
@@ -1046,6 +1050,10 @@ impl<Fields> Eq for DynSoaSlicePtrs<Fields> {}
 
 impl<Fields> PartialOrd for DynSoaSlicePtrs<Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.len.partial_cmp(&other.len) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
         match self.slices.partial_cmp(&other.slices) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
@@ -1056,6 +1064,10 @@ impl<Fields> PartialOrd for DynSoaSlicePtrs<Fields> {
 
 impl<Fields> Ord for DynSoaSlicePtrs<Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.len.cmp(&other.len) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
         match self.slices.cmp(&other.slices) {
             cmp::Ordering::Equal => {}
             ord => return ord,
@@ -1066,6 +1078,7 @@ impl<Fields> Ord for DynSoaSlicePtrs<Fields> {
 
 impl<Fields> Hash for DynSoaSlicePtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.len.hash(state);
         self.slices.hash(state);
         self.phantom.hash(state);
     }
@@ -1074,6 +1087,7 @@ impl<Fields> Hash for DynSoaSlicePtrs<Fields> {
 impl<Fields> Clone for DynSoaSlicePtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
+            len: self.len.clone(),
             slices: self.slices.clone(),
             phantom: self.phantom.clone(),
         }
@@ -1084,16 +1098,19 @@ impl<Fields> Clone for DynSoaSlicePtrs<Fields> {
 type DynFieldSliceMutPtr = *mut [u8];
 
 pub struct DynSoaSliceMutPtrs<Fields> {
+    len: usize,
     slices: Box<[DynFieldSliceMutPtr]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<Fields> DynSoaSliceMutPtrs<Fields> {
-    pub fn new<I>(slices: I) -> Self
+    pub fn new<I>(len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSliceMutPtr>,
     {
+        // TODO: pass context and make length checks
         Self {
+            len,
             slices: slices.into_iter().collect(),
             phantom: PhantomData,
         }
@@ -1116,15 +1133,16 @@ impl<Fields> AsMut<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<Fields> {
 
 impl<Fields> Debug for DynSoaSliceMutPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaSliceMutPtrs")
-            .field(&self.slices)
+        f.debug_struct("DynSoaSliceMutPtrs")
+            .field("len", &self.len)
+            .field("slices", &self.slices)
             .finish()
     }
 }
 
 impl<Fields> PartialEq for DynSoaSliceMutPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
-        self.slices == other.slices && self.phantom == other.phantom
+        self.len == other.len && self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
@@ -1132,6 +1150,10 @@ impl<Fields> Eq for DynSoaSliceMutPtrs<Fields> {}
 
 impl<Fields> PartialOrd for DynSoaSliceMutPtrs<Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.len.partial_cmp(&other.len) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
         match self.slices.partial_cmp(&other.slices) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
@@ -1142,6 +1164,10 @@ impl<Fields> PartialOrd for DynSoaSliceMutPtrs<Fields> {
 
 impl<Fields> Ord for DynSoaSliceMutPtrs<Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.len.cmp(&other.len) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
         match self.slices.cmp(&other.slices) {
             cmp::Ordering::Equal => {}
             ord => return ord,
@@ -1152,6 +1178,7 @@ impl<Fields> Ord for DynSoaSliceMutPtrs<Fields> {
 
 impl<Fields> Hash for DynSoaSliceMutPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.len.hash(state);
         self.slices.hash(state);
         self.phantom.hash(state);
     }
@@ -1160,6 +1187,7 @@ impl<Fields> Hash for DynSoaSliceMutPtrs<Fields> {
 impl<Fields> Clone for DynSoaSliceMutPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
+            len: self.len.clone(),
             slices: self.slices.clone(),
             phantom: self.phantom.clone(),
         }
@@ -1173,16 +1201,19 @@ pub struct DynSoaSlices<'a, Fields>
 where
     Fields: 'a,
 {
+    len: usize,
     slices: Box<[DynFieldSlice<'a>]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<'a, Fields> DynSoaSlices<'a, Fields> {
-    pub fn new<I>(slices: I) -> Self
+    pub fn new<I>(len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSlice<'a>>,
     {
+        // TODO: pass context and make length checks
         Self {
+            len,
             slices: slices.into_iter().collect(),
             phantom: PhantomData,
         }
@@ -1205,13 +1236,16 @@ impl<'a, Fields> AsMut<[DynFieldSlice<'a>]> for DynSoaSlices<'a, Fields> {
 
 impl<'a, Fields> Debug for DynSoaSlices<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaSlices").field(&self.slices).finish()
+        f.debug_struct("DynSoaSlices")
+            .field("len", &self.len)
+            .field("slices", &self.slices)
+            .finish()
     }
 }
 
 impl<'a, Fields> PartialEq for DynSoaSlices<'a, Fields> {
     fn eq(&self, other: &Self) -> bool {
-        self.slices == other.slices && self.phantom == other.phantom
+        self.len == other.len && self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
@@ -1219,6 +1253,10 @@ impl<'a, Fields> Eq for DynSoaSlices<'a, Fields> {}
 
 impl<'a, Fields> PartialOrd for DynSoaSlices<'a, Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.len.partial_cmp(&other.len) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
         match self.slices.partial_cmp(&other.slices) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
@@ -1229,6 +1267,10 @@ impl<'a, Fields> PartialOrd for DynSoaSlices<'a, Fields> {
 
 impl<'a, Fields> Ord for DynSoaSlices<'a, Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.len.cmp(&other.len) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
         match self.slices.cmp(&other.slices) {
             cmp::Ordering::Equal => {}
             ord => return ord,
@@ -1239,6 +1281,7 @@ impl<'a, Fields> Ord for DynSoaSlices<'a, Fields> {
 
 impl<'a, Fields> Hash for DynSoaSlices<'a, Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.len.hash(state);
         self.slices.hash(state);
         self.phantom.hash(state);
     }
@@ -1247,6 +1290,7 @@ impl<'a, Fields> Hash for DynSoaSlices<'a, Fields> {
 impl<'a, Fields> Clone for DynSoaSlices<'a, Fields> {
     fn clone(&self) -> Self {
         Self {
+            len: self.len.clone(),
             slices: self.slices.clone(),
             phantom: self.phantom.clone(),
         }
@@ -1263,16 +1307,19 @@ pub struct DynSoaSlicesMut<'a, Fields>
 where
     Fields: 'a,
 {
+    len: usize,
     slices: Box<[DynFieldSliceMut<'a>]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<'a, Fields> DynSoaSlicesMut<'a, Fields> {
-    pub fn new<I>(slices: I) -> Self
+    pub fn new<I>(len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSliceMut<'a>>,
     {
+        // TODO: pass context and make length checks
         Self {
+            len,
             slices: slices.into_iter().collect(),
             phantom: PhantomData,
         }
@@ -1295,15 +1342,16 @@ impl<'a, Fields> AsMut<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, Fields> {
 
 impl<'a, Fields> Debug for DynSoaSlicesMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaSlicesMut")
-            .field(&self.slices)
+        f.debug_struct("DynSoaSlicesMut")
+            .field("len", &self.len)
+            .field("slices", &self.slices)
             .finish()
     }
 }
 
 impl<'a, Fields> PartialEq for DynSoaSlicesMut<'a, Fields> {
     fn eq(&self, other: &Self) -> bool {
-        self.slices == other.slices && self.phantom == other.phantom
+        self.len == other.len && self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
@@ -1311,6 +1359,10 @@ impl<'a, Fields> Eq for DynSoaSlicesMut<'a, Fields> {}
 
 impl<'a, Fields> PartialOrd for DynSoaSlicesMut<'a, Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.len.partial_cmp(&other.len) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
         match self.slices.partial_cmp(&other.slices) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
@@ -1321,6 +1373,10 @@ impl<'a, Fields> PartialOrd for DynSoaSlicesMut<'a, Fields> {
 
 impl<'a, Fields> Ord for DynSoaSlicesMut<'a, Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.len.cmp(&other.len) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
         match self.slices.cmp(&other.slices) {
             cmp::Ordering::Equal => {}
             ord => return ord,
@@ -1331,6 +1387,7 @@ impl<'a, Fields> Ord for DynSoaSlicesMut<'a, Fields> {
 
 impl<'a, Fields> Hash for DynSoaSlicesMut<'a, Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.len.hash(state);
         self.slices.hash(state);
         self.phantom.hash(state);
     }
@@ -1874,7 +1931,6 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
         let DynSoaContext { field_layouts, .. } = context;
 
-        // let vecs = iter::repeat_n(Vec::with_capacity(capacity), field_layouts.len()).collect();
         let vecs = field_layouts
             .iter()
             .map(|field_layout| {
@@ -1882,11 +1938,10 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 DynFieldVec {
                     buffer: Vec::with_capacity(capacity),
                     layout: field_layout.clone(),
-                    len: 0,
                 }
             })
             .collect();
-        DynSoaVecs { vecs }
+        DynSoaVecs { len: 0, vecs }
     }
 
     fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
@@ -1949,27 +2004,29 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
 
     fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaVecs { vecs, .. } = vecs;
+        let DynSoaVecs { vecs, len, .. } = vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
 
-        let mut lens = field_layouts.iter().zip(vecs).map(|(field_layout, vec)| {
-            let DynFieldVec {
-                layout: vec_field_layout,
-                len,
-                ..
-            } = vec;
-            assert_eq!(field_layout, vec_field_layout);
-            *len
-        });
-        let len = lens.next().unwrap_or(0);
-        assert!(lens.all(|item| item == len));
-        len
+        // let mut lens = field_layouts.iter().zip(vecs).map(|(field_layout, vec)| {
+        //     let DynFieldVec {
+        //         buffer,
+        //         layout: vec_field_layout,
+        //         ..
+        //     } = vec;
+        //     assert_eq!(field_layout, vec_field_layout);
+        //     *len
+        // });
+        // let len = lens.next().unwrap_or(0);
+        // assert!(lens.all(|item| item == len));
+        *len
     }
 
     unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaVecs { vecs, .. } = vecs;
+        let DynSoaVecs {
+            vecs, len: vec_len, ..
+        } = vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
 
@@ -1977,7 +2034,6 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             let DynFieldVec {
                 buffer: field_buffer,
                 layout: vec_field_layout,
-                len: vec_len,
             } = vec;
             assert_eq!(field_layout, vec_field_layout);
 
@@ -2139,6 +2195,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSlicePtrs {
+            len,
             slices,
             phantom: PhantomData,
         }
@@ -2167,6 +2224,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSliceMutPtrs {
+            len,
             slices,
             phantom: PhantomData,
         }
@@ -2177,7 +2235,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicePtrs {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSliceMutPtrs { slices, .. } = slices;
+        let DynSoaSliceMutPtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2190,6 +2248,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSlicePtrs {
+            len,
             slices,
             phantom: PhantomData,
         }
@@ -2197,7 +2256,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
 
     fn slice_ptrs_cast_mut(context: &Self::Context, slices: Self::SlicePtrs) -> Self::SliceMutPtrs {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicePtrs { slices, .. } = slices;
+        let DynSoaSlicePtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2210,6 +2269,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSliceMutPtrs {
+            len,
             slices,
             phantom: PhantomData,
         }
@@ -2317,7 +2377,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         slices: Self::SlicePtrs,
     ) -> Self::Slices<'a> {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicePtrs { slices, .. } = slices;
+        let DynSoaSlicePtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2330,6 +2390,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSlices {
+            len,
             slices,
             phantom: PhantomData,
         }
@@ -2340,7 +2401,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicesMut<'a> {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSliceMutPtrs { slices, .. } = slices;
+        let DynSoaSliceMutPtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2353,6 +2414,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSlicesMut {
+            len,
             slices,
             phantom: PhantomData,
         }
@@ -2399,7 +2461,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         slices: Self::Slices<'_>,
     ) -> Self::SlicePtrs {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlices { slices, .. } = slices;
+        let DynSoaSlices { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2412,6 +2474,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSlicePtrs {
+            len,
             slices,
             phantom: PhantomData,
         }
@@ -2422,7 +2485,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         slices: Self::SlicesMut<'_>,
     ) -> Self::SliceMutPtrs {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicesMut { slices, .. } = slices;
+        let DynSoaSlicesMut { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2435,6 +2498,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSliceMutPtrs {
+            len,
             slices,
             phantom: PhantomData,
         }
@@ -2445,7 +2509,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         slices: Self::SlicesMut<'a>,
     ) -> Self::Slices<'a> {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicesMut { slices, .. } = slices;
+        let DynSoaSlicesMut { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2458,6 +2522,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             })
             .collect();
         DynSoaSlices {
+            len,
             slices,
             phantom: PhantomData,
         }

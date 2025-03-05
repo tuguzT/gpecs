@@ -2,7 +2,7 @@ use std::alloc::Layout;
 
 use gpecs_soa::{
     prelude::*,
-    r#dyn::DynSoaContext,
+    r#dyn::{DynSoa, DynSoaContext},
     slice::{Iter as SoaIter, IterMut as SoaIterMut},
     vec::IntoIter as SoaIntoIter,
 };
@@ -70,14 +70,43 @@ fn dyn_context_fail() {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn dyn_context_of() {
-    let context = DynSoaContext::of::<()>(());
-    assert_eq!(context.as_ref(), [Layout::new::<()>()]);
+    let context = DynSoaContext::of::<()>(&());
+    assert_eq!(context.layouts(), [Layout::new::<()>()]);
 
-    let context = DynSoaContext::of::<(u32, u16, u8)>(());
+    let context = DynSoaContext::of::<(u32, u16, u8)>(&());
     let optimized_layout = [
         Layout::new::<u8>(),
         Layout::new::<u16>(),
         Layout::new::<u32>(),
     ];
-    assert_eq!(context.as_ref(), optimized_layout);
+    assert_eq!(context.layouts(), optimized_layout);
+}
+
+#[test]
+#[cfg_attr(miri, ignore)]
+fn dyn_value() {
+    let context = ();
+    let dyn_context = DynSoaContext::of::<()>(&context);
+
+    let value = ();
+    let dyn_value = DynSoa::from(&context, value);
+    assert_eq!(dyn_value.as_refs(&dyn_context).as_ref(), [[]]);
+
+    let dyn_context = DynSoaContext::of::<(u32, u16, u8)>(&());
+
+    let i1 = 1u32;
+    let i2 = 2u16;
+    let i3 = 3u8;
+    let value = (i1, i2, i3);
+    let dyn_value = DynSoa::from(&(), value);
+
+    let i1_bytes = i1.to_ne_bytes();
+    let i2_bytes = i2.to_ne_bytes();
+    let i3_bytes = i3.to_ne_bytes();
+    let optimized_refs = [
+        i3_bytes.as_slice(),
+        i2_bytes.as_slice(),
+        i1_bytes.as_slice(),
+    ];
+    assert_eq!(dyn_value.as_refs(&dyn_context).as_ref(), optimized_refs);
 }

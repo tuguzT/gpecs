@@ -36,6 +36,7 @@ type DynFields<Fields> = Box<[Byte<Fields>]>;
 
 pub struct DynSoa<Fields> {
     buffer: DynFields<Fields>,
+    field_layouts: Box<[Layout]>,
 }
 
 impl<Fields> DynSoa<Fields> {
@@ -63,13 +64,51 @@ impl<Fields> DynSoa<Fields> {
             }
             buffer.assume_init()
         };
-        Self { buffer }
+        Self {
+            buffer,
+            field_layouts: field_layouts.clone(),
+        }
+    }
+
+    #[inline]
+    pub fn from<T>(context: &T::Context, value: T) -> Self
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let DynSoaContext { field_layouts, .. } = DynSoaContext::of::<T>(context);
+
+        let (buffer_layout, offsets) =
+            T::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
+
+        let mut buffer = Box::new_uninit_slice(buffer_len);
+        let buffer = unsafe {
+            let dst = T::ptrs(context, buffer.as_mut_ptr().cast(), offsets);
+            T::ptrs_write(context, dst, value);
+            buffer.assume_init()
+        };
+
+        Self {
+            buffer,
+            field_layouts,
+        }
+    }
+
+    #[inline]
+    pub fn layouts(&self) -> &[Layout] {
+        let Self { field_layouts, .. } = self;
+        field_layouts.as_ref()
     }
 
     #[inline]
     pub fn as_refs(&self, context: &DynSoaContext<Fields>) -> DynSoaRefs<'_, Fields> {
-        let Self { buffer } = self;
+        let Self {
+            buffer,
+            field_layouts: value_layouts,
+        } = self;
         let DynSoaContext { field_layouts, .. } = context;
+
+        assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
@@ -93,8 +132,13 @@ impl<Fields> DynSoa<Fields> {
 
     #[inline]
     pub fn as_refs_mut(&mut self, context: &DynSoaContext<Fields>) -> DynSoaRefsMut<'_, Fields> {
-        let Self { buffer } = self;
+        let Self {
+            buffer,
+            field_layouts: value_layouts,
+        } = self;
         let DynSoaContext { field_layouts, .. } = context;
+
+        assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
@@ -124,6 +168,7 @@ where
     fn clone(&self) -> Self {
         Self {
             buffer: self.buffer.clone(),
+            field_layouts: self.field_layouts.clone(),
         }
     }
 }
@@ -161,11 +206,11 @@ impl<Fields> DynSoaContext<Fields> {
     }
 
     #[inline]
-    pub fn of<T>(context: T::Context) -> Self
+    pub fn of<T>(context: &T::Context) -> Self
     where
         T: Soa<Fields = Fields>,
     {
-        let mut field_layouts: Box<[_]> = T::field_layouts(&context)
+        let mut field_layouts: Box<[_]> = T::field_layouts(context)
             .into_iter()
             .map(|item| {
                 let layout: &Layout = item.borrow();
@@ -181,7 +226,7 @@ impl<Fields> DynSoaContext<Fields> {
             .collect();
 
         let (_, offsets) =
-            T::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+            T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
         let offsets: Box<[_]> = offsets.into_iter().collect();
 
         let mut permutation: Box<_> = (0..offsets.len()).collect();
@@ -201,10 +246,9 @@ impl<Fields> DynSoaContext<Fields> {
             phantom: PhantomData,
         }
     }
-}
 
-impl<Fields> AsRef<[Layout]> for DynSoaContext<Fields> {
-    fn as_ref(&self) -> &[Layout] {
+    #[inline]
+    pub fn layouts(&self) -> &[Layout] {
         let Self { field_layouts, .. } = self;
         field_layouts.as_ref()
     }
@@ -1353,15 +1397,22 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             }
             buffer.assume_init()
         };
-        Self { buffer }
+        Self {
+            buffer,
+            field_layouts: field_layouts.clone(),
+        }
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
         let DynSoaContext { field_layouts, .. } = context;
         let DynSoaMutPtrs { ptrs: dst, .. } = dst;
-        let Self { buffer } = value;
+        let Self {
+            buffer,
+            field_layouts: value_layouts,
+        } = value;
 
         assert_eq!(field_layouts.len(), dst.len());
+        assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");

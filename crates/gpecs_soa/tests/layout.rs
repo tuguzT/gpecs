@@ -93,6 +93,9 @@ fn dyn_value() {
     assert_eq!(dyn_value.layouts(), [Layout::new::<()>()]);
     assert_eq!(dyn_value.as_refs(&dyn_context).as_ref(), [[]]);
 
+    let value = unsafe { dyn_value.into::<()>(&context) };
+    assert_eq!(value, ());
+
     let dyn_context = DynSoaContext::of::<(u32, u16, u8)>(&());
 
     let i1 = 1u32;
@@ -119,4 +122,7 @@ fn dyn_value() {
         dyn_value.as_refs(&dyn_context).as_ref(),
         [i3_bytes, i2_bytes, i1_bytes],
     );
+
+    let value = unsafe { dyn_value.into::<(u32, u16, u8)>(&context) };
+    assert_eq!(value, (i1, i2, i3));
 }

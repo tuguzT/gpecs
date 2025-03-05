@@ -95,6 +95,34 @@ impl<Fields> DynSoa<Fields> {
     }
 
     #[inline]
+    pub unsafe fn into<T>(self, context: &T::Context) -> T
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let Self {
+            mut buffer,
+            field_layouts,
+        } = self;
+        let DynSoaContext {
+            field_layouts: target_field_layouts,
+            ..
+        } = DynSoaContext::of::<T>(context);
+
+        assert_eq!(field_layouts.as_ref(), target_field_layouts.as_ref());
+
+        let (buffer_layout, offsets) =
+            T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
+        assert_eq!(buffer_len, buffer.len());
+
+        unsafe {
+            let src = T::ptrs(context, buffer.as_mut_ptr().cast(), offsets);
+            let src = T::ptrs_cast_const(context, src);
+            T::ptrs_read(context, src)
+        }
+    }
+
+    #[inline]
     pub fn layouts(&self) -> &[Layout] {
         let Self { field_layouts, .. } = self;
         field_layouts.as_ref()

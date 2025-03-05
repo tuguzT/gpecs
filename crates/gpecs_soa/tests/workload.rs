@@ -616,12 +616,7 @@ fn one_item_zst() {
 fn one_item_dyn() {
     type Vec = SoaVec<DynSoa<(u8, u64, u16)>>;
 
-    let field_layouts = [
-        Layout::new::<u8>(),
-        Layout::new::<u64>(),
-        Layout::new::<u16>(),
-    ];
-    let context = DynSoaContext::new(field_layouts);
+    let context = DynSoaContext::of::<(u8, u64, u16)>(&());
 
     let u8 = 1u8;
     let u64 = 2u64;
@@ -635,8 +630,8 @@ fn one_item_dyn() {
     let u64_bytes = u64_bytes.as_slice();
     let u16_bytes = u16_bytes.as_slice();
 
-    let fields = [u8_bytes, u64_bytes, u16_bytes];
-    let value = DynSoa::new(&context, fields);
+    let fields = [u8_bytes, u16_bytes, u64_bytes];
+    let value = DynSoa::from(&(), (u8, u64, u16));
     assert_eq!(value.as_refs(&context).as_ref(), fields);
 
     let mut vec = Vec::with_context(context);
@@ -656,7 +651,7 @@ fn one_item_dyn() {
 
     assert_eq!(
         format!("{vec:?}"),
-        format!("SoaVec(DynSoaSlices([{u8_bytes:?}, {u64_bytes:?}, {u16_bytes:?}]))"),
+        format!("SoaVec(DynSoaSlices([{u8_bytes:?}, {u16_bytes:?}, {u64_bytes:?}]))"),
     );
 
     let slice = vec.as_slice();
@@ -667,7 +662,7 @@ fn one_item_dyn() {
 
     assert_eq!(
         format!("{slice:?}"),
-        format!("SoaSlice(DynSoaSlices([{u8_bytes:?}, {u64_bytes:?}, {u16_bytes:?}]))"),
+        format!("SoaSlice(DynSoaSlices([{u8_bytes:?}, {u16_bytes:?}, {u64_bytes:?}]))"),
     );
 
     assert_eq!(vec, slice);

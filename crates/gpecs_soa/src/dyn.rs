@@ -18,6 +18,20 @@ union Byte<Fields> {
     _size_align: ManuallyDrop<MaybeUninit<Fields>>,
 }
 
+impl<Fields> Clone for Byte<Fields>
+where
+    Fields: Copy,
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<Fields> Copy for Byte<Fields> where Fields: Copy {}
+
+unsafe impl<Fields> Send for Byte<Fields> where Fields: Send {}
+unsafe impl<Fields> Sync for Byte<Fields> where Fields: Sync {}
+
 type DynFields<Fields> = Box<[Byte<Fields>]>;
 
 pub struct DynSoa<Fields> {
@@ -99,6 +113,17 @@ impl<Fields> DynSoa<Fields> {
         DynSoaRefsMut {
             refs,
             phantom: PhantomData,
+        }
+    }
+}
+
+impl<Fields> Clone for DynSoa<Fields>
+where
+    Fields: Copy,
+{
+    fn clone(&self) -> Self {
+        Self {
+            buffer: self.buffer.clone(),
         }
     }
 }
@@ -515,6 +540,9 @@ impl<'a, Fields> Clone for DynSoaRefs<'a, Fields> {
     }
 }
 
+unsafe impl<'a, Fields> Send for DynSoaRefs<'a, Fields> where Fields: Sync {}
+unsafe impl<'a, Fields> Sync for DynSoaRefs<'a, Fields> where Fields: Sync {}
+
 type DynFieldRefMut<'a> = &'a mut [u8];
 
 pub struct DynSoaRefsMut<'a, Fields>
@@ -591,6 +619,9 @@ impl<'a, Fields> Hash for DynSoaRefsMut<'a, Fields> {
         self.phantom.hash(state);
     }
 }
+
+unsafe impl<'a, Fields> Send for DynSoaRefsMut<'a, Fields> where Fields: Send {}
+unsafe impl<'a, Fields> Sync for DynSoaRefsMut<'a, Fields> where Fields: Sync {}
 
 // data is stored inline in a single buffer
 type DynFieldSlicePtr = *const [u8];
@@ -851,6 +882,9 @@ impl<'a, Fields> Clone for DynSoaSlices<'a, Fields> {
     }
 }
 
+unsafe impl<'a, Fields> Send for DynSoaSlices<'a, Fields> where Fields: Sync {}
+unsafe impl<'a, Fields> Sync for DynSoaSlices<'a, Fields> where Fields: Sync {}
+
 // data is stored inline in a single buffer
 type DynFieldSliceMut<'a> = &'a mut [u8];
 
@@ -930,6 +964,9 @@ impl<'a, Fields> Hash for DynSoaSlicesMut<'a, Fields> {
         self.phantom.hash(state);
     }
 }
+
+unsafe impl<'a, Fields> Send for DynSoaSlicesMut<'a, Fields> where Fields: Send {}
+unsafe impl<'a, Fields> Sync for DynSoaSlicesMut<'a, Fields> where Fields: Sync {}
 
 unsafe impl<Fields> Soa for DynSoa<Fields> {
     type Context = DynSoaContext<Fields>;

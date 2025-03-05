@@ -616,6 +616,22 @@ where
     }
 }
 
+unsafe impl<'a, T> Send for SoaSlice<T>
+where
+    T: Soa,
+    T::SizeAlign: Send,
+    T::Context: Send,
+{
+}
+
+unsafe impl<'a, T> Sync for SoaSlice<T>
+where
+    T: Soa,
+    T::SizeAlign: Sync,
+    T::Context: Sync,
+{
+}
+
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts<'slice, T>(

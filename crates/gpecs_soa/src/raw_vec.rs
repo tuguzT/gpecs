@@ -467,8 +467,21 @@ where
     }
 }
 
-unsafe impl<T> Send for RawSoaVec<T> where T: Soa + Send {}
-unsafe impl<T> Sync for RawSoaVec<T> where T: Soa + Sync {}
+unsafe impl<T> Send for RawSoaVec<T>
+where
+    T: Soa,
+    T::SizeAlign: Send,
+    T::Context: Send,
+{
+}
+
+unsafe impl<T> Sync for RawSoaVec<T>
+where
+    T: Soa,
+    T::SizeAlign: Sync,
+    T::Context: Sync,
+{
+}
 
 #[inline(never)]
 fn finish_grow(

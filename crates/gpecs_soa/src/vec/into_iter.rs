@@ -111,8 +111,21 @@ where
     }
 }
 
-unsafe impl<T> Send for IntoIter<T> where T: Soa + Send {}
-unsafe impl<T> Sync for IntoIter<T> where T: Soa + Sync {}
+unsafe impl<T> Send for IntoIter<T>
+where
+    T: Soa,
+    T::SizeAlign: Send,
+    T::Context: Send,
+{
+}
+
+unsafe impl<T> Sync for IntoIter<T>
+where
+    T: Soa,
+    T::SizeAlign: Sync,
+    T::Context: Sync,
+{
+}
 
 impl<T, U> AsRef<[U]> for IntoIter<T>
 where

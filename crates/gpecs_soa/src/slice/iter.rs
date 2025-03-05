@@ -86,8 +86,21 @@ where
     }
 }
 
-unsafe impl<T> Send for Iter<'_, T> where T: Soa + Send {}
-unsafe impl<T> Sync for Iter<'_, T> where T: Soa + Sync {}
+unsafe impl<T> Send for Iter<'_, T>
+where
+    T: Soa,
+    T::SizeAlign: Send,
+    T::Context: Send,
+{
+}
+
+unsafe impl<T> Sync for Iter<'_, T>
+where
+    T: Soa,
+    T::SizeAlign: Sync,
+    T::Context: Sync,
+{
+}
 
 impl<T, U> AsRef<[U]> for Iter<'_, T>
 where
@@ -461,8 +474,21 @@ where
     }
 }
 
-unsafe impl<T> Send for IterMut<'_, T> where T: Soa + Send {}
-unsafe impl<T> Sync for IterMut<'_, T> where T: Soa + Sync {}
+unsafe impl<T> Send for IterMut<'_, T>
+where
+    T: Soa,
+    T::SizeAlign: Send,
+    T::Context: Send,
+{
+}
+
+unsafe impl<T> Sync for IterMut<'_, T>
+where
+    T: Soa,
+    T::SizeAlign: Sync,
+    T::Context: Sync,
+{
+}
 
 impl<T, U> AsRef<[U]> for IterMut<'_, T>
 where

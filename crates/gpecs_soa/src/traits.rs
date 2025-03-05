@@ -10,7 +10,9 @@ use core::{
 
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
-    /// Special type used to properly allocate the buffer in memory.
+    /// Special type used to properly allocate a buffer in memory.
+    /// This should contain all the fields which are stored inside of a buffer
+    /// ([`Send`] and [`Sync`] bounds are implemented with account to this type, not `Self`).
     ///
     /// Most of the time, this should be the same as `Self`.
     /// This is true for such implementations which store all the fields of self.

@@ -372,6 +372,22 @@ where
     }
 }
 
+unsafe impl<'a, T> Send for SoaSlices<'a, T>
+where
+    T: Soa,
+    T::SizeAlign: Send,
+    T::Context: Send,
+{
+}
+
+unsafe impl<'a, T> Sync for SoaSlices<'a, T>
+where
+    T: Soa,
+    T::SizeAlign: Sync,
+    T::Context: Sync,
+{
+}
+
 pub struct SoaSlicesMut<'a, T>
 where
     T: Soa + 'a,
@@ -1095,4 +1111,20 @@ where
     fn into_iter(self) -> Self::IntoIter {
         IterMut::new(self)
     }
+}
+
+unsafe impl<'a, T> Send for SoaSlicesMut<'a, T>
+where
+    T: Soa,
+    T::SizeAlign: Send,
+    T::Context: Send,
+{
+}
+
+unsafe impl<'a, T> Sync for SoaSlicesMut<'a, T>
+where
+    T: Soa,
+    T::SizeAlign: Sync,
+    T::Context: Sync,
+{
 }

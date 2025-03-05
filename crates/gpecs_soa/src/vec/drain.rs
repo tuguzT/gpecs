@@ -79,8 +79,21 @@ where
     }
 }
 
-unsafe impl<T> Send for Drain<'_, T> where T: Soa + Send {}
-unsafe impl<T> Sync for Drain<'_, T> where T: Soa + Sync {}
+unsafe impl<T> Send for Drain<'_, T>
+where
+    T: Soa,
+    T::SizeAlign: Send,
+    T::Context: Send,
+{
+}
+
+unsafe impl<T> Sync for Drain<'_, T>
+where
+    T: Soa,
+    T::SizeAlign: Sync,
+    T::Context: Sync,
+{
+}
 
 impl<T, U> AsRef<[U]> for Drain<'_, T>
 where

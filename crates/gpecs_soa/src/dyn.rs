@@ -48,7 +48,7 @@ impl<Fields> DynSoa<Fields> {
         let DynSoaContext { field_layouts, .. } = context;
 
         let (buffer_layout, offsets) =
-            Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
@@ -78,7 +78,7 @@ impl<Fields> DynSoa<Fields> {
         let DynSoaContext { field_layouts, .. } = DynSoaContext::of::<T>(context);
 
         let (buffer_layout, offsets) =
-            T::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+            T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
@@ -111,7 +111,7 @@ impl<Fields> DynSoa<Fields> {
         assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
 
         let (buffer_layout, offsets) =
-            Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
         assert_eq!(buffer_len, buffer.len());
 
@@ -141,7 +141,7 @@ impl<Fields> DynSoa<Fields> {
         assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
 
         let (buffer_layout, offsets) =
-            Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
         assert_eq!(buffer_len, buffer.len());
 

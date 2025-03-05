@@ -90,6 +90,7 @@ fn dyn_value() {
 
     let value = ();
     let dyn_value = DynSoa::from(&context, value);
+    assert_eq!(dyn_value.layouts(), [Layout::new::<()>()]);
     assert_eq!(dyn_value.as_refs(&dyn_context).as_ref(), [[]]);
 
     let dyn_context = DynSoaContext::of::<(u32, u16, u8)>(&());
@@ -100,13 +101,22 @@ fn dyn_value() {
     let value = (i1, i2, i3);
     let dyn_value = DynSoa::from(&(), value);
 
+    let optimized_layout = [
+        Layout::new::<u8>(),
+        Layout::new::<u16>(),
+        Layout::new::<u32>(),
+    ];
+    assert_eq!(dyn_value.layouts(), optimized_layout);
+
     let i1_bytes = i1.to_ne_bytes();
     let i2_bytes = i2.to_ne_bytes();
     let i3_bytes = i3.to_ne_bytes();
-    let optimized_refs = [
-        i3_bytes.as_slice(),
-        i2_bytes.as_slice(),
-        i1_bytes.as_slice(),
-    ];
-    assert_eq!(dyn_value.as_refs(&dyn_context).as_ref(), optimized_refs);
+
+    let i1_bytes = i1_bytes.as_slice();
+    let i2_bytes = i2_bytes.as_slice();
+    let i3_bytes = i3_bytes.as_slice();
+    assert_eq!(
+        dyn_value.as_refs(&dyn_context).as_ref(),
+        [i3_bytes, i2_bytes, i1_bytes],
+    );
 }

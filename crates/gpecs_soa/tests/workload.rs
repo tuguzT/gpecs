@@ -627,23 +627,15 @@ fn one_item_dyn() {
     let u64 = 2u64;
     let u16 = 3u16;
 
-    let u8_slice = unsafe {
-        let data = ptr::from_ref(&u8).cast();
-        let len = size_of_val(&u8);
-        slice::from_raw_parts(data, len)
-    };
-    let u64_slice = unsafe {
-        let data = ptr::from_ref(&u64).cast();
-        let len = size_of_val(&u64);
-        slice::from_raw_parts(data, len)
-    };
-    let u16_slice = unsafe {
-        let data = ptr::from_ref(&u16).cast();
-        let len = size_of_val(&u16);
-        slice::from_raw_parts(data, len)
-    };
+    let u8_bytes = u8.to_ne_bytes();
+    let u64_bytes = u64.to_ne_bytes();
+    let u16_bytes = u16.to_ne_bytes();
 
-    let fields = [u8_slice, u64_slice, u16_slice];
+    let u8_bytes = u8_bytes.as_slice();
+    let u64_bytes = u64_bytes.as_slice();
+    let u16_bytes = u16_bytes.as_slice();
+
+    let fields = [u8_bytes, u64_bytes, u16_bytes];
     let value = DynSoa::new(&context, fields);
     assert_eq!(value.as_refs(&context).as_ref(), fields);
 
@@ -664,7 +656,7 @@ fn one_item_dyn() {
 
     assert_eq!(
         format!("{vec:?}"),
-        format!("SoaVec(DynSoaSlices([{u8_slice:?}, {u64_slice:?}, {u16_slice:?}]))"),
+        format!("SoaVec(DynSoaSlices([{u8_bytes:?}, {u64_bytes:?}, {u16_bytes:?}]))"),
     );
 
     let slice = vec.as_slice();
@@ -675,7 +667,7 @@ fn one_item_dyn() {
 
     assert_eq!(
         format!("{slice:?}"),
-        format!("SoaSlice(DynSoaSlices([{u8_slice:?}, {u64_slice:?}, {u16_slice:?}]))"),
+        format!("SoaSlice(DynSoaSlices([{u8_bytes:?}, {u64_bytes:?}, {u16_bytes:?}]))"),
     );
 
     assert_eq!(vec, slice);
@@ -1395,21 +1387,13 @@ fn three_items_dyn() {
     let i0_u64 = 0u64;
     let i0_u16 = 0u16;
 
-    let i0_u8_bytes = unsafe {
-        let data = ptr::from_ref(&i0_u8).cast();
-        let len = size_of_val(&i0_u8);
-        slice::from_raw_parts(data, len)
-    };
-    let i0_u64_bytes = unsafe {
-        let data = ptr::from_ref(&i0_u64).cast();
-        let len = size_of_val(&i0_u64);
-        slice::from_raw_parts(data, len)
-    };
-    let i0_u16_bytes = unsafe {
-        let data = ptr::from_ref(&i0_u16).cast();
-        let len = size_of_val(&i0_u16);
-        slice::from_raw_parts(data, len)
-    };
+    let i0_u8_bytes = i0_u8.to_ne_bytes();
+    let i0_u64_bytes = i0_u64.to_ne_bytes();
+    let i0_u16_bytes = i0_u16.to_ne_bytes();
+
+    let i0_u8_bytes = i0_u8_bytes.as_slice();
+    let i0_u64_bytes = i0_u64_bytes.as_slice();
+    let i0_u16_bytes = i0_u16_bytes.as_slice();
 
     let fields = [i0_u8_bytes, i0_u64_bytes, i0_u16_bytes];
     vec.extend(iter::repeat_with(|| DynSoa::new(&context, fields)).take(3));
@@ -1452,21 +1436,13 @@ fn three_items_dyn() {
     let i2 = 2u64;
     let i3 = 3u16;
 
-    let i1_bytes = unsafe {
-        let data = ptr::from_ref(&i1).cast();
-        let len = size_of_val(&i1);
-        slice::from_raw_parts(data, len)
-    };
-    let i2_bytes = unsafe {
-        let data = ptr::from_ref(&i2).cast();
-        let len = size_of_val(&i2);
-        slice::from_raw_parts(data, len)
-    };
-    let i3_bytes = unsafe {
-        let data = ptr::from_ref(&i3).cast();
-        let len = size_of_val(&i3);
-        slice::from_raw_parts(data, len)
-    };
+    let i1_bytes = i1.to_ne_bytes();
+    let i2_bytes = i2.to_ne_bytes();
+    let i3_bytes = i3.to_ne_bytes();
+
+    let i1_bytes = i1_bytes.as_slice();
+    let i2_bytes = i2_bytes.as_slice();
+    let i3_bytes = i3_bytes.as_slice();
 
     let fields = [i1_bytes, i2_bytes, i3_bytes];
     vec.insert(0, DynSoa::new(vec.context(), fields));
@@ -1475,21 +1451,13 @@ fn three_items_dyn() {
     let i5 = 5u64;
     let i6 = 6u16;
 
-    let i4_bytes = unsafe {
-        let data = ptr::from_ref(&i4).cast();
-        let len = size_of_val(&i4);
-        slice::from_raw_parts(data, len)
-    };
-    let i5_bytes = unsafe {
-        let data = ptr::from_ref(&i5).cast();
-        let len = size_of_val(&i5);
-        slice::from_raw_parts(data, len)
-    };
-    let i6_bytes = unsafe {
-        let data = ptr::from_ref(&i6).cast();
-        let len = size_of_val(&i6);
-        slice::from_raw_parts(data, len)
-    };
+    let i4_bytes = i4.to_ne_bytes();
+    let i5_bytes = i5.to_ne_bytes();
+    let i6_bytes = i6.to_ne_bytes();
+
+    let i4_bytes = i4_bytes.as_slice();
+    let i5_bytes = i5_bytes.as_slice();
+    let i6_bytes = i6_bytes.as_slice();
 
     let fields = [i4_bytes, i5_bytes, i6_bytes];
     vec.insert(0, DynSoa::new(vec.context(), fields));
@@ -1498,21 +1466,13 @@ fn three_items_dyn() {
     let i8 = 8u64;
     let i9 = 9u16;
 
-    let i7_bytes = unsafe {
-        let data = ptr::from_ref(&i7).cast();
-        let len = size_of_val(&i7);
-        slice::from_raw_parts(data, len)
-    };
-    let i8_bytes = unsafe {
-        let data = ptr::from_ref(&i8).cast();
-        let len = size_of_val(&i8);
-        slice::from_raw_parts(data, len)
-    };
-    let i9_bytes = unsafe {
-        let data = ptr::from_ref(&i9).cast();
-        let len = size_of_val(&i9);
-        slice::from_raw_parts(data, len)
-    };
+    let i7_bytes = i7.to_ne_bytes();
+    let i8_bytes = i8.to_ne_bytes();
+    let i9_bytes = i9.to_ne_bytes();
+
+    let i7_bytes = i7_bytes.as_slice();
+    let i8_bytes = i8_bytes.as_slice();
+    let i9_bytes = i9_bytes.as_slice();
 
     let fields = [i7_bytes, i8_bytes, i9_bytes];
     vec.insert(1, DynSoa::new(vec.context(), fields));
@@ -1610,11 +1570,8 @@ fn three_items_dyn() {
     assert_eq!(iter.len(), 3);
 
     let i5_plus_6 = 11_u64;
-    let i5_plus_6_bytes = unsafe {
-        let data = ptr::from_ref(&i5_plus_6).cast();
-        let len = size_of_val(&i5_plus_6);
-        slice::from_raw_parts(data, len)
-    };
+    let i5_plus_6_bytes = i5_plus_6.to_ne_bytes();
+    let i5_plus_6_bytes = i5_plus_6_bytes.as_slice();
     assert_eq!(
         iter.next(),
         Some(DynSoaRefs::new([i4_bytes, i5_plus_6_bytes, i6_bytes])),
@@ -1622,11 +1579,8 @@ fn three_items_dyn() {
     assert_eq!(iter.len(), 2);
 
     let i2_plus_3 = 5_u64;
-    let i2_plus_3_bytes = unsafe {
-        let data = ptr::from_ref(&i2_plus_3).cast();
-        let len = size_of_val(&i2_plus_3);
-        slice::from_raw_parts(data, len)
-    };
+    let i2_plus_3_bytes = i2_plus_3.to_ne_bytes();
+    let i2_plus_3_bytes = i2_plus_3_bytes.as_slice();
     assert_eq!(
         iter.next_back(),
         Some(DynSoaRefs::new([i1_bytes, i2_plus_3_bytes, i3_bytes])),
@@ -1634,11 +1588,8 @@ fn three_items_dyn() {
     assert_eq!(iter.len(), 1);
 
     let i8_plus_9 = 17_u64;
-    let i8_plus_9_bytes = unsafe {
-        let data = ptr::from_ref(&i8_plus_9).cast();
-        let len = size_of_val(&i8_plus_9);
-        slice::from_raw_parts(data, len)
-    };
+    let i8_plus_9_bytes = i8_plus_9.to_ne_bytes();
+    let i8_plus_9_bytes = i8_plus_9_bytes.as_slice();
     assert_eq!(
         iter.next(),
         Some(DynSoaRefs::new([i7_bytes, i8_plus_9_bytes, i9_bytes])),
@@ -1813,11 +1764,8 @@ fn three_items_dyn() {
     assert!(vec.capacity() >= (1 + 2 * 10));
 
     let i2_u8 = 2_u8;
-    let i2_u8_bytes = unsafe {
-        let data = ptr::from_ref(&i2_u8).cast();
-        let len = size_of_val(&i2_u8);
-        slice::from_raw_parts(data, len)
-    };
+    let i2_u8_bytes = i2_u8.to_ne_bytes();
+    let i2_u8_bytes = i2_u8_bytes.as_slice();
     assert_eq!(
         vec.as_slices(),
         DynSoaSlices::new([i2_u8_bytes, i2_bytes, i3_bytes]),

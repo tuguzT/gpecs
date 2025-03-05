@@ -91,7 +91,10 @@ fn dyn_value() {
     let value = ();
     let dyn_value = DynSoa::from(&context, value);
     assert_eq!(dyn_value.layouts(), [Layout::new::<()>()]);
-    assert_eq!(dyn_value.as_refs(&dyn_context).as_ref(), [[]]);
+    assert_eq!(
+        dyn_value.as_refs(&dyn_context).as_ref(),
+        [(Layout::new::<()>(), [].as_slice())],
+    );
 
     let value = unsafe { dyn_value.into::<()>(&context) };
     assert_eq!(value, ());
@@ -120,7 +123,11 @@ fn dyn_value() {
     let i3_bytes = i3_bytes.as_slice();
     assert_eq!(
         dyn_value.as_refs(&dyn_context).as_ref(),
-        [i3_bytes, i2_bytes, i1_bytes],
+        [
+            (optimized_layout[0], i3_bytes),
+            (optimized_layout[1], i2_bytes),
+            (optimized_layout[2], i1_bytes),
+        ],
     );
 
     let value = unsafe { dyn_value.into::<(u32, u16, u8)>(&context) };
@@ -128,5 +135,15 @@ fn dyn_value() {
 
     let refs = (&i1, &i2, &i3);
     let refs = DynSoaRefs::from::<(u32, u16, u8)>(&context, refs);
-    assert_eq!(refs.as_ref(), [i3_bytes, i2_bytes, i1_bytes]);
+    assert_eq!(
+        refs.as_ref(),
+        [
+            (optimized_layout[0], i3_bytes),
+            (optimized_layout[1], i2_bytes),
+            (optimized_layout[2], i1_bytes),
+        ],
+    );
+
+    let refs = unsafe { refs.into::<(u32, u16, u8)>(&context) };
+    assert_eq!(refs, (&i1, &i2, &i3));
 }

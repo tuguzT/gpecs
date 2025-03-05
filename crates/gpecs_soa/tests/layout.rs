@@ -66,3 +66,18 @@ fn dyn_context_fail() {
     let field_layouts = [Layout::new::<u8>(), Layout::new::<i16>()];
     let _context = DynSoaContext::<u8>::new(field_layouts);
 }
+
+#[test]
+#[cfg_attr(miri, ignore)]
+fn dyn_context_of() {
+    let context = DynSoaContext::of::<()>(());
+    assert_eq!(context.as_ref(), [Layout::new::<()>()]);
+
+    let context = DynSoaContext::of::<(u32, u16, u8)>(());
+    let optimized_layout = [
+        Layout::new::<u8>(),
+        Layout::new::<u16>(),
+        Layout::new::<u32>(),
+    ];
+    assert_eq!(context.as_ref(), optimized_layout);
+}

@@ -159,6 +159,48 @@ impl<Fields> DynSoaContext<Fields> {
             phantom: PhantomData,
         }
     }
+
+    #[inline]
+    pub fn of<T>(context: T::Context) -> Self
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let mut field_layouts: Box<[_]> = T::field_layouts(&context)
+            .into_iter()
+            .map(|item| {
+                let layout: &Layout = item.borrow();
+
+                let input_align = layout.align();
+                let max_align = align_of::<Fields>();
+                assert!(
+                input_align <= max_align,
+                "input alignment must be less than or equal to {max_align}, but got {input_align}",
+            );
+                layout.clone()
+            })
+            .collect();
+
+        let (_, offsets) =
+            T::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
+        let offsets: Box<[_]> = offsets.into_iter().collect();
+
+        let mut permutation: Box<_> = (0..offsets.len()).collect();
+        permutation.sort_by_key(|&index| offsets[index]);
+
+        for src in 0..permutation.len() {
+            let dst = permutation[src];
+            if src == dst {
+                continue;
+            }
+            field_layouts.swap(src, dst);
+            permutation.swap(src, dst);
+        }
+
+        Self {
+            field_layouts,
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<Fields> AsRef<[Layout]> for DynSoaContext<Fields> {

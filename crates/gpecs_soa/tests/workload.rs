@@ -621,6 +621,7 @@ fn one_item_dyn() {
         Layout::new::<u64>(),
         Layout::new::<u16>(),
     ];
+    let context = DynSoaContext::new(field_layouts);
 
     let u8 = 1u8;
     let u64 = 2u64;
@@ -642,25 +643,17 @@ fn one_item_dyn() {
         slice::from_raw_parts(data, len)
     };
 
-    let fields = [
-        (u8_slice, field_layouts[0]),
-        (u64_slice, field_layouts[1]),
-        (u16_slice, field_layouts[2]),
-    ];
-    let value = DynSoa::new(fields);
-    assert_eq!(
-        format!("{value:?}"),
-        format!("DynSoa([{u8_slice:?}, {u64_slice:?}, {u16_slice:?}])"),
-    );
+    let fields = [u8_slice, u64_slice, u16_slice];
+    let value = DynSoa::new(&context, fields);
+    assert_eq!(value.as_refs(&context).as_ref(), fields);
 
-    let context = DynSoaContext::new(field_layouts);
     let mut vec = Vec::with_context(context);
 
     vec.push(value);
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
 
-    let refs = DynSoaRefs::new([u8_slice, u64_slice, u16_slice]);
+    let refs = DynSoaRefs::new(fields);
     assert_eq!(vec.get(0), Some(refs.clone()));
     assert!(vec.contains_by_refs(refs.clone()));
 
@@ -677,10 +670,7 @@ fn one_item_dyn() {
     let slice = vec.as_slice();
     assert_eq!(slice.len(), 1);
     assert!(slice.capacity() >= 1);
-    assert_eq!(
-        slice.as_slices(),
-        DynSoaSlices::new([u8_slice, u64_slice, u16_slice]),
-    );
+    assert_eq!(slice.as_slices(), DynSoaSlices::new(fields));
     assert_eq!(slice.get(0), Some(refs.clone()));
 
     assert_eq!(
@@ -700,10 +690,7 @@ fn one_item_dyn() {
     let mut vec = Vec::from_vecs(context, vecs);
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
-    assert_eq!(
-        vec.as_slices(),
-        DynSoaSlices::new([u8_slice, u64_slice, u16_slice]),
-    );
+    assert_eq!(vec.as_slices(), DynSoaSlices::new(fields));
 
     let mut iter = vec.iter();
     assert_eq!(iter.len(), 1);
@@ -711,7 +698,11 @@ fn one_item_dyn() {
     assert_eq!(iter.next(), None);
 
     let value = vec.pop().expect("vector should not be empty");
-    assert_eq!(value, DynSoa::new(fields));
+    let context = vec.context();
+    assert_eq!(
+        value.as_refs(context).as_ref(),
+        DynSoa::new(context, fields).as_refs(context).as_ref(),
+    );
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
@@ -1398,7 +1389,7 @@ fn three_items_dyn() {
     ];
 
     let context = DynSoaContext::new(field_layouts);
-    let mut vec = Vec::with_context(context);
+    let mut vec = Vec::with_context(context.clone());
 
     let i0_u8 = 0u8;
     let i0_u64 = 0u64;
@@ -1420,15 +1411,11 @@ fn three_items_dyn() {
         slice::from_raw_parts(data, len)
     };
 
-    let fields = [
-        (i0_u8_bytes, field_layouts[0]),
-        (i0_u64_bytes, field_layouts[1]),
-        (i0_u16_bytes, field_layouts[2]),
-    ];
-    vec.extend(iter::repeat_with(|| DynSoa::new(fields)).take(3));
+    let fields = [i0_u8_bytes, i0_u64_bytes, i0_u16_bytes];
+    vec.extend(iter::repeat_with(|| DynSoa::new(&context, fields)).take(3));
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains_by_refs(DynSoaRefs::new([i0_u8_bytes, i0_u64_bytes, i0_u16_bytes])));
+    assert!(vec.contains_by_refs(DynSoaRefs::new(fields)));
 
     let i0_u8s = [i0_u8; 3];
     let i0_u64s = [i0_u64; 3];
@@ -1481,12 +1468,8 @@ fn three_items_dyn() {
         slice::from_raw_parts(data, len)
     };
 
-    let fields = [
-        (i1_bytes, field_layouts[0]),
-        (i2_bytes, field_layouts[1]),
-        (i3_bytes, field_layouts[2]),
-    ];
-    vec.insert(0, DynSoa::new(fields));
+    let fields = [i1_bytes, i2_bytes, i3_bytes];
+    vec.insert(0, DynSoa::new(vec.context(), fields));
 
     let i4 = 4u8;
     let i5 = 5u64;
@@ -1508,12 +1491,8 @@ fn three_items_dyn() {
         slice::from_raw_parts(data, len)
     };
 
-    let fields = [
-        (i4_bytes, field_layouts[0]),
-        (i5_bytes, field_layouts[1]),
-        (i6_bytes, field_layouts[2]),
-    ];
-    vec.insert(0, DynSoa::new(fields));
+    let fields = [i4_bytes, i5_bytes, i6_bytes];
+    vec.insert(0, DynSoa::new(vec.context(), fields));
 
     let i7 = 7u8;
     let i8 = 8u64;
@@ -1535,12 +1514,8 @@ fn three_items_dyn() {
         slice::from_raw_parts(data, len)
     };
 
-    let fields = [
-        (i7_bytes, field_layouts[0]),
-        (i8_bytes, field_layouts[1]),
-        (i9_bytes, field_layouts[2]),
-    ];
-    vec.insert(1, DynSoa::new(fields));
+    let fields = [i7_bytes, i8_bytes, i9_bytes];
+    vec.insert(1, DynSoa::new(vec.context(), fields));
 
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
@@ -1677,16 +1652,14 @@ fn three_items_dyn() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.push(DynSoa::new([
-        (i7_bytes, field_layouts[0]),
-        (i8_plus_9_bytes, field_layouts[1]),
-        (i9_bytes, field_layouts[2]),
-    ]));
-    vec.push(DynSoa::new([
-        (i1_bytes, field_layouts[0]),
-        (i2_plus_3_bytes, field_layouts[1]),
-        (i3_bytes, field_layouts[2]),
-    ]));
+    vec.push(DynSoa::new(
+        vec.context(),
+        [i7_bytes, i8_plus_9_bytes, i9_bytes],
+    ));
+    vec.push(DynSoa::new(
+        vec.context(),
+        [i1_bytes, i2_plus_3_bytes, i3_bytes],
+    ));
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
 
@@ -1712,31 +1685,28 @@ fn three_items_dyn() {
     );
 
     {
+        let context = vec.context().clone();
         let mut drain = vec.drain(2..4);
         assert_eq!(drain.len(), 2);
 
+        let value = drain
+            .next_back()
+            .expect("drain iterator should not be empty");
         assert_eq!(
-            drain.next_back(),
-            Some(DynSoa::new([
-                (i7_bytes, field_layouts[0]),
-                (i8_plus_9_bytes, field_layouts[1]),
-                (i9_bytes, field_layouts[2]),
-            ])),
+            value.as_refs(&context).as_ref(),
+            [i7_bytes, i8_plus_9_bytes, i9_bytes],
         );
         assert_eq!(drain.len(), 1);
 
+        let value = drain.next().expect("drain iterator should not be empty");
         assert_eq!(
-            drain.next(),
-            Some(DynSoa::new([
-                (i1_bytes, field_layouts[0]),
-                (i2_plus_3_bytes, field_layouts[1]),
-                (i3_bytes, field_layouts[2]),
-            ])),
+            value.as_refs(&context).as_ref(),
+            [i1_bytes, i2_plus_3_bytes, i3_bytes],
         );
         assert_eq!(drain.len(), 0);
 
-        assert_eq!(drain.next(), None);
-        assert_eq!(drain.next_back(), None);
+        assert!(drain.next().is_none());
+        assert!(drain.next_back().is_none());
     }
 
     assert_eq!(vec.len(), 3);
@@ -1749,12 +1719,8 @@ fn three_items_dyn() {
 
     let value = vec.swap_remove(1);
     assert_eq!(
-        value,
-        DynSoa::new([
-            (i7_bytes, field_layouts[0]),
-            (i8_plus_9_bytes, field_layouts[1]),
-            (i9_bytes, field_layouts[2]),
-        ]),
+        value.as_refs(vec.context()).as_ref(),
+        [i7_bytes, i8_plus_9_bytes, i9_bytes],
     );
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 3);
@@ -1767,12 +1733,8 @@ fn three_items_dyn() {
 
     let value = vec.pop().expect("vector should not be empty");
     assert_eq!(
-        value,
-        DynSoa::new([
-            (i1_bytes, field_layouts[0]),
-            (i2_plus_3_bytes, field_layouts[1]),
-            (i3_bytes, field_layouts[2]),
-        ]),
+        value.as_refs(vec.context()).as_ref(),
+        [i1_bytes, i2_plus_3_bytes, i3_bytes],
     );
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
@@ -1785,23 +1747,16 @@ fn three_items_dyn() {
 
     let value = vec.remove(0);
     assert_eq!(
-        value,
-        DynSoa::new([
-            (i4_bytes, field_layouts[0]),
-            (i5_plus_6_bytes, field_layouts[1]),
-            (i6_bytes, field_layouts[2]),
-        ]),
+        value.as_refs(vec.context()).as_ref(),
+        [i4_bytes, i5_plus_6_bytes, i6_bytes],
     );
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
     assert!(!vec.contains_by_refs(DynSoaRefs::new([i4_bytes, i5_plus_6_bytes, i6_bytes])));
 
-    let fields = [
-        (i0_u8_bytes, field_layouts[0]),
-        (i0_u64_bytes, field_layouts[1]),
-        (i0_u16_bytes, field_layouts[2]),
-    ];
-    vec.extend(iter::repeat_with(|| DynSoa::new(fields)).take(3));
+    let fields = [i0_u8_bytes, i0_u64_bytes, i0_u16_bytes];
+    let context = vec.context().clone();
+    vec.extend(iter::repeat_with(|| DynSoa::new(&context, fields)).take(3));
     vec.reserve(1);
     assert!(vec.capacity() >= 4);
     vec.reserve_exact(6);
@@ -1830,26 +1785,14 @@ fn three_items_dyn() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let fields = [
-        (i1_bytes, field_layouts[0]),
-        (i2_bytes, field_layouts[1]),
-        (i3_bytes, field_layouts[2]),
-    ];
-    vec.push(DynSoa::new(fields));
+    let fields = [i1_bytes, i2_bytes, i3_bytes];
+    vec.push(DynSoa::new(vec.context(), fields));
     for _ in 0..10 {
-        let fields = [
-            (i4_bytes, field_layouts[0]),
-            (i5_bytes, field_layouts[1]),
-            (i6_bytes, field_layouts[2]),
-        ];
-        vec.push(DynSoa::new(fields));
+        let fields = [i4_bytes, i5_bytes, i6_bytes];
+        vec.push(DynSoa::new(vec.context(), fields));
 
-        let fields = [
-            (i7_bytes, field_layouts[0]),
-            (i8_bytes, field_layouts[1]),
-            (i9_bytes, field_layouts[2]),
-        ];
-        vec.push(DynSoa::new(fields));
+        let fields = [i7_bytes, i8_bytes, i9_bytes];
+        vec.push(DynSoa::new(vec.context(), fields));
     }
     vec.retain_mut(|mut refs| {
         let [x, _, _] = refs.as_mut() else {
@@ -1916,14 +1859,13 @@ fn three_items_dyn() {
 
     let mut into_iter = boxed_slice.into_iter();
     assert_eq!(into_iter.len(), 1);
+
+    let value = into_iter.next_back().expect("iterator should not be empty");
     assert_eq!(
-        into_iter.next_back(),
-        Some(DynSoa::new([
-            (i2_u8_bytes, field_layouts[0]),
-            (i2_bytes, field_layouts[1]),
-            (i3_bytes, field_layouts[2]),
-        ])),
+        value.as_refs(into_iter.context()).as_ref(),
+        [i2_u8_bytes, i2_bytes, i3_bytes],
     );
-    assert_eq!(into_iter.next(), None);
-    assert_eq!(into_iter.next_back(), None);
+
+    assert!(into_iter.next().is_none());
+    assert!(into_iter.next_back().is_none());
 }

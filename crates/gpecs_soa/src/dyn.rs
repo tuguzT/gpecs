@@ -22,20 +22,15 @@ type DynFields<SizeAlign> = Box<[Byte<SizeAlign>]>;
 
 pub struct DynSoa<SizeAlign> {
     buffer: DynFields<SizeAlign>,
-    layouts: Box<[Layout]>,
 }
 
 impl<SizeAlign> DynSoa<SizeAlign> {
     #[inline]
-    pub fn new<'a, I>(fields: I) -> Self
+    pub fn new<'a, I>(context: &DynSoaContext<SizeAlign>, fields: I) -> Self
     where
-        I: IntoIterator<Item = (&'a [u8], Layout)>,
+        I: IntoIterator<Item = &'a [u8]>,
     {
-        let (fields, layouts): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
-        let context = DynSoaContext {
-            field_layouts: layouts.into_boxed_slice(),
-            phantom: PhantomData,
-        };
+        let DynSoaContext { field_layouts, .. } = context;
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
@@ -43,9 +38,9 @@ impl<SizeAlign> DynSoa<SizeAlign> {
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
         let buffer = unsafe {
-            for ((field_layout, src), offset) in
-                context.field_layouts.iter().zip(fields).zip(offsets)
-            {
+            for ((field_layout, src), offset) in field_layouts.iter().zip(fields).zip(offsets) {
+                assert_eq!(field_layout.size(), src.len());
+
                 let src = src.as_ptr();
                 let dst = buffer.as_mut_ptr().cast::<u8>().add(offset);
 
@@ -54,27 +49,20 @@ impl<SizeAlign> DynSoa<SizeAlign> {
             }
             buffer.assume_init()
         };
-
-        Self {
-            buffer,
-            layouts: context.field_layouts,
-        }
+        Self { buffer }
     }
 
     #[inline]
-    pub fn as_refs(&self) -> DynSoaRefs<'_, SizeAlign> {
-        let Self { buffer, layouts } = self;
-        let context = DynSoaContext {
-            field_layouts: layouts.clone(),
-            phantom: PhantomData,
-        };
+    pub fn as_refs(&self, context: &DynSoaContext<SizeAlign>) -> DynSoaRefs<'_, SizeAlign> {
+        let Self { buffer } = self;
+        let DynSoaContext { field_layouts, .. } = context;
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
         assert_eq!(buffer_len, buffer.len());
 
-        let refs = layouts
+        let refs = field_layouts
             .iter()
             .zip(offsets)
             .map(|(field_layout, offset)| unsafe {
@@ -90,19 +78,19 @@ impl<SizeAlign> DynSoa<SizeAlign> {
     }
 
     #[inline]
-    pub fn as_refs_mut(&mut self) -> DynSoaRefsMut<'_, SizeAlign> {
-        let Self { buffer, layouts } = self;
-        let context = DynSoaContext {
-            field_layouts: layouts.clone(),
-            phantom: PhantomData,
-        };
+    pub fn as_refs_mut(
+        &mut self,
+        context: &DynSoaContext<SizeAlign>,
+    ) -> DynSoaRefsMut<'_, SizeAlign> {
+        let Self { buffer } = self;
+        let DynSoaContext { field_layouts, .. } = context;
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
         assert_eq!(buffer_len, buffer.len());
 
-        let refs = layouts
+        let refs = field_layouts
             .iter()
             .zip(offsets)
             .map(|(field_layout, offset)| unsafe {
@@ -115,28 +103,6 @@ impl<SizeAlign> DynSoa<SizeAlign> {
             refs,
             phantom: PhantomData,
         }
-    }
-}
-
-impl<SizeAlign> Debug for DynSoa<SizeAlign> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let DynSoaRefs { refs, .. } = self.as_refs();
-        f.debug_tuple("DynSoa").field(&refs).finish()
-    }
-}
-
-impl<SizeAlign> PartialEq for DynSoa<SizeAlign> {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_refs() == other.as_refs() && self.layouts == other.layouts
-    }
-}
-
-impl<SizeAlign> Eq for DynSoa<SizeAlign> {}
-
-impl<SizeAlign> Hash for DynSoa<SizeAlign> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.as_refs().hash(state);
-        self.layouts.hash(state);
     }
 }
 
@@ -187,14 +153,6 @@ impl<SizeAlign> Debug for DynSoaContext<SizeAlign> {
             .finish()
     }
 }
-
-impl<SizeAlign> PartialEq for DynSoaContext<SizeAlign> {
-    fn eq(&self, other: &Self) -> bool {
-        self.field_layouts == other.field_layouts && self.phantom == other.phantom
-    }
-}
-
-impl<SizeAlign> Eq for DynSoaContext<SizeAlign> {}
 
 impl<SizeAlign> Hash for DynSoaContext<SizeAlign> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1319,23 +1277,15 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             }
             buffer.assume_init()
         };
-
-        Self {
-            buffer,
-            layouts: field_layouts.clone(),
-        }
+        Self { buffer }
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
         let DynSoaContext { field_layouts, .. } = context;
         let DynSoaMutPtrs { ptrs: dst, .. } = dst;
-        let Self {
-            buffer,
-            layouts: value_field_layouts,
-        } = value;
+        let Self { buffer } = value;
 
         assert_eq!(field_layouts.len(), dst.len());
-        assert_eq!(field_layouts.as_ref(), value_field_layouts.as_ref());
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");

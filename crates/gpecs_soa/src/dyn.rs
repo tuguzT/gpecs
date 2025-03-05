@@ -927,6 +927,33 @@ impl<'a, Fields> DynSoaRefsMut<'a, Fields> {
             phantom: PhantomData,
         }
     }
+
+    #[inline]
+    pub unsafe fn into<T>(self, context: &T::Context) -> T::Refs<'a>
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let Self { refs, .. } = self;
+
+        let mut permutation = permutation_of::<T>(context);
+        assert_eq!(refs.len(), permutation.len());
+
+        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+        apply_permutation(&mut permutation, &mut field_layouts);
+
+        let mut ptrs: Box<[_]> = refs
+            .iter()
+            .zip(field_layouts)
+            .map(|((layout, r#ref), field_layout)| {
+                assert_eq!(layout, &field_layout);
+                r#ref.as_ptr()
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut ptrs);
+
+        let ptrs = T::ptrs_restore(context, ptrs);
+        unsafe { T::ptrs_to_refs(context, ptrs) }
+    }
 }
 
 impl<'a, Fields> AsRef<[(Layout, DynFieldRefMut<'a>)]> for DynSoaRefsMut<'a, Fields> {

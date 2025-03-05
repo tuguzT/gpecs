@@ -89,7 +89,7 @@ where
 unsafe impl<T> Send for Iter<'_, T>
 where
     T: Soa,
-    T::SizeAlign: Send,
+    T::Fields: Send,
     T::Context: Send,
 {
 }
@@ -97,7 +97,7 @@ where
 unsafe impl<T> Sync for Iter<'_, T>
 where
     T: Soa,
-    T::SizeAlign: Sync,
+    T::Fields: Sync,
     T::Context: Sync,
 {
 }
@@ -477,7 +477,7 @@ where
 unsafe impl<T> Send for IterMut<'_, T>
 where
     T: Soa,
-    T::SizeAlign: Send,
+    T::Fields: Send,
     T::Context: Send,
 {
 }
@@ -485,7 +485,7 @@ where
 unsafe impl<T> Sync for IterMut<'_, T>
 where
     T: Soa,
-    T::SizeAlign: Sync,
+    T::Fields: Sync,
     T::Context: Sync,
 {
 }

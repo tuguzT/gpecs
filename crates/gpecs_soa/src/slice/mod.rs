@@ -619,7 +619,7 @@ where
 unsafe impl<'a, T> Send for SoaSlice<T>
 where
     T: Soa,
-    T::SizeAlign: Send,
+    T::Fields: Send,
     T::Context: Send,
 {
 }
@@ -627,7 +627,7 @@ where
 unsafe impl<'a, T> Sync for SoaSlice<T>
 where
     T: Soa,
-    T::SizeAlign: Sync,
+    T::Fields: Sync,
     T::Context: Sync,
 {
 }

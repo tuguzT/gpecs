@@ -53,13 +53,13 @@ where
 
 /// Special type which is used to properly allocate a buffer in memory
 /// with respect to the size and alignment of
-/// [`SizeAlign`](`Soa::SizeAlign`) and [`Context`](`Soa::Context`) associated types of `T`.
+/// [`Fields`](`Soa::Fields`) and [`Context`](`Soa::Context`) associated types of `T`.
 pub union BufferData<T>
 where
     T: Soa,
 {
     _required_align: [usize; 0],
-    _size_align: ManuallyDrop<MaybeUninit<T::SizeAlign>>,
+    _size_align: ManuallyDrop<MaybeUninit<T::Fields>>,
     _context: ManuallyDrop<MaybeUninit<T::Context>>,
 }
 
@@ -219,7 +219,7 @@ pub(crate) struct BufferPrefix<T>
 where
     T: Soa,
 {
-    _required_align: [T::SizeAlign; 0],
+    _required_align: [T::Fields; 0],
     context: T::Context,
     len: usize,
 }
@@ -310,7 +310,7 @@ pub(crate) fn is_zst<T>() -> bool
 where
     T: Soa,
 {
-    size_of::<T::SizeAlign>() == 0
+    size_of::<T::Fields>() == 0
 }
 
 #[inline]

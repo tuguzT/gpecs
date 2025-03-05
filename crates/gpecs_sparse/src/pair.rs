@@ -47,8 +47,8 @@ unsafe impl<K, V> Soa for KeyValuePair<K, V>
 where
     V: Soa,
 {
-    type SizeAlign = Self;
     type Context = V::Context;
+    type Fields = (K, V::Fields);
     type FieldLayouts<'a> = KeyValueFieldLayouts<'a, K, V>;
 
     #[inline]

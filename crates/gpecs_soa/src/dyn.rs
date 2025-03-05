@@ -13,20 +13,20 @@ use core::{
 
 use crate::traits::Soa;
 
-union Byte<SizeAlign> {
+union Byte<Fields> {
     _byte: u8,
-    _size_align: ManuallyDrop<MaybeUninit<SizeAlign>>,
+    _size_align: ManuallyDrop<MaybeUninit<Fields>>,
 }
 
-type DynFields<SizeAlign> = Box<[Byte<SizeAlign>]>;
+type DynFields<Fields> = Box<[Byte<Fields>]>;
 
-pub struct DynSoa<SizeAlign> {
-    buffer: DynFields<SizeAlign>,
+pub struct DynSoa<Fields> {
+    buffer: DynFields<Fields>,
 }
 
-impl<SizeAlign> DynSoa<SizeAlign> {
+impl<Fields> DynSoa<Fields> {
     #[inline]
-    pub fn new<'a, I>(context: &DynSoaContext<SizeAlign>, fields: I) -> Self
+    pub fn new<'a, I>(context: &DynSoaContext<Fields>, fields: I) -> Self
     where
         I: IntoIterator<Item = &'a [u8]>,
     {
@@ -34,7 +34,7 @@ impl<SizeAlign> DynSoa<SizeAlign> {
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
-        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
         let buffer = unsafe {
@@ -53,13 +53,13 @@ impl<SizeAlign> DynSoa<SizeAlign> {
     }
 
     #[inline]
-    pub fn as_refs(&self, context: &DynSoaContext<SizeAlign>) -> DynSoaRefs<'_, SizeAlign> {
+    pub fn as_refs(&self, context: &DynSoaContext<Fields>) -> DynSoaRefs<'_, Fields> {
         let Self { buffer } = self;
         let DynSoaContext { field_layouts, .. } = context;
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
-        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
         assert_eq!(buffer_len, buffer.len());
 
         let refs = field_layouts
@@ -78,16 +78,13 @@ impl<SizeAlign> DynSoa<SizeAlign> {
     }
 
     #[inline]
-    pub fn as_refs_mut(
-        &mut self,
-        context: &DynSoaContext<SizeAlign>,
-    ) -> DynSoaRefsMut<'_, SizeAlign> {
+    pub fn as_refs_mut(&mut self, context: &DynSoaContext<Fields>) -> DynSoaRefsMut<'_, Fields> {
         let Self { buffer } = self;
         let DynSoaContext { field_layouts, .. } = context;
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(&context, 1).expect("layout size should not exceed `isize::MAX`");
-        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
         assert_eq!(buffer_len, buffer.len());
 
         let refs = field_layouts
@@ -106,12 +103,12 @@ impl<SizeAlign> DynSoa<SizeAlign> {
     }
 }
 
-pub struct DynSoaContext<SizeAlign> {
+pub struct DynSoaContext<Fields> {
     field_layouts: Box<[Layout]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<SizeAlign> DynSoaContext<SizeAlign> {
+impl<Fields> DynSoaContext<Fields> {
     #[inline]
     pub fn new<I>(field_layouts: I) -> Self
     where
@@ -124,7 +121,7 @@ impl<SizeAlign> DynSoaContext<SizeAlign> {
                 let layout: &Layout = item.borrow();
 
                 let input_align = layout.align();
-                let max_align = align_of::<SizeAlign>();
+                let max_align = align_of::<Fields>();
                 assert!(
                     input_align <= max_align,
                     "input alignment must be less than or equal to {max_align}, but got {input_align}",
@@ -139,14 +136,14 @@ impl<SizeAlign> DynSoaContext<SizeAlign> {
     }
 }
 
-impl<SizeAlign> AsRef<[Layout]> for DynSoaContext<SizeAlign> {
+impl<Fields> AsRef<[Layout]> for DynSoaContext<Fields> {
     fn as_ref(&self) -> &[Layout] {
         let Self { field_layouts, .. } = self;
         field_layouts.as_ref()
     }
 }
 
-impl<SizeAlign> Debug for DynSoaContext<SizeAlign> {
+impl<Fields> Debug for DynSoaContext<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaContext")
             .field(&self.field_layouts)
@@ -154,14 +151,14 @@ impl<SizeAlign> Debug for DynSoaContext<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Hash for DynSoaContext<SizeAlign> {
+impl<Fields> Hash for DynSoaContext<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.field_layouts.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<SizeAlign> Clone for DynSoaContext<SizeAlign> {
+impl<Fields> Clone for DynSoaContext<Fields> {
     fn clone(&self) -> Self {
         Self {
             field_layouts: self.field_layouts.clone(),
@@ -172,12 +169,12 @@ impl<SizeAlign> Clone for DynSoaContext<SizeAlign> {
 
 type DynFieldPtr = *const [u8];
 
-pub struct DynSoaPtrs<SizeAlign> {
+pub struct DynSoaPtrs<Fields> {
     ptrs: Box<[DynFieldPtr]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<SizeAlign> DynSoaPtrs<SizeAlign> {
+impl<Fields> DynSoaPtrs<Fields> {
     pub fn new<I>(ptrs: I) -> Self
     where
         I: IntoIterator<Item = DynFieldPtr>,
@@ -189,35 +186,35 @@ impl<SizeAlign> DynSoaPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> AsRef<[DynFieldPtr]> for DynSoaPtrs<SizeAlign> {
+impl<Fields> AsRef<[DynFieldPtr]> for DynSoaPtrs<Fields> {
     fn as_ref(&self) -> &[DynFieldPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
 }
 
-impl<SizeAlign> AsMut<[DynFieldPtr]> for DynSoaPtrs<SizeAlign> {
+impl<Fields> AsMut<[DynFieldPtr]> for DynSoaPtrs<Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
     }
 }
 
-impl<SizeAlign> Debug for DynSoaPtrs<SizeAlign> {
+impl<Fields> Debug for DynSoaPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaPtrs").field(&self.ptrs).finish()
     }
 }
 
-impl<SizeAlign> PartialEq for DynSoaPtrs<SizeAlign> {
+impl<Fields> PartialEq for DynSoaPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.ptrs == other.ptrs && self.phantom == other.phantom
     }
 }
 
-impl<SizeAlign> Eq for DynSoaPtrs<SizeAlign> {}
+impl<Fields> Eq for DynSoaPtrs<Fields> {}
 
-impl<SizeAlign> PartialOrd for DynSoaPtrs<SizeAlign> {
+impl<Fields> PartialOrd for DynSoaPtrs<Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.ptrs.partial_cmp(&other.ptrs) {
             Some(cmp::Ordering::Equal) => {}
@@ -227,7 +224,7 @@ impl<SizeAlign> PartialOrd for DynSoaPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Ord for DynSoaPtrs<SizeAlign> {
+impl<Fields> Ord for DynSoaPtrs<Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.ptrs.cmp(&other.ptrs) {
             cmp::Ordering::Equal => {}
@@ -237,14 +234,14 @@ impl<SizeAlign> Ord for DynSoaPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Hash for DynSoaPtrs<SizeAlign> {
+impl<Fields> Hash for DynSoaPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.ptrs.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<SizeAlign> Clone for DynSoaPtrs<SizeAlign> {
+impl<Fields> Clone for DynSoaPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             ptrs: self.ptrs.clone(),
@@ -255,12 +252,12 @@ impl<SizeAlign> Clone for DynSoaPtrs<SizeAlign> {
 
 type DynFieldMutPtr = *mut [u8];
 
-pub struct DynSoaMutPtrs<SizeAlign> {
+pub struct DynSoaMutPtrs<Fields> {
     ptrs: Box<[DynFieldMutPtr]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<SizeAlign> DynSoaMutPtrs<SizeAlign> {
+impl<Fields> DynSoaMutPtrs<Fields> {
     pub fn new<I>(ptrs: I) -> Self
     where
         I: IntoIterator<Item = DynFieldMutPtr>,
@@ -272,35 +269,35 @@ impl<SizeAlign> DynSoaMutPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> AsRef<[DynFieldMutPtr]> for DynSoaMutPtrs<SizeAlign> {
+impl<Fields> AsRef<[DynFieldMutPtr]> for DynSoaMutPtrs<Fields> {
     fn as_ref(&self) -> &[DynFieldMutPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
 }
 
-impl<SizeAlign> AsMut<[DynFieldMutPtr]> for DynSoaMutPtrs<SizeAlign> {
+impl<Fields> AsMut<[DynFieldMutPtr]> for DynSoaMutPtrs<Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldMutPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
     }
 }
 
-impl<SizeAlign> Debug for DynSoaMutPtrs<SizeAlign> {
+impl<Fields> Debug for DynSoaMutPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaMutPtrs").field(&self.ptrs).finish()
     }
 }
 
-impl<SizeAlign> PartialEq for DynSoaMutPtrs<SizeAlign> {
+impl<Fields> PartialEq for DynSoaMutPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.ptrs == other.ptrs && self.phantom == other.phantom
     }
 }
 
-impl<SizeAlign> Eq for DynSoaMutPtrs<SizeAlign> {}
+impl<Fields> Eq for DynSoaMutPtrs<Fields> {}
 
-impl<SizeAlign> PartialOrd for DynSoaMutPtrs<SizeAlign> {
+impl<Fields> PartialOrd for DynSoaMutPtrs<Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.ptrs.partial_cmp(&other.ptrs) {
             Some(cmp::Ordering::Equal) => {}
@@ -310,7 +307,7 @@ impl<SizeAlign> PartialOrd for DynSoaMutPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Ord for DynSoaMutPtrs<SizeAlign> {
+impl<Fields> Ord for DynSoaMutPtrs<Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.ptrs.cmp(&other.ptrs) {
             cmp::Ordering::Equal => {}
@@ -320,14 +317,14 @@ impl<SizeAlign> Ord for DynSoaMutPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Hash for DynSoaMutPtrs<SizeAlign> {
+impl<Fields> Hash for DynSoaMutPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.ptrs.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<SizeAlign> Clone for DynSoaMutPtrs<SizeAlign> {
+impl<Fields> Clone for DynSoaMutPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             ptrs: self.ptrs.clone(),
@@ -338,12 +335,12 @@ impl<SizeAlign> Clone for DynSoaMutPtrs<SizeAlign> {
 
 type DynFieldNonNullPtr = NonNull<[u8]>;
 
-pub struct DynSoaNonNullPtrs<SizeAlign> {
+pub struct DynSoaNonNullPtrs<Fields> {
     ptrs: Box<[DynFieldNonNullPtr]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<SizeAlign> DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> DynSoaNonNullPtrs<Fields> {
     pub fn new<I>(ptrs: I) -> Self
     where
         I: IntoIterator<Item = DynFieldNonNullPtr>,
@@ -355,21 +352,21 @@ impl<SizeAlign> DynSoaNonNullPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> AsRef<[DynFieldNonNullPtr]> for DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> AsRef<[DynFieldNonNullPtr]> for DynSoaNonNullPtrs<Fields> {
     fn as_ref(&self) -> &[DynFieldNonNullPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
 }
 
-impl<SizeAlign> AsMut<[DynFieldNonNullPtr]> for DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> AsMut<[DynFieldNonNullPtr]> for DynSoaNonNullPtrs<Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldNonNullPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
     }
 }
 
-impl<SizeAlign> Debug for DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> Debug for DynSoaNonNullPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaNonNullPtrs")
             .field(&self.ptrs)
@@ -377,15 +374,15 @@ impl<SizeAlign> Debug for DynSoaNonNullPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> PartialEq for DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> PartialEq for DynSoaNonNullPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.ptrs == other.ptrs && self.phantom == other.phantom
     }
 }
 
-impl<SizeAlign> Eq for DynSoaNonNullPtrs<SizeAlign> {}
+impl<Fields> Eq for DynSoaNonNullPtrs<Fields> {}
 
-impl<SizeAlign> PartialOrd for DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> PartialOrd for DynSoaNonNullPtrs<Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.ptrs.partial_cmp(&other.ptrs) {
             Some(cmp::Ordering::Equal) => {}
@@ -395,7 +392,7 @@ impl<SizeAlign> PartialOrd for DynSoaNonNullPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Ord for DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> Ord for DynSoaNonNullPtrs<Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.ptrs.cmp(&other.ptrs) {
             cmp::Ordering::Equal => {}
@@ -405,14 +402,14 @@ impl<SizeAlign> Ord for DynSoaNonNullPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Hash for DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> Hash for DynSoaNonNullPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.ptrs.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<SizeAlign> Clone for DynSoaNonNullPtrs<SizeAlign> {
+impl<Fields> Clone for DynSoaNonNullPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             ptrs: self.ptrs.clone(),
@@ -422,27 +419,27 @@ impl<SizeAlign> Clone for DynSoaNonNullPtrs<SizeAlign> {
 }
 
 // data is stored inline in a single buffer
-struct DynFieldVec<SizeAlign> {
-    buffer: Vec<Byte<SizeAlign>>,
+struct DynFieldVec<Fields> {
+    buffer: Vec<Byte<Fields>>,
     layout: Layout,
     len: usize,
 }
 
-pub struct DynSoaVecs<SizeAlign> {
-    vecs: Box<[DynFieldVec<SizeAlign>]>,
+pub struct DynSoaVecs<Fields> {
+    vecs: Box<[DynFieldVec<Fields>]>,
 }
 
 type DynFieldRef<'a> = &'a [u8];
 
-pub struct DynSoaRefs<'a, SizeAlign>
+pub struct DynSoaRefs<'a, Fields>
 where
-    SizeAlign: 'a,
+    Fields: 'a,
 {
     refs: Box<[DynFieldRef<'a>]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, SizeAlign> DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> DynSoaRefs<'a, Fields> {
     pub fn new<I>(refs: I) -> Self
     where
         I: IntoIterator<Item = DynFieldRef<'a>>,
@@ -454,35 +451,35 @@ impl<'a, SizeAlign> DynSoaRefs<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> AsRef<[DynFieldRef<'a>]> for DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> AsRef<[DynFieldRef<'a>]> for DynSoaRefs<'a, Fields> {
     fn as_ref(&self) -> &[DynFieldRef<'a>] {
         let Self { refs, .. } = self;
         refs.as_ref()
     }
 }
 
-impl<'a, SizeAlign> AsMut<[DynFieldRef<'a>]> for DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> AsMut<[DynFieldRef<'a>]> for DynSoaRefs<'a, Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldRef<'a>] {
         let Self { refs, .. } = self;
         refs.as_mut()
     }
 }
 
-impl<'a, SizeAlign> Debug for DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> Debug for DynSoaRefs<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaRefs").field(&self.refs).finish()
     }
 }
 
-impl<'a, SizeAlign> PartialEq for DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> PartialEq for DynSoaRefs<'a, Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.refs == other.refs && self.phantom == other.phantom
     }
 }
 
-impl<'a, SizeAlign> Eq for DynSoaRefs<'a, SizeAlign> {}
+impl<'a, Fields> Eq for DynSoaRefs<'a, Fields> {}
 
-impl<'a, SizeAlign> PartialOrd for DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> PartialOrd for DynSoaRefs<'a, Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.refs.partial_cmp(&other.refs) {
             Some(cmp::Ordering::Equal) => {}
@@ -492,7 +489,7 @@ impl<'a, SizeAlign> PartialOrd for DynSoaRefs<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> Ord for DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> Ord for DynSoaRefs<'a, Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.refs.cmp(&other.refs) {
             cmp::Ordering::Equal => {}
@@ -502,14 +499,14 @@ impl<'a, SizeAlign> Ord for DynSoaRefs<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> Hash for DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> Hash for DynSoaRefs<'a, Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.refs.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<'a, SizeAlign> Clone for DynSoaRefs<'a, SizeAlign> {
+impl<'a, Fields> Clone for DynSoaRefs<'a, Fields> {
     fn clone(&self) -> Self {
         Self {
             refs: self.refs.clone(),
@@ -520,15 +517,15 @@ impl<'a, SizeAlign> Clone for DynSoaRefs<'a, SizeAlign> {
 
 type DynFieldRefMut<'a> = &'a mut [u8];
 
-pub struct DynSoaRefsMut<'a, SizeAlign>
+pub struct DynSoaRefsMut<'a, Fields>
 where
-    SizeAlign: 'a,
+    Fields: 'a,
 {
     refs: Box<[DynFieldRefMut<'a>]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, SizeAlign> DynSoaRefsMut<'a, SizeAlign> {
+impl<'a, Fields> DynSoaRefsMut<'a, Fields> {
     pub fn new<I>(refs: I) -> Self
     where
         I: IntoIterator<Item = DynFieldRefMut<'a>>,
@@ -540,35 +537,35 @@ impl<'a, SizeAlign> DynSoaRefsMut<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> AsRef<[DynFieldRefMut<'a>]> for DynSoaRefsMut<'a, SizeAlign> {
+impl<'a, Fields> AsRef<[DynFieldRefMut<'a>]> for DynSoaRefsMut<'a, Fields> {
     fn as_ref(&self) -> &[DynFieldRefMut<'a>] {
         let Self { refs, .. } = self;
         refs.as_ref()
     }
 }
 
-impl<'a, SizeAlign> AsMut<[DynFieldRefMut<'a>]> for DynSoaRefsMut<'a, SizeAlign> {
+impl<'a, Fields> AsMut<[DynFieldRefMut<'a>]> for DynSoaRefsMut<'a, Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldRefMut<'a>] {
         let Self { refs, .. } = self;
         refs.as_mut()
     }
 }
 
-impl<'a, SizeAlign> Debug for DynSoaRefsMut<'a, SizeAlign> {
+impl<'a, Fields> Debug for DynSoaRefsMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaRefsMut").field(&self.refs).finish()
     }
 }
 
-impl<'a, SizeAlign> PartialEq for DynSoaRefsMut<'a, SizeAlign> {
+impl<'a, Fields> PartialEq for DynSoaRefsMut<'a, Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.refs == other.refs && self.phantom == other.phantom
     }
 }
 
-impl<'a, SizeAlign> Eq for DynSoaRefsMut<'a, SizeAlign> {}
+impl<'a, Fields> Eq for DynSoaRefsMut<'a, Fields> {}
 
-impl<'a, SizeAlign> PartialOrd for DynSoaRefsMut<'a, SizeAlign> {
+impl<'a, Fields> PartialOrd for DynSoaRefsMut<'a, Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.refs.partial_cmp(&other.refs) {
             Some(cmp::Ordering::Equal) => {}
@@ -578,7 +575,7 @@ impl<'a, SizeAlign> PartialOrd for DynSoaRefsMut<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> Ord for DynSoaRefsMut<'a, SizeAlign> {
+impl<'a, Fields> Ord for DynSoaRefsMut<'a, Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.refs.cmp(&other.refs) {
             cmp::Ordering::Equal => {}
@@ -588,7 +585,7 @@ impl<'a, SizeAlign> Ord for DynSoaRefsMut<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> Hash for DynSoaRefsMut<'a, SizeAlign> {
+impl<'a, Fields> Hash for DynSoaRefsMut<'a, Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.refs.hash(state);
         self.phantom.hash(state);
@@ -598,12 +595,12 @@ impl<'a, SizeAlign> Hash for DynSoaRefsMut<'a, SizeAlign> {
 // data is stored inline in a single buffer
 type DynFieldSlicePtr = *const [u8];
 
-pub struct DynSoaSlicePtrs<SizeAlign> {
+pub struct DynSoaSlicePtrs<Fields> {
     slices: Box<[DynFieldSlicePtr]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<SizeAlign> DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> DynSoaSlicePtrs<Fields> {
     pub fn new<I>(slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSlicePtr>,
@@ -615,21 +612,21 @@ impl<SizeAlign> DynSoaSlicePtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> AsRef<[DynFieldSlicePtr]> for DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> AsRef<[DynFieldSlicePtr]> for DynSoaSlicePtrs<Fields> {
     fn as_ref(&self) -> &[DynFieldSlicePtr] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<SizeAlign> AsMut<[DynFieldSlicePtr]> for DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> AsMut<[DynFieldSlicePtr]> for DynSoaSlicePtrs<Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldSlicePtr] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 }
 
-impl<SizeAlign> Debug for DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> Debug for DynSoaSlicePtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaSlicePtrs")
             .field(&self.slices)
@@ -637,15 +634,15 @@ impl<SizeAlign> Debug for DynSoaSlicePtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> PartialEq for DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> PartialEq for DynSoaSlicePtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
-impl<SizeAlign> Eq for DynSoaSlicePtrs<SizeAlign> {}
+impl<Fields> Eq for DynSoaSlicePtrs<Fields> {}
 
-impl<SizeAlign> PartialOrd for DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> PartialOrd for DynSoaSlicePtrs<Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.slices.partial_cmp(&other.slices) {
             Some(cmp::Ordering::Equal) => {}
@@ -655,7 +652,7 @@ impl<SizeAlign> PartialOrd for DynSoaSlicePtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Ord for DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> Ord for DynSoaSlicePtrs<Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.slices.cmp(&other.slices) {
             cmp::Ordering::Equal => {}
@@ -665,14 +662,14 @@ impl<SizeAlign> Ord for DynSoaSlicePtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Hash for DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> Hash for DynSoaSlicePtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.slices.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<SizeAlign> Clone for DynSoaSlicePtrs<SizeAlign> {
+impl<Fields> Clone for DynSoaSlicePtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             slices: self.slices.clone(),
@@ -684,12 +681,12 @@ impl<SizeAlign> Clone for DynSoaSlicePtrs<SizeAlign> {
 // data is stored inline in a single buffer
 type DynFieldSliceMutPtr = *mut [u8];
 
-pub struct DynSoaSliceMutPtrs<SizeAlign> {
+pub struct DynSoaSliceMutPtrs<Fields> {
     slices: Box<[DynFieldSliceMutPtr]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<SizeAlign> DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> DynSoaSliceMutPtrs<Fields> {
     pub fn new<I>(slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSliceMutPtr>,
@@ -701,21 +698,21 @@ impl<SizeAlign> DynSoaSliceMutPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> AsRef<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> AsRef<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<Fields> {
     fn as_ref(&self) -> &[DynFieldSliceMutPtr] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<SizeAlign> AsMut<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> AsMut<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldSliceMutPtr] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 }
 
-impl<SizeAlign> Debug for DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> Debug for DynSoaSliceMutPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaSliceMutPtrs")
             .field(&self.slices)
@@ -723,15 +720,15 @@ impl<SizeAlign> Debug for DynSoaSliceMutPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> PartialEq for DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> PartialEq for DynSoaSliceMutPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
-impl<SizeAlign> Eq for DynSoaSliceMutPtrs<SizeAlign> {}
+impl<Fields> Eq for DynSoaSliceMutPtrs<Fields> {}
 
-impl<SizeAlign> PartialOrd for DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> PartialOrd for DynSoaSliceMutPtrs<Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.slices.partial_cmp(&other.slices) {
             Some(cmp::Ordering::Equal) => {}
@@ -741,7 +738,7 @@ impl<SizeAlign> PartialOrd for DynSoaSliceMutPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Ord for DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> Ord for DynSoaSliceMutPtrs<Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.slices.cmp(&other.slices) {
             cmp::Ordering::Equal => {}
@@ -751,14 +748,14 @@ impl<SizeAlign> Ord for DynSoaSliceMutPtrs<SizeAlign> {
     }
 }
 
-impl<SizeAlign> Hash for DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> Hash for DynSoaSliceMutPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.slices.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<SizeAlign> Clone for DynSoaSliceMutPtrs<SizeAlign> {
+impl<Fields> Clone for DynSoaSliceMutPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             slices: self.slices.clone(),
@@ -770,15 +767,15 @@ impl<SizeAlign> Clone for DynSoaSliceMutPtrs<SizeAlign> {
 // data is stored inline in a single buffer
 type DynFieldSlice<'a> = &'a [u8];
 
-pub struct DynSoaSlices<'a, SizeAlign>
+pub struct DynSoaSlices<'a, Fields>
 where
-    SizeAlign: 'a,
+    Fields: 'a,
 {
     slices: Box<[DynFieldSlice<'a>]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, SizeAlign> DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> DynSoaSlices<'a, Fields> {
     pub fn new<I>(slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSlice<'a>>,
@@ -790,35 +787,35 @@ impl<'a, SizeAlign> DynSoaSlices<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> AsRef<[DynFieldSlice<'a>]> for DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> AsRef<[DynFieldSlice<'a>]> for DynSoaSlices<'a, Fields> {
     fn as_ref(&self) -> &[DynFieldSlice<'a>] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<'a, SizeAlign> AsMut<[DynFieldSlice<'a>]> for DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> AsMut<[DynFieldSlice<'a>]> for DynSoaSlices<'a, Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldSlice<'a>] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 }
 
-impl<'a, SizeAlign> Debug for DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> Debug for DynSoaSlices<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaSlices").field(&self.slices).finish()
     }
 }
 
-impl<'a, SizeAlign> PartialEq for DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> PartialEq for DynSoaSlices<'a, Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
-impl<'a, SizeAlign> Eq for DynSoaSlices<'a, SizeAlign> {}
+impl<'a, Fields> Eq for DynSoaSlices<'a, Fields> {}
 
-impl<'a, SizeAlign> PartialOrd for DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> PartialOrd for DynSoaSlices<'a, Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.slices.partial_cmp(&other.slices) {
             Some(cmp::Ordering::Equal) => {}
@@ -828,7 +825,7 @@ impl<'a, SizeAlign> PartialOrd for DynSoaSlices<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> Ord for DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> Ord for DynSoaSlices<'a, Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.slices.cmp(&other.slices) {
             cmp::Ordering::Equal => {}
@@ -838,14 +835,14 @@ impl<'a, SizeAlign> Ord for DynSoaSlices<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> Hash for DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> Hash for DynSoaSlices<'a, Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.slices.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<'a, SizeAlign> Clone for DynSoaSlices<'a, SizeAlign> {
+impl<'a, Fields> Clone for DynSoaSlices<'a, Fields> {
     fn clone(&self) -> Self {
         Self {
             slices: self.slices.clone(),
@@ -857,15 +854,15 @@ impl<'a, SizeAlign> Clone for DynSoaSlices<'a, SizeAlign> {
 // data is stored inline in a single buffer
 type DynFieldSliceMut<'a> = &'a mut [u8];
 
-pub struct DynSoaSlicesMut<'a, SizeAlign>
+pub struct DynSoaSlicesMut<'a, Fields>
 where
-    SizeAlign: 'a,
+    Fields: 'a,
 {
     slices: Box<[DynFieldSliceMut<'a>]>,
-    phantom: PhantomData<fn() -> SizeAlign>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, SizeAlign> DynSoaSlicesMut<'a, SizeAlign> {
+impl<'a, Fields> DynSoaSlicesMut<'a, Fields> {
     pub fn new<I>(slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSliceMut<'a>>,
@@ -877,21 +874,21 @@ impl<'a, SizeAlign> DynSoaSlicesMut<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> AsRef<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, SizeAlign> {
+impl<'a, Fields> AsRef<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, Fields> {
     fn as_ref(&self) -> &[DynFieldSliceMut<'a>] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<'a, SizeAlign> AsMut<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, SizeAlign> {
+impl<'a, Fields> AsMut<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, Fields> {
     fn as_mut(&mut self) -> &mut [DynFieldSliceMut<'a>] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 }
 
-impl<'a, SizeAlign> Debug for DynSoaSlicesMut<'a, SizeAlign> {
+impl<'a, Fields> Debug for DynSoaSlicesMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DynSoaSlicesMut")
             .field(&self.slices)
@@ -899,15 +896,15 @@ impl<'a, SizeAlign> Debug for DynSoaSlicesMut<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> PartialEq for DynSoaSlicesMut<'a, SizeAlign> {
+impl<'a, Fields> PartialEq for DynSoaSlicesMut<'a, Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
-impl<'a, SizeAlign> Eq for DynSoaSlicesMut<'a, SizeAlign> {}
+impl<'a, Fields> Eq for DynSoaSlicesMut<'a, Fields> {}
 
-impl<'a, SizeAlign> PartialOrd for DynSoaSlicesMut<'a, SizeAlign> {
+impl<'a, Fields> PartialOrd for DynSoaSlicesMut<'a, Fields> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.slices.partial_cmp(&other.slices) {
             Some(cmp::Ordering::Equal) => {}
@@ -917,7 +914,7 @@ impl<'a, SizeAlign> PartialOrd for DynSoaSlicesMut<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> Ord for DynSoaSlicesMut<'a, SizeAlign> {
+impl<'a, Fields> Ord for DynSoaSlicesMut<'a, Fields> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.slices.cmp(&other.slices) {
             cmp::Ordering::Equal => {}
@@ -927,17 +924,17 @@ impl<'a, SizeAlign> Ord for DynSoaSlicesMut<'a, SizeAlign> {
     }
 }
 
-impl<'a, SizeAlign> Hash for DynSoaSlicesMut<'a, SizeAlign> {
+impl<'a, Fields> Hash for DynSoaSlicesMut<'a, Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.slices.hash(state);
         self.phantom.hash(state);
     }
 }
 
-unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
-    type SizeAlign = SizeAlign;
+unsafe impl<Fields> Soa for DynSoa<Fields> {
+    type Context = DynSoaContext<Fields>;
 
-    type Context = DynSoaContext<SizeAlign>;
+    type Fields = Fields;
 
     type FieldLayouts<'a> = &'a [Layout];
 
@@ -946,9 +943,9 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         field_layouts.as_ref()
     }
 
-    type Ptrs = DynSoaPtrs<SizeAlign>;
+    type Ptrs = DynSoaPtrs<Fields>;
 
-    type MutPtrs = DynSoaMutPtrs<SizeAlign>;
+    type MutPtrs = DynSoaMutPtrs<Fields>;
 
     unsafe fn ptrs(
         context: &Self::Context,
@@ -1264,7 +1261,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
-        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
         let buffer = unsafe {
@@ -1289,7 +1286,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
 
         let (buffer_layout, offsets) =
             Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
-        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<SizeAlign>>());
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
         assert_eq!(buffer_len, buffer.len());
 
         for ((field_layout, dst), offset) in field_layouts.iter().zip(dst).zip(offsets) {
@@ -1303,7 +1300,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         }
     }
 
-    type NonNullPtrs = DynSoaNonNullPtrs<SizeAlign>;
+    type NonNullPtrs = DynSoaNonNullPtrs<Fields>;
 
     unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
         let DynSoaContext { field_layouts, .. } = context;
@@ -1345,7 +1342,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         }
     }
 
-    type Vecs = DynSoaVecs<SizeAlign>;
+    type Vecs = DynSoaVecs<Fields>;
 
     fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
         let DynSoaContext { field_layouts, .. } = context;
@@ -1354,8 +1351,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         let vecs = field_layouts
             .iter()
             .map(|field_layout| {
-                let capacity =
-                    (capacity * field_layout.size()).div_ceil(size_of::<Byte<SizeAlign>>());
+                let capacity = (capacity * field_layout.size()).div_ceil(size_of::<Byte<Fields>>());
                 DynFieldVec {
                     buffer: Vec::with_capacity(capacity),
                     layout: field_layout.clone(),
@@ -1455,7 +1451,7 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
             assert_eq!(field_layout, vec_field_layout);
 
             *vec_len = len;
-            let len = (len * vec_field_layout.size()).div_ceil(size_of::<Byte<SizeAlign>>());
+            let len = (len * vec_field_layout.size()).div_ceil(size_of::<Byte<Fields>>());
             unsafe {
                 field_buffer.set_len(len);
             }
@@ -1463,12 +1459,12 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
     }
 
     type Refs<'a>
-        = DynSoaRefs<'a, SizeAlign>
+        = DynSoaRefs<'a, Fields>
     where
         Self: 'a;
 
     type RefsMut<'a>
-        = DynSoaRefsMut<'a, SizeAlign>
+        = DynSoaRefsMut<'a, Fields>
     where
         Self: 'a;
 
@@ -1575,9 +1571,9 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
         }
     }
 
-    type SlicePtrs = DynSoaSlicePtrs<SizeAlign>;
+    type SlicePtrs = DynSoaSlicePtrs<Fields>;
 
-    type SliceMutPtrs = DynSoaSliceMutPtrs<SizeAlign>;
+    type SliceMutPtrs = DynSoaSliceMutPtrs<Fields>;
 
     fn slices_from_raw_parts(
         context: &Self::Context,
@@ -1762,12 +1758,12 @@ unsafe impl<SizeAlign> Soa for DynSoa<SizeAlign> {
     }
 
     type Slices<'a>
-        = DynSoaSlices<'a, SizeAlign>
+        = DynSoaSlices<'a, Fields>
     where
         Self: 'a;
 
     type SlicesMut<'a>
-        = DynSoaSlicesMut<'a, SizeAlign>
+        = DynSoaSlicesMut<'a, Fields>
     where
         Self: 'a;
 

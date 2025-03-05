@@ -375,7 +375,7 @@ where
 unsafe impl<'a, T> Send for SoaSlices<'a, T>
 where
     T: Soa,
-    T::SizeAlign: Send,
+    T::Fields: Send,
     T::Context: Send,
 {
 }
@@ -383,7 +383,7 @@ where
 unsafe impl<'a, T> Sync for SoaSlices<'a, T>
 where
     T: Soa,
-    T::SizeAlign: Sync,
+    T::Fields: Sync,
     T::Context: Sync,
 {
 }
@@ -1116,7 +1116,7 @@ where
 unsafe impl<'a, T> Send for SoaSlicesMut<'a, T>
 where
     T: Soa,
-    T::SizeAlign: Send,
+    T::Fields: Send,
     T::Context: Send,
 {
 }
@@ -1124,7 +1124,7 @@ where
 unsafe impl<'a, T> Sync for SoaSlicesMut<'a, T>
 where
     T: Soa,
-    T::SizeAlign: Sync,
+    T::Fields: Sync,
     T::Context: Sync,
 {
 }

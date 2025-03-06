@@ -1,8 +1,8 @@
-use std::alloc::Layout;
+use std::{alloc::Layout, ptr, slice};
 
 use gpecs_soa::{
     prelude::*,
-    r#dyn::{DynSoa, DynSoaContext, DynSoaRefs},
+    r#dyn::{DynSoa, DynSoaContext, DynSoaRefs, DynSoaSlices},
     slice::{Iter as SoaIter, IterMut as SoaIterMut},
     vec::IntoIter as SoaIntoIter,
 };
@@ -146,4 +146,42 @@ fn dyn_value() {
 
     let refs = unsafe { refs.into::<(u32, u16, u8)>(&context) };
     assert_eq!(refs, (&i1, &i2, &i3));
+
+    let i123 = [1u32, 2, 3];
+    let i456 = [4u16, 5, 6];
+    let i789 = [7u8, 8, 9];
+
+    let i123_slices = i123.as_slice();
+    let i456_slices = i456.as_slice();
+    let i789_slices = i789.as_slice();
+
+    let slices = (i123_slices, i456_slices, i789_slices);
+    let slices = DynSoaSlices::from::<(u32, u16, u8)>(&(), slices);
+
+    let i123_bytes = unsafe {
+        let data = ptr::from_ref(&i123).cast();
+        let len = size_of_val(&i123);
+        slice::from_raw_parts(data, len)
+    };
+    let i456_bytes = unsafe {
+        let data = ptr::from_ref(&i456).cast();
+        let len = size_of_val(&i456);
+        slice::from_raw_parts(data, len)
+    };
+    let i789_bytes = unsafe {
+        let data = ptr::from_ref(&i789).cast();
+        let len = size_of_val(&i789);
+        slice::from_raw_parts(data, len)
+    };
+    assert_eq!(
+        slices.as_ref(),
+        [
+            (optimized_layout[0], i789_bytes),
+            (optimized_layout[1], i456_bytes),
+            (optimized_layout[2], i123_bytes),
+        ],
+    );
+
+    let slices = unsafe { slices.into::<(u32, u16, u8)>(&()) };
+    assert_eq!(slices, (i123_slices, i456_slices, i789_slices));
 }

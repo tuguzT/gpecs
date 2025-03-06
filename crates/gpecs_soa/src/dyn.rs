@@ -2,9 +2,9 @@ use alloc::{boxed::Box, vec::Vec};
 use core::{
     alloc::Layout,
     borrow::Borrow,
-    cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
+    iter,
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
     ptr::{self, NonNull},
@@ -999,33 +999,102 @@ type DynFieldSlicePtr = *const [u8];
 
 pub struct DynSoaSlicePtrs<Fields> {
     len: usize,
-    slices: Box<[DynFieldSlicePtr]>,
+    slices: Box<[(Layout, DynFieldSlicePtr)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<Fields> DynSoaSlicePtrs<Fields> {
-    pub fn new<I>(len: usize, slices: I) -> Self
+    pub fn new<I>(context: &DynSoaContext<Fields>, len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSlicePtr>,
     {
-        // TODO: pass context and make length checks
+        let DynSoaContext { field_layouts, .. } = context;
+        let slices: Box<[_]> = slices.into_iter().collect();
+        assert_eq!(field_layouts.len(), slices.len());
+
+        let slices = field_layouts
+            .iter()
+            .zip(slices)
+            .map(|(field_layout, slice)| {
+                assert_eq!(
+                    slice.len().checked_div(field_layout.size()).unwrap_or(len),
+                    len,
+                );
+                (field_layout.clone(), slice)
+            })
+            .collect();
         Self {
             len,
-            slices: slices.into_iter().collect(),
+            slices,
             phantom: PhantomData,
         }
     }
+
+    #[inline]
+    pub fn from<T>(context: &T::Context, slices: T::SlicePtrs) -> Self
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let len = T::slice_ptrs_len(context, slices.clone());
+        let ptrs = T::slice_ptrs_as_ptrs(context, slices);
+        let ptrs = T::ptrs_erase(context, ptrs);
+
+        let mut permutation = permutation_of::<T>(context);
+        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+
+        let mut slices: Box<[_]> = field_layouts
+            .iter()
+            .zip(ptrs)
+            .map(|(field_layout, ptr)| {
+                let len = field_layout.size() * len;
+                let slice = ptr::slice_from_raw_parts(ptr.cast(), len);
+                (field_layout.clone(), slice)
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut slices);
+
+        Self {
+            len,
+            slices,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub unsafe fn into<T>(self, context: &T::Context) -> T::SlicePtrs
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let Self { slices, len, .. } = self;
+
+        let mut permutation = permutation_of::<T>(context);
+        assert_eq!(slices.len(), permutation.len());
+
+        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+        apply_permutation(&mut permutation, &mut field_layouts);
+
+        let mut ptrs: Box<[_]> = iter::zip(slices, field_layouts)
+            .map(|((layout, slice), field_layout)| {
+                assert_eq!(layout, field_layout);
+                slice.cast()
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut ptrs);
+
+        let ptrs = T::ptrs_restore(context, ptrs);
+        T::slices_from_raw_parts(context, ptrs, len)
+    }
 }
 
-impl<Fields> AsRef<[DynFieldSlicePtr]> for DynSoaSlicePtrs<Fields> {
-    fn as_ref(&self) -> &[DynFieldSlicePtr] {
+impl<Fields> AsRef<[(Layout, DynFieldSlicePtr)]> for DynSoaSlicePtrs<Fields> {
+    fn as_ref(&self) -> &[(Layout, DynFieldSlicePtr)] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<Fields> AsMut<[DynFieldSlicePtr]> for DynSoaSlicePtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [DynFieldSlicePtr] {
+impl<Fields> AsMut<[(Layout, DynFieldSlicePtr)]> for DynSoaSlicePtrs<Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, DynFieldSlicePtr)] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
@@ -1047,34 +1116,6 @@ impl<Fields> PartialEq for DynSoaSlicePtrs<Fields> {
 }
 
 impl<Fields> Eq for DynSoaSlicePtrs<Fields> {}
-
-impl<Fields> PartialOrd for DynSoaSlicePtrs<Fields> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.len.partial_cmp(&other.len) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.slices.partial_cmp(&other.slices) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.phantom.partial_cmp(&other.phantom)
-    }
-}
-
-impl<Fields> Ord for DynSoaSlicePtrs<Fields> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.len.cmp(&other.len) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        match self.slices.cmp(&other.slices) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        self.phantom.cmp(&other.phantom)
-    }
-}
 
 impl<Fields> Hash for DynSoaSlicePtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1099,33 +1140,102 @@ type DynFieldSliceMutPtr = *mut [u8];
 
 pub struct DynSoaSliceMutPtrs<Fields> {
     len: usize,
-    slices: Box<[DynFieldSliceMutPtr]>,
+    slices: Box<[(Layout, DynFieldSliceMutPtr)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<Fields> DynSoaSliceMutPtrs<Fields> {
-    pub fn new<I>(len: usize, slices: I) -> Self
+    pub fn new<I>(context: &DynSoaContext<Fields>, len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSliceMutPtr>,
     {
-        // TODO: pass context and make length checks
+        let DynSoaContext { field_layouts, .. } = context;
+        let slices: Box<[_]> = slices.into_iter().collect();
+        assert_eq!(field_layouts.len(), slices.len());
+
+        let slices = field_layouts
+            .iter()
+            .zip(slices)
+            .map(|(field_layout, slice)| {
+                assert_eq!(
+                    slice.len().checked_div(field_layout.size()).unwrap_or(len),
+                    len,
+                );
+                (field_layout.clone(), slice)
+            })
+            .collect();
         Self {
             len,
-            slices: slices.into_iter().collect(),
+            slices,
             phantom: PhantomData,
         }
     }
+
+    #[inline]
+    pub fn from<T>(context: &T::Context, slices: T::SliceMutPtrs) -> Self
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let len = T::slice_ptrs_len_mut(context, slices.clone());
+        let ptrs = T::mut_slice_ptrs_as_ptrs(context, slices);
+        let ptrs = T::ptrs_erase_mut(context, ptrs);
+
+        let mut permutation = permutation_of::<T>(context);
+        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+
+        let mut slices: Box<[_]> = field_layouts
+            .iter()
+            .zip(ptrs)
+            .map(|(field_layout, ptr)| {
+                let len = field_layout.size() * len;
+                let slice = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
+                (field_layout.clone(), slice)
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut slices);
+
+        Self {
+            len,
+            slices,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub unsafe fn into<T>(self, context: &T::Context) -> T::SliceMutPtrs
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let Self { slices, len, .. } = self;
+
+        let mut permutation = permutation_of::<T>(context);
+        assert_eq!(slices.len(), permutation.len());
+
+        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+        apply_permutation(&mut permutation, &mut field_layouts);
+
+        let mut ptrs: Box<[_]> = iter::zip(slices, field_layouts)
+            .map(|((layout, slice), field_layout)| {
+                assert_eq!(layout, field_layout);
+                slice.cast()
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut ptrs);
+
+        let ptrs = T::ptrs_restore_mut(context, ptrs);
+        T::slices_from_raw_parts_mut(context, ptrs, len)
+    }
 }
 
-impl<Fields> AsRef<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<Fields> {
-    fn as_ref(&self) -> &[DynFieldSliceMutPtr] {
+impl<Fields> AsRef<[(Layout, DynFieldSliceMutPtr)]> for DynSoaSliceMutPtrs<Fields> {
+    fn as_ref(&self) -> &[(Layout, DynFieldSliceMutPtr)] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<Fields> AsMut<[DynFieldSliceMutPtr]> for DynSoaSliceMutPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [DynFieldSliceMutPtr] {
+impl<Fields> AsMut<[(Layout, DynFieldSliceMutPtr)]> for DynSoaSliceMutPtrs<Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, DynFieldSliceMutPtr)] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
@@ -1147,34 +1257,6 @@ impl<Fields> PartialEq for DynSoaSliceMutPtrs<Fields> {
 }
 
 impl<Fields> Eq for DynSoaSliceMutPtrs<Fields> {}
-
-impl<Fields> PartialOrd for DynSoaSliceMutPtrs<Fields> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.len.partial_cmp(&other.len) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.slices.partial_cmp(&other.slices) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.phantom.partial_cmp(&other.phantom)
-    }
-}
-
-impl<Fields> Ord for DynSoaSliceMutPtrs<Fields> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.len.cmp(&other.len) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        match self.slices.cmp(&other.slices) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        self.phantom.cmp(&other.phantom)
-    }
-}
 
 impl<Fields> Hash for DynSoaSliceMutPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1202,33 +1284,103 @@ where
     Fields: 'a,
 {
     len: usize,
-    slices: Box<[DynFieldSlice<'a>]>,
+    slices: Box<[(Layout, DynFieldSlice<'a>)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<'a, Fields> DynSoaSlices<'a, Fields> {
-    pub fn new<I>(len: usize, slices: I) -> Self
+    pub fn new<I>(context: &DynSoaContext<Fields>, len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSlice<'a>>,
     {
-        // TODO: pass context and make length checks
+        let DynSoaContext { field_layouts, .. } = context;
+        let slices: Box<[_]> = slices.into_iter().collect();
+        assert_eq!(field_layouts.len(), slices.len());
+
+        let slices = field_layouts
+            .iter()
+            .zip(slices)
+            .map(|(field_layout, slice)| {
+                assert_eq!(
+                    slice.len().checked_div(field_layout.size()).unwrap_or(len),
+                    len,
+                );
+                (field_layout.clone(), slice)
+            })
+            .collect();
         Self {
             len,
-            slices: slices.into_iter().collect(),
+            slices,
             phantom: PhantomData,
         }
     }
+
+    #[inline]
+    pub fn from<T>(context: &T::Context, slices: T::Slices<'a>) -> Self
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let len = T::slices_len(context, &slices);
+        let ptrs = T::slice_refs_as_ptrs(context, slices);
+        let ptrs = T::ptrs_erase(context, ptrs);
+
+        let mut permutation = permutation_of::<T>(context);
+        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+
+        let mut slices: Box<[_]> = field_layouts
+            .iter()
+            .zip(ptrs)
+            .map(|(field_layout, ptr)| {
+                let len = field_layout.size() * len;
+                let slice = unsafe { slice::from_raw_parts(ptr.cast(), len) };
+                (field_layout.clone(), slice)
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut slices);
+
+        Self {
+            len,
+            slices,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub unsafe fn into<T>(self, context: &T::Context) -> T::Slices<'a>
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let Self { slices, len, .. } = self;
+
+        let mut permutation = permutation_of::<T>(context);
+        assert_eq!(slices.len(), permutation.len());
+
+        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+        apply_permutation(&mut permutation, &mut field_layouts);
+
+        let mut ptrs: Box<[_]> = iter::zip(slices, field_layouts)
+            .map(|((layout, slice), field_layout)| {
+                assert_eq!(layout, field_layout);
+                slice.as_ptr()
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut ptrs);
+
+        let ptrs = T::ptrs_restore(context, ptrs);
+        let slices = T::slices_from_raw_parts(context, ptrs, len);
+        unsafe { T::slice_ptrs_to_slices(context, slices) }
+    }
 }
 
-impl<'a, Fields> AsRef<[DynFieldSlice<'a>]> for DynSoaSlices<'a, Fields> {
-    fn as_ref(&self) -> &[DynFieldSlice<'a>] {
+impl<'a, Fields> AsRef<[(Layout, DynFieldSlice<'a>)]> for DynSoaSlices<'a, Fields> {
+    fn as_ref(&self) -> &[(Layout, DynFieldSlice<'a>)] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<'a, Fields> AsMut<[DynFieldSlice<'a>]> for DynSoaSlices<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [DynFieldSlice<'a>] {
+impl<'a, Fields> AsMut<[(Layout, DynFieldSlice<'a>)]> for DynSoaSlices<'a, Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, DynFieldSlice<'a>)] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
@@ -1250,34 +1402,6 @@ impl<'a, Fields> PartialEq for DynSoaSlices<'a, Fields> {
 }
 
 impl<'a, Fields> Eq for DynSoaSlices<'a, Fields> {}
-
-impl<'a, Fields> PartialOrd for DynSoaSlices<'a, Fields> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.len.partial_cmp(&other.len) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.slices.partial_cmp(&other.slices) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.phantom.partial_cmp(&other.phantom)
-    }
-}
-
-impl<'a, Fields> Ord for DynSoaSlices<'a, Fields> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.len.cmp(&other.len) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        match self.slices.cmp(&other.slices) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        self.phantom.cmp(&other.phantom)
-    }
-}
 
 impl<'a, Fields> Hash for DynSoaSlices<'a, Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1308,33 +1432,103 @@ where
     Fields: 'a,
 {
     len: usize,
-    slices: Box<[DynFieldSliceMut<'a>]>,
+    slices: Box<[(Layout, DynFieldSliceMut<'a>)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<'a, Fields> DynSoaSlicesMut<'a, Fields> {
-    pub fn new<I>(len: usize, slices: I) -> Self
+    pub fn new<I>(context: &DynSoaContext<Fields>, len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = DynFieldSliceMut<'a>>,
     {
-        // TODO: pass context and make length checks
+        let DynSoaContext { field_layouts, .. } = context;
+        let slices: Box<[_]> = slices.into_iter().collect();
+        assert_eq!(field_layouts.len(), slices.len());
+
+        let slices = field_layouts
+            .iter()
+            .zip(slices)
+            .map(|(field_layout, slice)| {
+                assert_eq!(
+                    slice.len().checked_div(field_layout.size()).unwrap_or(len),
+                    len,
+                );
+                (field_layout.clone(), slice)
+            })
+            .collect();
         Self {
             len,
-            slices: slices.into_iter().collect(),
+            slices,
             phantom: PhantomData,
         }
     }
+
+    #[inline]
+    pub fn from<T>(context: &T::Context, slices: T::SlicesMut<'a>) -> Self
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let len = T::slices_len_mut(context, &slices);
+        let ptrs = T::mut_slice_refs_as_ptrs(context, slices);
+        let ptrs = T::ptrs_erase_mut(context, ptrs);
+
+        let mut permutation = permutation_of::<T>(context);
+        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+
+        let mut slices: Box<[_]> = field_layouts
+            .iter()
+            .zip(ptrs)
+            .map(|(field_layout, ptr)| {
+                let len = field_layout.size() * len;
+                let slice = unsafe { slice::from_raw_parts_mut(ptr.cast(), len) };
+                (field_layout.clone(), slice)
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut slices);
+
+        Self {
+            len,
+            slices,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub unsafe fn into<T>(self, context: &T::Context) -> T::SlicesMut<'a>
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let Self { slices, len, .. } = self;
+
+        let mut permutation = permutation_of::<T>(context);
+        assert_eq!(slices.len(), permutation.len());
+
+        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+        apply_permutation(&mut permutation, &mut field_layouts);
+
+        let mut ptrs: Box<[_]> = iter::zip(slices, field_layouts)
+            .map(|((layout, slice), field_layout)| {
+                assert_eq!(layout, field_layout);
+                slice.as_mut_ptr()
+            })
+            .collect();
+        apply_permutation(&mut permutation, &mut ptrs);
+
+        let ptrs = T::ptrs_restore_mut(context, ptrs);
+        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        unsafe { T::slice_ptrs_to_slices_mut(context, slices) }
+    }
 }
 
-impl<'a, Fields> AsRef<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, Fields> {
-    fn as_ref(&self) -> &[DynFieldSliceMut<'a>] {
+impl<'a, Fields> AsRef<[(Layout, DynFieldSliceMut<'a>)]> for DynSoaSlicesMut<'a, Fields> {
+    fn as_ref(&self) -> &[(Layout, DynFieldSliceMut<'a>)] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<'a, Fields> AsMut<[DynFieldSliceMut<'a>]> for DynSoaSlicesMut<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [DynFieldSliceMut<'a>] {
+impl<'a, Fields> AsMut<[(Layout, DynFieldSliceMut<'a>)]> for DynSoaSlicesMut<'a, Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, DynFieldSliceMut<'a>)] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
@@ -1356,34 +1550,6 @@ impl<'a, Fields> PartialEq for DynSoaSlicesMut<'a, Fields> {
 }
 
 impl<'a, Fields> Eq for DynSoaSlicesMut<'a, Fields> {}
-
-impl<'a, Fields> PartialOrd for DynSoaSlicesMut<'a, Fields> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.len.partial_cmp(&other.len) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.slices.partial_cmp(&other.slices) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.phantom.partial_cmp(&other.phantom)
-    }
-}
-
-impl<'a, Fields> Ord for DynSoaSlicesMut<'a, Fields> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.len.cmp(&other.len) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        match self.slices.cmp(&other.slices) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        self.phantom.cmp(&other.phantom)
-    }
-}
 
 impl<'a, Fields> Hash for DynSoaSlicesMut<'a, Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -2191,7 +2357,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
 
                 let data = ptr.cast();
                 let len = len * field_layout.size();
-                ptr::slice_from_raw_parts(data, len)
+                let slice = ptr::slice_from_raw_parts(data, len);
+                (layout, slice)
             })
             .collect();
         DynSoaSlicePtrs {
@@ -2220,7 +2387,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
 
                 let data = ptr.cast();
                 let len = len * field_layout.size();
-                ptr::slice_from_raw_parts_mut(data, len)
+                let slice = ptr::slice_from_raw_parts_mut(data, len);
+                (layout, slice)
             })
             .collect();
         DynSoaSliceMutPtrs {
@@ -2242,9 +2410,11 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                slice.cast_const()
+
+                (layout, slice.cast_const())
             })
             .collect();
         DynSoaSlicePtrs {
@@ -2263,9 +2433,11 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                slice.cast_mut()
+
+                (layout, slice.cast_mut())
             })
             .collect();
         DynSoaSliceMutPtrs {
@@ -2277,37 +2449,39 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
 
     fn slice_ptrs_len(context: &Self::Context, slices: Self::SlicePtrs) -> usize {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicePtrs { slices, .. } = slices;
+        let DynSoaSlicePtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
-        let mut lens = field_layouts
-            .iter()
-            .zip(slices)
-            .map(|(field_layout, slice)| {
-                assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                slice.len().checked_div(field_layout.size()).unwrap_or(0)
-            });
-        let len = lens.next().unwrap_or(0);
-        assert!(lens.all(|item| item == len));
+        // let mut lens = field_layouts
+        //     .iter()
+        //     .zip(slices)
+        //     .map(|(field_layout, slice)| {
+        //         assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
+        //         slice.len().checked_div(field_layout.size()).unwrap_or(0)
+        //     });
+        // let len = lens.next().unwrap_or(0);
+        // assert!(lens.all(|item| item == len));
         len
     }
 
     fn slice_ptrs_len_mut(context: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
         let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSliceMutPtrs { slices, .. } = slices;
+        let DynSoaSliceMutPtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
-        let mut lens = field_layouts
-            .iter()
-            .zip(slices)
-            .map(|(field_layout, slice)| {
-                assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                slice.len().checked_div(field_layout.size()).unwrap_or(0)
-            });
-        let len = lens.next().unwrap_or(0);
-        assert!(lens.all(|item| item == len));
+        // let mut lens = field_layouts
+        //     .iter()
+        //     .zip(slices)
+        //     .map(|(field_layout, (layout, slice))| {
+        //         assert_eq!(field_layout, &layout);
+        //         assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
+
+        //         slice.len().checked_div(field_layout.size()).unwrap_or(0)
+        //     });
+        // let len = lens.next().unwrap_or(0);
+        // assert!(lens.all(|item| item == len));
         len
     }
 
@@ -2320,13 +2494,14 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
 
                 let data = slice.cast();
                 let len = slice.len().checked_div(field_layout.size()).unwrap_or(0);
                 let ptr = ptr::slice_from_raw_parts(data, len);
-                (field_layout.clone(), ptr)
+                (layout, ptr)
             })
             .collect();
         DynSoaPtrs {
@@ -2347,13 +2522,14 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
 
                 let data = slice.cast();
                 let len = slice.len().checked_div(field_layout.size()).unwrap_or(0);
                 let ptr = ptr::slice_from_raw_parts_mut(data, len);
-                (field_layout.clone(), ptr)
+                (layout, ptr)
             })
             .collect();
         DynSoaMutPtrs {
@@ -2384,9 +2560,14 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                unsafe { slice::from_raw_parts(slice.cast(), slice.len()) }
+
+                let data = slice.cast();
+                let len = slice.len();
+                let slice = unsafe { slice::from_raw_parts(data, len) };
+                (layout, slice)
             })
             .collect();
         DynSoaSlices {
@@ -2408,9 +2589,14 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                unsafe { slice::from_raw_parts_mut(slice.cast(), slice.len()) }
+
+                let data = slice.cast();
+                let len = slice.len();
+                let slice = unsafe { slice::from_raw_parts_mut(data, len) };
+                (layout, slice)
             })
             .collect();
         DynSoaSlicesMut {
@@ -2429,8 +2615,10 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let mut lens = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
+
                 slice.len().checked_div(field_layout.size()).unwrap_or(0)
             });
         let len = lens.next().unwrap_or(0);
@@ -2447,8 +2635,10 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let mut lens = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
+
                 slice.len().checked_div(field_layout.size()).unwrap_or(0)
             });
         let len = lens.next().unwrap_or(0);
@@ -2468,9 +2658,11 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                ptr::from_ref(slice)
+
+                (layout, ptr::from_ref(slice))
             })
             .collect();
         DynSoaSlicePtrs {
@@ -2492,9 +2684,11 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                ptr::from_mut(slice)
+
+                (layout, ptr::from_mut(slice))
             })
             .collect();
         DynSoaSliceMutPtrs {
@@ -2516,9 +2710,10 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let slices = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-                &*slice
+                (layout, &*slice)
             })
             .collect();
         DynSoaSlices {
@@ -2537,13 +2732,14 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
 
                 let data = slice.as_ptr();
                 let len = field_layout.size();
                 let ptr = ptr::slice_from_raw_parts(data, len);
-                (field_layout.clone(), ptr)
+                (layout, ptr)
             })
             .collect();
         DynSoaPtrs {
@@ -2564,13 +2760,14 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
 
                 let data = slice.as_mut_ptr();
                 let len = field_layout.size();
                 let ptr = ptr::slice_from_raw_parts_mut(data, len);
-                (field_layout.clone(), ptr)
+                (layout, ptr)
             })
             .collect();
         DynSoaMutPtrs {

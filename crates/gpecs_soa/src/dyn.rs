@@ -6,7 +6,7 @@ use core::{
     hash::{self, Hash},
     iter,
     marker::PhantomData,
-    mem::{ManuallyDrop, MaybeUninit},
+    mem::{self, ManuallyDrop, MaybeUninit},
     ptr::{self, NonNull},
     slice,
 };
@@ -17,17 +17,6 @@ union Byte<Fields> {
     _byte: u8,
     _size_align: ManuallyDrop<MaybeUninit<Fields>>,
 }
-
-impl<Fields> Clone for Byte<Fields>
-where
-    Fields: Copy,
-{
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<Fields> Copy for Byte<Fields> where Fields: Copy {}
 
 unsafe impl<Fields> Send for Byte<Fields> where Fields: Send {}
 unsafe impl<Fields> Sync for Byte<Fields> where Fields: Sync {}
@@ -77,7 +66,9 @@ impl<Fields> DynSoa<Fields> {
     where
         T: Soa<Fields = Fields>,
     {
-        let DynSoaContext { field_layouts, .. } = DynSoaContext::of::<T>(context);
+        let mut permutation = permutation_of::<T>(context);
+        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+        apply_permutation(&mut permutation, &mut field_layouts);
 
         let (buffer_layout, offsets) =
             T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
@@ -105,10 +96,10 @@ impl<Fields> DynSoa<Fields> {
             mut buffer,
             field_layouts,
         } = self;
-        let DynSoaContext {
-            field_layouts: target_field_layouts,
-            ..
-        } = DynSoaContext::of::<T>(context);
+
+        let mut permutation = permutation_of::<T>(context);
+        let mut target_field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+        apply_permutation(&mut permutation, &mut target_field_layouts);
 
         assert_eq!(field_layouts.as_ref(), target_field_layouts.as_ref());
 
@@ -193,47 +184,53 @@ impl<Fields> DynSoa<Fields> {
     }
 }
 
-impl<Fields> Clone for DynSoa<Fields>
-where
-    Fields: Copy,
-{
-    fn clone(&self) -> Self {
-        Self {
-            buffer: self.buffer.clone(),
-            field_layouts: self.field_layouts.clone(),
-        }
-    }
-}
+type DynDropFn = Box<dyn Fn(&[(Layout, *mut [u8])])>;
 
 pub struct DynSoaContext<Fields> {
     field_layouts: Box<[Layout]>,
+    drop_fields: Option<DynDropFn>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<Fields> DynSoaContext<Fields> {
     #[inline]
-    pub fn new<I>(field_layouts: I) -> Self
+    pub fn new<I, O>(field_layouts: I, drop_fields: O) -> Self
     where
         I: IntoIterator,
         I::Item: Borrow<Layout>,
+        O: Into<Option<DynDropFn>>,
     {
         Self {
             field_layouts: collect_layouts::<Fields, I>(field_layouts),
+            drop_fields: drop_fields.into(),
             phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn of<T>(context: &T::Context) -> Self
+    pub fn of<T>(context: T::Context) -> Self
     where
         T: Soa<Fields = Fields>,
+        T::Context: 'static,
     {
-        let mut permutation = permutation_of::<T>(context);
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
+        let mut permutation = permutation_of::<T>(&context);
+        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(&context));
         apply_permutation(&mut permutation, &mut field_layouts);
+
+        let drop_fields = move |data: &[(_, *mut [u8])]| unsafe {
+            let ptrs = data.iter().map(|(_, ptr)| ptr.cast());
+            let ptrs = T::ptrs_restore_mut(&context, ptrs);
+            T::ptrs_drop_in_place(&context, ptrs);
+        };
+        let drop_fields: Option<DynDropFn> = if mem::needs_drop::<T::Fields>() {
+            Some(Box::new(drop_fields))
+        } else {
+            None
+        };
 
         Self {
             field_layouts,
+            drop_fields,
             phantom: PhantomData,
         }
     }
@@ -250,15 +247,6 @@ impl<Fields> Debug for DynSoaContext<Fields> {
         f.debug_tuple("DynSoaContext")
             .field(&self.field_layouts)
             .finish()
-    }
-}
-
-impl<Fields> Clone for DynSoaContext<Fields> {
-    fn clone(&self) -> Self {
-        Self {
-            field_layouts: self.field_layouts.clone(),
-            phantom: self.phantom.clone(),
-        }
     }
 }
 
@@ -1984,6 +1972,22 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         }
     }
 
+    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs) {
+        let DynSoaContext {
+            field_layouts,
+            drop_fields,
+            ..
+        } = context;
+        let Some(drop_fields) = drop_fields else {
+            return;
+        };
+
+        let DynSoaMutPtrs { ptrs, .. } = ptrs;
+        assert_eq!(field_layouts.len(), ptrs.len());
+
+        drop_fields(ptrs.as_ref());
+    }
+
     type NonNullPtrs = DynSoaNonNullPtrs<Fields>;
 
     unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
@@ -2709,6 +2713,41 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         DynSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
+        }
+    }
+
+    unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs) {
+        let DynSoaContext {
+            field_layouts,
+            drop_fields,
+            ..
+        } = context;
+        let Some(drop_fields) = drop_fields else {
+            return;
+        };
+
+        let DynSoaSliceMutPtrs {
+            mut slices, len, ..
+        } = slices;
+        assert_eq!(field_layouts.len(), slices.len());
+
+        for ((ref layout, ref mut slice), field_layout) in iter::zip(&mut slices, field_layouts) {
+            assert_eq!(layout, field_layout);
+            assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
+
+            let data = slice.cast();
+            let len = slice.len().checked_div(field_layout.size()).unwrap_or(0);
+            *slice = ptr::slice_from_raw_parts_mut(data, len);
+        }
+
+        for _ in 0..len {
+            drop_fields(slices.as_ref());
+
+            for (ref field_layout, ref mut slice) in slices.iter_mut() {
+                let len = field_layout.size();
+                let data = unsafe { slice.cast::<u8>().add(len) };
+                *slice = ptr::slice_from_raw_parts_mut(data, len);
+            }
         }
     }
 }

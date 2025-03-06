@@ -56,7 +56,7 @@ fn into_iter_null_opt() {
 #[cfg_attr(miri, ignore)]
 fn dyn_context() {
     let field_layouts = [Layout::new::<u8>(), Layout::new::<i16>()];
-    let _context = DynSoaContext::<i16>::new(field_layouts);
+    let _context = DynSoaContext::<i16>::new(field_layouts, None);
 }
 
 #[test]
@@ -64,16 +64,16 @@ fn dyn_context() {
 #[cfg_attr(miri, ignore)]
 fn dyn_context_fail() {
     let field_layouts = [Layout::new::<u8>(), Layout::new::<i16>()];
-    let _context = DynSoaContext::<u8>::new(field_layouts);
+    let _context = DynSoaContext::<u8>::new(field_layouts, None);
 }
 
 #[test]
 #[cfg_attr(miri, ignore)]
 fn dyn_context_of() {
-    let context = DynSoaContext::of::<()>(&());
+    let context = DynSoaContext::of::<()>(());
     assert_eq!(context.layouts(), [Layout::new::<()>()]);
 
-    let context = DynSoaContext::of::<(u32, u16, u8)>(&());
+    let context = DynSoaContext::of::<(u32, u16, u8)>(());
     let optimized_layout = [
         Layout::new::<u8>(),
         Layout::new::<u16>(),
@@ -86,7 +86,7 @@ fn dyn_context_of() {
 #[cfg_attr(miri, ignore)]
 fn dyn_value() {
     let context = ();
-    let dyn_context = DynSoaContext::of::<()>(&context);
+    let dyn_context = DynSoaContext::of::<()>(context);
 
     let value = ();
     let dyn_value = DynSoa::from(&context, value);
@@ -99,7 +99,7 @@ fn dyn_value() {
     let value = unsafe { dyn_value.into::<()>(&context) };
     assert_eq!(value, ());
 
-    let dyn_context = DynSoaContext::of::<(u32, u16, u8)>(&());
+    let dyn_context = DynSoaContext::of::<(u32, u16, u8)>(());
 
     let i1 = 1u32;
     let i2 = 2u16;

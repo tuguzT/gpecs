@@ -929,7 +929,7 @@ impl<'a, Fields> DynSoaRefsMut<'a, Fields> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self, context: &T::Context) -> T::Refs<'a>
+    pub unsafe fn into<T>(self, context: &T::Context) -> T::RefsMut<'a>
     where
         T: Soa<Fields = Fields>,
     {
@@ -941,18 +941,16 @@ impl<'a, Fields> DynSoaRefsMut<'a, Fields> {
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
         apply_permutation(&mut permutation, &mut field_layouts);
 
-        let mut ptrs: Box<[_]> = refs
-            .iter()
-            .zip(field_layouts)
+        let mut ptrs: Box<[_]> = iter::zip(refs, field_layouts)
             .map(|((layout, r#ref), field_layout)| {
-                assert_eq!(layout, &field_layout);
-                r#ref.as_ptr()
+                assert_eq!(layout, field_layout);
+                r#ref.as_mut_ptr()
             })
             .collect();
         apply_permutation(&mut permutation, &mut ptrs);
 
-        let ptrs = T::ptrs_restore(context, ptrs);
-        unsafe { T::ptrs_to_refs(context, ptrs) }
+        let ptrs = T::ptrs_restore_mut(context, ptrs);
+        unsafe { T::ptrs_to_refs_mut(context, ptrs) }
     }
 }
 

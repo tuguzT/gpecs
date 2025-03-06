@@ -126,15 +126,20 @@ fn new_zst() {
 
 #[test]
 fn new_dyn() {
-    type Vec = SoaVec<DynSoa<(u8, u64, u16)>>;
+    type Soa = (u8, u64, u16);
+    type Vec = SoaVec<DynSoa<Soa>>;
 
-    let field_layouts = [
+    let context = ();
+    let dyn_context = DynSoaContext::of::<Soa>(&context);
+
+    let optimized_layout = [
         Layout::new::<u8>(),
-        Layout::new::<u64>(),
         Layout::new::<u16>(),
+        Layout::new::<u64>(),
     ];
-    let context = DynSoaContext::new(field_layouts);
-    let vec = Vec::with_context(context);
+    assert_eq!(dyn_context.layouts(), optimized_layout);
+
+    let vec = Vec::with_context(dyn_context);
     assert!(vec.is_empty());
 
     let vec = {
@@ -146,9 +151,9 @@ fn new_dyn() {
         format!("{vec:?}"),
         format!(
             "SoaVec(DynSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
@@ -159,19 +164,19 @@ fn new_dyn() {
         format!("{slice:?}"),
         format!(
             "SoaSlice(DynSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
     assert_eq!(vec, slice);
     assert!(slice.to_owned().is_empty());
 
-    let (context, vecs) = vec.into_vecs();
+    let (dyn_context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, (vec![], vec![], vec![]));
 
-    let vec = Vec::from_vecs(context, vecs);
+    let vec = Vec::from_vecs(dyn_context, vecs);
     assert!(vec.is_empty());
 
     let boxed_slice = vec.into_boxed_slice();
@@ -195,9 +200,9 @@ fn new_dyn() {
         format!("{into_iter:?}"),
         format!(
             "IntoIter(DynSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 }
@@ -313,15 +318,20 @@ fn with_capacity_zst() {
 
 #[test]
 fn with_capacity_dyn() {
-    type Vec = SoaVec<DynSoa<(u8, u64, u16)>>;
+    type Soa = (u8, u64, u16);
+    type Vec = SoaVec<DynSoa<Soa>>;
 
-    let field_layouts = [
+    let context = ();
+    let dyn_context = DynSoaContext::of::<Soa>(&context);
+
+    let optimized_layout = [
         Layout::new::<u8>(),
-        Layout::new::<u64>(),
         Layout::new::<u16>(),
+        Layout::new::<u64>(),
     ];
-    let context = DynSoaContext::new(field_layouts);
-    let vec = Vec::with_context_and_capacity(context, 10);
+    assert_eq!(dyn_context.layouts(), optimized_layout);
+
+    let vec = Vec::with_context_and_capacity(dyn_context, 10);
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 10);
 
@@ -334,9 +344,9 @@ fn with_capacity_dyn() {
         format!("{vec:?}"),
         format!(
             "SoaVec(DynSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
@@ -348,19 +358,19 @@ fn with_capacity_dyn() {
         format!("{slice:?}"),
         format!(
             "SoaSlice(DynSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
     assert_eq!(vec, slice);
     assert!(slice.to_owned().is_empty());
 
-    let (context, vecs) = vec.into_vecs();
+    let (dyn_context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, (vec![], vec![], vec![]));
 
-    let vec = Vec::from_vecs(context, vecs);
+    let vec = Vec::from_vecs(dyn_context, vecs);
     assert!(vec.is_empty());
 
     let boxed_slice = vec.into_boxed_slice();
@@ -384,9 +394,9 @@ fn with_capacity_dyn() {
         format!("{into_iter:?}"),
         format!(
             "IntoIter(DynSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 }
@@ -652,9 +662,18 @@ fn one_item_zst() {
 
 #[test]
 fn one_item_dyn() {
-    type Vec = SoaVec<DynSoa<(u8, u64, u16)>>;
+    type Soa = (u8, u64, u16);
+    type Vec = SoaVec<DynSoa<Soa>>;
 
-    let context = DynSoaContext::of::<(u8, u64, u16)>(&());
+    let context = ();
+    let dyn_context = DynSoaContext::of::<Soa>(&context);
+
+    let optimized_layout = [
+        Layout::new::<u8>(),
+        Layout::new::<u16>(),
+        Layout::new::<u64>(),
+    ];
+    assert_eq!(dyn_context.layouts(), optimized_layout);
 
     let u8 = 1u8;
     let u64 = 2u64;
@@ -669,17 +688,17 @@ fn one_item_dyn() {
     let u16_bytes = u16_bytes.as_slice();
 
     let fields = [u8_bytes, u16_bytes, u64_bytes];
-    let value = DynSoa::from(&(), (u8, u64, u16));
+    let value = DynSoa::from(&context, (u8, u64, u16));
     assert_eq!(
-        value.as_refs(&context).as_ref(),
+        value.as_refs(&dyn_context).as_ref(),
         [
-            (context.layouts()[0], u8_bytes),
-            (context.layouts()[1], u16_bytes),
-            (context.layouts()[2], u64_bytes),
+            (optimized_layout[0], u8_bytes),
+            (optimized_layout[1], u16_bytes),
+            (optimized_layout[2], u64_bytes),
         ],
     );
 
-    let mut vec = Vec::with_context(context);
+    let mut vec = Vec::with_context(dyn_context);
 
     vec.push(value);
     assert_eq!(vec.len(), 1);
@@ -698,9 +717,9 @@ fn one_item_dyn() {
         format!("{vec:?}"),
         format!(
             "SoaVec(DynSoaSlices {{ len: 1, slices: [({l0:?}, {u8_bytes:?}), ({l1:?}, {u16_bytes:?}), ({l2:?}, {u64_bytes:?})] }})",
-            l0 = vec.context().layouts()[0],
-            l1 = vec.context().layouts()[1],
-            l2 = vec.context().layouts()[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
@@ -717,19 +736,19 @@ fn one_item_dyn() {
         format!("{slice:?}"),
         format!(
             "SoaSlice(DynSoaSlices {{ len: 1, slices: [({l0:?}, {u8_bytes:?}), ({l1:?}, {u16_bytes:?}), ({l2:?}, {u64_bytes:?})] }})",
-            l0 = vec.context().layouts()[0],
-            l1 = vec.context().layouts()[1],
-            l2 = vec.context().layouts()[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
     assert_eq!(vec, slice);
     assert!(slice.to_owned().is_empty().not());
 
-    let (context, vecs) = vec.into_vecs();
+    let (dyn_context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, (vec![ZST1], vec![ZST2(())], vec![ZST3 { empty: () }]));
 
-    let mut vec = Vec::from_vecs(context, vecs);
+    let mut vec = Vec::from_vecs(dyn_context, vecs);
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.as_slices(), DynSoaSlices::new(vec.context(), 1, fields));
@@ -740,22 +759,27 @@ fn one_item_dyn() {
     assert_eq!(iter.next(), None);
 
     let value = vec.pop().expect("vector should not be empty");
-    let context = vec.context();
+    let dyn_context = vec.context();
     assert_eq!(
-        value.as_refs(context).as_ref(),
-        DynSoa::new(context, fields).as_refs(context).as_ref(),
+        value.as_refs(dyn_context).as_ref(),
+        DynSoa::new(dyn_context, fields)
+            .as_refs(dyn_context)
+            .as_ref(),
     );
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
 
+    let value = unsafe { value.into::<Soa>(&context) };
+    assert_eq!(value, (u8, u64, u16));
+
     assert_eq!(
         format!("{vec:?}"),
         format!(
             "SoaVec(DynSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = vec.context().layouts()[0],
-            l1 = vec.context().layouts()[1],
-            l2 = vec.context().layouts()[2],
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
@@ -1427,34 +1451,33 @@ fn three_items_zst() {
 
 #[test]
 fn three_items_dyn() {
-    type Vec = SoaVec<DynSoa<(u8, u64, u16)>>;
+    type Soa = (u8, u64, u16);
+    type Vec = SoaVec<DynSoa<Soa>>;
 
-    let field_layouts = [
+    let context = ();
+    let dyn_context = DynSoaContext::of::<Soa>(&context);
+
+    let optimized_layout = [
         Layout::new::<u8>(),
-        Layout::new::<u64>(),
         Layout::new::<u16>(),
+        Layout::new::<u64>(),
     ];
+    assert_eq!(optimized_layout, dyn_context.layouts());
 
-    let context = DynSoaContext::new(field_layouts);
-    let mut vec = Vec::with_context(context.clone());
+    let mut vec = Vec::with_context(dyn_context);
 
     let i0_u8 = 0u8;
     let i0_u64 = 0u64;
     let i0_u16 = 0u16;
+    let iter = iter::repeat_with(|| DynSoa::from::<Soa>(&context, (i0_u8, i0_u64, i0_u16))).take(3);
+    vec.extend(iter);
 
-    let i0_u8_bytes = i0_u8.to_ne_bytes();
-    let i0_u64_bytes = i0_u64.to_ne_bytes();
-    let i0_u16_bytes = i0_u16.to_ne_bytes();
-
-    let i0_u8_bytes = i0_u8_bytes.as_slice();
-    let i0_u64_bytes = i0_u64_bytes.as_slice();
-    let i0_u16_bytes = i0_u16_bytes.as_slice();
-
-    let fields = [i0_u8_bytes, i0_u64_bytes, i0_u16_bytes];
-    vec.extend(iter::repeat_with(|| DynSoa::new(&context, fields)).take(3));
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains_by_refs(DynSoaRefs::new(vec.context(), fields)));
+
+    let refs = (&i0_u8, &i0_u64, &i0_u16);
+    let dyn_refs = DynSoaRefs::from::<Soa>(&context, refs);
+    assert!(vec.contains_by_refs(dyn_refs));
 
     let i0_u8s = [i0_u8; 3];
     let i0_u64s = [i0_u64; 3];
@@ -1481,16 +1504,16 @@ fn three_items_dyn() {
         DynSoaSlices::new(
             vec.context(),
             3,
-            [i0_u8s_bytes, i0_u64s_bytes, i0_u16s_bytes],
+            [i0_u8s_bytes, i0_u16s_bytes, i0_u64s_bytes],
         ),
     );
     assert_eq!(
         format!("{vec:?}"),
         format!(
-            "SoaVec(DynSoaSlices {{ len: 3, slices: [({l0:?}, {i0_u8s_bytes:?}), ({l1:?}, {i0_u64s_bytes:?}), ({l2:?}, {i0_u16s_bytes:?})] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            "SoaVec(DynSoaSlices {{ len: 3, slices: [({l0:?}, {i0_u8s_bytes:?}), ({l1:?}, {i0_u16s_bytes:?}), ({l2:?}, {i0_u64s_bytes:?})] }})",
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
@@ -1499,47 +1522,17 @@ fn three_items_dyn() {
     let i1 = 1u8;
     let i2 = 2u64;
     let i3 = 3u16;
-
-    let i1_bytes = i1.to_ne_bytes();
-    let i2_bytes = i2.to_ne_bytes();
-    let i3_bytes = i3.to_ne_bytes();
-
-    let i1_bytes = i1_bytes.as_slice();
-    let i2_bytes = i2_bytes.as_slice();
-    let i3_bytes = i3_bytes.as_slice();
-
-    let fields = [i1_bytes, i2_bytes, i3_bytes];
-    vec.insert(0, DynSoa::new(vec.context(), fields));
+    vec.insert(0, DynSoa::from::<Soa>(&context, (i1, i2, i3)));
 
     let i4 = 4u8;
     let i5 = 5u64;
     let i6 = 6u16;
-
-    let i4_bytes = i4.to_ne_bytes();
-    let i5_bytes = i5.to_ne_bytes();
-    let i6_bytes = i6.to_ne_bytes();
-
-    let i4_bytes = i4_bytes.as_slice();
-    let i5_bytes = i5_bytes.as_slice();
-    let i6_bytes = i6_bytes.as_slice();
-
-    let fields = [i4_bytes, i5_bytes, i6_bytes];
-    vec.insert(0, DynSoa::new(vec.context(), fields));
+    vec.insert(0, DynSoa::from::<Soa>(&context, (i4, i5, i6)));
 
     let i7 = 7u8;
     let i8 = 8u64;
     let i9 = 9u16;
-
-    let i7_bytes = i7.to_ne_bytes();
-    let i8_bytes = i8.to_ne_bytes();
-    let i9_bytes = i9.to_ne_bytes();
-
-    let i7_bytes = i7_bytes.as_slice();
-    let i8_bytes = i8_bytes.as_slice();
-    let i9_bytes = i9_bytes.as_slice();
-
-    let fields = [i7_bytes, i8_bytes, i9_bytes];
-    vec.insert(1, DynSoa::new(vec.context(), fields));
+    vec.insert(1, DynSoa::from::<Soa>(&context, (i7, i8, i9)));
 
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
@@ -1548,17 +1541,21 @@ fn three_items_dyn() {
     let i582 = [i5, i8, i2];
     let i693 = [i6, i9, i3];
 
-    let i471_bytes = unsafe {
+    let i471_slice = i471.as_slice();
+    let i582_slice = i582.as_slice();
+    let i693_slice = i693.as_slice();
+
+    let i471_bytes: &[u8] = unsafe {
         let data = ptr::from_ref(&i471).cast();
         let len = size_of_val(&i471);
         slice::from_raw_parts(data, len)
     };
-    let i582_bytes = unsafe {
+    let i582_bytes: &[u8] = unsafe {
         let data = ptr::from_ref(&i582).cast();
         let len = size_of_val(&i582);
         slice::from_raw_parts(data, len)
     };
-    let i693_bytes = unsafe {
+    let i693_bytes: &[u8] = unsafe {
         let data = ptr::from_ref(&i693).cast();
         let len = size_of_val(&i693);
         slice::from_raw_parts(data, len)
@@ -1566,15 +1563,15 @@ fn three_items_dyn() {
 
     assert_eq!(
         vec.as_slices(),
-        DynSoaSlices::new(vec.context(), 3, [i471_bytes, i582_bytes, i693_bytes]),
+        DynSoaSlices::from::<Soa>(&context, (i471_slice, i582_slice, i693_slice)),
     );
     assert_eq!(
         format!("{vec:?}"),
         format!(
-            "SoaVec(DynSoaSlices {{ len: 3, slices: [({l0:?}, {i471_bytes:?}), ({l1:?}, {i582_bytes:?}), ({l2:?}, {i693_bytes:?})] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            "SoaVec(DynSoaSlices {{ len: 3, slices: [({l0:?}, {i471_bytes:?}), ({l1:?}, {i693_bytes:?}), ({l2:?}, {i582_bytes:?})] }})",
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
@@ -1587,62 +1584,46 @@ fn three_items_dyn() {
     assert_eq!(slice.len(), 3);
     assert!(slice.capacity() >= 3);
 
-    let slices = DynSoaSlices::new(slice.context(), 3, [i471_bytes, i582_bytes, i693_bytes]);
+    let slices = DynSoaSlices::from::<Soa>(&context, (i471_slice, i582_slice, i693_slice));
     assert_eq!(slice.as_slices(), slices.clone());
 
     assert_eq!(
         slice.get(0),
-        Some(DynSoaRefs::new(
-            slice.context(),
-            [i4_bytes, i5_bytes, i6_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i4, &i5, &i6))),
     );
     assert_eq!(
         slice.get(1),
-        Some(DynSoaRefs::new(
-            slice.context(),
-            [i7_bytes, i8_bytes, i9_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i7, &i8, &i9))),
     );
     assert_eq!(
         slice.get(2),
-        Some(DynSoaRefs::new(
-            slice.context(),
-            [i1_bytes, i2_bytes, i3_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i1, &i2, &i3))),
     );
     assert_eq!(slice.get(0..), Some(slices.clone()));
 
     assert_eq!(
         format!("{slice:?}"),
         format!(
-            "SoaSlice(DynSoaSlices {{ len: 3, slices: [({l0:?}, {i471_bytes:?}), ({l1:?}, {i582_bytes:?}), ({l2:?}, {i693_bytes:?})] }})",
-            l0 = field_layouts[0],
-            l1 = field_layouts[1],
-            l2 = field_layouts[2],
+            "SoaSlice(DynSoaSlices {{ len: 3, slices: [({l0:?}, {i471_bytes:?}), ({l1:?}, {i693_bytes:?}), ({l2:?}, {i582_bytes:?})] }})",
+            l0 = optimized_layout[0],
+            l1 = optimized_layout[1],
+            l2 = optimized_layout[2],
         ),
     );
 
     assert_eq!(vec, slice);
     assert!(slice.to_owned().is_empty().not());
 
-    let (context, vecs) = vec.into_vecs();
+    let (dyn_context, vecs) = vec.into_vecs();
     // assert_eq!(vecs, ..);
 
-    let mut vec = Vec::from_vecs(context, vecs);
+    let mut vec = Vec::from_vecs(dyn_context, vecs);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
     assert_eq!(vec.as_slices(), slices.clone());
 
-    for mut refs in &mut vec {
-        let [_, (_, u64_bytes), (_, u16_bytes)] = refs.as_mut() else {
-            panic!("expected 3 fields");
-        };
-        assert_eq!(u64_bytes.len(), 8);
-        assert_eq!(u16_bytes.len(), 2);
-
-        let u64 = unsafe { &mut *u64_bytes.as_mut_ptr().cast::<u64>() };
-        let u16 = unsafe { &*u16_bytes.as_mut_ptr().cast::<u16>() };
+    for refs in &mut vec {
+        let (_, u64, u16) = unsafe { refs.into::<Soa>(&context) };
         *u64 += u64::from(*u16);
     }
 
@@ -1650,38 +1631,23 @@ fn three_items_dyn() {
     assert_eq!(iter.len(), 3);
 
     let i5_plus_6 = 11_u64;
-    let i5_plus_6_bytes = i5_plus_6.to_ne_bytes();
-    let i5_plus_6_bytes = i5_plus_6_bytes.as_slice();
     assert_eq!(
         iter.next(),
-        Some(DynSoaRefs::new(
-            iter.context(),
-            [i4_bytes, i5_plus_6_bytes, i6_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i4, &i5_plus_6, &i6))),
     );
     assert_eq!(iter.len(), 2);
 
     let i2_plus_3 = 5_u64;
-    let i2_plus_3_bytes = i2_plus_3.to_ne_bytes();
-    let i2_plus_3_bytes = i2_plus_3_bytes.as_slice();
     assert_eq!(
         iter.next_back(),
-        Some(DynSoaRefs::new(
-            iter.context(),
-            [i1_bytes, i2_plus_3_bytes, i3_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i1, &i2_plus_3, &i3))),
     );
     assert_eq!(iter.len(), 1);
 
     let i8_plus_9 = 17_u64;
-    let i8_plus_9_bytes = i8_plus_9.to_ne_bytes();
-    let i8_plus_9_bytes = i8_plus_9_bytes.as_slice();
     assert_eq!(
         iter.next(),
-        Some(DynSoaRefs::new(
-            iter.context(),
-            [i7_bytes, i8_plus_9_bytes, i9_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i7, &i8_plus_9, &i9))),
     );
     assert_eq!(iter.len(), 0);
 
@@ -1692,80 +1658,46 @@ fn three_items_dyn() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.push(DynSoa::new(
-        vec.context(),
-        [i7_bytes, i8_plus_9_bytes, i9_bytes],
-    ));
-    vec.push(DynSoa::new(
-        vec.context(),
-        [i1_bytes, i2_plus_3_bytes, i3_bytes],
-    ));
+    vec.push(DynSoa::from::<Soa>(&context, (i7, i8_plus_9, i9)));
+    vec.push(DynSoa::from::<Soa>(&context, (i1, i2_plus_3, i3)));
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
 
     assert_eq!(
         vec.get(0),
-        Some(DynSoaRefs::new(
-            vec.context(),
-            [i4_bytes, i5_plus_6_bytes, i6_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i4, &i5_plus_6, &i6))),
     );
     assert_eq!(
         vec.get(1),
-        Some(DynSoaRefs::new(
-            vec.context(),
-            [i7_bytes, i8_plus_9_bytes, i9_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i7, &i8_plus_9, &i9))),
     );
     assert_eq!(
         vec.get(2),
-        Some(DynSoaRefs::new(
-            vec.context(),
-            [i1_bytes, i2_plus_3_bytes, i3_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i1, &i2_plus_3, &i3))),
     );
     assert_eq!(
         vec.get(3),
-        Some(DynSoaRefs::new(
-            vec.context(),
-            [i7_bytes, i8_plus_9_bytes, i9_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i7, &i8_plus_9, &i9))),
     );
     assert_eq!(
         vec.get(4),
-        Some(DynSoaRefs::new(
-            vec.context(),
-            [i1_bytes, i2_plus_3_bytes, i3_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i1, &i2_plus_3, &i3))),
     );
 
     {
-        let context = vec.context().clone();
         let mut drain = vec.drain(2..4);
         assert_eq!(drain.len(), 2);
 
         let value = drain
             .next_back()
             .expect("drain iterator should not be empty");
-        assert_eq!(
-            value.as_refs(&context).as_ref(),
-            [
-                (field_layouts[0], i7_bytes),
-                (field_layouts[1], i8_plus_9_bytes),
-                (field_layouts[2], i9_bytes),
-            ],
-        );
+        let value = unsafe { value.into::<Soa>(&context) };
+        assert_eq!(value, (i7, i8_plus_9, i9));
         assert_eq!(drain.len(), 1);
 
         let value = drain.next().expect("drain iterator should not be empty");
-        assert_eq!(
-            value.as_refs(&context).as_ref(),
-            [
-                (field_layouts[0], i1_bytes),
-                (field_layouts[1], i2_plus_3_bytes),
-                (field_layouts[2], i3_bytes),
-            ],
-        );
+        let value = unsafe { value.into::<Soa>(&context) };
+        assert_eq!(value, (i1, i2_plus_3, i3));
         assert_eq!(drain.len(), 0);
 
         assert!(drain.next().is_none());
@@ -1781,17 +1713,13 @@ fn three_items_dyn() {
     };
 
     let value = vec.swap_remove(1);
-    assert_eq!(
-        value.as_refs(vec.context()).as_ref(),
-        [
-            (field_layouts[0], i7_bytes),
-            (field_layouts[1], i8_plus_9_bytes),
-            (field_layouts[2], i9_bytes),
-        ],
-    );
+    let value = unsafe { value.into::<Soa>(&context) };
+    assert_eq!(value, (i7, i8_plus_9, i9));
+
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 3);
-    let refs = DynSoaRefs::new(vec.context(), [i7_bytes, i8_plus_9_bytes, i9_bytes]);
+
+    let refs = DynSoaRefs::from::<Soa>(&context, (&i7, &i8_plus_9, &i9));
     assert!(!vec.contains_by_refs(refs));
 
     let mut vec = {
@@ -1800,17 +1728,13 @@ fn three_items_dyn() {
     };
 
     let value = vec.pop().expect("vector should not be empty");
-    assert_eq!(
-        value.as_refs(vec.context()).as_ref(),
-        [
-            (field_layouts[0], i1_bytes),
-            (field_layouts[1], i2_plus_3_bytes),
-            (field_layouts[2], i3_bytes),
-        ],
-    );
+    let value = unsafe { value.into::<Soa>(&context) };
+    assert_eq!(value, (i1, i2_plus_3, i3));
+
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
-    let refs = DynSoaRefs::new(vec.context(), [i1_bytes, i2_plus_3_bytes, i3_bytes]);
+
+    let refs = DynSoaRefs::from::<Soa>(&context, (&i1, &i2_plus_3, &i3));
     assert!(!vec.contains_by_refs(refs));
 
     let mut vec = {
@@ -1819,22 +1743,18 @@ fn three_items_dyn() {
     };
 
     let value = vec.remove(0);
-    assert_eq!(
-        value.as_refs(vec.context()).as_ref(),
-        [
-            (field_layouts[0], i4_bytes),
-            (field_layouts[1], i5_plus_6_bytes),
-            (field_layouts[2], i6_bytes),
-        ],
-    );
+    let value = unsafe { value.into::<Soa>(&context) };
+    assert_eq!(value, (i4, i5_plus_6, i6));
+
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
-    let refs = DynSoaRefs::new(vec.context(), [i4_bytes, i5_plus_6_bytes, i6_bytes]);
+
+    let refs = DynSoaRefs::from::<Soa>(&context, (&i4, &i5_plus_6, &i6));
     assert!(!vec.contains_by_refs(refs));
 
-    let fields = [i0_u8_bytes, i0_u64_bytes, i0_u16_bytes];
-    let context = vec.context().clone();
-    vec.extend(iter::repeat_with(|| DynSoa::new(&context, fields)).take(3));
+    let iter = iter::repeat_with(|| DynSoa::from::<Soa>(&context, (i0_u8, i0_u64, i0_u16))).take(3);
+    vec.extend(iter);
+
     vec.reserve(1);
     assert!(vec.capacity() >= 4);
     vec.reserve_exact(6);
@@ -1863,22 +1783,13 @@ fn three_items_dyn() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let fields = [i1_bytes, i2_bytes, i3_bytes];
-    vec.push(DynSoa::new(vec.context(), fields));
+    vec.push(DynSoa::from::<Soa>(&context, (i1, i2, i3)));
     for _ in 0..10 {
-        let fields = [i4_bytes, i5_bytes, i6_bytes];
-        vec.push(DynSoa::new(vec.context(), fields));
-
-        let fields = [i7_bytes, i8_bytes, i9_bytes];
-        vec.push(DynSoa::new(vec.context(), fields));
+        vec.push(DynSoa::from::<Soa>(&context, (i4, i5, i6)));
+        vec.push(DynSoa::from::<Soa>(&context, (i7, i8, i9)));
     }
-    vec.retain_mut(|mut refs| {
-        let [(_, x), _, _] = refs.as_mut() else {
-            panic!("expected 3 fields");
-        };
-        assert_eq!(x.len(), 1);
-
-        let x = unsafe { &mut *x.as_mut_ptr().cast::<u8>() };
+    vec.retain_mut(|refs| {
+        let (x, _, _) = unsafe { refs.into::<Soa>(&context) };
         if *x <= 3 {
             *x += 1;
             true
@@ -1891,11 +1802,9 @@ fn three_items_dyn() {
     assert!(vec.capacity() >= (1 + 2 * 10));
 
     let i2_u8 = 2_u8;
-    let i2_u8_bytes = i2_u8.to_ne_bytes();
-    let i2_u8_bytes = i2_u8_bytes.as_slice();
     assert_eq!(
         vec.as_slices(),
-        DynSoaSlices::new(vec.context(), 1, [i2_u8_bytes, i2_bytes, i3_bytes]),
+        DynSoaSlices::from::<Soa>(&context, (&[i2_u8], &[i2], &[i3])),
     );
 
     let vec = {
@@ -1908,10 +1817,7 @@ fn three_items_dyn() {
     assert!(boxed_slice.capacity() >= 1);
     assert_eq!(
         boxed_slice.get(0),
-        Some(DynSoaRefs::new(
-            boxed_slice.context(),
-            [i2_u8_bytes, i2_bytes, i3_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i2_u8, &i2, &i3))),
     );
 
     let vec = boxed_slice.into_vec();
@@ -1919,10 +1825,7 @@ fn three_items_dyn() {
     assert!(vec.capacity() >= 1);
     assert_eq!(
         vec.get(0),
-        Some(DynSoaRefs::new(
-            vec.context(),
-            [i2_u8_bytes, i2_bytes, i3_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i2_u8, &i2, &i3))),
     );
 
     let vec = {
@@ -1935,24 +1838,15 @@ fn three_items_dyn() {
     assert!(boxed_slice.capacity() >= 1);
     assert_eq!(
         boxed_slice.get(0),
-        Some(DynSoaRefs::new(
-            boxed_slice.context(),
-            [i2_u8_bytes, i2_bytes, i3_bytes],
-        )),
+        Some(DynSoaRefs::from::<Soa>(&context, (&i2_u8, &i2, &i3))),
     );
 
     let mut into_iter = boxed_slice.into_iter();
     assert_eq!(into_iter.len(), 1);
 
     let value = into_iter.next_back().expect("iterator should not be empty");
-    assert_eq!(
-        value.as_refs(into_iter.context()).as_ref(),
-        [
-            (field_layouts[0], i2_u8_bytes),
-            (field_layouts[1], i2_bytes),
-            (field_layouts[2], i3_bytes),
-        ],
-    );
+    let value = unsafe { value.into::<Soa>(&context) };
+    assert_eq!(value, (i2_u8, i2, i3));
 
     assert!(into_iter.next().is_none());
     assert!(into_iter.next_back().is_none());

@@ -21,20 +21,20 @@ union Byte<Fields> {
 unsafe impl<Fields> Send for Byte<Fields> where Fields: Send {}
 unsafe impl<Fields> Sync for Byte<Fields> where Fields: Sync {}
 
-type DynFields<Fields> = Box<[Byte<Fields>]>;
+type ErasedFields<Fields> = Box<[Byte<Fields>]>;
 
-pub struct DynSoa<Fields> {
-    buffer: DynFields<Fields>,
+pub struct ErasedSoa<Fields> {
+    buffer: ErasedFields<Fields>,
     field_layouts: Box<[Layout]>,
 }
 
-impl<Fields> DynSoa<Fields> {
+impl<Fields> ErasedSoa<Fields> {
     #[inline]
-    pub fn new<'a, I>(context: &DynSoaContext<Fields>, fields: I) -> Self
+    pub fn new<'a, I>(context: &ErasedSoaContext<Fields>, fields: I) -> Self
     where
         I: IntoIterator<Item = &'a [u8]>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let fields: Box<[_]> = fields.into_iter().collect();
         assert_eq!(field_layouts.len(), fields.len());
 
@@ -122,12 +122,12 @@ impl<Fields> DynSoa<Fields> {
     }
 
     #[inline]
-    pub fn as_refs(&self, context: &DynSoaContext<Fields>) -> DynSoaRefs<'_, Fields> {
+    pub fn as_refs(&self, context: &ErasedSoaContext<Fields>) -> ErasedSoaRefs<'_, Fields> {
         let Self {
             buffer,
             field_layouts: value_layouts,
         } = self;
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
 
         assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
 
@@ -146,19 +146,22 @@ impl<Fields> DynSoa<Fields> {
                 (field_layout.clone(), r#ref)
             })
             .collect();
-        DynSoaRefs {
+        ErasedSoaRefs {
             refs,
             phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn as_refs_mut(&mut self, context: &DynSoaContext<Fields>) -> DynSoaRefsMut<'_, Fields> {
+    pub fn as_refs_mut(
+        &mut self,
+        context: &ErasedSoaContext<Fields>,
+    ) -> ErasedSoaRefsMut<'_, Fields> {
         let Self {
             buffer,
             field_layouts: value_layouts,
         } = self;
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
 
         assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
 
@@ -177,28 +180,28 @@ impl<Fields> DynSoa<Fields> {
                 (field_layout.clone(), r#ref)
             })
             .collect();
-        DynSoaRefsMut {
+        ErasedSoaRefsMut {
             refs,
             phantom: PhantomData,
         }
     }
 }
 
-type DynDropFn = Box<dyn Fn(&[(Layout, *mut [u8])])>;
+type ErasedDropFn = Box<dyn Fn(&[(Layout, *mut [u8])])>;
 
-pub struct DynSoaContext<Fields> {
+pub struct ErasedSoaContext<Fields> {
     field_layouts: Box<[Layout]>,
-    drop_fields: Option<DynDropFn>,
+    drop_fields: Option<ErasedDropFn>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<Fields> DynSoaContext<Fields> {
+impl<Fields> ErasedSoaContext<Fields> {
     #[inline]
     pub fn new<I, O>(field_layouts: I, drop_fields: O) -> Self
     where
         I: IntoIterator,
         I::Item: Borrow<Layout>,
-        O: Into<Option<DynDropFn>>,
+        O: Into<Option<ErasedDropFn>>,
     {
         Self {
             field_layouts: collect_layouts::<Fields, I>(field_layouts),
@@ -222,7 +225,7 @@ impl<Fields> DynSoaContext<Fields> {
             let ptrs = T::ptrs_restore_mut(&context, ptrs);
             T::ptrs_drop_in_place(&context, ptrs);
         };
-        let drop_fields: Option<DynDropFn> = if mem::needs_drop::<T::Fields>() {
+        let drop_fields: Option<ErasedDropFn> = if mem::needs_drop::<T::Fields>() {
             Some(Box::new(drop_fields))
         } else {
             None
@@ -242,9 +245,9 @@ impl<Fields> DynSoaContext<Fields> {
     }
 }
 
-impl<Fields> Debug for DynSoaContext<Fields> {
+impl<Fields> Debug for ErasedSoaContext<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaContext")
+        f.debug_tuple("ErasedSoaContext")
             .field(&self.field_layouts)
             .finish()
     }
@@ -318,20 +321,20 @@ fn apply_permutation<T>(permutation: &mut [usize], data: &mut [T]) {
     }
 }
 
-type DynFieldPtr = *const [u8];
+type ErasedFieldPtr = *const [u8];
 
-pub struct DynSoaPtrs<Fields> {
-    ptrs: Box<[(Layout, DynFieldPtr)]>,
+pub struct ErasedSoaPtrs<Fields> {
+    ptrs: Box<[(Layout, ErasedFieldPtr)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<Fields> DynSoaPtrs<Fields> {
+impl<Fields> ErasedSoaPtrs<Fields> {
     #[inline]
-    pub fn new<I>(context: &DynSoaContext<Fields>, ptrs: I) -> Self
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, ptrs: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldPtr>,
+        I: IntoIterator<Item = ErasedFieldPtr>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let ptrs: Box<[_]> = ptrs.into_iter().collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -403,42 +406,42 @@ impl<Fields> DynSoaPtrs<Fields> {
     }
 }
 
-impl<Fields> AsRef<[(Layout, DynFieldPtr)]> for DynSoaPtrs<Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldPtr)] {
+impl<Fields> AsRef<[(Layout, ErasedFieldPtr)]> for ErasedSoaPtrs<Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldPtr)] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
 }
 
-impl<Fields> AsMut<[(Layout, DynFieldPtr)]> for DynSoaPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldPtr)] {
+impl<Fields> AsMut<[(Layout, ErasedFieldPtr)]> for ErasedSoaPtrs<Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldPtr)] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
     }
 }
 
-impl<Fields> Debug for DynSoaPtrs<Fields> {
+impl<Fields> Debug for ErasedSoaPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaPtrs").field(&self.ptrs).finish()
+        f.debug_tuple("ErasedSoaPtrs").field(&self.ptrs).finish()
     }
 }
 
-impl<Fields> PartialEq for DynSoaPtrs<Fields> {
+impl<Fields> PartialEq for ErasedSoaPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.ptrs == other.ptrs && self.phantom == other.phantom
     }
 }
 
-impl<Fields> Eq for DynSoaPtrs<Fields> {}
+impl<Fields> Eq for ErasedSoaPtrs<Fields> {}
 
-impl<Fields> Hash for DynSoaPtrs<Fields> {
+impl<Fields> Hash for ErasedSoaPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.ptrs.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<Fields> Clone for DynSoaPtrs<Fields> {
+impl<Fields> Clone for ErasedSoaPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             ptrs: self.ptrs.clone(),
@@ -447,19 +450,19 @@ impl<Fields> Clone for DynSoaPtrs<Fields> {
     }
 }
 
-type DynFieldMutPtr = *mut [u8];
+type ErasedFieldMutPtr = *mut [u8];
 
-pub struct DynSoaMutPtrs<Fields> {
-    ptrs: Box<[(Layout, DynFieldMutPtr)]>,
+pub struct ErasedSoaMutPtrs<Fields> {
+    ptrs: Box<[(Layout, ErasedFieldMutPtr)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<Fields> DynSoaMutPtrs<Fields> {
-    pub fn new<I>(context: &DynSoaContext<Fields>, ptrs: I) -> Self
+impl<Fields> ErasedSoaMutPtrs<Fields> {
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, ptrs: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldMutPtr>,
+        I: IntoIterator<Item = ErasedFieldMutPtr>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let ptrs: Box<[_]> = ptrs.into_iter().collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -532,42 +535,42 @@ impl<Fields> DynSoaMutPtrs<Fields> {
     }
 }
 
-impl<Fields> AsRef<[(Layout, DynFieldMutPtr)]> for DynSoaMutPtrs<Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldMutPtr)] {
+impl<Fields> AsRef<[(Layout, ErasedFieldMutPtr)]> for ErasedSoaMutPtrs<Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldMutPtr)] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
 }
 
-impl<Fields> AsMut<[(Layout, DynFieldMutPtr)]> for DynSoaMutPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldMutPtr)] {
+impl<Fields> AsMut<[(Layout, ErasedFieldMutPtr)]> for ErasedSoaMutPtrs<Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldMutPtr)] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
     }
 }
 
-impl<Fields> Debug for DynSoaMutPtrs<Fields> {
+impl<Fields> Debug for ErasedSoaMutPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaMutPtrs").field(&self.ptrs).finish()
+        f.debug_tuple("ErasedSoaMutPtrs").field(&self.ptrs).finish()
     }
 }
 
-impl<Fields> PartialEq for DynSoaMutPtrs<Fields> {
+impl<Fields> PartialEq for ErasedSoaMutPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.ptrs == other.ptrs && self.phantom == other.phantom
     }
 }
 
-impl<Fields> Eq for DynSoaMutPtrs<Fields> {}
+impl<Fields> Eq for ErasedSoaMutPtrs<Fields> {}
 
-impl<Fields> Hash for DynSoaMutPtrs<Fields> {
+impl<Fields> Hash for ErasedSoaMutPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.ptrs.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<Fields> Clone for DynSoaMutPtrs<Fields> {
+impl<Fields> Clone for ErasedSoaMutPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             ptrs: self.ptrs.clone(),
@@ -576,19 +579,19 @@ impl<Fields> Clone for DynSoaMutPtrs<Fields> {
     }
 }
 
-type DynFieldNonNullPtr = NonNull<[u8]>;
+type ErasedFieldNonNullPtr = NonNull<[u8]>;
 
-pub struct DynSoaNonNullPtrs<Fields> {
-    ptrs: Box<[(Layout, DynFieldNonNullPtr)]>,
+pub struct ErasedSoaNonNullPtrs<Fields> {
+    ptrs: Box<[(Layout, ErasedFieldNonNullPtr)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<Fields> DynSoaNonNullPtrs<Fields> {
-    pub fn new<I>(context: &DynSoaContext<Fields>, ptrs: I) -> Self
+impl<Fields> ErasedSoaNonNullPtrs<Fields> {
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, ptrs: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldNonNullPtr>,
+        I: IntoIterator<Item = ErasedFieldNonNullPtr>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let ptrs: Box<[_]> = ptrs.into_iter().collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -662,44 +665,44 @@ impl<Fields> DynSoaNonNullPtrs<Fields> {
     }
 }
 
-impl<Fields> AsRef<[(Layout, DynFieldNonNullPtr)]> for DynSoaNonNullPtrs<Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldNonNullPtr)] {
+impl<Fields> AsRef<[(Layout, ErasedFieldNonNullPtr)]> for ErasedSoaNonNullPtrs<Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldNonNullPtr)] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
 }
 
-impl<Fields> AsMut<[(Layout, DynFieldNonNullPtr)]> for DynSoaNonNullPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldNonNullPtr)] {
+impl<Fields> AsMut<[(Layout, ErasedFieldNonNullPtr)]> for ErasedSoaNonNullPtrs<Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldNonNullPtr)] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
     }
 }
 
-impl<Fields> Debug for DynSoaNonNullPtrs<Fields> {
+impl<Fields> Debug for ErasedSoaNonNullPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaNonNullPtrs")
+        f.debug_tuple("ErasedSoaNonNullPtrs")
             .field(&self.ptrs)
             .finish()
     }
 }
 
-impl<Fields> PartialEq for DynSoaNonNullPtrs<Fields> {
+impl<Fields> PartialEq for ErasedSoaNonNullPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.ptrs == other.ptrs && self.phantom == other.phantom
     }
 }
 
-impl<Fields> Eq for DynSoaNonNullPtrs<Fields> {}
+impl<Fields> Eq for ErasedSoaNonNullPtrs<Fields> {}
 
-impl<Fields> Hash for DynSoaNonNullPtrs<Fields> {
+impl<Fields> Hash for ErasedSoaNonNullPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.ptrs.hash(state);
         self.phantom.hash(state);
     }
 }
 
-impl<Fields> Clone for DynSoaNonNullPtrs<Fields> {
+impl<Fields> Clone for ErasedSoaNonNullPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             ptrs: self.ptrs.clone(),
@@ -709,32 +712,32 @@ impl<Fields> Clone for DynSoaNonNullPtrs<Fields> {
 }
 
 // data is stored inline in a single buffer
-struct DynFieldVec<Fields> {
+struct ErasedFieldVec<Fields> {
     buffer: Vec<Byte<Fields>>,
     layout: Layout,
 }
 
-pub struct DynSoaVecs<Fields> {
+pub struct ErasedSoaVecs<Fields> {
     len: usize,
-    vecs: Box<[DynFieldVec<Fields>]>,
+    vecs: Box<[ErasedFieldVec<Fields>]>,
 }
 
-type DynFieldRef<'a> = &'a [u8];
+type ErasedFieldRef<'a> = &'a [u8];
 
-pub struct DynSoaRefs<'a, Fields>
+pub struct ErasedSoaRefs<'a, Fields>
 where
     Fields: 'a,
 {
-    refs: Box<[(Layout, DynFieldRef<'a>)]>,
+    refs: Box<[(Layout, ErasedFieldRef<'a>)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, Fields> DynSoaRefs<'a, Fields> {
-    pub fn new<I>(context: &DynSoaContext<Fields>, refs: I) -> Self
+impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, refs: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldRef<'a>>,
+        I: IntoIterator<Item = ErasedFieldRef<'a>>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let refs: Box<[_]> = refs.into_iter().collect();
         assert_eq!(field_layouts.len(), refs.len());
 
@@ -807,27 +810,27 @@ impl<'a, Fields> DynSoaRefs<'a, Fields> {
     }
 }
 
-impl<'a, Fields> AsRef<[(Layout, DynFieldRef<'a>)]> for DynSoaRefs<'a, Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldRef<'a>)] {
+impl<'a, Fields> AsRef<[(Layout, ErasedFieldRef<'a>)]> for ErasedSoaRefs<'a, Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldRef<'a>)] {
         let Self { refs, .. } = self;
         refs.as_ref()
     }
 }
 
-impl<'a, Fields> AsMut<[(Layout, DynFieldRef<'a>)]> for DynSoaRefs<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldRef<'a>)] {
+impl<'a, Fields> AsMut<[(Layout, ErasedFieldRef<'a>)]> for ErasedSoaRefs<'a, Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldRef<'a>)] {
         let Self { refs, .. } = self;
         refs.as_mut()
     }
 }
 
-impl<'a, Fields> Debug for DynSoaRefs<'a, Fields> {
+impl<'a, Fields> Debug for ErasedSoaRefs<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaRefs").field(&self.refs).finish()
+        f.debug_tuple("ErasedSoaRefs").field(&self.refs).finish()
     }
 }
 
-impl<'a, Fields> Clone for DynSoaRefs<'a, Fields> {
+impl<'a, Fields> Clone for ErasedSoaRefs<'a, Fields> {
     fn clone(&self) -> Self {
         Self {
             refs: self.refs.clone(),
@@ -836,25 +839,25 @@ impl<'a, Fields> Clone for DynSoaRefs<'a, Fields> {
     }
 }
 
-unsafe impl<'a, Fields> Send for DynSoaRefs<'a, Fields> where Fields: Sync {}
-unsafe impl<'a, Fields> Sync for DynSoaRefs<'a, Fields> where Fields: Sync {}
+unsafe impl<'a, Fields> Send for ErasedSoaRefs<'a, Fields> where Fields: Sync {}
+unsafe impl<'a, Fields> Sync for ErasedSoaRefs<'a, Fields> where Fields: Sync {}
 
-type DynFieldRefMut<'a> = &'a mut [u8];
+type ErasedFieldRefMut<'a> = &'a mut [u8];
 
-pub struct DynSoaRefsMut<'a, Fields>
+pub struct ErasedSoaRefsMut<'a, Fields>
 where
     Fields: 'a,
 {
-    refs: Box<[(Layout, DynFieldRefMut<'a>)]>,
+    refs: Box<[(Layout, ErasedFieldRefMut<'a>)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, Fields> DynSoaRefsMut<'a, Fields> {
-    pub fn new<I>(context: &DynSoaContext<Fields>, refs: I) -> Self
+impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, refs: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldRefMut<'a>>,
+        I: IntoIterator<Item = ErasedFieldRefMut<'a>>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let refs: Box<[_]> = refs.into_iter().collect();
         assert_eq!(field_layouts.len(), refs.len());
 
@@ -927,44 +930,44 @@ impl<'a, Fields> DynSoaRefsMut<'a, Fields> {
     }
 }
 
-impl<'a, Fields> AsRef<[(Layout, DynFieldRefMut<'a>)]> for DynSoaRefsMut<'a, Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldRefMut<'a>)] {
+impl<'a, Fields> AsRef<[(Layout, ErasedFieldRefMut<'a>)]> for ErasedSoaRefsMut<'a, Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldRefMut<'a>)] {
         let Self { refs, .. } = self;
         refs.as_ref()
     }
 }
 
-impl<'a, Fields> AsMut<[(Layout, DynFieldRefMut<'a>)]> for DynSoaRefsMut<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldRefMut<'a>)] {
+impl<'a, Fields> AsMut<[(Layout, ErasedFieldRefMut<'a>)]> for ErasedSoaRefsMut<'a, Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldRefMut<'a>)] {
         let Self { refs, .. } = self;
         refs.as_mut()
     }
 }
 
-impl<'a, Fields> Debug for DynSoaRefsMut<'a, Fields> {
+impl<'a, Fields> Debug for ErasedSoaRefsMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DynSoaRefsMut").field(&self.refs).finish()
+        f.debug_tuple("ErasedSoaRefsMut").field(&self.refs).finish()
     }
 }
 
-unsafe impl<'a, Fields> Send for DynSoaRefsMut<'a, Fields> where Fields: Send {}
-unsafe impl<'a, Fields> Sync for DynSoaRefsMut<'a, Fields> where Fields: Sync {}
+unsafe impl<'a, Fields> Send for ErasedSoaRefsMut<'a, Fields> where Fields: Send {}
+unsafe impl<'a, Fields> Sync for ErasedSoaRefsMut<'a, Fields> where Fields: Sync {}
 
 // data is stored inline in a single buffer
-type DynFieldSlicePtr = *const [u8];
+type ErasedFieldSlicePtr = *const [u8];
 
-pub struct DynSoaSlicePtrs<Fields> {
+pub struct ErasedSoaSlicePtrs<Fields> {
     len: usize,
-    slices: Box<[(Layout, DynFieldSlicePtr)]>,
+    slices: Box<[(Layout, ErasedFieldSlicePtr)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<Fields> DynSoaSlicePtrs<Fields> {
-    pub fn new<I>(context: &DynSoaContext<Fields>, len: usize, slices: I) -> Self
+impl<Fields> ErasedSoaSlicePtrs<Fields> {
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldSlicePtr>,
+        I: IntoIterator<Item = ErasedFieldSlicePtr>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let slices: Box<[_]> = slices.into_iter().collect();
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -1042,38 +1045,38 @@ impl<Fields> DynSoaSlicePtrs<Fields> {
     }
 }
 
-impl<Fields> AsRef<[(Layout, DynFieldSlicePtr)]> for DynSoaSlicePtrs<Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldSlicePtr)] {
+impl<Fields> AsRef<[(Layout, ErasedFieldSlicePtr)]> for ErasedSoaSlicePtrs<Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldSlicePtr)] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<Fields> AsMut<[(Layout, DynFieldSlicePtr)]> for DynSoaSlicePtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldSlicePtr)] {
+impl<Fields> AsMut<[(Layout, ErasedFieldSlicePtr)]> for ErasedSoaSlicePtrs<Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldSlicePtr)] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 }
 
-impl<Fields> Debug for DynSoaSlicePtrs<Fields> {
+impl<Fields> Debug for ErasedSoaSlicePtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaSlicePtrs")
+        f.debug_struct("ErasedSoaSlicePtrs")
             .field("len", &self.len)
             .field("slices", &self.slices)
             .finish()
     }
 }
 
-impl<Fields> PartialEq for DynSoaSlicePtrs<Fields> {
+impl<Fields> PartialEq for ErasedSoaSlicePtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.len == other.len && self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
-impl<Fields> Eq for DynSoaSlicePtrs<Fields> {}
+impl<Fields> Eq for ErasedSoaSlicePtrs<Fields> {}
 
-impl<Fields> Hash for DynSoaSlicePtrs<Fields> {
+impl<Fields> Hash for ErasedSoaSlicePtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.len.hash(state);
         self.slices.hash(state);
@@ -1081,7 +1084,7 @@ impl<Fields> Hash for DynSoaSlicePtrs<Fields> {
     }
 }
 
-impl<Fields> Clone for DynSoaSlicePtrs<Fields> {
+impl<Fields> Clone for ErasedSoaSlicePtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             len: self.len.clone(),
@@ -1092,20 +1095,20 @@ impl<Fields> Clone for DynSoaSlicePtrs<Fields> {
 }
 
 // data is stored inline in a single buffer
-type DynFieldSliceMutPtr = *mut [u8];
+type ErasedFieldSliceMutPtr = *mut [u8];
 
-pub struct DynSoaSliceMutPtrs<Fields> {
+pub struct ErasedSoaSliceMutPtrs<Fields> {
     len: usize,
-    slices: Box<[(Layout, DynFieldSliceMutPtr)]>,
+    slices: Box<[(Layout, ErasedFieldSliceMutPtr)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<Fields> DynSoaSliceMutPtrs<Fields> {
-    pub fn new<I>(context: &DynSoaContext<Fields>, len: usize, slices: I) -> Self
+impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldSliceMutPtr>,
+        I: IntoIterator<Item = ErasedFieldSliceMutPtr>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let slices: Box<[_]> = slices.into_iter().collect();
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -1183,38 +1186,38 @@ impl<Fields> DynSoaSliceMutPtrs<Fields> {
     }
 }
 
-impl<Fields> AsRef<[(Layout, DynFieldSliceMutPtr)]> for DynSoaSliceMutPtrs<Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldSliceMutPtr)] {
+impl<Fields> AsRef<[(Layout, ErasedFieldSliceMutPtr)]> for ErasedSoaSliceMutPtrs<Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldSliceMutPtr)] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<Fields> AsMut<[(Layout, DynFieldSliceMutPtr)]> for DynSoaSliceMutPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldSliceMutPtr)] {
+impl<Fields> AsMut<[(Layout, ErasedFieldSliceMutPtr)]> for ErasedSoaSliceMutPtrs<Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldSliceMutPtr)] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 }
 
-impl<Fields> Debug for DynSoaSliceMutPtrs<Fields> {
+impl<Fields> Debug for ErasedSoaSliceMutPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaSliceMutPtrs")
+        f.debug_struct("ErasedSoaSliceMutPtrs")
             .field("len", &self.len)
             .field("slices", &self.slices)
             .finish()
     }
 }
 
-impl<Fields> PartialEq for DynSoaSliceMutPtrs<Fields> {
+impl<Fields> PartialEq for ErasedSoaSliceMutPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
         self.len == other.len && self.slices == other.slices && self.phantom == other.phantom
     }
 }
 
-impl<Fields> Eq for DynSoaSliceMutPtrs<Fields> {}
+impl<Fields> Eq for ErasedSoaSliceMutPtrs<Fields> {}
 
-impl<Fields> Hash for DynSoaSliceMutPtrs<Fields> {
+impl<Fields> Hash for ErasedSoaSliceMutPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.len.hash(state);
         self.slices.hash(state);
@@ -1222,7 +1225,7 @@ impl<Fields> Hash for DynSoaSliceMutPtrs<Fields> {
     }
 }
 
-impl<Fields> Clone for DynSoaSliceMutPtrs<Fields> {
+impl<Fields> Clone for ErasedSoaSliceMutPtrs<Fields> {
     fn clone(&self) -> Self {
         Self {
             len: self.len.clone(),
@@ -1233,23 +1236,23 @@ impl<Fields> Clone for DynSoaSliceMutPtrs<Fields> {
 }
 
 // data is stored inline in a single buffer
-type DynFieldSlice<'a> = &'a [u8];
+type ErasedFieldSlice<'a> = &'a [u8];
 
-pub struct DynSoaSlices<'a, Fields>
+pub struct ErasedSoaSlices<'a, Fields>
 where
     Fields: 'a,
 {
     len: usize,
-    slices: Box<[(Layout, DynFieldSlice<'a>)]>,
+    slices: Box<[(Layout, ErasedFieldSlice<'a>)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, Fields> DynSoaSlices<'a, Fields> {
-    pub fn new<I>(context: &DynSoaContext<Fields>, len: usize, slices: I) -> Self
+impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldSlice<'a>>,
+        I: IntoIterator<Item = ErasedFieldSlice<'a>>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let slices: Box<[_]> = slices.into_iter().collect();
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -1328,30 +1331,30 @@ impl<'a, Fields> DynSoaSlices<'a, Fields> {
     }
 }
 
-impl<'a, Fields> AsRef<[(Layout, DynFieldSlice<'a>)]> for DynSoaSlices<'a, Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldSlice<'a>)] {
+impl<'a, Fields> AsRef<[(Layout, ErasedFieldSlice<'a>)]> for ErasedSoaSlices<'a, Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldSlice<'a>)] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<'a, Fields> AsMut<[(Layout, DynFieldSlice<'a>)]> for DynSoaSlices<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldSlice<'a>)] {
+impl<'a, Fields> AsMut<[(Layout, ErasedFieldSlice<'a>)]> for ErasedSoaSlices<'a, Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldSlice<'a>)] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 }
 
-impl<'a, Fields> Debug for DynSoaSlices<'a, Fields> {
+impl<'a, Fields> Debug for ErasedSoaSlices<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaSlices")
+        f.debug_struct("ErasedSoaSlices")
             .field("len", &self.len)
             .field("slices", &self.slices)
             .finish()
     }
 }
 
-impl<'a, Fields> Clone for DynSoaSlices<'a, Fields> {
+impl<'a, Fields> Clone for ErasedSoaSlices<'a, Fields> {
     fn clone(&self) -> Self {
         Self {
             len: self.len.clone(),
@@ -1361,27 +1364,27 @@ impl<'a, Fields> Clone for DynSoaSlices<'a, Fields> {
     }
 }
 
-unsafe impl<'a, Fields> Send for DynSoaSlices<'a, Fields> where Fields: Sync {}
-unsafe impl<'a, Fields> Sync for DynSoaSlices<'a, Fields> where Fields: Sync {}
+unsafe impl<'a, Fields> Send for ErasedSoaSlices<'a, Fields> where Fields: Sync {}
+unsafe impl<'a, Fields> Sync for ErasedSoaSlices<'a, Fields> where Fields: Sync {}
 
 // data is stored inline in a single buffer
-type DynFieldSliceMut<'a> = &'a mut [u8];
+type ErasedFieldSliceMut<'a> = &'a mut [u8];
 
-pub struct DynSoaSlicesMut<'a, Fields>
+pub struct ErasedSoaSlicesMut<'a, Fields>
 where
     Fields: 'a,
 {
     len: usize,
-    slices: Box<[(Layout, DynFieldSliceMut<'a>)]>,
+    slices: Box<[(Layout, ErasedFieldSliceMut<'a>)]>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, Fields> DynSoaSlicesMut<'a, Fields> {
-    pub fn new<I>(context: &DynSoaContext<Fields>, len: usize, slices: I) -> Self
+impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
+    pub fn new<I>(context: &ErasedSoaContext<Fields>, len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = DynFieldSliceMut<'a>>,
+        I: IntoIterator<Item = ErasedFieldSliceMut<'a>>,
     {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         let slices: Box<[_]> = slices.into_iter().collect();
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -1460,54 +1463,54 @@ impl<'a, Fields> DynSoaSlicesMut<'a, Fields> {
     }
 }
 
-impl<'a, Fields> AsRef<[(Layout, DynFieldSliceMut<'a>)]> for DynSoaSlicesMut<'a, Fields> {
-    fn as_ref(&self) -> &[(Layout, DynFieldSliceMut<'a>)] {
+impl<'a, Fields> AsRef<[(Layout, ErasedFieldSliceMut<'a>)]> for ErasedSoaSlicesMut<'a, Fields> {
+    fn as_ref(&self) -> &[(Layout, ErasedFieldSliceMut<'a>)] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<'a, Fields> AsMut<[(Layout, DynFieldSliceMut<'a>)]> for DynSoaSlicesMut<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, DynFieldSliceMut<'a>)] {
+impl<'a, Fields> AsMut<[(Layout, ErasedFieldSliceMut<'a>)]> for ErasedSoaSlicesMut<'a, Fields> {
+    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldSliceMut<'a>)] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 }
 
-impl<'a, Fields> Debug for DynSoaSlicesMut<'a, Fields> {
+impl<'a, Fields> Debug for ErasedSoaSlicesMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DynSoaSlicesMut")
+        f.debug_struct("ErasedSoaSlicesMut")
             .field("len", &self.len)
             .field("slices", &self.slices)
             .finish()
     }
 }
 
-unsafe impl<'a, Fields> Send for DynSoaSlicesMut<'a, Fields> where Fields: Send {}
-unsafe impl<'a, Fields> Sync for DynSoaSlicesMut<'a, Fields> where Fields: Sync {}
+unsafe impl<'a, Fields> Send for ErasedSoaSlicesMut<'a, Fields> where Fields: Send {}
+unsafe impl<'a, Fields> Sync for ErasedSoaSlicesMut<'a, Fields> where Fields: Sync {}
 
-unsafe impl<Fields> Soa for DynSoa<Fields> {
-    type Context = DynSoaContext<Fields>;
+unsafe impl<Fields> Soa for ErasedSoa<Fields> {
+    type Context = ErasedSoaContext<Fields>;
 
     type Fields = Fields;
 
     type FieldLayouts<'a> = &'a [Layout];
 
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
         field_layouts.as_ref()
     }
 
-    type Ptrs = DynSoaPtrs<Fields>;
+    type Ptrs = ErasedSoaPtrs<Fields>;
 
-    type MutPtrs = DynSoaMutPtrs<Fields>;
+    type MutPtrs = ErasedSoaMutPtrs<Fields>;
 
     unsafe fn ptrs(
         context: &Self::Context,
         ptr: *mut u8,
         offsets: impl IntoIterator<Item = usize>,
     ) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
 
         let ptrs: Box<[_]> = field_layouts
             .iter()
@@ -1521,14 +1524,14 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             .collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
 
         let ptrs = field_layouts
             .iter()
@@ -1539,7 +1542,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (field_layout.clone(), ptr)
             })
             .collect();
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
@@ -1549,8 +1552,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         ptrs: Self::Ptrs,
     ) -> impl IntoIterator<Item = *const u8> {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -1561,8 +1564,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         ptrs: Self::MutPtrs,
     ) -> impl IntoIterator<Item = *mut u8> {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -1573,7 +1576,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
 
         let ptrs: Box<[_]> = field_layouts
             .iter()
@@ -1587,7 +1590,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             .collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
-        DynSoaPtrs {
+        ErasedSoaPtrs {
             ptrs,
             phantom: PhantomData,
         }
@@ -1597,7 +1600,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
 
         let ptrs: Box<[_]> = field_layouts
             .iter()
@@ -1611,15 +1614,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             .collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     fn ptrs_cast_const(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -1631,15 +1634,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr.cast_const())
             })
             .collect();
-        DynSoaPtrs {
+        ErasedSoaPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     fn ptrs_cast_mut(context: &Self::Context, ptrs: Self::Ptrs) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -1651,15 +1654,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr.cast_mut())
             })
             .collect();
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     unsafe fn ptrs_add(context: &Self::Context, ptrs: Self::Ptrs, offset: usize) -> Self::Ptrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -1677,7 +1680,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr)
             })
             .collect();
-        DynSoaPtrs {
+        ErasedSoaPtrs {
             ptrs,
             phantom: PhantomData,
         }
@@ -1688,8 +1691,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         ptrs: Self::MutPtrs,
         offset: usize,
     ) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -1707,7 +1710,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr)
             })
             .collect();
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
@@ -1718,9 +1721,9 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         ptrs: Self::Ptrs,
         origin: Self::Ptrs,
     ) -> isize {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs, .. } = ptrs;
-        let DynSoaPtrs { ptrs: origin, .. } = origin;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaPtrs { ptrs: origin, .. } = origin;
 
         assert_eq!(field_layouts.len(), ptrs.len());
         assert_eq!(ptrs.len(), origin.len());
@@ -1753,9 +1756,9 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         ptrs: Self::MutPtrs,
         origin: Self::Ptrs,
     ) -> isize {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
-        let DynSoaPtrs { ptrs: origin, .. } = origin;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaPtrs { ptrs: origin, .. } = origin;
 
         assert_eq!(field_layouts.len(), ptrs.len());
         assert_eq!(ptrs.len(), origin.len());
@@ -1784,9 +1787,9 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     unsafe fn ptrs_swap(context: &Self::Context, a: Self::MutPtrs, b: Self::MutPtrs) {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs: a, .. } = a;
-        let DynSoaMutPtrs { ptrs: b, .. } = b;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs: a, .. } = a;
+        let ErasedSoaMutPtrs { ptrs: b, .. } = b;
 
         assert_eq!(field_layouts.len(), a.len());
         assert_eq!(a.len(), b.len());
@@ -1815,9 +1818,9 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     unsafe fn ptrs_copy(context: &Self::Context, src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs: src, .. } = src;
-        let DynSoaMutPtrs { ptrs: dst, .. } = dst;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs: src, .. } = src;
+        let ErasedSoaMutPtrs { ptrs: dst, .. } = dst;
 
         assert_eq!(field_layouts.len(), src.len());
         assert_eq!(src.len(), dst.len());
@@ -1852,9 +1855,9 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         dst: Self::MutPtrs,
         len: usize,
     ) {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs: src, .. } = src;
-        let DynSoaMutPtrs { ptrs: dst, .. } = dst;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs: src, .. } = src;
+        let ErasedSoaMutPtrs { ptrs: dst, .. } = dst;
 
         assert_eq!(field_layouts.len(), src.len());
         assert_eq!(src.len(), dst.len());
@@ -1889,9 +1892,9 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         dst: Self::MutPtrs,
         len: usize,
     ) {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs: src, .. } = src;
-        let DynSoaMutPtrs { ptrs: dst, .. } = dst;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs: src, .. } = src;
+        let ErasedSoaMutPtrs { ptrs: dst, .. } = dst;
 
         assert_eq!(field_layouts.len(), src.len());
         assert_eq!(src.len(), dst.len());
@@ -1913,8 +1916,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs) -> Self {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs: src, .. } = src;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs: src, .. } = src;
         assert_eq!(field_layouts.len(), src.len());
 
         let (buffer_layout, offsets) =
@@ -1942,8 +1945,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs: dst, .. } = dst;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs: dst, .. } = dst;
         let Self {
             buffer,
             field_layouts: value_layouts,
@@ -1973,7 +1976,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs) {
-        let DynSoaContext {
+        let ErasedSoaContext {
             field_layouts,
             drop_fields,
             ..
@@ -1982,17 +1985,17 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             return;
         };
 
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
         assert_eq!(field_layouts.len(), ptrs.len());
 
         drop_fields(ptrs.as_ref());
     }
 
-    type NonNullPtrs = DynSoaNonNullPtrs<Fields>;
+    type NonNullPtrs = ErasedSoaNonNullPtrs<Fields>;
 
     unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -2005,15 +2008,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, unsafe { NonNull::new_unchecked(ptr) })
             })
             .collect();
-        DynSoaNonNullPtrs {
+        ErasedSoaNonNullPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     fn nonnull_to_ptrs(context: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaNonNullPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaNonNullPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -2026,33 +2029,33 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (field_layout.clone(), ptr.as_ptr())
             })
             .collect();
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
-    type Vecs = DynSoaVecs<Fields>;
+    type Vecs = ErasedSoaVecs<Fields>;
 
     fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
-        let DynSoaContext { field_layouts, .. } = context;
+        let ErasedSoaContext { field_layouts, .. } = context;
 
         let vecs = field_layouts
             .iter()
             .map(|field_layout| {
                 let capacity = (capacity * field_layout.size()).div_ceil(size_of::<Byte<Fields>>());
-                DynFieldVec {
+                ErasedFieldVec {
                     buffer: Vec::with_capacity(capacity),
                     layout: field_layout.clone(),
                 }
             })
             .collect();
-        DynSoaVecs { len: 0, vecs }
+        ErasedSoaVecs { len: 0, vecs }
     }
 
     fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaVecs { vecs, .. } = vecs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaVecs { vecs, .. } = vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
 
@@ -2060,7 +2063,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             .iter()
             .zip(vecs)
             .map(|(field_layout, vec)| {
-                let DynFieldVec {
+                let ErasedFieldVec {
                     buffer,
                     layout: vec_field_layout,
                     ..
@@ -2073,15 +2076,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (field_layout.clone(), ptr)
             })
             .collect();
-        DynSoaPtrs {
+        ErasedSoaPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaVecs { vecs, .. } = vecs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaVecs { vecs, .. } = vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
 
@@ -2089,7 +2092,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             .iter()
             .zip(vecs)
             .map(|(field_layout, vec)| {
-                let DynFieldVec {
+                let ErasedFieldVec {
                     buffer,
                     layout: vec_field_layout,
                     ..
@@ -2102,20 +2105,20 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (field_layout.clone(), ptr)
             })
             .collect();
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaVecs { vecs, len, .. } = vecs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaVecs { vecs, len, .. } = vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
 
         // let mut lens = field_layouts.iter().zip(vecs).map(|(field_layout, vec)| {
-        //     let DynFieldVec {
+        //     let ErasedFieldVec {
         //         buffer,
         //         layout: vec_field_layout,
         //         ..
@@ -2129,15 +2132,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaVecs {
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaVecs {
             vecs, len: vec_len, ..
         } = vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
 
         for (field_layout, vec) in field_layouts.iter().zip(vecs) {
-            let DynFieldVec {
+            let ErasedFieldVec {
                 buffer: field_buffer,
                 layout: vec_field_layout,
             } = vec;
@@ -2152,18 +2155,18 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     type Refs<'a>
-        = DynSoaRefs<'a, Fields>
+        = ErasedSoaRefs<'a, Fields>
     where
         Self: 'a;
 
     type RefsMut<'a>
-        = DynSoaRefsMut<'a, Fields>
+        = ErasedSoaRefsMut<'a, Fields>
     where
         Self: 'a;
 
     unsafe fn ptrs_to_refs<'a>(context: &Self::Context, ptrs: Self::Ptrs) -> Self::Refs<'a> {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -2178,7 +2181,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (field_layout.clone(), r#ref)
             })
             .collect();
-        DynSoaRefs {
+        ErasedSoaRefs {
             refs,
             phantom: PhantomData,
         }
@@ -2188,8 +2191,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         ptrs: Self::MutPtrs,
     ) -> Self::RefsMut<'a> {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -2204,15 +2207,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, r#ref)
             })
             .collect();
-        DynSoaRefsMut {
+        ErasedSoaRefsMut {
             refs,
             phantom: PhantomData,
         }
     }
 
     fn refs_as_ptrs(context: &Self::Context, refs: Self::Refs<'_>) -> Self::Ptrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaRefs { refs, .. } = refs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaRefs { refs, .. } = refs;
 
         assert_eq!(field_layouts.len(), refs.len());
 
@@ -2226,15 +2229,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr::from_ref(r#ref))
             })
             .collect();
-        DynSoaPtrs {
+        ErasedSoaPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     fn mut_refs_as_ptrs(context: &Self::Context, refs: Self::RefsMut<'_>) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaRefsMut { refs, .. } = refs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaRefsMut { refs, .. } = refs;
 
         assert_eq!(field_layouts.len(), refs.len());
 
@@ -2247,15 +2250,15 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr::from_mut(r#ref))
             })
             .collect();
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     fn mut_refs_as_refs<'a>(context: &Self::Context, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaRefsMut { refs, .. } = refs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaRefsMut { refs, .. } = refs;
 
         assert_eq!(field_layouts.len(), refs.len());
 
@@ -2268,23 +2271,23 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, &*r#ref)
             })
             .collect();
-        DynSoaRefs {
+        ErasedSoaRefs {
             refs,
             phantom: PhantomData,
         }
     }
 
-    type SlicePtrs = DynSoaSlicePtrs<Fields>;
+    type SlicePtrs = ErasedSoaSlicePtrs<Fields>;
 
-    type SliceMutPtrs = DynSoaSliceMutPtrs<Fields>;
+    type SliceMutPtrs = ErasedSoaSliceMutPtrs<Fields>;
 
     fn slices_from_raw_parts(
         context: &Self::Context,
         ptrs: Self::Ptrs,
         len: usize,
     ) -> Self::SlicePtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -2301,7 +2304,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, slice)
             })
             .collect();
-        DynSoaSlicePtrs {
+        ErasedSoaSlicePtrs {
             len,
             slices,
             phantom: PhantomData,
@@ -2313,8 +2316,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         ptrs: Self::MutPtrs,
         len: usize,
     ) -> Self::SliceMutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaMutPtrs { ptrs, .. } = ptrs;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
 
         assert_eq!(field_layouts.len(), ptrs.len());
 
@@ -2331,7 +2334,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, slice)
             })
             .collect();
-        DynSoaSliceMutPtrs {
+        ErasedSoaSliceMutPtrs {
             len,
             slices,
             phantom: PhantomData,
@@ -2342,8 +2345,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicePtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSliceMutPtrs { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSliceMutPtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2357,7 +2360,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, slice.cast_const())
             })
             .collect();
-        DynSoaSlicePtrs {
+        ErasedSoaSlicePtrs {
             len,
             slices,
             phantom: PhantomData,
@@ -2365,8 +2368,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     fn slice_ptrs_cast_mut(context: &Self::Context, slices: Self::SlicePtrs) -> Self::SliceMutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicePtrs { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlicePtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2380,7 +2383,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, slice.cast_mut())
             })
             .collect();
-        DynSoaSliceMutPtrs {
+        ErasedSoaSliceMutPtrs {
             len,
             slices,
             phantom: PhantomData,
@@ -2388,8 +2391,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     fn slice_ptrs_len(context: &Self::Context, slices: Self::SlicePtrs) -> usize {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicePtrs { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlicePtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2406,8 +2409,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     fn slice_ptrs_len_mut(context: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSliceMutPtrs { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSliceMutPtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2426,8 +2429,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     fn slice_ptrs_as_ptrs(context: &Self::Context, slices: Self::SlicePtrs) -> Self::Ptrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicePtrs { slices, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlicePtrs { slices, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2444,7 +2447,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr)
             })
             .collect();
-        DynSoaPtrs {
+        ErasedSoaPtrs {
             ptrs,
             phantom: PhantomData,
         }
@@ -2454,8 +2457,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSliceMutPtrs { slices, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSliceMutPtrs { slices, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2472,19 +2475,19 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr)
             })
             .collect();
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     type Slices<'a>
-        = DynSoaSlices<'a, Fields>
+        = ErasedSoaSlices<'a, Fields>
     where
         Self: 'a;
 
     type SlicesMut<'a>
-        = DynSoaSlicesMut<'a, Fields>
+        = ErasedSoaSlicesMut<'a, Fields>
     where
         Self: 'a;
 
@@ -2492,8 +2495,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicePtrs,
     ) -> Self::Slices<'a> {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicePtrs { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlicePtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2510,7 +2513,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, slice)
             })
             .collect();
-        DynSoaSlices {
+        ErasedSoaSlices {
             len,
             slices,
             phantom: PhantomData,
@@ -2521,8 +2524,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicesMut<'a> {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSliceMutPtrs { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSliceMutPtrs { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2539,7 +2542,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, slice)
             })
             .collect();
-        DynSoaSlicesMut {
+        ErasedSoaSlicesMut {
             len,
             slices,
             phantom: PhantomData,
@@ -2547,8 +2550,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     fn slices_len(context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlices { slices, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlices { slices, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2567,8 +2570,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     fn slices_len_mut(context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicesMut { slices, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlicesMut { slices, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2590,8 +2593,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         slices: Self::Slices<'_>,
     ) -> Self::SlicePtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlices { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlices { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2605,7 +2608,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr::from_ref(slice))
             })
             .collect();
-        DynSoaSlicePtrs {
+        ErasedSoaSlicePtrs {
             len,
             slices,
             phantom: PhantomData,
@@ -2616,8 +2619,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'_>,
     ) -> Self::SliceMutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicesMut { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlicesMut { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2631,7 +2634,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr::from_mut(slice))
             })
             .collect();
-        DynSoaSliceMutPtrs {
+        ErasedSoaSliceMutPtrs {
             len,
             slices,
             phantom: PhantomData,
@@ -2642,8 +2645,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'a>,
     ) -> Self::Slices<'a> {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicesMut { slices, len, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlicesMut { slices, len, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2656,7 +2659,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, &*slice)
             })
             .collect();
-        DynSoaSlices {
+        ErasedSoaSlices {
             len,
             slices,
             phantom: PhantomData,
@@ -2664,8 +2667,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
     }
 
     fn slice_refs_as_ptrs(context: &Self::Context, slices: Self::Slices<'_>) -> Self::Ptrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlices { slices, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlices { slices, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2682,7 +2685,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr)
             })
             .collect();
-        DynSoaPtrs {
+        ErasedSoaPtrs {
             ptrs,
             phantom: PhantomData,
         }
@@ -2692,8 +2695,8 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'_>,
     ) -> Self::MutPtrs {
-        let DynSoaContext { field_layouts, .. } = context;
-        let DynSoaSlicesMut { slices, .. } = slices;
+        let ErasedSoaContext { field_layouts, .. } = context;
+        let ErasedSoaSlicesMut { slices, .. } = slices;
 
         assert_eq!(field_layouts.len(), slices.len());
 
@@ -2710,14 +2713,14 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
                 (layout, ptr)
             })
             .collect();
-        DynSoaMutPtrs {
+        ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,
         }
     }
 
     unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs) {
-        let DynSoaContext {
+        let ErasedSoaContext {
             field_layouts,
             drop_fields,
             ..
@@ -2726,7 +2729,7 @@ unsafe impl<Fields> Soa for DynSoa<Fields> {
             return;
         };
 
-        let DynSoaSliceMutPtrs {
+        let ErasedSoaSliceMutPtrs {
             mut slices, len, ..
         } = slices;
         assert_eq!(field_layouts.len(), slices.len());

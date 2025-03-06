@@ -1,8 +1,8 @@
 use std::{alloc::Layout, ptr, slice};
 
 use gpecs_soa::{
+    erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaSlices},
     prelude::*,
-    r#dyn::{DynSoa, DynSoaContext, DynSoaRefs, DynSoaSlices},
     slice::{Iter as SoaIter, IterMut as SoaIterMut},
     vec::IntoIter as SoaIntoIter,
 };
@@ -54,26 +54,26 @@ fn into_iter_null_opt() {
 
 #[test]
 #[cfg_attr(miri, ignore)]
-fn dyn_context() {
+fn erased_context() {
     let field_layouts = [Layout::new::<u8>(), Layout::new::<i16>()];
-    let _context = DynSoaContext::<i16>::new(field_layouts, None);
+    let _context = ErasedSoaContext::<i16>::new(field_layouts, None);
 }
 
 #[test]
 #[should_panic = "input alignment must be less than or equal to 1, but got 2"]
 #[cfg_attr(miri, ignore)]
-fn dyn_context_fail() {
+fn erased_context_fail() {
     let field_layouts = [Layout::new::<u8>(), Layout::new::<i16>()];
-    let _context = DynSoaContext::<u8>::new(field_layouts, None);
+    let _context = ErasedSoaContext::<u8>::new(field_layouts, None);
 }
 
 #[test]
 #[cfg_attr(miri, ignore)]
-fn dyn_context_of() {
-    let context = DynSoaContext::of::<()>(());
+fn erased_context_of() {
+    let context = ErasedSoaContext::of::<()>(());
     assert_eq!(context.layouts(), [Layout::new::<()>()]);
 
-    let context = DynSoaContext::of::<(u32, u16, u8)>(());
+    let context = ErasedSoaContext::of::<(u32, u16, u8)>(());
     let optimized_layout = [
         Layout::new::<u8>(),
         Layout::new::<u16>(),
@@ -84,35 +84,35 @@ fn dyn_context_of() {
 
 #[test]
 #[cfg_attr(miri, ignore)]
-fn dyn_value() {
+fn erased_value() {
     let context = ();
-    let dyn_context = DynSoaContext::of::<()>(context);
+    let erased_context = ErasedSoaContext::of::<()>(context);
 
     let value = ();
-    let dyn_value = DynSoa::from(&context, value);
-    assert_eq!(dyn_value.layouts(), [Layout::new::<()>()]);
+    let erased_value = ErasedSoa::from(&context, value);
+    assert_eq!(erased_value.layouts(), [Layout::new::<()>()]);
     assert_eq!(
-        dyn_value.as_refs(&dyn_context).as_ref(),
+        erased_value.as_refs(&erased_context).as_ref(),
         [(Layout::new::<()>(), [].as_slice())],
     );
 
-    let value = unsafe { dyn_value.into::<()>(&context) };
+    let value = unsafe { erased_value.into::<()>(&context) };
     assert_eq!(value, ());
 
-    let dyn_context = DynSoaContext::of::<(u32, u16, u8)>(());
+    let erased_context = ErasedSoaContext::of::<(u32, u16, u8)>(());
 
     let i1 = 1u32;
     let i2 = 2u16;
     let i3 = 3u8;
     let value = (i1, i2, i3);
-    let dyn_value = DynSoa::from(&(), value);
+    let erased_value = ErasedSoa::from(&(), value);
 
     let optimized_layout = [
         Layout::new::<u8>(),
         Layout::new::<u16>(),
         Layout::new::<u32>(),
     ];
-    assert_eq!(dyn_value.layouts(), optimized_layout);
+    assert_eq!(erased_value.layouts(), optimized_layout);
 
     let i1_bytes = i1.to_ne_bytes();
     let i2_bytes = i2.to_ne_bytes();
@@ -122,7 +122,7 @@ fn dyn_value() {
     let i2_bytes = i2_bytes.as_slice();
     let i3_bytes = i3_bytes.as_slice();
     assert_eq!(
-        dyn_value.as_refs(&dyn_context).as_ref(),
+        erased_value.as_refs(&erased_context).as_ref(),
         [
             (optimized_layout[0], i3_bytes),
             (optimized_layout[1], i2_bytes),
@@ -130,11 +130,11 @@ fn dyn_value() {
         ],
     );
 
-    let value = unsafe { dyn_value.into::<(u32, u16, u8)>(&context) };
+    let value = unsafe { erased_value.into::<(u32, u16, u8)>(&context) };
     assert_eq!(value, (i1, i2, i3));
 
     let refs = (&i1, &i2, &i3);
-    let refs = DynSoaRefs::from::<(u32, u16, u8)>(&context, refs);
+    let refs = ErasedSoaRefs::from::<(u32, u16, u8)>(&context, refs);
     assert_eq!(
         refs.as_ref(),
         [
@@ -156,7 +156,7 @@ fn dyn_value() {
     let i789_slices = i789.as_slice();
 
     let slices = (i123_slices, i456_slices, i789_slices);
-    let slices = DynSoaSlices::from::<(u32, u16, u8)>(&(), slices);
+    let slices = ErasedSoaSlices::from::<(u32, u16, u8)>(&(), slices);
 
     let i123_bytes = unsafe {
         let data = ptr::from_ref(&i123).cast();

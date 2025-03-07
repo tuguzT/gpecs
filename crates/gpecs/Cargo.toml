@@ -8,3 +8,4 @@ edition.workspace = true
 
 [dependencies]
 gpecs_sparse = { workspace = true }
+as-any = { version = "0.3" }

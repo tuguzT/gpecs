@@ -1,61 +1,291 @@
-use std::{any::Any, collections::BTreeSet};
+use std::collections::BTreeSet;
 
+use as_any::{AsAny, Downcast};
 use gpecs_sparse::set::EpochSparseSet;
 
-use crate::{component::ComponentId, entity::Entity, soa::Soa};
+use crate::{
+    component::{ComponentId, ComponentRegistry},
+    entity::Entity,
+    prelude::Component,
+    soa::Soa,
+};
 
-pub struct Archetype {
-    #[allow(dead_code)]
+pub trait Archetype: Soa + 'static {
+    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId>;
+}
+
+pub struct ArchetypeStorage {
     component_ids: BTreeSet<ComponentId>,
     erased_storage: Box<dyn ErasedStorage>,
 }
 
-impl Archetype {
+type SparseSet<V> = EpochSparseSet<Entity, V>;
+
+impl ArchetypeStorage {
+    #[inline]
+    pub fn of<T>(components: &mut ComponentRegistry) -> Self
+    where
+        T: Archetype,
+        T::Context: Default,
+    {
+        let component_ids = T::component_ids(components).into_iter().collect();
+        Self {
+            component_ids,
+            erased_storage: Box::new(SparseSet::<T>::new()),
+        }
+    }
+
+    #[inline]
     pub fn entities(&self) -> &[Entity] {
         let Self { erased_storage, .. } = self;
         erased_storage.entities()
     }
 
-    #[allow(dead_code)]
-    fn insert_internal(&mut self, id: Entity, value: Box<dyn Any>) {
-        let Self { erased_storage, .. } = self;
-        erased_storage
-            .insert(id, value)
+    #[inline]
+    pub fn get<T>(
+        &self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+    ) -> Result<Option<T::Refs<'_>>, ()>
+    where
+        T: Archetype,
+    {
+        let Self {
+            component_ids,
+            erased_storage,
+        } = self;
+
+        let target_component_ids: BTreeSet<_> = T::component_ids(components).into_iter().collect();
+        if target_component_ids != *component_ids {
+            return Err(());
+        }
+
+        let storage = erased_storage
+            .as_ref()
+            .downcast_ref::<SparseSet<T>>()
             .expect("type of value should match with storage type");
+        let refs = storage.get(entity);
+        Ok(refs)
     }
 
-    #[allow(dead_code)]
-    fn remove_internal(&mut self, id: Entity) -> Option<Box<dyn Any>> {
-        let Self { erased_storage, .. } = self;
-        erased_storage.remove(id)
+    #[inline]
+    pub fn get_mut<T>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+    ) -> Result<Option<T::RefsMut<'_>>, ()>
+    where
+        T: Archetype,
+    {
+        let Self {
+            component_ids,
+            erased_storage,
+        } = self;
+
+        let target_component_ids: BTreeSet<_> = T::component_ids(components).into_iter().collect();
+        if target_component_ids != *component_ids {
+            return Err(());
+        }
+
+        let storage = erased_storage
+            .as_mut()
+            .downcast_mut::<SparseSet<T>>()
+            .expect("type of value should match with storage type");
+        let refs = storage.get_mut(entity);
+        Ok(refs)
+    }
+
+    #[inline]
+    pub fn insert<T>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        value: T,
+    ) -> Result<Option<T>, T>
+    where
+        T: Archetype,
+    {
+        let Self {
+            component_ids,
+            erased_storage,
+        } = self;
+
+        let target_component_ids: BTreeSet<_> = T::component_ids(components).into_iter().collect();
+        if target_component_ids != *component_ids {
+            return Err(value);
+        }
+
+        let storage = erased_storage
+            .as_mut()
+            .downcast_mut::<SparseSet<T>>()
+            .expect("type of value should match with storage type");
+        let value = storage.insert(entity, value);
+        Ok(value)
+    }
+
+    #[inline]
+    pub fn remove<T>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+    ) -> Result<Option<T>, ()>
+    where
+        T: Archetype,
+    {
+        let Self {
+            component_ids,
+            erased_storage,
+        } = self;
+
+        let target_component_ids: BTreeSet<_> = T::component_ids(components).into_iter().collect();
+        if target_component_ids != *component_ids {
+            return Err(());
+        }
+
+        let storage = erased_storage
+            .as_mut()
+            .downcast_mut::<SparseSet<T>>()
+            .expect("type of value should match with storage type");
+        let value = storage.remove(entity);
+        Ok(value)
     }
 }
 
-trait ErasedStorage {
+trait ErasedStorage: AsAny {
     fn entities(&self) -> &[Entity];
-
-    fn insert(&mut self, id: Entity, value: Box<dyn Any>) -> Result<(), Box<dyn Any>>;
-
-    fn remove(&mut self, id: Entity) -> Option<Box<dyn Any>>;
 }
 
-impl<V> ErasedStorage for EpochSparseSet<Entity, V>
+impl<T> ErasedStorage for SparseSet<T>
 where
-    V: Soa + 'static,
+    T: Archetype,
 {
     fn entities(&self) -> &[Entity] {
         self.as_keys_slice()
     }
+}
 
-    fn insert(&mut self, id: Entity, value: Box<dyn Any>) -> Result<(), Box<dyn Any>> {
-        let value = value.downcast::<V>()?;
-        self.insert(id, *value);
-        Ok(())
+impl Archetype for () {
+    fn component_ids(_: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
+        []
+    }
+}
+
+impl<A> Archetype for (A,)
+where
+    A: Component,
+{
+    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
+        [components.register_component::<A>()]
+    }
+}
+
+impl<A, B> Archetype for (A, B)
+where
+    A: Component,
+    B: Component,
+{
+    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
+        [
+            components.register_component::<A>(),
+            components.register_component::<B>(),
+        ]
+    }
+}
+
+impl<A, B, C> Archetype for (A, B, C)
+where
+    A: Component,
+    B: Component,
+    C: Component,
+{
+    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
+        [
+            components.register_component::<A>(),
+            components.register_component::<B>(),
+            components.register_component::<C>(),
+        ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::entity::EntityRegistry;
+
+    use super::*;
+
+    #[test]
+    fn unit_archetype() {
+        let mut components = ComponentRegistry::new();
+        let mut storage = ArchetypeStorage::of::<()>(&mut components);
+        assert_eq!(storage.entities(), []);
+
+        let mut entities = EntityRegistry::new();
+        let entity = entities.spawn();
+        let value = storage
+            .insert::<()>(&mut components, entity, ())
+            .expect("archetype storage should store unit");
+        assert_eq!(value, None);
+        assert_eq!(storage.entities(), [entity]);
+
+        let refs = storage
+            .get::<()>(&mut components, entity)
+            .expect("components by given entity should exist");
+        assert_eq!(refs, Some(&()));
+        assert_eq!(storage.entities(), [entity]);
+
+        let value = storage
+            .remove::<()>(&mut components, entity)
+            .expect("components by given entity should exist");
+        assert_eq!(value, Some(()));
+        assert_eq!(storage.entities(), []);
     }
 
-    fn remove(&mut self, id: Entity) -> Option<Box<dyn Any>> {
-        let value = self.remove(id)?;
-        let value = Box::new(value);
-        Some(value)
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    struct Position {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    struct Mass {
+        value: f32,
+    }
+
+    impl Component for Position {}
+    impl Component for Mass {}
+
+    #[test]
+    fn tuple_archetype() {
+        let mut components = ComponentRegistry::new();
+        let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components);
+        assert_eq!(storage.entities(), []);
+
+        let mut entities = EntityRegistry::new();
+        let entity = entities.spawn();
+
+        let position = Position {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        };
+        let mass = Mass { value: 4.0 };
+        let value = storage
+            .insert::<(Position, Mass)>(&mut components, entity, (position, mass))
+            .expect("archetype storage should store unit");
+        assert_eq!(value, None);
+        assert_eq!(storage.entities(), [entity]);
+
+        let refs = storage
+            .get::<(Position, Mass)>(&mut components, entity)
+            .expect("components by given entity should exist");
+        assert_eq!(refs, Some((&position, &mass)));
+        assert_eq!(storage.entities(), [entity]);
+
+        let value = storage
+            .remove::<(Position, Mass)>(&mut components, entity)
+            .expect("components by given entity should exist");
+        assert_eq!(value, Some((position, mass)));
+        assert_eq!(storage.entities(), []);
     }
 }

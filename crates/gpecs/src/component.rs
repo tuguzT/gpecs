@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
 };
 
-use crate::id::Id;
+use crate::entity::Entity;
 
 pub trait Component: 'static {}
 
@@ -21,10 +21,10 @@ impl ComponentId {
     }
 }
 
-impl From<ComponentId> for Id {
+impl From<ComponentId> for Entity {
     #[inline]
     fn from(value: ComponentId) -> Self {
-        Id::new(value.index(), 0)
+        Entity::new(value.index(), 0)
     }
 }
 

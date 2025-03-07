@@ -2,16 +2,16 @@ use std::{ops::Deref, slice::Iter, vec::IntoIter};
 
 use gpecs_sparse::{arena::EpochSparseArena, key::EpochKey};
 
-pub type Id = EpochKey;
+pub type Entity = EpochKey;
 
 pub type TryReserveError = gpecs_sparse::error::TryReserveError;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct IdRegistry {
-    inner: EpochSparseArena<Id, ()>,
+pub struct EntityRegistry {
+    inner: EpochSparseArena<Entity, ()>,
 }
 
-impl IdRegistry {
+impl EntityRegistry {
     #[inline]
     pub fn new() -> Self {
         let inner = EpochSparseArena::new();
@@ -85,25 +85,25 @@ impl IdRegistry {
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[Id] {
+    pub fn as_slice(&self) -> &[Entity] {
         let Self { inner } = self;
         inner.as_keys_slice()
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const Id {
+    pub fn as_ptr(&self) -> *const Entity {
         let Self { inner } = self;
         inner.as_keys_ptr()
     }
 
     #[inline]
-    pub fn insert(&mut self, id: Id) {
+    pub fn insert(&mut self, id: Entity) {
         let Self { inner } = self;
         inner.insert(id, ());
     }
 
     #[inline]
-    pub fn try_insert(&mut self, id: Id) -> Result<(), TryReserveError> {
+    pub fn try_insert(&mut self, id: Entity) -> Result<(), TryReserveError> {
         let Self { inner } = self;
 
         inner.try_insert(id, ())?;
@@ -111,19 +111,19 @@ impl IdRegistry {
     }
 
     #[inline]
-    pub fn push(&mut self) -> Id {
+    pub fn push(&mut self) -> Entity {
         let Self { inner } = self;
         inner.push(())
     }
 
     #[inline]
-    pub fn try_push(&mut self) -> Result<Id, TryReserveError> {
+    pub fn try_push(&mut self) -> Result<Entity, TryReserveError> {
         let Self { inner } = self;
         inner.try_push(())
     }
 
     #[inline]
-    pub fn remove(&mut self, id: Id) {
+    pub fn remove(&mut self, id: Entity) {
         let Self { inner } = self;
         inner.remove(id);
     }
@@ -135,7 +135,7 @@ impl IdRegistry {
     }
 
     #[inline]
-    pub fn invalidate_epoch(&mut self, id: Id) -> Option<Id> {
+    pub fn invalidate_epoch(&mut self, id: Entity) -> Option<Entity> {
         let Self { inner } = self;
         inner.invalidate_epoch(id)
     }
@@ -149,14 +149,14 @@ impl IdRegistry {
     #[inline]
     pub fn retain<F>(&mut self, mut f: F)
     where
-        F: FnMut(Id) -> bool,
+        F: FnMut(Entity) -> bool,
     {
         let Self { inner } = self;
         inner.retain(|id, _| f(id));
     }
 
     #[inline]
-    pub fn contains(&self, id: Id) -> bool {
+    pub fn contains(&self, id: Entity) -> bool {
         let Self { inner } = self;
         inner.contains_key(id)
     }
@@ -168,27 +168,27 @@ impl IdRegistry {
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, Id> {
+    pub fn iter(&self) -> Iter<'_, Entity> {
         self.as_slice().iter()
     }
 }
 
-impl From<Vec<Id>> for IdRegistry {
+impl From<Vec<Entity>> for EntityRegistry {
     #[inline]
-    fn from(value: Vec<Id>) -> Self {
+    fn from(value: Vec<Entity>) -> Self {
         value.into_iter().collect()
     }
 }
 
-impl From<IdRegistry> for Vec<Id> {
+impl From<EntityRegistry> for Vec<Entity> {
     #[inline]
-    fn from(storage: IdRegistry) -> Self {
-        let IdRegistry { inner } = storage;
+    fn from(storage: EntityRegistry) -> Self {
+        let EntityRegistry { inner } = storage;
         inner.into_keys_vec()
     }
 }
 
-impl Clone for IdRegistry {
+impl Clone for EntityRegistry {
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -204,29 +204,29 @@ impl Clone for IdRegistry {
     }
 }
 
-impl AsRef<[Id]> for IdRegistry {
+impl AsRef<[Entity]> for EntityRegistry {
     #[inline]
-    fn as_ref(&self) -> &[Id] {
+    fn as_ref(&self) -> &[Entity] {
         self.as_slice()
     }
 }
 
-impl AsRef<IdRegistry> for IdRegistry {
+impl AsRef<EntityRegistry> for EntityRegistry {
     #[inline]
-    fn as_ref(&self) -> &IdRegistry {
+    fn as_ref(&self) -> &EntityRegistry {
         self
     }
 }
 
-impl AsMut<IdRegistry> for IdRegistry {
+impl AsMut<EntityRegistry> for EntityRegistry {
     #[inline]
-    fn as_mut(&mut self) -> &mut IdRegistry {
+    fn as_mut(&mut self) -> &mut EntityRegistry {
         self
     }
 }
 
-impl Deref for IdRegistry {
-    type Target = [Id];
+impl Deref for EntityRegistry {
+    type Target = [Entity];
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -234,9 +234,9 @@ impl Deref for IdRegistry {
     }
 }
 
-impl<'a> IntoIterator for &'a IdRegistry {
-    type Item = &'a Id;
-    type IntoIter = Iter<'a, Id>;
+impl<'a> IntoIterator for &'a EntityRegistry {
+    type Item = &'a Entity;
+    type IntoIter = Iter<'a, Entity>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -244,9 +244,9 @@ impl<'a> IntoIterator for &'a IdRegistry {
     }
 }
 
-impl IntoIterator for IdRegistry {
-    type Item = Id;
-    type IntoIter = IntoIter<Id>;
+impl IntoIterator for EntityRegistry {
+    type Item = Entity;
+    type IntoIter = IntoIter<Entity>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -255,17 +255,17 @@ impl IntoIterator for IdRegistry {
     }
 }
 
-impl FromIterator<Id> for IdRegistry {
+impl FromIterator<Entity> for EntityRegistry {
     #[inline]
-    fn from_iter<T: IntoIterator<Item = Id>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = Entity>>(iter: T) -> Self {
         let inner = iter.into_iter().map(|id| (id, ())).collect();
         Self { inner }
     }
 }
 
-impl Extend<Id> for IdRegistry {
+impl Extend<Entity> for EntityRegistry {
     #[inline]
-    fn extend<T: IntoIterator<Item = Id>>(&mut self, iter: T) {
+    fn extend<T: IntoIterator<Item = Entity>>(&mut self, iter: T) {
         let Self { inner } = self;
         inner.extend(iter.into_iter().map(|id| (id, ())));
     }

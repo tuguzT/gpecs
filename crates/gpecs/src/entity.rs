@@ -183,13 +183,13 @@ impl EntityRegistry {
     }
 
     #[inline]
-    pub fn try_push(&mut self) -> Result<Entity, TryReserveError> {
+    pub fn try_spawn(&mut self) -> Result<Entity, TryReserveError> {
         let Self { inner } = self;
         inner.try_push(())
     }
 
     #[inline]
-    pub fn remove(&mut self, entity: Entity) {
+    pub fn despawn(&mut self, entity: Entity) {
         let Self { inner } = self;
         inner.remove(entity);
     }
@@ -375,7 +375,7 @@ mod tests {
         let mut registry = EntityRegistry::new();
 
         let entity = registry.spawn();
-        registry.remove(entity);
+        registry.despawn(entity);
         let entity = registry.spawn();
 
         assert_eq!(registry.len(), 1);
@@ -393,7 +393,7 @@ mod tests {
         let mut registry = EntityRegistry::new();
 
         let entity = registry.spawn();
-        registry.remove(entity);
+        registry.despawn(entity);
         let entity = registry.spawn();
         assert_eq!(entity, Entity::new(0, 1));
 

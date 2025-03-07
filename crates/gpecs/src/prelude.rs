@@ -1,1 +1,4 @@
-pub use crate::entity::Entity;
+pub use crate::{
+    component::{Component, ComponentId},
+    entity::Entity,
+};

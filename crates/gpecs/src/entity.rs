@@ -1,8 +1,74 @@
-use std::{ops::Deref, slice::Iter, vec::IntoIter};
+use std::{
+    fmt::{self, Display},
+    ops::Deref,
+    slice::Iter,
+    vec::IntoIter,
+};
 
-use gpecs_sparse::{arena::EpochSparseArena, key::EpochKey};
+use gpecs_sparse::{
+    arena::EpochSparseArena,
+    key::{EpochKey, Key},
+};
 
-pub type Entity = EpochKey;
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub struct Entity {
+    inner: EpochKey,
+}
+
+impl Entity {
+    #[inline]
+    pub const fn new(sparse_index: usize, epoch: usize) -> Self {
+        let inner = EpochKey::new(sparse_index, epoch);
+        Self { inner }
+    }
+
+    #[inline]
+    pub const fn sparse_index(&self) -> usize {
+        let Self { inner } = self;
+        inner.sparse_index()
+    }
+
+    #[inline]
+    pub const fn sparse_index_mut(&mut self) -> &mut usize {
+        let Self { inner } = self;
+        inner.sparse_index_mut()
+    }
+
+    #[inline]
+    pub const fn epoch(&self) -> usize {
+        let Self { inner } = self;
+        *inner.epoch()
+    }
+
+    #[inline]
+    pub const fn epoch_mut(&mut self) -> &mut usize {
+        let Self { inner } = self;
+        inner.epoch_mut()
+    }
+}
+
+impl Key for Entity {
+    type Epoch = usize;
+
+    fn new(sparse_index: usize, epoch: Self::Epoch) -> Self {
+        Entity::new(sparse_index, epoch)
+    }
+
+    fn sparse_index(self) -> usize {
+        Entity::sparse_index(&self)
+    }
+
+    fn epoch(self) -> Self::Epoch {
+        Entity::epoch(&self)
+    }
+}
+
+impl Display for Entity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { inner } = self;
+        inner.fmt(f)
+    }
+}
 
 pub type TryReserveError = gpecs_sparse::error::TryReserveError;
 
@@ -97,21 +163,21 @@ impl EntityRegistry {
     }
 
     #[inline]
-    pub fn insert(&mut self, id: Entity) {
+    pub fn insert(&mut self, entity: Entity) {
         let Self { inner } = self;
-        inner.insert(id, ());
+        inner.insert(entity, ());
     }
 
     #[inline]
-    pub fn try_insert(&mut self, id: Entity) -> Result<(), TryReserveError> {
+    pub fn try_insert(&mut self, entity: Entity) -> Result<(), TryReserveError> {
         let Self { inner } = self;
 
-        inner.try_insert(id, ())?;
+        inner.try_insert(entity, ())?;
         Ok(())
     }
 
     #[inline]
-    pub fn push(&mut self) -> Entity {
+    pub fn spawn(&mut self) -> Entity {
         let Self { inner } = self;
         inner.push(())
     }
@@ -123,9 +189,9 @@ impl EntityRegistry {
     }
 
     #[inline]
-    pub fn remove(&mut self, id: Entity) {
+    pub fn remove(&mut self, entity: Entity) {
         let Self { inner } = self;
-        inner.remove(id);
+        inner.remove(entity);
     }
 
     #[inline]
@@ -135,9 +201,9 @@ impl EntityRegistry {
     }
 
     #[inline]
-    pub fn invalidate_epoch(&mut self, id: Entity) -> Option<Entity> {
+    pub fn invalidate_epoch(&mut self, entity: Entity) -> Option<Entity> {
         let Self { inner } = self;
-        inner.invalidate_epoch(id)
+        inner.invalidate_epoch(entity)
     }
 
     #[inline]
@@ -152,13 +218,13 @@ impl EntityRegistry {
         F: FnMut(Entity) -> bool,
     {
         let Self { inner } = self;
-        inner.retain(|id, _| f(id));
+        inner.retain(|entity, _| f(entity));
     }
 
     #[inline]
-    pub fn contains(&self, id: Entity) -> bool {
+    pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner } = self;
-        inner.contains_key(id)
+        inner.contains_key(entity)
     }
 
     #[inline]
@@ -258,7 +324,7 @@ impl IntoIterator for EntityRegistry {
 impl FromIterator<Entity> for EntityRegistry {
     #[inline]
     fn from_iter<T: IntoIterator<Item = Entity>>(iter: T) -> Self {
-        let inner = iter.into_iter().map(|id| (id, ())).collect();
+        let inner = iter.into_iter().map(|entity| (entity, ())).collect();
         Self { inner }
     }
 }
@@ -267,6 +333,76 @@ impl Extend<Entity> for EntityRegistry {
     #[inline]
     fn extend<T: IntoIterator<Item = Entity>>(&mut self, iter: T) {
         let Self { inner } = self;
-        inner.extend(iter.into_iter().map(|id| (id, ())));
+        inner.extend(iter.into_iter().map(|entity| (entity, ())));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new() {
+        let registry = EntityRegistry::new();
+        assert_eq!(registry.len(), 0);
+        assert_eq!(registry.capacity(), 0);
+    }
+
+    #[test]
+    fn with_capacity() {
+        let registry = EntityRegistry::with_capacity(10);
+        assert_eq!(registry.len(), 0);
+        assert!(registry.capacity() >= 10);
+    }
+
+    #[test]
+    fn one_item_spawn() {
+        let mut registry = EntityRegistry::new();
+        let entity = registry.spawn();
+
+        assert_eq!(registry.len(), 1);
+        assert!(registry.capacity() >= 1);
+
+        assert_eq!(entity.sparse_index(), 0);
+        assert_eq!(entity.epoch(), 0);
+
+        assert!(registry.contains(entity));
+        assert_eq!(registry.get_epoch(0), Some(0));
+    }
+
+    #[test]
+    fn one_item_reuse() {
+        let mut registry = EntityRegistry::new();
+
+        let entity = registry.spawn();
+        registry.remove(entity);
+        let entity = registry.spawn();
+
+        assert_eq!(registry.len(), 1);
+        assert!(registry.capacity() >= 1);
+
+        assert_eq!(entity.sparse_index(), 0);
+        assert_eq!(entity.epoch(), 1);
+
+        assert!(registry.contains(entity));
+        assert_eq!(registry.get_epoch(0), Some(1));
+    }
+
+    #[test]
+    fn one_item_invalidate() {
+        let mut registry = EntityRegistry::new();
+
+        let entity = registry.spawn();
+        registry.remove(entity);
+        let entity = registry.spawn();
+        assert_eq!(entity, Entity::new(0, 1));
+
+        assert_eq!(registry.invalidate_epoch(Entity::new(0, 0)), None);
+        assert_eq!(registry.invalidate_epoch(entity), Some(Entity::new(0, 2)));
+        assert_eq!(registry.invalidate_epoch(entity), None);
+
+        assert!(!registry.contains(Entity::new(0, 0)));
+        assert!(!registry.contains(Entity::new(0, 1)));
+        assert!(registry.contains(Entity::new(0, 2)));
     }
 }

@@ -5,8 +5,6 @@ use std::{
     collections::HashMap,
 };
 
-use crate::entity::Entity;
-
 pub trait Component: 'static {}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -18,13 +16,6 @@ impl ComponentId {
     pub const fn index(&self) -> usize {
         let Self(id) = *self;
         id
-    }
-}
-
-impl From<ComponentId> for Entity {
-    #[inline]
-    fn from(value: ComponentId) -> Self {
-        Entity::new(value.index(), 0)
     }
 }
 

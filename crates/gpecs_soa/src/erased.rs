@@ -11,6 +11,8 @@ use core::{
     slice,
 };
 
+use gpecs_utils::permutation::apply as apply_permutation;
+
 use crate::traits::Soa;
 
 union Byte<Fields> {
@@ -276,7 +278,7 @@ pub fn sorted_layouts_of<T>(context: &T::Context) -> Box<[Layout]>
 where
     T: Soa,
 {
-    let mut permutation = permutation_of::<T>(context);
+    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
     let mut field_layouts = collect_layouts::<T::Fields, _>(T::field_layouts(context));
     apply_permutation(&mut permutation, &mut field_layouts);
 
@@ -303,45 +305,6 @@ where
             layout.clone()
         })
         .collect()
-}
-
-#[inline]
-fn permutation_of<T>(context: &T::Context) -> Box<[usize]>
-where
-    T: Soa,
-{
-    T::field_permutation(context).into_iter().collect()
-}
-
-#[inline]
-// code was taken from `permutation` crate:
-// https://github.com/jeremysalwen/rust-permutations/blob/5528e4fec7c5eb4551cfb39029c8d7982be2e6a4/src/permutation.rs#L400
-// dependency was not used because he lack of `#[no_std]` attribute
-fn apply_permutation<T>(permutation: &mut [usize], data: &mut [T]) {
-    assert_eq!(permutation.len(), data.len());
-
-    const MARKER: usize = isize::MIN as usize;
-
-    for i in 0..permutation.len() {
-        let i_idx = permutation[i];
-        if (i_idx & MARKER) != 0 {
-            continue;
-        }
-
-        let mut j = i;
-        let mut j_idx = i_idx;
-        while j_idx != i {
-            permutation[j] = j_idx ^ MARKER;
-            data.swap(j, j_idx);
-            j = j_idx;
-            j_idx = permutation[j];
-        }
-        permutation[j] = j_idx ^ MARKER;
-    }
-
-    for idx in permutation.iter_mut() {
-        *idx = *idx ^ MARKER;
-    }
 }
 
 type ErasedFieldPtr = *const [u8];
@@ -382,7 +345,7 @@ impl<Fields> ErasedSoaPtrs<Fields> {
     {
         let ptrs = T::ptrs_erase(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut ptrs: Box<[_]> = field_layouts
@@ -409,7 +372,7 @@ impl<Fields> ErasedSoaPtrs<Fields> {
     {
         let Self { ptrs, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(ptrs.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
@@ -510,7 +473,7 @@ impl<Fields> ErasedSoaMutPtrs<Fields> {
     {
         let ptrs = T::ptrs_erase_mut(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut ptrs: Box<[_]> = field_layouts
@@ -538,7 +501,7 @@ impl<Fields> ErasedSoaMutPtrs<Fields> {
     {
         let Self { ptrs, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(ptrs.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
@@ -640,7 +603,7 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut ptrs: Box<[_]> = field_layouts
@@ -667,7 +630,7 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     {
         let Self { ptrs, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(ptrs.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
@@ -786,7 +749,7 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
         let ptrs = T::refs_as_ptrs(context, refs);
         let ptrs = T::ptrs_erase(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut refs: Box<[_]> = field_layouts
@@ -812,7 +775,7 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
     {
         let Self { refs, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(refs.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
@@ -906,7 +869,7 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
         let ptrs = T::mut_refs_as_ptrs(context, refs);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut refs: Box<[_]> = field_layouts
@@ -934,7 +897,7 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
     {
         let Self { refs, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(refs.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
@@ -1021,7 +984,7 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
         let ptrs = T::slice_ptrs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut slices: Box<[_]> = field_layouts
@@ -1049,7 +1012,7 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(slices.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
@@ -1162,7 +1125,7 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
         let ptrs = T::mut_slice_ptrs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut slices: Box<[_]> = field_layouts
@@ -1190,7 +1153,7 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(slices.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
@@ -1306,7 +1269,7 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
         let ptrs = T::slice_refs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut slices: Box<[_]> = field_layouts
@@ -1334,7 +1297,7 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(slices.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
@@ -1438,7 +1401,7 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
         let ptrs = T::mut_slice_refs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
 
         let mut slices: Box<[_]> = field_layouts
@@ -1466,7 +1429,7 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let mut permutation = permutation_of::<T>(context);
+        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
         assert_eq!(slices.len(), permutation.len());
 
         let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));

@@ -7,6 +7,7 @@ use std::{
 
 use as_any::{AsAny, Downcast};
 use gpecs_sparse::set::EpochSparseSet;
+use gpecs_utils::permutation::apply as apply_permutation;
 
 use crate::{
     component::{ComponentId, ComponentRegistry},
@@ -214,7 +215,7 @@ where
         .collect();
     assert_eq!(fields.len(), len);
 
-    let mut permutation = permutation_of::<T>(context);
+    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
     apply_permutation(&mut permutation, &mut fields);
 
     let erased_context = ErasedSoaContext::<T::Fields>::new(
@@ -241,7 +242,7 @@ where
             .map(|(item, component_id)| (item.borrow().clone(), component_id))
             .collect();
 
-    let mut permutation = permutation_of::<T>(context);
+    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
     apply_permutation(&mut permutation, &mut field_metadata);
 
     let erased_context = ErasedSoaContext::<T::Fields>::new(
@@ -253,45 +254,6 @@ where
     iter::zip(field_metadata, erased_value.into_fields(&erased_context))
         .map(|((_, component_id), field)| (component_id, field))
         .collect()
-}
-
-#[inline]
-fn permutation_of<T>(context: &T::Context) -> Box<[usize]>
-where
-    T: Soa,
-{
-    T::field_permutation(context).into_iter().collect()
-}
-
-#[inline]
-// code was taken from `permutation` crate:
-// https://github.com/jeremysalwen/rust-permutations/blob/5528e4fec7c5eb4551cfb39029c8d7982be2e6a4/src/permutation.rs#L400
-// dependency was not used because he lack of `#[no_std]` attribute
-fn apply_permutation<T>(permutation: &mut [usize], data: &mut [T]) {
-    assert_eq!(permutation.len(), data.len());
-
-    const MARKER: usize = isize::MIN as usize;
-
-    for i in 0..permutation.len() {
-        let i_idx = permutation[i];
-        if (i_idx & MARKER) != 0 {
-            continue;
-        }
-
-        let mut j = i;
-        let mut j_idx = i_idx;
-        while j_idx != i {
-            permutation[j] = j_idx ^ MARKER;
-            data.swap(j, j_idx);
-            j = j_idx;
-            j_idx = permutation[j];
-        }
-        permutation[j] = j_idx ^ MARKER;
-    }
-
-    for idx in permutation.iter_mut() {
-        *idx = *idx ^ MARKER;
-    }
 }
 
 #[allow(unsafe_code)]

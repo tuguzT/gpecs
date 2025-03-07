@@ -2,7 +2,7 @@
 
 #![warn(clippy::all)]
 // TODO `#![warn(missing_docs)]` after implementation & tests
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 // TODO `#![no_std]` with `alloc` enabled
 
 pub use gpecs_sparse::soa;

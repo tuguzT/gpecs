@@ -1,13 +1,16 @@
-use std::collections::BTreeSet;
+use std::{alloc::Layout, collections::BTreeSet};
 
 use as_any::{AsAny, Downcast};
-use gpecs_sparse::set::EpochSparseSet;
+use gpecs_sparse::{set::EpochSparseSet, soa::erased::sorted_layouts_of};
 
 use crate::{
     component::{ComponentId, ComponentRegistry},
     entity::Entity,
     prelude::Component,
-    soa::Soa,
+    soa::{
+        erased::{ErasedSoa, ErasedSoaContext},
+        traits::Soa,
+    },
 };
 
 pub trait Archetype: Soa + 'static {
@@ -94,10 +97,12 @@ impl ArchetypeStorage {
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn insert<T>(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
+        context: &T::Context,
         value: T,
     ) -> Result<Option<T>, T>
     where
@@ -113,11 +118,17 @@ impl ArchetypeStorage {
             return Err(value);
         }
 
-        let Some(storage) = erased_storage.as_mut().downcast_mut::<SparseSet<T>>() else {
-            return Err(value);
+        let field_layouts = sorted_layouts_of::<T>(context);
+        let erased_context = ErasedSoaContext::<T::Fields>::new(field_layouts, None);
+        let fields = ErasedSoa::from(context, value).into_fields(&erased_context);
+        let Some(fields) = erased_storage.insert(entity, fields) else {
+            return Ok(None);
         };
-        let value = storage.insert(entity, value);
-        Ok(value)
+
+        // TODO: restore correct order of fields (with component ids and the context of self)
+        let fields = fields.iter().map(|(_, field)| field.as_ref());
+        let value = unsafe { ErasedSoa::new(&erased_context, fields).into::<T>(&context) };
+        Ok(Some(value))
     }
 
     #[inline]
@@ -147,16 +158,37 @@ impl ArchetypeStorage {
     }
 }
 
+type ErasedField = Box<[u8]>;
+type ErasedFields = Box<[(Layout, ErasedField)]>;
+
 trait ErasedStorage: AsAny {
     fn entities(&self) -> &[Entity];
+
+    fn insert(&mut self, entity: Entity, fields: ErasedFields) -> Option<ErasedFields>;
 }
 
+#[allow(unsafe_code)]
 impl<T> ErasedStorage for SparseSet<T>
 where
     T: Archetype,
 {
     fn entities(&self) -> &[Entity] {
         self.as_keys_slice()
+    }
+
+    fn insert(&mut self, entity: Entity, fields: ErasedFields) -> Option<ErasedFields> {
+        // TODO: restore correct order of fields (with component ids and the context of self)
+
+        let field_layouts = fields.iter().map(|(layout, _)| layout);
+        let context = ErasedSoaContext::<T::Fields>::new(field_layouts, None);
+
+        let fields = fields.iter().map(|(_, field)| field.as_ref());
+        let value = ErasedSoa::<T::Fields>::new(&context, fields);
+
+        let value = unsafe { value.into(self.context()) };
+        let value = self.insert(entity, value)?;
+        let fields = ErasedSoa::from(self.context(), value).into_fields(&context);
+        Some(fields)
     }
 }
 
@@ -218,7 +250,7 @@ mod tests {
         let mut entities = EntityRegistry::new();
         let entity = entities.spawn();
         let value = storage
-            .insert::<()>(&mut components, entity, ())
+            .insert::<()>(&mut components, entity, &(), ())
             .expect("archetype storage should store unit");
         assert_eq!(value, None);
         assert_eq!(storage.entities(), [entity]);
@@ -267,7 +299,7 @@ mod tests {
         };
         let mass = Mass { value: 4.0 };
         let value = storage
-            .insert::<(Position, Mass)>(&mut components, entity, (position, mass))
+            .insert::<(Position, Mass)>(&mut components, entity, &(), (position, mass))
             .expect("archetype storage should store unit");
         assert_eq!(value, None);
         assert_eq!(storage.entities(), [entity]);

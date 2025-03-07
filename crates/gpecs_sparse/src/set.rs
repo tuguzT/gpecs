@@ -117,6 +117,12 @@ where
     }
 
     #[inline]
+    pub fn context(&self) -> &V::Context {
+        let Self { dense, .. } = self;
+        dense.context()
+    }
+
+    #[inline]
     pub fn sparse_len(&self) -> usize {
         let Self { sparse, .. } = self;
         sparse.len()

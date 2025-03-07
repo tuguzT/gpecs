@@ -66,9 +66,7 @@ impl<Fields> ErasedSoa<Fields> {
     where
         T: Soa<Fields = Fields>,
     {
-        let mut permutation = permutation_of::<T>(context);
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
+        let field_layouts = sorted_layouts_of::<T>(context);
 
         let (buffer_layout, offsets) =
             T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
@@ -97,10 +95,7 @@ impl<Fields> ErasedSoa<Fields> {
             field_layouts,
         } = self;
 
-        let mut permutation = permutation_of::<T>(context);
-        let mut target_field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut target_field_layouts);
-
+        let target_field_layouts = sorted_layouts_of::<T>(context);
         assert_eq!(field_layouts.as_ref(), target_field_layouts.as_ref());
 
         let (buffer_layout, offsets) =
@@ -241,9 +236,7 @@ impl<Fields> ErasedSoaContext<Fields> {
         T: Soa<Fields = Fields>,
         T::Context: 'static,
     {
-        let mut permutation = permutation_of::<T>(&context);
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(&context));
-        apply_permutation(&mut permutation, &mut field_layouts);
+        let field_layouts = sorted_layouts_of::<T>(&context);
 
         let drop_fields = move |data: &[(_, *mut [u8])]| unsafe {
             let ptrs = data.iter().map(|(_, ptr)| ptr.cast());
@@ -276,6 +269,18 @@ impl<Fields> Debug for ErasedSoaContext<Fields> {
             .field(&self.field_layouts)
             .finish()
     }
+}
+
+#[inline]
+pub fn sorted_layouts_of<T>(context: &T::Context) -> Box<[Layout]>
+where
+    T: Soa,
+{
+    let mut permutation = permutation_of::<T>(context);
+    let mut field_layouts = collect_layouts::<T::Fields, _>(T::field_layouts(context));
+    apply_permutation(&mut permutation, &mut field_layouts);
+
+    field_layouts
 }
 
 #[inline]

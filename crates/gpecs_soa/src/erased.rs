@@ -116,6 +116,31 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
+    pub fn into_fields(self, context: &ErasedSoaContext<Fields>) -> Box<[(Layout, Box<[u8]>)]> {
+        let Self {
+            buffer,
+            field_layouts: value_layouts,
+        } = self;
+        let ErasedSoaContext { field_layouts, .. } = context;
+
+        assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
+
+        let (buffer_layout, offsets) =
+            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
+        let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
+        assert_eq!(buffer_len, buffer.len());
+
+        iter::zip(value_layouts, offsets)
+            .map(|(field_layout, offset)| {
+                let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
+                let len = field_layout.size();
+                let r#ref = unsafe { slice::from_raw_parts(data, len) };
+                (field_layout.clone(), r#ref.into())
+            })
+            .collect()
+    }
+
+    #[inline]
     pub fn layouts(&self) -> &[Layout] {
         let Self { field_layouts, .. } = self;
         field_layouts.as_ref()
@@ -139,10 +164,10 @@ impl<Fields> ErasedSoa<Fields> {
         let refs = field_layouts
             .iter()
             .zip(offsets)
-            .map(|(field_layout, offset)| unsafe {
-                let data = buffer.as_ptr().cast::<u8>().add(offset);
+            .map(|(field_layout, offset)| {
+                let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
                 let len = field_layout.size();
-                let r#ref = slice::from_raw_parts(data, len);
+                let r#ref = unsafe { slice::from_raw_parts(data, len) };
                 (field_layout.clone(), r#ref)
             })
             .collect();
@@ -173,10 +198,10 @@ impl<Fields> ErasedSoa<Fields> {
         let refs = field_layouts
             .iter()
             .zip(offsets)
-            .map(|(field_layout, offset)| unsafe {
-                let data = buffer.as_mut_ptr().cast::<u8>().add(offset);
+            .map(|(field_layout, offset)| {
+                let data = unsafe { buffer.as_mut_ptr().cast::<u8>().add(offset) };
                 let len = field_layout.size();
-                let r#ref = slice::from_raw_parts_mut(data, len);
+                let r#ref = unsafe { slice::from_raw_parts_mut(data, len) };
                 (field_layout.clone(), r#ref)
             })
             .collect();

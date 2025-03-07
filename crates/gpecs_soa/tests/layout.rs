@@ -130,6 +130,29 @@ fn erased_value() {
         ],
     );
 
+    let fields = erased_value.into_fields(&erased_context);
+    assert_eq!(
+        fields.as_ref(),
+        [
+            (optimized_layout[0], i3_bytes.into()),
+            (optimized_layout[1], i2_bytes.into()),
+            (optimized_layout[2], i1_bytes.into()),
+        ],
+    );
+
+    let erased_value = ErasedSoa::new(
+        &erased_context,
+        fields.iter().map(|(_, field)| field.as_ref()),
+    );
+    assert_eq!(
+        erased_value.as_refs(&erased_context).as_ref(),
+        [
+            (optimized_layout[0], i3_bytes),
+            (optimized_layout[1], i2_bytes),
+            (optimized_layout[2], i1_bytes),
+        ],
+    );
+
     let value = unsafe { erased_value.into::<(u32, u16, u8)>(&context) };
     assert_eq!(value, (i1, i2, i3));
 

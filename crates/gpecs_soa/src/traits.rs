@@ -33,6 +33,22 @@ pub unsafe trait Soa: Sized {
 
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_>;
 
+    fn field_permutation(context: &Self::Context) -> impl IntoIterator<Item = usize> {
+        let Ok((_, offsets)) = Self::buffer_layout(context, 1) else {
+            return Self::field_layouts(context)
+                .into_iter()
+                .enumerate()
+                .map(|(index, _)| index)
+                .collect();
+        };
+        let offsets: Box<[_]> = offsets.into_iter().collect();
+
+        let mut permutation: Box<[_]> = (0..offsets.len()).collect();
+        permutation.sort_by_key(|&index| offsets[index]);
+
+        permutation
+    }
+
     /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
     /// Also returns offsets of each field in the buffer (in bytes).
     ///
@@ -339,6 +355,11 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn field_layouts(_: &Self::Context) -> Self::FieldLayouts<'_> {
         [Layout::new::<Self>()]
+    }
+
+    #[inline(always)]
+    fn field_permutation(_: &Self::Context) -> impl IntoIterator<Item = usize> {
+        [0]
     }
 
     #[inline(always)]
@@ -739,6 +760,24 @@ macro_rules! count_idents {
 
 struct SoaTupleHelper<T>(PhantomData<T>);
 
+const fn layout_permutation<const N: usize>(
+    mut permutation: [usize; N],
+    layouts: [Layout; N],
+) -> [usize; N] {
+    let mut i = 1;
+    while i < N {
+        let mut j = i;
+        while j > 0 && layouts[permutation[j - 1]].align() > layouts[permutation[j]].align() {
+            let tmp = permutation[j - 1];
+            permutation[j - 1] = permutation[j];
+            permutation[j] = tmp;
+            j -= 1;
+        }
+        i += 1;
+    }
+    permutation
+}
+
 macro_rules! soa_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
         impl<$($types,)*> SoaTupleHelper<($($types,)*)> {
@@ -746,20 +785,8 @@ macro_rules! soa_impl {
                 $(Layout::new::<$types>(),)*
             ];
             const PERMUTATION: [usize; count_idents!($($types,)*)] = {
-                let mut permutation = [$($indices,)*];
-                let mut i = 1;
-                while i < count_idents!($($types,)*) {
-                    let mut j = i;
-                    while j > 0 && Self::LAYOUTS[j - 1].align() > Self::LAYOUTS[j].align() {
-                        let tmp = permutation[j - 1];
-                        permutation[j - 1] = permutation[j];
-                        permutation[j] = tmp;
-
-                        j -= 1;
-                    }
-                    i += 1;
-                }
-                permutation
+                let permutation = [$($indices,)*];
+                layout_permutation(permutation, Self::LAYOUTS)
             };
         }
 
@@ -771,6 +798,11 @@ macro_rules! soa_impl {
             #[inline(always)]
             fn field_layouts(_: &Self::Context) -> Self::FieldLayouts<'_> {
                 SoaTupleHelper::<($($types,)*)>::LAYOUTS
+            }
+
+            #[inline(always)]
+            fn field_permutation(_: &Self::Context) -> impl IntoIterator<Item = usize> {
+                SoaTupleHelper::<($($types,)*)>::PERMUTATION
             }
 
             #[inline(always)]

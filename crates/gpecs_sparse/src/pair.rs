@@ -57,6 +57,15 @@ where
     }
 
     #[inline]
+    fn field_permutation(context: &Self::Context) -> impl IntoIterator<Item = usize> {
+        iter::once(0).chain(
+            V::field_permutation(context)
+                .into_iter()
+                .map(|index| index + 1),
+        )
+    }
+
+    #[inline]
     fn buffer_layout(
         context: &Self::Context,
         capacity: usize,

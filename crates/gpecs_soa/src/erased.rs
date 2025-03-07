@@ -280,14 +280,7 @@ fn permutation_of<T>(context: &T::Context) -> Box<[usize]>
 where
     T: Soa,
 {
-    let (_, offsets) =
-        T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
-    let offsets: Box<[_]> = offsets.into_iter().collect();
-
-    let mut permutation: Box<[_]> = (0..offsets.len()).collect();
-    permutation.sort_by_key(|&index| offsets[index]);
-
-    permutation
+    T::field_permutation(context).into_iter().collect()
 }
 
 #[inline]
@@ -1499,6 +1492,11 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
         let ErasedSoaContext { field_layouts, .. } = context;
         field_layouts.as_ref()
+    }
+
+    fn field_permutation(context: &Self::Context) -> impl IntoIterator<Item = usize> {
+        let ErasedSoaContext { field_layouts, .. } = context;
+        field_layouts.iter().enumerate().map(|(index, _)| index)
     }
 
     type Ptrs = ErasedSoaPtrs<Fields>;

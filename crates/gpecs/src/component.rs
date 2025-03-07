@@ -7,6 +7,8 @@ use std::{
 
 pub trait Component: 'static {}
 
+impl Component for () {}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct ComponentId(usize);

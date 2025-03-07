@@ -1,7 +1,12 @@
-use std::{alloc::Layout, collections::BTreeSet};
+use std::{
+    alloc::Layout,
+    borrow::Borrow,
+    collections::{BTreeMap, BTreeSet},
+    iter,
+};
 
 use as_any::{AsAny, Downcast};
-use gpecs_sparse::{set::EpochSparseSet, soa::erased::sorted_layouts_of};
+use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
     component::{ComponentId, ComponentRegistry},
@@ -13,7 +18,9 @@ use crate::{
     },
 };
 
-pub trait Archetype: Soa + 'static {
+#[allow(unsafe_code)]
+pub unsafe trait Archetype: Soa + 'static {
+    // order of component ids should be the same as the order of layouts returned by `field_layouts` method
     fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId>;
 }
 
@@ -97,7 +104,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn insert<T>(
         &mut self,
         components: &mut ComponentRegistry,
@@ -118,16 +124,11 @@ impl ArchetypeStorage {
             return Err(value);
         }
 
-        let field_layouts = sorted_layouts_of::<T>(context);
-        let erased_context = ErasedSoaContext::<T::Fields>::new(field_layouts, None);
-        let fields = ErasedSoa::from(context, value).into_fields(&erased_context);
-        let Some(fields) = erased_storage.insert(entity, fields) else {
+        let fields = into_erased_fields(components, context, value);
+        let Some(fields) = erased_storage.insert(components, entity, fields) else {
             return Ok(None);
         };
-
-        // TODO: restore correct order of fields (with component ids and the context of self)
-        let fields = fields.iter().map(|(_, field)| field.as_ref());
-        let value = unsafe { ErasedSoa::new(&erased_context, fields).into::<T>(&context) };
+        let value = from_erased_fields(components, context, fields);
         Ok(Some(value))
     }
 
@@ -159,15 +160,19 @@ impl ArchetypeStorage {
 }
 
 type ErasedField = Box<[u8]>;
-type ErasedFields = Box<[(Layout, ErasedField)]>;
+type ErasedFields = BTreeMap<ComponentId, (Layout, ErasedField)>;
 
 trait ErasedStorage: AsAny {
     fn entities(&self) -> &[Entity];
 
-    fn insert(&mut self, entity: Entity, fields: ErasedFields) -> Option<ErasedFields>;
+    fn insert(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        fields: ErasedFields,
+    ) -> Option<ErasedFields>;
 }
 
-#[allow(unsafe_code)]
 impl<T> ErasedStorage for SparseSet<T>
 where
     T: Archetype,
@@ -176,29 +181,128 @@ where
         self.as_keys_slice()
     }
 
-    fn insert(&mut self, entity: Entity, fields: ErasedFields) -> Option<ErasedFields> {
-        // TODO: restore correct order of fields (with component ids and the context of self)
-
-        let field_layouts = fields.iter().map(|(layout, _)| layout);
-        let context = ErasedSoaContext::<T::Fields>::new(field_layouts, None);
-
-        let fields = fields.iter().map(|(_, field)| field.as_ref());
-        let value = ErasedSoa::<T::Fields>::new(&context, fields);
-
-        let value = unsafe { value.into(self.context()) };
+    fn insert(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        fields: ErasedFields,
+    ) -> Option<ErasedFields> {
+        let value = from_erased_fields(components, self.context(), fields);
         let value = self.insert(entity, value)?;
-        let fields = ErasedSoa::from(self.context(), value).into_fields(&context);
+        let fields = into_erased_fields(components, self.context(), value);
         Some(fields)
     }
 }
 
-impl Archetype for () {
-    fn component_ids(_: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        []
+#[allow(unsafe_code)]
+fn from_erased_fields<T>(
+    components: &mut ComponentRegistry,
+    context: &T::Context,
+    mut fields: ErasedFields,
+) -> T
+where
+    T: Archetype,
+{
+    let len = fields.len();
+    let mut fields: Box<[_]> = T::component_ids(components)
+        .into_iter()
+        .map(|id| {
+            fields
+                .remove(&id)
+                .expect("field with given component id should present")
+        })
+        .collect();
+    assert_eq!(fields.len(), len);
+
+    let mut permutation = permutation_of::<T>(context);
+    apply_permutation(&mut permutation, &mut fields);
+
+    let erased_context = ErasedSoaContext::<T::Fields>::new(
+        fields.iter().map(|(field_layout, _)| field_layout),
+        None,
+    );
+    let erased_value = ErasedSoa::<T::Fields>::new(
+        &erased_context,
+        fields.iter().map(|(_, field)| field.as_ref()),
+    );
+    unsafe { erased_value.into(context) }
+}
+
+fn into_erased_fields<T>(
+    components: &mut ComponentRegistry,
+    context: &T::Context,
+    value: T,
+) -> ErasedFields
+where
+    T: Archetype,
+{
+    let mut field_metadata: Box<[(Layout, ComponentId)]> =
+        iter::zip(T::field_layouts(context), T::component_ids(components))
+            .map(|(item, component_id)| (item.borrow().clone(), component_id))
+            .collect();
+
+    let mut permutation = permutation_of::<T>(context);
+    apply_permutation(&mut permutation, &mut field_metadata);
+
+    let erased_context = ErasedSoaContext::<T::Fields>::new(
+        field_metadata.iter().map(|(field_layout, _)| field_layout),
+        None,
+    );
+    let erased_value = ErasedSoa::from(context, value);
+
+    iter::zip(field_metadata, erased_value.into_fields(&erased_context))
+        .map(|((_, component_id), field)| (component_id, field))
+        .collect()
+}
+
+#[inline]
+fn permutation_of<T>(context: &T::Context) -> Box<[usize]>
+where
+    T: Soa,
+{
+    T::field_permutation(context).into_iter().collect()
+}
+
+#[inline]
+// code was taken from `permutation` crate:
+// https://github.com/jeremysalwen/rust-permutations/blob/5528e4fec7c5eb4551cfb39029c8d7982be2e6a4/src/permutation.rs#L400
+// dependency was not used because he lack of `#[no_std]` attribute
+fn apply_permutation<T>(permutation: &mut [usize], data: &mut [T]) {
+    assert_eq!(permutation.len(), data.len());
+
+    const MARKER: usize = isize::MIN as usize;
+
+    for i in 0..permutation.len() {
+        let i_idx = permutation[i];
+        if (i_idx & MARKER) != 0 {
+            continue;
+        }
+
+        let mut j = i;
+        let mut j_idx = i_idx;
+        while j_idx != i {
+            permutation[j] = j_idx ^ MARKER;
+            data.swap(j, j_idx);
+            j = j_idx;
+            j_idx = permutation[j];
+        }
+        permutation[j] = j_idx ^ MARKER;
+    }
+
+    for idx in permutation.iter_mut() {
+        *idx = *idx ^ MARKER;
     }
 }
 
-impl<A> Archetype for (A,)
+#[allow(unsafe_code)]
+unsafe impl Archetype for () {
+    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
+        [components.register_component::<Self>()]
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe impl<A> Archetype for (A,)
 where
     A: Component,
 {
@@ -207,7 +311,8 @@ where
     }
 }
 
-impl<A, B> Archetype for (A, B)
+#[allow(unsafe_code)]
+unsafe impl<A, B> Archetype for (A, B)
 where
     A: Component,
     B: Component,
@@ -220,7 +325,8 @@ where
     }
 }
 
-impl<A, B, C> Archetype for (A, B, C)
+#[allow(unsafe_code)]
+unsafe impl<A, B, C> Archetype for (A, B, C)
 where
     A: Component,
     B: Component,
@@ -299,7 +405,7 @@ mod tests {
         };
         let mass = Mass { value: 4.0 };
         let value = storage
-            .insert::<(Position, Mass)>(&mut components, entity, &(), (position, mass))
+            .insert::<(Mass, Position)>(&mut components, entity, &(), (mass, position))
             .expect("archetype storage should store unit");
         assert_eq!(value, None);
         assert_eq!(storage.entities(), [entity]);

@@ -23,15 +23,15 @@ type SparseSet<V> = EpochSparseSet<Entity, V>;
 
 impl ArchetypeStorage {
     #[inline]
-    pub fn of<T>(components: &mut ComponentRegistry) -> Self
+    pub fn of<T>(components: &mut ComponentRegistry, context: T::Context) -> Self
     where
         T: Archetype,
-        T::Context: Default,
     {
         let component_ids = T::component_ids(components).into_iter().collect();
+        let storage = SparseSet::<T>::with_context(context);
         Self {
             component_ids,
-            erased_storage: Box::new(SparseSet::<T>::new()),
+            erased_storage: Box::new(storage),
         }
     }
 
@@ -60,10 +60,9 @@ impl ArchetypeStorage {
             return Err(());
         }
 
-        let storage = erased_storage
-            .as_ref()
-            .downcast_ref::<SparseSet<T>>()
-            .expect("type of value should match with storage type");
+        let Some(storage) = erased_storage.as_ref().downcast_ref::<SparseSet<T>>() else {
+            return Err(());
+        };
         let refs = storage.get(entity);
         Ok(refs)
     }
@@ -87,10 +86,9 @@ impl ArchetypeStorage {
             return Err(());
         }
 
-        let storage = erased_storage
-            .as_mut()
-            .downcast_mut::<SparseSet<T>>()
-            .expect("type of value should match with storage type");
+        let Some(storage) = erased_storage.as_mut().downcast_mut::<SparseSet<T>>() else {
+            return Err(());
+        };
         let refs = storage.get_mut(entity);
         Ok(refs)
     }
@@ -115,10 +113,9 @@ impl ArchetypeStorage {
             return Err(value);
         }
 
-        let storage = erased_storage
-            .as_mut()
-            .downcast_mut::<SparseSet<T>>()
-            .expect("type of value should match with storage type");
+        let Some(storage) = erased_storage.as_mut().downcast_mut::<SparseSet<T>>() else {
+            return Err(value);
+        };
         let value = storage.insert(entity, value);
         Ok(value)
     }
@@ -142,10 +139,9 @@ impl ArchetypeStorage {
             return Err(());
         }
 
-        let storage = erased_storage
-            .as_mut()
-            .downcast_mut::<SparseSet<T>>()
-            .expect("type of value should match with storage type");
+        let Some(storage) = erased_storage.as_mut().downcast_mut::<SparseSet<T>>() else {
+            return Err(());
+        };
         let value = storage.remove(entity);
         Ok(value)
     }
@@ -216,7 +212,7 @@ mod tests {
     #[test]
     fn unit_archetype() {
         let mut components = ComponentRegistry::new();
-        let mut storage = ArchetypeStorage::of::<()>(&mut components);
+        let mut storage = ArchetypeStorage::of::<()>(&mut components, ());
         assert_eq!(storage.entities(), []);
 
         let mut entities = EntityRegistry::new();
@@ -258,7 +254,7 @@ mod tests {
     #[test]
     fn tuple_archetype() {
         let mut components = ComponentRegistry::new();
-        let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components);
+        let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components, ());
         assert_eq!(storage.entities(), []);
 
         let mut entities = EntityRegistry::new();

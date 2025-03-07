@@ -278,8 +278,9 @@ pub fn sorted_layouts_of<T>(context: &T::Context) -> Box<[Layout]>
 where
     T: Soa,
 {
-    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
     let mut field_layouts = collect_layouts::<T::Fields, _>(T::field_layouts(context));
+
+    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
     apply_permutation(&mut permutation, &mut field_layouts);
 
     field_layouts
@@ -825,6 +826,39 @@ impl<'a, Fields> Clone for ErasedSoaRefs<'a, Fields> {
     }
 }
 
+impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefs<'a, Fields> {
+    type Item = &'r (Layout, ErasedFieldRef<'a>);
+
+    type IntoIter = core::slice::Iter<'r, (Layout, ErasedFieldRef<'a>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let ErasedSoaRefs { refs, .. } = self;
+        refs.iter()
+    }
+}
+
+impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefs<'a, Fields> {
+    type Item = &'r mut (Layout, ErasedFieldRef<'a>);
+
+    type IntoIter = core::slice::IterMut<'r, (Layout, ErasedFieldRef<'a>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let ErasedSoaRefs { refs, .. } = self;
+        refs.iter_mut()
+    }
+}
+
+impl<'a, Fields> IntoIterator for ErasedSoaRefs<'a, Fields> {
+    type Item = (Layout, ErasedFieldRef<'a>);
+
+    type IntoIter = alloc::vec::IntoIter<(Layout, ErasedFieldRef<'a>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let ErasedSoaRefs { refs, .. } = self;
+        refs.into_vec().into_iter()
+    }
+}
+
 unsafe impl<'a, Fields> Send for ErasedSoaRefs<'a, Fields> where Fields: Sync {}
 unsafe impl<'a, Fields> Sync for ErasedSoaRefs<'a, Fields> where Fields: Sync {}
 
@@ -933,6 +967,39 @@ impl<'a, Fields> AsMut<[(Layout, ErasedFieldRefMut<'a>)]> for ErasedSoaRefsMut<'
 impl<'a, Fields> Debug for ErasedSoaRefsMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("ErasedSoaRefsMut").field(&self.refs).finish()
+    }
+}
+
+impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefsMut<'a, Fields> {
+    type Item = &'r (Layout, ErasedFieldRefMut<'a>);
+
+    type IntoIter = core::slice::Iter<'r, (Layout, ErasedFieldRefMut<'a>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let ErasedSoaRefsMut { refs, .. } = self;
+        refs.iter()
+    }
+}
+
+impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefsMut<'a, Fields> {
+    type Item = &'r mut (Layout, ErasedFieldRefMut<'a>);
+
+    type IntoIter = core::slice::IterMut<'r, (Layout, ErasedFieldRefMut<'a>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let ErasedSoaRefsMut { refs, .. } = self;
+        refs.iter_mut()
+    }
+}
+
+impl<'a, Fields> IntoIterator for ErasedSoaRefsMut<'a, Fields> {
+    type Item = (Layout, ErasedFieldRefMut<'a>);
+
+    type IntoIter = alloc::vec::IntoIter<(Layout, ErasedFieldRefMut<'a>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let ErasedSoaRefsMut { refs, .. } = self;
+        refs.into_vec().into_iter()
     }
 }
 

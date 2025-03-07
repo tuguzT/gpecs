@@ -116,20 +116,34 @@ where
 
     #[inline]
     pub fn get(&self, key: K) -> Option<V::Refs<'_>> {
+        let (_, refs) = self.get_with_context(key);
+        refs
+    }
+
+    #[inline]
+    pub fn get_with_context(&self, key: K) -> (&V::Context, Option<V::Refs<'_>>) {
         let Self { dense, sparse } = self;
-        sparse_get(dense, sparse, key)
+        let (context, dense) = dense.iter_with_context();
+        (context, sparse_get(dense, sparse, key))
     }
 
     #[inline]
     pub fn into_get(self, key: K) -> Option<V::Refs<'a>> {
+        let (_, refs) = self.into_get_with_context(key);
+        refs
+    }
+
+    #[inline]
+    pub fn into_get_with_context(self, key: K) -> (&'a V::Context, Option<V::Refs<'a>>) {
         let Self { dense, sparse } = self;
-        sparse_get(dense, sparse, key)
+        let (context, dense) = dense.iter_with_context();
+        (context, sparse_get(dense, sparse, key))
     }
 
     #[inline]
     pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, V::Refs<'_>)> {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(dense, sparse, sparse_index)
+        sparse_get_with_key(*dense, sparse, sparse_index)
     }
 
     #[inline]
@@ -173,21 +187,45 @@ where
     }
 
     #[inline]
+    #[track_caller]
     pub fn index(&self, key: K) -> V::Refs<'_>
     where
         K: Display,
     {
-        let Self { dense, sparse } = self;
-        sparse_index(dense, sparse, key)
+        let (_, refs) = self.index_with_context(key);
+        refs
     }
 
     #[inline]
-    pub fn into_index(self, key: K) -> V::Refs<'a>
+    #[track_caller]
+    pub fn index_with_context(&self, key: K) -> (&V::Context, V::Refs<'_>)
     where
         K: Display,
     {
         let Self { dense, sparse } = self;
-        sparse_index(dense, sparse, key)
+        let (context, dense) = dense.iter_with_context();
+        (context, sparse_index(dense, sparse, key))
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn into_index(self, key: K) -> V::Refs<'a>
+    where
+        K: Display,
+    {
+        let (_, refs) = self.into_index_with_context(key);
+        refs
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn into_index_with_context(self, key: K) -> (&'a V::Context, V::Refs<'a>)
+    where
+        K: Display,
+    {
+        let Self { dense, sparse } = self;
+        let (context, dense) = dense.iter_with_context();
+        (context, sparse_index(dense, sparse, key))
     }
 }
 
@@ -309,8 +347,7 @@ where
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        let Self { dense, sparse } = self;
-        sparse_index(dense, sparse, key)
+        EpochSparseView::index(self, key)
     }
 }
 
@@ -707,44 +744,72 @@ where
 
     #[inline]
     pub fn get(&self, key: K) -> Option<V::Refs<'_>> {
+        let (_, refs) = self.get_with_context(key);
+        refs
+    }
+
+    #[inline]
+    pub fn get_with_context(&self, key: K) -> (&V::Context, Option<V::Refs<'_>>) {
         let Self { dense, sparse } = self;
-        sparse_get(dense, sparse, key)
+        let (context, dense) = dense.iter_with_context();
+        (context, sparse_get(dense, sparse, key))
     }
 
     #[inline]
     pub fn into_get(self, key: K) -> Option<V::Refs<'a>> {
+        let (_, refs) = self.into_get_with_context(key);
+        refs
+    }
+
+    #[inline]
+    pub fn into_get_with_context(self, key: K) -> (&'a V::Context, Option<V::Refs<'a>>) {
         let Self { dense, sparse } = self;
-        sparse_get(dense, sparse, key)
+        let (context, dense) = dense.iter_with_context();
+        (context, sparse_get(dense, sparse, key))
     }
 
     #[inline]
     pub fn get_mut(&mut self, key: K) -> Option<V::RefsMut<'_>> {
+        let (_, refs) = self.get_mut_with_context(key);
+        refs
+    }
+
+    #[inline]
+    pub fn get_mut_with_context(&mut self, key: K) -> (&V::Context, Option<V::RefsMut<'_>>) {
         let Self { dense, sparse } = self;
-        sparse_get_mut(dense, sparse, key)
+        let (context, dense) = dense.iter_mut_with_context();
+        (context, sparse_get_mut(dense, sparse, key))
     }
 
     #[inline]
     pub fn into_get_mut(self, key: K) -> Option<V::RefsMut<'a>> {
+        let (_, refs) = self.into_get_mut_with_context(key);
+        refs
+    }
+
+    #[inline]
+    pub fn into_get_mut_with_context(self, key: K) -> (&'a V::Context, Option<V::RefsMut<'a>>) {
         let Self { dense, sparse } = self;
-        sparse_get_mut(dense, sparse, key)
+        let (context, dense) = dense.iter_mut_with_context();
+        (context, sparse_get_mut(dense, sparse, key))
     }
 
     #[inline]
     pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, V::Refs<'_>)> {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(dense, sparse, sparse_index)
+        sparse_get_with_key(&**dense, sparse, sparse_index)
     }
 
     #[inline]
     pub fn into_get_with_key(self, sparse_index: usize) -> Option<(K, V::Refs<'a>)> {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(dense, sparse, sparse_index)
+        sparse_get_with_key(&*dense, sparse, sparse_index)
     }
 
     #[inline]
     pub fn get_mut_with_key(&mut self, sparse_index: usize) -> Option<(K, V::RefsMut<'_>)> {
         let Self { dense, sparse } = self;
-        sparse_get_mut_with_key(dense, sparse, sparse_index)
+        sparse_get_mut_with_key(&mut **dense, sparse, sparse_index)
     }
 
     #[inline]
@@ -806,30 +871,66 @@ where
     }
 
     #[inline]
+    #[track_caller]
     pub fn index(&self, key: K) -> V::Refs<'_>
     where
         K: Display,
     {
-        let Self { dense, sparse } = self;
-        sparse_index(dense, sparse, key)
+        let (_, refs) = self.index_with_context(key);
+        refs
     }
 
     #[inline]
+    #[track_caller]
+    pub fn index_with_context(&self, key: K) -> (&V::Context, V::Refs<'_>)
+    where
+        K: Display,
+    {
+        let Self { dense, sparse } = self;
+        let (context, dense) = dense.iter_with_context();
+        (context, sparse_index(dense, sparse, key))
+    }
+
+    #[inline]
+    #[track_caller]
     pub fn into_index(self, key: K) -> V::Refs<'a>
     where
         K: Display,
     {
-        let Self { dense, sparse } = self;
-        sparse_index(dense, sparse, key)
+        let (_, refs) = self.into_index_with_context(key);
+        refs
     }
 
     #[inline]
-    pub fn index_mut(&mut self, key: K) -> V::RefsMut<'_>
+    #[track_caller]
+    pub fn into_index_with_context(self, key: K) -> (&'a V::Context, V::Refs<'a>)
     where
         K: Display,
     {
         let Self { dense, sparse } = self;
-        sparse_index_mut(dense, sparse, key)
+        let (context, dense) = dense.iter_with_context();
+        (context, sparse_index(dense, sparse, key))
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn index_mut(&mut self, key: K) -> V::RefsMut<'_>
+    where
+        K: Display,
+    {
+        let (_, refs) = self.index_mut_with_context(key);
+        refs
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn index_mut_with_context(&mut self, key: K) -> (&V::Context, V::RefsMut<'_>)
+    where
+        K: Display,
+    {
+        let Self { dense, sparse } = self;
+        let (context, dense) = dense.iter_mut_with_context();
+        (context, sparse_index_mut(dense, sparse, key))
     }
 
     #[inline]
@@ -837,8 +938,19 @@ where
     where
         K: Display,
     {
+        let (_, refs) = self.into_index_mut_with_context(key);
+        refs
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn into_index_mut_with_context(self, key: K) -> (&'a V::Context, V::RefsMut<'a>)
+    where
+        K: Display,
+    {
         let Self { dense, sparse } = self;
-        sparse_index_mut(dense, sparse, key)
+        let (context, dense) = dense.iter_mut_with_context();
+        (context, sparse_index_mut(dense, sparse, key))
     }
 }
 

@@ -134,8 +134,18 @@ where
     }
 
     #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, T>) {
+        self.slices().into_iter_with_context()
+    }
+
+    #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         self.slices_mut().into_iter()
+    }
+
+    #[inline]
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, T>) {
+        self.slices_mut().into_iter_with_context()
     }
 
     #[inline]

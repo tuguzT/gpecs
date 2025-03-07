@@ -778,7 +778,7 @@ const fn layout_permutation<const N: usize>(
     permutation
 }
 
-macro_rules! soa_impl {
+macro_rules! soa_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
         impl<$($types,)*> SoaTupleHelper<($($types,)*)> {
             const LAYOUTS: [Layout; count_idents!($($types,)*)] = [
@@ -1230,29 +1230,29 @@ macro_rules! soa_impl {
     };
 }
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
     D index 3,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
@@ -1260,7 +1260,7 @@ soa_impl!(
     E index 4,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
@@ -1269,7 +1269,7 @@ soa_impl!(
     F index 5,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
@@ -1279,7 +1279,7 @@ soa_impl!(
     G index 6,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
@@ -1290,7 +1290,7 @@ soa_impl!(
     H index 7,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
@@ -1302,7 +1302,7 @@ soa_impl!(
     I index 8,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
@@ -1315,7 +1315,7 @@ soa_impl!(
     J index 9,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,
@@ -1329,7 +1329,7 @@ soa_impl!(
     K index 10,
 );
 
-soa_impl!(
+soa_tuple_impl!(
     A index 0,
     B index 1,
     C index 2,

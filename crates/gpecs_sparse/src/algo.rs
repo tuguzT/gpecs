@@ -6,8 +6,8 @@ use crate::{
     assert::{check_dense_index_bounds, check_equal_key, unwrap_dense, unwrap_dense_pair},
     item::{SparseItem, SparseItemKind},
     key::Key,
-    pair::KeyValuePair,
-    soa::{mem::swap as soa_swap, slice::SoaSlice, Soa},
+    pair::{KeyValueRefs, KeyValueRefsMut},
+    soa::{mem::swap as soa_swap, traits::Soa},
 };
 
 // https://stackoverflow.com/a/73428605/14928295
@@ -127,12 +127,12 @@ pub fn sparse_swap_keys<K>(
 }
 
 pub fn sparse_get<'a, K, V>(
-    dense: &'a SoaSlice<KeyValuePair<K, V>>,
+    dense: impl IntoIterator<Item = KeyValueRefs<'a, K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     key: K,
 ) -> Option<V::Refs<'a>>
 where
-    K: Key,
+    K: Key + 'a,
     V: Soa,
 {
     let sparse_index = key.sparse_index();
@@ -160,12 +160,12 @@ where
 #[inline]
 #[track_caller]
 pub fn sparse_index<'a, K, V>(
-    dense: &'a SoaSlice<KeyValuePair<K, V>>,
+    dense: impl IntoIterator<Item = KeyValueRefs<'a, K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     key: K,
 ) -> V::Refs<'a>
 where
-    K: Key + Display,
+    K: Key + Display + 'a,
     V: Soa,
 {
     match sparse_get(dense, sparse, key) {
@@ -175,12 +175,12 @@ where
 }
 
 pub fn sparse_get_mut<'a, K, V>(
-    dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
+    dense: impl IntoIterator<Item = KeyValueRefsMut<'a, K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     key: K,
 ) -> Option<V::RefsMut<'a>>
 where
-    K: Key,
+    K: Key + 'a,
     V: Soa,
 {
     let sparse_index = key.sparse_index();
@@ -198,12 +198,12 @@ where
 #[inline]
 #[track_caller]
 pub fn sparse_index_mut<'a, K, V>(
-    dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
+    dense: impl IntoIterator<Item = KeyValueRefsMut<'a, K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     key: K,
 ) -> V::RefsMut<'a>
 where
-    K: Key + Display,
+    K: Key + Display + 'a,
     V: Soa,
 {
     match sparse_get_mut(dense, sparse, key) {
@@ -213,12 +213,12 @@ where
 }
 
 pub fn sparse_get_with_key<'a, K, V>(
-    dense: &'a SoaSlice<KeyValuePair<K, V>>,
+    dense: impl IntoIterator<Item = KeyValueRefs<'a, K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     sparse_index: usize,
 ) -> Option<(K, V::Refs<'a>)>
 where
-    K: Key,
+    K: Key + 'a,
     V: Soa,
 {
     let sparse_item = sparse.get(sparse_index)?;
@@ -231,12 +231,12 @@ where
 }
 
 pub fn sparse_get_mut_with_key<'a, K, V>(
-    dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
+    dense: impl IntoIterator<Item = KeyValueRefsMut<'a, K, V>>,
     sparse: &[SparseItem<K::Epoch>],
     sparse_index: usize,
 ) -> Option<(K, V::RefsMut<'a>)>
 where
-    K: Key,
+    K: Key + 'a,
     V: Soa,
 {
     let sparse_item = sparse.get(sparse_index)?;

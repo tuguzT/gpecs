@@ -206,6 +206,7 @@ impl<T> ErasedStorage for SparseSet<T>
 where
     T: Archetype,
 {
+    #[inline]
     fn entities(&self) -> &[Entity] {
         self.as_keys_slice()
     }

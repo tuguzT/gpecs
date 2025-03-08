@@ -37,14 +37,10 @@ pub struct ComponentDescriptor {
 
 impl ComponentDescriptor {
     #[inline]
-    pub fn new(
-        name: impl Into<Cow<'static, str>>,
-        type_id: Option<TypeId>,
-        layout: Layout,
-    ) -> Self {
+    pub fn new(name: impl Into<Cow<'static, str>>, layout: Layout) -> Self {
         Self {
             name: name.into(),
-            type_id,
+            type_id: None,
             layout,
         }
     }
@@ -247,7 +243,7 @@ mod tests {
         components.register_component::<Position>();
         assert_eq!(components.len(), 1);
 
-        let descriptor = ComponentDescriptor::new("Mass", None, Layout::new::<f32>());
+        let descriptor = ComponentDescriptor::new("Mass", Layout::new::<f32>());
         let id = components.register_component_with_descriptor(descriptor);
         assert_eq!(components.len(), 2);
         assert_eq!(id.index(), 1);

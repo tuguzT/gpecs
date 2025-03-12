@@ -428,58 +428,136 @@ unsafe impl Archetype for () {
     }
 }
 
-#[allow(unsafe_code)]
-unsafe impl<A> Archetype for (A,)
-where
-    A: Component,
-{
-    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        let permutation = SoaTupleImplHelper::<(A,)>::PERMUTATION;
+macro_rules! archetype_tuple_impl {
+    ($($types:ident index $indices:tt),* $(,)?) => {
+        #[allow(unsafe_code)]
+        unsafe impl<$($types,)*> Archetype for ($($types,)*)
+        where
+            $($types: Component,)*
+        {
+            fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-        let component_ids = [components.register_component::<A>()];
-        [component_ids[permutation[0]]]
-    }
+                let component_ids = [$(components.register_component::<$types>(),)*];
+                [$(component_ids[permutation[$indices]],)*]
+            }
+        }
+    };
 }
 
-#[allow(unsafe_code)]
-unsafe impl<A, B> Archetype for (A, B)
-where
-    A: Component,
-    B: Component,
-{
-    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        let permutation = SoaTupleImplHelper::<(A, B)>::PERMUTATION;
+archetype_tuple_impl!(
+    A index 0,
+);
 
-        let component_ids = [
-            components.register_component::<A>(),
-            components.register_component::<B>(),
-        ];
-        [component_ids[permutation[0]], component_ids[permutation[1]]]
-    }
-}
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+);
 
-#[allow(unsafe_code)]
-unsafe impl<A, B, C> Archetype for (A, B, C)
-where
-    A: Component,
-    B: Component,
-    C: Component,
-{
-    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        let permutation = SoaTupleImplHelper::<(A, B, C)>::PERMUTATION;
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+);
 
-        let component_ids = [
-            components.register_component::<A>(),
-            components.register_component::<B>(),
-            components.register_component::<C>(),
-        ];
-        [
-            component_ids[permutation[0]],
-            component_ids[permutation[1]],
-            component_ids[permutation[2]],
-        ]
-    }
-}
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+);
+
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+);
+
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+);
+
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+);
+
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+);
+
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+    I index 8,
+);
+
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+    I index 8,
+    J index 9,
+);
+
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+    I index 8,
+    J index 9,
+    K index 10,
+);
+
+archetype_tuple_impl!(
+    A index 0,
+    B index 1,
+    C index 2,
+    D index 3,
+    E index 4,
+    F index 5,
+    G index 6,
+    H index 7,
+    I index 8,
+    J index 9,
+    K index 10,
+    L index 11,
+);
 
 #[cfg(test)]
 mod tests {

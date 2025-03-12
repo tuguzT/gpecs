@@ -81,24 +81,6 @@ where
     type MutPtrs = KeyValueMutPtrs<K, V>;
 
     #[inline]
-    #[track_caller]
-    unsafe fn ptrs(
-        context: &Self::Context,
-        ptr: *mut u8,
-        offsets: impl IntoIterator<Item = usize>,
-    ) -> Self::MutPtrs {
-        let mut offsets = offsets.into_iter();
-        let key_offset = offsets
-            .next()
-            .expect("iterator should have at least one element");
-
-        KeyValueMutPtrs {
-            key: unsafe { ptr.add(key_offset).cast() },
-            value: unsafe { V::ptrs(context, ptr, offsets) },
-        }
-    }
-
-    #[inline]
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
         KeyValueMutPtrs {
             key: ptr::dangling_mut(),

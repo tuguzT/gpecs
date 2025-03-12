@@ -77,7 +77,11 @@ impl<Fields> ErasedSoa<Fields> {
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
         let buffer = unsafe {
-            let dst = T::ptrs(context, buffer.as_mut_ptr().cast(), offsets);
+            let dst = {
+                let buffer = buffer.as_mut_ptr().cast::<u8>();
+                let ptrs = offsets.into_iter().map(|offset| buffer.add(offset));
+                T::ptrs_restore_mut(context, ptrs)
+            };
             T::ptrs_write(context, dst, value);
             buffer.assume_init()
         };
@@ -94,7 +98,7 @@ impl<Fields> ErasedSoa<Fields> {
         T: Soa<Fields = Fields>,
     {
         let Self {
-            mut buffer,
+            buffer,
             field_layouts,
         } = self;
 
@@ -109,8 +113,11 @@ impl<Fields> ErasedSoa<Fields> {
         assert_eq!(buffer_len, buffer.len());
 
         unsafe {
-            let src = T::ptrs(context, buffer.as_mut_ptr().cast(), offsets);
-            let src = T::ptrs_cast_const(context, src);
+            let src = {
+                let buffer = buffer.as_ptr().cast::<u8>();
+                let ptrs = offsets.into_iter().map(|offset| buffer.add(offset));
+                T::ptrs_restore(context, ptrs)
+            };
             T::ptrs_read(context, src)
         }
     }
@@ -1488,31 +1495,6 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     type Ptrs = ErasedSoaPtrs<Fields>;
 
     type MutPtrs = ErasedSoaMutPtrs<Fields>;
-
-    unsafe fn ptrs(
-        context: &Self::Context,
-        ptr: *mut u8,
-        offsets: impl IntoIterator<Item = usize>,
-    ) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
-
-        let ptrs: Box<[_]> = field_layouts
-            .iter()
-            .zip(offsets)
-            .map(|(field_layout, offset)| unsafe {
-                let data = ptr.add(offset);
-                let len = field_layout.size();
-                let ptr = ptr::slice_from_raw_parts_mut(data, len);
-                (field_layout.clone(), ptr)
-            })
-            .collect();
-        assert_eq!(field_layouts.len(), ptrs.len());
-
-        ErasedSoaMutPtrs {
-            ptrs,
-            phantom: PhantomData,
-        }
-    }
 
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
         let ErasedSoaContext { field_layouts, .. } = context;

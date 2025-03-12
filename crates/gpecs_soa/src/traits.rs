@@ -85,14 +85,6 @@ pub unsafe trait Soa: Sized {
     type Ptrs: Clone;
     type MutPtrs: Clone;
 
-    /// Creates a collection of pointers to each field from a given pointer.
-    /// by provided offsets (in bytes).
-    unsafe fn ptrs(
-        context: &Self::Context,
-        ptr: *mut u8,
-        offsets: impl IntoIterator<Item = usize>,
-    ) -> Self::MutPtrs;
-
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs;
 
     /// Order of erased pointers should resemble the order of fields inside of a buffer in memory.
@@ -361,17 +353,6 @@ unsafe impl Soa for () {
 
     type Ptrs = *const Self;
     type MutPtrs = *mut Self;
-
-    #[track_caller]
-    #[inline(always)]
-    unsafe fn ptrs(
-        _: &Self::Context,
-        ptr: *mut u8,
-        offsets: impl IntoIterator<Item = usize>,
-    ) -> Self::MutPtrs {
-        let offsets: [usize; 1] = collect_array(offsets);
-        unsafe { ptr.add(offsets[0]).cast() }
-    }
 
     #[inline(always)]
     fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {
@@ -795,30 +776,16 @@ macro_rules! soa_tuple_impl {
             ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
                 let layouts = [$(Layout::array::<$types>(capacity)?,)*];
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
-                let mut offsets: [usize; count_idents!($($types,)*)] = Default::default();
 
-                let layout = Layout::new::<()>();
-                $(
-                    let (layout, offset) = layout.extend(layouts[permutation[$indices]])?;
-                    offsets[permutation[$indices]] = offset;
-                )*
+                let mut layout = Layout::new::<()>();
+                let mut offsets: [usize; count_idents!($($types,)*)] = Default::default();
+                $((layout, offsets[$indices]) = layout.extend(layouts[permutation[$indices]])?;)*
 
                 Ok((layout, offsets))
             }
 
             type Ptrs = ($(*const $types,)*);
             type MutPtrs = ($(*mut $types,)*);
-
-            #[track_caller]
-            #[inline(always)]
-            unsafe fn ptrs(
-                _: &Self::Context,
-                ptr: *mut u8,
-                offsets: impl IntoIterator<Item = usize>,
-            ) -> Self::MutPtrs {
-                let offsets: [usize; count_idents!($($types,)*)] = collect_array(offsets);
-                unsafe { ($(ptr.add(offsets[$indices]).cast(),)*) }
-            }
 
             #[inline(always)]
             fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {

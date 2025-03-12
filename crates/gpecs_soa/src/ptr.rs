@@ -438,12 +438,12 @@ where
 
     let prefix_layout = Layout::new::<BufferPrefix<T>>();
     let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
-    let offsets = offsets
-        .into_iter()
-        .map(|offset| offset + offset_from_prefix);
 
-    let ptrs = unsafe { T::ptrs(context, ptr.cast(), offsets) };
-    Ok(ptrs)
+    let ptr = ptr.cast::<u8>();
+    let ptrs = offsets
+        .into_iter()
+        .map(|offset| unsafe { ptr.add(offset + offset_from_prefix) });
+    Ok(T::ptrs_restore_mut(context, ptrs))
 }
 
 #[cfg(test)]

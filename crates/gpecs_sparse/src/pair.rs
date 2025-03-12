@@ -49,6 +49,7 @@ where
 {
     type Context = V::Context;
     type Fields = (K, V::Fields);
+
     type FieldLayouts<'a> = KeyValueFieldLayouts<'a, K, V>;
 
     #[inline]
@@ -56,24 +57,14 @@ where
         KeyValueFieldLayouts::new(context)
     }
 
+    type FieldOffsets<'a> = KeyValueFieldOffsets<'a, K, V>;
+
     #[inline]
     fn buffer_layout(
         context: &Self::Context,
         capacity: usize,
-    ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
-        let (mut layout, offsets) = V::buffer_layout(context, capacity)?;
-
-        let keys = Layout::array::<K>(capacity)?;
-        let offset_from_keys;
-        (layout, offset_from_keys) = keys.extend(layout)?;
-
-        let key_offset = 0;
-        let offsets = offsets
-            .into_iter()
-            .map(move |offset| offset + offset_from_keys);
-        let offsets = iter::once(key_offset).chain(offsets);
-
-        Ok((layout, offsets))
+    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
+        KeyValueFieldOffsets::new(context, capacity)
     }
 
     type Ptrs = KeyValuePtrs<K, V>;
@@ -788,6 +779,165 @@ where
         let f: fn(<V::FieldLayouts<'a> as IntoIterator>::Item) -> _ = |layout| *layout.borrow();
         let value_layouts = value_layouts.into_iter().map(f);
         iter::once(key_layout).chain(value_layouts)
+    }
+}
+
+pub struct KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+{
+    offset_from_keys: usize,
+    keys: PhantomData<fn() -> K>,
+    values: V::FieldOffsets<'a>,
+}
+
+impl<'a, K, V> KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+{
+    pub fn new(context: &'a V::Context, capacity: usize) -> Result<(Layout, Self), LayoutError> {
+        let (mut layout, offsets) = V::buffer_layout(context, capacity)?;
+
+        let keys = Layout::array::<K>(capacity)?;
+        let offset_from_keys;
+        (layout, offset_from_keys) = keys.extend(layout)?;
+
+        let this = Self {
+            offset_from_keys,
+            keys: PhantomData,
+            values: offsets,
+        };
+        Ok((layout, this))
+    }
+}
+
+impl<'a, K, V> Debug for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+    V::FieldOffsets<'a>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeyValueFieldOffsets")
+            .field("offset_from_keys", &self.offset_from_keys)
+            .field("values", &self.values)
+            .finish()
+    }
+}
+
+impl<'a, K, V> PartialEq for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+    V::FieldOffsets<'a>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.offset_from_keys == other.offset_from_keys
+            && self.keys == other.keys
+            && self.values == other.values
+    }
+}
+
+impl<'a, K, V> Eq for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+    V::FieldOffsets<'a>: Eq,
+{
+}
+
+impl<'a, K, V> PartialOrd for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+    V::FieldOffsets<'a>: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self.offset_from_keys.partial_cmp(&other.offset_from_keys) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.keys.partial_cmp(&other.keys) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.values.partial_cmp(&other.values)
+    }
+}
+
+impl<'a, K, V> Ord for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+    V::FieldOffsets<'a>: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.offset_from_keys.cmp(&other.offset_from_keys) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        match self.keys.cmp(&other.keys) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.values.cmp(&other.values)
+    }
+}
+
+impl<'a, K, V> Hash for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+    V::FieldOffsets<'a>: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.offset_from_keys.hash(state);
+        self.keys.hash(state);
+        self.values.hash(state);
+    }
+}
+
+impl<'a, K, V> Clone for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+    V::FieldOffsets<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            offset_from_keys: self.offset_from_keys.clone(),
+            keys: self.keys.clone(),
+            values: self.values.clone(),
+        }
+    }
+}
+
+impl<'a, K, V> Copy for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+    V::FieldOffsets<'a>: Copy,
+{
+}
+
+impl<'a, K, V> IntoIterator for KeyValueFieldOffsets<'a, K, V>
+where
+    V: Soa,
+{
+    type Item = usize;
+
+    type IntoIter = iter::Chain<
+        iter::Once<usize>,
+        iter::Scan<
+            <<V as Soa>::FieldOffsets<'a> as IntoIterator>::IntoIter,
+            usize,
+            fn(&mut usize, usize) -> Option<usize>,
+        >,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let Self {
+            offset_from_keys,
+            values,
+            ..
+        } = self;
+
+        let key_offset = 0;
+        let f: fn(&mut _, _) -> _ = |&mut offset_from_keys, offset| Some(offset + offset_from_keys);
+        let value_offsets = values.into_iter().scan(offset_from_keys, f);
+        iter::once(key_offset).chain(value_offsets)
     }
 }
 

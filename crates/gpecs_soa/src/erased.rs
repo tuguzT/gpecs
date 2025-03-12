@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{
-    alloc::Layout,
+    alloc::{Layout, LayoutError},
     borrow::Borrow,
     fmt::{self, Debug},
     hash::{self, Hash},
@@ -11,7 +11,7 @@ use core::{
     slice,
 };
 
-use crate::traits::Soa;
+use crate::traits::{buffer_layout, Soa};
 
 union Byte<Fields> {
     _byte: u8,
@@ -1490,6 +1490,15 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
         let ErasedSoaContext { field_layouts, .. } = context;
         field_layouts.as_ref()
+    }
+
+    type FieldOffsets<'a> = Box<[usize]>;
+
+    fn buffer_layout(
+        context: &Self::Context,
+        capacity: usize,
+    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
+        buffer_layout::<Self, _>(context, capacity)
     }
 
     type Ptrs = ErasedSoaPtrs<Fields>;

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
     array,
@@ -34,6 +34,8 @@ pub unsafe trait Soa: Sized {
 
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_>;
 
+    type FieldOffsets<'a>: IntoIterator<Item = usize>;
+
     /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
     /// Also returns offsets of each field in the buffer (in bytes).
     ///
@@ -42,20 +44,7 @@ pub unsafe trait Soa: Sized {
     fn buffer_layout(
         context: &Self::Context,
         capacity: usize,
-    ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
-        let mut layout = Layout::new::<()>();
-        let offsets = Self::field_layouts(context)
-            .into_iter()
-            .map(|item| {
-                let repeated = repeat_layout(item.borrow(), capacity)?;
-                let offset;
-                (layout, offset) = layout.extend(repeated)?;
-                Ok(offset)
-            })
-            .collect::<Result<Box<[_]>, _>>()?;
-
-        Ok((layout, offsets))
-    }
+    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError>;
 
     /// Retrieves maximum number of fields that can be stored inside of a buffer with given layout.
     fn capacity_from(context: &Self::Context, buffer_layout: Layout) -> usize {
@@ -279,6 +268,28 @@ pub unsafe trait Soa: Sized {
     }
 }
 
+pub fn buffer_layout<T, B>(
+    context: &T::Context,
+    capacity: usize,
+) -> Result<(Layout, B), LayoutError>
+where
+    T: Soa,
+    B: FromIterator<usize>,
+{
+    let mut layout = Layout::new::<()>();
+    let offsets = T::field_layouts(context)
+        .into_iter()
+        .map(|item| {
+            let repeated = repeat_layout(item.borrow(), capacity)?;
+            let offset;
+            (layout, offset) = layout.extend(repeated)?;
+            Ok(offset)
+        })
+        .collect::<Result<_, _>>()?;
+
+    Ok((layout, offsets))
+}
+
 pub trait SoaToOwned<'a> {
     type Owned: Soa<Refs<'a> = Self>
     where
@@ -338,11 +349,13 @@ unsafe impl Soa for () {
         [Layout::new::<Self>()]
     }
 
+    type FieldOffsets<'a> = [usize; 1];
+
     #[inline(always)]
     fn buffer_layout(
         _: &Self::Context,
         _: usize,
-    ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
+    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
         Ok((Layout::new::<Self>(), [0]))
     }
 
@@ -769,11 +782,13 @@ macro_rules! soa_tuple_impl {
                 SoaTupleImplHelper::<($($types,)*)>::FIELD_LAYOUTS
             }
 
+            type FieldOffsets<'a> = [usize; count_idents!($($types,)*)];
+
             #[inline(always)]
             fn buffer_layout(
                 _: &Self::Context,
                 capacity: usize,
-            ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
+            ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
                 let layouts = [$(Layout::array::<$types>(capacity)?,)*];
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 

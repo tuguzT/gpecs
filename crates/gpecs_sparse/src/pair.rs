@@ -68,31 +68,20 @@ where
     }
 
     type Ptrs = KeyValuePtrs<K, V>;
-
     type MutPtrs = KeyValueMutPtrs<K, V>;
 
-    #[inline]
-    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
-        KeyValueMutPtrs {
-            key: ptr::dangling_mut(),
-            value: V::ptrs_dangling(context),
-        }
-    }
+    type ErasedPtrs = iter::Chain<iter::Once<*const u8>, <V::ErasedPtrs as IntoIterator>::IntoIter>;
+    type ErasedMutPtrs =
+        iter::Chain<iter::Once<*mut u8>, <V::ErasedMutPtrs as IntoIterator>::IntoIter>;
 
     #[inline]
-    fn ptrs_erase(
-        context: &Self::Context,
-        ptrs: Self::Ptrs,
-    ) -> impl IntoIterator<Item = *const u8> {
+    fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
         let KeyValuePtrs { key, value } = ptrs;
         iter::once(key.cast()).chain(V::ptrs_erase(context, value))
     }
 
     #[inline]
-    fn ptrs_erase_mut(
-        context: &Self::Context,
-        ptrs: Self::MutPtrs,
-    ) -> impl IntoIterator<Item = *mut u8> {
+    fn ptrs_erase_mut(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
         let KeyValueMutPtrs { key, value } = ptrs;
         iter::once(key.cast()).chain(V::ptrs_erase_mut(context, value))
     }
@@ -128,6 +117,14 @@ where
         KeyValueMutPtrs {
             key: key.cast(),
             value: V::ptrs_restore_mut(context, ptrs),
+        }
+    }
+
+    #[inline]
+    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
+        KeyValueMutPtrs {
+            key: ptr::dangling_mut(),
+            value: V::ptrs_dangling(context),
         }
     }
 

@@ -3,6 +3,7 @@ use core::{
     alloc::{Layout, LayoutError},
     array,
     borrow::Borrow,
+    iter,
     marker::PhantomData,
     ptr::{self, NonNull},
     slice,
@@ -74,17 +75,14 @@ pub unsafe trait Soa: Sized {
     type Ptrs: Clone;
     type MutPtrs: Clone;
 
-    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs;
+    type ErasedPtrs: IntoIterator<Item = *const u8>;
+    type ErasedMutPtrs: IntoIterator<Item = *mut u8>;
 
     /// Order of erased pointers should resemble the order of fields inside of a buffer in memory.
-    fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs)
-        -> impl IntoIterator<Item = *const u8>;
+    fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs;
 
     /// Order of erased pointers should resemble the order of fields inside of a buffer in memory.
-    fn ptrs_erase_mut(
-        context: &Self::Context,
-        ptrs: Self::MutPtrs,
-    ) -> impl IntoIterator<Item = *mut u8>;
+    fn ptrs_erase_mut(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs;
 
     /// Order of input pointers should resemble the order of fields inside of a buffer in memory.
     fn ptrs_restore(
@@ -97,6 +95,8 @@ pub unsafe trait Soa: Sized {
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs;
+
+    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs;
 
     fn ptrs_cast_const(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs;
     fn ptrs_cast_mut(context: &Self::Context, ptrs: Self::Ptrs) -> Self::MutPtrs;
@@ -367,19 +367,17 @@ unsafe impl Soa for () {
     type Ptrs = *const Self;
     type MutPtrs = *mut Self;
 
+    type ErasedPtrs = iter::Once<*const u8>;
+    type ErasedMutPtrs = iter::Once<*mut u8>;
+
     #[inline(always)]
-    fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {
-        ptr::dangling_mut()
+    fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
+        iter::once(ptrs.cast())
     }
 
     #[inline(always)]
-    fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> impl IntoIterator<Item = *const u8> {
-        Some(ptrs.cast())
-    }
-
-    #[inline(always)]
-    fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> impl IntoIterator<Item = *mut u8> {
-        Some(ptrs.cast())
+    fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
+        iter::once(ptrs.cast())
     }
 
     #[track_caller]
@@ -397,6 +395,11 @@ unsafe impl Soa for () {
     ) -> Self::MutPtrs {
         let ptrs: [*mut u8; 1] = collect_array(ptrs);
         ptrs[0].cast()
+    }
+
+    #[inline(always)]
+    fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {
+        ptr::dangling_mut()
     }
 
     #[inline(always)]
@@ -802,13 +805,11 @@ macro_rules! soa_tuple_impl {
             type Ptrs = ($(*const $types,)*);
             type MutPtrs = ($(*mut $types,)*);
 
-            #[inline(always)]
-            fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {
-                ($(ptr::dangling_mut::<$types>(),)*)
-            }
+            type ErasedPtrs = [*const u8; count_idents!($($types,)*)];
+            type ErasedMutPtrs = [*mut u8; count_idents!($($types,)*)];
 
             #[inline(always)]
-            fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> impl IntoIterator<Item = *const u8> {
+            fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let erased: [*const u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
@@ -816,7 +817,7 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline(always)]
-            fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> impl IntoIterator<Item = *mut u8> {
+            fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let erased: [*mut u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
@@ -837,6 +838,11 @@ macro_rules! soa_tuple_impl {
 
                 let ptrs: [*mut u8; count_idents!($($types,)*)] = collect_array(ptrs);
                 ($(ptrs[permutation[$indices]].cast(),)*)
+            }
+
+            #[inline(always)]
+            fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {
+                ($(ptr::dangling_mut::<$types>(),)*)
             }
 
             #[inline(always)]

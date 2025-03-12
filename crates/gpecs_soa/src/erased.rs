@@ -1,4 +1,7 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{
+    boxed::Box,
+    vec::{self, Vec},
+};
 use core::{
     alloc::{Layout, LayoutError},
     borrow::Borrow,
@@ -786,7 +789,7 @@ impl<'a, Fields> Clone for ErasedSoaRefs<'a, Fields> {
 impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefs<'a, Fields> {
     type Item = &'r (Layout, ErasedFieldRef<'a>);
 
-    type IntoIter = core::slice::Iter<'r, (Layout, ErasedFieldRef<'a>)>;
+    type IntoIter = slice::Iter<'r, (Layout, ErasedFieldRef<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaRefs { refs, .. } = self;
@@ -797,7 +800,7 @@ impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefs<'a, Fields> {
 impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefs<'a, Fields> {
     type Item = &'r mut (Layout, ErasedFieldRef<'a>);
 
-    type IntoIter = core::slice::IterMut<'r, (Layout, ErasedFieldRef<'a>)>;
+    type IntoIter = slice::IterMut<'r, (Layout, ErasedFieldRef<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaRefs { refs, .. } = self;
@@ -808,7 +811,7 @@ impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefs<'a, Fields> {
 impl<'a, Fields> IntoIterator for ErasedSoaRefs<'a, Fields> {
     type Item = (Layout, ErasedFieldRef<'a>);
 
-    type IntoIter = alloc::vec::IntoIter<(Layout, ErasedFieldRef<'a>)>;
+    type IntoIter = vec::IntoIter<(Layout, ErasedFieldRef<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaRefs { refs, .. } = self;
@@ -926,7 +929,7 @@ impl<'a, Fields> Debug for ErasedSoaRefsMut<'a, Fields> {
 impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefsMut<'a, Fields> {
     type Item = &'r (Layout, ErasedFieldRefMut<'a>);
 
-    type IntoIter = core::slice::Iter<'r, (Layout, ErasedFieldRefMut<'a>)>;
+    type IntoIter = slice::Iter<'r, (Layout, ErasedFieldRefMut<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaRefsMut { refs, .. } = self;
@@ -937,7 +940,7 @@ impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefsMut<'a, Fields> {
 impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefsMut<'a, Fields> {
     type Item = &'r mut (Layout, ErasedFieldRefMut<'a>);
 
-    type IntoIter = core::slice::IterMut<'r, (Layout, ErasedFieldRefMut<'a>)>;
+    type IntoIter = slice::IterMut<'r, (Layout, ErasedFieldRefMut<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaRefsMut { refs, .. } = self;
@@ -948,7 +951,7 @@ impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefsMut<'a, Fields> {
 impl<'a, Fields> IntoIterator for ErasedSoaRefsMut<'a, Fields> {
     type Item = (Layout, ErasedFieldRefMut<'a>);
 
-    type IntoIter = alloc::vec::IntoIter<(Layout, ErasedFieldRefMut<'a>)>;
+    type IntoIter = vec::IntoIter<(Layout, ErasedFieldRefMut<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaRefsMut { refs, .. } = self;
@@ -1502,31 +1505,14 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     type Ptrs = ErasedSoaPtrs<Fields>;
-
     type MutPtrs = ErasedSoaMutPtrs<Fields>;
 
-    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+    type ErasedPtrs =
+        iter::Map<vec::IntoIter<(Layout, *const [u8])>, fn((Layout, *const [u8])) -> *const u8>;
+    type ErasedMutPtrs =
+        iter::Map<vec::IntoIter<(Layout, *mut [u8])>, fn((Layout, *mut [u8])) -> *mut u8>;
 
-        let ptrs = field_layouts
-            .iter()
-            .map(|field_layout| {
-                let data = ptr::without_provenance_mut(field_layout.align());
-                let len = field_layout.size();
-                let ptr = ptr::slice_from_raw_parts_mut(data, len);
-                (field_layout.clone(), ptr)
-            })
-            .collect();
-        ErasedSoaMutPtrs {
-            ptrs,
-            phantom: PhantomData,
-        }
-    }
-
-    fn ptrs_erase(
-        context: &Self::Context,
-        ptrs: Self::Ptrs,
-    ) -> impl IntoIterator<Item = *const u8> {
+    fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
         let ErasedSoaContext { field_layouts, .. } = context;
         let ErasedSoaPtrs { ptrs, .. } = ptrs;
 
@@ -1535,10 +1521,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs.into_vec().into_iter().map(|(_, ptr)| ptr.cast())
     }
 
-    fn ptrs_erase_mut(
-        context: &Self::Context,
-        ptrs: Self::MutPtrs,
-    ) -> impl IntoIterator<Item = *mut u8> {
+    fn ptrs_erase_mut(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
         let ErasedSoaContext { field_layouts, .. } = context;
         let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
 
@@ -1589,6 +1572,24 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
+        ErasedSoaMutPtrs {
+            ptrs,
+            phantom: PhantomData,
+        }
+    }
+
+    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
+        let ErasedSoaContext { field_layouts, .. } = context;
+
+        let ptrs = field_layouts
+            .iter()
+            .map(|field_layout| {
+                let data = ptr::without_provenance_mut(field_layout.align());
+                let len = field_layout.size();
+                let ptr = ptr::slice_from_raw_parts_mut(data, len);
+                (field_layout.clone(), ptr)
+            })
+            .collect();
         ErasedSoaMutPtrs {
             ptrs,
             phantom: PhantomData,

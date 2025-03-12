@@ -6,9 +6,6 @@ license.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[dependencies]
-gpecs_utils = { workspace = true }
-
 [dev-dependencies]
 criterion = { workspace = true }
 

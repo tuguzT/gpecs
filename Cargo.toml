@@ -9,7 +9,6 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [workspace.dependencies]
-gpecs_utils = { path = "crates/gpecs_utils" }
 gpecs_soa = { path = "crates/gpecs_soa" }
 gpecs_sparse = { path = "crates/gpecs_sparse" }
 as-any = { version = "0.3" }

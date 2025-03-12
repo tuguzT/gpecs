@@ -926,7 +926,7 @@ where
     #[track_caller]
     pub fn copy_from_slices(&mut self, src: SoaSlices<'_, T>)
     where
-        T: Copy,
+        T::Fields: Copy,
     {
         let len = self.len();
         if len != src.len() {

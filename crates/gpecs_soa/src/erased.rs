@@ -11,8 +11,6 @@ use core::{
     slice,
 };
 
-use gpecs_utils::permutation::apply as apply_permutation;
-
 use crate::traits::Soa;
 
 union Byte<Fields> {
@@ -68,7 +66,10 @@ impl<Fields> ErasedSoa<Fields> {
     where
         T: Soa<Fields = Fields>,
     {
-        let field_layouts = sorted_layouts_of::<T>(context);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<T::Fields, _>)
+            .collect();
 
         let (buffer_layout, offsets) =
             T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
@@ -97,8 +98,10 @@ impl<Fields> ErasedSoa<Fields> {
             field_layouts,
         } = self;
 
-        let target_field_layouts = sorted_layouts_of::<T>(context);
-        assert_eq!(field_layouts.as_ref(), target_field_layouts.as_ref());
+        let target_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<T::Fields, _>);
+        assert!(target_layouts.eq(field_layouts));
 
         let (buffer_layout, offsets) =
             T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
@@ -209,7 +212,8 @@ impl<Fields> ErasedSoa<Fields> {
     }
 }
 
-type ErasedDropFn = Box<dyn Fn(&[(Layout, *mut [u8])])>;
+type ErasedDropFnParam<'a> = &'a [(Layout, *mut [u8])];
+type ErasedDropFn = Box<dyn Fn(ErasedDropFnParam<'_>)>;
 
 pub struct ErasedSoaContext<Fields> {
     field_layouts: Box<[Layout]>,
@@ -221,12 +225,14 @@ impl<Fields> ErasedSoaContext<Fields> {
     #[inline]
     pub fn new<I, O>(field_layouts: I, drop_fields: O) -> Self
     where
-        I: IntoIterator,
-        I::Item: Borrow<Layout>,
+        I: IntoIterator<Item: Borrow<Layout>>,
         O: Into<Option<ErasedDropFn>>,
     {
         Self {
-            field_layouts: collect_layouts::<Fields, I>(field_layouts),
+            field_layouts: field_layouts
+                .into_iter()
+                .map(validate_layout::<Fields, _>)
+                .collect(),
             drop_fields: drop_fields.into(),
             phantom: PhantomData,
         }
@@ -238,9 +244,12 @@ impl<Fields> ErasedSoaContext<Fields> {
         T: Soa<Fields = Fields>,
         T::Context: 'static,
     {
-        let field_layouts = sorted_layouts_of::<T>(&context);
+        let field_layouts = T::field_layouts(&context)
+            .into_iter()
+            .map(validate_layout::<T::Fields, _>)
+            .collect();
 
-        let drop_fields = move |data: &[(_, *mut [u8])]| unsafe {
+        let drop_fields = move |data: ErasedDropFnParam<'_>| unsafe {
             let ptrs = data.iter().map(|(_, ptr)| ptr.cast());
             let ptrs = T::ptrs_restore_mut(&context, ptrs);
             T::ptrs_drop_in_place(&context, ptrs);
@@ -271,41 +280,6 @@ impl<Fields> Debug for ErasedSoaContext<Fields> {
             .field(&self.field_layouts)
             .finish()
     }
-}
-
-#[inline]
-pub fn sorted_layouts_of<T>(context: &T::Context) -> Box<[Layout]>
-where
-    T: Soa,
-{
-    let mut field_layouts = collect_layouts::<T::Fields, _>(T::field_layouts(context));
-
-    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-    apply_permutation(&mut permutation, &mut field_layouts);
-
-    field_layouts
-}
-
-#[inline]
-fn collect_layouts<Fields, I>(field_layouts: I) -> Box<[Layout]>
-where
-    I: IntoIterator,
-    I::Item: Borrow<Layout>,
-{
-    field_layouts
-        .into_iter()
-        .map(|item| {
-            let layout: &Layout = item.borrow();
-
-            let input_align = layout.align();
-            let max_align = align_of::<Fields>();
-            assert!(
-                input_align <= max_align,
-                "input alignment must be less than or equal to {max_align}, but got {input_align}",
-            );
-            layout.clone()
-        })
-        .collect()
 }
 
 type ErasedFieldPtr = *const [u8];
@@ -345,21 +319,18 @@ impl<Fields> ErasedSoaPtrs<Fields> {
         T: Soa<Fields = Fields>,
     {
         let ptrs = T::ptrs_erase(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut ptrs: Box<[_]> = field_layouts
-            .iter()
+        let ptrs = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size();
                 let ptr = ptr::slice_from_raw_parts(ptr.cast(), len);
-                (field_layout.clone(), ptr)
+                (field_layout, ptr)
             })
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
-
         Self {
             ptrs,
             phantom: PhantomData,
@@ -373,22 +344,19 @@ impl<Fields> ErasedSoaPtrs<Fields> {
     {
         let Self { ptrs, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(ptrs.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = ptrs
-            .iter()
-            .zip(field_layouts)
-            .map(|((layout, ptr), field_layout)| {
-                assert_eq!(layout, &field_layout);
-                ptr.cast()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(field_layouts.len(), ptrs.len());
 
+        let ptrs = field_layouts
+            .iter()
+            .zip(ptrs)
+            .map(|(field_layout, (layout, ptr))| {
+                assert_eq!(field_layout, &layout);
+                ptr.cast()
+            });
         T::ptrs_restore(context, ptrs)
     }
 }
@@ -473,12 +441,11 @@ impl<Fields> ErasedSoaMutPtrs<Fields> {
         T: Soa<Fields = Fields>,
     {
         let ptrs = T::ptrs_erase_mut(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut ptrs: Box<[_]> = field_layouts
-            .iter()
+        let ptrs: Box<[_]> = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let data = ptr.cast();
@@ -487,8 +454,6 @@ impl<Fields> ErasedSoaMutPtrs<Fields> {
                 (field_layout.clone(), ptr)
             })
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
-
         Self {
             ptrs,
             phantom: PhantomData,
@@ -502,22 +467,19 @@ impl<Fields> ErasedSoaMutPtrs<Fields> {
     {
         let Self { ptrs, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(ptrs.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = ptrs
-            .iter()
-            .zip(field_layouts)
-            .map(|((layout, ptr), field_layout)| {
-                assert_eq!(layout, &field_layout);
-                ptr.cast()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(field_layouts.len(), ptrs.len());
 
+        let ptrs = field_layouts
+            .iter()
+            .zip(ptrs)
+            .map(|(field_layout, (layout, ptr))| {
+                assert_eq!(field_layout, &layout);
+                ptr.cast()
+            });
         T::ptrs_restore_mut(context, ptrs)
     }
 }
@@ -603,12 +565,11 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     {
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut ptrs: Box<[_]> = field_layouts
-            .iter()
+        let ptrs = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size();
@@ -616,8 +577,6 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
                 (field_layout.clone(), unsafe { NonNull::new_unchecked(ptr) })
             })
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
-
         Self {
             ptrs,
             phantom: PhantomData,
@@ -631,22 +590,19 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     {
         let Self { ptrs, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(ptrs.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = ptrs
-            .iter()
-            .zip(field_layouts)
-            .map(|((layout, ptr), field_layout)| {
-                assert_eq!(layout, &field_layout);
-                ptr.as_ptr().cast()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(field_layouts.len(), ptrs.len());
 
+        let ptrs = field_layouts
+            .iter()
+            .zip(ptrs)
+            .map(|(field_layout, (layout, ptr))| {
+                assert_eq!(field_layout, &layout);
+                ptr.as_ptr().cast()
+            });
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         unsafe { T::ptrs_to_nonnull(context, ptrs) }
     }
@@ -749,20 +705,17 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
     {
         let ptrs = T::refs_as_ptrs(context, refs);
         let ptrs = T::ptrs_erase(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut refs: Box<[_]> = field_layouts
-            .iter()
+        let refs: Box<[_]> = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| unsafe {
                 let len = field_layout.size();
                 (field_layout.clone(), slice::from_raw_parts(ptr.cast(), len))
             })
             .collect();
-        apply_permutation(&mut permutation, &mut refs);
-
         Self {
             refs,
             phantom: PhantomData,
@@ -776,22 +729,19 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
     {
         let Self { refs, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(refs.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = refs
-            .iter()
-            .zip(field_layouts)
-            .map(|((layout, r#ref), field_layout)| {
-                assert_eq!(layout, &field_layout);
-                r#ref.as_ptr()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(field_layouts.len(), refs.len());
 
+        let ptrs = field_layouts
+            .iter()
+            .zip(refs)
+            .map(|(field_layout, (layout, r#ref))| {
+                assert_eq!(field_layout, &layout);
+                r#ref.as_ptr()
+            });
         let ptrs = T::ptrs_restore(context, ptrs);
         unsafe { T::ptrs_to_refs(context, ptrs) }
     }
@@ -902,12 +852,11 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
     {
         let ptrs = T::mut_refs_as_ptrs(context, refs);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut refs: Box<[_]> = field_layouts
-            .iter()
+        let refs = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let data = ptr.cast();
@@ -916,8 +865,6 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
                 (field_layout.clone(), r#ref)
             })
             .collect();
-        apply_permutation(&mut permutation, &mut refs);
-
         Self {
             refs,
             phantom: PhantomData,
@@ -931,20 +878,19 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
     {
         let Self { refs, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(refs.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = iter::zip(refs, field_layouts)
-            .map(|((layout, r#ref), field_layout)| {
-                assert_eq!(layout, field_layout);
-                r#ref.as_mut_ptr()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(field_layouts.len(), refs.len());
 
+        let ptrs = field_layouts
+            .iter()
+            .zip(refs)
+            .map(|(field_layout, (layout, r#ref))| {
+                assert_eq!(field_layout, &layout);
+                r#ref.as_mut_ptr()
+            });
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         unsafe { T::ptrs_to_refs_mut(context, ptrs) }
     }
@@ -1050,12 +996,11 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
         let len = T::slice_ptrs_len(context, slices.clone());
         let ptrs = T::slice_ptrs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut slices: Box<[_]> = field_layouts
-            .iter()
+        let slices = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size() * len;
@@ -1063,8 +1008,6 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
                 (field_layout.clone(), slice)
             })
             .collect();
-        apply_permutation(&mut permutation, &mut slices);
-
         Self {
             len,
             slices,
@@ -1079,20 +1022,19 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(slices.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = iter::zip(slices, field_layouts)
-            .map(|((layout, slice), field_layout)| {
-                assert_eq!(layout, field_layout);
-                slice.cast()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(slices.len(), field_layouts.len());
 
+        let ptrs = field_layouts
+            .iter()
+            .zip(slices)
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
+                slice.cast()
+            });
         let ptrs = T::ptrs_restore(context, ptrs);
         T::slices_from_raw_parts(context, ptrs, len)
     }
@@ -1191,12 +1133,11 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
         let len = T::slice_ptrs_len_mut(context, slices.clone());
         let ptrs = T::mut_slice_ptrs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut slices: Box<[_]> = field_layouts
-            .iter()
+        let slices = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size() * len;
@@ -1204,8 +1145,6 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
                 (field_layout.clone(), slice)
             })
             .collect();
-        apply_permutation(&mut permutation, &mut slices);
-
         Self {
             len,
             slices,
@@ -1220,20 +1159,19 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(slices.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = iter::zip(slices, field_layouts)
-            .map(|((layout, slice), field_layout)| {
-                assert_eq!(layout, field_layout);
-                slice.cast()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(slices.len(), field_layouts.len());
 
+        let ptrs = field_layouts
+            .iter()
+            .zip(slices)
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
+                slice.cast()
+            });
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         T::slices_from_raw_parts_mut(context, ptrs, len)
     }
@@ -1335,12 +1273,11 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
         let len = T::slices_len(context, &slices);
         let ptrs = T::slice_refs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut slices: Box<[_]> = field_layouts
-            .iter()
+        let slices = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size() * len;
@@ -1348,8 +1285,6 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
                 (field_layout.clone(), slice)
             })
             .collect();
-        apply_permutation(&mut permutation, &mut slices);
-
         Self {
             len,
             slices,
@@ -1364,20 +1299,19 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(slices.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = iter::zip(slices, field_layouts)
-            .map(|((layout, slice), field_layout)| {
-                assert_eq!(layout, field_layout);
-                slice.as_ptr()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(slices.len(), field_layouts.len());
 
+        let ptrs = field_layouts
+            .iter()
+            .zip(slices)
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
+                slice.as_ptr()
+            });
         let ptrs = T::ptrs_restore(context, ptrs);
         let slices = T::slices_from_raw_parts(context, ptrs, len);
         unsafe { T::slice_ptrs_to_slices(context, slices) }
@@ -1467,12 +1401,11 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
         let len = T::slices_len_mut(context, &slices);
         let ptrs = T::mut_slice_refs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
+        let field_layouts = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>);
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        let field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-
-        let mut slices: Box<[_]> = field_layouts
-            .iter()
+        let slices = field_layouts
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size() * len;
@@ -1480,8 +1413,6 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
                 (field_layout.clone(), slice)
             })
             .collect();
-        apply_permutation(&mut permutation, &mut slices);
-
         Self {
             len,
             slices,
@@ -1496,19 +1427,19 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-        assert_eq!(slices.len(), permutation.len());
-
-        let mut field_layouts = collect_layouts::<Fields, _>(T::field_layouts(context));
-        apply_permutation(&mut permutation, &mut field_layouts);
-
-        let mut ptrs: Box<[_]> = iter::zip(slices, field_layouts)
-            .map(|((layout, slice), field_layout)| {
-                assert_eq!(layout, field_layout);
-                slice.as_mut_ptr()
-            })
+        let field_layouts: Box<[_]> = T::field_layouts(context)
+            .into_iter()
+            .map(validate_layout::<Fields, _>)
             .collect();
-        apply_permutation(&mut permutation, &mut ptrs);
+        assert_eq!(slices.len(), field_layouts.len());
+
+        let ptrs = field_layouts
+            .iter()
+            .zip(slices)
+            .map(|(field_layout, (layout, slice))| {
+                assert_eq!(field_layout, &layout);
+                slice.as_mut_ptr()
+            });
 
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
@@ -1552,11 +1483,6 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
         let ErasedSoaContext { field_layouts, .. } = context;
         field_layouts.as_ref()
-    }
-
-    fn field_permutation(context: &Self::Context) -> impl IntoIterator<Item = usize> {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        field_layouts.iter().enumerate().map(|(index, _)| index)
     }
 
     type Ptrs = ErasedSoaPtrs<Fields>;
@@ -2811,4 +2737,20 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             }
         }
     }
+}
+
+#[inline]
+fn validate_layout<Fields, I>(item: I) -> Layout
+where
+    I: Borrow<Layout>,
+{
+    let layout: &Layout = item.borrow();
+
+    let input_align = layout.align();
+    let max_align = align_of::<Fields>();
+    assert!(
+        input_align <= max_align,
+        "input alignment must be less than or equal to {max_align}, but got {input_align}",
+    );
+    layout.clone()
 }

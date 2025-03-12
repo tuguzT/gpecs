@@ -7,6 +7,5 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-gpecs_utils = { workspace = true }
 gpecs_sparse = { workspace = true }
 as-any = { workspace = true }

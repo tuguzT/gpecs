@@ -27,27 +27,12 @@ pub unsafe trait Soa: Sized {
     /// Collection of layouts for each field.
     ///
     /// Safety requirements:
+    /// - order of layouts should resemble their order inside of a buffer in memory
     /// - sum of layouts' sizes should be less or equal to the size of [`Fields`](`Soa::Fields`)
     /// - alignment of each layout should be less or equal to the alignment of [`Fields`](`Soa::Fields`)
     type FieldLayouts<'a>: IntoIterator<Item: Borrow<Layout>>;
 
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_>;
-
-    fn field_permutation(context: &Self::Context) -> impl IntoIterator<Item = usize> {
-        let Ok((_, offsets)) = Self::buffer_layout(context, 1) else {
-            return Self::field_layouts(context)
-                .into_iter()
-                .enumerate()
-                .map(|(index, _)| index)
-                .collect();
-        };
-        let offsets: Box<[_]> = offsets.into_iter().collect();
-
-        let mut permutation: Box<[_]> = (0..offsets.len()).collect();
-        permutation.sort_by_key(|&index| offsets[index]);
-
-        permutation
-    }
 
     /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
     /// Also returns offsets of each field in the buffer (in bytes).
@@ -110,19 +95,23 @@ pub unsafe trait Soa: Sized {
 
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs;
 
+    /// Order of erased pointers should resemble the order of fields inside of a buffer in memory.
     fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs)
         -> impl IntoIterator<Item = *const u8>;
 
+    /// Order of erased pointers should resemble the order of fields inside of a buffer in memory.
     fn ptrs_erase_mut(
         context: &Self::Context,
         ptrs: Self::MutPtrs,
     ) -> impl IntoIterator<Item = *mut u8>;
 
+    /// Order of input pointers should resemble the order of fields inside of a buffer in memory.
     fn ptrs_restore(
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs;
 
+    /// Order of input pointers should resemble the order of fields inside of a buffer in memory.
     fn ptrs_restore_mut(
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *mut u8>,
@@ -355,11 +344,6 @@ unsafe impl Soa for () {
     #[inline(always)]
     fn field_layouts(_: &Self::Context) -> Self::FieldLayouts<'_> {
         [Layout::new::<Self>()]
-    }
-
-    #[inline(always)]
-    fn field_permutation(_: &Self::Context) -> impl IntoIterator<Item = usize> {
-        [0]
     }
 
     #[inline(always)]
@@ -758,11 +742,12 @@ macro_rules! count_idents {
     };
 }
 
-struct SoaTupleHelper<T>(PhantomData<T>);
+#[doc(hidden)]
+pub struct SoaTupleImplHelper<T>(PhantomData<T>);
 
 const fn layout_permutation<const N: usize>(
-    mut permutation: [usize; N],
     layouts: [Layout; N],
+    mut permutation: [usize; N],
 ) -> [usize; N] {
     let mut i = 1;
     while i < N {
@@ -780,13 +765,16 @@ const fn layout_permutation<const N: usize>(
 
 macro_rules! soa_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
-        impl<$($types,)*> SoaTupleHelper<($($types,)*)> {
-            const LAYOUTS: [Layout; count_idents!($($types,)*)] = [
-                $(Layout::new::<$types>(),)*
-            ];
-            const PERMUTATION: [usize; count_idents!($($types,)*)] = {
+        impl<$($types,)*> SoaTupleImplHelper<($($types,)*)> {
+            pub const PERMUTATION: [usize; count_idents!($($types,)*)] = {
+                let layouts = [$(Layout::new::<$types>(),)*];
                 let permutation = [$($indices,)*];
-                layout_permutation(permutation, Self::LAYOUTS)
+                layout_permutation(layouts, permutation)
+            };
+            pub const FIELD_LAYOUTS: [Layout; count_idents!($($types,)*)] = {
+                let layouts = [$(Layout::new::<$types>(),)*];
+                let permutation = Self::PERMUTATION;
+                [$(layouts[permutation[$indices]],)*]
             };
         }
 
@@ -797,12 +785,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline(always)]
             fn field_layouts(_: &Self::Context) -> Self::FieldLayouts<'_> {
-                SoaTupleHelper::<($($types,)*)>::LAYOUTS
-            }
-
-            #[inline(always)]
-            fn field_permutation(_: &Self::Context) -> impl IntoIterator<Item = usize> {
-                SoaTupleHelper::<($($types,)*)>::PERMUTATION
+                SoaTupleImplHelper::<($($types,)*)>::FIELD_LAYOUTS
             }
 
             #[inline(always)]
@@ -811,7 +794,7 @@ macro_rules! soa_tuple_impl {
                 capacity: usize,
             ) -> Result<(Layout, impl IntoIterator<Item = usize>), LayoutError> {
                 let layouts = [$(Layout::array::<$types>(capacity)?,)*];
-                let permutation = SoaTupleHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
                 let mut offsets: [usize; count_idents!($($types,)*)] = Default::default();
 
                 let layout = Layout::new::<()>();
@@ -844,24 +827,34 @@ macro_rules! soa_tuple_impl {
 
             #[inline(always)]
             fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> impl IntoIterator<Item = *const u8> {
-                [$(ptrs.$indices.cast(),)*]
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+
+                let erased: [*const u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
+                [$(erased[permutation[$indices]],)*]
             }
 
             #[inline(always)]
             fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> impl IntoIterator<Item = *mut u8> {
-                [$(ptrs.$indices.cast(),)*]
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+
+                let erased: [*mut u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
+                [$(erased[permutation[$indices]],)*]
             }
 
             #[inline(always)]
             fn ptrs_restore(_: &Self::Context, ptrs: impl IntoIterator<Item = *const u8>) -> Self::Ptrs {
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+
                 let ptrs: [*const u8; count_idents!($($types,)*)] = collect_array(ptrs);
-                ($(ptrs[$indices].cast(),)*)
+                ($(ptrs[permutation[$indices]].cast(),)*)
             }
 
             #[inline(always)]
             fn ptrs_restore_mut(_: &Self::Context, ptrs: impl IntoIterator<Item = *mut u8>) -> Self::MutPtrs {
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+
                 let ptrs: [*mut u8; count_idents!($($types,)*)] = collect_array(ptrs);
-                ($(ptrs[$indices].cast(),)*)
+                ($(ptrs[permutation[$indices]].cast(),)*)
             }
 
             #[inline(always)]
@@ -920,7 +913,7 @@ macro_rules! soa_tuple_impl {
                 a: Self::MutPtrs,
                 b: Self::MutPtrs,
             ) {
-                let permutation = SoaTupleHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::swap(a.$indices, b.$indices); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -937,7 +930,7 @@ macro_rules! soa_tuple_impl {
                 dst: Self::MutPtrs,
                 len: usize,
             ) {
-                let permutation = SoaTupleHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -954,7 +947,7 @@ macro_rules! soa_tuple_impl {
                 dst: Self::MutPtrs,
                 len: usize,
             ) {
-                let permutation = SoaTupleHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len); },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];

@@ -195,7 +195,7 @@ where
     #[track_caller]
     pub fn copy_from_slice(&mut self, src: &SoaSlice<T>)
     where
-        T: Copy,
+        T::Fields: Copy,
     {
         let src = src.slices();
         self.slices_mut().copy_from_slices(src);

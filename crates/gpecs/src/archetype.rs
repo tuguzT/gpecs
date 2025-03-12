@@ -6,8 +6,10 @@ use std::{
 };
 
 use as_any::AsAny;
-use gpecs_sparse::{set::EpochSparseSet, soa::erased::ErasedSoaRefsMut};
-use gpecs_utils::permutation::apply as apply_permutation;
+use gpecs_sparse::{
+    set::EpochSparseSet,
+    soa::{erased::ErasedSoaRefsMut, traits::SoaTupleImplHelper},
+};
 
 use crate::{
     component::{ComponentId, ComponentRegistry},
@@ -269,7 +271,7 @@ where
     T: Archetype,
 {
     let len = fields.len();
-    let mut fields: Box<[_]> = T::component_ids(components)
+    let fields: Box<[_]> = T::component_ids(components)
         .into_iter()
         .map(|id| {
             fields
@@ -278,9 +280,6 @@ where
         })
         .collect();
     assert_eq!(fields.len(), len);
-
-    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-    apply_permutation(&mut permutation, &mut fields);
 
     let erased_context = ErasedSoaContext::<T::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
@@ -302,13 +301,10 @@ fn into_erased_fields<T>(
 where
     T: Archetype,
 {
-    let mut field_metadata: Box<[(Layout, ComponentId)]> =
+    let field_metadata: Box<[(Layout, ComponentId)]> =
         iter::zip(T::field_layouts(context), T::component_ids(components))
             .map(|(item, component_id)| (item.borrow().clone(), component_id))
             .collect();
-
-    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-    apply_permutation(&mut permutation, &mut field_metadata);
 
     let erased_context = ErasedSoaContext::<T::Fields>::new(
         field_metadata.iter().map(|(field_layout, _)| field_layout),
@@ -332,7 +328,7 @@ where
     T: Archetype,
 {
     let len = fields.len();
-    let mut fields: Box<[_]> = T::component_ids(components)
+    let fields: Box<[_]> = T::component_ids(components)
         .into_iter()
         .map(|id| {
             fields
@@ -341,9 +337,6 @@ where
         })
         .collect();
     assert_eq!(fields.len(), len);
-
-    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-    apply_permutation(&mut permutation, &mut fields);
 
     let erased_context = ErasedSoaContext::<T::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
@@ -368,10 +361,7 @@ fn into_erased_field_refs<'a, T>(
 where
     T: Archetype,
 {
-    let mut component_ids: Box<[ComponentId]> = T::component_ids(components).into_iter().collect();
-
-    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-    apply_permutation(&mut permutation, &mut component_ids);
+    let component_ids: Box<[ComponentId]> = T::component_ids(components).into_iter().collect();
 
     let erased_refs = ErasedSoaRefs::from::<T>(context, refs);
     assert_eq!(component_ids.len(), erased_refs.as_ref().len());
@@ -390,7 +380,7 @@ where
     T: Archetype,
 {
     let len = fields.len();
-    let mut fields: Box<[_]> = T::component_ids(components)
+    let fields: Box<[_]> = T::component_ids(components)
         .into_iter()
         .map(|id| {
             fields
@@ -399,9 +389,6 @@ where
         })
         .collect();
     assert_eq!(fields.len(), len);
-
-    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-    apply_permutation(&mut permutation, &mut fields);
 
     let erased_context = ErasedSoaContext::<T::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
@@ -426,10 +413,7 @@ fn into_erased_field_refs_mut<'a, T>(
 where
     T: Archetype,
 {
-    let mut component_ids: Box<[ComponentId]> = T::component_ids(components).into_iter().collect();
-
-    let mut permutation: Box<[_]> = T::field_permutation(context).into_iter().collect();
-    apply_permutation(&mut permutation, &mut component_ids);
+    let component_ids: Box<[ComponentId]> = T::component_ids(components).into_iter().collect();
 
     let erased_refs = ErasedSoaRefsMut::from::<T>(context, refs);
     assert_eq!(component_ids.len(), erased_refs.as_ref().len());
@@ -450,7 +434,10 @@ where
     A: Component,
 {
     fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        [components.register_component::<A>()]
+        let permutation = SoaTupleImplHelper::<(A,)>::PERMUTATION;
+
+        let component_ids = [components.register_component::<A>()];
+        [component_ids[permutation[0]]]
     }
 }
 
@@ -461,10 +448,13 @@ where
     B: Component,
 {
     fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        [
+        let permutation = SoaTupleImplHelper::<(A, B)>::PERMUTATION;
+
+        let component_ids = [
             components.register_component::<A>(),
             components.register_component::<B>(),
-        ]
+        ];
+        [component_ids[permutation[0]], component_ids[permutation[1]]]
     }
 }
 
@@ -476,10 +466,17 @@ where
     C: Component,
 {
     fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        [
+        let permutation = SoaTupleImplHelper::<(A, B, C)>::PERMUTATION;
+
+        let component_ids = [
             components.register_component::<A>(),
             components.register_component::<B>(),
             components.register_component::<C>(),
+        ];
+        [
+            component_ids[permutation[0]],
+            component_ids[permutation[1]],
+            component_ids[permutation[2]],
         ]
     }
 }
@@ -526,7 +523,7 @@ mod tests {
 
     #[derive(Debug, PartialEq, Clone, Copy)]
     struct Mass {
-        value: f32,
+        value: u16,
     }
 
     impl Component for Position {}
@@ -546,7 +543,7 @@ mod tests {
             y: 2.0,
             z: 3.0,
         };
-        let mass = Mass { value: 4.0 };
+        let mass = Mass { value: 4 };
         let value = storage
             .insert::<(Mass, Position)>(&mut components, &(), entity, (mass, position))
             .expect("archetype storage should store unit");

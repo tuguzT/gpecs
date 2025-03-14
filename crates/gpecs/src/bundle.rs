@@ -1,5 +1,4 @@
 use std::{
-    convert::Infallible,
     error::Error,
     fmt::{self, Display},
     result,
@@ -37,21 +36,14 @@ impl DuplicateComponentError {
 
     #[inline]
     pub fn component_id(&self) -> ComponentId {
-        let Self { component_id, .. } = *self;
+        let Self { component_id } = *self;
         component_id
-    }
-}
-
-impl From<Infallible> for DuplicateComponentError {
-    #[inline]
-    fn from(value: Infallible) -> Self {
-        match value {}
     }
 }
 
 impl Display for DuplicateComponentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { component_id, .. } = *self;
+        let Self { component_id } = *self;
         write!(f, "duplicate component {component_id:?} were found")
     }
 }

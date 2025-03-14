@@ -5,9 +5,7 @@ use std::{
     collections::HashMap,
 };
 
-pub trait Component: 'static {}
-
-impl Component for () {}
+use super::Component;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]

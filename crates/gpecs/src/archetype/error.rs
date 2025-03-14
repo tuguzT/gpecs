@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     bundle::{Bundle, DuplicateComponentError},
-    component::ComponentId,
+    component::registry::ComponentId,
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]

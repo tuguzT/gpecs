@@ -5,7 +5,10 @@ use std::{
 };
 
 use crate::{
-    component::{Component, ComponentId, ComponentRegistry},
+    component::{
+        registry::{ComponentId, ComponentRegistry},
+        Component,
+    },
     soa::traits::Soa,
 };
 

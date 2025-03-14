@@ -1,6 +1,5 @@
 use std::{
     alloc::Layout,
-    borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
     iter,
 };
@@ -28,7 +27,10 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let component_ids = B::component_ids(components).into_iter().collect();
+        let component_ids = B::component_ids(components)
+            .expect("components of the bundle should be unique")
+            .into_iter()
+            .collect();
         let storage = SparseSet::<B>::with_context(context);
         Self {
             component_ids,
@@ -57,7 +59,10 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = B::component_ids(components).into_iter().collect();
+        let target_component_ids: BTreeSet<_> = B::component_ids(components)
+            .expect("components of the bundle should be unique")
+            .into_iter()
+            .collect();
         if target_component_ids != *component_ids {
             return Err(());
         }
@@ -84,7 +89,10 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = B::component_ids(components).into_iter().collect();
+        let target_component_ids: BTreeSet<_> = B::component_ids(components)
+            .expect("components of the bundle should be unique")
+            .into_iter()
+            .collect();
         if target_component_ids != *component_ids {
             return Err(());
         }
@@ -112,7 +120,10 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = B::component_ids(components).into_iter().collect();
+        let target_component_ids: BTreeSet<_> = B::component_ids(components)
+            .expect("components of the bundle should be unique")
+            .into_iter()
+            .collect();
         if target_component_ids != *component_ids {
             return Err(value);
         }
@@ -140,7 +151,10 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = B::component_ids(components).into_iter().collect();
+        let target_component_ids: BTreeSet<_> = B::component_ids(components)
+            .expect("components of the bundle should be unique")
+            .into_iter()
+            .collect();
         if target_component_ids != *component_ids {
             return Err(());
         }
@@ -260,6 +274,7 @@ where
 {
     let len = fields.len();
     let fields: Box<[_]> = B::component_ids(components)
+        .expect("components of the bundle should be unique")
         .into_iter()
         .map(|id| {
             fields
@@ -289,19 +304,15 @@ fn into_erased_fields<B>(
 where
     B: Bundle,
 {
-    let field_metadata: Box<[(Layout, ComponentId)]> =
-        iter::zip(B::field_layouts(context), B::component_ids(components))
-            .map(|(item, component_id)| (item.borrow().clone(), component_id))
-            .collect();
+    let component_ids = B::component_ids(components)
+        .expect("components of the bundle should be unique")
+        .into_iter();
 
-    let erased_context = ErasedSoaContext::<B::Fields>::new(
-        field_metadata.iter().map(|(field_layout, _)| field_layout),
-        None,
-    );
+    let erased_context = ErasedSoaContext::<B::Fields>::new(B::field_layouts(context), None);
     let erased_value = ErasedSoa::from(context, value);
 
-    iter::zip(field_metadata, erased_value.into_fields(&erased_context))
-        .map(|((_, component_id), field)| (component_id, field))
+    component_ids
+        .zip(erased_value.into_fields(&erased_context))
         .collect()
 }
 
@@ -317,6 +328,7 @@ where
 {
     let len = fields.len();
     let fields: Box<[_]> = B::component_ids(components)
+        .expect("components of the bundle should be unique")
         .into_iter()
         .map(|id| {
             fields
@@ -349,7 +361,10 @@ fn into_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let component_ids: Box<[ComponentId]> = B::component_ids(components).into_iter().collect();
+    let component_ids: Box<[ComponentId]> = B::component_ids(components)
+        .expect("components of the bundle should be unique")
+        .into_iter()
+        .collect();
 
     let erased_refs = ErasedSoaRefs::from::<B>(context, refs);
     assert_eq!(component_ids.len(), erased_refs.as_ref().len());
@@ -369,6 +384,7 @@ where
 {
     let len = fields.len();
     let fields: Box<[_]> = B::component_ids(components)
+        .expect("components of the bundle should be unique")
         .into_iter()
         .map(|id| {
             fields
@@ -401,7 +417,10 @@ fn into_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let component_ids: Box<[ComponentId]> = B::component_ids(components).into_iter().collect();
+    let component_ids: Box<[ComponentId]> = B::component_ids(components)
+        .expect("components of the bundle should be unique")
+        .into_iter()
+        .collect();
 
     let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs);
     assert_eq!(component_ids.len(), erased_refs.as_ref().len());
@@ -456,6 +475,14 @@ mod tests {
 
     impl Component for Position {}
     impl Component for Mass {}
+
+    #[test]
+    #[should_panic]
+    fn tuple_archetype_duplicate() {
+        let mut components = ComponentRegistry::new();
+        let storage = ArchetypeStorage::of::<(Position, Position)>(&mut components, ());
+        assert_eq!(storage.entities(), []);
+    }
 
     #[test]
     fn tuple_archetype() {

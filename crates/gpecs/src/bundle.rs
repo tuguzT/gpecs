@@ -1,18 +1,86 @@
-use gpecs_sparse::soa::Soa;
+use std::{
+    convert::Infallible,
+    error::Error,
+    fmt::{self, Display},
+    result,
+};
 
-use crate::component::{Component, ComponentId, ComponentRegistry};
+use crate::{
+    component::{Component, ComponentId, ComponentRegistry},
+    soa::traits::Soa,
+};
+
+pub type Result<T> = result::Result<T, DuplicateComponentError>;
 
 #[allow(unsafe_code)]
 pub unsafe trait Bundle: Soa + 'static {
-    // order of component ids should be the same as the order of layouts returned by `field_layouts` method
-    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId>;
+    type ComponentIds: IntoIterator<Item = ComponentId>;
+
+    /// Order of component identifiers should be the same as
+    /// the order of layouts returned by [`Soa::field_layouts()`] method.
+    fn component_ids(components: &mut ComponentRegistry) -> Result<Self::ComponentIds>;
 }
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub struct DuplicateComponentError {
+    component_id: ComponentId,
+}
+
+impl DuplicateComponentError {
+    #[inline]
+    pub fn new(component_id: ComponentId) -> Self {
+        Self { component_id }
+    }
+
+    #[inline]
+    pub fn component_id(&self) -> ComponentId {
+        let Self { component_id, .. } = *self;
+        component_id
+    }
+}
+
+impl From<Infallible> for DuplicateComponentError {
+    #[inline]
+    fn from(value: Infallible) -> Self {
+        match value {}
+    }
+}
+
+impl Display for DuplicateComponentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { component_id, .. } = *self;
+        write!(f, "duplicate component {component_id:?} were found")
+    }
+}
+
+impl Error for DuplicateComponentError {}
 
 #[allow(unsafe_code)]
 unsafe impl Bundle for () {
-    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        [components.register_component::<Self>()]
+    type ComponentIds = [ComponentId; 1];
+
+    #[inline]
+    fn component_ids(components: &mut ComponentRegistry) -> Result<Self::ComponentIds> {
+        let component_ids = [components.register_component::<Self>()];
+        Ok(component_ids)
     }
+}
+
+#[inline]
+fn find_first_duplicate<const N: usize>(
+    mut component_ids: [ComponentId; N],
+) -> Option<ComponentId> {
+    component_ids.sort_unstable();
+
+    for pair in component_ids.windows(2) {
+        let [first, second] = pair else {
+            unreachable!("should contain exactly two elements")
+        };
+        if first == second {
+            return Some(*first);
+        }
+    }
+    None
 }
 
 macro_rules! bundle_tuple_impl {
@@ -22,11 +90,18 @@ macro_rules! bundle_tuple_impl {
         where
             $($types: Component,)*
         {
-            fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-                let permutation = $crate::soa::traits::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+            type ComponentIds = [ComponentId; $crate::soa::traits::count_idents!($($types,)*)];
 
+            #[inline]
+            fn component_ids(components: &mut ComponentRegistry) -> Result<Self::ComponentIds> {
                 let component_ids = [$(components.register_component::<$types>(),)*];
-                [$(component_ids[permutation[$indices]],)*]
+                if let Some(component_id) = find_first_duplicate(component_ids) {
+                    return Err(DuplicateComponentError::new(component_id));
+                }
+
+                let permutation = $crate::soa::traits::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+                let component_ids = [$(component_ids[permutation[$indices]],)*];
+                Ok(component_ids)
             }
         }
     };

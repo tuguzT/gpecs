@@ -726,6 +726,8 @@ fn collect_array<T, const N: usize>(iter: impl IntoIterator<Item = T>) -> [T; N]
 }
 
 // https://veykril.github.io/tlborm/decl-macros/building-blocks/counting.html#enum-counting
+#[macro_export]
+#[doc(hidden)]
 macro_rules! count_idents {
     ($($idents:ident),* $(,)*) => {
         {
@@ -738,6 +740,9 @@ macro_rules! count_idents {
         }
     };
 }
+
+#[doc(hidden)]
+pub use count_idents;
 
 #[doc(hidden)]
 pub struct SoaTupleImplHelper<T>(PhantomData<T>);

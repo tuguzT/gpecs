@@ -79,6 +79,13 @@ impl Error for IncompatibleBundleError {
 #[non_exhaustive]
 pub struct TooFewComponentsError;
 
+impl TooFewComponentsError {
+    #[inline]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 impl Display for TooFewComponentsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "too few components in this bundle")

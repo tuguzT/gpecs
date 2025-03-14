@@ -18,7 +18,10 @@ pub unsafe trait Bundle: Soa + 'static {
 
     /// Order of component identifiers should be the same as
     /// the order of layouts returned by [`Soa::field_layouts()`] method.
-    fn component_ids(components: &mut ComponentRegistry) -> Result<Self::ComponentIds>;
+    fn component_ids(
+        context: &Self::Context,
+        components: &mut ComponentRegistry,
+    ) -> Result<Self::ComponentIds>;
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -60,7 +63,10 @@ unsafe impl Bundle for () {
     type ComponentIds = [ComponentId; 1];
 
     #[inline]
-    fn component_ids(components: &mut ComponentRegistry) -> Result<Self::ComponentIds> {
+    fn component_ids(
+        _: &Self::Context,
+        components: &mut ComponentRegistry,
+    ) -> Result<Self::ComponentIds> {
         let component_ids = [components.register_component::<Self>()];
         Ok(component_ids)
     }
@@ -93,7 +99,10 @@ macro_rules! bundle_tuple_impl {
             type ComponentIds = [ComponentId; $crate::soa::traits::count_idents!($($types,)*)];
 
             #[inline]
-            fn component_ids(components: &mut ComponentRegistry) -> Result<Self::ComponentIds> {
+            fn component_ids(
+                _: &Self::Context,
+                components: &mut ComponentRegistry,
+            ) -> Result<Self::ComponentIds> {
                 let component_ids = [$(components.register_component::<$types>(),)*];
                 if let Some(component_id) = find_first_duplicate(component_ids) {
                     return Err(DuplicateComponentError::new(component_id));

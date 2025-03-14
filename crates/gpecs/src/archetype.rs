@@ -3,6 +3,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug},
     iter,
+    ops::Not,
 };
 
 use as_any::AsAny;
@@ -31,7 +32,9 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let component_ids = B::component_ids(components)?.into_iter().collect();
+        let component_ids = B::component_ids(&context, components)?
+            .into_iter()
+            .collect();
         let storage = SparseSet::<B>::with_context(context);
 
         let this = Self {
@@ -62,11 +65,20 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = B::component_ids(components)
+        let mut target_component_ids_count = 0;
+        let mut target_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique")
             .into_iter()
-            .collect();
-        if target_component_ids != *component_ids {
+            .inspect(|_| target_component_ids_count += 1);
+        if target_component_ids
+            .all(|id| component_ids.contains(&id))
+            .not()
+        {
+            return Err(());
+        }
+
+        target_component_ids.for_each(drop);
+        if target_component_ids_count != component_ids.len() {
             return Err(());
         }
 
@@ -92,11 +104,20 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = B::component_ids(components)
+        let mut target_component_ids_count = 0;
+        let mut target_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique")
             .into_iter()
-            .collect();
-        if target_component_ids != *component_ids {
+            .inspect(|_| target_component_ids_count += 1);
+        if target_component_ids
+            .all(|id| component_ids.contains(&id))
+            .not()
+        {
+            return Err(());
+        }
+
+        target_component_ids.for_each(drop);
+        if target_component_ids_count != component_ids.len() {
             return Err(());
         }
 
@@ -123,11 +144,20 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = B::component_ids(components)
+        let mut target_component_ids_count = 0;
+        let mut target_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique")
             .into_iter()
-            .collect();
-        if target_component_ids != *component_ids {
+            .inspect(|_| target_component_ids_count += 1);
+        if target_component_ids
+            .all(|id| component_ids.contains(&id))
+            .not()
+        {
+            return Err(value);
+        }
+
+        target_component_ids.for_each(drop);
+        if target_component_ids_count != component_ids.len() {
             return Err(value);
         }
 
@@ -154,11 +184,20 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = B::component_ids(components)
+        let mut target_component_ids_count = 0;
+        let mut target_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique")
             .into_iter()
-            .collect();
-        if target_component_ids != *component_ids {
+            .inspect(|_| target_component_ids_count += 1);
+        if target_component_ids
+            .all(|id| component_ids.contains(&id))
+            .not()
+        {
+            return Err(());
+        }
+
+        target_component_ids.for_each(drop);
+        if target_component_ids_count != component_ids.len() {
             return Err(());
         }
 
@@ -286,7 +325,7 @@ where
     B: Bundle,
 {
     let len = fields.len();
-    let fields: Box<[_]> = B::component_ids(components)
+    let fields: Box<[_]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
         .map(|id| {
@@ -317,7 +356,7 @@ fn into_erased_fields<B>(
 where
     B: Bundle,
 {
-    let component_ids = B::component_ids(components)
+    let component_ids = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter();
 
@@ -340,7 +379,7 @@ where
     B: Bundle,
 {
     let len = fields.len();
-    let fields: Box<[_]> = B::component_ids(components)
+    let fields: Box<[_]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
         .map(|id| {
@@ -374,7 +413,7 @@ fn into_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let component_ids: Box<[ComponentId]> = B::component_ids(components)
+    let component_ids: Box<[ComponentId]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
         .collect();
@@ -396,7 +435,7 @@ where
     B: Bundle,
 {
     let len = fields.len();
-    let fields: Box<[_]> = B::component_ids(components)
+    let fields: Box<[_]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
         .map(|id| {
@@ -430,7 +469,7 @@ fn into_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let component_ids: Box<[ComponentId]> = B::component_ids(components)
+    let component_ids: Box<[ComponentId]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
         .collect();

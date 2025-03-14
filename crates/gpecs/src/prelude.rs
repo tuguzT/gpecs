@@ -1,5 +1,5 @@
 pub use crate::{
-    archetype::Archetype,
+    bundle::Bundle,
     component::{Component, ComponentId},
     entity::Entity,
 };

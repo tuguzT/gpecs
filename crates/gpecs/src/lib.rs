@@ -9,6 +9,7 @@
 pub use gpecs_sparse::soa;
 
 pub mod archetype;
+pub mod bundle;
 pub mod component;
 pub mod entity;
 pub mod prelude;

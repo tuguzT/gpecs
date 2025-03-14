@@ -6,26 +6,14 @@ use std::{
 };
 
 use as_any::AsAny;
-use gpecs_sparse::{
-    set::EpochSparseSet,
-    soa::{erased::ErasedSoaRefsMut, traits::SoaTupleImplHelper},
-};
+use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
+    bundle::Bundle,
     component::{ComponentId, ComponentRegistry},
     entity::Entity,
-    prelude::Component,
-    soa::{
-        erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefs},
-        traits::Soa,
-    },
+    soa::erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaRefsMut},
 };
-
-#[allow(unsafe_code)]
-pub unsafe trait Archetype: Soa + 'static {
-    // order of component ids should be the same as the order of layouts returned by `field_layouts` method
-    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId>;
-}
 
 pub struct ArchetypeStorage {
     component_ids: BTreeSet<ComponentId>,
@@ -36,12 +24,12 @@ type SparseSet<V> = EpochSparseSet<Entity, V>;
 
 impl ArchetypeStorage {
     #[inline]
-    pub fn of<T>(components: &mut ComponentRegistry, context: T::Context) -> Self
+    pub fn of<B>(components: &mut ComponentRegistry, context: B::Context) -> Self
     where
-        T: Archetype,
+        B: Bundle,
     {
-        let component_ids = T::component_ids(components).into_iter().collect();
-        let storage = SparseSet::<T>::with_context(context);
+        let component_ids = B::component_ids(components).into_iter().collect();
+        let storage = SparseSet::<B>::with_context(context);
         Self {
             component_ids,
             erased_storage: Box::new(storage),
@@ -55,21 +43,21 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn get<T>(
+    pub fn get<B>(
         &self,
         components: &mut ComponentRegistry,
-        context: &T::Context,
+        context: &B::Context,
         entity: Entity,
-    ) -> Result<Option<T::Refs<'_>>, ()>
+    ) -> Result<Option<B::Refs<'_>>, ()>
     where
-        T: Archetype,
+        B: Bundle,
     {
         let Self {
             component_ids,
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = T::component_ids(components).into_iter().collect();
+        let target_component_ids: BTreeSet<_> = B::component_ids(components).into_iter().collect();
         if target_component_ids != *component_ids {
             return Err(());
         }
@@ -77,26 +65,26 @@ impl ArchetypeStorage {
         let Some(fields) = erased_storage.get(components, entity) else {
             return Ok(None);
         };
-        let refs = from_erased_field_refs::<T>(components, context, fields);
+        let refs = from_erased_field_refs::<B>(components, context, fields);
         Ok(Some(refs))
     }
 
     #[inline]
-    pub fn get_mut<T>(
+    pub fn get_mut<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &T::Context,
+        context: &B::Context,
         entity: Entity,
-    ) -> Result<Option<T::RefsMut<'_>>, ()>
+    ) -> Result<Option<B::RefsMut<'_>>, ()>
     where
-        T: Archetype,
+        B: Bundle,
     {
         let Self {
             component_ids,
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = T::component_ids(components).into_iter().collect();
+        let target_component_ids: BTreeSet<_> = B::component_ids(components).into_iter().collect();
         if target_component_ids != *component_ids {
             return Err(());
         }
@@ -104,55 +92,55 @@ impl ArchetypeStorage {
         let Some(fields) = erased_storage.get_mut(components, entity) else {
             return Ok(None);
         };
-        let refs = from_erased_field_refs_mut::<T>(components, context, fields);
+        let refs = from_erased_field_refs_mut::<B>(components, context, fields);
         Ok(Some(refs))
     }
 
     #[inline]
-    pub fn insert<T>(
+    pub fn insert<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &T::Context,
+        context: &B::Context,
         entity: Entity,
-        value: T,
-    ) -> Result<Option<T>, T>
+        value: B,
+    ) -> Result<Option<B>, B>
     where
-        T: Archetype,
+        B: Bundle,
     {
         let Self {
             component_ids,
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = T::component_ids(components).into_iter().collect();
+        let target_component_ids: BTreeSet<_> = B::component_ids(components).into_iter().collect();
         if target_component_ids != *component_ids {
             return Err(value);
         }
 
-        let fields = into_erased_fields::<T>(components, context, value);
+        let fields = into_erased_fields::<B>(components, context, value);
         let Some(fields) = erased_storage.insert(components, entity, fields) else {
             return Ok(None);
         };
-        let value = from_erased_fields::<T>(components, context, fields);
+        let value = from_erased_fields::<B>(components, context, fields);
         Ok(Some(value))
     }
 
     #[inline]
-    pub fn remove<T>(
+    pub fn remove<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &T::Context,
+        context: &B::Context,
         entity: Entity,
-    ) -> Result<Option<T>, ()>
+    ) -> Result<Option<B>, ()>
     where
-        T: Archetype,
+        B: Bundle,
     {
         let Self {
             component_ids,
             erased_storage,
         } = self;
 
-        let target_component_ids: BTreeSet<_> = T::component_ids(components).into_iter().collect();
+        let target_component_ids: BTreeSet<_> = B::component_ids(components).into_iter().collect();
         if target_component_ids != *component_ids {
             return Err(());
         }
@@ -160,7 +148,7 @@ impl ArchetypeStorage {
         let Some(fields) = erased_storage.remove(components, entity) else {
             return Ok(None);
         };
-        let value = from_erased_fields::<T>(components, context, fields);
+        let value = from_erased_fields::<B>(components, context, fields);
         Ok(Some(value))
     }
 }
@@ -204,9 +192,9 @@ trait ErasedStorage: AsAny {
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>>;
 }
 
-impl<T> ErasedStorage for SparseSet<T>
+impl<B> ErasedStorage for SparseSet<B>
 where
-    T: Archetype,
+    B: Bundle,
 {
     #[inline]
     fn entities(&self) -> &[Entity] {
@@ -220,9 +208,9 @@ where
         entity: Entity,
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>> {
-        let value = from_erased_fields::<T>(components, self.context(), fields);
+        let value = from_erased_fields::<B>(components, self.context(), fields);
         let value = SparseSet::insert(self, entity, value)?;
-        let fields = into_erased_fields::<T>(components, self.context(), value);
+        let fields = into_erased_fields::<B>(components, self.context(), value);
         Some(fields)
     }
 
@@ -233,7 +221,7 @@ where
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
         let value = SparseSet::remove(self, entity)?;
-        let fields = into_erased_fields::<T>(components, self.context(), value);
+        let fields = into_erased_fields::<B>(components, self.context(), value);
         Some(fields)
     }
 
@@ -244,7 +232,7 @@ where
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
         let refs = SparseSet::get(self, entity)?;
-        let refs = into_erased_field_refs::<T>(components, self.context(), refs);
+        let refs = into_erased_field_refs::<B>(components, self.context(), refs);
         Some(refs)
     }
 
@@ -255,23 +243,23 @@ where
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {
         let (context, refs) = self.as_mut_view().into_get_mut_with_context(entity);
-        let refs = into_erased_field_refs_mut::<T>(components, context, refs?);
+        let refs = into_erased_field_refs_mut::<B>(components, context, refs?);
         Some(refs)
     }
 }
 
 #[allow(unsafe_code)]
 #[inline]
-fn from_erased_fields<T>(
+fn from_erased_fields<B>(
     components: &mut ComponentRegistry,
-    context: &T::Context,
+    context: &B::Context,
     mut fields: ErasedComponents<ErasedField>,
-) -> T
+) -> B
 where
-    T: Archetype,
+    B: Bundle,
 {
     let len = fields.len();
-    let fields: Box<[_]> = T::component_ids(components)
+    let fields: Box<[_]> = B::component_ids(components)
         .into_iter()
         .map(|id| {
             fields
@@ -281,32 +269,32 @@ where
         .collect();
     assert_eq!(fields.len(), len);
 
-    let erased_context = ErasedSoaContext::<T::Fields>::new(
+    let erased_context = ErasedSoaContext::<B::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
         None,
     );
-    let erased_value = ErasedSoa::<T::Fields>::new(
+    let erased_value = ErasedSoa::<B::Fields>::new(
         &erased_context,
         fields.iter().map(|(_, field)| field.as_ref()),
     );
-    unsafe { erased_value.into::<T>(context) }
+    unsafe { erased_value.into::<B>(context) }
 }
 
 #[inline]
-fn into_erased_fields<T>(
+fn into_erased_fields<B>(
     components: &mut ComponentRegistry,
-    context: &T::Context,
-    value: T,
+    context: &B::Context,
+    value: B,
 ) -> ErasedComponents<ErasedField>
 where
-    T: Archetype,
+    B: Bundle,
 {
     let field_metadata: Box<[(Layout, ComponentId)]> =
-        iter::zip(T::field_layouts(context), T::component_ids(components))
+        iter::zip(B::field_layouts(context), B::component_ids(components))
             .map(|(item, component_id)| (item.borrow().clone(), component_id))
             .collect();
 
-    let erased_context = ErasedSoaContext::<T::Fields>::new(
+    let erased_context = ErasedSoaContext::<B::Fields>::new(
         field_metadata.iter().map(|(field_layout, _)| field_layout),
         None,
     );
@@ -319,16 +307,16 @@ where
 
 #[allow(unsafe_code)]
 #[inline]
-fn from_erased_field_refs<'a, T>(
+fn from_erased_field_refs<'a, B>(
     components: &mut ComponentRegistry,
-    context: &T::Context,
+    context: &B::Context,
     mut fields: ErasedComponents<ErasedFieldRef<'a>>,
-) -> T::Refs<'a>
+) -> B::Refs<'a>
 where
-    T: Archetype,
+    B: Bundle,
 {
     let len = fields.len();
-    let fields: Box<[_]> = T::component_ids(components)
+    let fields: Box<[_]> = B::component_ids(components)
         .into_iter()
         .map(|id| {
             fields
@@ -338,32 +326,32 @@ where
         .collect();
     assert_eq!(fields.len(), len);
 
-    let erased_context = ErasedSoaContext::<T::Fields>::new(
+    let erased_context = ErasedSoaContext::<B::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
         None,
     );
-    let erased_refs = ErasedSoaRefs::<T::Fields>::new(
+    let erased_refs = ErasedSoaRefs::<B::Fields>::new(
         &erased_context,
         fields
             .into_vec()
             .into_iter()
             .map(|(_, field)| field.as_ref()),
     );
-    unsafe { erased_refs.into::<T>(context) }
+    unsafe { erased_refs.into::<B>(context) }
 }
 
 #[inline]
-fn into_erased_field_refs<'a, T>(
+fn into_erased_field_refs<'a, B>(
     components: &mut ComponentRegistry,
-    context: &T::Context,
-    refs: T::Refs<'a>,
+    context: &B::Context,
+    refs: B::Refs<'a>,
 ) -> ErasedComponents<ErasedFieldRef<'a>>
 where
-    T: Archetype,
+    B: Bundle,
 {
-    let component_ids: Box<[ComponentId]> = T::component_ids(components).into_iter().collect();
+    let component_ids: Box<[ComponentId]> = B::component_ids(components).into_iter().collect();
 
-    let erased_refs = ErasedSoaRefs::from::<T>(context, refs);
+    let erased_refs = ErasedSoaRefs::from::<B>(context, refs);
     assert_eq!(component_ids.len(), erased_refs.as_ref().len());
 
     iter::zip(component_ids, erased_refs).collect()
@@ -371,16 +359,16 @@ where
 
 #[allow(unsafe_code)]
 #[inline]
-fn from_erased_field_refs_mut<'a, T>(
+fn from_erased_field_refs_mut<'a, B>(
     components: &mut ComponentRegistry,
-    context: &T::Context,
+    context: &B::Context,
     mut fields: ErasedComponents<ErasedFieldRefMut<'a>>,
-) -> T::RefsMut<'a>
+) -> B::RefsMut<'a>
 where
-    T: Archetype,
+    B: Bundle,
 {
     let len = fields.len();
-    let fields: Box<[_]> = T::component_ids(components)
+    let fields: Box<[_]> = B::component_ids(components)
         .into_iter()
         .map(|id| {
             fields
@@ -390,178 +378,40 @@ where
         .collect();
     assert_eq!(fields.len(), len);
 
-    let erased_context = ErasedSoaContext::<T::Fields>::new(
+    let erased_context = ErasedSoaContext::<B::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
         None,
     );
-    let erased_refs = ErasedSoaRefsMut::<T::Fields>::new(
+    let erased_refs = ErasedSoaRefsMut::<B::Fields>::new(
         &erased_context,
         fields
             .into_vec()
             .into_iter()
             .map(|(_, field)| field.as_mut()),
     );
-    unsafe { erased_refs.into::<T>(context) }
+    unsafe { erased_refs.into::<B>(context) }
 }
 
 #[inline]
-fn into_erased_field_refs_mut<'a, T>(
+fn into_erased_field_refs_mut<'a, B>(
     components: &mut ComponentRegistry,
-    context: &T::Context,
-    refs: T::RefsMut<'a>,
+    context: &B::Context,
+    refs: B::RefsMut<'a>,
 ) -> ErasedComponents<ErasedFieldRefMut<'a>>
 where
-    T: Archetype,
+    B: Bundle,
 {
-    let component_ids: Box<[ComponentId]> = T::component_ids(components).into_iter().collect();
+    let component_ids: Box<[ComponentId]> = B::component_ids(components).into_iter().collect();
 
-    let erased_refs = ErasedSoaRefsMut::from::<T>(context, refs);
+    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs);
     assert_eq!(component_ids.len(), erased_refs.as_ref().len());
 
     iter::zip(component_ids, erased_refs).collect()
 }
 
-#[allow(unsafe_code)]
-unsafe impl Archetype for () {
-    fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-        [components.register_component::<Self>()]
-    }
-}
-
-macro_rules! archetype_tuple_impl {
-    ($($types:ident index $indices:tt),* $(,)?) => {
-        #[allow(unsafe_code)]
-        unsafe impl<$($types,)*> Archetype for ($($types,)*)
-        where
-            $($types: Component,)*
-        {
-            fn component_ids(components: &mut ComponentRegistry) -> impl IntoIterator<Item = ComponentId> {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
-
-                let component_ids = [$(components.register_component::<$types>(),)*];
-                [$(component_ids[permutation[$indices]],)*]
-            }
-        }
-    };
-}
-
-archetype_tuple_impl!(
-    A index 0,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-    E index 4,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-    E index 4,
-    F index 5,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-    E index 4,
-    F index 5,
-    G index 6,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-    E index 4,
-    F index 5,
-    G index 6,
-    H index 7,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-    E index 4,
-    F index 5,
-    G index 6,
-    H index 7,
-    I index 8,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-    E index 4,
-    F index 5,
-    G index 6,
-    H index 7,
-    I index 8,
-    J index 9,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-    E index 4,
-    F index 5,
-    G index 6,
-    H index 7,
-    I index 8,
-    J index 9,
-    K index 10,
-);
-
-archetype_tuple_impl!(
-    A index 0,
-    B index 1,
-    C index 2,
-    D index 3,
-    E index 4,
-    F index 5,
-    G index 6,
-    H index 7,
-    I index 8,
-    J index 9,
-    K index 10,
-    L index 11,
-);
-
 #[cfg(test)]
 mod tests {
-    use crate::entity::EntityRegistry;
+    use crate::{component::Component, entity::EntityRegistry};
 
     use super::*;
 

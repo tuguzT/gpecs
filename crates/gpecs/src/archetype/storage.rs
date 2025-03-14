@@ -452,7 +452,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{component::Component, entity::EntityRegistry};
+    use crate::{component::Component, entity::registry::EntityRegistry};
 
     use super::*;
 

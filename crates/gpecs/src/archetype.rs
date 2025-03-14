@@ -1,6 +1,7 @@
 use std::{
     alloc::Layout,
     collections::{BTreeMap, BTreeSet},
+    fmt::{self, Debug},
     iter,
 };
 
@@ -8,7 +9,7 @@ use as_any::AsAny;
 use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
-    bundle::Bundle,
+    bundle::{Bundle, DuplicateComponentError},
     component::{ComponentId, ComponentRegistry},
     entity::Entity,
     soa::erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaRefsMut},
@@ -23,19 +24,21 @@ type SparseSet<V> = EpochSparseSet<Entity, V>;
 
 impl ArchetypeStorage {
     #[inline]
-    pub fn of<B>(components: &mut ComponentRegistry, context: B::Context) -> Self
+    pub fn of<B>(
+        components: &mut ComponentRegistry,
+        context: B::Context,
+    ) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
     {
-        let component_ids = B::component_ids(components)
-            .expect("components of the bundle should be unique")
-            .into_iter()
-            .collect();
+        let component_ids = B::component_ids(components)?.into_iter().collect();
         let storage = SparseSet::<B>::with_context(context);
-        Self {
+
+        let this = Self {
             component_ids,
             erased_storage: Box::new(storage),
-        }
+        };
+        Ok(this)
     }
 
     #[inline]
@@ -164,6 +167,16 @@ impl ArchetypeStorage {
         };
         let value = from_erased_fields::<B>(components, context, fields);
         Ok(Some(value))
+    }
+}
+
+impl Debug for ArchetypeStorage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { component_ids, .. } = self;
+
+        f.debug_struct("ArchetypeStorage")
+            .field("component_ids", component_ids)
+            .finish_non_exhaustive()
     }
 }
 
@@ -437,7 +450,8 @@ mod tests {
     #[test]
     fn unit_archetype() {
         let mut components = ComponentRegistry::new();
-        let mut storage = ArchetypeStorage::of::<()>(&mut components, ());
+        let mut storage = ArchetypeStorage::of::<()>(&mut components, ())
+            .expect("creation of storage for empty archetype should succeed");
         assert_eq!(storage.entities(), []);
 
         let mut entities = EntityRegistry::new();
@@ -477,17 +491,18 @@ mod tests {
     impl Component for Mass {}
 
     #[test]
-    #[should_panic]
-    fn tuple_archetype_duplicate() {
-        let mut components = ComponentRegistry::new();
-        let storage = ArchetypeStorage::of::<(Position, Position)>(&mut components, ());
-        assert_eq!(storage.entities(), []);
-    }
-
-    #[test]
     fn tuple_archetype() {
         let mut components = ComponentRegistry::new();
-        let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components, ());
+
+        let error = ArchetypeStorage::of::<(Position, Position)>(&mut components, ())
+            .expect_err("creation of storage for archetype `(Position, Position)` should fail");
+        assert_eq!(
+            error.component_id(),
+            components.register_component::<Position>(),
+        );
+
+        let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components, ())
+            .expect("creation of storage for archetype `(Position, Mass)` should succeed");
         assert_eq!(storage.entities(), []);
 
         let mut entities = EntityRegistry::new();

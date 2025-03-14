@@ -448,7 +448,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn unit_archetype() {
+    fn storage_unit() {
         let mut components = ComponentRegistry::new();
         let mut storage = ArchetypeStorage::of::<()>(&mut components, ())
             .expect("creation of storage for empty archetype should succeed");
@@ -456,6 +456,7 @@ mod tests {
 
         let mut entities = EntityRegistry::new();
         let entity = entities.spawn();
+
         let value = storage
             .insert::<()>(&mut components, &(), entity, ())
             .expect("archetype storage should store unit");
@@ -491,44 +492,84 @@ mod tests {
     impl Component for Mass {}
 
     #[test]
-    fn tuple_archetype() {
+    fn storage_tuple() {
         let mut components = ComponentRegistry::new();
 
         let error = ArchetypeStorage::of::<(Position, Position)>(&mut components, ())
-            .expect_err("creation of storage for archetype `(Position, Position)` should fail");
+            .expect_err("creation of storage for bundle `(Position, Position)` should fail");
         assert_eq!(
             error.component_id(),
             components.register_component::<Position>(),
         );
 
         let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components, ())
-            .expect("creation of storage for archetype `(Position, Mass)` should succeed");
+            .expect("creation of storage for bundle `(Position, Mass)` should succeed");
         assert_eq!(storage.entities(), []);
 
         let mut entities = EntityRegistry::new();
         let entity = entities.spawn();
 
-        let position = Position {
+        let mut position = Position {
             x: 1.0,
             y: 2.0,
             z: 3.0,
         };
-        let mass = Mass { value: 4 };
+        let value = storage
+            .insert::<(Position,)>(&mut components, &(), entity, (position,))
+            .expect_err("insertion of just `Position` should fail (too few)");
+        assert_eq!(value, (position,));
+
+        let mut mass = Mass { value: 4 };
+        let value = storage
+            .insert::<(Position, Mass, ())>(&mut components, &(), entity, (position, mass, ()))
+            .expect_err("insertion of `Position`, `Mass` and `()` should fail (too many)");
+        assert_eq!(value, (position, mass, ()));
+
         let value = storage
             .insert::<(Mass, Position)>(&mut components, &(), entity, (mass, position))
-            .expect("archetype storage should store unit");
+            .expect("insertion of `Mass` and `Position` should succeed");
         assert_eq!(value, None);
         assert_eq!(storage.entities(), [entity]);
 
+        let _error = storage
+            .get::<(Position,)>(&mut components, &(), entity)
+            .expect_err("retrieval of just `Position` should fail (too few)");
+
+        let _error = storage
+            .get::<(Position, Mass, ())>(&mut components, &(), entity)
+            .expect_err("retrieval of `Position`, `Mass` and `()` should fail (too many)");
+
         let refs = storage
             .get::<(Mass, Position)>(&mut components, &(), entity)
-            .expect("components by given entity should exist");
+            .expect("retrieval of `Mass` and `Position` should succeed");
         assert_eq!(refs, Some((&mass, &position)));
         assert_eq!(storage.entities(), [entity]);
 
+        let _error = storage
+            .get_mut::<(Position,)>(&mut components, &(), entity)
+            .expect_err("retrieval of just `Position` should fail (too few)");
+
+        let _error = storage
+            .get_mut::<(Position, Mass, ())>(&mut components, &(), entity)
+            .expect_err("retrieval of `Position`, `Mass` and `()` should fail (too many)");
+
+        let refs_mut = storage
+            .get_mut::<(Mass, Position)>(&mut components, &(), entity)
+            .expect("retrieval of `Mass` and `Position` should succeed");
+        assert_eq!(refs_mut, Some((&mut mass, &mut position)));
+        assert_eq!(storage.entities(), [entity]);
+
+        let _error = storage
+            .remove::<(Position,)>(&mut components, &(), entity)
+            .expect_err("removal of just `Position` should fail (too few)");
+
+        let _error = storage
+            .remove::<(Position, Mass, ())>(&mut components, &(), entity)
+            .expect_err("removal of `Position`, `Mass` and `()` should fail (too many)");
+
         let value = storage
             .remove::<(Mass, Position)>(&mut components, &(), entity)
-            .expect("components by given entity should exist");
+            .expect("removal of `Mass` and `Position` should succeed");
         assert_eq!(value, Some((mass, position)));
         assert_eq!(storage.entities(), []);
     }

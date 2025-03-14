@@ -65,20 +65,13 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut target_component_ids_count = 0;
         let mut target_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique")
-            .into_iter()
-            .inspect(|_| target_component_ids_count += 1);
+            .into_iter();
         if target_component_ids
             .all(|id| component_ids.contains(&id))
             .not()
         {
-            return Err(());
-        }
-
-        target_component_ids.for_each(drop);
-        if target_component_ids_count != component_ids.len() {
             return Err(());
         }
 
@@ -104,20 +97,13 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut target_component_ids_count = 0;
         let mut target_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique")
-            .into_iter()
-            .inspect(|_| target_component_ids_count += 1);
+            .into_iter();
         if target_component_ids
             .all(|id| component_ids.contains(&id))
             .not()
         {
-            return Err(());
-        }
-
-        target_component_ids.for_each(drop);
-        if target_component_ids_count != component_ids.len() {
             return Err(());
         }
 
@@ -378,7 +364,6 @@ fn from_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let len = fields.len();
     let fields: Box<[_]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
@@ -388,7 +373,6 @@ where
                 .expect("field with given component id should present")
         })
         .collect();
-    assert_eq!(fields.len(), len);
 
     let erased_context = ErasedSoaContext::<B::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
@@ -434,7 +418,6 @@ fn from_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let len = fields.len();
     let fields: Box<[_]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
@@ -444,7 +427,6 @@ where
                 .expect("field with given component id should present")
         })
         .collect();
-    assert_eq!(fields.len(), len);
 
     let erased_context = ErasedSoaContext::<B::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
@@ -570,9 +552,11 @@ mod tests {
         assert_eq!(value, None);
         assert_eq!(storage.entities(), [entity]);
 
-        let _error = storage
+        let refs = storage
             .get::<(Position,)>(&mut components, &(), entity)
-            .expect_err("retrieval of just `Position` should fail (too few)");
+            .expect("retrieval of just `Position` should succeed");
+        assert_eq!(refs, Some((&position,)));
+        assert_eq!(storage.entities(), [entity]);
 
         let _error = storage
             .get::<(Position, Mass, ())>(&mut components, &(), entity)
@@ -584,9 +568,11 @@ mod tests {
         assert_eq!(refs, Some((&mass, &position)));
         assert_eq!(storage.entities(), [entity]);
 
-        let _error = storage
+        let refs_mut = storage
             .get_mut::<(Position,)>(&mut components, &(), entity)
-            .expect_err("retrieval of just `Position` should fail (too few)");
+            .expect("retrieval of just `Position` should succeed");
+        assert_eq!(refs_mut, Some((&mut position,)));
+        assert_eq!(storage.entities(), [entity]);
 
         let _error = storage
             .get_mut::<(Position, Mass, ())>(&mut components, &(), entity)

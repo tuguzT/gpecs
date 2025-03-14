@@ -1,18 +1,11 @@
-use std::{
-    error::Error,
-    fmt::{self, Display},
-    result,
-};
-
 use crate::{
-    component::{
-        registry::{ComponentId, ComponentRegistry},
-        Component,
-    },
+    component::registry::{ComponentId, ComponentRegistry},
     soa::traits::Soa,
 };
 
-pub type Result<T> = result::Result<T, DuplicateComponentError>;
+use self::error::DuplicateComponentError;
+
+pub mod error;
 
 #[allow(unsafe_code)]
 pub unsafe trait Bundle: Soa + 'static {
@@ -23,35 +16,8 @@ pub unsafe trait Bundle: Soa + 'static {
     fn component_ids(
         context: &Self::Context,
         components: &mut ComponentRegistry,
-    ) -> Result<Self::ComponentIds>;
+    ) -> Result<Self::ComponentIds, DuplicateComponentError>;
 }
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct DuplicateComponentError {
-    component_id: ComponentId,
-}
-
-impl DuplicateComponentError {
-    #[inline]
-    pub fn new(component_id: ComponentId) -> Self {
-        Self { component_id }
-    }
-
-    #[inline]
-    pub fn component_id(&self) -> ComponentId {
-        let Self { component_id } = *self;
-        component_id
-    }
-}
-
-impl Display for DuplicateComponentError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { component_id } = *self;
-        write!(f, "duplicate component {component_id:?} were found")
-    }
-}
-
-impl Error for DuplicateComponentError {}
 
 #[allow(unsafe_code)]
 unsafe impl Bundle for () {
@@ -61,7 +27,7 @@ unsafe impl Bundle for () {
     fn component_ids(
         _: &Self::Context,
         components: &mut ComponentRegistry,
-    ) -> Result<Self::ComponentIds> {
+    ) -> Result<Self::ComponentIds, DuplicateComponentError> {
         let component_ids = [components.register_component::<Self>()];
         Ok(component_ids)
     }
@@ -89,7 +55,7 @@ macro_rules! bundle_tuple_impl {
         #[allow(unsafe_code)]
         unsafe impl<$($types,)*> Bundle for ($($types,)*)
         where
-            $($types: Component,)*
+            $($types: $crate::component::Component,)*
         {
             type ComponentIds = [ComponentId; $crate::soa::traits::count_idents!($($types,)*)];
 
@@ -97,7 +63,7 @@ macro_rules! bundle_tuple_impl {
             fn component_ids(
                 _: &Self::Context,
                 components: &mut ComponentRegistry,
-            ) -> Result<Self::ComponentIds> {
+            ) -> Result<Self::ComponentIds, DuplicateComponentError> {
                 let component_ids = [$(components.register_component::<$types>(),)*];
                 if let Some(component_id) = find_first_duplicate(component_ids) {
                     return Err(DuplicateComponentError::new(component_id));

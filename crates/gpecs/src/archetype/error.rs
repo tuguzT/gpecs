@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    bundle::{Bundle, DuplicateComponentError},
+    bundle::{error::DuplicateComponentError, Bundle},
     component::registry::ComponentId,
 };
 

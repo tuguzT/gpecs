@@ -8,7 +8,7 @@ use std::{
 use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
-    bundle::{Bundle, DuplicateComponentError},
+    bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
     soa::erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaRefsMut},

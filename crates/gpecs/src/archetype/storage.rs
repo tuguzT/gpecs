@@ -293,6 +293,16 @@ where
     }
 }
 
+fn validate_component<B>(components: &mut ComponentRegistry, id: ComponentId, layout: B)
+where
+    B: Borrow<Layout>,
+{
+    let info = components
+        .get_info(id)
+        .expect("component info should present");
+    assert_eq!(info.layout(), *layout.borrow());
+}
+
 #[allow(unsafe_code)]
 #[inline]
 fn from_erased_fields<B>(
@@ -308,13 +318,7 @@ where
         .into_iter()
         .zip(B::field_layouts(context))
         .map(|(id, layout)| {
-            assert_eq!(
-                components
-                    .get_info(id)
-                    .expect("component info should present")
-                    .layout(),
-                *layout.borrow(),
-            );
+            validate_component(components, id, layout);
             fields
                 .remove(&id)
                 .expect("field with given component id should present")
@@ -346,13 +350,7 @@ where
         .into_iter()
         .zip(B::field_layouts(context))
         .map(|(id, layout)| {
-            assert_eq!(
-                components
-                    .get_info(id)
-                    .expect("component info should present")
-                    .layout(),
-                *layout.borrow(),
-            );
+            validate_component(components, id, layout);
             id
         });
 
@@ -379,13 +377,7 @@ where
         .into_iter()
         .zip(B::field_layouts(context))
         .map(|(id, layout)| {
-            assert_eq!(
-                components
-                    .get_info(id)
-                    .expect("component info should present")
-                    .layout(),
-                *layout.borrow(),
-            );
+            validate_component(components, id, layout);
             fields
                 .remove(&id)
                 .expect("field with given component id should present")
@@ -420,13 +412,7 @@ where
         .into_iter()
         .zip(B::field_layouts(context))
         .map(|(id, layout)| {
-            assert_eq!(
-                components
-                    .get_info(id)
-                    .expect("component info should present")
-                    .layout(),
-                *layout.borrow(),
-            );
+            validate_component(components, id, layout);
             id
         });
 
@@ -449,13 +435,7 @@ where
         .into_iter()
         .zip(B::field_layouts(context))
         .map(|(id, layout)| {
-            assert_eq!(
-                components
-                    .get_info(id)
-                    .expect("component info should present")
-                    .layout(),
-                *layout.borrow(),
-            );
+            validate_component(components, id, layout);
             fields
                 .remove(&id)
                 .expect("field with given component id should present")
@@ -490,13 +470,7 @@ where
         .into_iter()
         .zip(B::field_layouts(context))
         .map(|(id, layout)| {
-            assert_eq!(
-                components
-                    .get_info(id)
-                    .expect("component info should present")
-                    .layout(),
-                *layout.borrow(),
-            );
+            validate_component(components, id, layout);
             id
         });
 

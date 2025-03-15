@@ -1,8 +1,8 @@
 use std::{
     alloc::Layout,
+    borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug},
-    iter,
 };
 
 use gpecs_sparse::set::EpochSparseSet;
@@ -124,10 +124,15 @@ impl ArchetypeStorage {
         } = self;
 
         let mut target_component_ids_count = 0;
-        let mut target_component_ids = B::component_ids(context, components)
-            .expect("components of the bundle should be unique")
-            .into_iter()
-            .inspect(|_| target_component_ids_count += 1);
+        let mut target_component_ids = match B::component_ids(context, components) {
+            Ok(target_component_ids) => target_component_ids
+                .into_iter()
+                .inspect(|_| target_component_ids_count += 1),
+            Err(error) => {
+                let reason = error.into();
+                return Err(IncompatibleBundleValueError { value, reason });
+            }
+        };
         if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(&id)) {
             let reason = ExclusiveComponentError { component_id }.into();
             return Err(IncompatibleBundleValueError { value, reason });
@@ -298,17 +303,23 @@ fn from_erased_fields<B>(
 where
     B: Bundle,
 {
-    let len = fields.len();
     let fields: Box<[_]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
-        .map(|id| {
+        .zip(B::field_layouts(context))
+        .map(|(id, layout)| {
+            assert_eq!(
+                components
+                    .get_info(id)
+                    .expect("component info should present")
+                    .layout(),
+                *layout.borrow(),
+            );
             fields
                 .remove(&id)
                 .expect("field with given component id should present")
         })
         .collect();
-    assert_eq!(fields.len(), len);
 
     let erased_context = ErasedSoaContext::<B::Fields>::new(
         fields.iter().map(|(field_layout, _)| field_layout),
@@ -332,7 +343,18 @@ where
 {
     let component_ids = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
-        .into_iter();
+        .into_iter()
+        .zip(B::field_layouts(context))
+        .map(|(id, layout)| {
+            assert_eq!(
+                components
+                    .get_info(id)
+                    .expect("component info should present")
+                    .layout(),
+                *layout.borrow(),
+            );
+            id
+        });
 
     let erased_context = ErasedSoaContext::<B::Fields>::new(B::field_layouts(context), None);
     let erased_value = ErasedSoa::from(context, value);
@@ -355,7 +377,15 @@ where
     let fields: Box<[_]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
-        .map(|id| {
+        .zip(B::field_layouts(context))
+        .map(|(id, layout)| {
+            assert_eq!(
+                components
+                    .get_info(id)
+                    .expect("component info should present")
+                    .layout(),
+                *layout.borrow(),
+            );
             fields
                 .remove(&id)
                 .expect("field with given component id should present")
@@ -385,15 +415,23 @@ fn into_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let component_ids: Box<[ComponentId]> = B::component_ids(context, components)
+    let component_ids = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
-        .collect();
+        .zip(B::field_layouts(context))
+        .map(|(id, layout)| {
+            assert_eq!(
+                components
+                    .get_info(id)
+                    .expect("component info should present")
+                    .layout(),
+                *layout.borrow(),
+            );
+            id
+        });
 
     let erased_refs = ErasedSoaRefs::from::<B>(context, refs);
-    assert_eq!(component_ids.len(), erased_refs.as_ref().len());
-
-    iter::zip(component_ids, erased_refs).collect()
+    component_ids.zip(erased_refs).collect()
 }
 
 #[allow(unsafe_code)]
@@ -409,7 +447,15 @@ where
     let fields: Box<[_]> = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
-        .map(|id| {
+        .zip(B::field_layouts(context))
+        .map(|(id, layout)| {
+            assert_eq!(
+                components
+                    .get_info(id)
+                    .expect("component info should present")
+                    .layout(),
+                *layout.borrow(),
+            );
             fields
                 .remove(&id)
                 .expect("field with given component id should present")
@@ -439,13 +485,21 @@ fn into_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let component_ids: Box<[ComponentId]> = B::component_ids(context, components)
+    let component_ids = B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
-        .collect();
+        .zip(B::field_layouts(context))
+        .map(|(id, layout)| {
+            assert_eq!(
+                components
+                    .get_info(id)
+                    .expect("component info should present")
+                    .layout(),
+                *layout.borrow(),
+            );
+            id
+        });
 
     let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs);
-    assert_eq!(component_ids.len(), erased_refs.as_ref().len());
-
-    iter::zip(component_ids, erased_refs).collect()
+    component_ids.zip(erased_refs).collect()
 }

@@ -14,8 +14,13 @@ where
 {
     #[inline]
     fn drop(&mut self) {
+        let Self {
+            ref mut vec,
+            local_len,
+        } = *self;
+
         unsafe {
-            self.vec.set_len(self.local_len);
+            vec.set_len(local_len);
         }
     }
 }

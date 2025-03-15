@@ -33,13 +33,14 @@ pub struct ErasedSoa<Fields> {
 
 impl<Fields> ErasedSoa<Fields> {
     #[inline]
-    pub fn new<'a, I>(fields: I) -> Self
+    pub fn new<I, F>(fields: I) -> Self
     where
-        I: IntoIterator<Item = (Layout, &'a [u8])>,
+        I: IntoIterator<Item = (Layout, F)>,
+        F: AsRef<[u8]>,
     {
         let (field_layouts, fields): (Vec<_>, Vec<_>) = fields
             .into_iter()
-            .inspect(|(field_layout, src)| assert_eq!(field_layout.size(), src.len()))
+            .inspect(|(field_layout, src)| assert_eq!(field_layout.size(), src.as_ref().len()))
             .unzip();
         let field_layouts = field_layouts.into_boxed_slice();
 
@@ -50,7 +51,7 @@ impl<Fields> ErasedSoa<Fields> {
         let mut buffer = Box::new_uninit_slice(buffer_len);
         let buffer = unsafe {
             for ((field_layout, src), offset) in field_layouts.iter().zip(fields).zip(offsets) {
-                let src = src.as_ptr();
+                let src = src.as_ref().as_ptr();
                 let dst = buffer.as_mut_ptr().cast::<u8>().add(offset);
 
                 let len = field_layout.size();

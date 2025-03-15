@@ -276,8 +276,8 @@ where
         components: &mut ComponentRegistry,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
-        let refs = SparseSet::get(self, entity)?;
-        let refs = into_erased_field_refs::<B>(components, self.context(), refs);
+        let (context, refs) = self.as_view().into_get_with_context(entity);
+        let refs = into_erased_field_refs::<B>(components, context, refs?);
         Some(refs)
     }
 
@@ -293,6 +293,7 @@ where
     }
 }
 
+#[inline]
 fn validate_component<B>(components: &mut ComponentRegistry, id: ComponentId, layout: B)
 where
     B: Borrow<Layout>,
@@ -301,6 +302,48 @@ where
         .get_info(id)
         .expect("component info should present");
     assert_eq!(info.layout(), *layout.borrow());
+}
+
+#[inline]
+fn validate_components<'components, 'context, B>(
+    components: &'components mut ComponentRegistry,
+    context: &'context B::Context,
+) -> impl Iterator<Item = ComponentId> + 'context
+where
+    'components: 'context,
+    B: Bundle,
+{
+    B::component_ids(context, components)
+        .expect("components of the bundle should be unique")
+        .into_iter()
+        .zip(B::field_layouts(context))
+        .map(|(id, layout)| {
+            validate_component(components, id, layout);
+            id
+        })
+}
+
+#[inline]
+fn reorder_fields<'components, 'context, B, F>(
+    components: &'components mut ComponentRegistry,
+    context: &'context B::Context,
+    mut fields: ErasedComponents<F>,
+) -> impl Iterator<Item = (Layout, F)> + 'context
+where
+    'components: 'context,
+    B: Bundle,
+    F: 'context,
+{
+    B::component_ids(context, components)
+        .expect("components of the bundle should be unique")
+        .into_iter()
+        .zip(B::field_layouts(context))
+        .map(move |(id, layout)| {
+            validate_component(components, id, layout);
+            fields
+                .remove(&id)
+                .expect("field with given component id should present")
+        })
 }
 
 #[allow(unsafe_code)]
@@ -313,20 +356,8 @@ fn from_erased_fields<B>(
 where
     B: Bundle,
 {
-    let fields = B::component_ids(context, components)
-        .expect("components of the bundle should be unique")
-        .into_iter()
-        .zip(B::field_layouts(context))
-        .map(|(id, layout)| {
-            validate_component(components, id, layout);
-            fields
-                .get(&id)
-                .expect("field with given component id should present")
-        });
-
-    let erased_value = ErasedSoa::<B::Fields>::new(
-        fields.map(|(field_layout, field)| (*field_layout, field.as_ref())),
-    );
+    let fields = reorder_fields::<B, _>(components, context, fields);
+    let erased_value = ErasedSoa::<B::Fields>::new(fields);
     unsafe { erased_value.into::<B>(context) }
 }
 
@@ -339,17 +370,10 @@ fn into_erased_fields<B>(
 where
     B: Bundle,
 {
-    let component_ids = B::component_ids(context, components)
-        .expect("components of the bundle should be unique")
-        .into_iter()
-        .zip(B::field_layouts(context))
-        .map(|(id, layout)| {
-            validate_component(components, id, layout);
-            id
-        });
-
     let erased_value = ErasedSoa::from(context, value);
-    component_ids.zip(erased_value.into_fields()).collect()
+    validate_components::<B>(components, context)
+        .zip(erased_value.into_fields())
+        .collect()
 }
 
 #[allow(unsafe_code)]
@@ -357,22 +381,12 @@ where
 fn from_erased_field_refs<'a, B>(
     components: &mut ComponentRegistry,
     context: &B::Context,
-    mut fields: ErasedComponents<ErasedFieldRef<'a>>,
+    fields: ErasedComponents<ErasedFieldRef<'a>>,
 ) -> B::Refs<'a>
 where
     B: Bundle,
 {
-    let refs = B::component_ids(context, components)
-        .expect("components of the bundle should be unique")
-        .into_iter()
-        .zip(B::field_layouts(context))
-        .map(|(id, layout)| {
-            validate_component(components, id, layout);
-            fields
-                .remove(&id)
-                .expect("field with given component id should present")
-        });
-
+    let refs = reorder_fields::<B, _>(components, context, fields);
     let erased_refs = ErasedSoaRefs::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -386,17 +400,10 @@ fn into_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let component_ids = B::component_ids(context, components)
-        .expect("components of the bundle should be unique")
-        .into_iter()
-        .zip(B::field_layouts(context))
-        .map(|(id, layout)| {
-            validate_component(components, id, layout);
-            id
-        });
-
     let erased_refs = ErasedSoaRefs::from::<B>(context, refs);
-    component_ids.zip(erased_refs).collect()
+    validate_components::<B>(components, context)
+        .zip(erased_refs)
+        .collect()
 }
 
 #[allow(unsafe_code)]
@@ -404,23 +411,13 @@ where
 fn from_erased_field_refs_mut<'a, B>(
     components: &mut ComponentRegistry,
     context: &B::Context,
-    mut fields: ErasedComponents<ErasedFieldRefMut<'a>>,
+    fields: ErasedComponents<ErasedFieldRefMut<'a>>,
 ) -> B::RefsMut<'a>
 where
     B: Bundle,
 {
-    let fields = B::component_ids(context, components)
-        .expect("components of the bundle should be unique")
-        .into_iter()
-        .zip(B::field_layouts(context))
-        .map(|(id, layout)| {
-            validate_component(components, id, layout);
-            fields
-                .remove(&id)
-                .expect("field with given component id should present")
-        });
-
-    let erased_refs = ErasedSoaRefsMut::<B::Fields>::new(fields);
+    let refs = reorder_fields::<B, _>(components, context, fields);
+    let erased_refs = ErasedSoaRefsMut::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
 
@@ -433,15 +430,8 @@ fn into_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let component_ids = B::component_ids(context, components)
-        .expect("components of the bundle should be unique")
-        .into_iter()
-        .zip(B::field_layouts(context))
-        .map(|(id, layout)| {
-            validate_component(components, id, layout);
-            id
-        });
-
     let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs);
-    component_ids.zip(erased_refs).collect()
+    validate_components::<B>(components, context)
+        .zip(erased_refs)
+        .collect()
 }

@@ -268,16 +268,13 @@ pub unsafe trait Soa: Sized {
     }
 }
 
-pub fn buffer_layout<T, B>(
-    context: &T::Context,
-    capacity: usize,
-) -> Result<(Layout, B), LayoutError>
+pub fn buffer_layout<B, I>(field_layouts: I, capacity: usize) -> Result<(Layout, B), LayoutError>
 where
-    T: Soa,
+    I: IntoIterator<Item: Borrow<Layout>>,
     B: FromIterator<usize>,
 {
     let mut layout = Layout::new::<()>();
-    let offsets = T::field_layouts(context)
+    let offsets = field_layouts
         .into_iter()
         .map(|item| {
             let repeated = repeat_layout(item.borrow(), capacity)?;

@@ -1501,7 +1501,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         capacity: usize,
     ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
-        buffer_layout::<Self, _>(context, capacity)
+        let ErasedSoaContext { field_layouts, .. } = context;
+        buffer_layout(field_layouts, capacity)
     }
 
     type Ptrs = ErasedSoaPtrs<Fields>;

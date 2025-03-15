@@ -684,7 +684,7 @@ fn one_item_erased() {
     let fields = [u8_bytes, u16_bytes, u64_bytes];
     let value = ErasedSoa::from(&context, (u8, u64, u16));
     assert_eq!(
-        value.as_refs(&erased_context).as_ref(),
+        value.as_refs().as_ref(),
         [
             (optimized_layout[0], u8_bytes),
             (optimized_layout[1], u16_bytes),
@@ -762,9 +762,9 @@ fn one_item_erased() {
     let value = vec.pop().expect("vector should not be empty");
     let erased_context = vec.context();
     assert_eq!(
-        value.as_refs(erased_context).as_ref(),
-        ErasedSoa::new(erased_context, fields)
-            .as_refs(erased_context)
+        value.as_refs().as_ref(),
+        ErasedSoa::<Soa>::new(erased_context.layouts().into_iter().copied().zip(fields))
+            .as_refs()
             .as_ref(),
     );
     assert!(vec.is_empty());

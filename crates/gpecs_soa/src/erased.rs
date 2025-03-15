@@ -33,23 +33,23 @@ pub struct ErasedSoa<Fields> {
 
 impl<Fields> ErasedSoa<Fields> {
     #[inline]
-    pub fn new<'a, I>(context: &ErasedSoaContext<Fields>, fields: I) -> Self
+    pub fn new<'a, I>(fields: I) -> Self
     where
-        I: IntoIterator<Item = &'a [u8]>,
+        I: IntoIterator<Item = (Layout, &'a [u8])>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let fields: Box<[_]> = fields.into_iter().collect();
-        assert_eq!(field_layouts.len(), fields.len());
+        let (field_layouts, fields): (Vec<_>, Vec<_>) = fields
+            .into_iter()
+            .inspect(|(field_layout, src)| assert_eq!(field_layout.size(), src.len()))
+            .unzip();
+        let field_layouts = field_layouts.into_boxed_slice();
 
-        let (buffer_layout, offsets) =
-            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
+        let (buffer_layout, offsets): (_, Box<[_]>) =
+            buffer_layout(&field_layouts, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
         let buffer = unsafe {
             for ((field_layout, src), offset) in field_layouts.iter().zip(fields).zip(offsets) {
-                assert_eq!(field_layout.size(), src.len());
-
                 let src = src.as_ptr();
                 let dst = buffer.as_mut_ptr().cast::<u8>().add(offset);
 
@@ -60,7 +60,7 @@ impl<Fields> ErasedSoa<Fields> {
         };
         Self {
             buffer,
-            field_layouts: field_layouts.clone(),
+            field_layouts,
         }
     }
 
@@ -126,21 +126,18 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
-    pub fn into_fields(self, context: &ErasedSoaContext<Fields>) -> Box<[(Layout, Box<[u8]>)]> {
+    pub fn into_fields(self) -> Box<[(Layout, Box<[u8]>)]> {
         let Self {
             buffer,
-            field_layouts: value_layouts,
+            field_layouts,
         } = self;
-        let ErasedSoaContext { field_layouts, .. } = context;
 
-        assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
-
-        let (buffer_layout, offsets) =
-            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
+        let (buffer_layout, offsets): (_, Box<[_]>) =
+            buffer_layout(&field_layouts, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
         assert_eq!(buffer_len, buffer.len());
 
-        iter::zip(value_layouts, offsets)
+        iter::zip(field_layouts, offsets)
             .map(|(field_layout, offset)| {
                 let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
                 let len = field_layout.size();
@@ -157,17 +154,14 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
-    pub fn as_refs(&self, context: &ErasedSoaContext<Fields>) -> ErasedSoaRefs<'_, Fields> {
+    pub fn as_refs(&self) -> ErasedSoaRefs<'_, Fields> {
         let Self {
             buffer,
-            field_layouts: value_layouts,
+            field_layouts,
         } = self;
-        let ErasedSoaContext { field_layouts, .. } = context;
 
-        assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
-
-        let (buffer_layout, offsets) =
-            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
+        let (buffer_layout, offsets): (_, Box<[_]>) =
+            buffer_layout(field_layouts, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
         assert_eq!(buffer_len, buffer.len());
 
@@ -188,20 +182,14 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
-    pub fn as_refs_mut(
-        &mut self,
-        context: &ErasedSoaContext<Fields>,
-    ) -> ErasedSoaRefsMut<'_, Fields> {
+    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, Fields> {
         let Self {
             buffer,
-            field_layouts: value_layouts,
+            field_layouts,
         } = self;
-        let ErasedSoaContext { field_layouts, .. } = context;
 
-        assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
-
-        let (buffer_layout, offsets) =
-            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
+        let (buffer_layout, offsets): (_, Box<[_]>) =
+            buffer_layout(&*field_layouts, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout.size().div_ceil(size_of::<Byte<Fields>>());
         assert_eq!(buffer_len, buffer.len());
 
@@ -301,17 +289,12 @@ pub struct ErasedSoaPtrs<Fields> {
 
 impl<Fields> ErasedSoaPtrs<Fields> {
     #[inline]
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, ptrs: I) -> Self
+    pub fn new<I>(ptrs: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldPtr>,
+        I: IntoIterator<Item = (Layout, ErasedFieldPtr)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let ptrs: Box<[_]> = ptrs.into_iter().collect();
-        assert_eq!(field_layouts.len(), ptrs.len());
-
-        let ptrs = field_layouts
-            .iter()
-            .zip(ptrs)
+        let ptrs = ptrs
+            .into_iter()
             .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
                 (field_layout.clone(), ptr)
@@ -423,17 +406,12 @@ pub struct ErasedSoaMutPtrs<Fields> {
 }
 
 impl<Fields> ErasedSoaMutPtrs<Fields> {
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, ptrs: I) -> Self
+    pub fn new<I>(ptrs: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldMutPtr>,
+        I: IntoIterator<Item = (Layout, ErasedFieldMutPtr)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let ptrs: Box<[_]> = ptrs.into_iter().collect();
-        assert_eq!(field_layouts.len(), ptrs.len());
-
-        let ptrs = field_layouts
-            .iter()
-            .zip(ptrs)
+        let ptrs = ptrs
+            .into_iter()
             .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
                 (field_layout.clone(), ptr)
@@ -546,17 +524,12 @@ pub struct ErasedSoaNonNullPtrs<Fields> {
 }
 
 impl<Fields> ErasedSoaNonNullPtrs<Fields> {
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, ptrs: I) -> Self
+    pub fn new<I>(ptrs: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldNonNullPtr>,
+        I: IntoIterator<Item = (Layout, ErasedFieldNonNullPtr)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let ptrs: Box<[_]> = ptrs.into_iter().collect();
-        assert_eq!(field_layouts.len(), ptrs.len());
-
-        let ptrs = field_layouts
-            .iter()
-            .zip(ptrs)
+        let ptrs = ptrs
+            .into_iter()
             .map(|(field_layout, ptr)| {
                 assert_eq!(field_layout.size(), ptr.len());
                 (field_layout.clone(), ptr)
@@ -686,17 +659,12 @@ where
 }
 
 impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, refs: I) -> Self
+    pub fn new<I>(refs: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldRef<'a>>,
+        I: IntoIterator<Item = (Layout, ErasedFieldRef<'a>)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let refs: Box<[_]> = refs.into_iter().collect();
-        assert_eq!(field_layouts.len(), refs.len());
-
-        let refs = field_layouts
-            .iter()
-            .zip(refs)
+        let refs = refs
+            .into_iter()
             .map(|(field_layout, r#ref)| {
                 assert_eq!(field_layout.size(), r#ref.len());
                 (field_layout.clone(), r#ref)
@@ -833,17 +801,12 @@ where
 }
 
 impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, refs: I) -> Self
+    pub fn new<I>(refs: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldRefMut<'a>>,
+        I: IntoIterator<Item = (Layout, ErasedFieldRefMut<'a>)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let refs: Box<[_]> = refs.into_iter().collect();
-        assert_eq!(field_layouts.len(), refs.len());
-
-        let refs = field_layouts
-            .iter()
-            .zip(refs)
+        let refs = refs
+            .into_iter()
             .map(|(field_layout, r#ref)| {
                 assert_eq!(field_layout.size(), r#ref.len());
                 (field_layout.clone(), r#ref)
@@ -972,17 +935,12 @@ pub struct ErasedSoaSlicePtrs<Fields> {
 }
 
 impl<Fields> ErasedSoaSlicePtrs<Fields> {
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, len: usize, slices: I) -> Self
+    pub fn new<I>(len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldSlicePtr>,
+        I: IntoIterator<Item = (Layout, ErasedFieldSlicePtr)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let slices: Box<[_]> = slices.into_iter().collect();
-        assert_eq!(field_layouts.len(), slices.len());
-
-        let slices = field_layouts
-            .iter()
-            .zip(slices)
+        let slices = slices
+            .into_iter()
             .map(|(field_layout, slice)| {
                 assert_eq!(
                     slice.len().checked_div(field_layout.size()).unwrap_or(len),
@@ -1109,17 +1067,12 @@ pub struct ErasedSoaSliceMutPtrs<Fields> {
 }
 
 impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, len: usize, slices: I) -> Self
+    pub fn new<I>(len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldSliceMutPtr>,
+        I: IntoIterator<Item = (Layout, ErasedFieldSliceMutPtr)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let slices: Box<[_]> = slices.into_iter().collect();
-        assert_eq!(field_layouts.len(), slices.len());
-
-        let slices = field_layouts
-            .iter()
-            .zip(slices)
+        let slices = slices
+            .into_iter()
             .map(|(field_layout, slice)| {
                 assert_eq!(
                     slice.len().checked_div(field_layout.size()).unwrap_or(len),
@@ -1249,17 +1202,12 @@ where
 }
 
 impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, len: usize, slices: I) -> Self
+    pub fn new<I>(len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldSlice<'a>>,
+        I: IntoIterator<Item = (Layout, ErasedFieldSlice<'a>)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let slices: Box<[_]> = slices.into_iter().collect();
-        assert_eq!(field_layouts.len(), slices.len());
-
-        let slices = field_layouts
-            .iter()
-            .zip(slices)
+        let slices = slices
+            .into_iter()
             .map(|(field_layout, slice)| {
                 assert_eq!(
                     slice.len().checked_div(field_layout.size()).unwrap_or(len),
@@ -1377,17 +1325,12 @@ where
 }
 
 impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
-    pub fn new<I>(context: &ErasedSoaContext<Fields>, len: usize, slices: I) -> Self
+    pub fn new<I>(len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldSliceMut<'a>>,
+        I: IntoIterator<Item = (Layout, ErasedFieldSliceMut<'a>)>,
     {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        let slices: Box<[_]> = slices.into_iter().collect();
-        assert_eq!(field_layouts.len(), slices.len());
-
-        let slices = field_layouts
-            .iter()
-            .zip(slices)
+        let slices = slices
+            .into_iter()
             .map(|(field_layout, slice)| {
                 assert_eq!(
                     slice.len().checked_div(field_layout.size()).unwrap_or(len),

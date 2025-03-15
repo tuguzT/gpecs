@@ -86,20 +86,17 @@ fn erased_context_of() {
 #[cfg_attr(miri, ignore)]
 fn erased_value() {
     let context = ();
-    let erased_context = ErasedSoaContext::of::<()>(context);
 
     let value = ();
     let erased_value = ErasedSoa::from(&context, value);
     assert_eq!(erased_value.layouts(), [Layout::new::<()>()]);
     assert_eq!(
-        erased_value.as_refs(&erased_context).as_ref(),
+        erased_value.as_refs().as_ref(),
         [(Layout::new::<()>(), [].as_slice())],
     );
 
     let value = unsafe { erased_value.into::<()>(&context) };
     assert_eq!(value, ());
-
-    let erased_context = ErasedSoaContext::of::<(u32, u16, u8)>(());
 
     let i1 = 1u32;
     let i2 = 2u16;
@@ -122,7 +119,7 @@ fn erased_value() {
     let i2_bytes = i2_bytes.as_slice();
     let i3_bytes = i3_bytes.as_slice();
     assert_eq!(
-        erased_value.as_refs(&erased_context).as_ref(),
+        erased_value.as_refs().as_ref(),
         [
             (optimized_layout[0], i3_bytes),
             (optimized_layout[1], i2_bytes),
@@ -130,7 +127,7 @@ fn erased_value() {
         ],
     );
 
-    let fields = erased_value.into_fields(&erased_context);
+    let fields = erased_value.into_fields();
     assert_eq!(
         fields.as_ref(),
         [
@@ -141,11 +138,12 @@ fn erased_value() {
     );
 
     let erased_value = ErasedSoa::new(
-        &erased_context,
-        fields.iter().map(|(_, field)| field.as_ref()),
+        fields
+            .iter()
+            .map(|(field_layout, field)| (*field_layout, field.as_ref())),
     );
     assert_eq!(
-        erased_value.as_refs(&erased_context).as_ref(),
+        erased_value.as_refs().as_ref(),
         [
             (optimized_layout[0], i3_bytes),
             (optimized_layout[1], i2_bytes),

@@ -87,6 +87,24 @@ fn storage_tuple() {
         .expect("retrieval of slice of `(Mass, Position)` should succeed");
     assert_eq!(slices, ([].as_slice(), [].as_slice()));
 
+    let slices = storage
+        .components_mut::<(Position,)>(&mut components, &())
+        .expect("retrieval of slice of just `Position` should succeed");
+    assert_eq!(slices, ([].as_mut_slice(),));
+
+    let error = storage
+        .components_mut::<(Position, Mass, ())>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Mass, ())` should fail");
+    assert_eq!(
+        error,
+        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+    );
+
+    let slices = storage
+        .components_mut::<(Mass, Position)>(&mut components, &())
+        .expect("retrieval of slice of `(Mass, Position)` should succeed");
+    assert_eq!(slices, ([].as_mut_slice(), [].as_mut_slice()));
+
     let mut position = Position {
         x: 1.0,
         y: 2.0,
@@ -171,6 +189,24 @@ fn storage_tuple() {
         .components::<(Mass, Position)>(&mut components, &())
         .expect("retrieval of slice of `(Mass, Position)` should succeed");
     assert_eq!(slices, ([mass].as_slice(), [position].as_slice()));
+
+    let slices = storage
+        .components_mut::<(Position,)>(&mut components, &())
+        .expect("retrieval of slice of just `Position` should succeed");
+    assert_eq!(slices, ([position].as_mut_slice(),));
+
+    let error = storage
+        .components_mut::<(Position, Mass, ())>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Mass, ())` should fail");
+    assert_eq!(
+        error,
+        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+    );
+
+    let slices = storage
+        .components_mut::<(Mass, Position)>(&mut components, &())
+        .expect("retrieval of slice of `(Mass, Position)` should succeed");
+    assert_eq!(slices, ([mass].as_mut_slice(), [position].as_mut_slice()));
 
     let error = storage
         .remove::<(Position,)>(&mut components, &(), entity)

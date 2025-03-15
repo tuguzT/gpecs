@@ -72,10 +72,32 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> V::Slices<'_> {
+        let (_, slices) = self.as_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&V::Context, V::Slices<'_>) {
         let Self { dense, .. } = self;
 
-        let KeyValueSlices { values, .. } = dense.as_slices();
-        values
+        let (context, slices) = dense.slices().into_slices_with_context();
+        let KeyValueSlices { values, .. } = slices;
+        (context, values)
+    }
+
+    #[inline]
+    pub fn into_slices(self) -> V::Slices<'a> {
+        let (_, slices) = self.into_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn into_slices_with_context(self) -> (&'a V::Context, V::Slices<'a>) {
+        let Self { dense, .. } = self;
+
+        let (context, slices) = dense.slices().into_slices_with_context();
+        let KeyValueSlices { values, .. } = slices;
+        (context, values)
     }
 
     #[inline]
@@ -463,26 +485,47 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> V::Slices<'_> {
+        let (_, slices) = self.as_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&V::Context, V::Slices<'_>) {
         let Self { dense, .. } = self;
 
-        let KeyValueSlices { values, .. } = dense.as_slices();
-        values
+        let (context, slices) = dense.slices().into_slices_with_context();
+        let KeyValueSlices { values, .. } = slices;
+        (context, values)
     }
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> V::SlicesMut<'_> {
+        let (_, slices) = self.as_mut_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_mut_slices_with_context(&mut self) -> (&V::Context, V::SlicesMut<'_>) {
         let Self { dense, .. } = self;
 
-        let KeyValueSlicesMut { values, .. } = dense.as_mut_slices();
-        values
+        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let KeyValueSlicesMut { values, .. } = slices;
+        (context, values)
     }
 
     #[inline]
     pub fn into_slices(self) -> V::SlicesMut<'a> {
+        let (_, slices) = self.into_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn into_slices_with_context(self) -> (&'a V::Context, V::SlicesMut<'a>) {
         let Self { dense, .. } = self;
 
-        let KeyValueSlicesMut { values, .. } = dense.as_mut_slices();
-        values
+        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let KeyValueSlicesMut { values, .. } = slices;
+        (context, values)
     }
 
     #[inline]
@@ -571,7 +614,7 @@ where
         let dense_index = sparse_item.dense_index()?;
 
         let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
-        let dense_key = unwrap_dense(keys, dense_index);
+        let dense_key: &mut K = unwrap_dense(keys, dense_index);
         check_equal_key(key, *dense_key);
 
         sparse_item.epoch = sparse_item.epoch.next();

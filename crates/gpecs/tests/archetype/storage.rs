@@ -69,6 +69,24 @@ fn storage_tuple() {
     let mut entities = EntityRegistry::new();
     let entity = entities.spawn();
 
+    let slices = storage
+        .components::<(Position,)>(&mut components, &())
+        .expect("retrieval of slice of just `Position` should succeed");
+    assert_eq!(slices, ([].as_slice(),));
+
+    let error = storage
+        .components::<(Position, Mass, ())>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Mass, ())` should fail");
+    assert_eq!(
+        error,
+        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+    );
+
+    let slices = storage
+        .components::<(Mass, Position)>(&mut components, &())
+        .expect("retrieval of slice of `(Mass, Position)` should succeed");
+    assert_eq!(slices, ([].as_slice(), [].as_slice()));
+
     let mut position = Position {
         x: 1.0,
         y: 2.0,
@@ -135,6 +153,24 @@ fn storage_tuple() {
         .expect("retrieval of `Mass` and `Position` should succeed");
     assert_eq!(refs_mut, Some((&mut mass, &mut position)));
     assert_eq!(storage.entities(), [entity]);
+
+    let slices = storage
+        .components::<(Position,)>(&mut components, &())
+        .expect("retrieval of slice of just `Position` should succeed");
+    assert_eq!(slices, ([position].as_slice(),));
+
+    let error = storage
+        .components::<(Position, Mass, ())>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Mass, ())` should fail");
+    assert_eq!(
+        error,
+        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+    );
+
+    let slices = storage
+        .components::<(Mass, Position)>(&mut components, &())
+        .expect("retrieval of slice of `(Mass, Position)` should succeed");
+    assert_eq!(slices, ([mass].as_slice(), [position].as_slice()));
 
     let error = storage
         .remove::<(Position,)>(&mut components, &(), entity)

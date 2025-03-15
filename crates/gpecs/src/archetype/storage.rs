@@ -11,7 +11,7 @@ use crate::{
     bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
-    soa::erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut},
+    soa::erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices},
 };
 
 use super::error::{
@@ -51,6 +51,30 @@ impl ArchetypeStorage {
     pub fn entities(&self) -> &[Entity] {
         let Self { erased_storage, .. } = self;
         erased_storage.entities()
+    }
+
+    #[inline]
+    pub fn components<B>(
+        &self,
+        components: &mut ComponentRegistry,
+        context: &B::Context,
+    ) -> Result<B::Slices<'_>, IncompatibleBundleError>
+    where
+        B: Bundle,
+    {
+        let Self {
+            component_ids,
+            erased_storage,
+        } = self;
+
+        let mut target_component_ids = B::component_ids(context, components)?.into_iter();
+        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(&id)) {
+            return Err(ExclusiveComponentError { component_id }.into());
+        }
+
+        let (len, fields) = erased_storage.components(components);
+        let slices = from_erased_field_slices::<B>(components, context, len, fields);
+        Ok(slices)
     }
 
     #[inline]
@@ -203,11 +227,16 @@ type ErasedComponents<T> = BTreeMap<ComponentId, (Layout, T)>;
 type ErasedField = Box<[u8]>;
 type ErasedFieldRef<'a> = &'a [u8];
 type ErasedFieldRefMut<'a> = &'a mut [u8];
+type ErasedFieldSlice<'a> = &'a [u8];
 
 trait ErasedStorage {
     fn entities(&self) -> &[Entity];
 
-    #[track_caller]
+    fn components(
+        &self,
+        components: &mut ComponentRegistry,
+    ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>);
+
     fn insert(
         &mut self,
         components: &mut ComponentRegistry,
@@ -215,21 +244,18 @@ trait ErasedStorage {
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>>;
 
-    #[track_caller]
     fn remove(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>>;
 
-    #[track_caller]
     fn get(
         &self,
         components: &mut ComponentRegistry,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>>;
 
-    #[track_caller]
     fn get_mut(
         &mut self,
         components: &mut ComponentRegistry,
@@ -244,6 +270,15 @@ where
     #[inline]
     fn entities(&self) -> &[Entity] {
         self.as_keys_slice()
+    }
+
+    #[inline]
+    fn components(
+        &self,
+        components: &mut ComponentRegistry,
+    ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>) {
+        let slices = SparseSet::as_slices(self);
+        into_erased_field_slices::<B>(components, self.context(), slices)
     }
 
     #[inline]
@@ -294,17 +329,20 @@ where
 }
 
 #[inline]
+#[track_caller]
 fn validate_component<B>(components: &mut ComponentRegistry, id: ComponentId, layout: B)
 where
     B: Borrow<Layout>,
 {
     let info = components
         .get_info(id)
-        .expect("component info should present");
+        .ok_or_else(|| format!("info of component {id:?} should be present"))
+        .unwrap();
     assert_eq!(info.layout(), *layout.borrow());
 }
 
 #[inline]
+#[track_caller]
 fn validate_components<'components, 'context, B>(
     components: &'components mut ComponentRegistry,
     context: &'context B::Context,
@@ -324,6 +362,7 @@ where
 }
 
 #[inline]
+#[track_caller]
 fn reorder_fields<'components, 'context, B, F>(
     components: &'components mut ComponentRegistry,
     context: &'context B::Context,
@@ -342,7 +381,8 @@ where
             validate_component(components, id, layout);
             fields
                 .remove(&id)
-                .expect("field with given component id should present")
+                .ok_or_else(|| format!("field of component {id:?} should be present"))
+                .unwrap()
         })
 }
 
@@ -434,4 +474,38 @@ where
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
+}
+
+#[allow(unsafe_code)]
+#[inline]
+fn from_erased_field_slices<'a, B>(
+    components: &mut ComponentRegistry,
+    context: &B::Context,
+    len: usize,
+    fields: ErasedComponents<ErasedFieldSlice<'a>>,
+) -> B::Slices<'a>
+where
+    B: Bundle,
+{
+    let slices = reorder_fields::<B, _>(components, context, fields);
+    let erased_slices = ErasedSoaSlices::<B::Fields>::new(len, slices);
+    unsafe { erased_slices.into::<B>(context) }
+}
+
+#[inline]
+fn into_erased_field_slices<'a, B>(
+    components: &mut ComponentRegistry,
+    context: &B::Context,
+    slices: B::Slices<'a>,
+) -> (usize, ErasedComponents<ErasedFieldSlice<'a>>)
+where
+    B: Bundle,
+{
+    let erased_slices = ErasedSoaSlices::from::<B>(context, slices);
+
+    let len = erased_slices.len();
+    let fields = validate_components::<B>(components, context)
+        .zip(erased_slices)
+        .collect();
+    (len, fields)
 }

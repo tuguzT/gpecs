@@ -10,10 +10,13 @@ use crate::{
     arena,
     assert::{
         check_dense_index_bounds, check_equal_key, check_key_bounds, unwrap_dense,
-        unwrap_dense_index_mut, unwrap_sparse_item_mut,
+        unwrap_dense_index_mut, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item_mut,
     },
     entry::generate_entry_types,
-    error::TryReserveError,
+    error::{
+        InvalidKeyError, TooLargeSparseIndexError, TooSmallSparseIndexError, TryInvalidKeyError,
+        TryReserveError,
+    },
     item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
@@ -38,7 +41,7 @@ where
     V: Soa,
 {
     dense: SoaVec<KeyValuePair<K, V>>,
-    sparse: Vec<SparseItem<K::Epoch>>,
+    sparse: Vec<SparseItem<K>>,
 }
 
 impl<K, V> EpochSparseSet<K, V>
@@ -315,19 +318,19 @@ where
     }
 
     #[inline]
-    pub fn as_sparse_slice(&self) -> &[SparseItem<K::Epoch>] {
+    pub fn as_sparse_slice(&self) -> &[SparseItem<K>] {
         let Self { sparse, .. } = self;
         sparse.as_slice()
     }
 
     #[inline]
-    pub fn into_sparse_vec(self) -> Vec<SparseItem<K::Epoch>> {
+    pub fn into_sparse_vec(self) -> Vec<SparseItem<K>> {
         let Self { sparse, .. } = self;
         sparse
     }
 
     #[inline]
-    pub fn as_sparse_ptr(&self) -> *const SparseItem<K::Epoch> {
+    pub fn as_sparse_ptr(&self) -> *const SparseItem<K> {
         let Self { sparse, .. } = self;
         sparse.as_ptr()
     }
@@ -345,64 +348,85 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (SoaVec<KeyValuePair<K, V>>, Vec<SparseItem<K::Epoch>>) {
+    pub fn into_parts(self) -> (SoaVec<KeyValuePair<K, V>>, Vec<SparseItem<K>>) {
         let Self { dense, sparse } = self;
         (dense, sparse)
     }
 
     pub fn from_parts(
         dense: SoaVec<KeyValuePair<K, V>>,
-        mut sparse: Vec<SparseItem<K::Epoch>>,
-    ) -> Self {
+        mut sparse: Vec<SparseItem<K>>,
+    ) -> Result<Self, InvalidKeyError<K>> {
         sparse.clear();
         for (dense_index, KeyValueRefs { key, .. }) in dense.iter().enumerate() {
-            let sparse_index = key.sparse_index();
+            let sparse_index = key
+                .sparse_index()
+                .try_into()
+                .map_err(TooLargeSparseIndexError::new)?;
             let epoch = key.epoch();
+
+            let dense_index = dense_index
+                .try_into()
+                .map_err(TooSmallSparseIndexError::new)?;
             let item = SparseItem::occupied(dense_index, epoch);
 
             extend_sparse(&mut sparse, sparse_index.saturating_add(1));
             sparse[sparse_index] = item;
         }
 
-        Self { dense, sparse }
+        Ok(Self { dense, sparse })
     }
 
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+    pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InvalidKeyError<K>> {
         let Self { dense, sparse } = self;
 
-        let sparse_index = key.sparse_index();
+        let sparse_index = key
+            .sparse_index()
+            .try_into()
+            .map_err(TooLargeSparseIndexError::new)?;
         extend_sparse(sparse, sparse_index.saturating_add(1));
 
         let sparse_item = sparse.index_mut(sparse_index);
         if key.epoch() < sparse_item.epoch {
-            return None;
+            return Ok(None);
         }
 
         if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
             let (context, dense) = dense.slices_mut().into_slices_with_context();
             let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
+
+            let dense_index = unwrap_into_usize(dense_index);
             let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
 
             let value = soa_replace(context, dense_value, value);
             sparse_item.epoch = key.epoch();
             *dense_key = key;
 
-            return Some(value);
+            return Ok(Some(value));
         }
 
-        dense.push((key, value).into());
-        *sparse_item = SparseItem::occupied(dense.len() - 1, key.epoch());
+        let dense_index = dense
+            .len()
+            .try_into()
+            .map_err(TooSmallSparseIndexError::new)?;
+        dense.push(KeyValuePair { key, value });
+        *sparse_item = SparseItem::occupied(dense_index, key.epoch());
 
-        None
+        Ok(None)
     }
 
-    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryReserveError> {
+    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryInvalidKeyError<K>> {
         let Self { dense, sparse } = self;
 
-        let sparse_index = key.sparse_index();
+        let sparse_index = key
+            .sparse_index()
+            .try_into()
+            .map_err(TooLargeSparseIndexError::new)?;
 
         let new_sparse_len = sparse_index.saturating_add(1);
-        sparse.try_reserve(new_sparse_len.saturating_sub(sparse.len()))?;
+        sparse
+            .try_reserve(new_sparse_len.saturating_sub(sparse.len()))
+            .map_err(TryReserveError::Sparse)?;
         extend_sparse(sparse, new_sparse_len);
 
         let sparse_item = sparse.index_mut(sparse_index);
@@ -413,6 +437,8 @@ where
         if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
             let (context, dense) = dense.slices_mut().into_slices_with_context();
             let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
+
+            let dense_index = unwrap_into_usize(dense_index);
             let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
 
             let value = soa_replace(context, dense_value, value);
@@ -422,14 +448,18 @@ where
             return Ok(Some(value));
         }
 
-        dense.try_reserve(1)?;
-        dense.push((key, value).into());
-        *sparse_item = SparseItem::occupied(dense.len() - 1, key.epoch());
+        let dense_index = dense
+            .len()
+            .try_into()
+            .map_err(TooSmallSparseIndexError::new)?;
+        dense.try_reserve(1).map_err(TryReserveError::Dense)?;
+        dense.push(KeyValuePair { key, value });
+        *sparse_item = SparseItem::occupied(dense_index, key.epoch());
 
         Ok(None)
     }
 
-    pub fn push(&mut self, value: V) -> K {
+    pub fn push(&mut self, value: V) -> Result<K, InvalidKeyError<K>> {
         let Self { sparse, .. } = self;
 
         let (sparse_index, epoch) = sparse
@@ -438,13 +468,16 @@ where
             .find(|(_, item)| item.is_vacant())
             .map(|(sparse_index, item)| (sparse_index, item.epoch))
             .unwrap_or((self.sparse.len(), Default::default()));
+        let sparse_index = sparse_index
+            .try_into()
+            .map_err(TooSmallSparseIndexError::new)?;
         let key = K::new(sparse_index, epoch);
 
-        self.insert(key, value);
-        key
+        self.insert(key, value)?;
+        Ok(key)
     }
 
-    pub fn try_push(&mut self, value: V) -> Result<K, TryReserveError> {
+    pub fn try_push(&mut self, value: V) -> Result<K, TryInvalidKeyError<K>> {
         let Self { sparse, .. } = self;
 
         let (sparse_index, epoch) = sparse
@@ -453,6 +486,9 @@ where
             .find(|(_, item)| item.is_vacant())
             .map(|(sparse_index, item)| (sparse_index, item.epoch))
             .unwrap_or((self.sparse.len(), Default::default()));
+        let sparse_index = sparse_index
+            .try_into()
+            .map_err(TooSmallSparseIndexError::new)?;
         let key = K::new(sparse_index, epoch);
 
         self.try_insert(key, value)?;
@@ -474,24 +510,25 @@ where
     pub fn swap_remove(&mut self, key: K) -> Option<V> {
         let Self { dense, sparse } = self;
 
-        let sparse_index = key.sparse_index();
-        let dense_index = sparse
+        let sparse_index = key.sparse_index().try_into().ok()?;
+        let dense_index = *sparse
             .get(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
             .and_then(SparseItem::dense_index)?;
-        check_dense_index_bounds(dense_index, dense.len());
+        let dense_index_usize = unwrap_into_usize(dense_index);
+        check_dense_index_bounds(dense_index_usize, dense.len());
 
-        let (dense_key, value) = dense.swap_remove(dense_index).into();
+        let (dense_key, value) = dense.swap_remove(dense_index_usize).into();
         check_equal_key(key, dense_key);
 
-        if let Some(KeyValueRefs { key, .. }) = dense.get(dense_index) {
-            let sparse_index = key.sparse_index();
+        if let Some(KeyValueRefs { key, .. }) = dense.get(dense_index_usize) {
+            let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             if let Some(swapped_dense_index) = sparse_item.dense_index_mut() {
                 *swapped_dense_index = dense_index;
             }
         }
-        sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
+        sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
 
         Some(value)
     }
@@ -499,37 +536,39 @@ where
     pub fn remove(&mut self, key: K) -> Option<V> {
         let Self { dense, sparse } = self;
 
-        let sparse_index = key.sparse_index();
+        let sparse_index = key.sparse_index().try_into().ok()?;
         let dense_index = sparse
             .get(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
             .and_then(SparseItem::dense_index)?;
+        let dense_index = unwrap_into_usize(*dense_index);
         check_dense_index_bounds(dense_index, dense.len());
 
         let (dense_key, value) = dense.remove(dense_index).into();
         check_equal_key(key, dense_key);
 
         for KeyValueRefs { key, .. } in dense.iter().skip(dense_index) {
-            let sparse_index = key.sparse_index();
+            let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
-            *dense_index -= 1;
+            *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - 1);
         }
-        sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
+        sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
 
         Some(value)
     }
 
-    pub fn pop(&mut self) -> Option<KeyValuePair<K, V>> {
+    pub fn pop(&mut self) -> Option<(K, V)> {
         let Self { dense, sparse } = self;
 
-        let pair = dense.pop()?;
+        let KeyValuePair { key, value } = dense.pop()?;
 
-        let sparse_index = pair.key.sparse_index();
+        let sparse_index = unwrap_into_usize(key.sparse_index());
         check_key_bounds(sparse_index, sparse.len());
-        sparse[sparse_index] = SparseItem::vacant(0, pair.key.epoch().next());
 
-        Some(pair)
+        sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
+
+        Some((key, value))
     }
 
     #[inline]
@@ -547,7 +586,7 @@ where
 
         for sparse_index in sparse_len..self.sparse_len() {
             let epoch = self.sparse[sparse_index].epoch;
-            let key = K::new(sparse_index, epoch.next());
+            let key = K::new(unwrap_into_index(sparse_index), epoch.next());
             self.remove(key);
         }
         self.sparse.truncate(sparse_len);
@@ -558,8 +597,8 @@ where
         let Self { dense, sparse } = self;
 
         for KeyValueRefs { key, .. } in dense.iter() {
-            let sparse_index = key.sparse_index();
-            sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
+            let sparse_index = unwrap_into_usize(key.sparse_index());
+            sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
         }
 
         Drain::new(dense.drain(..))
@@ -576,17 +615,17 @@ where
         for curr in 0..old_len {
             let (&mut key, value) = dense.deref_mut().index_mut(curr).into();
             if !f(key, value) {
-                let sparse_index = key.sparse_index();
-                sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
+                let sparse_index = unwrap_into_usize(key.sparse_index());
+                sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
                 continue;
             }
 
             dense.swap(curr, last);
 
-            let sparse_index = key.sparse_index();
+            let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
-            *dense_index -= curr - last;
+            *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - (curr - last));
 
             last += 1;
         }
@@ -703,19 +742,22 @@ where
     }
 
     #[inline]
-    pub fn get_with_key(&self, sparse_index: usize) -> Option<(K, V::Refs<'_>)> {
+    pub fn get_with_key(&self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'_>)> {
         let view = self.as_view();
         view.into_get_with_key(sparse_index)
     }
 
     #[inline]
-    pub fn get_mut_with_key(&mut self, sparse_index: usize) -> Option<(K, V::RefsMut<'_>)> {
+    pub fn get_mut_with_key(
+        &mut self,
+        sparse_index: K::SparseIndex,
+    ) -> Option<(K, V::RefsMut<'_>)> {
         let view_mut = self.as_mut_view();
         view_mut.into_get_mut_with_key(sparse_index)
     }
 
     #[inline]
-    pub fn get_epoch(&self, sparse_index: usize) -> Option<K::Epoch> {
+    pub fn get_epoch(&self, sparse_index: K::SparseIndex) -> Option<K::Epoch> {
         let view = self.as_view();
         view.get_epoch(sparse_index)
     }
@@ -726,22 +768,26 @@ where
         view.contains_key(key)
     }
 
-    pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
+    pub fn entry(&mut self, key: K) -> Result<Entry<'_, K, V>, TooLargeSparseIndexError<K>> {
         let Self { dense, sparse } = self;
 
-        let sparse_index = key.sparse_index();
+        let sparse_index: usize = key
+            .sparse_index()
+            .try_into()
+            .map_err(TooLargeSparseIndexError::new)?;
         let Some(dense_index) = sparse
             .get(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
             .and_then(SparseItem::dense_index)
         else {
             let entry = VacantEntry::new(key, self);
-            return Entry::Vacant(entry);
+            return Ok(Entry::Vacant(entry));
         };
 
+        let dense_index = unwrap_into_usize(*dense_index);
         check_dense_index_bounds(dense_index, dense.len());
         let entry = OccupiedEntry::new(key, dense_index, self);
-        Entry::Occupied(entry)
+        Ok(Entry::Occupied(entry))
     }
 
     #[inline]
@@ -749,8 +795,8 @@ where
         let Self { dense, sparse } = self;
 
         for KeyValueRefs { key, .. } in dense.iter() {
-            let sparse_index = key.sparse_index();
-            sparse[sparse_index] = SparseItem::vacant(0, key.epoch().next());
+            let sparse_index = unwrap_into_usize(key.sparse_index());
+            sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
         }
         dense.clear();
     }
@@ -810,7 +856,7 @@ impl<K, V> Debug for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa,
-    K::Epoch: Debug,
+    SparseItem<K>: Debug,
     SoaVec<KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -888,7 +934,7 @@ impl<K, V> Hash for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa,
-    K::Epoch: Hash,
+    SparseItem<K>: Hash,
     SoaVec<KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1051,7 +1097,7 @@ where
 
 impl<K, V> FromIterator<KeyValuePair<K, V>> for EpochSparseSet<K, V>
 where
-    K: Key,
+    K: Key<SparseIndex = usize>,
     V: Soa,
     V::Context: Default,
 {
@@ -1064,7 +1110,7 @@ where
 
         let mut me = Self::with_capacity(iter_len, iter_len);
         for KeyValuePair { key, value } in iter {
-            me.insert(key, value);
+            me.insert(key, value).unwrap();
         }
 
         me
@@ -1073,7 +1119,7 @@ where
 
 impl<K, V> FromIterator<(K, V)> for EpochSparseSet<K, V>
 where
-    K: Key,
+    K: Key<SparseIndex = usize>,
     V: Soa,
     V::Context: Default,
 {
@@ -1084,7 +1130,7 @@ where
 
 impl<K, V> FromIterator<V> for EpochSparseSet<K, V>
 where
-    K: Key,
+    K: Key<SparseIndex = usize>,
     V: Soa,
     V::Context: Default,
 {
@@ -1109,7 +1155,7 @@ where
 
 impl<K, V> Extend<KeyValuePair<K, V>> for EpochSparseSet<K, V>
 where
-    K: Key,
+    K: Key<SparseIndex = usize>,
     V: Soa,
 {
     fn extend<I: IntoIterator<Item = KeyValuePair<K, V>>>(&mut self, iter: I) {
@@ -1119,14 +1165,14 @@ where
                 let (lower, _) = iter.size_hint();
                 self.reserve(lower.saturating_add(1), 0);
             }
-            self.insert(key, value);
+            self.insert(key, value).unwrap();
         }
     }
 }
 
 impl<K, V> Extend<(K, V)> for EpochSparseSet<K, V>
 where
-    K: Key,
+    K: Key<SparseIndex = usize>,
     V: Soa,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
@@ -1136,7 +1182,7 @@ where
 
 impl<K, V> Extend<V> for EpochSparseSet<K, V>
 where
-    K: Key,
+    K: Key<SparseIndex = usize>,
     V: Soa,
 {
     fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
@@ -1154,14 +1200,14 @@ where
                 .find(|&key| self.sparse[key].is_vacant())
                 .unwrap_or(self.sparse.len());
             let key = K::new(sparse_index, Default::default());
-            self.insert(key, value);
+            self.insert(key, value).unwrap();
         }
     }
 }
 
 impl<K, V> From<arena::EpochSparseArena<K, V>> for EpochSparseSet<K, V>
 where
-    K: Key,
+    K: Key<SparseIndex = usize>,
     V: Soa,
 {
     #[inline]
@@ -1171,9 +1217,9 @@ where
     }
 }
 
-fn extend_sparse<E>(sparse: &mut Vec<SparseItem<E>>, new_len: usize)
+fn extend_sparse<K>(sparse: &mut Vec<SparseItem<K>>, new_len: usize)
 where
-    E: Epoch,
+    K: Key,
 {
     let old_len = sparse.len();
     if old_len >= new_len {
@@ -1181,7 +1227,7 @@ where
     }
 
     let epoch = Default::default();
-    let item = SparseItem::vacant(0, epoch);
+    let item = SparseItem::vacant(unwrap_into_index(0), epoch);
     sparse.resize(new_len, item);
 }
 
@@ -1217,7 +1263,8 @@ mod tests {
         assert_eq!(dense.len(), 0);
         assert_eq!(sparse.len(), 0);
 
-        let sparse_set = SparseSet::from_parts(dense, sparse);
+        let sparse_set = SparseSet::from_parts(dense, sparse)
+            .expect("creation of sparse set from empty parts should not fail");
         assert_eq!(sparse_set.len(), 0);
     }
 
@@ -1299,7 +1346,9 @@ mod tests {
     #[test]
     fn empty_insert_one() {
         let mut sparse_set = SparseSet::new();
-        let previous = sparse_set.insert(0, (42,));
+        let previous = sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(previous, None);
 
         assert_eq!(sparse_set.len(), 1);
@@ -1310,7 +1359,9 @@ mod tests {
     #[test]
     fn with_capacity_insert_one() {
         let mut sparse_set = SparseSet::with_capacity(10, 10);
-        let previous = sparse_set.insert(0, (42,));
+        let previous = sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(previous, None);
 
         assert_eq!(sparse_set.len(), 1);
@@ -1321,7 +1372,9 @@ mod tests {
     #[test]
     fn empty_insert_one_mutate() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
         *sparse_set.index_mut(0).0 = 43;
 
         assert_eq!(sparse_set.len(), 1);
@@ -1332,7 +1385,9 @@ mod tests {
     #[test]
     fn with_capacity_insert_one_mutate() {
         let mut sparse_set = SparseSet::with_capacity(10, 10);
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
         *sparse_set.index_mut(0).0 = 43;
 
         assert_eq!(sparse_set.len(), 1);
@@ -1345,14 +1400,18 @@ mod tests {
         let mut sparse_set = SparseSet::new();
 
         let (key, value) = (3, (42,));
-        sparse_set.insert(key, value);
+        sparse_set
+            .insert(key, value)
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
         assert!(sparse_set.contains_key(key));
 
         let (key, value) = (6, (69,));
-        sparse_set.insert(key, value);
+        sparse_set
+            .insert(key, value)
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
@@ -1362,8 +1421,12 @@ mod tests {
     #[test]
     fn empty_insert_far_remove() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(3, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(3, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let key = 3;
         let value = sparse_set.remove(key).unwrap();
@@ -1386,7 +1449,9 @@ mod tests {
     fn empty_push() {
         let mut sparse_set = SparseSet::new();
 
-        let key = sparse_set.push((42,));
+        let key = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(key, 0);
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.get(key), Some((&42,)));
@@ -1405,7 +1470,9 @@ mod tests {
     #[test]
     fn one_item_insert_remove_one() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.remove(0);
         assert_eq!(removed, Some((42,)));
@@ -1420,7 +1487,9 @@ mod tests {
         let mut sparse_set = EpochSparseSet::new();
 
         let key = Key::new(0, 1);
-        sparse_set.insert(key, (42,));
+        sparse_set
+            .insert(key, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.remove(key);
         assert_eq!(removed, Some((42,)));
@@ -1430,7 +1499,7 @@ mod tests {
         assert!(sparse_set.contains_key(key).not());
 
         assert_eq!(
-            sparse_set.get_epoch(key.sparse_index()),
+            sparse_set.get_epoch(*key.sparse_index()),
             Some(key.epoch().next()),
         );
         let key = Key::new(0, key.epoch().next());
@@ -1441,7 +1510,9 @@ mod tests {
     #[test]
     fn one_item_insert_swap_remove_one() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.swap_remove(0);
         assert_eq!(removed, Some((42,)));
@@ -1456,7 +1527,9 @@ mod tests {
         let mut sparse_set = EpochSparseSet::new();
 
         let key = Key::new(0, 1);
-        sparse_set.insert(key, (42,));
+        sparse_set
+            .insert(key, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.swap_remove(key);
         assert_eq!(removed, Some((42,)));
@@ -1466,7 +1539,7 @@ mod tests {
         assert!(sparse_set.contains_key(key).not());
 
         assert_eq!(
-            sparse_set.get_epoch(key.sparse_index()),
+            sparse_set.get_epoch(*key.sparse_index()),
             Some(key.epoch().next()),
         );
         let key = Key::new(0, key.epoch().next());
@@ -1477,7 +1550,9 @@ mod tests {
     #[test]
     fn one_item_push_remove_one() {
         let mut sparse_set = SparseSet::new();
-        let key = sparse_set.push((42,));
+        let key = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.remove(key);
         assert_eq!(removed, Some((42,)));
@@ -1490,7 +1565,9 @@ mod tests {
     #[test]
     fn one_item_push_remove_one_epoch() {
         let mut sparse_set = EpochSparseSet::<Key, _>::new();
-        let key = sparse_set.push((42,));
+        let key = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.remove(key);
         assert_eq!(removed, Some((42,)));
@@ -1500,7 +1577,7 @@ mod tests {
         assert!(sparse_set.contains_key(key).not());
 
         assert_eq!(
-            sparse_set.get_epoch(key.sparse_index()),
+            sparse_set.get_epoch(*key.sparse_index()),
             Some(key.epoch().next()),
         );
         let key = Key::new(0, key.epoch().next());
@@ -1511,7 +1588,9 @@ mod tests {
     #[test]
     fn one_item_push_swap_remove_one() {
         let mut sparse_set = SparseSet::new();
-        let key = sparse_set.push((42,));
+        let key = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.swap_remove(key);
         assert_eq!(removed, Some((42,)));
@@ -1524,7 +1603,9 @@ mod tests {
     #[test]
     fn one_item_push_swap_remove_one_epoch() {
         let mut sparse_set = EpochSparseSet::<Key, _>::new();
-        let key = sparse_set.push((42,));
+        let key = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.swap_remove(key);
         assert_eq!(removed, Some((42,)));
@@ -1534,7 +1615,7 @@ mod tests {
         assert!(sparse_set.contains_key(key).not());
 
         assert_eq!(
-            sparse_set.get_epoch(key.sparse_index()),
+            sparse_set.get_epoch(*key.sparse_index()),
             Some(key.epoch().next()),
         );
         let key = Key::new(0, key.epoch().next());
@@ -1543,9 +1624,12 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn one_item_swap() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.swap(0, 0);
         assert_eq!(sparse_set.len(), 1);
@@ -1561,9 +1645,12 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn one_item_swap_keys() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.swap_keys(0, 0);
         assert_eq!(sparse_set.len(), 1);
@@ -1581,7 +1668,9 @@ mod tests {
     #[test]
     fn one_item_parts() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (42,));
+        sparse_set
+            .insert(2, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let (dense, sparse) = sparse_set.into_parts();
         let (keys, values) = dense.as_slices().into();
@@ -1596,7 +1685,8 @@ mod tests {
             ]
         );
 
-        let sparse_set = SparseSet::from_parts(dense, sparse);
+        let sparse_set = SparseSet::from_parts(dense, sparse)
+            .expect("creation of sparse set from valid parts should not fail");
         assert_eq!(sparse_set.len(), 1);
         assert_eq!(sparse_set.as_slices(), ([42].as_slice(),));
         assert_eq!(sparse_set.as_keys_slice(), &[2]);
@@ -1606,7 +1696,9 @@ mod tests {
     #[test]
     fn one_item_keys() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let keys = sparse_set.keys();
         assert_eq!(keys.len(), 1);
@@ -1616,7 +1708,9 @@ mod tests {
     #[test]
     fn one_item_into_keys() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let keys = sparse_set.into_keys();
         assert_eq!(keys.len(), 1);
@@ -1626,7 +1720,9 @@ mod tests {
     #[test]
     fn one_item_values() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let values = sparse_set.values();
         assert_eq!(values.len(), 1);
@@ -1636,7 +1732,9 @@ mod tests {
     #[test]
     fn one_item_values_mut() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let values_mut = sparse_set.values_mut();
         assert_eq!(values_mut.len(), 1);
@@ -1646,7 +1744,9 @@ mod tests {
     #[test]
     fn one_item_into_values() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let values = sparse_set.into_values();
         assert_eq!(values.len(), 1);
@@ -1656,7 +1756,9 @@ mod tests {
     #[test]
     fn one_item_iter() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let iter = sparse_set.iter();
         assert_eq!(iter.len(), 1);
@@ -1667,7 +1769,9 @@ mod tests {
     #[test]
     fn one_item_iter_mut() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let iter_mut = sparse_set.iter_mut();
         assert_eq!(iter_mut.len(), 1);
@@ -1678,7 +1782,9 @@ mod tests {
     #[test]
     fn one_item_into_iter() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let into_iter = sparse_set.into_iter();
         assert_eq!(into_iter.len(), 1);
@@ -1689,14 +1795,20 @@ mod tests {
     #[test]
     fn two_items_insert_first() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some((&42,)));
         assert_eq!(sparse_set.get(1), Some((&69,)));
 
-        let previous = sparse_set.insert(0, (34,));
+        let previous = sparse_set
+            .insert(0, (34,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(previous, Some((42,)));
 
         assert_eq!(sparse_set.len(), 2);
@@ -1711,17 +1823,23 @@ mod tests {
         let mut sparse_set = EpochSparseSet::new();
 
         let first_key = Key::new(0, 3);
-        sparse_set.insert(first_key, (42,));
+        sparse_set
+            .insert(first_key, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let second_key = Key::new(1, 0);
-        sparse_set.insert(second_key, (69,));
+        sparse_set
+            .insert(second_key, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(first_key), Some((&42,)));
         assert_eq!(sparse_set.get(second_key), Some((&69,)));
 
-        let first_key = Key::new(first_key.sparse_index(), first_key.epoch().next());
-        let previous = sparse_set.insert(first_key, (34,));
+        let first_key = Key::new(*first_key.sparse_index(), first_key.epoch().next());
+        let previous = sparse_set
+            .insert(first_key, (34,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(previous, Some((42,)));
 
         assert_eq!(sparse_set.len(), 2);
@@ -1734,14 +1852,20 @@ mod tests {
     #[test]
     fn two_items_insert_second() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some((&42,)));
         assert_eq!(sparse_set.get(1), Some((&69,)));
 
-        let previous = sparse_set.insert(1, (34,));
+        let previous = sparse_set
+            .insert(1, (34,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(previous, Some((69,)));
 
         assert_eq!(sparse_set.len(), 2);
@@ -1754,8 +1878,12 @@ mod tests {
     #[test]
     fn two_items_remove_first() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some((&42,)));
@@ -1774,8 +1902,12 @@ mod tests {
     #[test]
     fn two_items_swap_remove_first() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some((&42,)));
@@ -1794,8 +1926,12 @@ mod tests {
     #[test]
     fn two_items_remove_second() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some((&42,)));
@@ -1814,8 +1950,12 @@ mod tests {
     #[test]
     fn two_items_swap_remove_second() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.get(0), Some((&42,)));
@@ -1834,14 +1974,20 @@ mod tests {
     #[test]
     fn two_items_remove_one_insert_one() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.remove(0);
         assert_eq!(removed, Some((42,)));
         assert_eq!(sparse_set.get(0), None);
 
-        sparse_set.insert(0, (34,));
+        sparse_set
+            .insert(0, (34,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(sparse_set.get(0), Some((&34,)));
         assert_eq!(sparse_set.get(1), Some((&69,)));
         assert!(sparse_set.contains_key(0));
@@ -1851,14 +1997,20 @@ mod tests {
     #[test]
     fn two_items_swap_remove_one_insert_one() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.swap_remove(0);
         assert_eq!(removed, Some((42,)));
         assert_eq!(sparse_set.get(0), None);
 
-        sparse_set.insert(0, (34,));
+        sparse_set
+            .insert(0, (34,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(sparse_set.get(0), Some((&34,)));
         assert_eq!(sparse_set.get(1), Some((&69,)));
         assert!(sparse_set.contains_key(0));
@@ -1868,14 +2020,20 @@ mod tests {
     #[test]
     fn two_items_remove_one_push_one() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.remove(0);
         assert_eq!(removed, Some((42,)));
         assert_eq!(sparse_set.get(0), None);
 
-        let key = sparse_set.push((34,));
+        let key = sparse_set
+            .push((34,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(key, 0);
 
         assert_eq!(sparse_set.get(0), Some((&34,)));
@@ -1887,14 +2045,20 @@ mod tests {
     #[test]
     fn two_items_swap_remove_one_push_one() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.swap_remove(0);
         assert_eq!(removed, Some((42,)));
         assert_eq!(sparse_set.get(0), None);
 
-        let key = sparse_set.push((34,));
+        let key = sparse_set
+            .push((34,))
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(key, 0);
 
         assert_eq!(sparse_set.get(0), Some((&34,)));
@@ -1906,8 +2070,12 @@ mod tests {
     #[test]
     fn two_items_swap() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.swap(0, 0);
         assert_eq!(sparse_set.len(), 2);
@@ -1931,8 +2099,12 @@ mod tests {
     #[test]
     fn two_items_swap_keys() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (42,));
-        sparse_set.insert(1, (69,));
+        sparse_set
+            .insert(0, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.swap_keys(0, 0);
         assert_eq!(sparse_set.len(), 2);
@@ -1956,8 +2128,12 @@ mod tests {
     #[test]
     fn two_items_insert_pop() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(5, (42,));
-        sparse_set.insert(2, (69,));
+        sparse_set
+            .insert(5, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(2, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let popped = sparse_set.pop();
         assert_eq!(popped, Some((2, (69,)).into()));
@@ -1969,8 +2145,12 @@ mod tests {
     #[test]
     fn two_items_push_pop() {
         let mut sparse_set = SparseSet::new();
-        let first_key = sparse_set.push((42,));
-        let second_key = sparse_set.push((69,));
+        let first_key = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
+        let second_key = sparse_set
+            .push((69,))
+            .expect("key-to-usize conversions should not fail");
 
         let popped = sparse_set.pop();
         assert_eq!(popped, Some((second_key, (69,)).into()));
@@ -1984,10 +2164,14 @@ mod tests {
         let mut sparse_set = EpochSparseSet::new();
 
         let first_key = Key::new(5, 1);
-        sparse_set.insert(first_key, (42,));
+        sparse_set
+            .insert(first_key, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let second_key = Key::new(2, 0);
-        sparse_set.insert(second_key, (69,));
+        sparse_set
+            .insert(second_key, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let popped = sparse_set.pop();
         assert_eq!(popped, Some((second_key, (69,)).into()));
@@ -1996,7 +2180,7 @@ mod tests {
         assert_eq!(sparse_set.get(second_key), None);
 
         assert_eq!(
-            sparse_set.get_epoch(second_key.sparse_index()),
+            sparse_set.get_epoch(*second_key.sparse_index()),
             Some(second_key.epoch().next()),
         );
     }
@@ -2004,8 +2188,12 @@ mod tests {
     #[test]
     fn two_items_push_pop_epoch() {
         let mut sparse_set = EpochSparseSet::<Key, _>::new();
-        let first_key = sparse_set.push((42,));
-        let second_key = sparse_set.push((69,));
+        let first_key = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
+        let second_key = sparse_set
+            .push((69,))
+            .expect("key-to-usize conversions should not fail");
 
         let popped = sparse_set.pop();
         assert_eq!(popped, Some((second_key, (69,)).into()));
@@ -2014,7 +2202,7 @@ mod tests {
         assert_eq!(sparse_set.get(second_key), None);
 
         assert_eq!(
-            sparse_set.get_epoch(second_key.sparse_index()),
+            sparse_set.get_epoch(*second_key.sparse_index()),
             Some(second_key.epoch().next()),
         );
     }
@@ -2024,10 +2212,14 @@ mod tests {
         let mut sparse_set = EpochSparseSet::new();
 
         let first_key = Key::new(5, 1);
-        sparse_set.insert(first_key, (42,));
+        sparse_set
+            .insert(first_key, (42,))
+            .expect("key-to-usize conversions should not fail");
 
         let second_key = Key::new(2, 0);
-        sparse_set.insert(second_key, (69,));
+        sparse_set
+            .insert(second_key, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let new_first_key = sparse_set
             .invalidate_epoch(first_key)
@@ -2051,9 +2243,15 @@ mod tests {
     #[test]
     fn three_items_insert_remove_middle() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.remove(2);
         assert_eq!(removed, Some((34,)));
@@ -2070,9 +2268,15 @@ mod tests {
     #[test]
     fn three_items_push_remove_middle() {
         let mut sparse_set = SparseSet::new();
-        let first_key = sparse_set.push((34,));
-        let middle_key = sparse_set.push((42,));
-        let last_key = sparse_set.push((69,));
+        let first_key = sparse_set
+            .push((34,))
+            .expect("key-to-usize conversions should not fail");
+        let middle_key = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
+        let last_key = sparse_set
+            .push((69,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.remove(middle_key);
         assert_eq!(removed, Some((42,)));
@@ -2089,9 +2293,15 @@ mod tests {
     #[test]
     fn three_items_swap_remove_middle() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(0, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(2, (69,));
+        sparse_set
+            .insert(0, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(2, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let removed = sparse_set.swap_remove(1);
         assert_eq!(removed, Some((42,)));
@@ -2108,9 +2318,15 @@ mod tests {
     #[test]
     fn three_items_parts() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let (mut dense, sparse) = sparse_set.into_parts();
         let (keys, values) = dense.as_slices().into();
@@ -2129,7 +2345,8 @@ mod tests {
         );
 
         dense.swap_remove(0);
-        let sparse_set = SparseSet::from_parts(dense, sparse);
+        let sparse_set = SparseSet::from_parts(dense, sparse)
+            .expect("creation of sparse set from valid parts should not fail");
         assert_eq!(sparse_set.len(), 2);
         assert_eq!(sparse_set.as_slices(), ([69, 42].as_slice(),));
         assert_eq!(sparse_set.as_keys_slice(), &[5, 1]);
@@ -2139,9 +2356,15 @@ mod tests {
     #[test]
     fn three_items_keys() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let keys = sparse_set.keys();
         assert_eq!(keys.len(), 3);
@@ -2151,9 +2374,15 @@ mod tests {
     #[test]
     fn three_items_into_keys() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let keys = sparse_set.into_keys();
         assert_eq!(keys.len(), 3);
@@ -2163,9 +2392,15 @@ mod tests {
     #[test]
     fn three_items_values() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let values = sparse_set.values();
         assert_eq!(values.len(), 3);
@@ -2175,9 +2410,15 @@ mod tests {
     #[test]
     fn three_items_values_mut() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let values_mut = sparse_set.values_mut();
         assert_eq!(values_mut.len(), 3);
@@ -2187,9 +2428,15 @@ mod tests {
     #[test]
     fn three_items_into_values() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let values = sparse_set.into_values();
         assert_eq!(values.len(), 3);
@@ -2199,9 +2446,15 @@ mod tests {
     #[test]
     fn three_items_iter() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let iter = sparse_set.iter();
         assert_eq!(iter.len(), 3);
@@ -2212,9 +2465,15 @@ mod tests {
     #[test]
     fn three_items_iter_mut() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let iter_mut = sparse_set.iter_mut();
         assert_eq!(iter_mut.len(), 3);
@@ -2225,9 +2484,15 @@ mod tests {
     #[test]
     fn three_items_into_iter() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let into_iter = sparse_set.into_iter();
         assert_eq!(into_iter.len(), 3);
@@ -2238,11 +2503,21 @@ mod tests {
     #[test]
     fn five_items_remove_insert() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(4, (34,));
-        sparse_set.insert(2, (42,));
-        sparse_set.insert(1, (69,));
-        sparse_set.insert(6, (228,));
-        sparse_set.insert(0, (666,));
+        sparse_set
+            .insert(4, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(2, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(0, (666,))
+            .expect("key-to-usize conversions should not fail");
 
         let key = 1;
         let value = sparse_set.remove(key).unwrap();
@@ -2262,7 +2537,9 @@ mod tests {
 
         let key = 3;
         let value = (0,);
-        let previous = sparse_set.insert(key, value);
+        let previous = sparse_set
+            .insert(key, value)
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
@@ -2270,7 +2547,9 @@ mod tests {
 
         let key = 2;
         let value = (1,);
-        let previous = sparse_set.insert(key, value);
+        let previous = sparse_set
+            .insert(key, value)
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(previous, Some((42,)));
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
@@ -2278,7 +2557,9 @@ mod tests {
 
         let key = 4;
         let value = (10,);
-        let previous = sparse_set.insert(key, value);
+        let previous = sparse_set
+            .insert(key, value)
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
@@ -2288,11 +2569,21 @@ mod tests {
     #[test]
     fn five_items_swap_remove_insert() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(4, (34,));
-        sparse_set.insert(2, (42,));
-        sparse_set.insert(1, (69,));
-        sparse_set.insert(6, (228,));
-        sparse_set.insert(0, (666,));
+        sparse_set
+            .insert(4, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(2, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(0, (666,))
+            .expect("key-to-usize conversions should not fail");
 
         let key = 1;
         let value = sparse_set.swap_remove(key).unwrap();
@@ -2312,7 +2603,9 @@ mod tests {
 
         let key = 3;
         let value = (0,);
-        let previous = sparse_set.insert(key, value);
+        let previous = sparse_set
+            .insert(key, value)
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
@@ -2320,7 +2613,9 @@ mod tests {
 
         let key = 2;
         let value = (1,);
-        let previous = sparse_set.insert(key, value);
+        let previous = sparse_set
+            .insert(key, value)
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(previous, Some((42,)));
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
@@ -2328,7 +2623,9 @@ mod tests {
 
         let key = 4;
         let value = (10,);
-        let previous = sparse_set.insert(key, value);
+        let previous = sparse_set
+            .insert(key, value)
+            .expect("key-to-usize conversions should not fail");
 
         assert_eq!(previous, None);
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
@@ -2338,11 +2635,21 @@ mod tests {
     #[test]
     fn five_items_remove_push() {
         let mut sparse_set = SparseSet::new();
-        let _key0 = sparse_set.push((34,));
-        let key1 = sparse_set.push((42,));
-        let key2 = sparse_set.push((69,));
-        let key3 = sparse_set.push((228,));
-        let key4 = sparse_set.push((666,));
+        let _key0 = sparse_set
+            .push((34,))
+            .expect("key-to-usize conversions should not fail");
+        let key1 = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
+        let key2 = sparse_set
+            .push((69,))
+            .expect("key-to-usize conversions should not fail");
+        let key3 = sparse_set
+            .push((228,))
+            .expect("key-to-usize conversions should not fail");
+        let key4 = sparse_set
+            .push((666,))
+            .expect("key-to-usize conversions should not fail");
 
         let value = sparse_set.remove(key1).unwrap();
         assert_eq!(value, (42,));
@@ -2357,17 +2664,23 @@ mod tests {
         assert_eq!(value, (69,));
 
         let value = (0,);
-        let key = sparse_set.push(value);
+        let key = sparse_set
+            .push(value)
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
         assert!(sparse_set.contains_key(key));
 
         let value = (1,);
-        let key = sparse_set.push(value);
+        let key = sparse_set
+            .push(value)
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
         assert!(sparse_set.contains_key(key));
 
         let value = (10,);
-        let key = sparse_set.push(value);
+        let key = sparse_set
+            .push(value)
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
         assert!(sparse_set.contains_key(key));
     }
@@ -2375,11 +2688,21 @@ mod tests {
     #[test]
     fn five_items_swap_remove_push() {
         let mut sparse_set = SparseSet::new();
-        let _key0 = sparse_set.push((34,));
-        let key1 = sparse_set.push((42,));
-        let key2 = sparse_set.push((69,));
-        let key3 = sparse_set.push((228,));
-        let key4 = sparse_set.push((666,));
+        let _key0 = sparse_set
+            .push((34,))
+            .expect("key-to-usize conversions should not fail");
+        let key1 = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
+        let key2 = sparse_set
+            .push((69,))
+            .expect("key-to-usize conversions should not fail");
+        let key3 = sparse_set
+            .push((228,))
+            .expect("key-to-usize conversions should not fail");
+        let key4 = sparse_set
+            .push((666,))
+            .expect("key-to-usize conversions should not fail");
 
         let value = sparse_set.swap_remove(key1).unwrap();
         assert_eq!(value, (42,));
@@ -2394,17 +2717,23 @@ mod tests {
         assert_eq!(value, (69,));
 
         let value = (0,);
-        let key = sparse_set.push(value);
+        let key = sparse_set
+            .push(value)
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
         assert!(sparse_set.contains_key(key));
 
         let value = (1,);
-        let key = sparse_set.push(value);
+        let key = sparse_set
+            .push(value)
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
         assert!(sparse_set.contains_key(key));
 
         let value = (10,);
-        let key = sparse_set.push(value);
+        let key = sparse_set
+            .push(value)
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(sparse_set.get(key), Some((&value.0,)));
         assert!(sparse_set.contains_key(key));
     }
@@ -2412,11 +2741,21 @@ mod tests {
     #[test]
     fn five_items_retain() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(8, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(4, (69,));
-        sparse_set.insert(3, (228,));
-        sparse_set.insert(6, (666,));
+        sparse_set
+            .insert(8, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(4, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(3, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (666,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.retain(|key, _| key % 2 == 0);
         assert_eq!(sparse_set.len(), 3);
@@ -2444,11 +2783,21 @@ mod tests {
     #[test]
     fn five_items_drain() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(8, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(4, (69,));
-        sparse_set.insert(3, (228,));
-        sparse_set.insert(6, (666,));
+        sparse_set
+            .insert(8, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(4, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(3, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (666,))
+            .expect("key-to-usize conversions should not fail");
 
         let drain = sparse_set.drain();
         assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
@@ -2467,11 +2816,21 @@ mod tests {
     #[test]
     fn five_items_insert_truncate() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(8, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(4, (69,));
-        sparse_set.insert(3, (228,));
-        sparse_set.insert(6, (666,));
+        sparse_set
+            .insert(8, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(4, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(3, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (666,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.truncate(usize::MAX, 5);
         assert_eq!(sparse_set.sparse_len(), 5);
@@ -2493,11 +2852,21 @@ mod tests {
     #[test]
     fn five_items_push_truncate() {
         let mut sparse_set = SparseSet::new();
-        let key0 = sparse_set.push((34,));
-        let key1 = sparse_set.push((42,));
-        let key2 = sparse_set.push((69,));
-        let key3 = sparse_set.push((228,));
-        let key4 = sparse_set.push((666,));
+        let key0 = sparse_set
+            .push((34,))
+            .expect("key-to-usize conversions should not fail");
+        let key1 = sparse_set
+            .push((42,))
+            .expect("key-to-usize conversions should not fail");
+        let key2 = sparse_set
+            .push((69,))
+            .expect("key-to-usize conversions should not fail");
+        let key3 = sparse_set
+            .push((228,))
+            .expect("key-to-usize conversions should not fail");
+        let key4 = sparse_set
+            .push((666,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.truncate(usize::MAX, 3);
         assert_eq!(sparse_set.sparse_len(), 3);
@@ -2521,11 +2890,21 @@ mod tests {
     #[test]
     fn five_items_sort() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(8, (42,));
-        sparse_set.insert(1, (228,));
-        sparse_set.insert(4, (69,));
-        sparse_set.insert(3, (666,));
-        sparse_set.insert(6, (34,));
+        sparse_set
+            .insert(8, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(4, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(3, (666,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (34,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.sort();
         assert_eq!(sparse_set.keys().as_slice(), &[6, 8, 4, 1, 3]);
@@ -2544,11 +2923,21 @@ mod tests {
     #[test]
     fn five_items_sort_keys() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(8, (42,));
-        sparse_set.insert(1, (228,));
-        sparse_set.insert(4, (69,));
-        sparse_set.insert(3, (666,));
-        sparse_set.insert(6, (34,));
+        sparse_set
+            .insert(8, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(4, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(3, (666,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (34,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.sort_keys();
         assert_eq!(sparse_set.keys().as_slice(), &[1, 3, 4, 6, 8]);
@@ -2567,11 +2956,21 @@ mod tests {
     #[test]
     fn five_items_sort_by() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(8, (42,));
-        sparse_set.insert(1, (228,));
-        sparse_set.insert(4, (69,));
-        sparse_set.insert(3, (666,));
-        sparse_set.insert(6, (34,));
+        sparse_set
+            .insert(8, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(4, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(3, (666,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (34,))
+            .expect("key-to-usize conversions should not fail");
 
         sparse_set.sort_by(|(_, (a,)), (_, (b,))| Ord::cmp(b, a));
         assert_eq!(sparse_set.keys().as_slice(), &[3, 1, 4, 8, 6]);
@@ -2590,13 +2989,25 @@ mod tests {
     #[test]
     fn five_items_entry() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(8, (42,));
-        sparse_set.insert(1, (228,));
-        sparse_set.insert(4, (69,));
-        sparse_set.insert(3, (666,));
-        sparse_set.insert(6, (34,));
+        sparse_set
+            .insert(8, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (228,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(4, (69,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(3, (666,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(6, (34,))
+            .expect("key-to-usize conversions should not fail");
 
-        let entry = sparse_set.entry(0);
+        let entry = sparse_set
+            .entry(0)
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(entry.key(), 0);
         assert_eq!(entry.get(), None);
 
@@ -2604,7 +3015,9 @@ mod tests {
         assert_eq!(entry.key(), 0);
         assert_eq!(entry.get(), None);
 
-        let entry = entry.replace_key(1);
+        let entry = entry
+            .replace_key(1)
+            .expect("key-to-usize conversions should not fail");
         assert_eq!(entry.key(), 1);
         assert_eq!(entry.get(), Some((&228,)));
 
@@ -2674,9 +3087,15 @@ mod tests {
     #[test]
     fn extend_keys_values() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(5, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let keys = [3, 0, 2, 8];
         let values = [(228,), (666,), (42,), (69,)];
@@ -2699,9 +3118,15 @@ mod tests {
     #[test]
     fn extend_values() {
         let mut sparse_set = SparseSet::new();
-        sparse_set.insert(2, (34,));
-        sparse_set.insert(1, (42,));
-        sparse_set.insert(4, (69,));
+        sparse_set
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_set
+            .insert(4, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let values = [(228,), (666,), (201,)];
         sparse_set.extend(values);
@@ -2723,9 +3148,15 @@ mod tests {
     #[test]
     fn from_arena() {
         let mut sparse_arena = SparseArena::new();
-        sparse_arena.insert(2, (34,));
-        sparse_arena.insert(1, (42,));
-        sparse_arena.insert(5, (69,));
+        sparse_arena
+            .insert(2, (34,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_arena
+            .insert(1, (42,))
+            .expect("key-to-usize conversions should not fail");
+        sparse_arena
+            .insert(5, (69,))
+            .expect("key-to-usize conversions should not fail");
 
         let sparse_set = SparseSet::from(sparse_arena);
         assert_eq!(sparse_set.len(), 3);

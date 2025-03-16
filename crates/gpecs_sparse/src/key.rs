@@ -5,25 +5,30 @@ use core::{
 };
 
 pub trait Key: Copy + Ord {
+    type SparseIndex: SparseIndex;
     type Epoch: Epoch;
 
-    fn new(sparse_index: usize, epoch: Self::Epoch) -> Self;
+    fn new(sparse_index: Self::SparseIndex, epoch: Self::Epoch) -> Self;
 
-    fn sparse_index(self) -> usize;
+    fn sparse_index(self) -> Self::SparseIndex;
 
     fn epoch(self) -> Self::Epoch;
 }
 
-impl Key for usize {
+impl<I> Key for I
+where
+    I: SparseIndex,
+{
+    type SparseIndex = I;
     type Epoch = NoEpoch;
 
     #[inline]
-    fn new(sparse_index: usize, _: Self::Epoch) -> Self {
+    fn new(sparse_index: Self::SparseIndex, _: Self::Epoch) -> Self {
         sparse_index
     }
 
     #[inline]
-    fn sparse_index(self) -> usize {
+    fn sparse_index(self) -> Self::SparseIndex {
         self
     }
 
@@ -34,14 +39,14 @@ impl Key for usize {
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct EpochKey<E = usize> {
-    pub sparse_index: usize,
+pub struct EpochKey<I = usize, E = usize> {
+    pub sparse_index: I,
     pub epoch: E,
 }
 
-impl<E> EpochKey<E> {
+impl<I, E> EpochKey<I, E> {
     #[inline]
-    pub const fn new(sparse_index: usize, epoch: E) -> Self {
+    pub const fn new(sparse_index: I, epoch: E) -> Self {
         Self {
             sparse_index,
             epoch,
@@ -49,13 +54,13 @@ impl<E> EpochKey<E> {
     }
 
     #[inline]
-    pub const fn sparse_index(&self) -> usize {
+    pub const fn sparse_index(&self) -> &I {
         let Self { sparse_index, .. } = self;
-        *sparse_index
+        sparse_index
     }
 
     #[inline]
-    pub const fn sparse_index_mut(&mut self) -> &mut usize {
+    pub const fn sparse_index_mut(&mut self) -> &mut I {
         let Self { sparse_index, .. } = self;
         sparse_index
     }
@@ -73,8 +78,9 @@ impl<E> EpochKey<E> {
     }
 }
 
-impl<E> Display for EpochKey<E>
+impl<I, E> Display for EpochKey<I, E>
 where
+    I: Display,
     E: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -87,20 +93,22 @@ where
     }
 }
 
-impl<E> Key for EpochKey<E>
+impl<I, E> Key for EpochKey<I, E>
 where
+    I: SparseIndex,
     E: Epoch,
 {
+    type SparseIndex = I;
     type Epoch = E;
 
     #[inline]
-    fn new(sparse_index: usize, epoch: Self::Epoch) -> Self {
+    fn new(sparse_index: Self::SparseIndex, epoch: Self::Epoch) -> Self {
         EpochKey::new(sparse_index, epoch)
     }
 
     #[inline]
-    fn sparse_index(self) -> usize {
-        EpochKey::sparse_index(&self)
+    fn sparse_index(self) -> Self::SparseIndex {
+        *EpochKey::sparse_index(&self)
     }
 
     #[inline]
@@ -109,7 +117,7 @@ where
     }
 }
 
-impl From<usize> for EpochKey<NoEpoch> {
+impl From<usize> for EpochKey<usize, NoEpoch> {
     #[inline]
     fn from(sparse_index: usize) -> Self {
         EpochKey {
@@ -119,13 +127,22 @@ impl From<usize> for EpochKey<NoEpoch> {
     }
 }
 
-impl From<EpochKey<NoEpoch>> for usize {
+impl From<EpochKey<usize, NoEpoch>> for usize {
     #[inline]
-    fn from(value: EpochKey<NoEpoch>) -> Self {
+    fn from(value: EpochKey<usize, NoEpoch>) -> Self {
         let EpochKey { sparse_index, .. } = value;
         sparse_index
     }
 }
+
+pub trait SparseIndex: Copy + Ord + Default + TryFrom<usize> + TryInto<usize> {}
+
+impl SparseIndex for u8 {}
+impl SparseIndex for u16 {}
+impl SparseIndex for u32 {}
+impl SparseIndex for u64 {}
+impl SparseIndex for u128 {}
+impl SparseIndex for usize {}
 
 pub trait Epoch: Copy + Ord + Default {
     fn next(self) -> Self;

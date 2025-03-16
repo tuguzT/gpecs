@@ -1,4 +1,7 @@
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    num::Wrapping,
+};
 
 use gpecs_sparse::key::{EpochKey, Key};
 
@@ -6,54 +9,55 @@ pub mod registry;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Entity {
-    inner: EpochKey,
+    inner: EpochKey<u32, Wrapping<u16>>,
 }
 
 impl Entity {
     #[inline]
-    pub const fn new(sparse_index: usize, epoch: usize) -> Self {
-        let inner = EpochKey::new(sparse_index, epoch);
+    pub const fn new(sparse_index: u32, epoch: u16) -> Self {
+        let inner = EpochKey::new(sparse_index, Wrapping(epoch));
         Self { inner }
     }
 
     #[inline]
-    pub const fn sparse_index(&self) -> usize {
+    pub const fn sparse_index(&self) -> u32 {
         let Self { inner } = self;
-        inner.sparse_index()
+        *inner.sparse_index()
     }
 
     #[inline]
-    pub const fn sparse_index_mut(&mut self) -> &mut usize {
+    pub const fn sparse_index_mut(&mut self) -> &mut u32 {
         let Self { inner } = self;
         inner.sparse_index_mut()
     }
 
     #[inline]
-    pub const fn epoch(&self) -> usize {
+    pub const fn epoch(&self) -> u16 {
         let Self { inner } = self;
-        *inner.epoch()
+        inner.epoch().0
     }
 
     #[inline]
-    pub const fn epoch_mut(&mut self) -> &mut usize {
+    pub const fn epoch_mut(&mut self) -> &mut u16 {
         let Self { inner } = self;
-        inner.epoch_mut()
+        &mut inner.epoch_mut().0
     }
 }
 
 impl Key for Entity {
-    type Epoch = usize;
+    type SparseIndex = u32;
+    type Epoch = Wrapping<u16>;
 
-    fn new(sparse_index: usize, epoch: Self::Epoch) -> Self {
-        Entity::new(sparse_index, epoch)
+    fn new(sparse_index: Self::SparseIndex, epoch: Self::Epoch) -> Self {
+        Entity::new(sparse_index, epoch.0)
     }
 
-    fn sparse_index(self) -> usize {
+    fn sparse_index(self) -> Self::SparseIndex {
         Entity::sparse_index(&self)
     }
 
     fn epoch(self) -> Self::Epoch {
-        Entity::epoch(&self)
+        Wrapping(Entity::epoch(&self))
     }
 }
 

@@ -1,6 +1,6 @@
 use std::{ops::Deref, slice::Iter, vec::IntoIter};
 
-use gpecs_sparse::arena::EpochSparseArena;
+use gpecs_sparse::{arena::EpochSparseArena, error::TryInvalidKeyError};
 
 use super::Entity;
 
@@ -99,27 +99,34 @@ impl EntityRegistry {
     #[inline]
     pub fn insert(&mut self, entity: Entity) {
         let Self { inner } = self;
-        inner.insert(entity, ());
+        inner.insert(entity, ()).unwrap();
     }
 
     #[inline]
     pub fn try_insert(&mut self, entity: Entity) -> Result<(), TryReserveError> {
         let Self { inner } = self;
 
-        inner.try_insert(entity, ())?;
-        Ok(())
+        match inner.try_insert(entity, ()) {
+            Ok(_) => Ok(()),
+            Err(TryInvalidKeyError::TryReserve(error)) => Err(error),
+            Err(_) => todo!(),
+        }
     }
 
     #[inline]
     pub fn spawn(&mut self) -> Entity {
         let Self { inner } = self;
-        inner.push(())
+        inner.push(()).unwrap()
     }
 
     #[inline]
     pub fn try_spawn(&mut self) -> Result<Entity, TryReserveError> {
         let Self { inner } = self;
-        inner.try_push(())
+        match inner.try_push(()) {
+            Ok(entity) => Ok(entity),
+            Err(TryInvalidKeyError::TryReserve(error)) => Err(error),
+            Err(_) => todo!(),
+        }
     }
 
     #[inline]
@@ -129,9 +136,9 @@ impl EntityRegistry {
     }
 
     #[inline]
-    pub fn get_epoch(&self, sparse_index: usize) -> Option<usize> {
+    pub fn get_epoch(&self, sparse_index: u32) -> Option<u16> {
         let Self { inner } = self;
-        inner.get_epoch(sparse_index)
+        inner.get_epoch(sparse_index).map(|epoch| epoch.0)
     }
 
     #[inline]
@@ -170,13 +177,6 @@ impl EntityRegistry {
     #[inline]
     pub fn iter(&self) -> Iter<'_, Entity> {
         self.as_slice().iter()
-    }
-}
-
-impl From<Vec<Entity>> for EntityRegistry {
-    #[inline]
-    fn from(value: Vec<Entity>) -> Self {
-        value.into_iter().collect()
     }
 }
 
@@ -252,21 +252,5 @@ impl IntoIterator for EntityRegistry {
     fn into_iter(self) -> Self::IntoIter {
         let vec: Vec<_> = self.into();
         vec.into_iter()
-    }
-}
-
-impl FromIterator<Entity> for EntityRegistry {
-    #[inline]
-    fn from_iter<T: IntoIterator<Item = Entity>>(iter: T) -> Self {
-        let inner = iter.into_iter().map(|entity| (entity, ())).collect();
-        Self { inner }
-    }
-}
-
-impl Extend<Entity> for EntityRegistry {
-    #[inline]
-    fn extend<T: IntoIterator<Item = Entity>>(&mut self, iter: T) {
-        let Self { inner } = self;
-        inner.extend(iter.into_iter().map(|entity| (entity, ())));
     }
 }

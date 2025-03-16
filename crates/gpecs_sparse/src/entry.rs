@@ -6,6 +6,7 @@ use core::{
 use crate::{
     arena::EpochSparseArena,
     assert::unwrap_dense,
+    error::InvalidKeyError,
     key::Key,
     set::EpochSparseSet,
     soa::{mem::replace as soa_replace, Soa},
@@ -112,7 +113,7 @@ where
     }
 
     #[inline]
-    pub fn replace_key(&mut self, key: K) -> Option<V> {
+    pub fn replace_key(&mut self, key: K) -> Result<Option<V>, InvalidKeyError<K>> {
         let new_key = key;
         let Self { key, container, .. } = self;
 
@@ -184,7 +185,9 @@ where
     pub fn insert(self, value: V) -> V::RefsMut<'a> {
         let Self { key, container, .. } = self;
 
-        container.insert(key, value);
+        if let Err(_) = container.insert(key, value) {
+            unreachable!()
+        }
 
         let value = container.slices_mut().into_iter().last();
         unwrap_entry_value(value)
@@ -198,7 +201,9 @@ where
             phantom,
         } = self;
 
-        container.insert(key, value);
+        if let Err(_) = container.insert(key, value) {
+            unreachable!()
+        }
         let dense_index = container.slices().len() - 1;
 
         OccupiedEntry {
@@ -247,7 +252,7 @@ where
 
     fn slices_mut(&mut self) -> SoaSlicesMut<'_, V>;
 
-    fn insert(&mut self, key: K, value: V) -> Option<V>;
+    fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InvalidKeyError<K>>;
 
     fn remove(&mut self, key: K) -> Option<V>;
 
@@ -270,7 +275,7 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, key: K, value: V) -> Option<V> {
+    fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InvalidKeyError<K>> {
         EpochSparseSet::insert(self, key, value)
     }
 
@@ -301,7 +306,7 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, key: K, value: V) -> Option<V> {
+    fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InvalidKeyError<K>> {
         EpochSparseArena::insert(self, key, value)
     }
 
@@ -422,15 +427,15 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn replace_key(self, key: K) -> Self {
+            pub fn replace_key(self, key: K) -> Result<Self, InvalidKeyError<K>> {
                 match self {
                     Self::Occupied(mut entry) => {
-                        entry.replace_key(key);
-                        Self::Occupied(entry)
+                        entry.replace_key(key)?;
+                        Ok(Self::Occupied(entry))
                     }
                     Self::Vacant(entry) => {
                         let container = entry.into_container();
-                        container.entry(key)
+                        Ok(container.entry(key)?)
                     }
                 }
             }
@@ -513,7 +518,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn replace_key(&mut self, key: K) -> Option<V> {
+            pub fn replace_key(&mut self, key: K) -> Result<Option<V>, InvalidKeyError<K>> {
                 let Self { inner } = self;
                 inner.replace_key(key)
             }

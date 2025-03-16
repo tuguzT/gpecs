@@ -330,7 +330,7 @@ where
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>> {
         let value = from_erased_fields::<B>(components, self.context(), fields);
-        let value = SparseSet::insert(self, entity, value)?;
+        let value = SparseSet::insert(self, entity, value).unwrap()?;
         let fields = into_erased_fields::<B>(components, self.context(), value);
         Some(fields)
     }

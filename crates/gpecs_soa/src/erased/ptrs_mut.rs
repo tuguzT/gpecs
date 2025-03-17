@@ -11,6 +11,7 @@ use crate::traits::Soa;
 
 use super::validate_layout;
 
+// TODO: replace with struct of layout and this
 type ErasedFieldMutPtr = *mut [u8];
 
 pub struct ErasedSoaMutPtrs<Fields> {

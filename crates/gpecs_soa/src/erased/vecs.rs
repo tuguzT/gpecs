@@ -4,6 +4,7 @@ use alloc::{boxed::Box, vec::Vec};
 
 use super::byte::ErasedByte;
 
+// TODO: add API (and decide what to do with drops for fields)
 // data is stored inline in a single buffer
 pub struct ErasedFieldVec<Fields> {
     pub(super) buffer: Vec<ErasedByte<Fields>>,

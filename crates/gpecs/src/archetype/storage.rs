@@ -12,7 +12,7 @@ use crate::{
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
     soa::erased::{
-        ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut,
+        self, ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut,
     },
 };
 
@@ -467,7 +467,8 @@ fn from_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let refs = reorder_fields::<B, _>(components, context, fields);
+    let refs = reorder_fields::<B, _>(components, context, fields)
+        .map(|(layout, buffer)| erased::ErasedFieldRef::new(layout, buffer));
     let erased_refs = ErasedSoaRefs::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -481,7 +482,9 @@ fn into_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let erased_refs = ErasedSoaRefs::from::<B>(context, refs);
+    let erased_refs = ErasedSoaRefs::from::<B>(context, refs)
+        .into_iter()
+        .map(erased::ErasedFieldRef::into_parts);
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -497,7 +500,8 @@ fn from_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let refs = reorder_fields::<B, _>(components, context, fields);
+    let refs = reorder_fields::<B, _>(components, context, fields)
+        .map(|(layout, buffer)| erased::ErasedFieldRefMut::new(layout, buffer));
     let erased_refs = ErasedSoaRefsMut::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -511,7 +515,9 @@ fn into_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs);
+    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs)
+        .into_iter()
+        .map(erased::ErasedFieldRefMut::into_parts);
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()

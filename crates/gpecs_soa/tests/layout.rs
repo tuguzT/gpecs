@@ -1,7 +1,7 @@
 use std::{alloc::Layout, ptr, slice};
 
 use gpecs_soa::{
-    erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaSlices},
+    erased::{ErasedFieldRef, ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaSlices},
     prelude::*,
     slice::{Iter as SoaIter, IterMut as SoaIterMut},
     vec::IntoIter as SoaIntoIter,
@@ -83,7 +83,6 @@ fn erased_context_of() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)]
 fn erased_value() {
     let context = ();
 
@@ -92,7 +91,7 @@ fn erased_value() {
     assert_eq!(erased_value.layouts(), [Layout::new::<()>()]);
     assert_eq!(
         erased_value.as_refs().as_ref(),
-        [(Layout::new::<()>(), [].as_slice())],
+        [ErasedFieldRef::new(Layout::new::<()>(), [].as_slice())],
     );
 
     let value = unsafe { erased_value.into::<()>(&context) };
@@ -111,19 +110,28 @@ fn erased_value() {
     ];
     assert_eq!(erased_value.layouts(), optimized_layout);
 
-    let i1_bytes = i1.to_ne_bytes();
-    let i2_bytes = i2.to_ne_bytes();
-    let i3_bytes = i3.to_ne_bytes();
+    let i1_bytes = unsafe {
+        let data = ptr::from_ref(&i1).cast();
+        let len = size_of_val(&i1);
+        slice::from_raw_parts(data, len)
+    };
+    let i2_bytes = unsafe {
+        let data = ptr::from_ref(&i2).cast();
+        let len = size_of_val(&i2);
+        slice::from_raw_parts(data, len)
+    };
+    let i3_bytes = unsafe {
+        let data = ptr::from_ref(&i3).cast();
+        let len = size_of_val(&i3);
+        slice::from_raw_parts(data, len)
+    };
 
-    let i1_bytes = i1_bytes.as_slice();
-    let i2_bytes = i2_bytes.as_slice();
-    let i3_bytes = i3_bytes.as_slice();
     assert_eq!(
         erased_value.as_refs().as_ref(),
         [
-            (optimized_layout[0], i3_bytes),
-            (optimized_layout[1], i2_bytes),
-            (optimized_layout[2], i1_bytes),
+            ErasedFieldRef::new(optimized_layout[0], i3_bytes),
+            ErasedFieldRef::new(optimized_layout[1], i2_bytes),
+            ErasedFieldRef::new(optimized_layout[2], i1_bytes),
         ],
     );
 
@@ -145,9 +153,9 @@ fn erased_value() {
     assert_eq!(
         erased_value.as_refs().as_ref(),
         [
-            (optimized_layout[0], i3_bytes),
-            (optimized_layout[1], i2_bytes),
-            (optimized_layout[2], i1_bytes),
+            ErasedFieldRef::new(optimized_layout[0], i3_bytes),
+            ErasedFieldRef::new(optimized_layout[1], i2_bytes),
+            ErasedFieldRef::new(optimized_layout[2], i1_bytes),
         ],
     );
 
@@ -159,9 +167,9 @@ fn erased_value() {
     assert_eq!(
         refs.as_ref(),
         [
-            (optimized_layout[0], i3_bytes),
-            (optimized_layout[1], i2_bytes),
-            (optimized_layout[2], i1_bytes),
+            ErasedFieldRef::new(optimized_layout[0], i3_bytes),
+            ErasedFieldRef::new(optimized_layout[1], i2_bytes),
+            ErasedFieldRef::new(optimized_layout[2], i1_bytes),
         ],
     );
 

@@ -11,6 +11,7 @@ use crate::traits::Soa;
 
 use super::validate_layout;
 
+// TODO: replace with struct of layout and this
 // data is stored inline in a single buffer
 type ErasedFieldSliceMutPtr = *mut [u8];
 

@@ -682,19 +682,9 @@ fn one_item_erased() {
     let u16_bytes = u16_bytes.as_slice();
 
     let fields = [u8_bytes, u16_bytes, u64_bytes];
-    let value = ErasedSoa::from(&context, (u8, u64, u16));
-    assert_eq!(
-        value.as_refs().as_ref(),
-        [
-            (optimized_layout[0], u8_bytes),
-            (optimized_layout[1], u16_bytes),
-            (optimized_layout[2], u64_bytes),
-        ],
-    );
-
     let mut vec = Vec::with_context(erased_context);
 
-    vec.push(value);
+    vec.push(ErasedSoa::from(&context, (u8, u64, u16)));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(

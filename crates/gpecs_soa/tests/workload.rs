@@ -137,7 +137,7 @@ fn new_erased() {
         Layout::new::<u16>(),
         Layout::new::<u64>(),
     ];
-    assert_eq!(erased_context.layouts(), optimized_layout);
+    assert_eq!(erased_context.field_layouts(), optimized_layout);
 
     let vec = Vec::with_context(erased_context);
     assert!(vec.is_empty());
@@ -326,7 +326,7 @@ fn with_capacity_erased() {
         Layout::new::<u16>(),
         Layout::new::<u64>(),
     ];
-    assert_eq!(erased_context.layouts(), optimized_layout);
+    assert_eq!(erased_context.field_layouts(), optimized_layout);
 
     let vec = Vec::with_context_and_capacity(erased_context, 10);
     assert!(vec.is_empty());
@@ -667,7 +667,7 @@ fn one_item_erased() {
         Layout::new::<u16>(),
         Layout::new::<u64>(),
     ];
-    assert_eq!(erased_context.layouts(), optimized_layout);
+    assert_eq!(erased_context.field_layouts(), optimized_layout);
 
     let u8 = 1u8;
     let u64 = 2u64;
@@ -763,9 +763,15 @@ fn one_item_erased() {
     let erased_context = vec.context();
     assert_eq!(
         value.as_refs().as_ref(),
-        ErasedSoa::<Soa>::new(erased_context.layouts().into_iter().copied().zip(fields))
-            .as_refs()
-            .as_ref(),
+        ErasedSoa::<Soa>::new(
+            erased_context
+                .field_layouts()
+                .into_iter()
+                .copied()
+                .zip(fields)
+        )
+        .as_refs()
+        .as_ref(),
     );
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
@@ -1463,7 +1469,7 @@ fn three_items_erased() {
         Layout::new::<String>(),
         Layout::new::<u128>(),
     ];
-    assert_eq!(optimized_layout, erased_context.layouts());
+    assert_eq!(optimized_layout, erased_context.field_layouts());
 
     let mut vec = Vec::with_context(erased_context);
 

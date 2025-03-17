@@ -71,7 +71,7 @@ fn erased_context_fail() {
 #[cfg_attr(miri, ignore)]
 fn erased_context_of() {
     let context = ErasedSoaContext::of::<()>(());
-    assert_eq!(context.layouts(), [Layout::new::<()>()]);
+    assert_eq!(context.field_layouts(), [Layout::new::<()>()]);
 
     let context = ErasedSoaContext::of::<(u32, u16, u8)>(());
     let optimized_layout = [
@@ -79,7 +79,7 @@ fn erased_context_of() {
         Layout::new::<u16>(),
         Layout::new::<u32>(),
     ];
-    assert_eq!(context.layouts(), optimized_layout);
+    assert_eq!(context.field_layouts(), optimized_layout);
 }
 
 #[test]

@@ -23,19 +23,18 @@ impl ErasedFieldNonNullPtr {
     #[inline]
     #[track_caller]
     pub fn new(layout: Layout, buffer: NonNull<[u8]>) -> Self {
-        // TODO: return checks when the source of wrong pointer arithmetic is found
-        // let buffer_len = buffer.len();
-        // let layout_size = layout.size();
-        // assert!(
-        //     buffer_len == layout_size,
-        //     "buffer len {buffer_len} should match layout size {layout_size}",
-        // );
+        let buffer_len = buffer.len();
+        let layout_size = layout.size();
+        assert!(
+            buffer_len == layout_size,
+            "buffer len {buffer_len} should match layout size {layout_size}",
+        );
 
-        // let layout_align = layout.align();
-        // assert!(
-        //     buffer.cast::<u8>().align_offset(layout_align) == 0,
-        //     "buffer should be aligned to {layout_align}",
-        // );
+        let layout_align = layout.align();
+        assert!(
+            buffer.cast::<u8>().align_offset(layout_align) == 0,
+            "buffer should be aligned to {layout_align}",
+        );
 
         Self { layout, buffer }
     }

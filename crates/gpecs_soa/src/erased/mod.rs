@@ -1182,7 +1182,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
 
                 let data = slice.cast();
-                let len = slice.len().checked_div(field_layout.size()).unwrap_or(0);
+                let len = field_layout.size();
                 let ptr = ptr::slice_from_raw_parts(data, len);
                 ErasedFieldPtr::new(layout, ptr)
             })
@@ -1210,7 +1210,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                 assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
 
                 let data = slice.cast();
-                let len = slice.len().checked_div(field_layout.size()).unwrap_or(0);
+                let len = field_layout.size();
                 let ptr = ptr::slice_from_raw_parts_mut(data, len);
                 (layout, ptr)
             })

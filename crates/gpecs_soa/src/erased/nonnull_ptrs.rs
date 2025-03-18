@@ -41,6 +41,12 @@ impl ErasedFieldNonNullPtr {
     }
 
     #[inline]
+    pub fn as_ptr(&self) -> NonNull<u8> {
+        let Self { buffer, .. } = self;
+        buffer.cast()
+    }
+
+    #[inline]
     pub fn into_parts(self) -> (Layout, NonNull<[u8]>) {
         let Self { layout, buffer } = self;
         (layout, buffer)

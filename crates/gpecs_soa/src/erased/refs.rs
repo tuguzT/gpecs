@@ -34,7 +34,19 @@ impl<'a> ErasedFieldRef<'a> {
 
     #[inline]
     pub fn buffer(&self) -> &[u8] {
-        let Self { buffer, .. } = *self;
+        let Self { buffer, .. } = self;
+        buffer
+    }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const u8 {
+        let Self { buffer, .. } = self;
+        buffer.as_ptr()
+    }
+
+    #[inline]
+    pub fn into_buffer(self) -> &'a [u8] {
+        let Self { buffer, .. } = self;
         buffer
     }
 

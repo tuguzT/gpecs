@@ -39,7 +39,25 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
+    pub fn as_ptr(&self) -> *const u8 {
+        let Self { buffer, .. } = self;
+        buffer.as_ptr()
+    }
+
+    #[inline]
     pub fn buffer_mut(&mut self) -> &mut [u8] {
+        let Self { buffer, .. } = self;
+        buffer
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+        let Self { buffer, .. } = self;
+        buffer.as_mut_ptr()
+    }
+
+    #[inline]
+    pub fn into_buffer(self) -> &'a mut [u8] {
         let Self { buffer, .. } = self;
         buffer
     }

@@ -10,7 +10,7 @@ use alloc::{boxed::Box, vec};
 
 use crate::traits::Soa;
 
-use super::validate_layout;
+use super::{assert_value_buffer_align, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldPtr {
@@ -22,18 +22,8 @@ impl ErasedFieldPtr {
     #[inline]
     #[track_caller]
     pub fn new(layout: Layout, buffer: *const [u8]) -> Self {
-        let buffer_len = buffer.len();
-        let layout_size = layout.size();
-        assert!(
-            buffer_len == layout_size,
-            "buffer len {buffer_len} should match layout size {layout_size}",
-        );
-
-        let layout_align = layout.align();
-        assert!(
-            buffer.cast::<u8>().align_offset(layout_align) == 0,
-            "buffer should be aligned to {layout_align}",
-        );
+        assert_value_buffer_len(buffer.len(), layout.size());
+        assert_value_buffer_align(buffer.cast(), layout.align());
 
         Self { layout, buffer }
     }
@@ -135,13 +125,15 @@ impl<Fields> AsMut<[ErasedFieldPtr]> for ErasedSoaPtrs<Fields> {
 
 impl<Fields> Debug for ErasedSoaPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("ErasedSoaPtrs").field(&self.ptrs).finish()
+        let Self { ptrs, .. } = self;
+        f.debug_tuple("ErasedSoaPtrs").field(ptrs).finish()
     }
 }
 
 impl<Fields> PartialEq for ErasedSoaPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
-        self.ptrs == other.ptrs && self.phantom == other.phantom
+        let Self { ptrs, phantom } = self;
+        *ptrs == other.ptrs && *phantom == other.phantom
     }
 }
 
@@ -149,16 +141,18 @@ impl<Fields> Eq for ErasedSoaPtrs<Fields> {}
 
 impl<Fields> Hash for ErasedSoaPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.ptrs.hash(state);
-        self.phantom.hash(state);
+        let Self { ptrs, phantom } = self;
+        ptrs.hash(state);
+        phantom.hash(state);
     }
 }
 
 impl<Fields> Clone for ErasedSoaPtrs<Fields> {
     fn clone(&self) -> Self {
+        let Self { ptrs, phantom } = self;
         Self {
-            ptrs: self.ptrs.clone(),
-            phantom: self.phantom.clone(),
+            ptrs: ptrs.clone(),
+            phantom: phantom.clone(),
         }
     }
 }

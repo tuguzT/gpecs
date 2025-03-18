@@ -1510,3 +1510,35 @@ where
     );
     layout.clone()
 }
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+fn assert_value_buffer_len_failed(buffer_len: usize, layout_size: usize) -> ! {
+    panic!("buffer len {buffer_len} should match layout size {layout_size}")
+}
+
+#[inline]
+#[track_caller]
+fn assert_value_buffer_len(buffer_len: usize, layout_size: usize) {
+    if buffer_len == layout_size {
+        return;
+    }
+    assert_value_buffer_len_failed(buffer_len, layout_size)
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+fn assert_value_buffer_align_failed(layout_align: usize) -> ! {
+    panic!("buffer should be aligned to {layout_align}")
+}
+
+#[inline]
+#[track_caller]
+fn assert_value_buffer_align(buffer: *const u8, layout_align: usize) {
+    if buffer.align_offset(layout_align) == 0 {
+        return;
+    }
+    assert_value_buffer_align_failed(layout_align)
+}

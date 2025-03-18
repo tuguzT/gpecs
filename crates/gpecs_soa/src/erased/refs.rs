@@ -9,7 +9,7 @@ use alloc::{boxed::Box, vec};
 
 use crate::traits::Soa;
 
-use super::validate_layout;
+use super::{assert_value_buffer_align, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldRef<'a> {
@@ -21,18 +21,8 @@ impl<'a> ErasedFieldRef<'a> {
     #[inline]
     #[track_caller]
     pub fn new(layout: Layout, buffer: &'a [u8]) -> Self {
-        let buffer_len = buffer.len();
-        let layout_size = layout.size();
-        assert!(
-            buffer_len == layout_size,
-            "buffer len {buffer_len} should match layout size {layout_size}",
-        );
-
-        let layout_align = layout.align();
-        assert!(
-            buffer.as_ptr().align_offset(layout_align) == 0,
-            "buffer should be aligned to {layout_align}",
-        );
+        assert_value_buffer_len(buffer.len(), layout.size());
+        assert_value_buffer_align(buffer.as_ptr(), layout.align());
 
         Self { layout, buffer }
     }
@@ -139,22 +129,23 @@ impl<'a, Fields> AsMut<[ErasedFieldRef<'a>]> for ErasedSoaRefs<'a, Fields> {
 
 impl<'a, Fields> Debug for ErasedSoaRefs<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("ErasedSoaRefs").field(&self.refs).finish()
+        let Self { refs, .. } = self;
+        f.debug_tuple("ErasedSoaRefs").field(refs).finish()
     }
 }
 
 impl<'a, Fields> Clone for ErasedSoaRefs<'a, Fields> {
     fn clone(&self) -> Self {
+        let Self { refs, phantom } = self;
         Self {
-            refs: self.refs.clone(),
-            phantom: self.phantom.clone(),
+            refs: refs.clone(),
+            phantom: phantom.clone(),
         }
     }
 }
 
 impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefs<'a, Fields> {
     type Item = &'r ErasedFieldRef<'a>;
-
     type IntoIter = slice::Iter<'r, ErasedFieldRef<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -165,7 +156,6 @@ impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefs<'a, Fields> {
 
 impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefs<'a, Fields> {
     type Item = &'r mut ErasedFieldRef<'a>;
-
     type IntoIter = slice::IterMut<'r, ErasedFieldRef<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -176,7 +166,6 @@ impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefs<'a, Fields> {
 
 impl<'a, Fields> IntoIterator for ErasedSoaRefs<'a, Fields> {
     type Item = ErasedFieldRef<'a>;
-
     type IntoIter = vec::IntoIter<ErasedFieldRef<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {

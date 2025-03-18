@@ -76,6 +76,7 @@ impl<Fields> ErasedSoaContext<Fields> {
 impl<Fields> Debug for ErasedSoaContext<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { field_layouts, .. } = self;
+
         f.debug_struct("ErasedSoaContext")
             .field("field_layouts", field_layouts)
             .finish_non_exhaustive()

@@ -126,16 +126,17 @@ impl<'a, Fields> AsMut<[(Layout, ErasedFieldSliceMut<'a>)]> for ErasedSoaSlicesM
 
 impl<'a, Fields> Debug for ErasedSoaSlicesMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { len, slices, .. } = self;
+
         f.debug_struct("ErasedSoaSlicesMut")
-            .field("len", &self.len)
-            .field("slices", &self.slices)
+            .field("len", len)
+            .field("slices", slices)
             .finish()
     }
 }
 
 impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaSlicesMut<'a, Fields> {
     type Item = &'r (Layout, ErasedFieldSliceMut<'a>);
-
     type IntoIter = slice::Iter<'r, (Layout, ErasedFieldSliceMut<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -146,7 +147,6 @@ impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaSlicesMut<'a, Fields> {
 
 impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaSlicesMut<'a, Fields> {
     type Item = &'r mut (Layout, ErasedFieldSliceMut<'a>);
-
     type IntoIter = slice::IterMut<'r, (Layout, ErasedFieldSliceMut<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -157,7 +157,6 @@ impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaSlicesMut<'a, Fields> {
 
 impl<'a, Fields> IntoIterator for ErasedSoaSlicesMut<'a, Fields> {
     type Item = (Layout, ErasedFieldSliceMut<'a>);
-
     type IntoIter = vec::IntoIter<(Layout, ErasedFieldSliceMut<'a>)>;
 
     fn into_iter(self) -> Self::IntoIter {

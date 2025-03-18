@@ -11,7 +11,7 @@ use alloc::{boxed::Box, vec};
 
 use crate::traits::Soa;
 
-use super::validate_layout;
+use super::{assert_value_buffer_align, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldNonNullPtr {
@@ -23,18 +23,8 @@ impl ErasedFieldNonNullPtr {
     #[inline]
     #[track_caller]
     pub fn new(layout: Layout, buffer: NonNull<[u8]>) -> Self {
-        let buffer_len = buffer.len();
-        let layout_size = layout.size();
-        assert!(
-            buffer_len == layout_size,
-            "buffer len {buffer_len} should match layout size {layout_size}",
-        );
-
-        let layout_align = layout.align();
-        assert!(
-            buffer.cast::<u8>().align_offset(layout_align) == 0,
-            "buffer should be aligned to {layout_align}",
-        );
+        assert_value_buffer_len(buffer.len(), layout.size());
+        assert_value_buffer_align(buffer.as_ptr().cast(), layout.align());
 
         Self { layout, buffer }
     }
@@ -139,15 +129,15 @@ impl<Fields> AsMut<[ErasedFieldNonNullPtr]> for ErasedSoaNonNullPtrs<Fields> {
 
 impl<Fields> Debug for ErasedSoaNonNullPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("ErasedSoaNonNullPtrs")
-            .field(&self.ptrs)
-            .finish()
+        let Self { ptrs, .. } = self;
+        f.debug_tuple("ErasedSoaNonNullPtrs").field(ptrs).finish()
     }
 }
 
 impl<Fields> PartialEq for ErasedSoaNonNullPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
-        self.ptrs == other.ptrs && self.phantom == other.phantom
+        let Self { ptrs, phantom } = self;
+        *ptrs == other.ptrs && *phantom == other.phantom
     }
 }
 
@@ -155,23 +145,24 @@ impl<Fields> Eq for ErasedSoaNonNullPtrs<Fields> {}
 
 impl<Fields> Hash for ErasedSoaNonNullPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.ptrs.hash(state);
-        self.phantom.hash(state);
+        let Self { ptrs, phantom } = self;
+        ptrs.hash(state);
+        phantom.hash(state);
     }
 }
 
 impl<Fields> Clone for ErasedSoaNonNullPtrs<Fields> {
     fn clone(&self) -> Self {
+        let Self { ptrs, phantom } = self;
         Self {
-            ptrs: self.ptrs.clone(),
-            phantom: self.phantom.clone(),
+            ptrs: ptrs.clone(),
+            phantom: phantom.clone(),
         }
     }
 }
 
 impl<'a, Fields> IntoIterator for &'a ErasedSoaNonNullPtrs<Fields> {
     type Item = &'a ErasedFieldNonNullPtr;
-
     type IntoIter = slice::Iter<'a, ErasedFieldNonNullPtr>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -182,7 +173,6 @@ impl<'a, Fields> IntoIterator for &'a ErasedSoaNonNullPtrs<Fields> {
 
 impl<'a, Fields> IntoIterator for &'a mut ErasedSoaNonNullPtrs<Fields> {
     type Item = &'a mut ErasedFieldNonNullPtr;
-
     type IntoIter = slice::IterMut<'a, ErasedFieldNonNullPtr>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -193,7 +183,6 @@ impl<'a, Fields> IntoIterator for &'a mut ErasedSoaNonNullPtrs<Fields> {
 
 impl<Fields> IntoIterator for ErasedSoaNonNullPtrs<Fields> {
     type Item = ErasedFieldNonNullPtr;
-
     type IntoIter = vec::IntoIter<ErasedFieldNonNullPtr>;
 
     fn into_iter(self) -> Self::IntoIter {

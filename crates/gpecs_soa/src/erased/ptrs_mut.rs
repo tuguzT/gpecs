@@ -103,13 +103,15 @@ impl<Fields> AsMut<[(Layout, ErasedFieldMutPtr)]> for ErasedSoaMutPtrs<Fields> {
 
 impl<Fields> Debug for ErasedSoaMutPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("ErasedSoaMutPtrs").field(&self.ptrs).finish()
+        let Self { ptrs, .. } = self;
+        f.debug_tuple("ErasedSoaMutPtrs").field(ptrs).finish()
     }
 }
 
 impl<Fields> PartialEq for ErasedSoaMutPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
-        self.ptrs == other.ptrs && self.phantom == other.phantom
+        let Self { ptrs, phantom } = self;
+        *ptrs == other.ptrs && *phantom == other.phantom
     }
 }
 
@@ -117,23 +119,24 @@ impl<Fields> Eq for ErasedSoaMutPtrs<Fields> {}
 
 impl<Fields> Hash for ErasedSoaMutPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.ptrs.hash(state);
-        self.phantom.hash(state);
+        let Self { ptrs, phantom } = self;
+        ptrs.hash(state);
+        phantom.hash(state);
     }
 }
 
 impl<Fields> Clone for ErasedSoaMutPtrs<Fields> {
     fn clone(&self) -> Self {
+        let Self { ptrs, phantom } = self;
         Self {
-            ptrs: self.ptrs.clone(),
-            phantom: self.phantom.clone(),
+            ptrs: ptrs.clone(),
+            phantom: phantom.clone(),
         }
     }
 }
 
 impl<'a, Fields> IntoIterator for &'a ErasedSoaMutPtrs<Fields> {
     type Item = &'a (Layout, ErasedFieldMutPtr);
-
     type IntoIter = slice::Iter<'a, (Layout, ErasedFieldMutPtr)>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -144,7 +147,6 @@ impl<'a, Fields> IntoIterator for &'a ErasedSoaMutPtrs<Fields> {
 
 impl<'a, Fields> IntoIterator for &'a mut ErasedSoaMutPtrs<Fields> {
     type Item = &'a mut (Layout, ErasedFieldMutPtr);
-
     type IntoIter = slice::IterMut<'a, (Layout, ErasedFieldMutPtr)>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -155,7 +157,6 @@ impl<'a, Fields> IntoIterator for &'a mut ErasedSoaMutPtrs<Fields> {
 
 impl<Fields> IntoIterator for ErasedSoaMutPtrs<Fields> {
     type Item = (Layout, ErasedFieldMutPtr);
-
     type IntoIter = vec::IntoIter<(Layout, ErasedFieldMutPtr)>;
 
     fn into_iter(self) -> Self::IntoIter {

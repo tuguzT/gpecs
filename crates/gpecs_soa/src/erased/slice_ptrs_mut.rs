@@ -122,16 +122,24 @@ impl<Fields> AsMut<[(Layout, ErasedFieldSliceMutPtr)]> for ErasedSoaSliceMutPtrs
 
 impl<Fields> Debug for ErasedSoaSliceMutPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { len, slices, .. } = self;
+
         f.debug_struct("ErasedSoaSliceMutPtrs")
-            .field("len", &self.len)
-            .field("slices", &self.slices)
+            .field("len", len)
+            .field("slices", slices)
             .finish()
     }
 }
 
 impl<Fields> PartialEq for ErasedSoaSliceMutPtrs<Fields> {
     fn eq(&self, other: &Self) -> bool {
-        self.len == other.len && self.slices == other.slices && self.phantom == other.phantom
+        let Self {
+            len,
+            slices,
+            phantom,
+        } = self;
+
+        *len == other.len && *slices == other.slices && *phantom == other.phantom
     }
 }
 
@@ -139,25 +147,36 @@ impl<Fields> Eq for ErasedSoaSliceMutPtrs<Fields> {}
 
 impl<Fields> Hash for ErasedSoaSliceMutPtrs<Fields> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.len.hash(state);
-        self.slices.hash(state);
-        self.phantom.hash(state);
+        let Self {
+            len,
+            slices,
+            phantom,
+        } = self;
+
+        len.hash(state);
+        slices.hash(state);
+        phantom.hash(state);
     }
 }
 
 impl<Fields> Clone for ErasedSoaSliceMutPtrs<Fields> {
     fn clone(&self) -> Self {
+        let Self {
+            len,
+            slices,
+            phantom,
+        } = self;
+
         Self {
-            len: self.len.clone(),
-            slices: self.slices.clone(),
-            phantom: self.phantom.clone(),
+            len: len.clone(),
+            slices: slices.clone(),
+            phantom: phantom.clone(),
         }
     }
 }
 
 impl<'a, Fields> IntoIterator for &'a ErasedSoaSliceMutPtrs<Fields> {
     type Item = &'a (Layout, ErasedFieldSliceMutPtr);
-
     type IntoIter = slice::Iter<'a, (Layout, ErasedFieldSliceMutPtr)>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -168,7 +187,6 @@ impl<'a, Fields> IntoIterator for &'a ErasedSoaSliceMutPtrs<Fields> {
 
 impl<'a, Fields> IntoIterator for &'a mut ErasedSoaSliceMutPtrs<Fields> {
     type Item = &'a mut (Layout, ErasedFieldSliceMutPtr);
-
     type IntoIter = slice::IterMut<'a, (Layout, ErasedFieldSliceMutPtr)>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -179,7 +197,6 @@ impl<'a, Fields> IntoIterator for &'a mut ErasedSoaSliceMutPtrs<Fields> {
 
 impl<Fields> IntoIterator for ErasedSoaSliceMutPtrs<Fields> {
     type Item = (Layout, ErasedFieldSliceMutPtr);
-
     type IntoIter = vec::IntoIter<(Layout, ErasedFieldSliceMutPtr)>;
 
     fn into_iter(self) -> Self::IntoIter {

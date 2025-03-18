@@ -1,3 +1,4 @@
+use alloc::{boxed::Box, vec};
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
@@ -7,11 +8,9 @@ use core::{
     slice,
 };
 
-use alloc::{boxed::Box, vec};
-
 use crate::traits::Soa;
 
-use super::{assert_value_buffer_align, assert_value_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldNonNullPtr {
@@ -24,7 +23,7 @@ impl ErasedFieldNonNullPtr {
     #[track_caller]
     pub fn new(layout: Layout, buffer: NonNull<[u8]>) -> Self {
         assert_value_buffer_len(buffer.len(), layout.size());
-        assert_value_buffer_align(buffer.as_ptr().cast(), layout.align());
+        assert_buffer_align(buffer.as_ptr().cast(), layout.align());
 
         Self { layout, buffer }
     }

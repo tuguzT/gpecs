@@ -8,18 +8,61 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::validate_layout;
+use super::{assert_buffer_align, assert_slice_buffer_len, validate_layout};
 
-// TODO: replace with struct of layout and this
-// data is stored inline in a single buffer
-type ErasedFieldSlice<'a> = &'a [u8];
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub struct ErasedFieldSlice<'a> {
+    layout: Layout,
+    // data is stored inline in a single buffer
+    buffer: &'a [u8],
+}
+
+impl<'a> ErasedFieldSlice<'a> {
+    #[inline]
+    #[track_caller]
+    pub fn new(layout: Layout, buffer: &'a [u8]) -> Self {
+        assert_slice_buffer_len(buffer.len(), layout.size());
+        assert_buffer_align(buffer.as_ptr(), layout.align());
+
+        Self { layout, buffer }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { layout, buffer } = self;
+        buffer.len().checked_div(layout.size()).unwrap_or(0)
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn layout(&self) -> Layout {
+        let Self { layout, .. } = *self;
+        layout
+    }
+
+    #[inline]
+    pub fn buffer(&self) -> &[u8] {
+        let Self { buffer, .. } = *self;
+        buffer
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (Layout, &'a [u8]) {
+        let Self { layout, buffer } = self;
+        (layout, buffer)
+    }
+}
 
 pub struct ErasedSoaSlices<'a, Fields>
 where
     Fields: 'a,
 {
     pub(super) len: usize,
-    pub(super) slices: Box<[(Layout, ErasedFieldSlice<'a>)]>,
+    pub(super) slices: Box<[ErasedFieldSlice<'a>]>,
     pub(super) phantom: PhantomData<fn() -> Fields>,
 }
 
@@ -27,21 +70,14 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     #[inline]
     pub fn new<I>(len: usize, slices: I) -> Self
     where
-        I: IntoIterator<Item = (Layout, ErasedFieldSlice<'a>)>,
+        I: IntoIterator<Item = ErasedFieldSlice<'a>>,
     {
-        let slices = slices
-            .into_iter()
-            .map(|(field_layout, slice)| {
-                assert_eq!(
-                    slice.len().checked_div(field_layout.size()).unwrap_or(len),
-                    len,
-                );
-                (field_layout.clone(), slice)
-            })
-            .collect();
         Self {
             len,
-            slices,
+            slices: slices
+                .into_iter()
+                .inspect(|slice| assert_eq!(slice.len(), len))
+                .collect(),
             phantom: PhantomData,
         }
     }
@@ -63,7 +99,7 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size() * len;
                 let slice = unsafe { slice::from_raw_parts(ptr.cast(), len) };
-                (field_layout.clone(), slice)
+                ErasedFieldSlice::new(field_layout.clone(), slice)
             })
             .collect();
         Self {
@@ -89,9 +125,9 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, (layout, slice))| {
-                assert_eq!(field_layout, &layout);
-                slice.as_ptr()
+            .map(|(field_layout, slice)| {
+                assert_eq!(*field_layout, slice.layout());
+                slice.buffer().as_ptr()
             });
         let ptrs = T::ptrs_restore(context, ptrs);
         let slices = T::slices_from_raw_parts(context, ptrs, len);
@@ -109,15 +145,15 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     }
 }
 
-impl<'a, Fields> AsRef<[(Layout, ErasedFieldSlice<'a>)]> for ErasedSoaSlices<'a, Fields> {
-    fn as_ref(&self) -> &[(Layout, ErasedFieldSlice<'a>)] {
+impl<'a, Fields> AsRef<[ErasedFieldSlice<'a>]> for ErasedSoaSlices<'a, Fields> {
+    fn as_ref(&self) -> &[ErasedFieldSlice<'a>] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 }
 
-impl<'a, Fields> AsMut<[(Layout, ErasedFieldSlice<'a>)]> for ErasedSoaSlices<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [(Layout, ErasedFieldSlice<'a>)] {
+impl<'a, Fields> AsMut<[ErasedFieldSlice<'a>]> for ErasedSoaSlices<'a, Fields> {
+    fn as_mut(&mut self) -> &mut [ErasedFieldSlice<'a>] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
@@ -151,8 +187,8 @@ impl<'a, Fields> Clone for ErasedSoaSlices<'a, Fields> {
 }
 
 impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaSlices<'a, Fields> {
-    type Item = &'r (Layout, ErasedFieldSlice<'a>);
-    type IntoIter = slice::Iter<'r, (Layout, ErasedFieldSlice<'a>)>;
+    type Item = &'r ErasedFieldSlice<'a>;
+    type IntoIter = slice::Iter<'r, ErasedFieldSlice<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaSlices { slices, .. } = self;
@@ -161,8 +197,8 @@ impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaSlices<'a, Fields> {
 }
 
 impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaSlices<'a, Fields> {
-    type Item = &'r mut (Layout, ErasedFieldSlice<'a>);
-    type IntoIter = slice::IterMut<'r, (Layout, ErasedFieldSlice<'a>)>;
+    type Item = &'r mut ErasedFieldSlice<'a>;
+    type IntoIter = slice::IterMut<'r, ErasedFieldSlice<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaSlices { slices, .. } = self;
@@ -171,8 +207,8 @@ impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaSlices<'a, Fields> {
 }
 
 impl<'a, Fields> IntoIterator for ErasedSoaSlices<'a, Fields> {
-    type Item = (Layout, ErasedFieldSlice<'a>);
-    type IntoIter = vec::IntoIter<(Layout, ErasedFieldSlice<'a>)>;
+    type Item = ErasedFieldSlice<'a>;
+    type IntoIter = vec::IntoIter<ErasedFieldSlice<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ErasedSoaSlices { slices, .. } = self;

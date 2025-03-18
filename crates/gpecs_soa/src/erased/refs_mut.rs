@@ -8,7 +8,7 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{assert_value_buffer_align, assert_value_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ErasedFieldRefMut<'a> {
@@ -21,7 +21,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     #[track_caller]
     pub fn new(layout: Layout, buffer: &'a mut [u8]) -> Self {
         assert_value_buffer_len(buffer.len(), layout.size());
-        assert_value_buffer_align(buffer.as_ptr(), layout.align());
+        assert_buffer_align(buffer.as_ptr(), layout.align());
 
         Self { layout, buffer }
     }

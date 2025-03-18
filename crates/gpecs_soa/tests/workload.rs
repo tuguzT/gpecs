@@ -148,26 +148,16 @@ fn new_erased() {
     };
 
     assert_eq!(
-        format!("{vec:?}"),
-        format!(
-            "SoaVec(ErasedSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { vec.as_slices().into::<Soa>(&context) },
+        ([].as_slice(), [].as_slice(), [].as_slice()),
     );
 
     let slice = vec.as_slice();
     assert!(slice.is_empty());
 
     assert_eq!(
-        format!("{slice:?}"),
-        format!(
-            "SoaSlice(ErasedSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { slice.as_slices().into::<Soa>(&context) },
+        ([].as_slice(), [].as_slice(), [].as_slice()),
     );
 
     let (erased_context, vecs) = vec.into_vecs();
@@ -194,13 +184,8 @@ fn new_erased() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        format!("{into_iter:?}"),
-        format!(
-            "IntoIter(ErasedSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { into_iter.as_slices().into::<Soa>(&context) },
+        ([].as_slice(), [].as_slice(), [].as_slice()),
     );
 }
 
@@ -338,13 +323,8 @@ fn with_capacity_erased() {
     };
 
     assert_eq!(
-        format!("{vec:?}"),
-        format!(
-            "SoaVec(ErasedSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { vec.as_slices().into::<Soa>(&context) },
+        ([].as_slice(), [].as_slice(), [].as_slice()),
     );
 
     let slice = vec.as_slice();
@@ -352,13 +332,8 @@ fn with_capacity_erased() {
     assert!(slice.capacity() >= 10);
 
     assert_eq!(
-        format!("{slice:?}"),
-        format!(
-            "SoaSlice(ErasedSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { slice.as_slices().into::<Soa>(&context) },
+        ([].as_slice(), [].as_slice(), [].as_slice()),
     );
 
     let (erased_context, vecs) = vec.into_vecs();
@@ -385,13 +360,8 @@ fn with_capacity_erased() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        format!("{into_iter:?}"),
-        format!(
-            "IntoIter(ErasedSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { into_iter.as_slices().into::<Soa>(&context) },
+        ([].as_slice(), [].as_slice(), [].as_slice()),
     );
 }
 
@@ -698,13 +668,8 @@ fn one_item_erased() {
     };
 
     assert_eq!(
-        format!("{vec:?}"),
-        format!(
-            "SoaVec(ErasedSoaSlices {{ len: 1, slices: [({l0:?}, {u8_bytes:?}), ({l1:?}, {u16_bytes:?}), ({l2:?}, {u64_bytes:?})] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { vec.as_slices().into::<Soa>(&context) },
+        ([u8].as_slice(), [u64].as_slice(), [u16].as_slice()),
     );
 
     let slice = vec.as_slice();
@@ -720,13 +685,8 @@ fn one_item_erased() {
     );
 
     assert_eq!(
-        format!("{slice:?}"),
-        format!(
-            "SoaSlice(ErasedSoaSlices {{ len: 1, slices: [({l0:?}, {u8_bytes:?}), ({l1:?}, {u16_bytes:?}), ({l2:?}, {u64_bytes:?})] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { slice.as_slices().into::<Soa>(&context) },
+        ([u8].as_slice(), [u64].as_slice(), [u16].as_slice()),
     );
 
     let (erased_context, vecs) = vec.into_vecs();
@@ -771,13 +731,8 @@ fn one_item_erased() {
     assert_eq!(value, (u8, u64, u16));
 
     assert_eq!(
-        format!("{vec:?}"),
-        format!(
-            "SoaVec(ErasedSoaSlices {{ len: 0, slices: [({l0:?}, []), ({l1:?}, []), ({l2:?}, [])] }})",
-            l0 = optimized_layout[0],
-            l1 = optimized_layout[1],
-            l2 = optimized_layout[2],
-        ),
+        unsafe { vec.as_slices().into::<Soa>(&context) },
+        ([].as_slice(), [].as_slice(), [].as_slice()),
     );
 
     let boxed_slice = vec.into_boxed_slice();

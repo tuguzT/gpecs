@@ -1,7 +1,10 @@
 use std::{alloc::Layout, ptr, slice};
 
 use gpecs_soa::{
-    erased::{ErasedFieldRef, ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaSlices},
+    erased::{
+        ErasedFieldRef, ErasedFieldSlice, ErasedSoa, ErasedSoaContext, ErasedSoaRefs,
+        ErasedSoaSlices,
+    },
     prelude::*,
     slice::{Iter as SoaIter, IterMut as SoaIterMut},
     vec::IntoIter as SoaIntoIter,
@@ -205,9 +208,9 @@ fn erased_value() {
     assert_eq!(
         slices.as_ref(),
         [
-            (optimized_layout[0], i789_bytes),
-            (optimized_layout[1], i456_bytes),
-            (optimized_layout[2], i123_bytes),
+            ErasedFieldSlice::new(optimized_layout[0], i789_bytes),
+            ErasedFieldSlice::new(optimized_layout[1], i456_bytes),
+            ErasedFieldSlice::new(optimized_layout[2], i123_bytes),
         ],
     );
 

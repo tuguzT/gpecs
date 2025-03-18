@@ -1,6 +1,5 @@
-use core::alloc::Layout;
-
 use alloc::{boxed::Box, vec::Vec};
+use core::alloc::Layout;
 
 use super::byte::ErasedByte;
 

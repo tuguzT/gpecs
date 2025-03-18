@@ -107,6 +107,26 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 }
 
+// TODO: convert into a custom iterator type
+//       with `DoubleEndedIterator` and `ExactSizeIterator` and `FusedIterator` implemented
+impl<'a> IntoIterator for ErasedFieldSlice<'a> {
+    type Item = super::ErasedFieldRef<'a>;
+    type IntoIter = core::iter::Scan<
+        core::ops::Range<usize>,
+        (Layout, &'a [u8]),
+        fn(&mut (Layout, &'a [u8]), usize) -> Option<super::ErasedFieldRef<'a>>,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (0..self.len()).scan(self.into_parts(), |&mut (layout, ref buffer), idx| {
+            let data = unsafe { buffer.as_ptr().add(layout.size() * idx) };
+            let len = layout.size();
+            let buffer = unsafe { slice::from_raw_parts(data, len) };
+            Some(super::ErasedFieldRef::new(layout, buffer))
+        })
+    }
+}
+
 pub struct ErasedSoaSlices<'a, Fields>
 where
     Fields: 'a,

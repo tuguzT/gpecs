@@ -8,7 +8,7 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{assert_buffer_align, assert_into_size, assert_slice_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_layout, assert_slice_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldSlice<'a> {
@@ -42,7 +42,7 @@ impl<'a> ErasedFieldSlice<'a> {
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a [T] {
         let Self { layout, buffer } = self;
-        assert_into_size::<T>(layout.size());
+        assert_layout::<T>(&layout);
 
         let data = buffer.as_ptr().cast();
         let len = buffer.len().checked_div(layout.size()).unwrap_or(0);
@@ -52,8 +52,8 @@ impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &[T] {
-        let Self { layout, buffer } = self;
-        assert_into_size::<T>(layout.size());
+        let Self { layout, ref buffer } = self;
+        assert_layout::<T>(layout);
 
         let data = buffer.as_ptr().cast();
         let len = buffer.len().checked_div(layout.size()).unwrap_or(0);

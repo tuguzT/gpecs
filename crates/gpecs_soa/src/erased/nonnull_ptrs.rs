@@ -10,7 +10,7 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{assert_buffer_align, assert_into_size, assert_value_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_layout, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldNonNullPtr {
@@ -40,7 +40,7 @@ impl ErasedFieldNonNullPtr {
     #[track_caller]
     pub fn into<T>(self) -> NonNull<T> {
         let Self { layout, buffer } = self;
-        assert_into_size::<T>(layout.size());
+        assert_layout::<T>(&layout);
 
         buffer.cast()
     }

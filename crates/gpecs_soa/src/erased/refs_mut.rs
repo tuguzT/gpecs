@@ -8,7 +8,7 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{assert_buffer_align, assert_into_size, assert_value_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_layout, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ErasedFieldRefMut<'a> {
@@ -38,7 +38,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a mut T {
         let Self { layout, buffer } = self;
-        assert_into_size::<T>(layout.size());
+        assert_layout::<T>(&layout);
 
         let ptr = buffer.as_mut_ptr().cast();
         unsafe { &mut *ptr }
@@ -48,7 +48,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &T {
         let Self { layout, buffer } = self;
-        assert_into_size::<T>(layout.size());
+        assert_layout::<T>(layout);
 
         let ptr = buffer.as_ptr().cast();
         unsafe { &*ptr }
@@ -57,8 +57,8 @@ impl<'a> ErasedFieldRefMut<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
-        let Self { layout, buffer } = self;
-        assert_into_size::<T>(layout.size());
+        let Self { ref layout, buffer } = self;
+        assert_layout::<T>(layout);
 
         let ptr = buffer.as_mut_ptr().cast();
         unsafe { &mut *ptr }

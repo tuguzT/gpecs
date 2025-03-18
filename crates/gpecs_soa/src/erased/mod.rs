@@ -1553,17 +1553,17 @@ fn assert_buffer_align(buffer: *const u8, layout_align: usize) {
 #[cold]
 #[track_caller]
 #[inline(never)]
-fn assert_into_size_failed<T>(layout_size: usize) -> ! {
-    let size_of = size_of::<T>();
+fn assert_layout_failed<T>(layout: &Layout) -> ! {
+    let target_layout = Layout::new::<T>();
     let type_name = type_name::<T>();
-    panic!("size {size_of} of type {type_name} should match layout size {layout_size}")
+    panic!("layout {target_layout:?} of type {type_name} should match layout {layout:?}")
 }
 
 #[inline]
 #[track_caller]
-fn assert_into_size<T>(layout_size: usize) {
-    if layout_size == size_of::<T>() {
+fn assert_layout<T>(layout: &Layout) {
+    if *layout == Layout::new::<T>() {
         return;
     }
-    assert_into_size_failed::<T>(layout_size)
+    assert_layout_failed::<T>(layout)
 }

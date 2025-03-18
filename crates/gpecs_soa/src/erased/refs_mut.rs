@@ -45,6 +45,26 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn cast<T>(&self) -> &T {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        let ptr = buffer.as_ptr().cast();
+        unsafe { &*ptr }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        let ptr = buffer.as_mut_ptr().cast();
+        unsafe { &mut *ptr }
+    }
+
+    #[inline]
     pub fn layout(&self) -> Layout {
         let Self { layout, .. } = *self;
         layout

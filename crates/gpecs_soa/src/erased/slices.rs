@@ -50,6 +50,17 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn cast<T>(&self) -> &[T] {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        let data = buffer.as_ptr().cast();
+        let len = buffer.len().checked_div(layout.size()).unwrap_or(0);
+        unsafe { slice::from_raw_parts(data, len) }
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { layout, buffer } = self;
         buffer.len().checked_div(layout.size()).unwrap_or(0)

@@ -45,6 +45,16 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn cast<T>(&self) -> &T {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        let ptr = buffer.as_ptr().cast();
+        unsafe { &*ptr }
+    }
+
+    #[inline]
     pub fn layout(&self) -> Layout {
         let Self { layout, .. } = *self;
         layout

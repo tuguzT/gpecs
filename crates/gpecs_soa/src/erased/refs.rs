@@ -14,6 +14,7 @@ use super::{assert_buffer_align, assert_layout, assert_value_buffer_len, validat
 pub struct ErasedFieldRef<'a> {
     layout: Layout,
     buffer: &'a [u8],
+    no_send_sync: PhantomData<*const u8>,
 }
 
 impl<'a> ErasedFieldRef<'a> {
@@ -23,7 +24,11 @@ impl<'a> ErasedFieldRef<'a> {
         assert_value_buffer_len(buffer.len(), layout.size());
         assert_buffer_align(buffer.as_ptr(), layout.align());
 
-        Self { layout, buffer }
+        Self {
+            layout,
+            buffer,
+            no_send_sync: PhantomData,
+        }
     }
 
     #[inline]
@@ -37,7 +42,7 @@ impl<'a> ErasedFieldRef<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a T {
-        let Self { layout, buffer } = self;
+        let Self { layout, buffer, .. } = self;
         assert_layout::<T>(&layout);
 
         let ptr = buffer.as_ptr().cast();
@@ -47,7 +52,7 @@ impl<'a> ErasedFieldRef<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &T {
-        let Self { layout, buffer } = self;
+        let Self { layout, buffer, .. } = self;
         assert_layout::<T>(layout);
 
         let ptr = buffer.as_ptr().cast();
@@ -80,7 +85,7 @@ impl<'a> ErasedFieldRef<'a> {
 
     #[inline]
     pub fn into_parts(self) -> (Layout, &'a [u8]) {
-        let Self { layout, buffer } = self;
+        let Self { layout, buffer, .. } = self;
         (layout, buffer)
     }
 }

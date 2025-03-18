@@ -15,6 +15,7 @@ pub struct ErasedFieldSlice<'a> {
     layout: Layout,
     // data is stored inline in a single buffer
     buffer: &'a [u8],
+    no_send_sync: PhantomData<*const u8>,
 }
 
 impl<'a> ErasedFieldSlice<'a> {
@@ -24,7 +25,11 @@ impl<'a> ErasedFieldSlice<'a> {
         assert_slice_buffer_len(buffer.len(), layout.size());
         assert_buffer_align(buffer.as_ptr(), layout.align());
 
-        Self { layout, buffer }
+        Self {
+            layout,
+            buffer,
+            no_send_sync: PhantomData,
+        }
     }
 
     #[inline]
@@ -41,7 +46,7 @@ impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a [T] {
-        let Self { layout, buffer } = self;
+        let Self { layout, buffer, .. } = self;
         assert_layout::<T>(&layout);
 
         let data = buffer.as_ptr().cast();
@@ -52,7 +57,7 @@ impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &[T] {
-        let Self { layout, ref buffer } = self;
+        let Self { layout, buffer, .. } = self;
         assert_layout::<T>(layout);
 
         let data = buffer.as_ptr().cast();
@@ -62,7 +67,7 @@ impl<'a> ErasedFieldSlice<'a> {
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { layout, buffer } = self;
+        let Self { layout, buffer, .. } = self;
         buffer.len().checked_div(layout.size()).unwrap_or(0)
     }
 
@@ -97,7 +102,7 @@ impl<'a> ErasedFieldSlice<'a> {
 
     #[inline]
     pub fn into_parts(self) -> (Layout, &'a [u8]) {
-        let Self { layout, buffer } = self;
+        let Self { layout, buffer, .. } = self;
         (layout, buffer)
     }
 }

@@ -9,7 +9,7 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{assert_buffer_align, assert_value_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_into_size, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldPtr {
@@ -25,6 +25,22 @@ impl ErasedFieldPtr {
         assert_buffer_align(buffer.cast(), layout.align());
 
         Self { layout, buffer }
+    }
+
+    #[inline]
+    pub fn from<T>(ptr: *const T) -> Self {
+        let layout = Layout::new::<T>();
+        let buffer = ptr::slice_from_raw_parts(ptr.cast(), layout.size());
+        Self::new(layout, buffer)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn into<T>(self) -> *const T {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        buffer.cast()
     }
 
     #[inline]
@@ -83,8 +99,8 @@ impl<Fields> ErasedSoaPtrs<Fields> {
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size();
-                let ptr = ptr::slice_from_raw_parts(ptr.cast(), len);
-                ErasedFieldPtr::new(field_layout, ptr)
+                let buffer = ptr::slice_from_raw_parts(ptr, len);
+                ErasedFieldPtr::new(field_layout, buffer)
             })
             .collect();
         Self {
@@ -106,10 +122,11 @@ impl<Fields> ErasedSoaPtrs<Fields> {
             .collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
-        let ptrs = field_layouts.iter().zip(ptrs).map(|(field_layout, ptr)| {
-            assert_eq!(*field_layout, ptr.layout());
-            ptr.buffer().cast()
-        });
+        let ptrs = field_layouts
+            .iter()
+            .zip(ptrs)
+            .inspect(|(&field_layout, ptr)| assert_eq!(field_layout, ptr.layout()))
+            .map(|(_, ptr)| ptr.as_ptr());
         T::ptrs_restore(context, ptrs)
     }
 }

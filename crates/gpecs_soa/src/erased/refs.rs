@@ -3,12 +3,12 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
-    slice,
+    ptr, slice,
 };
 
 use crate::traits::Soa;
 
-use super::{assert_buffer_align, assert_value_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_into_size, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldRef<'a> {
@@ -24,6 +24,24 @@ impl<'a> ErasedFieldRef<'a> {
         assert_buffer_align(buffer.as_ptr(), layout.align());
 
         Self { layout, buffer }
+    }
+
+    #[inline]
+    pub fn from<T>(r#ref: &'a T) -> Self {
+        let layout = Layout::new::<T>();
+        let data = ptr::from_ref(r#ref).cast();
+        let buffer = unsafe { slice::from_raw_parts(data, layout.size()) };
+        Self::new(layout, buffer)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn into<T>(self) -> &'a T {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        let ptr = buffer.as_ptr().cast();
+        unsafe { &*ptr }
     }
 
     #[inline]
@@ -92,8 +110,8 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size();
-                let buffer = unsafe { slice::from_raw_parts(ptr.cast(), len) };
-                ErasedFieldRef::new(field_layout.clone(), buffer)
+                let buffer = unsafe { slice::from_raw_parts(ptr, len) };
+                ErasedFieldRef::new(field_layout, buffer)
             })
             .collect();
         Self {
@@ -115,10 +133,11 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
             .collect();
         assert_eq!(field_layouts.len(), refs.len());
 
-        let ptrs = field_layouts.iter().zip(refs).map(|(field_layout, r#ref)| {
-            assert_eq!(*field_layout, r#ref.layout());
-            r#ref.buffer().as_ptr()
-        });
+        let ptrs = field_layouts
+            .iter()
+            .zip(refs)
+            .inspect(|(&field_layout, r#ref)| assert_eq!(field_layout, r#ref.layout()))
+            .map(|(_, r#ref)| r#ref.into_buffer().as_ptr());
         let ptrs = T::ptrs_restore(context, ptrs);
         unsafe { T::ptrs_to_refs(context, ptrs) }
     }

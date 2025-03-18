@@ -7,9 +7,9 @@ use core::{
     ptr, slice,
 };
 
-use crate::{erased::assert_slice_buffer_len, traits::Soa};
+use crate::traits::Soa;
 
-use super::{assert_buffer_align, validate_layout};
+use super::{assert_buffer_align, assert_into_size, assert_slice_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldSlicePtr {
@@ -26,6 +26,25 @@ impl ErasedFieldSlicePtr {
         assert_buffer_align(buffer.cast(), layout.align());
 
         Self { layout, buffer }
+    }
+
+    #[inline]
+    pub fn from<T>(ptr: *const [T]) -> Self {
+        let layout = Layout::new::<T>();
+        let buffer = ptr::slice_from_raw_parts(ptr.cast(), layout.size() * ptr.len());
+        Self::new(layout, buffer)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn into<T>(self) -> *const [T] {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        ptr::slice_from_raw_parts(
+            buffer.cast(),
+            buffer.len().checked_div(layout.size()).unwrap_or(0),
+        )
     }
 
     #[inline]
@@ -102,8 +121,8 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size() * len;
-                let slice = ptr::slice_from_raw_parts(ptr.cast(), len);
-                ErasedFieldSlicePtr::new(field_layout.clone(), slice)
+                let slice = ptr::slice_from_raw_parts(ptr, len);
+                ErasedFieldSlicePtr::new(field_layout, slice)
             })
             .collect();
         Self {
@@ -129,10 +148,8 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
-                assert_eq!(*field_layout, slice.layout());
-                slice.buffer().cast()
-            });
+            .inspect(|(&field_layout, slice)| assert_eq!(field_layout, slice.layout()))
+            .map(|(_, slice)| slice.as_ptr());
         let ptrs = T::ptrs_restore(context, ptrs);
         T::slices_from_raw_parts(context, ptrs, len)
     }

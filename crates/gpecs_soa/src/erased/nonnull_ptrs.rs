@@ -10,7 +10,7 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{assert_buffer_align, assert_value_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_into_size, assert_value_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldNonNullPtr {
@@ -26,6 +26,23 @@ impl ErasedFieldNonNullPtr {
         assert_buffer_align(buffer.as_ptr().cast(), layout.align());
 
         Self { layout, buffer }
+    }
+
+    #[inline]
+    pub fn from<T>(ptr: NonNull<T>) -> Self {
+        let layout = Layout::new::<T>();
+        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), layout.size());
+        let buffer = NonNull::new(ptr).expect("input pointer should be nonnull");
+        Self::new(layout, buffer)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn into<T>(self) -> NonNull<T> {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        buffer.cast()
     }
 
     #[inline]
@@ -85,9 +102,9 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size();
-                let ptr = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
+                let ptr = ptr::slice_from_raw_parts_mut(ptr, len);
                 let buffer = unsafe { NonNull::new_unchecked(ptr) };
-                ErasedFieldNonNullPtr::new(field_layout.clone(), buffer)
+                ErasedFieldNonNullPtr::new(field_layout, buffer)
             })
             .collect();
         Self {
@@ -109,10 +126,11 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
             .collect();
         assert_eq!(field_layouts.len(), ptrs.len());
 
-        let ptrs = field_layouts.iter().zip(ptrs).map(|(field_layout, ptr)| {
-            assert_eq!(*field_layout, ptr.layout());
-            ptr.buffer().as_ptr().cast()
-        });
+        let ptrs = field_layouts
+            .iter()
+            .zip(ptrs)
+            .inspect(|(&field_layout, ptr)| assert_eq!(field_layout, ptr.layout()))
+            .map(|(_, ptr)| ptr.as_ptr().as_ptr());
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         unsafe { T::ptrs_to_nonnull(context, ptrs) }
     }

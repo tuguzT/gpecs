@@ -4,6 +4,7 @@ use alloc::{
 };
 use core::{
     alloc::{Layout, LayoutError},
+    any::type_name,
     borrow::Borrow,
     iter,
     marker::PhantomData,
@@ -1547,4 +1548,22 @@ fn assert_buffer_align(buffer: *const u8, layout_align: usize) {
         return;
     }
     assert_buffer_align_failed(layout_align)
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+fn assert_into_size_failed<T>(layout_size: usize) -> ! {
+    let size_of = size_of::<T>();
+    let type_name = type_name::<T>();
+    panic!("size {size_of} of type {type_name} should match layout size {layout_size}")
+}
+
+#[inline]
+#[track_caller]
+fn assert_into_size<T>(layout_size: usize) {
+    if layout_size == size_of::<T>() {
+        return;
+    }
+    assert_into_size_failed::<T>(layout_size)
 }

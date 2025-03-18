@@ -8,7 +8,7 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{assert_buffer_align, assert_slice_buffer_len, validate_layout};
+use super::{assert_buffer_align, assert_into_size, assert_slice_buffer_len, validate_layout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldSlice<'a> {
@@ -25,6 +25,28 @@ impl<'a> ErasedFieldSlice<'a> {
         assert_buffer_align(buffer.as_ptr(), layout.align());
 
         Self { layout, buffer }
+    }
+
+    #[inline]
+    pub fn from<T>(ptr: &'a [T]) -> Self {
+        let layout = Layout::new::<T>();
+        let buffer = unsafe {
+            let data = ptr.as_ptr().cast();
+            let len = layout.size() * ptr.len();
+            slice::from_raw_parts(data, len)
+        };
+        Self::new(layout, buffer)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn into<T>(self) -> &'a [T] {
+        let Self { layout, buffer } = self;
+        assert_into_size::<T>(layout.size());
+
+        let data = buffer.as_ptr().cast();
+        let len = buffer.len().checked_div(layout.size()).unwrap_or(0);
+        unsafe { slice::from_raw_parts(data, len) }
     }
 
     #[inline]
@@ -110,8 +132,8 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
             .zip(ptrs)
             .map(|(field_layout, ptr)| {
                 let len = field_layout.size() * len;
-                let slice = unsafe { slice::from_raw_parts(ptr.cast(), len) };
-                ErasedFieldSlice::new(field_layout.clone(), slice)
+                let slice = unsafe { slice::from_raw_parts(ptr, len) };
+                ErasedFieldSlice::new(field_layout, slice)
             })
             .collect();
         Self {
@@ -137,10 +159,8 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(slices)
-            .map(|(field_layout, slice)| {
-                assert_eq!(*field_layout, slice.layout());
-                slice.buffer().as_ptr()
-            });
+            .inspect(|(&field_layout, slice)| assert_eq!(field_layout, slice.layout()))
+            .map(|(_, slice)| slice.into_buffer().as_ptr());
         let ptrs = T::ptrs_restore(context, ptrs);
         let slices = T::slices_from_raw_parts(context, ptrs, len);
         unsafe { T::slice_ptrs_to_slices(context, slices) }

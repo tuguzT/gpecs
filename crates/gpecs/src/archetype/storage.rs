@@ -468,7 +468,7 @@ where
     B: Bundle,
 {
     let refs = reorder_fields::<B, _>(components, context, fields)
-        .map(|(layout, buffer)| erased::ErasedFieldRef::new(layout, buffer));
+        .map(|(layout, buffer)| erased::field::ErasedFieldRef::new(layout, buffer));
     let erased_refs = ErasedSoaRefs::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -486,7 +486,7 @@ where
         .into_fields()
         .into_vec()
         .into_iter()
-        .map(erased::ErasedFieldRef::into_parts);
+        .map(erased::field::ErasedFieldRef::into_parts);
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -503,7 +503,7 @@ where
     B: Bundle,
 {
     let refs = reorder_fields::<B, _>(components, context, fields)
-        .map(|(layout, buffer)| erased::ErasedFieldRefMut::new(layout, buffer));
+        .map(|(layout, buffer)| erased::field::ErasedFieldRefMut::new(layout, buffer));
     let erased_refs = ErasedSoaRefsMut::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -521,7 +521,7 @@ where
         .into_fields()
         .into_vec()
         .into_iter()
-        .map(erased::ErasedFieldRefMut::into_parts);
+        .map(erased::field::ErasedFieldRefMut::into_parts);
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -539,7 +539,7 @@ where
     B: Bundle,
 {
     let slices = reorder_fields::<B, _>(components, context, fields)
-        .map(|(layout, buffer)| erased::ErasedFieldSlice::new(layout, buffer));
+        .map(|(layout, buffer)| erased::field::ErasedFieldSlice::new(layout, buffer));
     let erased_slices = ErasedSoaSlices::<B::Fields>::new(len, slices);
     unsafe { erased_slices.into::<B>(context) }
 }
@@ -559,7 +559,7 @@ where
         .into_fields()
         .into_vec()
         .into_iter()
-        .map(erased::ErasedFieldSlice::into_parts);
+        .map(erased::field::ErasedFieldSlice::into_parts);
 
     let fields = validate_components::<B>(components, context)
         .zip(erased_slices)
@@ -579,7 +579,7 @@ where
     B: Bundle,
 {
     let slices = reorder_fields::<B, _>(components, context, fields)
-        .map(|(layout, buffer)| erased::ErasedFieldSliceMut::new(layout, buffer));
+        .map(|(layout, buffer)| erased::field::ErasedFieldSliceMut::new(layout, buffer));
     let erased_slices = ErasedSoaSlicesMut::<B::Fields>::new(len, slices);
     unsafe { erased_slices.into::<B>(context) }
 }
@@ -599,7 +599,7 @@ where
         .into_fields()
         .into_vec()
         .into_iter()
-        .map(erased::ErasedFieldSliceMut::into_parts);
+        .map(erased::field::ErasedFieldSliceMut::into_parts);
 
     let fields = validate_components::<B>(components, context)
         .zip(erased_slices)

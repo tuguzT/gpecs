@@ -9,7 +9,7 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{validate_layout, ErasedFieldMutPtr};
+use super::{assert::validate_layout, ErasedFieldMutPtr};
 
 type ErasedDropFnParam<'a> = &'a [ErasedFieldMutPtr];
 type ErasedDropFn = Box<dyn Fn(ErasedDropFnParam<'_>)>;

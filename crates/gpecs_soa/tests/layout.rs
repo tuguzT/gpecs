@@ -2,8 +2,8 @@ use std::{alloc::Layout, ptr, slice};
 
 use gpecs_soa::{
     erased::{
-        ErasedFieldRef, ErasedFieldSlice, ErasedSoa, ErasedSoaContext, ErasedSoaRefs,
-        ErasedSoaSlices,
+        field::{ErasedFieldRef, ErasedFieldSlice},
+        ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaSlices,
     },
     prelude::*,
     slice::{Iter as SoaIter, IterMut as SoaIterMut},

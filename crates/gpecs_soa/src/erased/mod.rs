@@ -4,7 +4,6 @@ use alloc::{
 };
 use core::{
     alloc::{Layout, LayoutError},
-    any::type_name,
     borrow::Borrow,
     iter,
     marker::PhantomData,
@@ -14,29 +13,33 @@ use core::{
 
 use crate::traits::{buffer_layout, Soa};
 
-use self::byte::ErasedByte;
+use self::{
+    assert::validate_layout,
+    byte::ErasedByte,
+    field::{
+        ErasedFieldMutPtr, ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldRef,
+        ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSliceMutPtr,
+        ErasedFieldSlicePtr,
+    },
+};
 
 pub use self::{
     context::ErasedSoaContext,
-    nonnull_ptrs::{ErasedFieldNonNullPtr, ErasedSoaNonNullPtrs},
-    ptrs::{ErasedFieldPtr, ErasedSoaPtrs},
-    ptrs_mut::{ErasedFieldMutPtr, ErasedSoaMutPtrs},
-    refs::{ErasedFieldRef, ErasedSoaRefs},
-    refs_mut::{ErasedFieldRefMut, ErasedSoaRefsMut},
-    slice_ptrs::{
-        ErasedFieldSlicePtr, ErasedFieldSlicePtrIter, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
-    },
-    slice_ptrs_mut::{
-        ErasedFieldSliceMutPtr, ErasedFieldSliceMutPtrIter, ErasedSoaSliceMutPtrs,
-        ErasedSoaSliceMutPtrsIter,
-    },
-    slices::{ErasedFieldSlice, ErasedFieldSliceIter, ErasedSoaSlices, ErasedSoaSlicesIter},
-    slices_mut::{
-        ErasedFieldSliceIterMut, ErasedFieldSliceMut, ErasedSoaSlicesIterMut, ErasedSoaSlicesMut,
-    },
+    nonnull_ptrs::ErasedSoaNonNullPtrs,
+    ptrs::ErasedSoaPtrs,
+    ptrs_mut::ErasedSoaMutPtrs,
+    refs::ErasedSoaRefs,
+    refs_mut::ErasedSoaRefsMut,
+    slice_ptrs::{ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter},
+    slice_ptrs_mut::{ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter},
+    slices::{ErasedSoaSlices, ErasedSoaSlicesIter},
+    slices_mut::{ErasedSoaSlicesIterMut, ErasedSoaSlicesMut},
     vecs::{ErasedFieldVec, ErasedSoaVecs},
 };
 
+pub mod field;
+
+mod assert;
 mod byte;
 mod context;
 mod nonnull_ptrs;
@@ -1459,86 +1462,4 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             drop_fields(ptrs.as_ref());
         }
     }
-}
-
-#[inline]
-fn validate_layout<Fields, I>(item: I) -> Layout
-where
-    I: Borrow<Layout>,
-{
-    let layout: &Layout = item.borrow();
-
-    let input_align = layout.align();
-    let max_align = align_of::<Fields>();
-    assert!(
-        input_align <= max_align,
-        "input alignment must be less than or equal to {max_align}, but got {input_align}",
-    );
-    layout.clone()
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn assert_value_buffer_len_failed(buffer_len: usize, layout_size: usize) -> ! {
-    panic!("buffer len {buffer_len} should match layout size {layout_size}")
-}
-
-#[inline]
-#[track_caller]
-fn assert_value_buffer_len(buffer_len: usize, layout_size: usize) {
-    if buffer_len == layout_size {
-        return;
-    }
-    assert_value_buffer_len_failed(buffer_len, layout_size)
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn assert_slice_buffer_len_failed(buffer_len: usize, layout_size: usize) -> ! {
-    panic!("buffer len {buffer_len} should be dividable by layout size {layout_size}")
-}
-
-#[inline]
-#[track_caller]
-fn assert_slice_buffer_len(buffer_len: usize, layout_size: usize) {
-    if buffer_len.checked_rem(layout_size).unwrap_or(0) == 0 {
-        return;
-    }
-    assert_slice_buffer_len_failed(buffer_len, layout_size)
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn assert_buffer_align_failed(layout_align: usize) -> ! {
-    panic!("buffer should be aligned to {layout_align}")
-}
-
-#[inline]
-#[track_caller]
-fn assert_buffer_align(buffer: *const u8, layout_align: usize) {
-    if buffer.align_offset(layout_align) == 0 {
-        return;
-    }
-    assert_buffer_align_failed(layout_align)
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn assert_layout_failed<T>(layout: &Layout) -> ! {
-    let target_layout = Layout::new::<T>();
-    let type_name = type_name::<T>();
-    panic!("layout {target_layout:?} of type {type_name} should match layout {layout:?}")
-}
-
-#[inline]
-#[track_caller]
-fn assert_layout<T>(layout: &Layout) {
-    if *layout == Layout::new::<T>() {
-        return;
-    }
-    assert_layout_failed::<T>(layout)
 }

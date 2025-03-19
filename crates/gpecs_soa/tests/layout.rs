@@ -63,7 +63,7 @@ fn erased_context() {
 }
 
 #[test]
-#[should_panic = "input alignment must be less than or equal to 1, but got 2"]
+#[should_panic = "input alignment 2 must be less than or equal to 1"]
 #[cfg_attr(miri, ignore)]
 fn erased_context_fail() {
     let field_layouts = [Layout::new::<u8>(), Layout::new::<i16>()];

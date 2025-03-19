@@ -49,7 +49,7 @@ impl<Fields> ErasedSoaContext<Fields> {
             .collect();
 
         let drop_fields = move |data: ErasedDropFnParam<'_>| unsafe {
-            let ptrs = data.iter().map(|ptr| ptr.as_ptr());
+            let ptrs = data.iter().map(ErasedFieldMutPtr::as_ptr);
             let ptrs = T::ptrs_restore_mut(&context, ptrs);
             T::ptrs_drop_in_place(&context, ptrs);
         };

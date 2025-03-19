@@ -19,6 +19,13 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
+    pub fn dangling(layout: Layout) -> Self {
+        let data = ptr::without_provenance(layout.align());
+        let buffer = ptr::slice_from_raw_parts(data, layout.size());
+        Self::new(layout, buffer)
+    }
+
+    #[inline]
     pub fn from<T>(ptr: *const T) -> Self {
         let layout = Layout::new::<T>();
         let buffer = ptr::slice_from_raw_parts(ptr.cast(), layout.size());
@@ -48,6 +55,12 @@ impl ErasedFieldPtr {
 
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
+        let Self { buffer, .. } = self;
+        buffer.cast()
+    }
+
+    #[inline]
+    pub fn into_ptr(self) -> *const u8 {
         let Self { buffer, .. } = self;
         buffer.cast()
     }

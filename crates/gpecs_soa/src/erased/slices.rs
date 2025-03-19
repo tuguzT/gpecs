@@ -8,7 +8,7 @@ use core::{
 use crate::traits::Soa;
 
 use super::{
-    assert::validate_layout,
+    assert::{assert_same_len, validate_layout},
     field::{ErasedFieldSlice, ErasedFieldSliceIter},
     ErasedSoaRefs,
 };
@@ -32,7 +32,10 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
             len,
             slices: slices
                 .into_iter()
-                .inspect(|slice| assert_eq!(slice.len(), len))
+                .inspect(|slice| {
+                    validate_layout::<Fields, _>(slice.layout());
+                    assert_same_len(len, slice.len());
+                })
                 .collect(),
             phantom: PhantomData,
         }
@@ -190,8 +193,17 @@ impl<'a, Fields> ErasedSoaSlicesIter<'a, Fields> {
     where
         I: IntoIterator<Item = ErasedFieldSliceIter<'a>>,
     {
+        let mut slices = slices.into_iter().peekable();
+        let len = slices
+            .peek()
+            .map(ExactSizeIterator::len)
+            .expect("input slices should contain at least one field");
+
         Self {
-            slices: slices.into_iter().collect(),
+            #[allow(dropping_copy_types)]
+            slices: slices
+                .inspect(|iter| drop(assert_same_len(len, iter.len())))
+                .collect(),
             phantom: PhantomData,
         }
     }
@@ -199,11 +211,7 @@ impl<'a, Fields> ErasedSoaSlicesIter<'a, Fields> {
     #[inline]
     pub fn len(&self) -> usize {
         let Self { slices, .. } = self;
-        let mut lens = slices.iter().map(ExactSizeIterator::len);
-
-        let first = lens.next().expect("SoA should contain at least one field");
-        assert!(lens.all(|len| len == first));
-        first
+        slices.iter().map(ExactSizeIterator::len).next().unwrap()
     }
 
     #[inline]

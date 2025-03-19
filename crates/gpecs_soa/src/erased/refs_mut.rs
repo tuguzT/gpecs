@@ -19,12 +19,17 @@ where
 
 impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
     #[inline]
+    #[track_caller]
     pub fn new<I>(refs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldRefMut<'a>>,
     {
         Self {
-            refs: refs.into_iter().collect(),
+            #[allow(dropping_copy_types)]
+            refs: refs
+                .into_iter()
+                .inspect(|r#ref| drop(validate_layout::<Fields, _>(r#ref.layout())))
+                .collect(),
             phantom: PhantomData,
         }
     }
@@ -55,6 +60,7 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
     }
 
     #[inline]
+    #[track_caller]
     pub unsafe fn into<T>(self, context: &T::Context) -> T::RefsMut<'a>
     where
         T: Soa<Fields = Fields>,

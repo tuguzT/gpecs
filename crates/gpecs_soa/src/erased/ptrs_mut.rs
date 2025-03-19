@@ -17,12 +17,17 @@ pub struct ErasedSoaMutPtrs<Fields> {
 
 impl<Fields> ErasedSoaMutPtrs<Fields> {
     #[inline]
+    #[track_caller]
     pub fn new<I>(ptrs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldMutPtr>,
     {
         Self {
-            ptrs: ptrs.into_iter().collect(),
+            #[allow(dropping_copy_types)]
+            ptrs: ptrs
+                .into_iter()
+                .inspect(|ptr| drop(validate_layout::<Fields, _>(ptr.layout())))
+                .collect(),
             phantom: PhantomData,
         }
     }
@@ -52,6 +57,7 @@ impl<Fields> ErasedSoaMutPtrs<Fields> {
     }
 
     #[inline]
+    #[track_caller]
     pub unsafe fn into<T>(self, context: &T::Context) -> T::MutPtrs
     where
         T: Soa<Fields = Fields>,

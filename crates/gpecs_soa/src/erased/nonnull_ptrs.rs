@@ -17,12 +17,17 @@ pub struct ErasedSoaNonNullPtrs<Fields> {
 
 impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     #[inline]
+    #[track_caller]
     pub fn new<I>(ptrs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldNonNullPtr>,
     {
         Self {
-            ptrs: ptrs.into_iter().collect(),
+            #[allow(dropping_copy_types)]
+            ptrs: ptrs
+                .into_iter()
+                .inspect(|ptr| drop(validate_layout::<Fields, _>(ptr.layout())))
+                .collect(),
             phantom: PhantomData,
         }
     }
@@ -54,6 +59,7 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     }
 
     #[inline]
+    #[track_caller]
     pub unsafe fn into<T>(self, context: &T::Context) -> T::NonNullPtrs
     where
         T: Soa<Fields = Fields>,

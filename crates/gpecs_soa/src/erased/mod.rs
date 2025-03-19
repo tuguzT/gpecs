@@ -14,7 +14,7 @@ use core::{
 
 use crate::traits::{buffer_layout, Soa};
 
-use self::{byte::ErasedByte, vecs::ErasedFieldVec};
+use self::byte::ErasedByte;
 
 pub use self::{
     context::ErasedSoaContext,
@@ -23,11 +23,11 @@ pub use self::{
     ptrs_mut::ErasedSoaMutPtrs,
     refs::{ErasedFieldRef, ErasedSoaRefs},
     refs_mut::{ErasedFieldRefMut, ErasedSoaRefsMut},
-    slice_ptrs::{ErasedFieldSlicePtr, ErasedSoaSlicePtrs},
+    slice_ptrs::{ErasedFieldSlicePtr, ErasedFieldSlicePtrIter, ErasedSoaSlicePtrs},
     slice_ptrs_mut::ErasedSoaSliceMutPtrs,
     slices::{ErasedFieldSlice, ErasedFieldSliceIter, ErasedSoaSlices},
     slices_mut::{ErasedFieldSliceIterMut, ErasedFieldSliceMut, ErasedSoaSlicesMut},
-    vecs::ErasedSoaVecs,
+    vecs::{ErasedFieldVec, ErasedSoaVecs},
 };
 
 mod byte;

@@ -1,6 +1,9 @@
 use core::{alloc::Layout, ptr};
 
-use super::assert::{assert_buffer_align, assert_layout, assert_value_buffer_len};
+use super::{
+    assert::{assert_buffer_align, assert_layout, assert_value_buffer_len},
+    ErasedFieldMutPtr,
+};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldPtr {
@@ -39,6 +42,22 @@ impl ErasedFieldPtr {
         assert_layout::<T>(&layout);
 
         buffer.cast()
+    }
+
+    #[inline]
+    pub fn cast_mut(self) -> ErasedFieldMutPtr {
+        let Self { layout, buffer } = self;
+        ErasedFieldMutPtr::new(layout, buffer.cast_mut())
+    }
+
+    #[inline]
+    pub unsafe fn add(self, count: usize) -> Self {
+        let Self { layout, buffer } = self;
+
+        let data = unsafe { buffer.cast::<u8>().add(count * layout.size()) };
+        let len = layout.size();
+        let buffer = ptr::slice_from_raw_parts(data, len);
+        Self::new(layout, buffer)
     }
 
     #[inline]

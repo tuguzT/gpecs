@@ -167,12 +167,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                assert_eq!(*field_layout, ptr.layout());
-
-                let buffer = ptr.buffer().cast_const();
-                ErasedFieldPtr::new(*field_layout, buffer)
-            })
+            .inspect(|(&field_layout, ptr)| assert_eq!(field_layout, ptr.layout()))
+            .map(|(_, ptr)| ptr.cast_const())
             .collect();
         ErasedSoaPtrs {
             ptrs,
@@ -189,12 +185,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|(field_layout, field_ptr)| {
-                assert_eq!(*field_layout, field_ptr.layout());
-
-                let buffer = field_ptr.buffer().cast_mut();
-                ErasedFieldMutPtr::new(*field_layout, buffer)
-            })
+            .inspect(|(&field_layout, ptr)| assert_eq!(field_layout, ptr.layout()))
+            .map(|(_, ptr)| ptr.cast_mut())
             .collect();
         ErasedSoaMutPtrs {
             ptrs,
@@ -211,14 +203,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                assert_eq!(*field_layout, ptr.layout());
-
-                let data = unsafe { ptr.as_ptr().add(offset * field_layout.size()) };
-                let len = field_layout.size();
-                let buffer = ptr::slice_from_raw_parts(data, len);
-                ErasedFieldPtr::new(*field_layout, buffer)
-            })
+            .inspect(|(&field_layout, ptr)| assert_eq!(field_layout, ptr.layout()))
+            .map(|(_, ptr)| unsafe { ptr.add(offset) })
             .collect();
         ErasedSoaPtrs {
             ptrs,
@@ -239,14 +225,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = field_layouts
             .iter()
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                assert_eq!(*field_layout, ptr.layout());
-
-                let data = unsafe { ptr.as_ptr().add(offset * field_layout.size()) };
-                let len = field_layout.size();
-                let buffer = ptr::slice_from_raw_parts_mut(data, len);
-                ErasedFieldMutPtr::new(*field_layout, buffer)
-            })
+            .inspect(|(&field_layout, ptr)| assert_eq!(field_layout, ptr.layout()))
+            .map(|(_, ptr)| unsafe { ptr.add(offset) })
             .collect();
         ErasedSoaMutPtrs {
             ptrs,

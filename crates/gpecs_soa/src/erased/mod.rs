@@ -23,10 +23,17 @@ pub use self::{
     ptrs_mut::{ErasedFieldMutPtr, ErasedSoaMutPtrs},
     refs::{ErasedFieldRef, ErasedSoaRefs},
     refs_mut::{ErasedFieldRefMut, ErasedSoaRefsMut},
-    slice_ptrs::{ErasedFieldSlicePtr, ErasedFieldSlicePtrIter, ErasedSoaSlicePtrs},
-    slice_ptrs_mut::{ErasedFieldSliceMutPtr, ErasedFieldSliceMutPtrIter, ErasedSoaSliceMutPtrs},
-    slices::{ErasedFieldSlice, ErasedFieldSliceIter, ErasedSoaSlices},
-    slices_mut::{ErasedFieldSliceIterMut, ErasedFieldSliceMut, ErasedSoaSlicesMut},
+    slice_ptrs::{
+        ErasedFieldSlicePtr, ErasedFieldSlicePtrIter, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
+    },
+    slice_ptrs_mut::{
+        ErasedFieldSliceMutPtr, ErasedFieldSliceMutPtrIter, ErasedSoaSliceMutPtrs,
+        ErasedSoaSliceMutPtrsIter,
+    },
+    slices::{ErasedFieldSlice, ErasedFieldSliceIter, ErasedSoaSlices, ErasedSoaSlicesIter},
+    slices_mut::{
+        ErasedFieldSliceIterMut, ErasedFieldSliceMut, ErasedSoaSlicesIterMut, ErasedSoaSlicesMut,
+    },
     vecs::{ErasedFieldVec, ErasedSoaVecs},
 };
 
@@ -1431,41 +1438,27 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         }
     }
 
-    // TODO: reimplement with iterators
-    // unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs) {
-    //     let ErasedSoaContext {
-    //         field_layouts,
-    //         drop_fields,
-    //         ..
-    //     } = context;
-    //     let Some(drop_fields) = drop_fields else {
-    //         return;
-    //     };
+    unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs) {
+        let ErasedSoaContext {
+            field_layouts,
+            drop_fields,
+            ..
+        } = context;
+        let Some(drop_fields) = drop_fields else {
+            return;
+        };
+        assert_eq!(field_layouts.len(), slices.fields().len());
 
-    //     let ErasedSoaSliceMutPtrs {
-    //         mut slices, len, ..
-    //     } = slices;
-    //     assert_eq!(field_layouts.len(), slices.len());
+        for ptrs in slices {
+            let ErasedSoaMutPtrs { ptrs, .. } = ptrs;
+            assert!(field_layouts
+                .iter()
+                .copied()
+                .eq(ptrs.iter().map(ErasedFieldMutPtr::layout)));
 
-    //     for ((ref layout, ref mut slice), field_layout) in iter::zip(&mut slices, field_layouts) {
-    //         assert_eq!(layout, field_layout);
-    //         assert_eq!(slice.len().checked_rem(field_layout.size()).unwrap_or(0), 0);
-
-    //         let data = slice.cast();
-    //         let len = slice.len().checked_div(field_layout.size()).unwrap_or(0);
-    //         *slice = ptr::slice_from_raw_parts_mut(data, len);
-    //     }
-
-    //     for _ in 0..len {
-    //         drop_fields(slices.as_ref());
-
-    //         for (ref field_layout, ref mut slice) in slices.iter_mut() {
-    //             let len = field_layout.size();
-    //             let data = unsafe { slice.cast::<u8>().add(len) };
-    //             *slice = ptr::slice_from_raw_parts_mut(data, len);
-    //         }
-    //     }
-    // }
+            drop_fields(ptrs.as_ref());
+        }
+    }
 }
 
 #[inline]

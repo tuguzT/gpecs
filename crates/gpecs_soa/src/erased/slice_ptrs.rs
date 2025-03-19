@@ -12,6 +12,7 @@ use crate::traits::Soa;
 
 use super::{
     assert_buffer_align, assert_layout, assert_slice_buffer_len, validate_layout, ErasedFieldPtr,
+    ErasedSoaPtrs,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -516,6 +517,13 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
         let Self { slices, .. } = self;
         slices
     }
+
+    #[inline]
+    pub fn iter(&self) -> ErasedSoaSlicePtrsIter<Fields> {
+        let Self { slices, .. } = self;
+        let slices = slices.iter().map(IntoIterator::into_iter);
+        ErasedSoaSlicePtrsIter::new(slices)
+    }
 }
 
 impl<Fields> Debug for ErasedSoaSlicePtrs<Fields> {
@@ -570,5 +578,102 @@ impl<Fields> Clone for ErasedSoaSlicePtrs<Fields> {
             slices: slices.clone(),
             phantom: phantom.clone(),
         }
+    }
+}
+
+impl<Fields> IntoIterator for &ErasedSoaSlicePtrs<Fields> {
+    type Item = ErasedSoaPtrs<Fields>;
+    type IntoIter = ErasedSoaSlicePtrsIter<Fields>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<Fields> IntoIterator for ErasedSoaSlicePtrs<Fields> {
+    type Item = ErasedSoaPtrs<Fields>;
+    type IntoIter = ErasedSoaSlicePtrsIter<Fields>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { slices, .. } = self;
+        let slices = slices.into_vec().into_iter().map(IntoIterator::into_iter);
+        ErasedSoaSlicePtrsIter::new(slices)
+    }
+}
+
+pub struct ErasedSoaSlicePtrsIter<Fields> {
+    slices: Box<[ErasedFieldSlicePtrIter]>,
+    phantom: PhantomData<fn() -> Fields>,
+}
+
+impl<Fields> ErasedSoaSlicePtrsIter<Fields> {
+    #[inline]
+    pub(super) fn new<I>(slices: I) -> Self
+    where
+        I: IntoIterator<Item = ErasedFieldSlicePtrIter>,
+    {
+        Self {
+            slices: slices.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { slices, .. } = self;
+        let mut lens = slices.iter().map(ExactSizeIterator::len);
+
+        let first = lens.next().expect("SoA should contain at least one field");
+        assert!(lens.all(|len| len == first));
+        first
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<Fields> Iterator for ErasedSoaSlicePtrsIter<Fields> {
+    type Item = ErasedSoaPtrs<Fields>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if ErasedSoaSlicePtrsIter::is_empty(self) {
+            return None;
+        }
+
+        let ptrs = self.slices.iter_mut().flat_map(Iterator::next);
+        Some(ErasedSoaPtrs::new(ptrs))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl<Fields> DoubleEndedIterator for ErasedSoaSlicePtrsIter<Fields> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if ErasedSoaSlicePtrsIter::is_empty(self) {
+            return None;
+        }
+
+        let ptrs = self
+            .slices
+            .iter_mut()
+            .flat_map(DoubleEndedIterator::next_back);
+        Some(ErasedSoaPtrs::new(ptrs))
+    }
+}
+
+impl<Fields> ExactSizeIterator for ErasedSoaSlicePtrsIter<Fields> {
+    #[inline]
+    fn len(&self) -> usize {
+        ErasedSoaSlicePtrsIter::len(self)
     }
 }

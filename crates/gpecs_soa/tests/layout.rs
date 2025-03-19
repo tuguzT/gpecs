@@ -294,6 +294,18 @@ fn erased_value() {
         ],
     );
 
+    for (idx, refs) in erased_slices.iter().enumerate().rev() {
+        assert_eq!(
+            refs.fields(),
+            ErasedSoaRefs::from::<(u32, u16, u8)>(&context, (&i123[idx], &i456[idx], &i789[idx]))
+                .fields(),
+        );
+        assert_eq!(
+            unsafe { refs.into::<(u32, u16, u8)>(&context) },
+            (&i123[idx], &i456[idx], &i789[idx]),
+        );
+    }
+
     let slices = unsafe { erased_slices.into::<(u32, u16, u8)>(&()) };
     assert_eq!(slices, (i123_slices, i456_slices, i789_slices));
 }

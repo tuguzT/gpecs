@@ -12,6 +12,7 @@ use crate::traits::Soa;
 
 use super::{
     assert_buffer_align, assert_layout, assert_slice_buffer_len, validate_layout, ErasedFieldRef,
+    ErasedSoaRefs,
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -118,7 +119,7 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 }
 
-impl<'a> Debug for ErasedFieldSlice<'a> {
+impl Debug for ErasedFieldSlice<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { layout, buffer, .. } = self;
         f.debug_struct("ErasedFieldSlice")
@@ -128,9 +129,9 @@ impl<'a> Debug for ErasedFieldSlice<'a> {
     }
 }
 
-impl<'r, 'a> IntoIterator for &'r ErasedFieldSlice<'a> {
-    type Item = ErasedFieldRef<'r>;
-    type IntoIter = ErasedFieldSliceIter<'r>;
+impl<'a> IntoIterator for &'a ErasedFieldSlice<'_> {
+    type Item = ErasedFieldRef<'a>;
+    type IntoIter = ErasedFieldSliceIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -558,9 +559,16 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
         let Self { slices, .. } = self;
         slices
     }
+
+    #[inline]
+    pub fn iter(&self) -> ErasedSoaSlicesIter<'_, Fields> {
+        let Self { slices, .. } = self;
+        let slices = slices.iter().map(IntoIterator::into_iter);
+        ErasedSoaSlicesIter::new(slices)
+    }
 }
 
-impl<'a, Fields> Debug for ErasedSoaSlices<'a, Fields> {
+impl<Fields> Debug for ErasedSoaSlices<'_, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { len, slices, .. } = self;
 
@@ -571,7 +579,7 @@ impl<'a, Fields> Debug for ErasedSoaSlices<'a, Fields> {
     }
 }
 
-impl<'a, Fields> Clone for ErasedSoaSlices<'a, Fields> {
+impl<Fields> Clone for ErasedSoaSlices<'_, Fields> {
     fn clone(&self) -> Self {
         let Self {
             len,
@@ -587,5 +595,108 @@ impl<'a, Fields> Clone for ErasedSoaSlices<'a, Fields> {
     }
 }
 
-unsafe impl<'a, Fields> Send for ErasedSoaSlices<'a, Fields> where Fields: Sync {}
-unsafe impl<'a, Fields> Sync for ErasedSoaSlices<'a, Fields> where Fields: Sync {}
+impl<'a, Fields> IntoIterator for &'a ErasedSoaSlices<'_, Fields> {
+    type Item = ErasedSoaRefs<'a, Fields>;
+    type IntoIter = ErasedSoaSlicesIter<'a, Fields>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, Fields> IntoIterator for ErasedSoaSlices<'a, Fields> {
+    type Item = ErasedSoaRefs<'a, Fields>;
+    type IntoIter = ErasedSoaSlicesIter<'a, Fields>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { slices, .. } = self;
+        let slices = slices.into_vec().into_iter().map(IntoIterator::into_iter);
+        ErasedSoaSlicesIter::new(slices)
+    }
+}
+
+unsafe impl<Fields> Send for ErasedSoaSlices<'_, Fields> where Fields: Sync {}
+unsafe impl<Fields> Sync for ErasedSoaSlices<'_, Fields> where Fields: Sync {}
+
+pub struct ErasedSoaSlicesIter<'a, Fields>
+where
+    Fields: 'a,
+{
+    slices: Box<[ErasedFieldSliceIter<'a>]>,
+    phantom: PhantomData<fn() -> Fields>,
+}
+
+impl<'a, Fields> ErasedSoaSlicesIter<'a, Fields> {
+    #[inline]
+    pub(super) fn new<I>(slices: I) -> Self
+    where
+        I: IntoIterator<Item = ErasedFieldSliceIter<'a>>,
+    {
+        Self {
+            slices: slices.into_iter().collect(),
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { slices, .. } = self;
+        let mut lens = slices.iter().map(ExactSizeIterator::len);
+
+        let first = lens.next().expect("SoA should contain at least one field");
+        assert!(lens.all(|len| len == first));
+        first
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a, Fields> Iterator for ErasedSoaSlicesIter<'a, Fields> {
+    type Item = ErasedSoaRefs<'a, Fields>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if ErasedSoaSlicesIter::is_empty(self) {
+            return None;
+        }
+
+        let refs = self.slices.iter_mut().flat_map(Iterator::next);
+        Some(ErasedSoaRefs::new(refs))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl<Fields> DoubleEndedIterator for ErasedSoaSlicesIter<'_, Fields> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if ErasedSoaSlicesIter::is_empty(self) {
+            return None;
+        }
+
+        let refs = self
+            .slices
+            .iter_mut()
+            .flat_map(DoubleEndedIterator::next_back);
+        Some(ErasedSoaRefs::new(refs))
+    }
+}
+
+impl<Fields> ExactSizeIterator for ErasedSoaSlicesIter<'_, Fields> {
+    #[inline]
+    fn len(&self) -> usize {
+        ErasedSoaSlicesIter::len(self)
+    }
+}
+
+unsafe impl<Fields> Send for ErasedSoaSlicesIter<'_, Fields> where Fields: Sync {}
+unsafe impl<Fields> Sync for ErasedSoaSlicesIter<'_, Fields> where Fields: Sync {}

@@ -9,9 +9,9 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::validate_layout;
+use super::{validate_layout, ErasedFieldMutPtr};
 
-type ErasedDropFnParam<'a> = &'a [(Layout, *mut [u8])];
+type ErasedDropFnParam<'a> = &'a [ErasedFieldMutPtr];
 type ErasedDropFn = Box<dyn Fn(ErasedDropFnParam<'_>)>;
 
 pub struct ErasedSoaContext<Fields> {
@@ -49,7 +49,7 @@ impl<Fields> ErasedSoaContext<Fields> {
             .collect();
 
         let drop_fields = move |data: ErasedDropFnParam<'_>| unsafe {
-            let ptrs = data.iter().map(|(_, ptr)| ptr.cast());
+            let ptrs = data.iter().map(|ptr| ptr.as_ptr());
             let ptrs = T::ptrs_restore_mut(&context, ptrs);
             T::ptrs_drop_in_place(&context, ptrs);
         };

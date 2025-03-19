@@ -171,7 +171,7 @@ impl ErasedFieldSlicePtrIter {
 impl Debug for ErasedFieldSlicePtrIter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (layout, buffer) = self.as_slice().into_parts();
-        f.debug_struct("ErasedFieldSliceIter")
+        f.debug_struct("ErasedFieldSlicePtrIter")
             .field("layout", &layout)
             .field("buffer", &buffer)
             .finish()

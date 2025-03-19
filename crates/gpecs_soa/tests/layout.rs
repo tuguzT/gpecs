@@ -221,10 +221,16 @@ fn erased_value() {
         erased_slices.as_ref()[0],
         ErasedFieldSlice::from(i789_slices),
     );
-    for (idx, r#ref) in erased_slices.as_ref()[0].into_iter().enumerate() {
+    for (idx, r#ref) in erased_slices.as_ref()[0].iter().enumerate().rev() {
         assert_eq!(unsafe { r#ref.into::<u8>() }, &i789[idx]);
         assert_eq!(r#ref, ErasedFieldRef::from(&i789[idx]));
     }
+    assert_eq!(
+        erased_slices.as_ref()[0]
+            .iter()
+            .fold(0, |acc, item| acc + unsafe { item.into::<u8>() }),
+        24,
+    );
 
     assert_eq!(
         unsafe { erased_slices.as_ref()[1].into::<u16>() },
@@ -234,10 +240,16 @@ fn erased_value() {
         erased_slices.as_ref()[1],
         ErasedFieldSlice::from(i456_slices),
     );
-    for (idx, r#ref) in erased_slices.as_ref()[1].into_iter().enumerate() {
+    for (idx, r#ref) in erased_slices.as_ref()[1].iter().enumerate().rev() {
         assert_eq!(unsafe { r#ref.into::<u16>() }, &i456[idx]);
         assert_eq!(r#ref, ErasedFieldRef::from(&i456[idx]));
     }
+    assert_eq!(
+        erased_slices.as_ref()[1]
+            .iter()
+            .fold(0, |acc, item| acc + unsafe { item.into::<u16>() }),
+        15,
+    );
 
     assert_eq!(
         unsafe { erased_slices.as_ref()[2].into::<u32>() },
@@ -247,10 +259,16 @@ fn erased_value() {
         erased_slices.as_ref()[2],
         ErasedFieldSlice::from(i123_slices),
     );
-    for (idx, r#ref) in erased_slices.as_ref()[2].into_iter().enumerate() {
+    for (idx, r#ref) in erased_slices.as_ref()[2].iter().enumerate().rev() {
         assert_eq!(unsafe { r#ref.into::<u32>() }, &i123[idx]);
         assert_eq!(r#ref, ErasedFieldRef::from(&i123[idx]));
     }
+    assert_eq!(
+        erased_slices.as_ref()[2]
+            .iter()
+            .fold(0, |acc, item| acc + unsafe { item.into::<u32>() }),
+        6,
+    );
 
     let i123_bytes = unsafe {
         let data = ptr::from_ref(&i123).cast();

@@ -10,7 +10,7 @@ use crate::traits::Soa;
 
 use super::{assert_buffer_align, assert_layout, assert_value_buffer_len, validate_layout};
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldRef<'a> {
     layout: Layout,
     buffer: &'a [u8],
@@ -87,6 +87,16 @@ impl<'a> ErasedFieldRef<'a> {
     pub fn into_parts(self) -> (Layout, &'a [u8]) {
         let Self { layout, buffer, .. } = self;
         (layout, buffer)
+    }
+}
+
+impl<'a> Debug for ErasedFieldRef<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { layout, buffer, .. } = self;
+        f.debug_struct("ErasedFieldRef")
+            .field("layout", layout)
+            .field("buffer", buffer)
+            .finish()
     }
 }
 

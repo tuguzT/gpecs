@@ -10,7 +10,7 @@ use crate::traits::Soa;
 
 use super::{assert_buffer_align, assert_layout, assert_slice_buffer_len, validate_layout};
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash)]
 pub struct ErasedFieldSliceMut<'a> {
     layout: Layout,
     // data is stored inline in a single buffer
@@ -127,6 +127,16 @@ impl<'a> ErasedFieldSliceMut<'a> {
     pub fn into_parts(self) -> (Layout, &'a mut [u8]) {
         let Self { layout, buffer, .. } = self;
         (layout, buffer)
+    }
+}
+
+impl<'a> Debug for ErasedFieldSliceMut<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { layout, buffer, .. } = self;
+        f.debug_struct("ErasedFieldSliceMut")
+            .field("layout", layout)
+            .field("buffer", buffer)
+            .finish()
     }
 }
 

@@ -26,7 +26,7 @@ pub use self::{
     slice_ptrs::{ErasedFieldSlicePtr, ErasedSoaSlicePtrs},
     slice_ptrs_mut::ErasedSoaSliceMutPtrs,
     slices::{ErasedFieldSlice, ErasedFieldSliceIter, ErasedSoaSlices},
-    slices_mut::{ErasedFieldSliceMut, ErasedSoaSlicesMut},
+    slices_mut::{ErasedFieldSliceIterMut, ErasedFieldSliceMut, ErasedSoaSlicesMut},
     vecs::ErasedSoaVecs,
 };
 

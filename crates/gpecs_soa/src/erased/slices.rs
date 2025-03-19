@@ -113,7 +113,7 @@ impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     pub fn iter(&self) -> ErasedFieldSliceIter<'_> {
         let Self { layout, buffer, .. } = self;
-        let slice = Self::new(*layout, buffer);
+        let slice = ErasedFieldSlice::new(*layout, buffer);
         ErasedFieldSliceIter::new(slice)
     }
 }

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
@@ -166,19 +166,23 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
         let ptrs = T::ptrs_restore(context, ptrs);
         unsafe { T::ptrs_to_refs(context, ptrs) }
     }
-}
 
-impl<'a, Fields> AsRef<[ErasedFieldRef<'a>]> for ErasedSoaRefs<'a, Fields> {
-    fn as_ref(&self) -> &[ErasedFieldRef<'a>] {
+    #[inline]
+    pub fn fields(&self) -> &[ErasedFieldRef<'a>] {
         let Self { refs, .. } = self;
         refs.as_ref()
     }
-}
 
-impl<'a, Fields> AsMut<[ErasedFieldRef<'a>]> for ErasedSoaRefs<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [ErasedFieldRef<'a>] {
+    #[inline]
+    pub fn fields_mut(&mut self) -> &mut [ErasedFieldRef<'a>] {
         let Self { refs, .. } = self;
         refs.as_mut()
+    }
+
+    #[inline]
+    pub fn into_fields(self) -> Box<[ErasedFieldRef<'a>]> {
+        let Self { refs, .. } = self;
+        refs
     }
 }
 
@@ -196,36 +200,6 @@ impl<'a, Fields> Clone for ErasedSoaRefs<'a, Fields> {
             refs: refs.clone(),
             phantom: phantom.clone(),
         }
-    }
-}
-
-impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefs<'a, Fields> {
-    type Item = &'r ErasedFieldRef<'a>;
-    type IntoIter = slice::Iter<'r, ErasedFieldRef<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaRefs { refs, .. } = self;
-        refs.iter()
-    }
-}
-
-impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefs<'a, Fields> {
-    type Item = &'r mut ErasedFieldRef<'a>;
-    type IntoIter = slice::IterMut<'r, ErasedFieldRef<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaRefs { refs, .. } = self;
-        refs.iter_mut()
-    }
-}
-
-impl<'a, Fields> IntoIterator for ErasedSoaRefs<'a, Fields> {
-    type Item = ErasedFieldRef<'a>;
-    type IntoIter = vec::IntoIter<ErasedFieldRef<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaRefs { refs, .. } = self;
-        refs.into_vec().into_iter()
     }
 }
 

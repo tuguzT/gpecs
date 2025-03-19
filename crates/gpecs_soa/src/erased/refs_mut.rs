@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
@@ -188,6 +188,24 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         unsafe { T::ptrs_to_refs_mut(context, ptrs) }
     }
+
+    #[inline]
+    pub fn fields(&self) -> &[ErasedFieldRefMut<'a>] {
+        let Self { refs, .. } = self;
+        refs.as_ref()
+    }
+
+    #[inline]
+    pub fn fields_mut(&mut self) -> &mut [ErasedFieldRefMut<'a>] {
+        let Self { refs, .. } = self;
+        refs.as_mut()
+    }
+
+    #[inline]
+    pub fn into_fields(self) -> Box<[ErasedFieldRefMut<'a>]> {
+        let Self { refs, .. } = self;
+        refs
+    }
 }
 
 impl<'a, Fields> AsRef<[ErasedFieldRefMut<'a>]> for ErasedSoaRefsMut<'a, Fields> {
@@ -208,36 +226,6 @@ impl<'a, Fields> Debug for ErasedSoaRefsMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { refs, .. } = self;
         f.debug_tuple("ErasedSoaRefsMut").field(refs).finish()
-    }
-}
-
-impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaRefsMut<'a, Fields> {
-    type Item = &'r ErasedFieldRefMut<'a>;
-    type IntoIter = slice::Iter<'r, ErasedFieldRefMut<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaRefsMut { refs, .. } = self;
-        refs.iter()
-    }
-}
-
-impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaRefsMut<'a, Fields> {
-    type Item = &'r mut ErasedFieldRefMut<'a>;
-    type IntoIter = slice::IterMut<'r, ErasedFieldRefMut<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaRefsMut { refs, .. } = self;
-        refs.iter_mut()
-    }
-}
-
-impl<'a, Fields> IntoIterator for ErasedSoaRefsMut<'a, Fields> {
-    type Item = ErasedFieldRefMut<'a>;
-    type IntoIter = vec::IntoIter<ErasedFieldRefMut<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaRefsMut { refs, .. } = self;
-        refs.into_vec().into_iter()
     }
 }
 

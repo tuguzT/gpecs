@@ -1,10 +1,10 @@
-use alloc::{boxed::Box, vec};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
     hash::{self, Hash},
     marker::PhantomData,
-    ptr, slice,
+    ptr,
 };
 
 use crate::traits::Soa;
@@ -129,19 +129,23 @@ impl<Fields> ErasedSoaPtrs<Fields> {
             .map(|(_, ptr)| ptr.as_ptr());
         T::ptrs_restore(context, ptrs)
     }
-}
 
-impl<Fields> AsRef<[ErasedFieldPtr]> for ErasedSoaPtrs<Fields> {
-    fn as_ref(&self) -> &[ErasedFieldPtr] {
+    #[inline]
+    pub fn fields(&self) -> &[ErasedFieldPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
-}
 
-impl<Fields> AsMut<[ErasedFieldPtr]> for ErasedSoaPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [ErasedFieldPtr] {
+    #[inline]
+    pub fn fields_mut(&mut self) -> &mut [ErasedFieldPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
+    }
+
+    #[inline]
+    pub fn into_fields(self) -> Box<[ErasedFieldPtr]> {
+        let Self { ptrs, .. } = self;
+        ptrs
     }
 }
 
@@ -176,35 +180,5 @@ impl<Fields> Clone for ErasedSoaPtrs<Fields> {
             ptrs: ptrs.clone(),
             phantom: phantom.clone(),
         }
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a ErasedSoaPtrs<Fields> {
-    type Item = &'a ErasedFieldPtr;
-    type IntoIter = slice::Iter<'a, ErasedFieldPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaPtrs { ptrs, .. } = self;
-        ptrs.iter()
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a mut ErasedSoaPtrs<Fields> {
-    type Item = &'a mut ErasedFieldPtr;
-    type IntoIter = slice::IterMut<'a, ErasedFieldPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaPtrs { ptrs, .. } = self;
-        ptrs.iter_mut()
-    }
-}
-
-impl<Fields> IntoIterator for ErasedSoaPtrs<Fields> {
-    type Item = ErasedFieldPtr;
-    type IntoIter = vec::IntoIter<ErasedFieldPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaPtrs { ptrs, .. } = self;
-        ptrs.into_vec().into_iter()
     }
 }

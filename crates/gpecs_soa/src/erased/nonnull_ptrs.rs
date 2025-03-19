@@ -1,11 +1,10 @@
-use alloc::{boxed::Box, vec};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
     hash::{self, Hash},
     marker::PhantomData,
     ptr::{self, NonNull},
-    slice,
 };
 
 use crate::traits::Soa;
@@ -134,19 +133,23 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         unsafe { T::ptrs_to_nonnull(context, ptrs) }
     }
-}
 
-impl<Fields> AsRef<[ErasedFieldNonNullPtr]> for ErasedSoaNonNullPtrs<Fields> {
-    fn as_ref(&self) -> &[ErasedFieldNonNullPtr] {
+    #[inline]
+    pub fn fields(&self) -> &[ErasedFieldNonNullPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
-}
 
-impl<Fields> AsMut<[ErasedFieldNonNullPtr]> for ErasedSoaNonNullPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [ErasedFieldNonNullPtr] {
+    #[inline]
+    pub fn fields_mut(&mut self) -> &mut [ErasedFieldNonNullPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
+    }
+
+    #[inline]
+    pub fn into_fields(self) -> Box<[ErasedFieldNonNullPtr]> {
+        let Self { ptrs, .. } = self;
+        ptrs
     }
 }
 
@@ -181,35 +184,5 @@ impl<Fields> Clone for ErasedSoaNonNullPtrs<Fields> {
             ptrs: ptrs.clone(),
             phantom: phantom.clone(),
         }
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a ErasedSoaNonNullPtrs<Fields> {
-    type Item = &'a ErasedFieldNonNullPtr;
-    type IntoIter = slice::Iter<'a, ErasedFieldNonNullPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaNonNullPtrs { ptrs, .. } = self;
-        ptrs.iter()
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a mut ErasedSoaNonNullPtrs<Fields> {
-    type Item = &'a mut ErasedFieldNonNullPtr;
-    type IntoIter = slice::IterMut<'a, ErasedFieldNonNullPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaNonNullPtrs { ptrs, .. } = self;
-        ptrs.iter_mut()
-    }
-}
-
-impl<Fields> IntoIterator for ErasedSoaNonNullPtrs<Fields> {
-    type Item = ErasedFieldNonNullPtr;
-    type IntoIter = vec::IntoIter<ErasedFieldNonNullPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaNonNullPtrs { ptrs, .. } = self;
-        ptrs.into_vec().into_iter()
     }
 }

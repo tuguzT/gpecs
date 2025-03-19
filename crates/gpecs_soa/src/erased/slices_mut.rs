@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
@@ -575,19 +575,23 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-}
 
-impl<'a, Fields> AsRef<[ErasedFieldSliceMut<'a>]> for ErasedSoaSlicesMut<'a, Fields> {
-    fn as_ref(&self) -> &[ErasedFieldSliceMut<'a>] {
+    #[inline]
+    pub fn fields(&self) -> &[ErasedFieldSliceMut<'a>] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
-}
 
-impl<'a, Fields> AsMut<[ErasedFieldSliceMut<'a>]> for ErasedSoaSlicesMut<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [ErasedFieldSliceMut<'a>] {
+    #[inline]
+    pub fn fields_mut(&mut self) -> &mut [ErasedFieldSliceMut<'a>] {
         let Self { slices, .. } = self;
         slices.as_mut()
+    }
+
+    #[inline]
+    pub fn into_fields(self) -> Box<[ErasedFieldSliceMut<'a>]> {
+        let Self { slices, .. } = self;
+        slices
     }
 }
 
@@ -599,36 +603,6 @@ impl<'a, Fields> Debug for ErasedSoaSlicesMut<'a, Fields> {
             .field("len", len)
             .field("slices", slices)
             .finish()
-    }
-}
-
-impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaSlicesMut<'a, Fields> {
-    type Item = &'r ErasedFieldSliceMut<'a>;
-    type IntoIter = slice::Iter<'r, ErasedFieldSliceMut<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSlicesMut { slices, .. } = self;
-        slices.iter()
-    }
-}
-
-impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaSlicesMut<'a, Fields> {
-    type Item = &'r mut ErasedFieldSliceMut<'a>;
-    type IntoIter = slice::IterMut<'r, ErasedFieldSliceMut<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSlicesMut { slices, .. } = self;
-        slices.iter_mut()
-    }
-}
-
-impl<'a, Fields> IntoIterator for ErasedSoaSlicesMut<'a, Fields> {
-    type Item = ErasedFieldSliceMut<'a>;
-    type IntoIter = vec::IntoIter<ErasedFieldSliceMut<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSlicesMut { slices, .. } = self;
-        slices.into_vec().into_iter()
     }
 }
 

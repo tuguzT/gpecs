@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
@@ -6,7 +6,6 @@ use core::{
     iter::FusedIterator,
     marker::PhantomData,
     ptr::{self, NonNull},
-    slice,
 };
 
 use crate::traits::Soa;
@@ -517,19 +516,23 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-}
 
-impl<Fields> AsRef<[ErasedFieldSliceMutPtr]> for ErasedSoaSliceMutPtrs<Fields> {
-    fn as_ref(&self) -> &[ErasedFieldSliceMutPtr] {
+    #[inline]
+    pub fn fields(&self) -> &[ErasedFieldSliceMutPtr] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
-}
 
-impl<Fields> AsMut<[ErasedFieldSliceMutPtr]> for ErasedSoaSliceMutPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [ErasedFieldSliceMutPtr] {
+    #[inline]
+    pub fn fields_mut(&mut self) -> &mut [ErasedFieldSliceMutPtr] {
         let Self { slices, .. } = self;
         slices.as_mut()
+    }
+
+    #[inline]
+    pub fn into_fields(self) -> Box<[ErasedFieldSliceMutPtr]> {
+        let Self { slices, .. } = self;
+        slices
     }
 }
 
@@ -585,35 +588,5 @@ impl<Fields> Clone for ErasedSoaSliceMutPtrs<Fields> {
             slices: slices.clone(),
             phantom: phantom.clone(),
         }
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a ErasedSoaSliceMutPtrs<Fields> {
-    type Item = &'a ErasedFieldSliceMutPtr;
-    type IntoIter = slice::Iter<'a, ErasedFieldSliceMutPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSliceMutPtrs { slices, .. } = self;
-        slices.iter()
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a mut ErasedSoaSliceMutPtrs<Fields> {
-    type Item = &'a mut ErasedFieldSliceMutPtr;
-    type IntoIter = slice::IterMut<'a, ErasedFieldSliceMutPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSliceMutPtrs { slices, .. } = self;
-        slices.iter_mut()
-    }
-}
-
-impl<Fields> IntoIterator for ErasedSoaSliceMutPtrs<Fields> {
-    type Item = ErasedFieldSliceMutPtr;
-    type IntoIter = vec::IntoIter<ErasedFieldSliceMutPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSliceMutPtrs { slices, .. } = self;
-        slices.into_vec().into_iter()
     }
 }

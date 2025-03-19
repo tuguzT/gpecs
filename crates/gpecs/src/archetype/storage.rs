@@ -483,6 +483,8 @@ where
     B: Bundle,
 {
     let erased_refs = ErasedSoaRefs::from::<B>(context, refs)
+        .into_fields()
+        .into_vec()
         .into_iter()
         .map(erased::ErasedFieldRef::into_parts);
     validate_components::<B>(components, context)
@@ -516,6 +518,8 @@ where
     B: Bundle,
 {
     let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs)
+        .into_fields()
+        .into_vec()
         .into_iter()
         .map(erased::ErasedFieldRefMut::into_parts);
     validate_components::<B>(components, context)
@@ -552,6 +556,8 @@ where
     let erased_slices = ErasedSoaSlices::from::<B>(context, slices);
     let len = erased_slices.len();
     let erased_slices = erased_slices
+        .into_fields()
+        .into_vec()
         .into_iter()
         .map(erased::ErasedFieldSlice::into_parts);
 
@@ -590,6 +596,8 @@ where
     let erased_slices = ErasedSoaSlicesMut::from::<B>(context, slices);
     let len = erased_slices.len();
     let erased_slices = erased_slices
+        .into_fields()
+        .into_vec()
         .into_iter()
         .map(erased::ErasedFieldSliceMut::into_parts);
 

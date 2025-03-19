@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
@@ -540,19 +540,23 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-}
 
-impl<'a, Fields> AsRef<[ErasedFieldSlice<'a>]> for ErasedSoaSlices<'a, Fields> {
-    fn as_ref(&self) -> &[ErasedFieldSlice<'a>] {
+    #[inline]
+    pub fn fields(&self) -> &[ErasedFieldSlice<'a>] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
-}
 
-impl<'a, Fields> AsMut<[ErasedFieldSlice<'a>]> for ErasedSoaSlices<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [ErasedFieldSlice<'a>] {
+    #[inline]
+    pub fn fields_mut(&mut self) -> &mut [ErasedFieldSlice<'a>] {
         let Self { slices, .. } = self;
         slices.as_mut()
+    }
+
+    #[inline]
+    pub fn into_fields(self) -> Box<[ErasedFieldSlice<'a>]> {
+        let Self { slices, .. } = self;
+        slices
     }
 }
 
@@ -580,36 +584,6 @@ impl<'a, Fields> Clone for ErasedSoaSlices<'a, Fields> {
             slices: slices.clone(),
             phantom: phantom.clone(),
         }
-    }
-}
-
-impl<'r, 'a, Fields> IntoIterator for &'r ErasedSoaSlices<'a, Fields> {
-    type Item = &'r ErasedFieldSlice<'a>;
-    type IntoIter = slice::Iter<'r, ErasedFieldSlice<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSlices { slices, .. } = self;
-        slices.iter()
-    }
-}
-
-impl<'r, 'a, Fields> IntoIterator for &'r mut ErasedSoaSlices<'a, Fields> {
-    type Item = &'r mut ErasedFieldSlice<'a>;
-    type IntoIter = slice::IterMut<'r, ErasedFieldSlice<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSlices { slices, .. } = self;
-        slices.iter_mut()
-    }
-}
-
-impl<'a, Fields> IntoIterator for ErasedSoaSlices<'a, Fields> {
-    type Item = ErasedFieldSlice<'a>;
-    type IntoIter = vec::IntoIter<ErasedFieldSlice<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSlices { slices, .. } = self;
-        slices.into_vec().into_iter()
     }
 }
 

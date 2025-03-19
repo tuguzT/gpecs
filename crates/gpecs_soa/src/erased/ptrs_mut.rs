@@ -1,10 +1,10 @@
-use alloc::{boxed::Box, vec};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
     hash::{self, Hash},
     marker::PhantomData,
-    ptr, slice,
+    ptr,
 };
 
 use crate::traits::Soa;
@@ -129,19 +129,23 @@ impl<Fields> ErasedSoaMutPtrs<Fields> {
             .map(|(_, ptr)| ptr.as_ptr());
         T::ptrs_restore_mut(context, ptrs)
     }
-}
 
-impl<Fields> AsRef<[ErasedFieldMutPtr]> for ErasedSoaMutPtrs<Fields> {
-    fn as_ref(&self) -> &[ErasedFieldMutPtr] {
+    #[inline]
+    pub fn fields(&self) -> &[ErasedFieldMutPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
-}
 
-impl<Fields> AsMut<[ErasedFieldMutPtr]> for ErasedSoaMutPtrs<Fields> {
-    fn as_mut(&mut self) -> &mut [ErasedFieldMutPtr] {
+    #[inline]
+    pub fn fields_mut(&mut self) -> &mut [ErasedFieldMutPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
+    }
+
+    #[inline]
+    pub fn into_fields(self) -> Box<[ErasedFieldMutPtr]> {
+        let Self { ptrs, .. } = self;
+        ptrs
     }
 }
 
@@ -176,35 +180,5 @@ impl<Fields> Clone for ErasedSoaMutPtrs<Fields> {
             ptrs: ptrs.clone(),
             phantom: phantom.clone(),
         }
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a ErasedSoaMutPtrs<Fields> {
-    type Item = &'a ErasedFieldMutPtr;
-    type IntoIter = slice::Iter<'a, ErasedFieldMutPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaMutPtrs { ptrs, .. } = self;
-        ptrs.iter()
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a mut ErasedSoaMutPtrs<Fields> {
-    type Item = &'a mut ErasedFieldMutPtr;
-    type IntoIter = slice::IterMut<'a, ErasedFieldMutPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaMutPtrs { ptrs, .. } = self;
-        ptrs.iter_mut()
-    }
-}
-
-impl<Fields> IntoIterator for ErasedSoaMutPtrs<Fields> {
-    type Item = ErasedFieldMutPtr;
-    type IntoIter = vec::IntoIter<ErasedFieldMutPtr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaMutPtrs { ptrs, .. } = self;
-        ptrs.into_vec().into_iter()
     }
 }

@@ -712,7 +712,7 @@ fn one_item_erased() {
     let value = vec.pop().expect("vector should not be empty");
     let erased_context = vec.context();
     assert_eq!(
-        value.as_refs().as_ref(),
+        value.as_refs().fields(),
         ErasedSoa::<Soa>::new(
             erased_context
                 .field_layouts()
@@ -721,7 +721,7 @@ fn one_item_erased() {
                 .zip(fields)
         )
         .as_refs()
-        .as_ref(),
+        .fields(),
     );
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);

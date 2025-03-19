@@ -93,7 +93,7 @@ fn erased_value() {
     let erased_value = ErasedSoa::from(&context, value);
     assert_eq!(erased_value.layouts(), [Layout::new::<()>()]);
     assert_eq!(
-        erased_value.as_refs().as_ref(),
+        erased_value.as_refs().fields(),
         [ErasedFieldRef::new(Layout::new::<()>(), [].as_slice())],
     );
 
@@ -114,16 +114,16 @@ fn erased_value() {
     assert_eq!(erased_value.layouts(), optimized_layout);
 
     let erased_refs = erased_value.as_refs();
-    assert_eq!(erased_refs.as_ref().len(), 3);
+    assert_eq!(erased_refs.fields().len(), 3);
 
-    assert_eq!(unsafe { erased_refs.as_ref()[0].into::<u8>() }, &i3);
-    assert_eq!(erased_refs.as_ref()[0], ErasedFieldRef::from(&i3));
+    assert_eq!(unsafe { erased_refs.fields()[0].into::<u8>() }, &i3);
+    assert_eq!(erased_refs.fields()[0], ErasedFieldRef::from(&i3));
 
-    assert_eq!(unsafe { erased_refs.as_ref()[1].into::<u16>() }, &i2);
-    assert_eq!(erased_refs.as_ref()[1], ErasedFieldRef::from(&i2));
+    assert_eq!(unsafe { erased_refs.fields()[1].into::<u16>() }, &i2);
+    assert_eq!(erased_refs.fields()[1], ErasedFieldRef::from(&i2));
 
-    assert_eq!(unsafe { erased_refs.as_ref()[2].into::<u32>() }, &i1);
-    assert_eq!(erased_refs.as_ref()[2], ErasedFieldRef::from(&i1));
+    assert_eq!(unsafe { erased_refs.fields()[2].into::<u32>() }, &i1);
+    assert_eq!(erased_refs.fields()[2], ErasedFieldRef::from(&i1));
 
     let i1_bytes = unsafe {
         let data = ptr::from_ref(&i1).cast();
@@ -141,7 +141,7 @@ fn erased_value() {
         slice::from_raw_parts(data, len)
     };
     assert_eq!(
-        erased_refs.as_ref(),
+        erased_refs.fields(),
         [
             ErasedFieldRef::new(optimized_layout[0], i3_bytes),
             ErasedFieldRef::new(optimized_layout[1], i2_bytes),
@@ -165,7 +165,7 @@ fn erased_value() {
             .map(|(field_layout, field)| (*field_layout, field.as_ref())),
     );
     assert_eq!(
-        erased_value.as_refs().as_ref(),
+        erased_value.as_refs().fields(),
         [
             ErasedFieldRef::new(optimized_layout[0], i3_bytes),
             ErasedFieldRef::new(optimized_layout[1], i2_bytes),
@@ -178,19 +178,19 @@ fn erased_value() {
 
     let refs = (&i1, &i2, &i3);
     let erased_refs = ErasedSoaRefs::from::<(u32, u16, u8)>(&context, refs);
-    assert_eq!(erased_refs.as_ref().len(), 3);
+    assert_eq!(erased_refs.fields().len(), 3);
 
-    assert_eq!(unsafe { erased_refs.as_ref()[0].into::<u8>() }, &i3);
-    assert_eq!(erased_refs.as_ref()[0], ErasedFieldRef::from(&i3));
+    assert_eq!(unsafe { erased_refs.fields()[0].into::<u8>() }, &i3);
+    assert_eq!(erased_refs.fields()[0], ErasedFieldRef::from(&i3));
 
-    assert_eq!(unsafe { erased_refs.as_ref()[1].into::<u16>() }, &i2);
-    assert_eq!(erased_refs.as_ref()[1], ErasedFieldRef::from(&i2));
+    assert_eq!(unsafe { erased_refs.fields()[1].into::<u16>() }, &i2);
+    assert_eq!(erased_refs.fields()[1], ErasedFieldRef::from(&i2));
 
-    assert_eq!(unsafe { erased_refs.as_ref()[2].into::<u32>() }, &i1);
-    assert_eq!(erased_refs.as_ref()[2], ErasedFieldRef::from(&i1));
+    assert_eq!(unsafe { erased_refs.fields()[2].into::<u32>() }, &i1);
+    assert_eq!(erased_refs.fields()[2], ErasedFieldRef::from(&i1));
 
     assert_eq!(
-        erased_refs.as_ref(),
+        erased_refs.fields(),
         [
             ErasedFieldRef::new(optimized_layout[0], i3_bytes),
             ErasedFieldRef::new(optimized_layout[1], i2_bytes),
@@ -211,60 +211,60 @@ fn erased_value() {
 
     let slices = (i123_slices, i456_slices, i789_slices);
     let erased_slices = ErasedSoaSlices::from::<(u32, u16, u8)>(&(), slices);
-    assert_eq!(erased_slices.as_ref().len(), 3);
+    assert_eq!(erased_slices.fields().len(), 3);
 
     assert_eq!(
-        unsafe { erased_slices.as_ref()[0].into::<u8>() },
+        unsafe { erased_slices.fields()[0].into::<u8>() },
         i789_slices,
     );
     assert_eq!(
-        erased_slices.as_ref()[0],
+        erased_slices.fields()[0],
         ErasedFieldSlice::from(i789_slices),
     );
-    for (idx, r#ref) in erased_slices.as_ref()[0].iter().enumerate().rev() {
+    for (idx, r#ref) in erased_slices.fields()[0].iter().enumerate().rev() {
         assert_eq!(unsafe { r#ref.into::<u8>() }, &i789[idx]);
         assert_eq!(r#ref, ErasedFieldRef::from(&i789[idx]));
     }
     assert_eq!(
-        erased_slices.as_ref()[0]
+        erased_slices.fields()[0]
             .iter()
             .fold(0, |acc, item| acc + unsafe { item.into::<u8>() }),
         24,
     );
 
     assert_eq!(
-        unsafe { erased_slices.as_ref()[1].into::<u16>() },
+        unsafe { erased_slices.fields()[1].into::<u16>() },
         i456_slices,
     );
     assert_eq!(
-        erased_slices.as_ref()[1],
+        erased_slices.fields()[1],
         ErasedFieldSlice::from(i456_slices),
     );
-    for (idx, r#ref) in erased_slices.as_ref()[1].iter().enumerate().rev() {
+    for (idx, r#ref) in erased_slices.fields()[1].iter().enumerate().rev() {
         assert_eq!(unsafe { r#ref.into::<u16>() }, &i456[idx]);
         assert_eq!(r#ref, ErasedFieldRef::from(&i456[idx]));
     }
     assert_eq!(
-        erased_slices.as_ref()[1]
+        erased_slices.fields()[1]
             .iter()
             .fold(0, |acc, item| acc + unsafe { item.into::<u16>() }),
         15,
     );
 
     assert_eq!(
-        unsafe { erased_slices.as_ref()[2].into::<u32>() },
+        unsafe { erased_slices.fields()[2].into::<u32>() },
         i123_slices,
     );
     assert_eq!(
-        erased_slices.as_ref()[2],
+        erased_slices.fields()[2],
         ErasedFieldSlice::from(i123_slices),
     );
-    for (idx, r#ref) in erased_slices.as_ref()[2].iter().enumerate().rev() {
+    for (idx, r#ref) in erased_slices.fields()[2].iter().enumerate().rev() {
         assert_eq!(unsafe { r#ref.into::<u32>() }, &i123[idx]);
         assert_eq!(r#ref, ErasedFieldRef::from(&i123[idx]));
     }
     assert_eq!(
-        erased_slices.as_ref()[2]
+        erased_slices.fields()[2]
             .iter()
             .fold(0, |acc, item| acc + unsafe { item.into::<u32>() }),
         6,
@@ -286,7 +286,7 @@ fn erased_value() {
         slice::from_raw_parts(data, len)
     };
     assert_eq!(
-        erased_slices.as_ref(),
+        erased_slices.fields(),
         [
             ErasedFieldSlice::new(optimized_layout[0], i789_bytes),
             ErasedFieldSlice::new(optimized_layout[1], i456_bytes),

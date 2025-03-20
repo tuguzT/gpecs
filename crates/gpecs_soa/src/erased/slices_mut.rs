@@ -17,9 +17,9 @@ pub struct ErasedSoaSlicesMut<'a, Fields>
 where
     Fields: 'a,
 {
-    pub(super) len: usize,
-    pub(super) slices: Box<[ErasedFieldSliceMut<'a>]>,
-    pub(super) phantom: PhantomData<fn() -> Fields>,
+    len: usize,
+    slices: Box<[ErasedFieldSliceMut<'a>]>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {

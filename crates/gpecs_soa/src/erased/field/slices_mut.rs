@@ -49,7 +49,7 @@ impl<'a> ErasedFieldSliceMut<'a> {
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a mut [T] {
         let Self { layout, buffer, .. } = self;
-        assert_layout::<T>(&layout);
+        assert_layout::<T>(layout);
 
         let data = buffer.as_mut_ptr().cast();
         let len = buffer.len().checked_div(layout.size()).unwrap_or(0);
@@ -71,7 +71,7 @@ impl<'a> ErasedFieldSliceMut<'a> {
     #[track_caller]
     pub unsafe fn cast_mut<T>(&mut self) -> &mut [T] {
         let Self { layout, buffer, .. } = self;
-        assert_layout::<T>(layout);
+        assert_layout::<T>(*layout);
 
         let data = buffer.as_mut_ptr().cast();
         let len = buffer.len().checked_div(layout.size()).unwrap_or(0);

@@ -38,7 +38,7 @@ impl ErasedFieldSliceMutPtr {
     #[track_caller]
     pub fn into<T>(self) -> *mut [T] {
         let Self { layout, buffer } = self;
-        assert_layout::<T>(&layout);
+        assert_layout::<T>(layout);
 
         ptr::slice_from_raw_parts_mut(
             buffer.cast(),

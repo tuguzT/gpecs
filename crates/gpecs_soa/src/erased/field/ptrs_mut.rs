@@ -1,6 +1,7 @@
 use core::{alloc::Layout, ptr};
 
 use super::{
+    super::assert::assert_layouts,
     assert::{assert_buffer_align, assert_layout, assert_value_buffer_len},
     ErasedFieldPtr,
 };
@@ -58,6 +59,22 @@ impl ErasedFieldMutPtr {
         let len = layout.size();
         let buffer = ptr::slice_from_raw_parts_mut(data, len);
         Self::new(layout, buffer)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn offset_from(&self, origin: &ErasedFieldPtr) -> isize {
+        let Self { layout, .. } = self;
+        assert_layouts(layout, origin.layout());
+
+        let offset = unsafe { self.as_ptr().offset_from(origin.as_ptr()) };
+        let field_size = layout
+            .size()
+            .try_into()
+            .expect("layout size should not exceed `isize::MAX`");
+        offset
+            .checked_div(field_size)
+            .expect("erased field pointer should not be a ZST")
     }
 
     #[inline]

@@ -40,7 +40,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a mut T {
         let Self { layout, buffer, .. } = self;
-        assert_layout::<T>(&layout);
+        assert_layout::<T>(layout);
 
         let ptr = buffer.as_mut_ptr().cast();
         unsafe { &mut *ptr }

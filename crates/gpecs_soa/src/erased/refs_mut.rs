@@ -13,8 +13,8 @@ pub struct ErasedSoaRefsMut<'a, Fields>
 where
     Fields: 'a,
 {
-    pub(super) refs: Box<[ErasedFieldRefMut<'a>]>,
-    pub(super) phantom: PhantomData<fn() -> Fields>,
+    refs: Box<[ErasedFieldRefMut<'a>]>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {

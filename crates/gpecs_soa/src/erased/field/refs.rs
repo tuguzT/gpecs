@@ -40,7 +40,7 @@ impl<'a> ErasedFieldRef<'a> {
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a T {
         let Self { layout, buffer, .. } = self;
-        assert_layout::<T>(&layout);
+        assert_layout::<T>(layout);
 
         let ptr = buffer.as_ptr().cast();
         unsafe { &*ptr }

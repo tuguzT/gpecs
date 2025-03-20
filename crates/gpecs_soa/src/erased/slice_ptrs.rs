@@ -15,9 +15,9 @@ use super::{
 };
 
 pub struct ErasedSoaSlicePtrs<Fields> {
-    pub(super) len: usize,
-    pub(super) slices: Box<[ErasedFieldSlicePtr]>,
-    pub(super) phantom: PhantomData<fn() -> Fields>,
+    len: usize,
+    slices: Box<[ErasedFieldSlicePtr]>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<Fields> ErasedSoaSlicePtrs<Fields> {

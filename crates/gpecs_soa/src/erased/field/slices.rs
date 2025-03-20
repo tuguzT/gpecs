@@ -49,7 +49,7 @@ impl<'a> ErasedFieldSlice<'a> {
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a [T] {
         let Self { layout, buffer, .. } = self;
-        assert_layout::<T>(&layout);
+        assert_layout::<T>(layout);
 
         let data = buffer.as_ptr().cast();
         let len = buffer.len().checked_div(layout.size()).unwrap_or(0);

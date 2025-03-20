@@ -1,4 +1,4 @@
-use core::{alloc::Layout, any::type_name};
+use core::{alloc::Layout, any::type_name, borrow::Borrow};
 
 #[cold]
 #[track_caller]
@@ -59,7 +59,8 @@ fn assert_layout_failed<T>(layout: &Layout) -> ! {
 
 #[inline]
 #[track_caller]
-pub fn assert_layout<T>(layout: &Layout) {
+pub fn assert_layout<T>(layout: impl Borrow<Layout>) {
+    let layout = layout.borrow();
     if *layout == Layout::new::<T>() {
         return;
     }

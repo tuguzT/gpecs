@@ -38,3 +38,21 @@ pub fn assert_same_len(base_len: usize, len: usize) -> usize {
     }
     assert_same_len_failed(base_len, len)
 }
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+fn assert_layouts_failed(first: &Layout, second: &Layout) -> ! {
+    panic!("layouts {first:?} and {second:?} should match")
+}
+
+#[inline]
+#[track_caller]
+pub fn assert_layouts(first: impl Borrow<Layout>, second: impl Borrow<Layout>) {
+    let first = first.borrow();
+    let second = second.borrow();
+    if first == second {
+        return;
+    }
+    assert_layouts_failed(first, second)
+}

@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, vec::Vec};
-use core::{alloc::Layout, borrow::Borrow, iter, marker::PhantomData, ptr, slice};
+use core::{alloc::Layout, borrow::Borrow, iter, ptr, slice};
 
 use crate::traits::{buffer_layout, Soa};
 
@@ -171,12 +171,8 @@ impl<Fields> ErasedSoa<Fields> {
                 let len = field_layout.size();
                 let r#ref = unsafe { slice::from_raw_parts(data, len) };
                 ErasedFieldRef::new(field_layout.clone(), r#ref)
-            })
-            .collect();
-        ErasedSoaRefs {
-            refs,
-            phantom: PhantomData,
-        }
+            });
+        ErasedSoaRefs::new(refs)
     }
 
     #[inline]
@@ -201,11 +197,7 @@ impl<Fields> ErasedSoa<Fields> {
                 let len = field_layout.size();
                 let r#ref = unsafe { slice::from_raw_parts_mut(data, len) };
                 ErasedFieldRefMut::new(field_layout.clone(), r#ref)
-            })
-            .collect();
-        ErasedSoaRefsMut {
-            refs,
-            phantom: PhantomData,
-        }
+            });
+        ErasedSoaRefsMut::new(refs)
     }
 }

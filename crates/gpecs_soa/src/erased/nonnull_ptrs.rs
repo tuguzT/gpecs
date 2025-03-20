@@ -11,8 +11,8 @@ use crate::traits::Soa;
 use super::{assert::validate_layout, field::ErasedFieldNonNullPtr};
 
 pub struct ErasedSoaNonNullPtrs<Fields> {
-    pub(super) ptrs: Box<[ErasedFieldNonNullPtr]>,
-    pub(super) phantom: PhantomData<fn() -> Fields>,
+    ptrs: Box<[ErasedFieldNonNullPtr]>,
+    phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<Fields> ErasedSoaNonNullPtrs<Fields> {

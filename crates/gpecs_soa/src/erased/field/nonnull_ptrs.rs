@@ -33,7 +33,7 @@ impl ErasedFieldNonNullPtr {
     #[track_caller]
     pub fn into<T>(self) -> NonNull<T> {
         let Self { layout, buffer } = self;
-        assert_layout::<T>(&layout);
+        assert_layout::<T>(layout);
 
         buffer.cast()
     }

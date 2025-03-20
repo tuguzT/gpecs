@@ -30,7 +30,8 @@ impl<Fields> ErasedSoaContext<Fields> {
         Self {
             field_layouts: field_layouts
                 .into_iter()
-                .map(validate_layout::<Fields, _>)
+                .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
+                .map(|layout| layout.borrow().clone())
                 .collect(),
             drop_fields: drop_fields.into(),
             phantom: PhantomData,
@@ -45,7 +46,8 @@ impl<Fields> ErasedSoaContext<Fields> {
     {
         let field_layouts = T::field_layouts(&context)
             .into_iter()
-            .map(validate_layout::<T::Fields, _>)
+            .inspect(|layout| validate_layout::<T::Fields>(layout.borrow()))
+            .map(|layout| layout.borrow().clone())
             .collect();
 
         let drop_fields = move |data: ErasedDropFnParam<'_>| unsafe {

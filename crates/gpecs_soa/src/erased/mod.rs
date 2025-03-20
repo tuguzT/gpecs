@@ -355,56 +355,26 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), src.fields().len());
 
-        let (buffer_layout, offsets) =
-            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
-        let buffer_len = buffer_layout
-            .size()
-            .div_ceil(size_of::<ErasedByte<Fields>>());
-
-        let mut buffer = Box::new_uninit_slice(buffer_len);
-        field_layouts
+        let fields = field_layouts
             .iter()
             .zip(src.into_fields())
-            .zip(offsets)
-            .inspect(|((&field_layout, src), _)| assert_layouts(field_layout, src.layout()))
-            .for_each(|((_, src), offset)| {
-                let data = unsafe { buffer.as_mut_ptr().cast::<u8>().add(offset) };
-                let buffer = ptr::slice_from_raw_parts_mut(data, src.layout().size());
-                let dst = ErasedFieldMutPtr::new(src.layout(), buffer);
-                unsafe { dst.copy_from_nonoverlapping(src, 1) }
-            });
-        Self {
-            buffer: unsafe { buffer.assume_init() },
-            field_layouts: field_layouts.into(),
-        }
+            .inspect(|(&field_layout, src)| assert_layouts(field_layout, src.layout()))
+            .map(|(&field_layout, src)| (field_layout, unsafe { src.deref().into_buffer() }));
+        Self::new(fields)
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
         let field_layouts = context.field_layouts();
-        let Self {
-            buffer,
-            field_layouts: value_layouts,
-        } = value;
-
         assert_eq!(field_layouts.len(), dst.fields().len());
-        assert_eq!(field_layouts.as_ref(), value_layouts.as_ref());
-
-        let (buffer_layout, offsets) =
-            Self::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
-        let buffer_len = buffer_layout
-            .size()
-            .div_ceil(size_of::<ErasedByte<Fields>>());
-        assert_eq!(buffer_len, buffer.len());
+        assert_eq!(field_layouts, value.field_layouts());
 
         field_layouts
             .iter()
             .zip(dst.into_fields())
-            .zip(offsets)
+            .zip(value.as_refs().into_fields()) // TODO: replace with `into_fields` when it returns boxes of `ErasedByte<Fields>` instead of `u8`
             .inspect(|((&field_layout, dst), _)| assert_layouts(field_layout, dst.layout()))
-            .for_each(|((_, dst), offset)| {
-                let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
-                let buffer = ptr::slice_from_raw_parts(data, dst.layout().size());
-                let src = ErasedFieldPtr::new(dst.layout(), buffer);
+            .for_each(|((_, dst), src)| {
+                let src = src.as_field_ptr();
                 unsafe { dst.copy_from_nonoverlapping(src, 1) }
             })
     }

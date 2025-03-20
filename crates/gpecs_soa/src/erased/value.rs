@@ -14,8 +14,8 @@ use super::{
 type ErasedFields<Fields> = Box<[ErasedByte<Fields>]>;
 
 pub struct ErasedSoa<Fields> {
-    pub(super) buffer: ErasedFields<Fields>,
-    pub(super) field_layouts: Box<[Layout]>,
+    buffer: ErasedFields<Fields>,
+    field_layouts: Box<[Layout]>,
 }
 
 impl<Fields> ErasedSoa<Fields> {
@@ -38,18 +38,17 @@ impl<Fields> ErasedSoa<Fields> {
             .div_ceil(size_of::<ErasedByte<Fields>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
-        let buffer = unsafe {
-            for ((field_layout, src), offset) in field_layouts.iter().zip(fields).zip(offsets) {
-                let src = src.borrow().as_ptr();
-                let dst = buffer.as_mut_ptr().cast::<u8>().add(offset);
+        for ((field_layout, src), offset) in field_layouts.iter().zip(fields).zip(offsets) {
+            let src = src.borrow().as_ptr();
+            let dst = unsafe { buffer.as_mut_ptr().cast::<u8>().add(offset) };
 
-                let len = field_layout.size();
+            let len = field_layout.size();
+            unsafe {
                 ptr::copy_nonoverlapping(src, dst, len);
             }
-            buffer.assume_init()
-        };
+        }
         Self {
-            buffer,
+            buffer: unsafe { buffer.assume_init() },
             field_layouts,
         }
     }
@@ -61,7 +60,8 @@ impl<Fields> ErasedSoa<Fields> {
     {
         let field_layouts = T::field_layouts(context)
             .into_iter()
-            .map(validate_layout::<T::Fields, _>)
+            .inspect(|layout| validate_layout::<T::Fields>(layout.borrow()))
+            .map(|layout| layout.borrow().clone())
             .collect();
 
         let (buffer_layout, offsets) =
@@ -71,18 +71,17 @@ impl<Fields> ErasedSoa<Fields> {
             .div_ceil(size_of::<ErasedByte<Fields>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
-        let buffer = unsafe {
+        unsafe {
             let dst = {
                 let buffer = buffer.as_mut_ptr().cast::<u8>();
                 let ptrs = offsets.into_iter().map(|offset| buffer.add(offset));
                 T::ptrs_restore_mut(context, ptrs)
             };
             T::ptrs_write(context, dst, value);
-            buffer.assume_init()
-        };
+        }
 
         Self {
-            buffer,
+            buffer: unsafe { buffer.assume_init() },
             field_layouts,
         }
     }
@@ -99,7 +98,8 @@ impl<Fields> ErasedSoa<Fields> {
 
         let target_layouts = T::field_layouts(context)
             .into_iter()
-            .map(validate_layout::<T::Fields, _>);
+            .inspect(|layout| validate_layout::<T::Fields>(layout.borrow()))
+            .map(|layout| layout.borrow().clone());
         assert!(target_layouts.eq(field_layouts));
 
         let (buffer_layout, offsets) =
@@ -144,7 +144,7 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
-    pub fn layouts(&self) -> &[Layout] {
+    pub fn field_layouts(&self) -> &[Layout] {
         let Self { field_layouts, .. } = self;
         field_layouts.as_ref()
     }

@@ -9,16 +9,11 @@ fn validate_layout_failed(input_align: usize, max_align: usize) -> ! {
 
 #[inline]
 #[track_caller]
-pub fn validate_layout<Fields, I>(item: I) -> Layout
-where
-    I: Borrow<Layout>,
-{
-    let layout: &Layout = item.borrow();
-
-    let input_align = layout.align();
+pub fn validate_layout<Fields>(layout: impl Borrow<Layout>) {
+    let input_align = layout.borrow().align();
     let max_align = align_of::<Fields>();
     if input_align <= max_align {
-        return layout.clone();
+        return;
     }
     validate_layout_failed(input_align, max_align)
 }
@@ -32,9 +27,9 @@ fn assert_same_len_failed(base_len: usize, len: usize) -> ! {
 
 #[inline]
 #[track_caller]
-pub fn assert_same_len(base_len: usize, len: usize) -> usize {
+pub fn assert_same_len(base_len: usize, len: usize) {
     if base_len == len {
-        return len;
+        return;
     }
     assert_same_len_failed(base_len, len)
 }

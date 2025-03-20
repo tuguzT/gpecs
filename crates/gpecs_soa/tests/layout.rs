@@ -91,7 +91,7 @@ fn erased_value() {
 
     let value = ();
     let erased_value = ErasedSoa::from(&context, value);
-    assert_eq!(erased_value.layouts(), [Layout::new::<()>()]);
+    assert_eq!(erased_value.field_layouts(), [Layout::new::<()>()]);
     assert_eq!(
         erased_value.as_refs().fields(),
         [ErasedFieldRef::new(Layout::new::<()>(), [].as_slice())],
@@ -111,7 +111,7 @@ fn erased_value() {
         Layout::new::<u16>(),
         Layout::new::<u32>(),
     ];
-    assert_eq!(erased_value.layouts(), optimized_layout);
+    assert_eq!(erased_value.field_layouts(), optimized_layout);
 
     let erased_refs = erased_value.as_refs();
     assert_eq!(erased_refs.fields().len(), 3);

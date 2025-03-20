@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use core::{
+    borrow::Borrow,
     fmt::{self, Debug},
     marker::PhantomData,
     slice,
@@ -25,10 +26,9 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
         I: IntoIterator<Item = ErasedFieldRefMut<'a>>,
     {
         Self {
-            #[allow(dropping_copy_types)]
             refs: refs
                 .into_iter()
-                .inspect(|r#ref| drop(validate_layout::<Fields, _>(r#ref.layout())))
+                .inspect(|r#ref| validate_layout::<Fields>(r#ref.layout()))
                 .collect(),
             phantom: PhantomData,
         }
@@ -43,7 +43,8 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
         let ptrs = T::ptrs_erase_mut(context, ptrs);
         let field_layouts = T::field_layouts(context)
             .into_iter()
-            .map(validate_layout::<Fields, _>);
+            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
+            .map(|layout| layout.borrow().clone());
 
         let refs = field_layouts
             .zip(ptrs)
@@ -69,7 +70,8 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
 
         let field_layouts: Box<[_]> = T::field_layouts(context)
             .into_iter()
-            .map(validate_layout::<Fields, _>)
+            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
+            .map(|layout| layout.borrow().clone())
             .collect();
         assert_eq!(field_layouts.len(), refs.len());
 

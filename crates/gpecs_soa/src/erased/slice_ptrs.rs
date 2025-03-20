@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use core::{
+    borrow::Borrow,
     fmt::{self, Debug},
     hash::{self, Hash},
     marker::PhantomData,
@@ -31,7 +32,7 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
             slices: slices
                 .into_iter()
                 .inspect(|slice| {
-                    validate_layout::<Fields, _>(slice.layout());
+                    validate_layout::<Fields>(slice.layout());
                     assert_same_len(len, slice.len());
                 })
                 .collect(),
@@ -49,7 +50,8 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
         let ptrs = T::ptrs_erase(context, ptrs);
         let field_layouts = T::field_layouts(context)
             .into_iter()
-            .map(validate_layout::<Fields, _>);
+            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
+            .map(|layout| layout.borrow().clone());
 
         let slices = field_layouts
             .zip(ptrs)
@@ -75,7 +77,8 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
 
         let field_layouts: Box<[_]> = T::field_layouts(context)
             .into_iter()
-            .map(validate_layout::<Fields, _>)
+            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
+            .map(|layout| layout.borrow().clone())
             .collect();
         assert_eq!(slices.len(), field_layouts.len());
 

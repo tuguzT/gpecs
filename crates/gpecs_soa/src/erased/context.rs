@@ -15,8 +15,8 @@ type ErasedDropFnParam<'a> = &'a [ErasedFieldMutPtr];
 type ErasedDropFn = Box<dyn Fn(ErasedDropFnParam<'_>)>;
 
 pub struct ErasedSoaContext<Fields> {
-    pub(super) field_layouts: Box<[Layout]>,
-    pub(super) drop_fields: Option<ErasedDropFn>,
+    field_layouts: Box<[Layout]>,
+    drop_fields: Option<ErasedDropFn>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
@@ -70,6 +70,28 @@ impl<Fields> ErasedSoaContext<Fields> {
     pub fn field_layouts(&self) -> &[Layout] {
         let Self { field_layouts, .. } = self;
         field_layouts.as_ref()
+    }
+
+    #[inline]
+    pub fn drop_in_place<I>(&self, iter: I)
+    where
+        I: IntoIterator<Item: Borrow<[ErasedFieldMutPtr]>>,
+    {
+        let Self {
+            field_layouts,
+            drop_fields,
+            ..
+        } = self;
+        let Some(drop_fields) = drop_fields else {
+            return;
+        };
+
+        iter.into_iter()
+            .inspect(|ptrs| {
+                let layouts = ptrs.borrow().iter().map(ErasedFieldMutPtr::layout);
+                assert!(field_layouts.iter().copied().eq(layouts))
+            })
+            .for_each(|ptrs| drop_fields(ptrs.borrow()))
     }
 }
 

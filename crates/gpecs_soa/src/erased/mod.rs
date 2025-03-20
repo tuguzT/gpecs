@@ -59,8 +59,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     type FieldLayouts<'a> = &'a [Layout];
 
     fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
-        let ErasedSoaContext { field_layouts, .. } = context;
-        field_layouts.as_ref()
+        context.field_layouts()
     }
 
     type FieldOffsets<'a> = Box<[usize]>;
@@ -69,7 +68,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         capacity: usize,
     ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         buffer_layout(field_layouts, capacity)
     }
 
@@ -81,7 +80,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         iter::Map<vec::IntoIter<ErasedFieldMutPtr>, fn(ErasedFieldMutPtr) -> *mut u8>;
 
     fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         ptrs.into_fields()
@@ -91,7 +90,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn ptrs_erase_mut(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         ptrs.into_fields()
@@ -104,7 +103,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
 
         let ptrs: Box<[_]> = field_layouts
             .iter()
@@ -123,7 +122,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
 
         let ptrs: Box<[_]> = field_layouts
             .iter()
@@ -139,9 +138,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
-
-        let ptrs = field_layouts
+        let ptrs = context
+            .field_layouts()
             .iter()
             .copied()
             .map(ErasedFieldMutPtr::dangling);
@@ -149,7 +147,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn ptrs_cast_const(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let ptrs = field_layouts
@@ -161,7 +159,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn ptrs_cast_mut(context: &Self::Context, ptrs: Self::Ptrs) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let ptrs = field_layouts
@@ -173,7 +171,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn ptrs_add(context: &Self::Context, ptrs: Self::Ptrs, offset: usize) -> Self::Ptrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let ptrs = field_layouts
@@ -189,7 +187,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::MutPtrs,
         offset: usize,
     ) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let ptrs = field_layouts
@@ -205,7 +203,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::Ptrs,
         origin: Self::Ptrs,
     ) -> isize {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
         assert_eq!(ptrs.fields().len(), origin.fields().len());
 
@@ -229,7 +227,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::MutPtrs,
         origin: Self::Ptrs,
     ) -> isize {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
         assert_eq!(ptrs.fields().len(), origin.fields().len());
 
@@ -249,7 +247,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn ptrs_swap(context: &Self::Context, a: Self::MutPtrs, b: Self::MutPtrs) {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), a.fields().len());
         assert_eq!(a.fields().len(), b.fields().len());
 
@@ -275,7 +273,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn ptrs_copy(context: &Self::Context, src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), src.fields().len());
         assert_eq!(src.fields().len(), dst.fields().len());
 
@@ -306,7 +304,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         dst: Self::MutPtrs,
         len: usize,
     ) {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), src.fields().len());
         assert_eq!(src.fields().len(), dst.fields().len());
 
@@ -338,7 +336,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         dst: Self::MutPtrs,
         len: usize,
     ) {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), src.fields().len());
         assert_eq!(src.fields().len(), dst.fields().len());
 
@@ -354,7 +352,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs) -> Self {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), src.fields().len());
 
         let (buffer_layout, offsets) =
@@ -377,12 +375,12 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             });
         Self {
             buffer: unsafe { buffer.assume_init() },
-            field_layouts: field_layouts.clone(),
+            field_layouts: field_layouts.into(),
         }
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         let Self {
             buffer,
             field_layouts: value_layouts,
@@ -412,25 +410,14 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs) {
-        let ErasedSoaContext {
-            field_layouts,
-            drop_fields,
-            ..
-        } = context;
-        let Some(drop_fields) = drop_fields else {
-            return;
-        };
-
-        let layouts = ptrs.fields().iter().map(ErasedFieldMutPtr::layout);
-        assert!(field_layouts.iter().copied().eq(layouts));
-
-        drop_fields(ptrs.fields())
+        let iter = iter::once(ptrs.fields());
+        context.drop_in_place(iter);
     }
 
     type NonNullPtrs = ErasedSoaNonNullPtrs<Fields>;
 
     unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let ptrs = field_layouts
@@ -446,7 +433,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn nonnull_to_ptrs(context: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let ptrs = field_layouts
@@ -464,7 +451,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     type Vecs = ErasedSoaVecs<Fields>;
 
     fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
 
         let vecs = field_layouts
             .iter()
@@ -481,7 +468,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         let ErasedSoaVecs { vecs, .. } = vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
@@ -502,7 +489,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         let ErasedSoaVecs { vecs, .. } = vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
@@ -523,7 +510,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         let ErasedSoaVecs { ref vecs, len, .. } = *vecs;
 
         assert_eq!(field_layouts.len(), vecs.len());
@@ -532,7 +519,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         let ErasedSoaVecs {
             vecs,
             len: vecs_len,
@@ -564,7 +551,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         Self: 'a;
 
     unsafe fn ptrs_to_refs<'a>(context: &Self::Context, ptrs: Self::Ptrs) -> Self::Refs<'a> {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let refs = field_layouts
@@ -579,7 +566,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         ptrs: Self::MutPtrs,
     ) -> Self::RefsMut<'a> {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let refs = field_layouts
@@ -591,7 +578,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn refs_as_ptrs(context: &Self::Context, refs: Self::Refs<'_>) -> Self::Ptrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), refs.fields().len());
 
         let ptrs = field_layouts
@@ -603,7 +590,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn mut_refs_as_ptrs(context: &Self::Context, refs: Self::RefsMut<'_>) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), refs.fields().len());
 
         let ptrs = field_layouts
@@ -615,7 +602,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn mut_refs_as_refs<'a>(context: &Self::Context, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), refs.fields().len());
 
         let refs = field_layouts
@@ -635,7 +622,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::Ptrs,
         len: usize,
     ) -> Self::SlicePtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let slices = field_layouts
@@ -655,7 +642,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::MutPtrs,
         len: usize,
     ) -> Self::SliceMutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), ptrs.fields().len());
 
         let slices = field_layouts
@@ -674,7 +661,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicePtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let len = slices.len();
@@ -687,7 +674,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn slice_ptrs_cast_mut(context: &Self::Context, slices: Self::SlicePtrs) -> Self::SliceMutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let len = slices.len();
@@ -700,21 +687,21 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn slice_ptrs_len(context: &Self::Context, slices: Self::SlicePtrs) -> usize {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         slices.len()
     }
 
     fn slice_ptrs_len_mut(context: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         slices.len()
     }
 
     fn slice_ptrs_as_ptrs(context: &Self::Context, slices: Self::SlicePtrs) -> Self::Ptrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let ptrs = field_layouts
@@ -729,7 +716,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let ptrs = field_layouts
@@ -754,7 +741,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicePtrs,
     ) -> Self::Slices<'a> {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let len = slices.len();
@@ -770,7 +757,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicesMut<'a> {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let len = slices.len();
@@ -783,14 +770,14 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn slices_len(context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         slices.len()
     }
 
     fn slices_len_mut(context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         slices.len()
@@ -800,7 +787,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::Slices<'_>,
     ) -> Self::SlicePtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let len = slices.len();
@@ -816,7 +803,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'_>,
     ) -> Self::SliceMutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let len = slices.len();
@@ -832,7 +819,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'a>,
     ) -> Self::Slices<'a> {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let len = slices.len();
@@ -845,7 +832,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn slice_refs_as_ptrs(context: &Self::Context, slices: Self::Slices<'_>) -> Self::Ptrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let ptrs = field_layouts
@@ -860,7 +847,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'_>,
     ) -> Self::MutPtrs {
-        let ErasedSoaContext { field_layouts, .. } = context;
+        let field_layouts = context.field_layouts();
         assert_eq!(field_layouts.len(), slices.fields().len());
 
         let ptrs = field_layouts
@@ -872,22 +859,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs) {
-        let ErasedSoaContext {
-            field_layouts,
-            drop_fields,
-            ..
-        } = context;
-        let Some(drop_fields) = drop_fields else {
-            return;
-        };
-        assert_eq!(field_layouts.len(), slices.fields().len());
-
-        slices
-            .into_iter()
-            .inspect(|ptrs| {
-                let layouts = ptrs.fields().iter().map(ErasedFieldMutPtr::layout);
-                assert!(field_layouts.iter().copied().eq(layouts));
-            })
-            .for_each(|ptrs| drop_fields(ptrs.fields()))
+        let iter = slices.into_iter().map(ErasedSoaMutPtrs::into_fields);
+        context.drop_in_place(iter);
     }
 }

@@ -5,7 +5,10 @@ use core::{
     ptr, slice,
 };
 
-use super::assert::{assert_buffer_align, assert_layout, assert_value_buffer_len};
+use super::{
+    assert::{assert_buffer_align, assert_layout, assert_value_buffer_len},
+    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
+};
 
 #[derive(PartialEq, Eq, Hash)]
 pub struct ErasedFieldRefMut<'a> {
@@ -85,6 +88,13 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+        let Self { layout, buffer, .. } = self;
+        let buffer = ptr::from_ref(*buffer);
+        ErasedFieldPtr::new(*layout, buffer)
+    }
+
+    #[inline]
     pub fn buffer_mut(&mut self) -> &mut [u8] {
         let Self { buffer, .. } = self;
         buffer
@@ -94,6 +104,13 @@ impl<'a> ErasedFieldRefMut<'a> {
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { buffer, .. } = self;
         buffer.as_mut_ptr()
+    }
+
+    #[inline]
+    pub fn as_field_mut_ptr(&mut self) -> ErasedFieldMutPtr {
+        let Self { layout, buffer, .. } = self;
+        let buffer = ptr::from_mut(*buffer);
+        ErasedFieldMutPtr::new(*layout, buffer)
     }
 
     #[inline]
@@ -116,5 +133,12 @@ impl Debug for ErasedFieldRefMut<'_> {
             .field("layout", layout)
             .field("buffer", buffer)
             .finish()
+    }
+}
+
+impl<'a> From<ErasedFieldRefMut<'a>> for ErasedFieldRef<'a> {
+    fn from(value: ErasedFieldRefMut<'a>) -> Self {
+        let ErasedFieldRefMut { layout, buffer, .. } = value;
+        ErasedFieldRef::new(layout, buffer)
     }
 }

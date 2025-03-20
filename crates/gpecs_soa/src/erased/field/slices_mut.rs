@@ -3,13 +3,14 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
-    ptr::NonNull,
+    ptr::{self, NonNull},
     slice,
 };
 
 use super::{
     assert::{assert_buffer_align, assert_layout, assert_slice_buffer_len},
-    ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceIter,
+    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
+    ErasedFieldSliceIter, ErasedFieldSliceMutPtr, ErasedFieldSlicePtr,
 };
 
 #[derive(PartialEq, Eq, Hash)]
@@ -108,6 +109,20 @@ impl<'a> ErasedFieldSliceMut<'a> {
     }
 
     #[inline]
+    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr {
+        let Self { layout, buffer, .. } = self;
+        let buffer = ptr::from_ref(*buffer);
+        ErasedFieldSlicePtr::new(*layout, buffer)
+    }
+
+    #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+        let Self { layout, buffer, .. } = self;
+        let buffer = ptr::slice_from_raw_parts(buffer.as_ptr(), layout.size());
+        ErasedFieldPtr::new(*layout, buffer)
+    }
+
+    #[inline]
     pub fn buffer_mut(&mut self) -> &mut [u8] {
         let Self { buffer, .. } = self;
         buffer
@@ -117,6 +132,20 @@ impl<'a> ErasedFieldSliceMut<'a> {
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { buffer, .. } = self;
         buffer.as_mut_ptr()
+    }
+
+    #[inline]
+    pub fn as_field_slice_mut_ptr(&mut self) -> ErasedFieldSliceMutPtr {
+        let Self { layout, buffer, .. } = self;
+        let buffer = ptr::from_mut(*buffer);
+        ErasedFieldSliceMutPtr::new(*layout, buffer)
+    }
+
+    #[inline]
+    pub fn as_field_mut_ptr(&mut self) -> ErasedFieldMutPtr {
+        let Self { layout, buffer, .. } = self;
+        let buffer = ptr::slice_from_raw_parts_mut(buffer.as_mut_ptr(), layout.size());
+        ErasedFieldMutPtr::new(*layout, buffer)
     }
 
     #[inline]
@@ -153,6 +182,13 @@ impl Debug for ErasedFieldSliceMut<'_> {
             .field("layout", layout)
             .field("buffer", buffer)
             .finish()
+    }
+}
+
+impl<'a> From<ErasedFieldSliceMut<'a>> for ErasedFieldSlice<'a> {
+    fn from(value: ErasedFieldSliceMut<'a>) -> Self {
+        let ErasedFieldSliceMut { layout, buffer, .. } = value;
+        ErasedFieldSlice::new(layout, buffer)
     }
 }
 

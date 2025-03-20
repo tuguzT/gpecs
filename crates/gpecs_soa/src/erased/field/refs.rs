@@ -5,7 +5,10 @@ use core::{
     ptr, slice,
 };
 
-use super::assert::{assert_buffer_align, assert_layout, assert_value_buffer_len};
+use super::{
+    assert::{assert_buffer_align, assert_layout, assert_value_buffer_len},
+    ErasedFieldPtr,
+};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ErasedFieldRef<'a> {
@@ -72,6 +75,13 @@ impl<'a> ErasedFieldRef<'a> {
     pub fn as_ptr(&self) -> *const u8 {
         let Self { buffer, .. } = self;
         buffer.as_ptr()
+    }
+
+    #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+        let Self { layout, buffer, .. } = *self;
+        let buffer = ptr::from_ref(buffer);
+        ErasedFieldPtr::new(layout, buffer)
     }
 
     #[inline]

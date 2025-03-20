@@ -3,11 +3,12 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     ptr::{self, NonNull},
+    slice,
 };
 
 use super::{
     assert::{assert_buffer_align, assert_layout, assert_slice_buffer_len},
-    ErasedFieldPtr,
+    ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMutPtr,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -47,6 +48,19 @@ impl ErasedFieldSlicePtr {
     }
 
     #[inline]
+    pub fn cast_mut(self) -> ErasedFieldSliceMutPtr {
+        let Self { layout, buffer } = self;
+        ErasedFieldSliceMutPtr::new(layout, buffer.cast_mut())
+    }
+
+    #[inline]
+    pub unsafe fn deref<'a>(self) -> ErasedFieldSlice<'a> {
+        let Self { layout, buffer } = self;
+        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
+        ErasedFieldSlice::new(layout, buffer)
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { layout, buffer } = *self;
         buffer.len().checked_div(layout.size()).unwrap_or(0)
@@ -73,6 +87,13 @@ impl ErasedFieldSlicePtr {
     pub fn as_ptr(&self) -> *const u8 {
         let Self { buffer, .. } = self;
         buffer.cast()
+    }
+
+    #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+        let Self { layout, buffer } = *self;
+        let buffer = ptr::slice_from_raw_parts(buffer.cast(), layout.size());
+        ErasedFieldPtr::new(layout, buffer)
     }
 
     #[inline]

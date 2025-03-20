@@ -1,9 +1,9 @@
-use core::{alloc::Layout, ptr};
+use core::{alloc::Layout, ptr, slice};
 
 use super::{
     super::assert::assert_layouts,
     assert::{assert_buffer_align, assert_layout, assert_value_buffer_len},
-    ErasedFieldMutPtr,
+    ErasedFieldMutPtr, ErasedFieldRef,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -63,7 +63,7 @@ impl ErasedFieldPtr {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn offset_from(&self, origin: &Self) -> isize {
+    pub unsafe fn offset_from(self, origin: Self) -> isize {
         let Self { layout, .. } = self;
         assert_layouts(layout, origin.layout());
 
@@ -75,6 +75,13 @@ impl ErasedFieldPtr {
         offset
             .checked_div(field_size)
             .expect("erased field pointer should not be a ZST")
+    }
+
+    #[inline]
+    pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
+        let Self { layout, buffer } = self;
+        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), layout.size()) };
+        ErasedFieldRef::new(layout, buffer)
     }
 
     #[inline]

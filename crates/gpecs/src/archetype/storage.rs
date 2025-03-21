@@ -67,7 +67,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let Self {
-            component_ids,
+            ref component_ids,
             erased_storage,
         } = self;
 
@@ -91,7 +91,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let Self {
-            component_ids,
+            ref component_ids,
             erased_storage,
         } = self;
 
@@ -116,7 +116,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let Self {
-            component_ids,
+            ref component_ids,
             erased_storage,
         } = self;
 
@@ -143,7 +143,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let Self {
-            component_ids,
+            ref component_ids,
             erased_storage,
         } = self;
 
@@ -171,7 +171,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let Self {
-            component_ids,
+            ref component_ids,
             erased_storage,
         } = self;
 
@@ -215,7 +215,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let Self {
-            component_ids,
+            ref component_ids,
             erased_storage,
         } = self;
 
@@ -379,8 +379,7 @@ where
 {
     let info = components
         .get_info(id)
-        .ok_or_else(|| format!("info of component {id:?} should be present"))
-        .unwrap();
+        .unwrap_or_else(|| panic!("info of component {id:?} should be present"));
     assert_eq!(info.layout(), descriptor.borrow().layout());
 }
 
@@ -389,19 +388,16 @@ where
 fn validate_components<'components, 'context, B>(
     components: &'components mut ComponentRegistry,
     context: &'context B::Context,
-) -> impl Iterator<Item = ComponentId> + 'context
+) -> impl Iterator<Item = ComponentId> + use<'components, 'context, B>
 where
-    'components: 'context,
     B: Bundle,
 {
     B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
         .zip(B::field_descriptors(context))
-        .map(|(id, layout)| {
-            validate_component(components, id, layout);
-            id
-        })
+        .inspect(|(id, desc)| validate_component(components, *id, desc.borrow()))
+        .map(|(id, _)| id)
 }
 
 #[inline]
@@ -410,22 +406,19 @@ fn reorder_fields<'components, 'context, B, F>(
     components: &'components mut ComponentRegistry,
     context: &'context B::Context,
     mut fields: ErasedComponents<F>,
-) -> impl Iterator<Item = (FieldDescriptor, F)> + 'context
+) -> impl Iterator<Item = (FieldDescriptor, F)> + use<'components, 'context, B, F>
 where
-    'components: 'context,
     B: Bundle,
-    F: 'context,
 {
     B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
         .zip(B::field_descriptors(context))
-        .map(move |(id, layout)| {
-            validate_component(components, id, layout);
+        .inspect(|(id, desc)| validate_component(components, *id, desc.borrow()))
+        .map(move |(id, _)| {
             fields
                 .remove(&id)
-                .ok_or_else(|| format!("field of component {id:?} should be present"))
-                .unwrap()
+                .unwrap_or_else(|| panic!("field of component {id:?} should be present"))
         })
 }
 
@@ -474,7 +467,7 @@ where
     B: Bundle,
 {
     let refs = reorder_fields::<B, _>(components, context, fields)
-        .map(|(layout, buffer)| erased::field::ErasedFieldRef::new(layout, buffer));
+        .map(|(desc, buffer)| erased::field::ErasedFieldRef::new(desc, buffer));
     let erased_refs = ErasedSoaRefs::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -509,7 +502,7 @@ where
     B: Bundle,
 {
     let refs = reorder_fields::<B, _>(components, context, fields)
-        .map(|(layout, buffer)| erased::field::ErasedFieldRefMut::new(layout, buffer));
+        .map(|(desc, buffer)| erased::field::ErasedFieldRefMut::new(desc, buffer));
     let erased_refs = ErasedSoaRefsMut::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -545,7 +538,7 @@ where
     B: Bundle,
 {
     let slices = reorder_fields::<B, _>(components, context, fields)
-        .map(|(layout, buffer)| erased::field::ErasedFieldSlice::new(layout, buffer));
+        .map(|(desc, buffer)| erased::field::ErasedFieldSlice::new(desc, buffer));
     let erased_slices = ErasedSoaSlices::<B::Fields>::new(len, slices);
     unsafe { erased_slices.into::<B>(context) }
 }
@@ -585,7 +578,7 @@ where
     B: Bundle,
 {
     let slices = reorder_fields::<B, _>(components, context, fields)
-        .map(|(layout, buffer)| erased::field::ErasedFieldSliceMut::new(layout, buffer));
+        .map(|(desc, buffer)| erased::field::ErasedFieldSliceMut::new(desc, buffer));
     let erased_slices = ErasedSoaSlicesMut::<B::Fields>::new(len, slices);
     unsafe { erased_slices.into::<B>(context) }
 }

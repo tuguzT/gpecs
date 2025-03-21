@@ -8,6 +8,7 @@ pub use self::{
     slice_ptrs_mut::{ErasedFieldSliceMutPtr, ErasedFieldSliceMutPtrIter},
     slices::{ErasedFieldSlice, ErasedFieldSliceIter},
     slices_mut::{ErasedFieldSliceIterMut, ErasedFieldSliceMut},
+    value::ErasedField,
 };
 
 mod assert;
@@ -20,3 +21,4 @@ mod slice_ptrs;
 mod slice_ptrs_mut;
 mod slices;
 mod slices_mut;
+mod value;

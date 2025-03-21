@@ -371,7 +371,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         field_layouts
             .iter()
             .zip(dst.into_fields())
-            .zip(value.as_refs().into_fields()) // TODO: replace with `into_fields` when it returns boxes of `ErasedByte<Fields>` instead of `u8`
+            .zip(value.into_fields())
             .inspect(|((&field_layout, dst), _)| assert_layouts(field_layout, dst.layout()))
             .for_each(|((_, dst), src)| {
                 let src = src.as_field_ptr();

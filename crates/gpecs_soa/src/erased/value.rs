@@ -4,9 +4,9 @@ use core::{alloc::Layout, borrow::Borrow, iter, ptr, slice};
 use crate::traits::{buffer_layout, Soa};
 
 use super::{
-    assert::validate_layout,
+    assert::{assert_same_len, validate_layout},
     byte::ErasedByte,
-    field::{ErasedFieldRef, ErasedFieldRefMut},
+    field::{ErasedField, ErasedFieldRef, ErasedFieldRefMut},
     ErasedSoaRefs, ErasedSoaRefsMut,
 };
 
@@ -27,7 +27,10 @@ impl<Fields> ErasedSoa<Fields> {
     {
         let (field_layouts, fields): (Vec<_>, Vec<_>) = fields
             .into_iter()
-            .inspect(|(field_layout, src)| assert_eq!(field_layout.size(), src.borrow().len()))
+            .inspect(|(field_layout, src)| {
+                validate_layout::<Fields>(field_layout);
+                assert_same_len(field_layout.size(), src.borrow().len());
+            })
             .unzip();
         let field_layouts = field_layouts.into_boxed_slice();
 
@@ -120,7 +123,7 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
-    pub fn into_fields(self) -> Box<[(Layout, Box<[u8]>)]> {
+    pub fn into_fields(self) -> Box<[ErasedField<Fields>]> {
         let Self {
             buffer,
             field_layouts,
@@ -136,9 +139,8 @@ impl<Fields> ErasedSoa<Fields> {
         iter::zip(field_layouts, offsets)
             .map(|(field_layout, offset)| {
                 let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
-                let len = field_layout.size();
-                let r#ref = unsafe { slice::from_raw_parts(data, len) };
-                (field_layout.clone(), r#ref.into())
+                let buffer = unsafe { slice::from_raw_parts(data, field_layout.size()) };
+                ErasedField::new(field_layout, buffer)
             })
             .collect()
     }

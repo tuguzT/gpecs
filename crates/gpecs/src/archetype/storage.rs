@@ -451,9 +451,13 @@ fn into_erased_fields<B>(
 where
     B: Bundle,
 {
-    let erased_value = ErasedSoa::from(context, value);
+    let erased_value = ErasedSoa::from(context, value)
+        .into_fields()
+        .into_vec()
+        .into_iter()
+        .map(erased::field::ErasedField::into_parts);
     validate_components::<B>(components, context)
-        .zip(erased_value.into_fields())
+        .zip(erased_value)
         .collect()
 }
 

@@ -1,7 +1,8 @@
-use std::{alloc::Layout, iter};
+use std::iter;
 
 use gpecs_soa::{
     erased::{ErasedSoa, ErasedSoaContext},
+    traits::FieldDescriptor,
     vec::SoaVec,
 };
 
@@ -132,12 +133,16 @@ fn new_erased() {
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(context);
 
-    let optimized_layout = [
-        Layout::new::<u8>(),
-        Layout::new::<u16>(),
-        Layout::new::<u64>(),
+    let descriptors = [
+        FieldDescriptor::of::<u8>(),
+        FieldDescriptor::of::<u16>(),
+        FieldDescriptor::of::<u64>(),
     ];
-    assert_eq!(erased_context.field_layouts(), optimized_layout);
+    assert!(erased_context
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
 
     let vec = Vec::with_context(erased_context);
     assert!(vec.is_empty());
@@ -306,12 +311,16 @@ fn with_capacity_erased() {
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(context);
 
-    let optimized_layout = [
-        Layout::new::<u8>(),
-        Layout::new::<u16>(),
-        Layout::new::<u64>(),
+    let descriptors = [
+        FieldDescriptor::of::<u8>(),
+        FieldDescriptor::of::<u16>(),
+        FieldDescriptor::of::<u64>(),
     ];
-    assert_eq!(erased_context.field_layouts(), optimized_layout);
+    assert!(erased_context
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
 
     let vec = Vec::with_context_and_capacity(erased_context, 10);
     assert!(vec.is_empty());
@@ -632,12 +641,16 @@ fn one_item_erased() {
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(context);
 
-    let optimized_layout = [
-        Layout::new::<u8>(),
-        Layout::new::<u16>(),
-        Layout::new::<u64>(),
+    let descriptors = [
+        FieldDescriptor::of::<u8>(),
+        FieldDescriptor::of::<u16>(),
+        FieldDescriptor::of::<u64>(),
     ];
-    assert_eq!(erased_context.field_layouts(), optimized_layout);
+    assert!(erased_context
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
 
     let mut vec = Vec::with_context(erased_context);
 
@@ -1386,12 +1399,16 @@ fn three_items_erased() {
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(context);
 
-    let optimized_layout = [
-        Layout::new::<u16>(),
-        Layout::new::<String>(),
-        Layout::new::<u128>(),
+    let descriptors = [
+        FieldDescriptor::of::<u16>(),
+        FieldDescriptor::of::<String>(),
+        FieldDescriptor::of::<u128>(),
     ];
-    assert_eq!(optimized_layout, erased_context.field_layouts());
+    assert!(erased_context
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
 
     let mut vec = Vec::with_context(erased_context);
 

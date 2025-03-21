@@ -1,10 +1,11 @@
 use alloc::boxed::Box;
 use core::{
-    alloc::Layout,
     fmt::{self, Debug},
     mem::ManuallyDrop,
     ptr, slice,
 };
+
+use crate::traits::FieldDescriptor;
 
 use super::{
     super::{assert::validate_layout, byte::ErasedByte},
@@ -13,42 +14,49 @@ use super::{
 };
 
 pub struct ErasedField<Fields> {
-    layout: Layout,
+    desc: FieldDescriptor,
     buffer: Box<[ErasedByte<Fields>]>,
 }
 
 impl<Fields> ErasedField<Fields> {
     #[inline]
     #[track_caller]
-    pub fn new(layout: Layout, buffer: &[u8]) -> Self {
-        validate_layout::<Fields>(layout);
-        assert_value_buffer_len(buffer.len(), layout.size());
+    pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Self {
+        validate_layout::<Fields>(desc.layout());
+        assert_value_buffer_len(buffer.len(), desc.layout().size());
 
         let buffer_len = buffer.len().div_ceil(size_of::<ErasedByte<Fields>>());
         let mut r#box = Box::new_uninit_slice(buffer_len);
         unsafe {
-            ptr::copy_nonoverlapping(buffer.as_ptr(), r#box.as_mut_ptr().cast(), layout.size());
+            ptr::copy_nonoverlapping(
+                buffer.as_ptr(),
+                r#box.as_mut_ptr().cast(),
+                desc.layout().size(),
+            );
         }
 
         Self {
-            layout,
+            desc,
             buffer: unsafe { r#box.assume_init() },
         }
     }
 
     #[inline]
     pub fn from<T>(value: T) -> Self {
-        let value = ManuallyDrop::new(value); // TODO: dispose of that value later with drop fn
-        let layout = Layout::new::<T>();
-        let buffer = unsafe { slice::from_raw_parts(ptr::from_ref(&value).cast(), layout.size()) };
-        Self::new(layout, buffer)
+        let value = ManuallyDrop::new(value);
+        let desc = FieldDescriptor::of::<T>();
+        let data = ptr::from_ref(&value).cast();
+        let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
+        Self::new(desc, buffer)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn into<T>(self) -> T {
-        let Self { layout, buffer } = self;
-        assert_layout::<T>(layout);
+        let me = ManuallyDrop::new(self);
+        let buffer = unsafe { ptr::read(&me.buffer) };
+        let desc = unsafe { ptr::read(&me.desc) };
+        assert_layout::<T>(desc.layout());
 
         unsafe { ptr::read(buffer.as_ptr().cast()) }
     }
@@ -56,8 +64,8 @@ impl<Fields> ErasedField<Fields> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &T {
-        let Self { layout, buffer } = self;
-        assert_layout::<T>(layout);
+        let Self { desc, buffer } = self;
+        assert_layout::<T>(desc.layout());
 
         let ptr = buffer.as_ptr().cast();
         unsafe { &*ptr }
@@ -66,32 +74,32 @@ impl<Fields> ErasedField<Fields> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
-        let Self { layout, buffer } = self;
-        assert_layout::<T>(layout);
+        let Self { desc, buffer } = self;
+        assert_layout::<T>(desc.layout());
 
         let ptr = buffer.as_mut_ptr().cast();
         unsafe { &mut *ptr }
     }
 
     #[inline]
-    pub fn layout(&self) -> Layout {
-        let Self { layout, .. } = *self;
-        layout
+    pub fn descriptor(&self) -> FieldDescriptor {
+        let Self { desc, .. } = *self;
+        desc
     }
 
     #[inline]
     pub fn buffer(&self) -> &[u8] {
-        let Self { layout, buffer } = self;
+        let Self { desc, buffer } = self;
 
         let data = buffer.as_ptr().cast();
-        unsafe { slice::from_raw_parts(data, layout.size()) }
+        unsafe { slice::from_raw_parts(data, desc.layout().size()) }
     }
 
     #[inline]
     pub fn as_field_ref(&self) -> ErasedFieldRef<'_> {
-        let Self { layout, .. } = *self;
+        let Self { desc, .. } = *self;
         let buffer = self.buffer();
-        ErasedFieldRef::new(layout, buffer)
+        ErasedFieldRef::new(desc, buffer)
     }
 
     #[inline]
@@ -102,24 +110,24 @@ impl<Fields> ErasedField<Fields> {
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
-        let Self { layout, .. } = *self;
+        let Self { desc, .. } = *self;
         let buffer = ptr::from_ref(self.buffer());
-        ErasedFieldPtr::new(layout, buffer)
+        ErasedFieldPtr::new(desc, buffer)
     }
 
     #[inline]
     pub fn buffer_mut(&mut self) -> &mut [u8] {
-        let Self { layout, buffer } = self;
+        let Self { desc, buffer } = self;
 
         let data = buffer.as_mut_ptr().cast();
-        unsafe { slice::from_raw_parts_mut(data, layout.size()) }
+        unsafe { slice::from_raw_parts_mut(data, desc.layout().size()) }
     }
 
     #[inline]
     pub fn as_field_ref_mut(&mut self) -> ErasedFieldRefMut<'_> {
-        let Self { layout, .. } = *self;
+        let Self { desc, .. } = *self;
         let buffer = self.buffer_mut();
-        ErasedFieldRefMut::new(layout, buffer)
+        ErasedFieldRefMut::new(desc, buffer)
     }
 
     #[inline]
@@ -130,9 +138,9 @@ impl<Fields> ErasedField<Fields> {
 
     #[inline]
     pub fn as_field_ptr_mut(&mut self) -> ErasedFieldMutPtr {
-        let Self { layout, .. } = *self;
+        let Self { desc, .. } = *self;
         let buffer = ptr::from_mut(self.buffer_mut());
-        ErasedFieldMutPtr::new(layout, buffer)
+        ErasedFieldMutPtr::new(desc, buffer)
     }
 
     #[inline]
@@ -142,22 +150,37 @@ impl<Fields> ErasedField<Fields> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (Layout, Box<[u8]>) {
-        let Self { layout, buffer } = self;
+    pub fn into_parts(self) -> (FieldDescriptor, Box<[u8]>) {
+        let me = ManuallyDrop::new(self);
+        let desc = unsafe { ptr::read(&me.desc) };
+        let buffer = unsafe { ptr::read(&me.buffer) };
 
         let data = buffer.as_ptr().cast();
-        let buffer = unsafe { slice::from_raw_parts(data, layout.size()) };
-        (layout, buffer.into())
+        let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
+        (desc, buffer.into())
     }
 }
 
 impl<Fields> Debug for ErasedField<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { layout, .. } = self;
+        let Self { desc, .. } = self;
         let buffer = self.buffer();
         f.debug_struct("ErasedField")
-            .field("layout", layout)
+            .field("desc", desc)
             .field("buffer", &buffer)
             .finish()
+    }
+}
+
+impl<Fields> Drop for ErasedField<Fields> {
+    fn drop(&mut self) {
+        // TODO: return drop when the source of double free is found
+        let Self { desc, buffer } = self;
+        let Some(drop_fn) = desc.drop_fn() else {
+            return;
+        };
+
+        let data = buffer.as_mut_ptr().cast();
+        unsafe { drop_fn(data) }
     }
 }

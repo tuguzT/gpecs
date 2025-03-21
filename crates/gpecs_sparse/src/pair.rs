@@ -10,6 +10,7 @@ use core::{
     ptr::{self, NonNull},
     slice,
 };
+use gpecs_soa::traits::FieldDescriptor;
 
 use crate::soa::traits::{Soa, SoaToOwned};
 
@@ -50,11 +51,11 @@ where
     type Context = V::Context;
     type Fields = (K, V::Fields);
 
-    type FieldLayouts<'a> = KeyValueFieldLayouts<'a, K, V>;
+    type FieldDescriptors<'a> = KeyValueFieldDescriptors<'a, K, V>;
 
     #[inline]
-    fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
-        KeyValueFieldLayouts::new(context)
+    fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_> {
+        KeyValueFieldDescriptors::new(context)
     }
 
     type FieldOffsets<'a> = KeyValueFieldOffsets<'a, K, V>;
@@ -664,116 +665,86 @@ where
     }
 }
 
-pub struct KeyValueFieldLayouts<'a, K, V>
+pub struct KeyValueFieldDescriptors<'a, K, V>
 where
     V: Soa,
 {
-    key_layout: Layout,
-    key_phantom: PhantomData<fn() -> K>,
-    value_layouts: V::FieldLayouts<'a>,
+    key: FieldDescriptor,
+    value: V::FieldDescriptors<'a>,
+    phantom: PhantomData<fn() -> K>,
 }
 
-impl<'a, K, V> KeyValueFieldLayouts<'a, K, V>
+impl<'a, K, V> KeyValueFieldDescriptors<'a, K, V>
 where
     V: Soa,
 {
     #[inline]
     pub fn new(context: &'a V::Context) -> Self {
         Self {
-            key_layout: Layout::new::<K>(),
-            key_phantom: PhantomData,
-            value_layouts: V::field_layouts(context),
+            key: FieldDescriptor::of::<K>(),
+            phantom: PhantomData,
+            value: V::field_descriptors(context),
         }
     }
 }
 
-impl<'a, K, V> Debug for KeyValueFieldLayouts<'a, K, V>
+impl<'a, K, V> Debug for KeyValueFieldDescriptors<'a, K, V>
 where
     V: Soa,
-    V::FieldLayouts<'a>: Debug,
+    V::FieldDescriptors<'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, value, .. } = self;
         f.debug_struct("KeyValueFieldLayouts")
-            .field("key_layout", &self.key_layout)
-            .field("value_layouts", &self.value_layouts)
+            .field("key", key)
+            .field("value", value)
             .finish()
     }
 }
 
-impl<'a, K, V> PartialEq for KeyValueFieldLayouts<'a, K, V>
+impl<'a, K, V> Clone for KeyValueFieldDescriptors<'a, K, V>
 where
     V: Soa,
-    V::FieldLayouts<'a>: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.key_layout == other.key_layout
-            && self.key_phantom == other.key_phantom
-            && self.value_layouts == other.value_layouts
-    }
-}
-
-impl<'a, K, V> Eq for KeyValueFieldLayouts<'a, K, V>
-where
-    V: Soa,
-    V::FieldLayouts<'a>: Eq,
-{
-}
-
-impl<'a, K, V> Hash for KeyValueFieldLayouts<'a, K, V>
-where
-    V: Soa,
-    V::FieldLayouts<'a>: Hash,
-{
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.key_layout.hash(state);
-        self.key_phantom.hash(state);
-        self.value_layouts.hash(state);
-    }
-}
-
-impl<'a, K, V> Clone for KeyValueFieldLayouts<'a, K, V>
-where
-    V: Soa,
-    V::FieldLayouts<'a>: Clone,
+    V::FieldDescriptors<'a>: Clone,
 {
     fn clone(&self) -> Self {
         Self {
-            key_layout: self.key_layout.clone(),
-            key_phantom: self.key_phantom.clone(),
-            value_layouts: self.value_layouts.clone(),
+            key: self.key.clone(),
+            phantom: self.phantom.clone(),
+            value: self.value.clone(),
         }
     }
 }
 
-impl<'a, K, V> Copy for KeyValueFieldLayouts<'a, K, V>
+impl<'a, K, V> Copy for KeyValueFieldDescriptors<'a, K, V>
 where
     V: Soa,
-    V::FieldLayouts<'a>: Copy,
+    V::FieldDescriptors<'a>: Copy,
 {
 }
 
-impl<'a, K, V> IntoIterator for KeyValueFieldLayouts<'a, K, V>
+impl<'a, K, V> IntoIterator for KeyValueFieldDescriptors<'a, K, V>
 where
     V: Soa,
 {
-    type Item = Layout;
+    type Item = FieldDescriptor;
 
     type IntoIter = iter::Chain<
-        iter::Once<Layout>,
+        iter::Once<FieldDescriptor>,
         iter::Map<
-            <V::FieldLayouts<'a> as IntoIterator>::IntoIter,
-            fn(<V::FieldLayouts<'a> as IntoIterator>::Item) -> Layout,
+            <V::FieldDescriptors<'a> as IntoIterator>::IntoIter,
+            fn(<V::FieldDescriptors<'a> as IntoIterator>::Item) -> FieldDescriptor,
         >,
     >;
 
     fn into_iter(self) -> Self::IntoIter {
         let Self {
-            key_layout,
-            value_layouts,
+            key: key_layout,
+            value: value_layouts,
             ..
         } = self;
 
-        let f: fn(<V::FieldLayouts<'a> as IntoIterator>::Item) -> _ = |layout| *layout.borrow();
+        let f: fn(<V::FieldDescriptors<'a> as IntoIterator>::Item) -> _ = |layout| *layout.borrow();
         let value_layouts = value_layouts.into_iter().map(f);
         iter::once(key_layout).chain(value_layouts)
     }

@@ -8,7 +8,10 @@ use core::{
 
 use crate::traits::Soa;
 
-use super::{assert::validate_layout, field::ErasedFieldRef};
+use super::{
+    assert::{assert_layouts, validate_layout},
+    field::ErasedFieldRef,
+};
 
 pub struct ErasedSoaRefs<'a, Fields>
 where
@@ -28,7 +31,7 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
         Self {
             refs: refs
                 .into_iter()
-                .inspect(|r#ref| validate_layout::<Fields>(r#ref.layout()))
+                .inspect(|r#ref| validate_layout::<Fields>(r#ref.descriptor().layout()))
                 .collect(),
             phantom: PhantomData,
         }
@@ -41,17 +44,17 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
     {
         let ptrs = T::refs_as_ptrs(context, refs);
         let ptrs = T::ptrs_erase(context, ptrs);
-        let field_layouts = T::field_layouts(context)
+        let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone());
+            .inspect(|desc| validate_layout::<Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone());
 
-        let refs: Box<[_]> = field_layouts
+        let refs: Box<[_]> = descriptors
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                let len = field_layout.size();
+            .map(|(desc, ptr)| {
+                let len = desc.layout().size();
                 let buffer = unsafe { slice::from_raw_parts(ptr, len) };
-                ErasedFieldRef::new(field_layout, buffer)
+                ErasedFieldRef::new(desc, buffer)
             })
             .collect();
         Self {
@@ -68,17 +71,17 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
     {
         let Self { refs, .. } = self;
 
-        let field_layouts: Box<[_]> = T::field_layouts(context)
+        let descriptors: Box<[_]> = T::field_descriptors(context)
             .into_iter()
-            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone())
+            .inspect(|desc| validate_layout::<Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone())
             .collect();
-        assert_eq!(field_layouts.len(), refs.len());
+        assert_eq!(descriptors.len(), refs.len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(refs)
-            .inspect(|(&field_layout, r#ref)| assert_eq!(field_layout, r#ref.layout()))
+            .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
             .map(|(_, r#ref)| r#ref.into_buffer().as_ptr());
         let ptrs = T::ptrs_restore(context, ptrs);
         unsafe { T::ptrs_to_refs(context, ptrs) }

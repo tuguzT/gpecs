@@ -1,5 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
-use core::alloc::Layout;
+
+use crate::traits::FieldDescriptor;
 
 use super::byte::ErasedByte;
 
@@ -7,7 +8,7 @@ use super::byte::ErasedByte;
 // data is stored inline in a single buffer
 pub struct ErasedFieldVec<Fields> {
     pub(super) buffer: Vec<ErasedByte<Fields>>,
-    pub(super) layout: Layout,
+    pub(super) desc: FieldDescriptor,
 }
 
 pub struct ErasedSoaVecs<Fields> {

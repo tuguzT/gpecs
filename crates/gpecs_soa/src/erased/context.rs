@@ -1,13 +1,12 @@
 use alloc::boxed::Box;
 use core::{
-    alloc::Layout,
     borrow::Borrow,
     fmt::{self, Debug},
     marker::PhantomData,
     mem,
 };
 
-use crate::traits::Soa;
+use crate::traits::{FieldDescriptor, Soa};
 
 use super::{assert::validate_layout, ErasedFieldMutPtr};
 
@@ -15,23 +14,23 @@ type ErasedDropFnParam<'a> = &'a [ErasedFieldMutPtr];
 type ErasedDropFn = Box<dyn Fn(ErasedDropFnParam<'_>)>;
 
 pub struct ErasedSoaContext<Fields> {
-    field_layouts: Box<[Layout]>,
+    descriptors: Box<[FieldDescriptor]>,
     drop_fields: Option<ErasedDropFn>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
 impl<Fields> ErasedSoaContext<Fields> {
     #[inline]
-    pub fn new<I, O>(field_layouts: I, drop_fields: O) -> Self
+    pub fn new<I, O>(descriptors: I, drop_fields: O) -> Self
     where
-        I: IntoIterator<Item: Borrow<Layout>>,
+        I: IntoIterator<Item: Borrow<FieldDescriptor>>,
         O: Into<Option<ErasedDropFn>>,
     {
         Self {
-            field_layouts: field_layouts
+            descriptors: descriptors
                 .into_iter()
-                .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
-                .map(|layout| layout.borrow().clone())
+                .inspect(|desc| validate_layout::<Fields>(desc.borrow().layout()))
+                .map(|desc| desc.borrow().clone())
                 .collect(),
             drop_fields: drop_fields.into(),
             phantom: PhantomData,
@@ -44,10 +43,10 @@ impl<Fields> ErasedSoaContext<Fields> {
         T: Soa<Fields = Fields>,
         T::Context: 'static,
     {
-        let field_layouts = T::field_layouts(&context)
+        let descriptors = T::field_descriptors(&context)
             .into_iter()
-            .inspect(|layout| validate_layout::<T::Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone())
+            .inspect(|desc| validate_layout::<T::Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone())
             .collect();
 
         let drop_fields = move |data: ErasedDropFnParam<'_>| unsafe {
@@ -62,16 +61,16 @@ impl<Fields> ErasedSoaContext<Fields> {
         };
 
         Self {
-            field_layouts,
+            descriptors,
             drop_fields,
             phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn field_layouts(&self) -> &[Layout] {
-        let Self { field_layouts, .. } = self;
-        field_layouts.as_ref()
+    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
+        let Self { descriptors, .. } = self;
+        descriptors.as_ref()
     }
 
     #[inline]
@@ -80,7 +79,7 @@ impl<Fields> ErasedSoaContext<Fields> {
         I: IntoIterator<Item: Borrow<[ErasedFieldMutPtr]>>,
     {
         let Self {
-            field_layouts,
+            descriptors,
             drop_fields,
             ..
         } = self;
@@ -90,8 +89,9 @@ impl<Fields> ErasedSoaContext<Fields> {
 
         iter.into_iter()
             .inspect(|ptrs| {
-                let layouts = ptrs.borrow().iter().map(ErasedFieldMutPtr::layout);
-                assert!(field_layouts.iter().copied().eq(layouts))
+                let layouts = ptrs.borrow().iter().map(|ptr| ptr.descriptor().layout());
+                let descriptors = descriptors.iter().copied().map(|desc| desc.layout());
+                assert!(descriptors.eq(layouts))
             })
             .for_each(|ptrs| drop_fields(ptrs.borrow()))
     }
@@ -99,10 +99,9 @@ impl<Fields> ErasedSoaContext<Fields> {
 
 impl<Fields> Debug for ErasedSoaContext<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { field_layouts, .. } = self;
-
+        let Self { descriptors, .. } = self;
         f.debug_struct("ErasedSoaContext")
-            .field("field_layouts", field_layouts)
+            .field("descriptors", descriptors)
             .finish_non_exhaustive()
     }
 }

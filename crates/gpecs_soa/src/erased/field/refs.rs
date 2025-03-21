@@ -1,9 +1,10 @@
 use core::{
-    alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
     ptr, slice,
 };
+
+use crate::traits::FieldDescriptor;
 
 use super::{
     assert::{assert_buffer_align, assert_layout, assert_value_buffer_len},
@@ -12,7 +13,7 @@ use super::{
 
 #[derive(Clone, Copy)]
 pub struct ErasedFieldRef<'a> {
-    layout: Layout,
+    desc: FieldDescriptor,
     buffer: &'a [u8],
     no_send_sync: PhantomData<*const u8>,
 }
@@ -20,12 +21,12 @@ pub struct ErasedFieldRef<'a> {
 impl<'a> ErasedFieldRef<'a> {
     #[inline]
     #[track_caller]
-    pub fn new(layout: Layout, buffer: &'a [u8]) -> Self {
-        assert_value_buffer_len(buffer.len(), layout.size());
-        assert_buffer_align(buffer.as_ptr(), layout.align());
+    pub fn new(desc: FieldDescriptor, buffer: &'a [u8]) -> Self {
+        assert_value_buffer_len(buffer.len(), desc.layout().size());
+        assert_buffer_align(buffer.as_ptr(), desc.layout().align());
 
         Self {
-            layout,
+            desc,
             buffer,
             no_send_sync: PhantomData,
         }
@@ -33,17 +34,17 @@ impl<'a> ErasedFieldRef<'a> {
 
     #[inline]
     pub fn from<T>(r#ref: &'a T) -> Self {
-        let layout = Layout::new::<T>();
+        let desc = FieldDescriptor::of::<T>();
         let data = ptr::from_ref(r#ref).cast();
-        let buffer = unsafe { slice::from_raw_parts(data, layout.size()) };
-        Self::new(layout, buffer)
+        let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
+        Self::new(desc, buffer)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a T {
-        let Self { layout, buffer, .. } = self;
-        assert_layout::<T>(layout);
+        let Self { desc, buffer, .. } = self;
+        assert_layout::<T>(desc.layout());
 
         let ptr = buffer.as_ptr().cast();
         unsafe { &*ptr }
@@ -52,17 +53,17 @@ impl<'a> ErasedFieldRef<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &T {
-        let Self { layout, buffer, .. } = self;
-        assert_layout::<T>(layout);
+        let Self { desc, buffer, .. } = self;
+        assert_layout::<T>(desc.layout());
 
         let ptr = buffer.as_ptr().cast();
         unsafe { &*ptr }
     }
 
     #[inline]
-    pub fn layout(&self) -> Layout {
-        let Self { layout, .. } = *self;
-        layout
+    pub fn descriptor(&self) -> FieldDescriptor {
+        let Self { desc, .. } = *self;
+        desc
     }
 
     #[inline]
@@ -79,9 +80,9 @@ impl<'a> ErasedFieldRef<'a> {
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
-        let Self { layout, buffer, .. } = *self;
+        let Self { desc, buffer, .. } = *self;
         let buffer = ptr::from_ref(buffer);
-        ErasedFieldPtr::new(layout, buffer)
+        ErasedFieldPtr::new(desc, buffer)
     }
 
     #[inline]
@@ -91,17 +92,17 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (Layout, &'a [u8]) {
-        let Self { layout, buffer, .. } = self;
-        (layout, buffer)
+    pub fn into_parts(self) -> (FieldDescriptor, &'a [u8]) {
+        let Self { desc, buffer, .. } = self;
+        (desc, buffer)
     }
 }
 
 impl Debug for ErasedFieldRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { layout, buffer, .. } = self;
+        let Self { desc, buffer, .. } = self;
         f.debug_struct("ErasedFieldRef")
-            .field("layout", layout)
+            .field("desc", desc)
             .field("buffer", buffer)
             .finish()
     }

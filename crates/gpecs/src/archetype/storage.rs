@@ -1,5 +1,4 @@
 use std::{
-    alloc::Layout,
     borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug},
@@ -11,8 +10,11 @@ use crate::{
     bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
-    soa::erased::{
-        self, ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut,
+    soa::{
+        erased::{
+            self, ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut,
+        },
+        traits::FieldDescriptor,
     },
 };
 
@@ -248,7 +250,7 @@ impl Debug for ArchetypeStorage {
     }
 }
 
-type ErasedComponents<T> = BTreeMap<ComponentId, (Layout, T)>;
+type ErasedComponents<T> = BTreeMap<ComponentId, (FieldDescriptor, T)>;
 
 type ErasedField = Box<[u8]>;
 type ErasedFieldRef<'a> = &'a [u8];
@@ -371,15 +373,15 @@ where
 
 #[inline]
 #[track_caller]
-fn validate_component<B>(components: &mut ComponentRegistry, id: ComponentId, layout: B)
+fn validate_component<B>(components: &mut ComponentRegistry, id: ComponentId, descriptor: B)
 where
-    B: Borrow<Layout>,
+    B: Borrow<FieldDescriptor>,
 {
     let info = components
         .get_info(id)
         .ok_or_else(|| format!("info of component {id:?} should be present"))
         .unwrap();
-    assert_eq!(info.layout(), *layout.borrow());
+    assert_eq!(info.layout(), descriptor.borrow().layout());
 }
 
 #[inline]
@@ -395,7 +397,7 @@ where
     B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
-        .zip(B::field_layouts(context))
+        .zip(B::field_descriptors(context))
         .map(|(id, layout)| {
             validate_component(components, id, layout);
             id
@@ -408,7 +410,7 @@ fn reorder_fields<'components, 'context, B, F>(
     components: &'components mut ComponentRegistry,
     context: &'context B::Context,
     mut fields: ErasedComponents<F>,
-) -> impl Iterator<Item = (Layout, F)> + 'context
+) -> impl Iterator<Item = (FieldDescriptor, F)> + 'context
 where
     'components: 'context,
     B: Bundle,
@@ -417,7 +419,7 @@ where
     B::component_ids(context, components)
         .expect("components of the bundle should be unique")
         .into_iter()
-        .zip(B::field_layouts(context))
+        .zip(B::field_descriptors(context))
         .map(move |(id, layout)| {
             validate_component(components, id, layout);
             fields

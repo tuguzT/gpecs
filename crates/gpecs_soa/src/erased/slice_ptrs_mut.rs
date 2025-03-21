@@ -2,7 +2,6 @@ use alloc::boxed::Box;
 use core::{
     borrow::Borrow,
     fmt::{self, Debug},
-    hash::{self, Hash},
     marker::PhantomData,
     ptr,
 };
@@ -10,7 +9,7 @@ use core::{
 use crate::traits::Soa;
 
 use super::{
-    assert::{assert_same_len, validate_layout},
+    assert::{assert_layouts, assert_same_len, validate_layout},
     field::{ErasedFieldSliceMutPtr, ErasedFieldSliceMutPtrIter},
     ErasedSoaMutPtrs, ErasedSoaPtrs, ErasedSoaSlicePtrsIter,
 };
@@ -30,7 +29,7 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
         let slices = slices
             .into_iter()
             .inspect(|slice| {
-                validate_layout::<Fields>(slice.layout());
+                validate_layout::<Fields>(slice.descriptor().layout());
                 assert_same_len(len, slice.len());
             })
             .collect();
@@ -49,17 +48,17 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
         let len = T::slice_ptrs_len_mut(context, slices.clone());
         let ptrs = T::mut_slice_ptrs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
-        let field_layouts = T::field_layouts(context)
+        let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone());
+            .inspect(|desc| validate_layout::<Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone());
 
-        let slices = field_layouts
+        let slices = descriptors
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                let len = field_layout.size() * len;
+            .map(|(desc, ptr)| {
+                let len = desc.layout().size() * len;
                 let slice = ptr::slice_from_raw_parts_mut(ptr, len);
-                ErasedFieldSliceMutPtr::new(field_layout, slice)
+                ErasedFieldSliceMutPtr::new(desc, slice)
             })
             .collect();
         Self {
@@ -76,17 +75,17 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let field_layouts: Box<[_]> = T::field_layouts(context)
+        let descriptors: Box<[_]> = T::field_descriptors(context)
             .into_iter()
-            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone())
+            .inspect(|desc| validate_layout::<Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone())
             .collect();
-        assert_eq!(slices.len(), field_layouts.len());
+        assert_eq!(slices.len(), descriptors.len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(slices)
-            .inspect(|(&field_layout, slice)| assert_eq!(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.as_ptr());
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         T::slices_from_raw_parts_mut(context, ptrs, len)
@@ -143,34 +142,6 @@ impl<Fields> Debug for ErasedSoaSliceMutPtrs<Fields> {
             .field("len", len)
             .field("slices", slices)
             .finish()
-    }
-}
-
-impl<Fields> PartialEq for ErasedSoaSliceMutPtrs<Fields> {
-    fn eq(&self, other: &Self) -> bool {
-        let Self {
-            len,
-            slices,
-            phantom,
-        } = self;
-
-        *len == other.len && *slices == other.slices && *phantom == other.phantom
-    }
-}
-
-impl<Fields> Eq for ErasedSoaSliceMutPtrs<Fields> {}
-
-impl<Fields> Hash for ErasedSoaSliceMutPtrs<Fields> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self {
-            len,
-            slices,
-            phantom,
-        } = self;
-
-        len.hash(state);
-        slices.hash(state);
-        phantom.hash(state);
     }
 }
 
@@ -241,9 +212,8 @@ impl<Fields> ErasedSoaSliceMutPtrsIter<Fields> {
             .expect("input slices should contain at least one field");
 
         Self {
-            #[allow(dropping_copy_types)]
             slices: slices
-                .inspect(|iter| drop(assert_same_len(len, iter.len())))
+                .inspect(|iter| assert_same_len(len, iter.len()))
                 .collect(),
             phantom: PhantomData,
         }

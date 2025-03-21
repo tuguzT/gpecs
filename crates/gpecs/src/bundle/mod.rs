@@ -12,7 +12,7 @@ pub unsafe trait Bundle: Soa + 'static {
     type ComponentIds: IntoIterator<Item = ComponentId>;
 
     /// Order of component identifiers should be the same as
-    /// the order of layouts returned by [`Soa::field_layouts()`] method.
+    /// the order of descriptors returned by [`Soa::field_descriptors()`] method.
     fn component_ids(
         context: &Self::Context,
         components: &mut ComponentRegistry,

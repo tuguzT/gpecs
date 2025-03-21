@@ -2,14 +2,16 @@ use alloc::boxed::Box;
 use core::{
     borrow::Borrow,
     fmt::{self, Debug},
-    hash::{self, Hash},
     marker::PhantomData,
     ptr::{self, NonNull},
 };
 
 use crate::traits::Soa;
 
-use super::{assert::validate_layout, field::ErasedFieldNonNullPtr};
+use super::{
+    assert::{assert_layouts, validate_layout},
+    field::ErasedFieldNonNullPtr,
+};
 
 pub struct ErasedSoaNonNullPtrs<Fields> {
     ptrs: Box<[ErasedFieldNonNullPtr]>,
@@ -26,7 +28,7 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
         Self {
             ptrs: ptrs
                 .into_iter()
-                .inspect(|ptr| validate_layout::<Fields>(ptr.layout()))
+                .inspect(|ptr| validate_layout::<Fields>(ptr.descriptor().layout()))
                 .collect(),
             phantom: PhantomData,
         }
@@ -39,18 +41,18 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     {
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
-        let field_layouts = T::field_layouts(context)
+        let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|layout| validate_layout::<T::Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone());
+            .inspect(|desc| validate_layout::<T::Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                let len = field_layout.size();
+            .map(|(desc, ptr)| {
+                let len = desc.layout().size();
                 let ptr = ptr::slice_from_raw_parts_mut(ptr, len);
                 let buffer = unsafe { NonNull::new_unchecked(ptr) };
-                ErasedFieldNonNullPtr::new(field_layout, buffer)
+                ErasedFieldNonNullPtr::new(desc, buffer)
             })
             .collect();
         Self {
@@ -67,17 +69,17 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     {
         let Self { ptrs, .. } = self;
 
-        let field_layouts: Box<[_]> = T::field_layouts(context)
+        let descriptors: Box<[_]> = T::field_descriptors(context)
             .into_iter()
-            .inspect(|layout| validate_layout::<T::Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone())
+            .inspect(|desc| validate_layout::<T::Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone())
             .collect();
-        assert_eq!(field_layouts.len(), ptrs.len());
+        assert_eq!(descriptors.len(), ptrs.len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(ptrs)
-            .inspect(|(&field_layout, ptr)| assert_eq!(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| ptr.as_ptr().as_ptr());
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         unsafe { T::ptrs_to_nonnull(context, ptrs) }
@@ -106,23 +108,6 @@ impl<Fields> Debug for ErasedSoaNonNullPtrs<Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { ptrs, .. } = self;
         f.debug_tuple("ErasedSoaNonNullPtrs").field(ptrs).finish()
-    }
-}
-
-impl<Fields> PartialEq for ErasedSoaNonNullPtrs<Fields> {
-    fn eq(&self, other: &Self) -> bool {
-        let Self { ptrs, phantom } = self;
-        *ptrs == other.ptrs && *phantom == other.phantom
-    }
-}
-
-impl<Fields> Eq for ErasedSoaNonNullPtrs<Fields> {}
-
-impl<Fields> Hash for ErasedSoaNonNullPtrs<Fields> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self { ptrs, phantom } = self;
-        ptrs.hash(state);
-        phantom.hash(state);
     }
 }
 

@@ -1,4 +1,6 @@
-use core::{alloc::Layout, ptr, slice};
+use core::{ptr, slice};
+
+use crate::traits::FieldDescriptor;
 
 use super::{
     super::assert::assert_layouts,
@@ -6,69 +8,70 @@ use super::{
     ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
 };
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct ErasedFieldMutPtr {
-    layout: Layout,
+    desc: FieldDescriptor,
     buffer: *mut [u8],
 }
 
 impl ErasedFieldMutPtr {
     #[inline]
     #[track_caller]
-    pub fn new(layout: Layout, buffer: *mut [u8]) -> Self {
-        assert_value_buffer_len(buffer.len(), layout.size());
-        assert_buffer_align(buffer.cast(), layout.align());
+    pub fn new(desc: FieldDescriptor, buffer: *mut [u8]) -> Self {
+        assert_value_buffer_len(buffer.len(), desc.layout().size());
+        assert_buffer_align(buffer.cast(), desc.layout().align());
 
-        Self { layout, buffer }
+        Self { desc, buffer }
     }
 
     #[inline]
-    pub fn dangling(layout: Layout) -> Self {
-        let data = ptr::without_provenance_mut(layout.align());
-        let buffer = ptr::slice_from_raw_parts_mut(data, layout.size());
-        Self::new(layout, buffer)
+    pub fn dangling(desc: FieldDescriptor) -> Self {
+        let data = ptr::without_provenance_mut(desc.layout().align());
+        let buffer = ptr::slice_from_raw_parts_mut(data, desc.layout().size());
+        Self::new(desc, buffer)
     }
 
     #[inline]
     pub fn from<T>(ptr: *mut T) -> Self {
-        let layout = Layout::new::<T>();
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), layout.size());
-        Self::new(layout, buffer)
+        let desc = FieldDescriptor::of::<T>();
+        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), desc.layout().size());
+        Self::new(desc, buffer)
     }
 
     #[inline]
     #[track_caller]
     pub fn into<T>(self) -> *mut T {
-        let Self { layout, buffer } = self;
-        assert_layout::<T>(&layout);
+        let Self { desc, buffer } = self;
+        assert_layout::<T>(desc.layout());
 
         buffer.cast()
     }
 
     #[inline]
     pub fn cast_const(self) -> ErasedFieldPtr {
-        let Self { layout, buffer } = self;
-        ErasedFieldPtr::new(layout, buffer.cast_const())
+        let Self { desc, buffer } = self;
+        ErasedFieldPtr::new(desc, buffer.cast_const())
     }
 
     #[inline]
     pub unsafe fn add(self, count: usize) -> Self {
-        let Self { layout, buffer } = self;
+        let Self { desc, buffer } = self;
 
-        let data = unsafe { buffer.cast::<u8>().add(count * layout.size()) };
-        let len = layout.size();
+        let data = unsafe { buffer.cast::<u8>().add(count * desc.layout().size()) };
+        let len = desc.layout().size();
         let buffer = ptr::slice_from_raw_parts_mut(data, len);
-        Self::new(layout, buffer)
+        Self::new(desc, buffer)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn offset_from(self, origin: ErasedFieldPtr) -> isize {
-        let Self { layout, .. } = self;
-        assert_layouts(layout, origin.layout());
+        let Self { desc, .. } = self;
+        assert_layouts(desc.layout(), origin.descriptor().layout());
 
         let offset = unsafe { self.as_ptr().offset_from(origin.as_ptr()) };
-        let field_size = layout
+        let field_size = desc
+            .layout()
             .size()
             .try_into()
             .expect("layout size should not exceed `isize::MAX`");
@@ -80,10 +83,10 @@ impl ErasedFieldMutPtr {
     #[inline]
     #[track_caller]
     pub unsafe fn swap(self, with: Self, temp: &mut [u8]) {
-        let Self { layout, .. } = self;
-        assert_layouts(layout, with.layout());
+        let Self { desc, .. } = self;
+        assert_layouts(desc.layout(), with.descriptor().layout());
 
-        let count = layout.size();
+        let count = desc.layout().size();
         assert!(temp.len() >= count);
 
         let a = self.as_ptr();
@@ -98,10 +101,10 @@ impl ErasedFieldMutPtr {
     #[inline]
     #[track_caller]
     pub unsafe fn copy_from(self, from: ErasedFieldPtr, count: usize, temp: &mut [u8]) {
-        let Self { layout, .. } = self;
-        assert_layouts(layout, from.layout());
+        let Self { desc, .. } = self;
+        assert_layouts(desc.layout(), from.descriptor().layout());
 
-        let count = count * layout.size();
+        let count = count * desc.layout().size();
         assert!(temp.len() >= count);
 
         let src = from.as_ptr();
@@ -115,10 +118,10 @@ impl ErasedFieldMutPtr {
     #[inline]
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping(self, from: ErasedFieldPtr, count: usize) {
-        let Self { layout, .. } = self;
-        assert_layouts(layout, from.layout());
+        let Self { desc, .. } = self;
+        assert_layouts(desc.layout(), from.descriptor().layout());
 
-        let count = count * layout.size();
+        let count = count * desc.layout().size();
         let src = from.as_ptr();
         let dst = self.as_ptr();
         unsafe {
@@ -128,22 +131,22 @@ impl ErasedFieldMutPtr {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
-        let Self { layout, buffer } = self;
-        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), layout.size()) };
-        ErasedFieldRef::new(layout, buffer)
+        let Self { desc, buffer } = self;
+        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), desc.layout().size()) };
+        ErasedFieldRef::new(desc, buffer)
     }
 
     #[inline]
     pub unsafe fn deref_mut<'a>(self) -> ErasedFieldRefMut<'a> {
-        let Self { layout, buffer } = self;
-        let buffer = unsafe { slice::from_raw_parts_mut(buffer.cast(), layout.size()) };
-        ErasedFieldRefMut::new(layout, buffer)
+        let Self { desc, buffer } = self;
+        let buffer = unsafe { slice::from_raw_parts_mut(buffer.cast(), desc.layout().size()) };
+        ErasedFieldRefMut::new(desc, buffer)
     }
 
     #[inline]
-    pub fn layout(&self) -> Layout {
-        let Self { layout, .. } = *self;
-        layout
+    pub fn descriptor(&self) -> FieldDescriptor {
+        let Self { desc, .. } = *self;
+        desc
     }
 
     #[inline]
@@ -165,8 +168,8 @@ impl ErasedFieldMutPtr {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (Layout, *mut [u8]) {
-        let Self { layout, buffer } = self;
-        (layout, buffer)
+    pub fn into_parts(self) -> (FieldDescriptor, *mut [u8]) {
+        let Self { desc, buffer } = self;
+        (desc, buffer)
     }
 }

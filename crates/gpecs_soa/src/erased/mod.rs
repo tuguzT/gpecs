@@ -8,7 +8,7 @@ use core::{
     ptr::{self, NonNull},
 };
 
-use crate::traits::{buffer_layout, Soa};
+use crate::traits::{buffer_layout, FieldDescriptor, Soa};
 
 use self::{
     assert::assert_layouts,
@@ -56,10 +56,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
 
     type Fields = Fields;
 
-    type FieldLayouts<'a> = &'a [Layout];
+    type FieldDescriptors<'a> = &'a [FieldDescriptor];
 
-    fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_> {
-        context.field_layouts()
+    fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_> {
+        context.field_descriptors()
     }
 
     type FieldOffsets<'a> = Box<[usize]>;
@@ -68,7 +68,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         capacity: usize,
     ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
-        let field_layouts = context.field_layouts();
+        let field_layouts = context
+            .field_descriptors()
+            .iter()
+            .map(FieldDescriptor::layout);
         buffer_layout(field_layouts, capacity)
     }
 
@@ -80,8 +83,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         iter::Map<vec::IntoIter<ErasedFieldMutPtr>, fn(ErasedFieldMutPtr) -> *mut u8>;
 
     fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
         ptrs.into_fields()
             .into_vec()
@@ -90,8 +93,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn ptrs_erase_mut(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
         ptrs.into_fields()
             .into_vec()
@@ -103,17 +106,17 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs {
-        let field_layouts = context.field_layouts();
+        let descriptors = context.field_descriptors();
 
-        let ptrs: Box<[_]> = field_layouts
+        let ptrs: Box<[_]> = descriptors
             .iter()
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                let buffer = ptr::slice_from_raw_parts(ptr, field_layout.size());
-                ErasedFieldPtr::new(*field_layout, buffer)
+            .map(|(desc, ptr)| {
+                let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
+                ErasedFieldPtr::new(*desc, buffer)
             })
             .collect();
-        assert_eq!(field_layouts.len(), ptrs.len());
+        assert_eq!(descriptors.len(), ptrs.len());
 
         ErasedSoaPtrs::new(ptrs)
     }
@@ -122,24 +125,24 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs {
-        let field_layouts = context.field_layouts();
+        let descriptors = context.field_descriptors();
 
-        let ptrs: Box<[_]> = field_layouts
+        let ptrs: Box<[_]> = descriptors
             .iter()
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                let buffer = ptr::slice_from_raw_parts_mut(ptr, field_layout.size());
-                ErasedFieldMutPtr::new(*field_layout, buffer)
+            .map(|(desc, ptr)| {
+                let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size());
+                ErasedFieldMutPtr::new(*desc, buffer)
             })
             .collect();
-        assert_eq!(field_layouts.len(), ptrs.len());
+        assert_eq!(descriptors.len(), ptrs.len());
 
         ErasedSoaMutPtrs::new(ptrs)
     }
 
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
         let ptrs = context
-            .field_layouts()
+            .field_descriptors()
             .iter()
             .copied()
             .map(ErasedFieldMutPtr::dangling);
@@ -147,37 +150,37 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     fn ptrs_cast_const(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| ptr.cast_const());
         ErasedSoaPtrs::new(ptrs)
     }
 
     fn ptrs_cast_mut(context: &Self::Context, ptrs: Self::Ptrs) -> Self::MutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| ptr.cast_mut());
         ErasedSoaMutPtrs::new(ptrs)
     }
 
     unsafe fn ptrs_add(context: &Self::Context, ptrs: Self::Ptrs, offset: usize) -> Self::Ptrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| unsafe { ptr.add(offset) });
         ErasedSoaPtrs::new(ptrs)
     }
@@ -187,13 +190,13 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::MutPtrs,
         offset: usize,
     ) -> Self::MutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| unsafe { ptr.add(offset) });
         ErasedSoaMutPtrs::new(ptrs)
     }
@@ -203,17 +206,17 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::Ptrs,
         origin: Self::Ptrs,
     ) -> isize {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
         assert_eq!(ptrs.fields().len(), origin.fields().len());
 
-        let mut offsets = field_layouts
+        let mut offsets = descriptors
             .iter()
             .zip(ptrs.into_fields())
             .zip(origin.into_fields())
-            .inspect(|((&field_layout, ptr), origin)| {
-                assert_layouts(field_layout, ptr.layout());
-                assert_layouts(field_layout, origin.layout());
+            .inspect(|((desc, ptr), origin)| {
+                assert_layouts(desc.layout(), ptr.descriptor().layout());
+                assert_layouts(desc.layout(), origin.descriptor().layout());
             })
             .map(|((_, ptr), origin)| unsafe { ptr.offset_from(origin) });
 
@@ -227,17 +230,17 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::MutPtrs,
         origin: Self::Ptrs,
     ) -> isize {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
         assert_eq!(ptrs.fields().len(), origin.fields().len());
 
-        let mut offsets = field_layouts
+        let mut offsets = descriptors
             .iter()
             .zip(ptrs.into_fields())
             .zip(origin.into_fields())
-            .inspect(|((&field_layout, ptr), origin)| {
-                assert_layouts(field_layout, ptr.layout());
-                assert_layouts(field_layout, origin.layout());
+            .inspect(|((desc, ptr), origin)| {
+                assert_layouts(desc.layout(), ptr.descriptor().layout());
+                assert_layouts(desc.layout(), origin.descriptor().layout());
             })
             .map(|((_, ptr), origin)| unsafe { ptr.offset_from(origin) });
 
@@ -247,21 +250,21 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn ptrs_swap(context: &Self::Context, a: Self::MutPtrs, b: Self::MutPtrs) {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), a.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), a.fields().len());
         assert_eq!(a.fields().len(), b.fields().len());
 
         let mut temp = Vec::new();
-        field_layouts
+        descriptors
             .iter()
             .zip(a.into_fields())
             .zip(b.into_fields())
-            .inspect(|((&field_layout, a), b)| {
-                assert_layouts(field_layout, a.layout());
-                assert_layouts(field_layout, b.layout());
+            .inspect(|((desc, a), b)| {
+                assert_layouts(desc.layout(), a.descriptor().layout());
+                assert_layouts(desc.layout(), b.descriptor().layout());
             })
             .for_each(|((_, a), b)| {
-                let count = a.layout().size();
+                let count = a.descriptor().layout().size();
                 temp.reserve(count);
 
                 unsafe {
@@ -273,21 +276,21 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     }
 
     unsafe fn ptrs_copy(context: &Self::Context, src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), src.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), src.fields().len());
         assert_eq!(src.fields().len(), dst.fields().len());
 
         let mut temp = Vec::new();
-        field_layouts
+        descriptors
             .iter()
             .zip(src.into_fields())
             .zip(dst.into_fields())
-            .inspect(|((&field_layout, src), dst)| {
-                assert_layouts(field_layout, src.layout());
-                assert_layouts(field_layout, dst.layout());
+            .inspect(|((desc, src), dst)| {
+                assert_layouts(desc.layout(), src.descriptor().layout());
+                assert_layouts(desc.layout(), dst.descriptor().layout());
             })
             .for_each(|((_, src), dst)| {
-                let count = len * src.layout().size();
+                let count = len * src.descriptor().layout().size();
                 temp.reserve(count);
 
                 unsafe {
@@ -304,22 +307,22 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         dst: Self::MutPtrs,
         len: usize,
     ) {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), src.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), src.fields().len());
         assert_eq!(src.fields().len(), dst.fields().len());
 
         let mut temp = Vec::new();
-        field_layouts
+        descriptors
             .iter()
             .zip(src.into_fields())
             .zip(dst.into_fields())
             .rev()
-            .inspect(|((&field_layout, src), dst)| {
-                assert_layouts(field_layout, src.layout());
-                assert_layouts(field_layout, dst.layout());
+            .inspect(|((desc, src), dst)| {
+                assert_layouts(desc.layout(), src.descriptor().layout());
+                assert_layouts(desc.layout(), dst.descriptor().layout());
             })
             .for_each(|((_, src), dst)| {
-                let count = len * src.layout().size();
+                let count = len * src.descriptor().layout().size();
                 temp.reserve(count);
 
                 unsafe {
@@ -336,43 +339,47 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         dst: Self::MutPtrs,
         len: usize,
     ) {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), src.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), src.fields().len());
         assert_eq!(src.fields().len(), dst.fields().len());
 
-        field_layouts
+        descriptors
             .iter()
             .zip(src.into_fields())
             .zip(dst.into_fields())
-            .inspect(|((&field_layout, src), dst)| {
-                assert_layouts(field_layout, src.layout());
-                assert_layouts(field_layout, dst.layout());
+            .inspect(|((desc, src), dst)| {
+                assert_layouts(desc.layout(), src.descriptor().layout());
+                assert_layouts(desc.layout(), dst.descriptor().layout());
             })
             .for_each(|((_, src), dst)| unsafe { dst.copy_from_nonoverlapping(src, len) })
     }
 
     unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs) -> Self {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), src.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), src.fields().len());
 
-        let fields = field_layouts
+        let fields = descriptors
             .iter()
             .zip(src.into_fields())
-            .inspect(|(&field_layout, src)| assert_layouts(field_layout, src.layout()))
+            .inspect(|(desc, src)| assert_layouts(desc.layout(), src.descriptor().layout()))
             .map(|(&field_layout, src)| (field_layout, unsafe { src.deref().into_buffer() }));
         Self::new(fields)
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), dst.fields().len());
-        assert_eq!(field_layouts, value.field_layouts());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), dst.fields().len());
+        assert!(value
+            .field_descriptors()
+            .iter()
+            .map(FieldDescriptor::layout)
+            .eq(descriptors.iter().map(FieldDescriptor::layout)));
 
-        field_layouts
+        descriptors
             .iter()
             .zip(dst.into_fields())
-            .zip(value.into_fields())
-            .inspect(|((&field_layout, dst), _)| assert_layouts(field_layout, dst.layout()))
+            .zip(value.as_refs().into_fields())
+            .inspect(|((desc, dst), _)| assert_layouts(desc.layout(), dst.descriptor().layout()))
             .for_each(|((_, dst), src)| {
                 let src = src.as_field_ptr();
                 unsafe { dst.copy_from_nonoverlapping(src, 1) }
@@ -387,33 +394,33 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     type NonNullPtrs = ErasedSoaNonNullPtrs<Fields>;
 
     unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| {
-                let layout = ptr.layout();
+                let desc = ptr.descriptor();
                 let buffer = unsafe { NonNull::new_unchecked(ptr.buffer()) };
-                ErasedFieldNonNullPtr::new(layout, buffer)
+                ErasedFieldNonNullPtr::new(desc, buffer)
             });
         ErasedSoaNonNullPtrs::new(ptrs)
     }
 
     fn nonnull_to_ptrs(context: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| {
-                let layout = ptr.layout();
+                let desc = ptr.descriptor();
                 let buffer = ptr.buffer().as_ptr();
-                ErasedFieldMutPtr::new(layout, buffer)
+                ErasedFieldMutPtr::new(desc, buffer)
             });
         ErasedSoaMutPtrs::new(ptrs)
     }
@@ -421,90 +428,83 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
     type Vecs = ErasedSoaVecs<Fields>;
 
     fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
-        let field_layouts = context.field_layouts();
-
-        let vecs = field_layouts
+        let vecs = context
+            .field_descriptors()
             .iter()
-            .map(|field_layout| {
+            .map(|&desc| {
                 let capacity =
-                    (capacity * field_layout.size()).div_ceil(size_of::<ErasedByte<Fields>>());
-                ErasedFieldVec {
-                    buffer: Vec::with_capacity(capacity),
-                    layout: field_layout.clone(),
-                }
+                    (capacity * desc.layout().size()).div_ceil(size_of::<ErasedByte<Fields>>());
+                let buffer = Vec::with_capacity(capacity);
+                ErasedFieldVec { buffer, desc }
             })
             .collect();
         ErasedSoaVecs { len: 0, vecs }
     }
 
     fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
-        let field_layouts = context.field_layouts();
+        let descriptors = context.field_descriptors();
         let ErasedSoaVecs { vecs, .. } = vecs;
+        assert_eq!(descriptors.len(), vecs.len());
 
-        assert_eq!(field_layouts.len(), vecs.len());
-
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(vecs)
-            .inspect(|(&field_layout, vec)| assert_layouts(field_layout, vec.layout))
+            .inspect(|(desc, vec)| assert_layouts(desc.layout(), vec.desc.layout()))
             .map(|(_, vec)| {
-                let ErasedFieldVec { buffer, layout, .. } = vec;
+                let ErasedFieldVec { buffer, desc, .. } = vec;
 
                 let data = buffer.as_ptr().cast();
-                let len = layout.size();
+                let len = desc.layout().size();
                 let buffer = ptr::slice_from_raw_parts(data, len);
-                ErasedFieldPtr::new(layout.clone(), buffer)
+                ErasedFieldPtr::new(*desc, buffer)
             });
         ErasedSoaPtrs::new(ptrs)
     }
 
     fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
-        let field_layouts = context.field_layouts();
+        let descriptors = context.field_descriptors();
         let ErasedSoaVecs { vecs, .. } = vecs;
+        assert_eq!(descriptors.len(), vecs.len());
 
-        assert_eq!(field_layouts.len(), vecs.len());
-
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(vecs)
-            .inspect(|(&field_layout, vec)| assert_layouts(field_layout, vec.layout))
+            .inspect(|(desc, vec)| assert_layouts(desc.layout(), vec.desc.layout()))
             .map(|(_, vec)| {
-                let ErasedFieldVec { buffer, layout, .. } = vec;
+                let ErasedFieldVec { buffer, desc, .. } = vec;
 
                 let data = buffer.as_mut_ptr().cast();
-                let len = layout.size();
+                let len = desc.layout().size();
                 let buffer = ptr::slice_from_raw_parts_mut(data, len);
-                ErasedFieldMutPtr::new(layout.clone(), buffer)
+                ErasedFieldMutPtr::new(*desc, buffer)
             });
         ErasedSoaMutPtrs::new(ptrs)
     }
 
     fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
-        let field_layouts = context.field_layouts();
+        let descriptors = context.field_descriptors();
         let ErasedSoaVecs { ref vecs, len, .. } = *vecs;
-
-        assert_eq!(field_layouts.len(), vecs.len());
+        assert_eq!(descriptors.len(), vecs.len());
 
         len
     }
 
     unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-        let field_layouts = context.field_layouts();
+        let descriptors = context.field_descriptors();
         let ErasedSoaVecs {
             vecs,
             len: vecs_len,
             ..
         } = vecs;
+        assert_eq!(descriptors.len(), vecs.len());
 
-        assert_eq!(field_layouts.len(), vecs.len());
-
-        field_layouts
+        descriptors
             .iter()
             .zip(vecs)
-            .inspect(|(&field_layout, vec)| assert_layouts(field_layout, vec.layout))
+            .inspect(|(desc, vec)| assert_layouts(desc.layout(), vec.desc.layout()))
             .for_each(|(_, vec)| {
-                let ErasedFieldVec { buffer, layout } = vec;
-                let len = (len * layout.size()).div_ceil(size_of::<ErasedByte<Fields>>());
+                let ErasedFieldVec { buffer, desc } = vec;
+                let len = (len * desc.layout().size()).div_ceil(size_of::<ErasedByte<Fields>>());
                 unsafe { buffer.set_len(len) }
             });
         *vecs_len = len;
@@ -521,13 +521,13 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         Self: 'a;
 
     unsafe fn ptrs_to_refs<'a>(context: &Self::Context, ptrs: Self::Ptrs) -> Self::Refs<'a> {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let refs = field_layouts
+        let refs = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| unsafe { ptr.deref() });
         ErasedSoaRefs::new(refs)
     }
@@ -536,49 +536,49 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         ptrs: Self::MutPtrs,
     ) -> Self::RefsMut<'a> {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let refs = field_layouts
+        let refs = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| unsafe { ptr.deref_mut() });
         ErasedSoaRefsMut::new(refs)
     }
 
     fn refs_as_ptrs(context: &Self::Context, refs: Self::Refs<'_>) -> Self::Ptrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), refs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), refs.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(refs.into_fields())
-            .inspect(|(&field_layout, r#ref)| assert_layouts(field_layout, r#ref.layout()))
+            .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
             .map(|(_, r#ref)| r#ref.as_field_ptr());
         ErasedSoaPtrs::new(ptrs)
     }
 
     fn mut_refs_as_ptrs(context: &Self::Context, refs: Self::RefsMut<'_>) -> Self::MutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), refs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), refs.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(refs.into_fields())
-            .inspect(|(&field_layout, r#ref)| assert_layouts(field_layout, r#ref.layout()))
+            .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
             .map(|(_, mut r#ref)| r#ref.as_field_mut_ptr());
         ErasedSoaMutPtrs::new(ptrs)
     }
 
     fn mut_refs_as_refs<'a>(context: &Self::Context, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), refs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), refs.fields().len());
 
-        let refs = field_layouts
+        let refs = descriptors
             .iter()
             .zip(refs.into_fields())
-            .inspect(|(&field_layout, r#ref)| assert_layouts(field_layout, r#ref.layout()))
+            .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
             .map(|(_, r#ref)| From::from(r#ref));
         ErasedSoaRefs::new(refs)
     }
@@ -592,17 +592,18 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::Ptrs,
         len: usize,
     ) -> Self::SlicePtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| {
-                let layout = ptr.layout();
-                let buffer = ptr::slice_from_raw_parts(ptr.as_ptr(), len * layout.size());
-                ErasedFieldSlicePtr::new(layout, buffer)
+                let desc = ptr.descriptor();
+                let len = len * desc.layout().size();
+                let buffer = ptr::slice_from_raw_parts(ptr.as_ptr(), len);
+                ErasedFieldSlicePtr::new(desc, buffer)
             });
         ErasedSoaSlicePtrs::new(len, slices)
     }
@@ -612,17 +613,18 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ptrs: Self::MutPtrs,
         len: usize,
     ) -> Self::SliceMutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), ptrs.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), ptrs.fields().len());
 
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(ptrs.into_fields())
-            .inspect(|(&field_layout, ptr)| assert_layouts(field_layout, ptr.layout()))
+            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| {
-                let layout = ptr.layout();
-                let buffer = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), len * layout.size());
-                ErasedFieldSliceMutPtr::new(layout, buffer)
+                let desc = ptr.descriptor();
+                let len = len * desc.layout().size();
+                let buffer = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), len);
+                ErasedFieldSliceMutPtr::new(desc, buffer)
             });
         ErasedSoaSliceMutPtrs::new(len, slices)
     }
@@ -631,53 +633,53 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicePtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         let len = slices.len();
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.cast_const());
         ErasedSoaSlicePtrs::new(len, slices)
     }
 
     fn slice_ptrs_cast_mut(context: &Self::Context, slices: Self::SlicePtrs) -> Self::SliceMutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         let len = slices.len();
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.cast_mut());
         ErasedSoaSliceMutPtrs::new(len, slices)
     }
 
     fn slice_ptrs_len(context: &Self::Context, slices: Self::SlicePtrs) -> usize {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         slices.len()
     }
 
     fn slice_ptrs_len_mut(context: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         slices.len()
     }
 
     fn slice_ptrs_as_ptrs(context: &Self::Context, slices: Self::SlicePtrs) -> Self::Ptrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.as_field_ptr());
         ErasedSoaPtrs::new(ptrs)
     }
@@ -686,13 +688,13 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::MutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.as_field_ptr());
         ErasedSoaMutPtrs::new(ptrs)
     }
@@ -711,14 +713,14 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicePtrs,
     ) -> Self::Slices<'a> {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         let len = slices.len();
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| unsafe { slice.deref() });
         ErasedSoaSlices::new(len, slices)
     }
@@ -727,28 +729,28 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicesMut<'a> {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         let len = slices.len();
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| unsafe { slice.deref_mut() });
         ErasedSoaSlicesMut::new(len, slices)
     }
 
     fn slices_len(context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         slices.len()
     }
 
     fn slices_len_mut(context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         slices.len()
     }
@@ -757,14 +759,14 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::Slices<'_>,
     ) -> Self::SlicePtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         let len = slices.len();
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.as_field_slice_ptr());
         ErasedSoaSlicePtrs::new(len, slices)
     }
@@ -773,14 +775,14 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'_>,
     ) -> Self::SliceMutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         let len = slices.len();
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, mut slice)| slice.as_field_slice_mut_ptr());
         ErasedSoaSliceMutPtrs::new(len, slices)
     }
@@ -789,26 +791,26 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'a>,
     ) -> Self::Slices<'a> {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
         let len = slices.len();
-        let slices = field_layouts
+        let slices = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| From::from(slice));
         ErasedSoaSlices::new(len, slices)
     }
 
     fn slice_refs_as_ptrs(context: &Self::Context, slices: Self::Slices<'_>) -> Self::Ptrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.as_field_ptr());
         ErasedSoaPtrs::new(ptrs)
     }
@@ -817,13 +819,13 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         context: &Self::Context,
         slices: Self::SlicesMut<'_>,
     ) -> Self::MutPtrs {
-        let field_layouts = context.field_layouts();
-        assert_eq!(field_layouts.len(), slices.fields().len());
+        let descriptors = context.field_descriptors();
+        assert_eq!(descriptors.len(), slices.fields().len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(slices.into_fields())
-            .inspect(|(&field_layout, slice)| assert_layouts(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, mut slice)| slice.as_field_mut_ptr());
         ErasedSoaMutPtrs::new(ptrs)
     }

@@ -5,9 +5,65 @@ use core::{
     borrow::Borrow,
     iter,
     marker::PhantomData,
+    mem,
     ptr::{self, NonNull},
     slice,
 };
+
+pub type DropFn = unsafe fn(*mut u8);
+
+#[derive(Debug, Clone, Copy)]
+pub struct FieldDescriptor {
+    layout: Layout,
+    drop_fn: Option<DropFn>,
+}
+
+impl FieldDescriptor {
+    #[inline]
+    pub fn new<D>(layout: Layout, drop_fn: D) -> Self
+    where
+        D: Into<Option<DropFn>>,
+    {
+        Self {
+            layout,
+            drop_fn: drop_fn.into(),
+        }
+    }
+
+    #[inline]
+    pub const fn of<T>() -> Self {
+        let layout = Layout::new::<T>();
+        let drop_fn = if mem::needs_drop::<T>() {
+            let drop_fn: DropFn = |to_drop| unsafe {
+                let to_drop = to_drop.cast();
+                ptr::drop_in_place::<T>(to_drop);
+            };
+            Some(drop_fn)
+        } else {
+            None
+        };
+
+        Self { layout, drop_fn }
+    }
+
+    #[inline]
+    pub const fn layout(&self) -> Layout {
+        let Self { layout, .. } = *self;
+        layout
+    }
+
+    #[inline]
+    pub const fn drop_fn(&self) -> Option<DropFn> {
+        let Self { drop_fn, .. } = *self;
+        drop_fn
+    }
+
+    #[inline]
+    pub const fn into_inner(self) -> (Layout, Option<DropFn>) {
+        let Self { layout, drop_fn } = self;
+        (layout, drop_fn)
+    }
+}
 
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
@@ -25,15 +81,15 @@ pub unsafe trait Soa: Sized {
     /// This is true for such implementations which store all the fields of self.
     type Fields;
 
-    /// Collection of layouts for each field.
+    /// Collection of [descriptors][`FieldDescriptor`] for each field.
     ///
     /// Safety requirements:
-    /// - order of layouts should resemble their order inside of a buffer in memory
-    /// - sum of layouts' sizes should be less or equal to the size of [`Fields`](`Soa::Fields`)
-    /// - alignment of each layout should be less or equal to the alignment of [`Fields`](`Soa::Fields`)
-    type FieldLayouts<'a>: IntoIterator<Item: Borrow<Layout>>;
+    /// - order of descriptors should resemble their order inside of a buffer in memory
+    /// - sum of layouts' sizes of descriptors should be less or equal to the size of [`Fields`](`Soa::Fields`)
+    /// - alignment of each layout of descriptors should be less or equal to the alignment of [`Fields`](`Soa::Fields`)
+    type FieldDescriptors<'a>: IntoIterator<Item: Borrow<FieldDescriptor>>;
 
-    fn field_layouts(context: &Self::Context) -> Self::FieldLayouts<'_>;
+    fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_>;
 
     type FieldOffsets<'a>: IntoIterator<Item = usize>;
 
@@ -49,12 +105,9 @@ pub unsafe trait Soa: Sized {
 
     /// Retrieves maximum number of fields that can be stored inside of a buffer with given layout.
     fn capacity_from(context: &Self::Context, buffer_layout: Layout) -> usize {
-        let packed_size = Self::field_layouts(context)
+        let packed_size = Self::field_descriptors(context)
             .into_iter()
-            .map(|item| {
-                let layout: &Layout = item.borrow();
-                layout.size()
-            })
+            .map(|descriptor| descriptor.borrow().layout().size())
             .sum();
         let max_capacity = buffer_layout
             .size()
@@ -339,11 +392,11 @@ const fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError>
 unsafe impl Soa for () {
     type Context = Self;
     type Fields = Self;
-    type FieldLayouts<'a> = [Layout; 1];
+    type FieldDescriptors<'a> = [FieldDescriptor; 1];
 
     #[inline(always)]
-    fn field_layouts(_: &Self::Context) -> Self::FieldLayouts<'_> {
-        [Layout::new::<Self>()]
+    fn field_descriptors(_: &Self::Context) -> Self::FieldDescriptors<'_> {
+        [FieldDescriptor::of::<Self>()]
     }
 
     type FieldOffsets<'a> = [usize; 1];
@@ -770,21 +823,21 @@ macro_rules! soa_tuple_impl {
                 let permutation = [$($indices,)*];
                 layout_permutation(layouts, permutation)
             };
-            pub const FIELD_LAYOUTS: [Layout; count_idents!($($types,)*)] = {
-                let layouts = [$(Layout::new::<$types>(),)*];
+            pub const FIELD_DESCRIPTORS: [FieldDescriptor; count_idents!($($types,)*)] = {
+                let descriptors = [$(FieldDescriptor::of::<$types>(),)*];
                 let permutation = Self::PERMUTATION;
-                [$(layouts[permutation[$indices]],)*]
+                [$(descriptors[permutation[$indices]],)*]
             };
         }
 
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
             type Context = ();
             type Fields = Self;
-            type FieldLayouts<'a> = [Layout; count_idents!($($types,)*)];
+            type FieldDescriptors<'a> = [FieldDescriptor; count_idents!($($types,)*)];
 
             #[inline(always)]
-            fn field_layouts(_: &Self::Context) -> Self::FieldLayouts<'_> {
-                SoaTupleImplHelper::<($($types,)*)>::FIELD_LAYOUTS
+            fn field_descriptors(_: &Self::Context) -> Self::FieldDescriptors<'_> {
+                SoaTupleImplHelper::<($($types,)*)>::FIELD_DESCRIPTORS
             }
 
             type FieldOffsets<'a> = [usize; count_idents!($($types,)*)];

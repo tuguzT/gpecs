@@ -9,7 +9,7 @@ use core::{
 use crate::traits::Soa;
 
 use super::{
-    assert::{assert_same_len, validate_layout},
+    assert::{assert_layouts, assert_same_len, validate_layout},
     field::{ErasedFieldSlice, ErasedFieldSliceIter},
     ErasedSoaRefs,
 };
@@ -34,7 +34,7 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
             slices: slices
                 .into_iter()
                 .inspect(|slice| {
-                    validate_layout::<Fields>(slice.layout());
+                    validate_layout::<Fields>(slice.descriptor().layout());
                     assert_same_len(len, slice.len());
                 })
                 .collect(),
@@ -50,17 +50,17 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
         let len = T::slices_len(context, &slices);
         let ptrs = T::slice_refs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase(context, ptrs);
-        let field_layouts = T::field_layouts(context)
+        let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone());
+            .inspect(|desc| validate_layout::<Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone());
 
-        let slices = field_layouts
+        let slices = descriptors
             .zip(ptrs)
-            .map(|(field_layout, ptr)| {
-                let len = field_layout.size() * len;
+            .map(|(desc, ptr)| {
+                let len = desc.layout().size() * len;
                 let slice = unsafe { slice::from_raw_parts(ptr, len) };
-                ErasedFieldSlice::new(field_layout, slice)
+                ErasedFieldSlice::new(desc, slice)
             })
             .collect();
         Self {
@@ -77,17 +77,17 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     {
         let Self { slices, len, .. } = self;
 
-        let field_layouts: Box<[_]> = T::field_layouts(context)
+        let descriptors: Box<[_]> = T::field_descriptors(context)
             .into_iter()
-            .inspect(|layout| validate_layout::<Fields>(layout.borrow()))
-            .map(|layout| layout.borrow().clone())
+            .inspect(|desc| validate_layout::<Fields>(desc.borrow().layout()))
+            .map(|desc| desc.borrow().clone())
             .collect();
-        assert_eq!(slices.len(), field_layouts.len());
+        assert_eq!(slices.len(), descriptors.len());
 
-        let ptrs = field_layouts
+        let ptrs = descriptors
             .iter()
             .zip(slices)
-            .inspect(|(&field_layout, slice)| assert_eq!(field_layout, slice.layout()))
+            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.into_buffer().as_ptr());
         let ptrs = T::ptrs_restore(context, ptrs);
         let slices = T::slices_from_raw_parts(context, ptrs, len);
@@ -203,9 +203,8 @@ impl<'a, Fields> ErasedSoaSlicesIter<'a, Fields> {
             .expect("input slices should contain at least one field");
 
         Self {
-            #[allow(dropping_copy_types)]
             slices: slices
-                .inspect(|iter| drop(assert_same_len(len, iter.len())))
+                .inspect(|iter| assert_same_len(len, iter.len()))
                 .collect(),
             phantom: PhantomData,
         }

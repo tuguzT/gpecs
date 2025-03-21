@@ -161,12 +161,3 @@ impl<Fields> Debug for ErasedField<Fields> {
             .finish()
     }
 }
-
-impl<Fields> PartialEq for ErasedField<Fields> {
-    fn eq(&self, other: &Self) -> bool {
-        let Self { layout, .. } = self;
-        *layout == other.layout() && self.buffer() == other.buffer()
-    }
-}
-
-impl<Fields> Eq for ErasedField<Fields> {}

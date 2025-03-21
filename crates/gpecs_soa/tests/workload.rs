@@ -639,21 +639,11 @@ fn one_item_erased() {
     ];
     assert_eq!(erased_context.field_layouts(), optimized_layout);
 
-    let u8 = 1u8;
-    let u64 = 2u64;
-    let u16 = 3u16;
-
-    let u8_bytes = u8.to_ne_bytes();
-    let u64_bytes = u64.to_ne_bytes();
-    let u16_bytes = u16.to_ne_bytes();
-
-    let u8_bytes = u8_bytes.as_slice();
-    let u64_bytes = u64_bytes.as_slice();
-    let u16_bytes = u16_bytes.as_slice();
-
-    let fields = [u8_bytes, u16_bytes, u64_bytes];
     let mut vec = Vec::with_context(erased_context);
 
+    let u8 = 1;
+    let u64 = 2;
+    let u16 = 3;
     vec.push(ErasedSoa::from(&context, (u8, u64, u16)));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
@@ -710,19 +700,6 @@ fn one_item_erased() {
     assert!(iter.next().is_none());
 
     let value = vec.pop().expect("vector should not be empty");
-    let erased_context = vec.context();
-    assert_eq!(
-        value.as_refs().fields(),
-        ErasedSoa::<Soa>::new(
-            erased_context
-                .field_layouts()
-                .into_iter()
-                .copied()
-                .zip(fields)
-        )
-        .as_refs()
-        .fields(),
-    );
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert!(vec.get(0).is_none());

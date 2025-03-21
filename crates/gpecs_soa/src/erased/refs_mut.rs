@@ -103,20 +103,6 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
     }
 }
 
-impl<'a, Fields> AsRef<[ErasedFieldRefMut<'a>]> for ErasedSoaRefsMut<'a, Fields> {
-    fn as_ref(&self) -> &[ErasedFieldRefMut<'a>] {
-        let Self { refs, .. } = self;
-        refs.as_ref()
-    }
-}
-
-impl<'a, Fields> AsMut<[ErasedFieldRefMut<'a>]> for ErasedSoaRefsMut<'a, Fields> {
-    fn as_mut(&mut self) -> &mut [ErasedFieldRefMut<'a>] {
-        let Self { refs, .. } = self;
-        refs.as_mut()
-    }
-}
-
 impl<'a, Fields> Debug for ErasedSoaRefsMut<'a, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { refs, .. } = self;

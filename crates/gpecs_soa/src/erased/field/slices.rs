@@ -12,7 +12,7 @@ use super::{
     ErasedFieldPtr, ErasedFieldRef, ErasedFieldSlicePtr,
 };
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ErasedFieldSlice<'a> {
     layout: Layout,
     // data is stored inline in a single buffer

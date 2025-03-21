@@ -10,7 +10,6 @@ use super::{
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
 };
 
-#[derive(PartialEq, Eq, Hash)]
 pub struct ErasedFieldRefMut<'a> {
     layout: Layout,
     buffer: &'a mut [u8],

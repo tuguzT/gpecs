@@ -10,7 +10,7 @@ use super::{
     ErasedFieldPtr,
 };
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ErasedFieldRef<'a> {
     layout: Layout,
     buffer: &'a [u8],

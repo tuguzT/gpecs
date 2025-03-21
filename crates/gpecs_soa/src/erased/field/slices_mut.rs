@@ -13,7 +13,6 @@ use super::{
     ErasedFieldSliceIter, ErasedFieldSliceMutPtr, ErasedFieldSlicePtr,
 };
 
-#[derive(PartialEq, Eq, Hash)]
 pub struct ErasedFieldSliceMut<'a> {
     layout: Layout,
     // data is stored inline in a single buffer

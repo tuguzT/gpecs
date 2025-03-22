@@ -1,9 +1,10 @@
 use std::{
-    alloc::Layout,
     any::{type_name, TypeId},
     borrow::Cow,
     collections::HashMap,
 };
+
+use crate::soa::traits::FieldDescriptor;
 
 use super::Component;
 
@@ -30,16 +31,16 @@ impl From<ComponentId> for usize {
 pub struct ComponentDescriptor {
     name: Cow<'static, str>,
     type_id: Option<TypeId>,
-    layout: Layout,
+    desc: FieldDescriptor,
 }
 
 impl ComponentDescriptor {
     #[inline]
-    pub fn new(name: impl Into<Cow<'static, str>>, layout: Layout) -> Self {
+    pub fn new(name: impl Into<Cow<'static, str>>, desc: FieldDescriptor) -> Self {
         Self {
             name: name.into(),
             type_id: None,
-            layout,
+            desc,
         }
     }
 
@@ -51,7 +52,7 @@ impl ComponentDescriptor {
         Self {
             name: type_name::<T>().into(),
             type_id: Some(TypeId::of::<T>()),
-            layout: Layout::new::<T>(),
+            desc: FieldDescriptor::of::<T>(),
         }
     }
 
@@ -68,9 +69,9 @@ impl ComponentDescriptor {
     }
 
     #[inline]
-    pub fn layout(&self) -> Layout {
-        let Self { layout, .. } = self;
-        layout.clone()
+    pub fn descriptor(&self) -> FieldDescriptor {
+        let Self { desc, .. } = *self;
+        desc
     }
 }
 
@@ -100,9 +101,9 @@ impl ComponentInfo {
     }
 
     #[inline]
-    pub fn layout(&self) -> Layout {
+    pub fn descriptor(&self) -> FieldDescriptor {
         let Self { descriptor, .. } = self;
-        descriptor.layout()
+        descriptor.descriptor()
     }
 }
 

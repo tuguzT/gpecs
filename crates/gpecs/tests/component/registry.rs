@@ -3,9 +3,12 @@ use std::{
     any::{type_name, TypeId},
 };
 
-use gpecs::component::{
-    registry::{ComponentDescriptor, ComponentRegistry},
-    Component,
+use gpecs::{
+    component::{
+        registry::{ComponentDescriptor, ComponentRegistry},
+        Component,
+    },
+    soa::traits::FieldDescriptor,
 };
 
 struct Position {
@@ -41,7 +44,7 @@ fn register_type() {
     assert_eq!(info.id(), id);
     assert_eq!(info.type_id(), Some(TypeId::of::<Position>()));
     assert_eq!(info.name(), type_name::<Position>());
-    assert_eq!(info.layout(), Layout::new::<Position>());
+    assert_eq!(info.descriptor().layout(), Layout::new::<Position>());
 }
 
 #[test]
@@ -50,7 +53,7 @@ fn register_with_descriptor() {
     components.register_component::<Position>();
     assert_eq!(components.len(), 1);
 
-    let descriptor = ComponentDescriptor::new("Mass", Layout::new::<f32>());
+    let descriptor = ComponentDescriptor::new("Mass", FieldDescriptor::of::<f32>());
     let id = components.register_component_with_descriptor(descriptor);
     assert_eq!(components.len(), 2);
     assert_eq!(id.index(), 1);
@@ -61,5 +64,5 @@ fn register_with_descriptor() {
     assert_eq!(info.id(), id);
     assert_eq!(info.type_id(), None);
     assert_eq!(info.name(), "Mass");
-    assert_eq!(info.layout(), Layout::new::<f32>());
+    assert_eq!(info.descriptor().layout(), Layout::new::<f32>());
 }

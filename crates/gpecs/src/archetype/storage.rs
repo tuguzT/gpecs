@@ -379,7 +379,7 @@ where
     let info = components
         .get_info(id)
         .unwrap_or_else(|| panic!("info of component {id:?} should be present"));
-    assert_eq!(info.layout(), descriptor.borrow().layout());
+    assert_eq!(info.descriptor().layout(), descriptor.borrow().layout());
 }
 
 #[inline]

@@ -745,7 +745,7 @@ fn one_item_erased() {
 
 #[test]
 fn three_items() {
-    type Vec = SoaVec<(u16, String, u128)>;
+    type Vec = SoaVec<(u8, String, u16)>;
 
     let mut vec = Vec::from_iter(iter::repeat((0, "0".to_owned(), 0)).take(3));
     assert_eq!(vec.len(), 3);
@@ -1393,16 +1393,16 @@ fn three_items_zst() {
 
 #[test]
 fn three_items_erased() {
-    type Soa = (u16, String, u128);
+    type Soa = (u8, String, u16);
     type Vec = SoaVec<ErasedSoa<Soa>>;
 
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(context);
 
     let descriptors = [
+        FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<u16>(),
         FieldDescriptor::of::<String>(),
-        FieldDescriptor::of::<u128>(),
     ];
     assert!(erased_context
         .field_descriptors()

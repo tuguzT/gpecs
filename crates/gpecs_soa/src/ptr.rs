@@ -443,7 +443,8 @@ where
     let ptrs = offsets
         .into_iter()
         .map(|offset| unsafe { ptr.add(offset + offset_from_prefix) });
-    Ok(T::ptrs_restore_mut(context, ptrs))
+    let ptrs = T::ptrs_restore_mut(context, ptrs);
+    Ok(ptrs)
 }
 
 #[cfg(test)]

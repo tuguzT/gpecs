@@ -815,10 +815,20 @@ pub use count_idents;
 #[doc(hidden)]
 pub struct SoaTupleImplHelper<T>(PhantomData<T>);
 
-const fn layout_permutation<const N: usize>(
-    layouts: [Layout; N],
-    mut permutation: [usize; N],
-) -> [usize; N] {
+#[inline]
+const fn permutation<const N: usize>() -> [usize; N] {
+    let mut permutation = [0; N];
+    let mut i = 0;
+    while i < N {
+        permutation[i] = i;
+        i += 1;
+    }
+    permutation
+}
+
+#[inline]
+const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize; N] {
+    let mut permutation = permutation::<N>();
     let mut i = 1;
     while i < N {
         let mut j = i;
@@ -838,12 +848,11 @@ macro_rules! soa_tuple_impl {
         impl<$($types,)*> SoaTupleImplHelper<($($types,)*)> {
             pub const PERMUTATION: [usize; count_idents!($($types,)*)] = {
                 let layouts = [$(Layout::new::<$types>(),)*];
-                let permutation = [$($indices,)*];
-                layout_permutation(layouts, permutation)
+                layout_permutation(layouts)
             };
             pub const FIELD_DESCRIPTORS: [FieldDescriptor; count_idents!($($types,)*)] = {
-                let descriptors = [$(FieldDescriptor::of::<$types>(),)*];
                 let permutation = Self::PERMUTATION;
+                let descriptors = [$(FieldDescriptor::of::<$types>(),)*];
                 [$(descriptors[permutation[$indices]],)*]
             };
         }
@@ -976,7 +985,7 @@ macro_rules! soa_tuple_impl {
             ) {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let closures = ($(|| unsafe { ptr::swap(a.$indices, b.$indices); },)*);
+                let closures = ($(|| unsafe { ptr::swap(a.$indices, b.$indices) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in 0..count_idents!($($types,)*) {
@@ -993,7 +1002,7 @@ macro_rules! soa_tuple_impl {
             ) {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len); },)*);
+                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in 0..count_idents!($($types,)*) {
@@ -1010,7 +1019,7 @@ macro_rules! soa_tuple_impl {
             ) {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len); },)*);
+                let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
 
                 for index in (0..count_idents!($($types,)*)).rev() {

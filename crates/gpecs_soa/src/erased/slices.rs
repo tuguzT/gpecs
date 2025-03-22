@@ -58,9 +58,8 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
         let slices = descriptors
             .zip(ptrs)
             .map(|(desc, ptr)| {
-                let len = desc.layout().size() * len;
-                let slice = unsafe { slice::from_raw_parts(ptr, len) };
-                ErasedFieldSlice::new(desc, slice)
+                let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
+                ErasedFieldSlice::new(desc, buffer, len)
             })
             .collect();
         Self {

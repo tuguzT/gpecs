@@ -58,9 +58,8 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
         let slices = descriptors
             .zip(ptrs)
             .map(|(desc, ptr)| {
-                let len = desc.layout().size() * len;
-                let slice = unsafe { slice::from_raw_parts_mut(ptr, len) };
-                ErasedFieldSliceMut::new(desc, slice)
+                let buffer = unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size() * len) };
+                ErasedFieldSliceMut::new(desc, buffer, len)
             })
             .collect();
         Self {

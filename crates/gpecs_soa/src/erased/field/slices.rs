@@ -18,39 +18,40 @@ pub struct ErasedFieldSlice<'a> {
     desc: FieldDescriptor,
     // data is stored inline in a single buffer
     buffer: &'a [u8],
+    len: usize,
     no_send_sync: PhantomData<*const u8>,
 }
 
 impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &'a [u8]) -> Self {
-        assert_slice_buffer_len(buffer.len(), desc.layout().size());
+    pub fn new(desc: FieldDescriptor, buffer: &'a [u8], len: usize) -> Self {
+        assert_slice_buffer_len(buffer.len(), desc.layout().size(), len);
         assert_buffer_align(buffer.as_ptr(), desc.layout().align());
 
         Self {
             desc,
             buffer,
+            len,
             no_send_sync: PhantomData,
         }
     }
 
     #[inline]
     pub fn from<T>(ptr: &'a [T]) -> Self {
+        let len = ptr.len();
         let desc = FieldDescriptor::of::<T>();
-        let buffer = unsafe {
-            let data = ptr.as_ptr().cast();
-            let len = desc.layout().size() * ptr.len();
-            slice::from_raw_parts(data, len)
-        };
-        Self::new(desc, buffer)
+        let data = ptr.as_ptr().cast();
+        let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size() * len) };
+        Self::new(desc, buffer, len)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a [T] {
-        let len = self.len();
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc, buffer, len, ..
+        } = self;
         assert_layout::<T>(desc.layout());
 
         let data = buffer.as_ptr().cast();
@@ -60,8 +61,9 @@ impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &[T] {
-        let len = self.len();
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc, buffer, len, ..
+        } = *self;
         assert_layout::<T>(desc.layout());
 
         let data = buffer.as_ptr().cast();
@@ -70,8 +72,8 @@ impl<'a> ErasedFieldSlice<'a> {
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { desc, buffer, .. } = self;
-        buffer.len().checked_div(desc.layout().size()).unwrap_or(0)
+        let Self { len, .. } = *self;
+        len
     }
 
     #[inline]
@@ -99,9 +101,11 @@ impl<'a> ErasedFieldSlice<'a> {
 
     #[inline]
     pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr {
-        let Self { desc, buffer, .. } = *self;
+        let Self {
+            desc, buffer, len, ..
+        } = *self;
         let buffer = ptr::from_ref(buffer);
-        ErasedFieldSlicePtr::new(desc, buffer)
+        ErasedFieldSlicePtr::new(desc, buffer, len)
     }
 
     #[inline]
@@ -118,25 +122,32 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a [u8]) {
-        let Self { desc, buffer, .. } = self;
-        (desc, buffer)
+    pub fn into_parts(self) -> (FieldDescriptor, &'a [u8], usize) {
+        let Self {
+            desc, buffer, len, ..
+        } = self;
+        (desc, buffer, len)
     }
 
     #[inline]
     pub fn iter(&self) -> ErasedFieldSliceIter<'_> {
-        let Self { desc, buffer, .. } = self;
-        let slice = ErasedFieldSlice::new(*desc, buffer);
+        let Self {
+            desc, buffer, len, ..
+        } = *self;
+        let slice = ErasedFieldSlice::new(desc, buffer, len);
         ErasedFieldSliceIter::new(slice)
     }
 }
 
 impl Debug for ErasedFieldSlice<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc, buffer, len, ..
+        } = self;
         f.debug_struct("ErasedFieldSlice")
             .field("desc", desc)
             .field("buffer", buffer)
+            .field("len", len)
             .finish()
     }
 }
@@ -170,8 +181,7 @@ pub struct ErasedFieldSliceIter<'a> {
 impl<'a> ErasedFieldSliceIter<'a> {
     #[inline]
     pub(super) fn new(slice: ErasedFieldSlice<'a>) -> Self {
-        let end = slice.len();
-        let (desc, buffer) = slice.into_parts();
+        let (desc, buffer, end) = slice.into_parts();
         let buffer = NonNull::new(buffer.as_ptr().cast_mut()).expect("slice ptr should be nonnull");
 
         Self {
@@ -195,9 +205,10 @@ impl<'a> ErasedFieldSliceIter<'a> {
 
     #[inline]
     pub fn as_slice(&self) -> ErasedFieldSlice<'_> {
-        let len = self.len() * self.desc.layout().size();
-        let buffer = unsafe { slice::from_raw_parts(self.buffer.as_ptr(), len) };
-        ErasedFieldSlice::new(self.desc, buffer)
+        let Self { desc, buffer, .. } = *self;
+        let len = self.len();
+        let buffer = unsafe { slice::from_raw_parts(buffer.as_ptr(), len * desc.layout().size()) };
+        ErasedFieldSlice::new(desc, buffer, len)
     }
 
     #[inline]
@@ -221,10 +232,11 @@ impl<'a> ErasedFieldSliceIter<'a> {
 
 impl Debug for ErasedFieldSliceIter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (desc, buffer) = self.as_slice().into_parts();
+        let (desc, buffer, len) = self.as_slice().into_parts();
         f.debug_struct("ErasedFieldSliceIter")
             .field("desc", &desc)
             .field("buffer", &buffer)
+            .field("len", &len)
             .finish()
     }
 }

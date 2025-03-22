@@ -19,17 +19,20 @@ pub fn assert_value_buffer_len(buffer_len: usize, layout_size: usize) {
 #[cold]
 #[track_caller]
 #[inline(never)]
-fn assert_slice_buffer_len_failed(buffer_len: usize, layout_size: usize) -> ! {
-    panic!("buffer len {buffer_len} should be dividable by layout size {layout_size}")
+fn assert_slice_buffer_len_failed(buffer_len: usize, layout_size: usize, len: usize) -> ! {
+    panic!("buffer len {buffer_len} divided by layout size {layout_size} should be equal to {len}")
 }
 
 #[inline]
 #[track_caller]
-pub fn assert_slice_buffer_len(buffer_len: usize, layout_size: usize) {
-    if buffer_len.checked_rem(layout_size).unwrap_or(0) == 0 {
+pub fn assert_slice_buffer_len(buffer_len: usize, layout_size: usize, len: usize) {
+    if layout_size == 0 && buffer_len == 0 {
         return;
     }
-    assert_slice_buffer_len_failed(buffer_len, layout_size)
+    if buffer_len.div_ceil(layout_size) == len {
+        return;
+    }
+    assert_slice_buffer_len_failed(buffer_len, layout_size, len)
 }
 
 #[cold]

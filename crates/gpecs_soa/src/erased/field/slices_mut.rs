@@ -18,39 +18,40 @@ pub struct ErasedFieldSliceMut<'a> {
     desc: FieldDescriptor,
     // data is stored inline in a single buffer
     buffer: &'a mut [u8],
+    len: usize,
     no_send_sync: PhantomData<*const u8>,
 }
 
 impl<'a> ErasedFieldSliceMut<'a> {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &'a mut [u8]) -> Self {
-        assert_slice_buffer_len(buffer.len(), desc.layout().size());
+    pub fn new(desc: FieldDescriptor, buffer: &'a mut [u8], len: usize) -> Self {
+        assert_slice_buffer_len(buffer.len(), desc.layout().size(), len);
         assert_buffer_align(buffer.as_ptr(), desc.layout().align());
 
         Self {
             desc,
             buffer,
+            len,
             no_send_sync: PhantomData,
         }
     }
 
     #[inline]
     pub fn from<T>(ptr: &'a mut [T]) -> Self {
+        let len = ptr.len();
         let desc = FieldDescriptor::of::<T>();
-        let buffer = unsafe {
-            let data = ptr.as_mut_ptr().cast();
-            let len = desc.layout().size() * ptr.len();
-            slice::from_raw_parts_mut(data, len)
-        };
-        Self::new(desc, buffer)
+        let data = ptr.as_mut_ptr().cast();
+        let buffer = unsafe { slice::from_raw_parts_mut(data, desc.layout().size() * ptr.len()) };
+        Self::new(desc, buffer, len)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a mut [T] {
-        let len = self.len();
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc, buffer, len, ..
+        } = self;
         assert_layout::<T>(desc.layout());
 
         let data = buffer.as_mut_ptr().cast();
@@ -60,8 +61,12 @@ impl<'a> ErasedFieldSliceMut<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &[T] {
-        let len = self.len();
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc,
+            ref buffer,
+            len,
+            ..
+        } = *self;
         assert_layout::<T>(desc.layout());
 
         let data = buffer.as_ptr().cast();
@@ -71,8 +76,12 @@ impl<'a> ErasedFieldSliceMut<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn cast_mut<T>(&mut self) -> &mut [T] {
-        let len = self.len();
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc,
+            ref mut buffer,
+            len,
+            ..
+        } = *self;
         assert_layout::<T>(desc.layout());
 
         let data = buffer.as_mut_ptr().cast();
@@ -81,8 +90,8 @@ impl<'a> ErasedFieldSliceMut<'a> {
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { desc, buffer, .. } = self;
-        buffer.len().checked_div(desc.layout().size()).unwrap_or(0)
+        let Self { len, .. } = *self;
+        len
     }
 
     #[inline]
@@ -110,9 +119,14 @@ impl<'a> ErasedFieldSliceMut<'a> {
 
     #[inline]
     pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr {
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc,
+            ref buffer,
+            len,
+            ..
+        } = *self;
         let buffer = ptr::from_ref(*buffer);
-        ErasedFieldSlicePtr::new(*desc, buffer)
+        ErasedFieldSlicePtr::new(desc, buffer, len)
     }
 
     #[inline]
@@ -136,9 +150,14 @@ impl<'a> ErasedFieldSliceMut<'a> {
 
     #[inline]
     pub fn as_field_slice_mut_ptr(&mut self) -> ErasedFieldSliceMutPtr {
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc,
+            ref mut buffer,
+            len,
+            ..
+        } = *self;
         let buffer = ptr::from_mut(*buffer);
-        ErasedFieldSliceMutPtr::new(*desc, buffer)
+        ErasedFieldSliceMutPtr::new(desc, buffer, len)
     }
 
     #[inline]
@@ -155,40 +174,57 @@ impl<'a> ErasedFieldSliceMut<'a> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a mut [u8]) {
-        let Self { desc, buffer, .. } = self;
-        (desc, buffer)
+    pub fn into_parts(self) -> (FieldDescriptor, &'a mut [u8], usize) {
+        let Self {
+            desc, buffer, len, ..
+        } = self;
+        (desc, buffer, len)
     }
 
     #[inline]
     pub fn iter(&self) -> ErasedFieldSliceIter<'_> {
-        let Self { desc, buffer, .. } = self;
-        let slice = ErasedFieldSlice::new(*desc, buffer);
+        let Self {
+            desc,
+            ref buffer,
+            len,
+            ..
+        } = *self;
+        let slice = ErasedFieldSlice::new(desc, buffer, len);
         ErasedFieldSliceIter::new(slice)
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> ErasedFieldSliceIterMut<'_> {
-        let Self { desc, buffer, .. } = self;
-        let slice = ErasedFieldSliceMut::new(*desc, buffer);
+        let Self {
+            desc,
+            ref mut buffer,
+            len,
+            ..
+        } = *self;
+        let slice = ErasedFieldSliceMut::new(desc, buffer, len);
         ErasedFieldSliceIterMut::new(slice)
     }
 }
 
 impl Debug for ErasedFieldSliceMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { desc, buffer, .. } = self;
+        let Self {
+            desc, buffer, len, ..
+        } = self;
         f.debug_struct("ErasedFieldSliceMut")
             .field("desc", desc)
             .field("buffer", buffer)
+            .field("len", len)
             .finish()
     }
 }
 
 impl<'a> From<ErasedFieldSliceMut<'a>> for ErasedFieldSlice<'a> {
     fn from(value: ErasedFieldSliceMut<'a>) -> Self {
-        let ErasedFieldSliceMut { desc, buffer, .. } = value;
-        ErasedFieldSlice::new(desc, buffer)
+        let ErasedFieldSliceMut {
+            desc, buffer, len, ..
+        } = value;
+        ErasedFieldSlice::new(desc, buffer, len)
     }
 }
 
@@ -230,8 +266,7 @@ pub struct ErasedFieldSliceIterMut<'a> {
 impl<'a> ErasedFieldSliceIterMut<'a> {
     #[inline]
     pub(super) fn new(slice: ErasedFieldSliceMut<'a>) -> Self {
-        let end = slice.len();
-        let (desc, buffer) = slice.into_parts();
+        let (desc, buffer, end) = slice.into_parts();
         let buffer = NonNull::new(buffer.as_mut_ptr()).expect("slice ptr should be nonnull");
 
         Self {
@@ -255,16 +290,20 @@ impl<'a> ErasedFieldSliceIterMut<'a> {
 
     #[inline]
     pub fn as_slice(&self) -> ErasedFieldSlice<'_> {
-        let len = self.len() * self.desc.layout().size();
-        let buffer = unsafe { slice::from_raw_parts(self.buffer.as_ptr(), len) };
-        ErasedFieldSlice::new(self.desc, buffer)
+        let Self { desc, buffer, .. } = *self;
+        let len = self.len();
+        let data = buffer.as_ptr();
+        let buffer = unsafe { slice::from_raw_parts(data, len * desc.layout().size()) };
+        ErasedFieldSlice::new(desc, buffer, len)
     }
 
     #[inline]
     pub fn into_slice(self) -> ErasedFieldSliceMut<'a> {
-        let len = self.len() * self.desc.layout().size();
-        let buffer = unsafe { slice::from_raw_parts_mut(self.buffer.as_ptr(), len) };
-        ErasedFieldSliceMut::new(self.desc, buffer)
+        let Self { desc, buffer, .. } = self;
+        let len = self.len();
+        let data = buffer.as_ptr();
+        let buffer = unsafe { slice::from_raw_parts_mut(data, len * desc.layout().size()) };
+        ErasedFieldSliceMut::new(desc, buffer, len)
     }
 
     #[inline]
@@ -288,10 +327,11 @@ impl<'a> ErasedFieldSliceIterMut<'a> {
 
 impl Debug for ErasedFieldSliceIterMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (desc, buffer) = self.as_slice().into_parts();
+        let (desc, buffer, len) = self.as_slice().into_parts();
         f.debug_struct("ErasedFieldSliceIterMut")
             .field("desc", &desc)
             .field("buffer", &buffer)
+            .field("len", &len)
             .finish()
     }
 }

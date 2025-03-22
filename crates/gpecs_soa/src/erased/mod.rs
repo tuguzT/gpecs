@@ -603,9 +603,9 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| {
                 let desc = ptr.descriptor();
-                let len = len * desc.layout().size();
-                let buffer = ptr::slice_from_raw_parts(ptr.as_ptr(), len);
-                ErasedFieldSlicePtr::new(desc, buffer)
+                let data = ptr.as_ptr();
+                let buffer = ptr::slice_from_raw_parts(data, len * desc.layout().size());
+                ErasedFieldSlicePtr::new(desc, buffer, len)
             });
         ErasedSoaSlicePtrs::new(len, slices)
     }
@@ -624,9 +624,9 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| {
                 let desc = ptr.descriptor();
-                let len = len * desc.layout().size();
-                let buffer = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), len);
-                ErasedFieldSliceMutPtr::new(desc, buffer)
+                let data = ptr.as_ptr();
+                let buffer = ptr::slice_from_raw_parts_mut(data, len * desc.layout().size());
+                ErasedFieldSliceMutPtr::new(desc, buffer, len)
             });
         ErasedSoaSliceMutPtrs::new(len, slices)
     }

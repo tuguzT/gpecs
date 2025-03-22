@@ -12,7 +12,12 @@ use crate::{
     entity::Entity,
     soa::{
         erased::{
-            self, ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut,
+            field::{
+                ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
+                ErasedFieldSliceMut,
+            },
+            ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut,
+            Unaligned,
         },
         traits::FieldDescriptor,
     },
@@ -250,13 +255,7 @@ impl Debug for ArchetypeStorage {
     }
 }
 
-type ErasedComponents<T> = BTreeMap<ComponentId, (FieldDescriptor, T)>;
-
-type ErasedField = Box<[u8]>;
-type ErasedFieldRef<'a> = &'a [u8];
-type ErasedFieldRefMut<'a> = &'a mut [u8];
-type ErasedFieldSlice<'a> = &'a [u8];
-type ErasedFieldSliceMut<'a> = &'a mut [u8];
+type ErasedComponents<T> = BTreeMap<ComponentId, T>;
 
 trait ErasedStorage {
     fn entities(&self) -> &[Entity];
@@ -275,14 +274,14 @@ trait ErasedStorage {
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-        fields: ErasedComponents<ErasedField>,
-    ) -> Option<ErasedComponents<ErasedField>>;
+        fields: ErasedComponents<ErasedField<Unaligned>>,
+    ) -> Option<ErasedComponents<ErasedField<Unaligned>>>;
 
     fn remove(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedField>>;
+    ) -> Option<ErasedComponents<ErasedField<Unaligned>>>;
 
     fn get(
         &self,
@@ -329,8 +328,8 @@ where
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-        fields: ErasedComponents<ErasedField>,
-    ) -> Option<ErasedComponents<ErasedField>> {
+        fields: ErasedComponents<ErasedField<Unaligned>>,
+    ) -> Option<ErasedComponents<ErasedField<Unaligned>>> {
         let value = from_erased_fields::<B>(components, self.context(), fields);
         let value = SparseSet::insert(self, entity, value).unwrap()?;
         let fields = into_erased_fields::<B>(components, self.context(), value);
@@ -342,7 +341,7 @@ where
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedField>> {
+    ) -> Option<ErasedComponents<ErasedField<Unaligned>>> {
         let value = SparseSet::remove(self, entity)?;
         let fields = into_erased_fields::<B>(components, self.context(), value);
         Some(fields)
@@ -406,7 +405,7 @@ fn reorder_fields<'components, 'context, B, F>(
     components: &'components mut ComponentRegistry,
     context: &'context B::Context,
     mut fields: ErasedComponents<F>,
-) -> impl Iterator<Item = (FieldDescriptor, F)> + use<'components, 'context, B, F>
+) -> impl Iterator<Item = F> + use<'components, 'context, B, F>
 where
     B: Bundle,
 {
@@ -427,12 +426,12 @@ where
 fn from_erased_fields<B>(
     components: &mut ComponentRegistry,
     context: &B::Context,
-    fields: ErasedComponents<ErasedField>,
+    fields: ErasedComponents<ErasedField<Unaligned>>,
 ) -> B
 where
     B: Bundle,
 {
-    let fields = reorder_fields::<B, _>(components, context, fields);
+    let fields = reorder_fields::<B, _>(components, context, fields).map(ErasedField::into_parts);
     let erased_value = ErasedSoa::<B::Fields>::new(fields);
     unsafe { erased_value.into::<B>(context) }
 }
@@ -442,17 +441,14 @@ fn into_erased_fields<B>(
     components: &mut ComponentRegistry,
     context: &B::Context,
     value: B,
-) -> ErasedComponents<ErasedField>
+) -> ErasedComponents<ErasedField<Unaligned>>
 where
     B: Bundle,
 {
-    let erased_value = ErasedSoa::from(context, value)
-        .into_fields()
-        .into_vec()
-        .into_iter()
-        .map(erased::field::ErasedField::into_parts);
+    let erased_value = ErasedSoa::from(context, value).into_fields();
     validate_components::<B>(components, context)
         .zip(erased_value)
+        .map(|(component_id, field)| (component_id, field.unaligned()))
         .collect()
 }
 
@@ -466,8 +462,7 @@ fn from_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let refs = reorder_fields::<B, _>(components, context, fields)
-        .map(|(desc, buffer)| erased::field::ErasedFieldRef::new(desc, buffer));
+    let refs = reorder_fields::<B, _>(components, context, fields);
     let erased_refs = ErasedSoaRefs::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -481,11 +476,7 @@ fn into_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let erased_refs = ErasedSoaRefs::from::<B>(context, refs)
-        .into_fields()
-        .into_vec()
-        .into_iter()
-        .map(erased::field::ErasedFieldRef::into_parts);
+    let erased_refs = ErasedSoaRefs::from::<B>(context, refs).into_fields();
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -501,8 +492,7 @@ fn from_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let refs = reorder_fields::<B, _>(components, context, fields)
-        .map(|(desc, buffer)| erased::field::ErasedFieldRefMut::new(desc, buffer));
+    let refs = reorder_fields::<B, _>(components, context, fields);
     let erased_refs = ErasedSoaRefsMut::<B::Fields>::new(refs);
     unsafe { erased_refs.into::<B>(context) }
 }
@@ -516,11 +506,7 @@ fn into_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs)
-        .into_fields()
-        .into_vec()
-        .into_iter()
-        .map(erased::field::ErasedFieldRefMut::into_parts);
+    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs).into_fields();
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -537,8 +523,7 @@ fn from_erased_field_slices<'a, B>(
 where
     B: Bundle,
 {
-    let slices = reorder_fields::<B, _>(components, context, fields)
-        .map(|(desc, buffer)| erased::field::ErasedFieldSlice::new(desc, buffer));
+    let slices = reorder_fields::<B, _>(components, context, fields);
     let erased_slices = ErasedSoaSlices::<B::Fields>::new(len, slices);
     unsafe { erased_slices.into::<B>(context) }
 }
@@ -554,14 +539,8 @@ where
 {
     let erased_slices = ErasedSoaSlices::from::<B>(context, slices);
     let len = erased_slices.len();
-    let erased_slices = erased_slices
-        .into_fields()
-        .into_vec()
-        .into_iter()
-        .map(erased::field::ErasedFieldSlice::into_parts);
-
     let fields = validate_components::<B>(components, context)
-        .zip(erased_slices)
+        .zip(erased_slices.into_fields())
         .collect();
     (len, fields)
 }
@@ -577,8 +556,7 @@ fn from_erased_field_slices_mut<'a, B>(
 where
     B: Bundle,
 {
-    let slices = reorder_fields::<B, _>(components, context, fields)
-        .map(|(desc, buffer)| erased::field::ErasedFieldSliceMut::new(desc, buffer));
+    let slices = reorder_fields::<B, _>(components, context, fields);
     let erased_slices = ErasedSoaSlicesMut::<B::Fields>::new(len, slices);
     unsafe { erased_slices.into::<B>(context) }
 }
@@ -594,14 +572,8 @@ where
 {
     let erased_slices = ErasedSoaSlicesMut::from::<B>(context, slices);
     let len = erased_slices.len();
-    let erased_slices = erased_slices
-        .into_fields()
-        .into_vec()
-        .into_iter()
-        .map(erased::field::ErasedFieldSliceMut::into_parts);
-
     let fields = validate_components::<B>(components, context)
-        .zip(erased_slices)
+        .zip(erased_slices.into_fields())
         .collect();
     (len, fields)
 }

@@ -2,13 +2,13 @@ use alloc::{boxed::Box, vec::Vec};
 
 use crate::traits::FieldDescriptor;
 
-use super::byte::ErasedByte;
+use super::byte::{Aligned, ErasedByte};
 
-// TODO: add API (and decide what to do with drops for fields)
-// data is stored inline in a single buffer
+// TODO: implement some API (in the future)
 pub struct ErasedFieldVec<Fields> {
-    pub(super) buffer: Vec<ErasedByte<Fields>>,
     pub(super) desc: FieldDescriptor,
+    // data is stored inline in a single buffer
+    pub(super) buffer: Vec<ErasedByte<Aligned<Fields>>>,
 }
 
 pub struct ErasedSoaVecs<Fields> {

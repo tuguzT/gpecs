@@ -5,16 +5,13 @@ use crate::traits::{buffer_layout, FieldDescriptor, Soa};
 
 use super::{
     assert::{assert_same_len, validate_layout},
-    byte::ErasedByte,
+    byte::{Aligned, ErasedByte},
     field::{ErasedField, ErasedFieldRef, ErasedFieldRefMut},
     ErasedSoaRefs, ErasedSoaRefsMut,
 };
 
-// data is stored inline in a single buffer
-type ErasedFields<Fields> = Box<[ErasedByte<Fields>]>;
-
 pub struct ErasedSoa<Fields> {
-    buffer: ErasedFields<Fields>,
+    buffer: Box<[ErasedByte<Aligned<Fields>>]>,
     descriptors: Box<[FieldDescriptor]>,
 }
 
@@ -39,7 +36,7 @@ impl<Fields> ErasedSoa<Fields> {
                 .expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout
             .size()
-            .div_ceil(size_of::<ErasedByte<Fields>>());
+            .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
         for ((desc, src), offset) in descriptors.iter().zip(fields).zip(offsets) {
@@ -72,7 +69,7 @@ impl<Fields> ErasedSoa<Fields> {
             T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout
             .size()
-            .div_ceil(size_of::<ErasedByte<Fields>>());
+            .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
         unsafe {
@@ -111,7 +108,7 @@ impl<Fields> ErasedSoa<Fields> {
             T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout
             .size()
-            .div_ceil(size_of::<ErasedByte<Fields>>());
+            .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
         assert_eq!(buffer_len, buffer.len());
 
         unsafe {
@@ -125,7 +122,7 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
-    pub fn into_fields(self) -> Box<[ErasedField<Fields>]> {
+    pub fn into_fields(self) -> Box<[ErasedField<Aligned<Fields>>]> {
         let Self {
             buffer,
             descriptors,
@@ -136,7 +133,7 @@ impl<Fields> ErasedSoa<Fields> {
             buffer_layout(field_layouts, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout
             .size()
-            .div_ceil(size_of::<ErasedByte<Fields>>());
+            .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
         assert_eq!(buffer_len, buffer.len());
 
         iter::zip(descriptors, offsets)
@@ -166,7 +163,7 @@ impl<Fields> ErasedSoa<Fields> {
             buffer_layout(field_layouts, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout
             .size()
-            .div_ceil(size_of::<ErasedByte<Fields>>());
+            .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
         assert_eq!(buffer_len, buffer.len());
 
         let refs = descriptors.iter().zip(offsets).map(|(desc, offset)| {
@@ -190,7 +187,7 @@ impl<Fields> ErasedSoa<Fields> {
             buffer_layout(field_layouts, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout
             .size()
-            .div_ceil(size_of::<ErasedByte<Fields>>());
+            .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
         assert_eq!(buffer_len, buffer.len());
 
         let refs = descriptors.iter().zip(offsets).map(|(desc, offset)| {

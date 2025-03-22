@@ -5,27 +5,38 @@ use core::{
     ptr, slice,
 };
 
-use crate::traits::FieldDescriptor;
+use crate::traits::{drop_unaligned, FieldDescriptor};
 
 use super::{
-    super::{assert::validate_layout, byte::ErasedByte},
+    super::{
+        assert::validate_layout,
+        byte::{Aligned, ErasedByte, Fields, Unaligned},
+    },
     assert::{assert_layout, assert_value_buffer_len},
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
 };
 
-pub struct ErasedField<Fields> {
+pub struct ErasedField<F>
+where
+    F: Fields,
+{
     desc: FieldDescriptor,
-    buffer: Box<[ErasedByte<Fields>]>,
+    buffer: Box<[ErasedByte<F>]>,
 }
 
-impl<Fields> ErasedField<Fields> {
+impl<F> ErasedField<F>
+where
+    F: Fields,
+{
     #[inline]
     #[track_caller]
     pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Self {
-        validate_layout::<Fields>(desc.layout());
+        if F::ALIGNED {
+            validate_layout::<F>(desc.layout());
+        }
         assert_value_buffer_len(buffer.len(), desc.layout().size());
 
-        let buffer_len = buffer.len().div_ceil(size_of::<ErasedByte<Fields>>());
+        let buffer_len = buffer.len().div_ceil(size_of::<ErasedByte<F>>());
         let mut r#box = Box::new_uninit_slice(buffer_len);
         unsafe {
             ptr::copy_nonoverlapping(
@@ -54,31 +65,16 @@ impl<Fields> ErasedField<Fields> {
     #[track_caller]
     pub unsafe fn into<T>(self) -> T {
         let me = ManuallyDrop::new(self);
-        let buffer = unsafe { ptr::read(&me.buffer) };
         let desc = unsafe { ptr::read(&me.desc) };
+        let buffer = unsafe { ptr::read(&me.buffer) };
         assert_layout::<T>(desc.layout());
 
-        unsafe { ptr::read(buffer.as_ptr().cast()) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn cast<T>(&self) -> &T {
-        let Self { desc, buffer } = self;
-        assert_layout::<T>(desc.layout());
-
-        let ptr = buffer.as_ptr().cast();
-        unsafe { &*ptr }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
-        let Self { desc, buffer } = self;
-        assert_layout::<T>(desc.layout());
-
-        let ptr = buffer.as_mut_ptr().cast();
-        unsafe { &mut *ptr }
+        let src = buffer.as_ptr().cast();
+        if F::ALIGNED {
+            unsafe { ptr::read(src) }
+        } else {
+            unsafe { ptr::read_unaligned(src) }
+        }
     }
 
     #[inline]
@@ -89,17 +85,10 @@ impl<Fields> ErasedField<Fields> {
 
     #[inline]
     pub fn buffer(&self) -> &[u8] {
-        let Self { desc, buffer } = self;
+        let Self { ref desc, buffer } = self;
 
         let data = buffer.as_ptr().cast();
         unsafe { slice::from_raw_parts(data, desc.layout().size()) }
-    }
-
-    #[inline]
-    pub fn as_field_ref(&self) -> ErasedFieldRef<'_> {
-        let Self { desc, .. } = *self;
-        let buffer = self.buffer();
-        ErasedFieldRef::new(desc, buffer)
     }
 
     #[inline]
@@ -109,38 +98,17 @@ impl<Fields> ErasedField<Fields> {
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
-        let Self { desc, .. } = *self;
-        let buffer = ptr::from_ref(self.buffer());
-        ErasedFieldPtr::new(desc, buffer)
-    }
-
-    #[inline]
     pub fn buffer_mut(&mut self) -> &mut [u8] {
-        let Self { desc, buffer } = self;
+        let Self { ref desc, buffer } = self;
 
         let data = buffer.as_mut_ptr().cast();
         unsafe { slice::from_raw_parts_mut(data, desc.layout().size()) }
     }
 
     #[inline]
-    pub fn as_field_ref_mut(&mut self) -> ErasedFieldRefMut<'_> {
-        let Self { desc, .. } = *self;
-        let buffer = self.buffer_mut();
-        ErasedFieldRefMut::new(desc, buffer)
-    }
-
-    #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { buffer, .. } = self;
         buffer.as_mut_ptr().cast()
-    }
-
-    #[inline]
-    pub fn as_field_ptr_mut(&mut self) -> ErasedFieldMutPtr {
-        let Self { desc, .. } = *self;
-        let buffer = ptr::from_mut(self.buffer_mut());
-        ErasedFieldMutPtr::new(desc, buffer)
     }
 
     #[inline]
@@ -161,26 +129,104 @@ impl<Fields> ErasedField<Fields> {
     }
 }
 
-impl<Fields> Debug for ErasedField<Fields> {
+impl<F> ErasedField<Aligned<F>> {
+    #[inline]
+    #[track_caller]
+    pub unsafe fn cast<T>(&self) -> &T {
+        let Self { ref desc, buffer } = self;
+        assert_layout::<T>(desc.layout());
+
+        let ptr = buffer.as_ptr().cast();
+        unsafe { &*ptr }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
+        let Self { ref desc, buffer } = self;
+        assert_layout::<T>(desc.layout());
+
+        let ptr = buffer.as_mut_ptr().cast();
+        unsafe { &mut *ptr }
+    }
+
+    #[inline]
+    pub fn as_field_ref(&self) -> ErasedFieldRef<'_> {
+        let Self { desc, .. } = *self;
+        let buffer = self.buffer();
+        ErasedFieldRef::new(desc, buffer)
+    }
+
+    #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+        let Self { desc, .. } = *self;
+        let buffer = ptr::from_ref(self.buffer());
+        ErasedFieldPtr::new(desc, buffer)
+    }
+
+    #[inline]
+    pub fn as_field_ref_mut(&mut self) -> ErasedFieldRefMut<'_> {
+        let Self { desc, .. } = *self;
+        let buffer = self.buffer_mut();
+        ErasedFieldRefMut::new(desc, buffer)
+    }
+
+    #[inline]
+    pub fn as_field_ptr_mut(&mut self) -> ErasedFieldMutPtr {
+        let Self { desc, .. } = *self;
+        let buffer = ptr::from_mut(self.buffer_mut());
+        ErasedFieldMutPtr::new(desc, buffer)
+    }
+
+    #[inline]
+    pub fn unaligned(self) -> ErasedField<Unaligned> {
+        let (desc, buffer) = self.into_parts();
+        ErasedField::new(desc, &buffer)
+    }
+}
+
+impl ErasedField<Unaligned> {
+    #[inline]
+    pub fn aligned<F>(self) -> ErasedField<Aligned<F>> {
+        let (desc, buffer) = self.into_parts();
+        ErasedField::new(desc, &buffer)
+    }
+}
+
+impl<F> Debug for ErasedField<F>
+where
+    F: Fields,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { desc, .. } = self;
-        let buffer = self.buffer();
+        let buffer = &self.buffer();
+        let aligned = &F::ALIGNED;
         f.debug_struct("ErasedField")
             .field("desc", desc)
-            .field("buffer", &buffer)
+            .field("buffer", buffer)
+            .field("aligned", aligned)
             .finish()
     }
 }
 
-impl<Fields> Drop for ErasedField<Fields> {
+impl<F> Drop for ErasedField<F>
+where
+    F: Fields,
+{
     fn drop(&mut self) {
-        // TODO: return drop when the source of double free is found
-        let Self { desc, buffer } = self;
+        let Self { ref desc, buffer } = self;
         let Some(drop_fn) = desc.drop_fn() else {
             return;
         };
 
-        let data = buffer.as_mut_ptr().cast();
-        unsafe { drop_fn(data) }
+        let to_drop = buffer.as_mut_ptr().cast::<u8>();
+        if F::ALIGNED {
+            unsafe { drop_fn(to_drop) }
+        } else {
+            let offset = to_drop.align_offset(desc.layout().align());
+            let len = offset + desc.layout().size();
+            let mut temp = unsafe { Box::new_uninit_slice(len).assume_init() };
+            unsafe { drop_unaligned(to_drop, desc, &mut temp) }
+        }
     }
 }

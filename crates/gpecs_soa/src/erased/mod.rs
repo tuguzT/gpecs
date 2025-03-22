@@ -20,6 +20,7 @@ use self::{
 };
 
 pub use self::{
+    byte::{Aligned, Fields, Unaligned},
     context::ErasedSoaContext,
     nonnull_ptrs::ErasedSoaNonNullPtrs,
     ptrs::ErasedSoaPtrs,
@@ -432,8 +433,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .field_descriptors()
             .iter()
             .map(|&desc| {
-                let capacity =
-                    (capacity * desc.layout().size()).div_ceil(size_of::<ErasedByte<Fields>>());
+                let capacity = (capacity * desc.layout().size())
+                    .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
                 let buffer = Vec::with_capacity(capacity);
                 ErasedFieldVec { buffer, desc }
             })
@@ -504,7 +505,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .inspect(|(desc, vec)| assert_layouts(desc.layout(), vec.desc.layout()))
             .for_each(|(_, vec)| {
                 let ErasedFieldVec { buffer, desc } = vec;
-                let len = (len * desc.layout().size()).div_ceil(size_of::<ErasedByte<Fields>>());
+                let len =
+                    (len * desc.layout().size()).div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
                 unsafe { buffer.set_len(len) }
             });
         *vecs_len = len;

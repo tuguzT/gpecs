@@ -10,7 +10,7 @@ use core::{
     slice,
 };
 
-pub type DropFn = unsafe fn(*mut u8);
+pub type DropFn = unsafe fn(to_drop: *mut u8);
 
 #[derive(Debug, Clone, Copy)]
 pub struct FieldDescriptor {
@@ -62,6 +62,24 @@ impl FieldDescriptor {
     pub const fn into_inner(self) -> (Layout, Option<DropFn>) {
         let Self { layout, drop_fn } = self;
         (layout, drop_fn)
+    }
+}
+
+#[allow(clippy::missing_safety_doc)]
+#[inline]
+#[track_caller]
+pub unsafe fn drop_unaligned(to_drop: *mut u8, descriptor: &FieldDescriptor, temp: &mut [u8]) {
+    let Some(drop_fn) = descriptor.drop_fn() else {
+        return;
+    };
+
+    let offset = to_drop.align_offset(descriptor.layout().align());
+    assert!(offset + descriptor.layout().size() <= temp.len());
+
+    let temp = &raw mut temp[offset];
+    unsafe {
+        ptr::copy_nonoverlapping(to_drop, temp, descriptor.layout().size());
+        drop_fn(temp);
     }
 }
 

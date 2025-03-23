@@ -800,26 +800,26 @@ fn one_item_erased() {
 
 #[test]
 fn three_items() {
-    type Vec = SoaVec<(u8, String, u64)>;
+    type Vec = SoaVec<(u8, String, u64, u8)>;
 
-    let mut vec = Vec::from_iter(iter::repeat((0, "0".to_owned(), 0)).take(3));
+    let mut vec = Vec::from_iter(iter::repeat((0, "0".to_owned(), 0, 0)).take(3));
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains_by_refs((&0, &"0".to_owned(), &0)));
+    assert!(vec.contains_by_refs((&0, &"0".to_owned(), &0, &0)));
 
     assert_eq!(
         format!("{vec:?}"),
-        r#"SoaVec(([0, 0, 0], ["0", "0", "0"], [0, 0, 0]))"#,
+        r#"SoaVec(([0, 0, 0], ["0", "0", "0"], [0, 0, 0], [0, 0, 0]))"#,
     );
 
     vec.truncate(0);
-    vec.insert(0, (1, "2".to_owned(), 3));
-    vec.insert(0, (4, "5".to_owned(), 6));
-    vec.insert(1, (7, "8".to_owned(), 9));
+    vec.insert(0, (1, "2".to_owned(), 3, 0));
+    vec.insert(0, (4, "5".to_owned(), 6, 0));
+    vec.insert(1, (7, "8".to_owned(), 9, 0));
 
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains_by_refs((&4, &"5".to_owned(), &6)));
+    assert!(vec.contains_by_refs((&4, &"5".to_owned(), &6, &0)));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -828,7 +828,7 @@ fn three_items() {
 
     assert_eq!(
         format!("{vec:?}"),
-        r#"SoaVec(([4, 7, 1], ["5", "8", "2"], [6, 9, 3]))"#,
+        r#"SoaVec(([4, 7, 1], ["5", "8", "2"], [6, 9, 3], [0, 0, 0]))"#,
     );
 
     let slice = vec.as_slice();
@@ -840,23 +840,25 @@ fn three_items() {
             [4, 7, 1].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
             [6, 9, 3].as_slice(),
+            [0, 0, 0].as_slice(),
         ),
     );
-    assert_eq!(slice.get(0), Some((&4, &"5".to_owned(), &6)));
-    assert_eq!(slice.get(1), Some((&7, &"8".to_owned(), &9)));
-    assert_eq!(slice.get(2), Some((&1, &"2".to_owned(), &3)));
+    assert_eq!(slice.get(0), Some((&4, &"5".to_owned(), &6, &0)));
+    assert_eq!(slice.get(1), Some((&7, &"8".to_owned(), &9, &0)));
+    assert_eq!(slice.get(2), Some((&1, &"2".to_owned(), &3, &0)));
     assert_eq!(
         slice.get(0..),
         Some((
             [4, 7, 1].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
             [6, 9, 3].as_slice(),
+            [0, 0, 0].as_slice(),
         )),
     );
 
     assert_eq!(
         format!("{slice:?}"),
-        r#"SoaSlice(([4, 7, 1], ["5", "8", "2"], [6, 9, 3]))"#,
+        r#"SoaSlice(([4, 7, 1], ["5", "8", "2"], [6, 9, 3], [0, 0, 0]))"#,
     );
 
     assert_eq!(vec, slice);
@@ -866,7 +868,7 @@ fn three_items() {
     assert_eq!(slice.to_owned(), vec.clone());
 
     let mut clone = vec.clone();
-    for (t, _, _) in &mut clone {
+    for (t, _, _, _) in &mut clone {
         *t += 1;
     }
     vec.clone_from_slice(clone.as_slice());
@@ -878,6 +880,7 @@ fn three_items() {
             [5, 8, 2].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
             [6, 9, 3].as_slice(),
+            [0, 0, 0].as_slice(),
         ),
     );
 
@@ -888,6 +891,7 @@ fn three_items() {
             vec![5, 8, 2],
             vec!["5".to_owned(), "8".to_owned(), "2".to_owned()],
             vec![6, 9, 3],
+            vec![0, 0, 0],
         ),
     );
 
@@ -900,22 +904,29 @@ fn three_items() {
             [5, 8, 2].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
             [6, 9, 3].as_slice(),
+            [0, 0, 0].as_slice(),
         ),
     );
 
     let mut iter = vec.iter_mut();
     assert_eq!(iter.len(), 3);
 
-    assert_eq!(iter.next(), Some((&mut 5, &mut "5".to_owned(), &mut 6)));
+    assert_eq!(
+        iter.next(),
+        Some((&mut 5, &mut "5".to_owned(), &mut 6, &mut 0)),
+    );
     assert_eq!(iter.len(), 2);
 
     assert_eq!(
         iter.next_back(),
-        Some((&mut 2, &mut "2".to_owned(), &mut 3)),
+        Some((&mut 2, &mut "2".to_owned(), &mut 3, &mut 0)),
     );
     assert_eq!(iter.len(), 1);
 
-    assert_eq!(iter.next(), Some((&mut 8, &mut "8".to_owned(), &mut 9)));
+    assert_eq!(
+        iter.next(),
+        Some((&mut 8, &mut "8".to_owned(), &mut 9, &mut 0)),
+    );
     assert_eq!(iter.len(), 0);
 
     assert_eq!(iter.next_back(), None);
@@ -941,13 +952,14 @@ fn three_items() {
             ]
             .as_slice(),
             [6, 9, 3, 9, 3].as_slice(),
+            [0, 0, 0, 0, 0].as_slice(),
         ),
     );
-    assert_eq!(vec.get(0), Some((&5, &"5".to_owned(), &6)));
-    assert_eq!(vec.get(1), Some((&8, &"8".to_owned(), &9)));
-    assert_eq!(vec.get(2), Some((&2, &"2".to_owned(), &3)));
-    assert_eq!(vec.get(3), Some((&8, &"8".to_owned(), &9)));
-    assert_eq!(vec.get(4), Some((&2, &"2".to_owned(), &3)));
+    assert_eq!(vec.get(0), Some((&5, &"5".to_owned(), &6, &0)));
+    assert_eq!(vec.get(1), Some((&8, &"8".to_owned(), &9, &0)));
+    assert_eq!(vec.get(2), Some((&2, &"2".to_owned(), &3, &0)));
+    assert_eq!(vec.get(3), Some((&8, &"8".to_owned(), &9, &0)));
+    assert_eq!(vec.get(4), Some((&2, &"2".to_owned(), &3, &0)));
 
     {
         let mut drain = vec.drain(2..4);
@@ -958,13 +970,14 @@ fn three_items() {
                 [2, 8].as_slice(),
                 ["2".to_owned(), "8".to_owned()].as_slice(),
                 [3, 9].as_slice(),
+                [0, 0].as_slice(),
             )
         );
 
-        assert_eq!(drain.next_back(), Some((8, "8".to_owned(), 9)));
+        assert_eq!(drain.next_back(), Some((8, "8".to_owned(), 9, 0)));
         assert_eq!(drain.len(), 1);
 
-        assert_eq!(drain.next(), Some((2, "2".to_owned(), 3)));
+        assert_eq!(drain.next(), Some((2, "2".to_owned(), 3, 0)));
         assert_eq!(drain.len(), 0);
 
         assert_eq!(drain.next(), None);
@@ -974,33 +987,33 @@ fn three_items() {
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 5);
 
-    let (t, u, v) = vec.swap_remove(1);
-    assert_eq!((t, u, v), (8, "8".to_owned(), 9));
+    let (t, u, v, w) = vec.swap_remove(1);
+    assert_eq!((t, u, v, w), (8, "8".to_owned(), 9, 0));
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains_by_refs((&8, &"8".to_owned(), &9)));
+    assert!(!vec.contains_by_refs((&8, &"8".to_owned(), &9, &0)));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let (t, u, v) = vec.pop().expect("vector should not be empty");
-    assert_eq!((t, u, v), (2, "2".to_owned(), 3));
+    let (t, u, v, w) = vec.pop().expect("vector should not be empty");
+    assert_eq!((t, u, v, w), (2, "2".to_owned(), 3, 0));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains_by_refs((&2, &"2".to_owned(), &3)));
+    assert!(!vec.contains_by_refs((&2, &"2".to_owned(), &3, &0)));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let (t, u, v) = vec.remove(0);
-    assert_eq!((t, u, v), (5, "5".to_owned(), 6));
+    let (t, u, v, w) = vec.remove(0);
+    assert_eq!((t, u, v, w), (5, "5".to_owned(), 6, 0));
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains_by_refs((&5, &"5".to_owned(), &6)));
+    assert!(!vec.contains_by_refs((&5, &"5".to_owned(), &6, &0)));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -1023,7 +1036,7 @@ fn three_items() {
     assert!(vec.capacity() >= 1);
     assert_eq!(vec.get(0), None);
 
-    vec.extend(iter::repeat((0, "0".to_owned(), 0)).take(3));
+    vec.extend(iter::repeat((0, "0".to_owned(), 0, 0)).take(3));
     vec.reserve(1);
     assert!(vec.capacity() >= 4);
     vec.reserve_exact(6);
@@ -1036,6 +1049,7 @@ fn three_items() {
             vec![0, 0, 0],
             vec!["0".to_owned(), "0".to_owned(), "0".to_owned()],
             vec![0, 0, 0],
+            vec![0, 0, 0],
         ),
     );
 
@@ -1047,6 +1061,7 @@ fn three_items() {
         (
             [0, 0, 0].as_slice(),
             ["0".to_owned(), "0".to_owned(), "0".to_owned()].as_slice(),
+            [0, 0, 0].as_slice(),
             [0, 0, 0].as_slice(),
         ),
     );
@@ -1084,12 +1099,12 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.push((1, "2".to_owned(), 3));
+    vec.push((1, "2".to_owned(), 3, 0));
     for _ in 0..10 {
-        vec.push((4, "5".to_owned(), 6));
-        vec.push((7, "8".to_owned(), 9));
+        vec.push((4, "5".to_owned(), 6, 0));
+        vec.push((7, "8".to_owned(), 9, 0));
     }
-    vec.retain_mut(|(x, _, _)| {
+    vec.retain_mut(|(x, _, _, _)| {
         if *x <= 3 {
             *x += 1;
             true
@@ -1101,7 +1116,12 @@ fn three_items() {
     assert!(vec.capacity() >= (1 + 2 * 10));
     assert_eq!(
         vec.as_slices(),
-        ([2].as_slice(), ["2".to_owned()].as_slice(), [3].as_slice()),
+        (
+            [2].as_slice(),
+            ["2".to_owned()].as_slice(),
+            [3].as_slice(),
+            [0].as_slice(),
+        ),
     );
 
     let vec = {
@@ -1112,12 +1132,12 @@ fn three_items() {
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 1);
     assert!(boxed_slice.capacity() >= 1);
-    assert_eq!(boxed_slice.get(0), Some((&2, &"2".to_owned(), &3)));
+    assert_eq!(boxed_slice.get(0), Some((&2, &"2".to_owned(), &3, &0)));
 
     let vec = boxed_slice.into_vec();
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
-    assert_eq!(vec.get(0), Some((&2, &"2".to_owned(), &3)));
+    assert_eq!(vec.get(0), Some((&2, &"2".to_owned(), &3, &0)));
 
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -1127,11 +1147,11 @@ fn three_items() {
     let boxed_slice = vec.into_boxed_slice();
     assert_eq!(boxed_slice.len(), 1);
     assert!(boxed_slice.capacity() >= 1);
-    assert_eq!(boxed_slice.get(0), Some((&2, &"2".to_owned(), &3)));
+    assert_eq!(boxed_slice.get(0), Some((&2, &"2".to_owned(), &3, &0)));
 
     let mut into_iter = boxed_slice.into_iter();
     assert_eq!(into_iter.len(), 1);
-    assert_eq!(into_iter.next_back(), Some((2, "2".to_owned(), 3)));
+    assert_eq!(into_iter.next_back(), Some((2, "2".to_owned(), 3, 0)));
     assert_eq!(into_iter.next(), None);
     assert_eq!(into_iter.next_back(), None);
 }

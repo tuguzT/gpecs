@@ -926,7 +926,11 @@ macro_rules! soa_tuple_impl {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let ptrs: [*const u8; count_idents!($($types,)*)] = collect_array(ptrs);
-                let ptrs = [$(ptrs[permutation[$indices]],)*];
+                let ptrs = {
+                    let mut result = [ptr::null(); count_idents!($($types,)*)];
+                    $(result[permutation[$indices]] = ptrs[$indices];)*
+                    result
+                };
 
                 let ptrs: Self::Ptrs = ($(ptrs[$indices].cast(),)*);
                 $(debug_assert_ptr_is_aligned(ptrs.$indices);)*
@@ -938,7 +942,11 @@ macro_rules! soa_tuple_impl {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let ptrs: [*mut u8; count_idents!($($types,)*)] = collect_array(ptrs);
-                let ptrs = [$(ptrs[permutation[$indices]],)*];
+                let ptrs = {
+                    let mut result = [ptr::null_mut(); count_idents!($($types,)*)];
+                    $(result[permutation[$indices]] = ptrs[$indices];)*
+                    result
+                };
 
                 let ptrs: Self::MutPtrs = ($(ptrs[$indices].cast(),)*);
                 $(debug_assert_ptr_is_aligned(ptrs.$indices);)*

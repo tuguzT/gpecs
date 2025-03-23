@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
+    any::type_name,
     array,
     borrow::Borrow,
     iter,
@@ -843,6 +844,17 @@ const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize; N] 
     permutation
 }
 
+#[inline]
+fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
+    debug_assert!(
+        ptr.is_aligned(),
+        "pointer of {} should be aligned to {}\nits align offset (in bytes) is {}",
+        type_name::<T>(),
+        align_of::<T>(),
+        ptr.cast::<u8>().align_offset(align_of::<T>()),
+    )
+}
+
 macro_rules! soa_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
         impl<$($types,)*> SoaTupleImplHelper<($($types,)*)> {
@@ -894,16 +906,18 @@ macro_rules! soa_tuple_impl {
             fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let erased: [*const u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
-                [$(erased[permutation[$indices]],)*]
+                let ptrs: [*const u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
+                let ptrs = [$(ptrs[permutation[$indices]],)*];
+                ptrs
             }
 
             #[inline]
             fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let erased: [*mut u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
-                [$(erased[permutation[$indices]],)*]
+                let ptrs: [*mut u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
+                let ptrs = [$(ptrs[permutation[$indices]],)*];
+                ptrs
             }
 
             #[inline]
@@ -911,7 +925,11 @@ macro_rules! soa_tuple_impl {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let ptrs: [*const u8; count_idents!($($types,)*)] = collect_array(ptrs);
-                ($(ptrs[permutation[$indices]].cast(),)*)
+                let ptrs = [$(ptrs[permutation[$indices]],)*];
+
+                let ptrs: Self::Ptrs = ($(ptrs[$indices].cast(),)*);
+                $(debug_assert_ptr_is_aligned(ptrs.$indices);)*
+                ptrs
             }
 
             #[inline]
@@ -919,22 +937,29 @@ macro_rules! soa_tuple_impl {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let ptrs: [*mut u8; count_idents!($($types,)*)] = collect_array(ptrs);
-                ($(ptrs[permutation[$indices]].cast(),)*)
+                let ptrs = [$(ptrs[permutation[$indices]],)*];
+
+                let ptrs: Self::MutPtrs = ($(ptrs[$indices].cast(),)*);
+                $(debug_assert_ptr_is_aligned(ptrs.$indices);)*
+                ptrs
             }
 
             #[inline]
             fn ptrs_dangling(_: &Self::Context) -> Self::MutPtrs {
-                ($(ptr::dangling_mut::<$types>(),)*)
+                let ptrs = ($(ptr::dangling_mut::<$types>(),)*);
+                ptrs
             }
 
             #[inline]
             fn ptrs_cast_const(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs {
-                ($(ptrs.$indices.cast_const(),)*)
+                let ptrs = ($(ptrs.$indices.cast_const(),)*);
+                ptrs
             }
 
             #[inline]
             fn ptrs_cast_mut(_: &Self::Context, ptrs: Self::Ptrs) -> Self::MutPtrs {
-                ($(ptrs.$indices.cast_mut(),)*)
+                let ptrs = ($(ptrs.$indices.cast_mut(),)*);
+                ptrs
             }
 
             #[inline]
@@ -943,7 +968,8 @@ macro_rules! soa_tuple_impl {
                 ptrs: Self::Ptrs,
                 offset: usize,
             ) -> Self::Ptrs {
-                unsafe { ($(ptrs.$indices.add(offset),)*) }
+                let ptrs = unsafe { ($(ptrs.$indices.add(offset),)*) };
+                ptrs
             }
 
             #[inline]
@@ -952,7 +978,8 @@ macro_rules! soa_tuple_impl {
                 ptrs: Self::MutPtrs,
                 offset: usize,
             ) -> Self::MutPtrs {
-                unsafe { ($(ptrs.$indices.add(offset),)*) }
+                let ptrs = unsafe { ($(ptrs.$indices.add(offset),)*) };
+                ptrs
             }
 
             #[inline]
@@ -1057,29 +1084,34 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_to_nonnull(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
-                unsafe { ($(NonNull::new_unchecked(ptrs.$indices),)*) }
+                let ptrs = unsafe { ($(NonNull::new_unchecked(ptrs.$indices),)*) };
+                ptrs
             }
 
             #[inline]
             fn nonnull_to_ptrs(_: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
-                ($(ptrs.$indices.as_ptr(),)*)
+                let ptrs = ($(ptrs.$indices.as_ptr(),)*);
+                ptrs
             }
 
             type Vecs = ($(Vec<$types>,)*);
 
             #[inline]
             fn vecs_with_capacity(_: &Self::Context, capacity: usize) -> Self::Vecs {
-                ($(Vec::<$types>::with_capacity(capacity),)*)
+                let vecs = ($(Vec::<$types>::with_capacity(capacity),)*);
+                vecs
             }
 
             #[inline]
             fn vecs_as_ptrs(_: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
-                ($(vecs.$indices.as_ptr(),)*)
+                let ptrs = ($(vecs.$indices.as_ptr(),)*);
+                ptrs
             }
 
             #[inline]
             fn mut_vecs_as_ptrs(_: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
-                ($(vecs.$indices.as_mut_ptr(),)*)
+                let ptrs = ($(vecs.$indices.as_mut_ptr(),)*);
+                ptrs
             }
 
             #[inline]
@@ -1106,27 +1138,32 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_to_refs<'a>(_: &Self::Context, ptrs: Self::Ptrs) -> Self::Refs<'a> {
-                unsafe { ($(&*ptrs.$indices,)*) }
+                let refs = unsafe { ($(&*ptrs.$indices,)*) };
+                refs
             }
 
             #[inline]
             unsafe fn ptrs_to_refs_mut<'a>(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::RefsMut<'a> {
-                unsafe { ($(&mut *ptrs.$indices,)*) }
+                let refs = unsafe { ($(&mut *ptrs.$indices,)*) };
+                refs
             }
 
             #[inline]
             fn refs_as_ptrs(_: &Self::Context, refs: Self::Refs<'_>) -> Self::Ptrs {
-                ($(ptr::from_ref(refs.$indices),)*)
+                let ptrs = ($(ptr::from_ref(refs.$indices),)*);
+                ptrs
             }
 
             #[inline]
             fn mut_refs_as_ptrs(_: &Self::Context, refs: Self::RefsMut<'_>) -> Self::MutPtrs {
-                ($(ptr::from_mut(refs.$indices),)*)
+                let ptrs = ($(ptr::from_mut(refs.$indices),)*);
+                ptrs
             }
 
             #[inline]
             fn mut_refs_as_refs<'a>(_: &Self::Context, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-                ($(&*refs.$indices,)*)
+                let refs = ($(&*refs.$indices,)*);
+                refs
             }
 
             #[inline]
@@ -1135,7 +1172,8 @@ macro_rules! soa_tuple_impl {
                 ptrs: Self::Ptrs,
                 len: usize,
             ) -> Self::SlicePtrs {
-                ($(ptr::slice_from_raw_parts(ptrs.$indices, len),)*)
+                let slices = ($(ptr::slice_from_raw_parts(ptrs.$indices, len),)*);
+                slices
             }
 
             type SlicePtrs = ($(*const [$types],)*);
@@ -1147,7 +1185,8 @@ macro_rules! soa_tuple_impl {
                 ptrs: Self::MutPtrs,
                 len: usize,
             ) -> Self::SliceMutPtrs {
-                ($(ptr::slice_from_raw_parts_mut(ptrs.$indices, len),)*)
+                let slices = ($(ptr::slice_from_raw_parts_mut(ptrs.$indices, len),)*);
+                slices
             }
 
             #[inline]
@@ -1155,7 +1194,8 @@ macro_rules! soa_tuple_impl {
                 _: &Self::Context,
                 slices: Self::SliceMutPtrs,
             ) -> Self::SlicePtrs {
-                ($(slices.$indices.cast_const(),)*)
+                let slices = ($(slices.$indices.cast_const(),)*);
+                slices
             }
 
             #[inline]
@@ -1163,7 +1203,8 @@ macro_rules! soa_tuple_impl {
                 _: &Self::Context,
                 slices: Self::SlicePtrs,
             ) -> Self::SliceMutPtrs {
-                ($(slices.$indices.cast_mut(),)*)
+                let slices = ($(slices.$indices.cast_mut(),)*);
+                slices
             }
 
             #[inline]
@@ -1182,12 +1223,14 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             fn slice_ptrs_as_ptrs(_: &Self::Context, slices: Self::SlicePtrs) -> Self::Ptrs {
-                ($(slices.$indices.cast(),)*) // should be `slices.$indices.as_ptr()` but it's unstable
+                let slices = ($(slices.$indices.cast(),)*); // should be `slices.$indices.as_ptr()` but it's unstable
+                slices
             }
 
             #[inline]
             fn mut_slice_ptrs_as_ptrs(_: &Self::Context, slices: Self::SliceMutPtrs) -> Self::MutPtrs {
-                ($(slices.$indices.cast(),)*) // should be `slices.$indices.as_mut_ptr()` but it's unstable
+                let slices = ($(slices.$indices.cast(),)*); // should be `slices.$indices.as_mut_ptr()` but it's unstable
+                slices
             }
 
             type Slices<'a>
@@ -1207,7 +1250,8 @@ macro_rules! soa_tuple_impl {
             ) -> Self::Slices<'a> {
                 let data = Self::slice_ptrs_as_ptrs(context, slices);
                 let len = Self::slice_ptrs_len(context, slices);
-                unsafe { ($(slice::from_raw_parts(data.$indices, len),)*) }
+                let slices = unsafe { ($(slice::from_raw_parts(data.$indices, len),)*) };
+                slices
             }
 
             #[inline]
@@ -1217,7 +1261,8 @@ macro_rules! soa_tuple_impl {
             ) -> Self::SlicesMut<'a> {
                 let data = Self::mut_slice_ptrs_as_ptrs(context, slices);
                 let len = Self::slice_ptrs_len_mut(context, slices);
-                unsafe { ($(slice::from_raw_parts_mut(data.$indices, len),)*) }
+                let slices = unsafe { ($(slice::from_raw_parts_mut(data.$indices, len),)*) };
+                slices
             }
 
             #[inline]
@@ -1236,27 +1281,32 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             fn slice_refs_as_slice_ptrs(_: &Self::Context, slices: Self::Slices<'_>) -> Self::SlicePtrs {
-                ($(ptr::from_ref(slices.$indices),)*)
+                let slices = ($(ptr::from_ref(slices.$indices),)*);
+                slices
             }
 
             #[inline]
             fn mut_slice_refs_as_slice_ptrs(_: &Self::Context, slices: Self::SlicesMut<'_>) -> Self::SliceMutPtrs {
-                ($(ptr::from_mut(slices.$indices),)*)
+                let slices = ($(ptr::from_mut(slices.$indices),)*);
+                slices
             }
 
             #[inline]
             fn mut_slices_as_slices<'a>(_: &Self::Context, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
-                ($(&*slices.$indices,)*)
+                let slices = ($(&*slices.$indices,)*);
+                slices
             }
 
             #[inline]
             fn slice_refs_as_ptrs(_: &Self::Context, slices: Self::Slices<'_>) -> Self::Ptrs {
-                ($(slices.$indices.as_ptr(),)*)
+                let slices = ($(slices.$indices.as_ptr(),)*);
+                slices
             }
 
             #[inline]
             fn mut_slice_refs_as_ptrs(_: &Self::Context, slices: Self::SlicesMut<'_>) -> Self::MutPtrs {
-                ($(slices.$indices.as_mut_ptr(),)*)
+                let slices = ($(slices.$indices.as_mut_ptr(),)*);
+                slices
             }
 
             #[inline]
@@ -1273,7 +1323,8 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             fn to_owned(&self) -> Self::Owned {
-                ($(self.$indices.clone(),)*)
+                let owned = ($(self.$indices.clone(),)*);
+                owned
             }
 
             #[inline]

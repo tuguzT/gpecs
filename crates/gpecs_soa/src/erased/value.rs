@@ -20,13 +20,13 @@ impl<Fields> ErasedSoa<Fields> {
     pub fn new<I, F>(fields: I) -> Self
     where
         I: IntoIterator<Item = (FieldDescriptor, F)>,
-        F: Borrow<[u8]>,
+        F: AsRef<[u8]>,
     {
         let (descriptors, fields): (Vec<_>, Vec<_>) = fields
             .into_iter()
             .inspect(|(desc, src)| {
                 validate_layout::<Fields>(desc.layout());
-                assert_same_len(desc.layout().size(), src.borrow().len());
+                assert_same_len(desc.layout().size(), src.as_ref().len());
             })
             .unzip();
         let descriptors = descriptors.into_boxed_slice();
@@ -40,7 +40,7 @@ impl<Fields> ErasedSoa<Fields> {
 
         let mut buffer = Box::new_uninit_slice(buffer_len);
         for ((desc, src), offset) in descriptors.iter().zip(fields).zip(offsets) {
-            let src = src.borrow().as_ptr();
+            let src = src.as_ref().as_ptr();
             let dst = unsafe { buffer.as_mut_ptr().cast::<u8>().add(offset) };
 
             let len = desc.layout().size();

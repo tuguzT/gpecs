@@ -891,7 +891,7 @@ macro_rules! soa_tuple_impl {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();
-                let mut offsets: [usize; count_idents!($($types,)*)] = Default::default();
+                let mut offsets = [0; count_idents!($($types,)*)];
                 $((layout, offsets[$indices]) = layout.extend(layouts[permutation[$indices]])?;)*
 
                 Ok((layout, offsets))
@@ -907,7 +907,7 @@ macro_rules! soa_tuple_impl {
             fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let ptrs: [*const u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
+                let ptrs = [$(ptrs.$indices.cast(),)*];
                 let ptrs = [$(ptrs[permutation[$indices]],)*];
                 ptrs
             }
@@ -916,7 +916,7 @@ macro_rules! soa_tuple_impl {
             fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let ptrs: [*mut u8; count_idents!($($types,)*)] = [$(ptrs.$indices.cast(),)*];
+                let ptrs = [$(ptrs.$indices.cast(),)*];
                 let ptrs = [$(ptrs[permutation[$indices]],)*];
                 ptrs
             }

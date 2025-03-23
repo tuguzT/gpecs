@@ -845,6 +845,7 @@ const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize; N] 
 }
 
 #[inline]
+#[track_caller]
 fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
     debug_assert!(
         ptr.is_aligned(),

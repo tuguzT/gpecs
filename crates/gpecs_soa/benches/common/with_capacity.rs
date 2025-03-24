@@ -1,14 +1,24 @@
 use std::{any::type_name, hint::black_box};
 
 use criterion::{criterion_group, BenchmarkId, Criterion};
-use gpecs_soa::prelude::*;
+use gpecs_soa::{
+    erased::{ErasedSoa, ErasedSoaContext},
+    prelude::*,
+};
 
 use super::*;
 
-pub(super) trait WithCapacity: Soa<Context: Default> {
+pub(super) trait WithCapacity: Soa<Context: Default + 'static> {
     fn soa_slf_with_capacity(capacity: usize) -> SoaVec<Self> {
         let capacity = black_box(capacity);
         let vec = SoaVec::<Self>::with_capacity(capacity);
+        black_box(vec)
+    }
+
+    fn soa_ser_with_capacity(capacity: usize) -> SoaVec<ErasedSoa<Self::Fields>> {
+        let capacity = black_box(capacity);
+        let context = ErasedSoaContext::of::<Self>(Default::default());
+        let vec = SoaVec::with_context_and_capacity(context, capacity);
         black_box(vec)
     }
 
@@ -105,6 +115,11 @@ where
             BenchmarkId::new(SOA_SLF_FUNCTION_NAME, capacity),
             &capacity,
             |b, &capacity| b.iter(|| T::soa_slf_with_capacity(capacity)),
+        );
+        group.bench_with_input(
+            BenchmarkId::new(SOA_SER_FUNCTION_NAME, capacity),
+            &capacity,
+            |b, &capacity| b.iter(|| T::soa_ser_with_capacity(capacity)),
         );
         group.bench_with_input(
             BenchmarkId::new(SOA_STD_FUNCTION_NAME, capacity),

@@ -1,7 +1,7 @@
 use std::{any::type_name, hint::black_box};
 
 use criterion::{criterion_group, BenchmarkId, Criterion};
-use gpecs_soa::prelude::*;
+use gpecs_soa::{erased::ErasedSoa, prelude::*};
 
 use super::{with_capacity::WithCapacity, *};
 
@@ -12,6 +12,15 @@ pub(super) trait Push: WithCapacity {
     }
 
     fn soa_slf_clear(vec: &mut SoaVec<Self>) {
+        vec.clear();
+    }
+
+    fn soa_ser_push(vec: &mut SoaVec<ErasedSoa<Self::Fields>>, value: ErasedSoa<Self::Fields>) {
+        let value = black_box(value);
+        vec.push(value);
+    }
+
+    fn soa_ser_clear(vec: &mut SoaVec<ErasedSoa<Self::Fields>>) {
         vec.clear();
     }
 
@@ -184,6 +193,21 @@ where
             },
         );
         group.bench_with_input(
+            BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
+            &count,
+            |b, &count| {
+                let context = Default::default();
+                let mut vec = T::soa_ser_with_capacity(0);
+                b.iter(|| {
+                    for _ in 0..count {
+                        let value = ErasedSoa::from::<T>(&context, Default::default());
+                        T::soa_ser_push(&mut vec, value);
+                    }
+                    black_box(&mut vec);
+                });
+            },
+        );
+        group.bench_with_input(
             BenchmarkId::new(SOA_STD_FUNCTION_NAME, count),
             &count,
             |b, &count| {
@@ -227,6 +251,22 @@ where
                     black_box(&mut vec);
                 });
                 T::soa_slf_clear(&mut vec);
+            },
+        );
+        let context = Default::default();
+        let mut vec = T::soa_ser_with_capacity(count);
+        group.bench_with_input(
+            BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
+            &count,
+            |b, &count| {
+                b.iter(|| {
+                    for _ in 0..count {
+                        let value = ErasedSoa::from::<T>(&context, Default::default());
+                        T::soa_ser_push(&mut vec, value);
+                    }
+                    black_box(&mut vec);
+                });
+                T::soa_ser_clear(&mut vec);
             },
         );
         let mut vec = T::soa_std_with_capacity(count);

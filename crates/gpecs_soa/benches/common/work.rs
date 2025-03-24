@@ -1,7 +1,7 @@
 use std::{any::type_name, array, hint::black_box, iter::Zip, slice};
 
 use criterion::{criterion_group, BenchmarkId, Criterion};
-use gpecs_soa::{prelude::*, slice as soa_slice};
+use gpecs_soa::{erased::ErasedSoa, prelude::*, slice as soa_slice};
 
 use super::{push_many::Push, *};
 
@@ -20,6 +20,21 @@ pub(super) trait Work: Push {
     type SoaSlfIter<'a>: Iterator + Clone;
     fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_>;
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>);
+
+    fn soa_ser_prepare_vec(count: usize) -> SoaVec<ErasedSoa<Self::Fields>> {
+        let context = Default::default();
+        let mut vec = Self::soa_ser_with_capacity(count);
+        for index in 0..count {
+            let value = black_box(Self::work_item(index));
+            let value = ErasedSoa::from(&context, value);
+            Self::soa_ser_push(&mut vec, value);
+        }
+        black_box(vec)
+    }
+
+    type SoaSerIter<'a>: Iterator + Clone;
+    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_>;
+    fn soa_ser_work(iter: Self::SoaSerIter<'_>);
 
     fn soa_std_prepare_vec(count: usize) -> Self::Vecs {
         let mut vecs = Self::soa_std_with_capacity(count);
@@ -63,6 +78,21 @@ impl Work for Tiny {
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
         let mut result = 0;
         for (i,) in iter {
+            result += *i;
+        }
+        black_box(result);
+    }
+
+    type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa<Self::Fields>>;
+
+    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
+        data.iter()
+    }
+
+    fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
+        let mut result = 0;
+        for refs in iter {
+            let (i,) = unsafe { refs.into::<Self>(&()) };
             result += *i;
         }
         black_box(result);
@@ -113,6 +143,21 @@ impl Work for Small {
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
         let mut result = 0.0;
         for (x, y, _) in iter {
+            result += *x + *y;
+        }
+        black_box(result);
+    }
+
+    type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa<Self::Fields>>;
+
+    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
+        data.iter()
+    }
+
+    fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
+        let mut result = 0.0;
+        for refs in iter {
+            let (x, y, _) = unsafe { refs.into::<Self>(&()) };
             result += *x + *y;
         }
         black_box(result);
@@ -170,6 +215,21 @@ impl Work for Big {
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
         let mut result = 0;
         for (index, (_, _, array, _, str)) in iter.enumerate() {
+            result += index + array.iter().sum::<usize>() + str.len();
+        }
+        black_box(result);
+    }
+
+    type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa<Self::Fields>>;
+
+    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
+        data.iter()
+    }
+
+    fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
+        let mut result = 0;
+        for (index, refs) in iter.enumerate() {
+            let (_, _, array, _, str) = unsafe { refs.into::<Self>(&()) };
             result += index + array.iter().sum::<usize>() + str.len();
         }
         black_box(result);
@@ -241,6 +301,23 @@ impl Work for Large {
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
         let mut result = 0;
         for (_, b, _, _, e, f, _, _, i, _) in iter {
+            result += b.iter().max().unwrap() + e.iter().sum::<u32>()
+                - f.iter().min().unwrap()
+                - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
+        }
+        black_box(result);
+    }
+
+    type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa<Self::Fields>>;
+
+    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
+        data.iter()
+    }
+
+    fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
+        let mut result = 0;
+        for refs in iter {
+            let (_, b, _, _, e, f, _, _, i, _) = unsafe { refs.into::<Self>(&()) };
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
                 - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
@@ -329,6 +406,14 @@ where
             BenchmarkId::new(SOA_SLF_FUNCTION_NAME, count),
             &count,
             |b, _| b.iter(|| T::soa_slf_work(iter.clone())),
+        );
+
+        let vec = T::soa_ser_prepare_vec(count);
+        let iter = T::soa_ser_prepare_iter(&vec);
+        group.bench_with_input(
+            BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
+            &count,
+            |b, _| b.iter(|| T::soa_ser_work(iter.clone())),
         );
 
         let vec = T::soa_std_prepare_vec(count);

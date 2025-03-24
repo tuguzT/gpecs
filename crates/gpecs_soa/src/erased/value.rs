@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, vec::Vec};
-use core::{borrow::Borrow, iter, ptr, slice};
+use core::{iter, ptr, slice};
 
 use crate::traits::{buffer_layout, FieldDescriptor, Soa};
 
@@ -61,8 +61,8 @@ impl<Fields> ErasedSoa<Fields> {
     {
         let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<T::Fields>(desc.borrow().layout()))
-            .map(|desc| desc.borrow().clone())
+            .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
+            .map(|desc| desc.as_ref().clone())
             .collect();
 
         let (buffer_layout, offsets) =
@@ -99,8 +99,8 @@ impl<Fields> ErasedSoa<Fields> {
 
         let target_layouts = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<T::Fields>(desc.borrow().layout()))
-            .map(|desc| desc.borrow().layout());
+            .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
+            .map(|desc| desc.as_ref().layout());
         let field_layouts = descriptors.iter().map(FieldDescriptor::layout);
         assert!(target_layouts.eq(field_layouts));
 

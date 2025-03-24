@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
 use core::{
-    borrow::Borrow,
     fmt::{self, Debug},
     marker::PhantomData,
     ptr::{self, NonNull},
@@ -43,8 +42,8 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
         let ptrs = T::ptrs_erase_mut(context, ptrs);
         let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<T::Fields>(desc.borrow().layout()))
-            .map(|desc| desc.borrow().clone());
+            .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
+            .map(|desc| desc.as_ref().clone());
 
         let ptrs = descriptors
             .zip(ptrs)
@@ -71,8 +70,8 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
 
         let descriptors: Box<[_]> = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<T::Fields>(desc.borrow().layout()))
-            .map(|desc| desc.borrow().clone())
+            .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
+            .map(|desc| desc.as_ref().clone())
             .collect();
         assert_eq!(descriptors.len(), ptrs.len());
 

@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
-    borrow::Borrow,
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
@@ -738,15 +737,11 @@ where
     >;
 
     fn into_iter(self) -> Self::IntoIter {
-        let Self {
-            key: key_layout,
-            value: value_layouts,
-            ..
-        } = self;
+        let Self { key, value, .. } = self;
 
-        let f: fn(<V::FieldDescriptors<'a> as IntoIterator>::Item) -> _ = |layout| *layout.borrow();
-        let value_layouts = value_layouts.into_iter().map(f);
-        iter::once(key_layout).chain(value_layouts)
+        let f: fn(<V::FieldDescriptors<'a> as IntoIterator>::Item) -> _ = |desc| *desc.as_ref();
+        let value = value.into_iter().map(f);
+        iter::once(key).chain(value)
     }
 }
 

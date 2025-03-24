@@ -1,4 +1,4 @@
-use core::{alloc::Layout, any::type_name, borrow::Borrow};
+use core::{alloc::Layout, any::type_name};
 
 #[cold]
 #[track_caller]
@@ -54,7 +54,7 @@ pub fn assert_buffer_align(buffer: *const u8, layout_align: usize) {
 #[cold]
 #[track_caller]
 #[inline(never)]
-fn assert_layout_failed<T>(layout: &Layout) -> ! {
+fn assert_layout_failed<T>(layout: Layout) -> ! {
     let target_layout = Layout::new::<T>();
     let type_name = type_name::<T>();
     panic!("layout {target_layout:?} of type {type_name} should match layout {layout:?}")
@@ -62,9 +62,8 @@ fn assert_layout_failed<T>(layout: &Layout) -> ! {
 
 #[inline]
 #[track_caller]
-pub fn assert_layout<T>(layout: impl Borrow<Layout>) {
-    let layout = layout.borrow();
-    if *layout == Layout::new::<T>() {
+pub fn assert_layout<T>(layout: Layout) {
+    if layout == Layout::new::<T>() {
         return;
     }
     assert_layout_failed::<T>(layout)

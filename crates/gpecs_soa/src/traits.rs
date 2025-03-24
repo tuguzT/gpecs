@@ -67,6 +67,20 @@ impl FieldDescriptor {
     }
 }
 
+impl AsRef<FieldDescriptor> for FieldDescriptor {
+    #[inline]
+    fn as_ref(&self) -> &FieldDescriptor {
+        self
+    }
+}
+
+impl AsMut<FieldDescriptor> for FieldDescriptor {
+    #[inline]
+    fn as_mut(&mut self) -> &mut FieldDescriptor {
+        self
+    }
+}
+
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 #[track_caller]
@@ -112,7 +126,7 @@ pub unsafe trait Soa: Sized {
     /// - order of descriptors should resemble their order inside of a buffer in memory
     /// - sum of layouts' sizes of descriptors should be less or equal to the size of [`Fields`](`Soa::Fields`)
     /// - alignment of each layout of descriptors should be less or equal to the alignment of [`Fields`](`Soa::Fields`)
-    type FieldDescriptors<'a>: IntoIterator<Item: Borrow<FieldDescriptor>>;
+    type FieldDescriptors<'a>: IntoIterator<Item: AsRef<FieldDescriptor>>;
 
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_>;
 
@@ -132,7 +146,7 @@ pub unsafe trait Soa: Sized {
     fn capacity_from(context: &Self::Context, buffer_layout: Layout) -> usize {
         let packed_size = Self::field_descriptors(context)
             .into_iter()
-            .map(|descriptor| descriptor.borrow().layout().size())
+            .map(|descriptor| descriptor.as_ref().layout().size())
             .sum();
         let max_capacity = buffer_layout
             .size()
@@ -400,7 +414,7 @@ pub trait SoaToOwned<'a> {
 }
 
 /// Use this until [`Layout::repeat()`] is stabilized
-const fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
+fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
     const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
         Ok(_) => unreachable!(),
         Err(err) => err,

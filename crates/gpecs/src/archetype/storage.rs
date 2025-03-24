@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug},
 };
@@ -372,14 +371,14 @@ where
 
 #[inline]
 #[track_caller]
-fn validate_component<B>(components: &mut ComponentRegistry, id: ComponentId, descriptor: B)
+fn validate_component<D>(components: &mut ComponentRegistry, id: ComponentId, desc: D)
 where
-    B: Borrow<FieldDescriptor>,
+    D: AsRef<FieldDescriptor>,
 {
     let info = components
         .get_info(id)
         .unwrap_or_else(|| panic!("info of component {id:?} should be present"));
-    assert_eq!(info.descriptor().layout(), descriptor.borrow().layout());
+    assert_eq!(info.descriptor().layout(), desc.as_ref().layout());
 }
 
 #[inline]
@@ -395,7 +394,7 @@ where
         .expect("components of the bundle should be unique")
         .into_iter()
         .zip(B::field_descriptors(context))
-        .inspect(|(id, desc)| validate_component(components, *id, desc.borrow()))
+        .inspect(|(id, desc)| validate_component(components, *id, desc))
         .map(|(id, _)| id)
 }
 
@@ -413,7 +412,7 @@ where
         .expect("components of the bundle should be unique")
         .into_iter()
         .zip(B::field_descriptors(context))
-        .inspect(|(id, desc)| validate_component(components, *id, desc.borrow()))
+        .inspect(|(id, desc)| validate_component(components, *id, desc))
         .map(move |(id, _)| {
             fields
                 .remove(&id)

@@ -1,4 +1,4 @@
-use core::{alloc::Layout, borrow::Borrow};
+use core::alloc::Layout;
 
 #[cold]
 #[track_caller]
@@ -9,8 +9,8 @@ fn validate_layout_failed(input_align: usize, max_align: usize) -> ! {
 
 #[inline]
 #[track_caller]
-pub fn validate_layout<Fields>(layout: impl Borrow<Layout>) {
-    let input_align = layout.borrow().align();
+pub fn validate_layout<Fields>(layout: Layout) {
+    let input_align = layout.align();
     let max_align = align_of::<Fields>();
     if input_align <= max_align {
         return;
@@ -37,15 +37,13 @@ pub fn assert_same_len(base_len: usize, len: usize) {
 #[cold]
 #[track_caller]
 #[inline(never)]
-fn assert_layouts_failed(first: &Layout, second: &Layout) -> ! {
+fn assert_layouts_failed(first: Layout, second: Layout) -> ! {
     panic!("layouts {first:?} and {second:?} should match")
 }
 
 #[inline]
 #[track_caller]
-pub fn assert_layouts(first: impl Borrow<Layout>, second: impl Borrow<Layout>) {
-    let first = first.borrow();
-    let second = second.borrow();
+pub fn assert_layouts(first: Layout, second: Layout) {
     if first == second {
         return;
     }

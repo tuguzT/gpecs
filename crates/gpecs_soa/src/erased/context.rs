@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
 use core::{
-    borrow::Borrow,
     fmt::{self, Debug},
     marker::PhantomData,
     mem,
@@ -23,14 +22,14 @@ impl<Fields> ErasedSoaContext<Fields> {
     #[inline]
     pub fn new<I, O>(descriptors: I, drop_fields: O) -> Self
     where
-        I: IntoIterator<Item: Borrow<FieldDescriptor>>,
+        I: IntoIterator<Item: AsRef<FieldDescriptor>>,
         O: Into<Option<ErasedDropFn>>,
     {
         Self {
             descriptors: descriptors
                 .into_iter()
-                .inspect(|desc| validate_layout::<Fields>(desc.borrow().layout()))
-                .map(|desc| desc.borrow().clone())
+                .inspect(|desc| validate_layout::<Fields>(desc.as_ref().layout()))
+                .map(|desc| desc.as_ref().clone())
                 .collect(),
             drop_fields: drop_fields.into(),
             phantom: PhantomData,
@@ -45,8 +44,8 @@ impl<Fields> ErasedSoaContext<Fields> {
     {
         let descriptors = T::field_descriptors(&context)
             .into_iter()
-            .inspect(|desc| validate_layout::<T::Fields>(desc.borrow().layout()))
-            .map(|desc| desc.borrow().clone())
+            .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
+            .map(|desc| desc.as_ref().clone())
             .collect();
 
         let drop_fields = move |data: ErasedDropFnParam<'_>| unsafe {
@@ -76,7 +75,7 @@ impl<Fields> ErasedSoaContext<Fields> {
     #[inline]
     pub fn drop_in_place<I>(&self, iter: I)
     where
-        I: IntoIterator<Item: Borrow<[ErasedFieldMutPtr]>>,
+        I: IntoIterator<Item: AsRef<[ErasedFieldMutPtr]>>,
     {
         let Self {
             descriptors,
@@ -89,11 +88,11 @@ impl<Fields> ErasedSoaContext<Fields> {
 
         iter.into_iter()
             .inspect(|ptrs| {
-                let layouts = ptrs.borrow().iter().map(|ptr| ptr.descriptor().layout());
+                let layouts = ptrs.as_ref().iter().map(|ptr| ptr.descriptor().layout());
                 let descriptors = descriptors.iter().copied().map(|desc| desc.layout());
                 assert!(descriptors.eq(layouts))
             })
-            .for_each(|ptrs| drop_fields(ptrs.borrow()))
+            .for_each(|ptrs| drop_fields(ptrs.as_ref()))
     }
 }
 

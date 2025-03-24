@@ -10,20 +10,20 @@ use crate::traits::{FieldDescriptor, Soa};
 use super::{assert::validate_layout, ErasedFieldMutPtr};
 
 type ErasedDropFnParam<'a> = &'a [ErasedFieldMutPtr];
-type ErasedDropFn = Box<dyn Fn(ErasedDropFnParam<'_>)>;
+type ErasedDropFn<'context> = Box<dyn Fn(ErasedDropFnParam<'_>) + 'context>;
 
-pub struct ErasedSoaContext<Fields> {
+pub struct ErasedSoaContext<'context, Fields> {
     descriptors: Box<[FieldDescriptor]>,
-    drop_fields: Option<ErasedDropFn>,
+    drop_fields: Option<ErasedDropFn<'context>>,
     phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<Fields> ErasedSoaContext<Fields> {
+impl<'context, Fields> ErasedSoaContext<'context, Fields> {
     #[inline]
     pub fn new<I, O>(descriptors: I, drop_fields: O) -> Self
     where
         I: IntoIterator<Item: AsRef<FieldDescriptor>>,
-        O: Into<Option<ErasedDropFn>>,
+        O: Into<Option<ErasedDropFn<'context>>>,
     {
         Self {
             descriptors: descriptors
@@ -40,24 +40,15 @@ impl<Fields> ErasedSoaContext<Fields> {
     pub fn of<T>(context: T::Context) -> Self
     where
         T: Soa<Fields = Fields>,
-        T::Context: 'static,
+        T::Context: 'context,
     {
         let descriptors = T::field_descriptors(&context)
             .into_iter()
             .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
             .map(|desc| desc.as_ref().clone())
             .collect();
-
-        let drop_fields = move |data: ErasedDropFnParam<'_>| unsafe {
-            let ptrs = data.iter().map(ErasedFieldMutPtr::as_ptr);
-            let ptrs = T::ptrs_restore_mut(&context, ptrs);
-            T::ptrs_drop_in_place(&context, ptrs);
-        };
-        let drop_fields: Option<ErasedDropFn> = if mem::needs_drop::<T::Fields>() {
-            Some(Box::new(drop_fields))
-        } else {
-            None
-        };
+        let drop_fields = mem::needs_drop::<T::Fields>()
+            .then(|| Box::new(drop_soa::<T>(context)) as ErasedDropFn<'context>);
 
         Self {
             descriptors,
@@ -96,11 +87,24 @@ impl<Fields> ErasedSoaContext<Fields> {
     }
 }
 
-impl<Fields> Debug for ErasedSoaContext<Fields> {
+impl<Fields> Debug for ErasedSoaContext<'_, Fields> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { descriptors, .. } = self;
         f.debug_struct("ErasedSoaContext")
             .field("descriptors", descriptors)
             .finish_non_exhaustive()
+    }
+}
+
+#[inline]
+pub fn drop_soa<'context, T>(context: T::Context) -> impl Fn(ErasedDropFnParam<'_>) + 'context
+where
+    T: Soa,
+    T::Context: 'context,
+{
+    move |data: ErasedDropFnParam<'_>| unsafe {
+        let ptrs = data.iter().map(ErasedFieldMutPtr::as_ptr);
+        let ptrs = T::ptrs_restore_mut(&context, ptrs);
+        T::ptrs_drop_in_place(&context, ptrs);
     }
 }

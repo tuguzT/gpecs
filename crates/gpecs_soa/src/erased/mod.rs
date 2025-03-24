@@ -53,7 +53,7 @@ mod value;
 mod vecs;
 
 unsafe impl<Fields> Soa for ErasedSoa<Fields> {
-    type Context = ErasedSoaContext<Fields>;
+    type Context = ErasedSoaContext<'static, Fields>;
 
     type Fields = Fields;
 

@@ -793,7 +793,7 @@ impl<'a> SoaToOwned<'a> for &'a () {
 
 #[inline]
 #[track_caller]
-fn collect_array<T, const N: usize>(iter: impl IntoIterator<Item = T>) -> [T; N] {
+pub(super) fn collect_array<T, const N: usize>(iter: impl IntoIterator<Item = T>) -> [T; N] {
     #[cold]
     #[inline(never)]
     #[track_caller]
@@ -866,7 +866,7 @@ const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize; N] 
 
 #[inline]
 #[track_caller]
-fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
+pub(super) fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
     debug_assert!(
         ptr.is_aligned(),
         "pointer of {} should be aligned to {}\nits align offset (in bytes) is {}",

@@ -10,6 +10,7 @@ extern crate alloc;
 pub use self::traits::Soa;
 
 pub mod erased;
+pub mod identity;
 pub mod mem;
 pub mod prelude;
 pub mod ptr;

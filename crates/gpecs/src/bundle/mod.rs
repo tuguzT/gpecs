@@ -57,7 +57,7 @@ macro_rules! bundle_tuple_impl {
         where
             $($types: $crate::component::Component,)*
         {
-            type ComponentIds = [ComponentId; $crate::soa::traits::count_idents!($($types,)*)];
+            type ComponentIds = [ComponentId; $crate::soa::traits::impls::count_idents!($($types,)*)];
 
             #[inline]
             fn component_ids(
@@ -69,7 +69,7 @@ macro_rules! bundle_tuple_impl {
                     return Err(DuplicateComponentError::new(component_id));
                 }
 
-                let permutation = $crate::soa::traits::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = $crate::soa::traits::impls::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
                 Ok(component_ids)
             }

@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
     borrow::{Borrow, BorrowMut},
@@ -6,9 +7,7 @@ use core::{
     slice,
 };
 
-use alloc::vec::Vec;
-
-use crate::traits::{collect_array, debug_assert_ptr_is_aligned, FieldDescriptor, Soa};
+use crate::traits::{debug_assert_ptr_is_aligned, impls::collect_array, FieldDescriptor, Soa};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]

@@ -115,7 +115,7 @@ fn empty_insert_one() {
     assert_eq!(previous, None);
 
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(0), Some(&42));
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
     assert!(sparse_arena.contains_key(0));
 }
 
@@ -128,7 +128,7 @@ fn with_capacity_insert_one() {
     assert_eq!(previous, None);
 
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(0), Some(&42));
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
     assert!(sparse_arena.contains_key(0));
 }
 
@@ -138,10 +138,10 @@ fn empty_insert_one_mutate() {
     sparse_arena
         .insert(0, Identity(42))
         .expect("key-to-usize conversions should not fail");
-    sparse_arena[0] += 1;
+    sparse_arena[0] = 43.into();
 
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(0), Some(&43));
+    assert_eq!(sparse_arena.get(0), Some(&43.into()));
     assert!(sparse_arena.contains_key(0));
 }
 
@@ -151,10 +151,10 @@ fn with_capacity_insert_one_mutate() {
     sparse_arena
         .insert(0, Identity(42))
         .expect("key-to-usize conversions should not fail");
-    sparse_arena[0] += 1;
+    sparse_arena[0] = 43.into();
 
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(0), Some(&43));
+    assert_eq!(sparse_arena.get(0), Some(&43.into()));
     assert!(sparse_arena.contains_key(0));
 }
 
@@ -168,7 +168,7 @@ fn empty_insert_far() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(key), Some(&42));
+    assert_eq!(sparse_arena.get(key), Some(&42.into()));
     assert!(sparse_arena.contains_key(key));
 
     let (key, value) = (6, Identity(69));
@@ -177,7 +177,7 @@ fn empty_insert_far() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(key), Some(&69));
+    assert_eq!(sparse_arena.get(key), Some(&69.into()));
     assert!(sparse_arena.contains_key(key));
 }
 
@@ -217,7 +217,7 @@ fn empty_push() {
         .expect("key-to-usize conversions should not fail");
     assert_eq!(key, 0);
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(key), Some(&42));
+    assert_eq!(sparse_arena.get(key), Some(&42.into()));
     assert!(sparse_arena.contains_key(key));
 }
 
@@ -397,14 +397,14 @@ fn one_item_swap() {
 
     sparse_arena.swap(0, 0);
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.as_slices(), &[42]);
-    assert_eq!(sparse_arena.get(0), Some(&42));
+    assert_eq!(sparse_arena.as_slices(), &[42.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
     assert!(sparse_arena.contains_key(0));
 
     sparse_arena.swap(0, 1);
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.as_slices(), &[42]);
-    assert_eq!(sparse_arena.get(0), Some(&42));
+    assert_eq!(sparse_arena.as_slices(), &[42.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
     assert!(sparse_arena.contains_key(0));
 }
 
@@ -419,14 +419,14 @@ fn one_item_swap_keys() {
 
     sparse_arena.swap_keys(0, 0);
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.as_slices(), &[42]);
-    assert_eq!(sparse_arena.get(0), Some(&42));
+    assert_eq!(sparse_arena.as_slices(), &[42.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
     assert!(sparse_arena.contains_key(0));
 
     sparse_arena.swap_keys(0, 1);
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.as_slices(), &[42]);
-    assert_eq!(sparse_arena.get(0), Some(&42));
+    assert_eq!(sparse_arena.as_slices(), &[42.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
     assert!(sparse_arena.contains_key(0));
 }
 
@@ -440,7 +440,7 @@ fn one_item_parts() {
     let (dense, sparse) = sparse_arena.into_parts();
     let (keys, values) = dense.as_slices().into();
     assert_eq!(keys, &[2]);
-    assert_eq!(values, &[42]);
+    assert_eq!(values, &[42.into()]);
     assert_eq!(
         sparse,
         &[
@@ -453,9 +453,9 @@ fn one_item_parts() {
     let sparse_arena = SparseArena::from_parts(dense, sparse)
         .expect("creation of sparse arena from valid parts should not fail");
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.as_slices(), &[42]);
+    assert_eq!(sparse_arena.as_slices(), &[42.into()]);
     assert_eq!(sparse_arena.as_keys_slice(), &[2]);
-    assert_eq!(sparse_arena.get(2), Some(&42));
+    assert_eq!(sparse_arena.get(2), Some(&42.into()));
 }
 
 #[test]
@@ -491,7 +491,7 @@ fn one_item_values() {
 
     let values = sparse_arena.values();
     assert_eq!(values.len(), 1);
-    assert_eq!(values.as_slice(), &[42]);
+    assert_eq!(values.as_slice(), &[42.into()]);
 }
 
 #[test]
@@ -503,7 +503,7 @@ fn one_item_values_mut() {
 
     let values_mut = sparse_arena.values_mut();
     assert_eq!(values_mut.len(), 1);
-    assert_eq!(values_mut.into_slice(), &[42]);
+    assert_eq!(values_mut.into_slice(), &[42.into()]);
 }
 
 #[test]
@@ -515,7 +515,7 @@ fn one_item_into_values() {
 
     let values = sparse_arena.into_values();
     assert_eq!(values.len(), 1);
-    assert_eq!(values.as_slice(), &[42]);
+    assert_eq!(values.as_slice(), &[42.into()]);
 }
 
 #[test]
@@ -528,7 +528,7 @@ fn one_item_iter() {
     let iter = sparse_arena.iter();
     assert_eq!(iter.len(), 1);
     assert_eq!(iter.as_keys_slice(), &[0]);
-    assert_eq!(iter.as_values_slice(), &[42]);
+    assert_eq!(iter.as_values_slice(), &[42.into()]);
 }
 
 #[test]
@@ -541,7 +541,7 @@ fn one_item_iter_mut() {
     let iter_mut = sparse_arena.iter_mut();
     assert_eq!(iter_mut.len(), 1);
     assert_eq!(iter_mut.as_keys_slice(), &[0]);
-    assert_eq!(iter_mut.into_values_slice(), &[42]);
+    assert_eq!(iter_mut.into_values_slice(), &[42.into()]);
 }
 
 #[test]
@@ -554,7 +554,7 @@ fn one_item_into_iter() {
     let into_iter = sparse_arena.into_iter();
     assert_eq!(into_iter.len(), 1);
     assert_eq!(into_iter.as_keys_slice(), &[0]);
-    assert_eq!(into_iter.as_values_slice(), &[42]);
+    assert_eq!(into_iter.as_values_slice(), &[42.into()]);
 }
 
 #[test]
@@ -568,8 +568,8 @@ fn two_items_insert_first() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(0), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&69));
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&69.into()));
 
     let previous = sparse_arena
         .insert(0, Identity(34))
@@ -577,8 +577,8 @@ fn two_items_insert_first() {
     assert_eq!(previous, Some(Identity(42)));
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(0), Some(&34));
-    assert_eq!(sparse_arena.get(1), Some(&69));
+    assert_eq!(sparse_arena.get(0), Some(&34.into()));
+    assert_eq!(sparse_arena.get(1), Some(&69.into()));
     assert!(sparse_arena.contains_key(0));
     assert!(sparse_arena.contains_key(1));
 }
@@ -598,8 +598,8 @@ fn two_items_insert_first_epoch() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
 
     let first_key = Key::new(*first_key.sparse_index(), first_key.epoch().next());
     let previous = sparse_arena
@@ -608,8 +608,8 @@ fn two_items_insert_first_epoch() {
     assert_eq!(previous, Some(Identity(42)));
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(first_key), Some(&34));
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(first_key), Some(&34.into()));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
     assert!(sparse_arena.contains_key(first_key));
     assert!(sparse_arena.contains_key(second_key));
 }
@@ -625,8 +625,8 @@ fn two_items_insert_second() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(0), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&69));
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&69.into()));
 
     let previous = sparse_arena
         .insert(1, Identity(34))
@@ -634,8 +634,8 @@ fn two_items_insert_second() {
     assert_eq!(previous, Some(Identity(69)));
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(0), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&34));
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&34.into()));
     assert!(sparse_arena.contains_key(0));
     assert!(sparse_arena.contains_key(1));
 }
@@ -651,15 +651,15 @@ fn two_items_remove_first() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
 
     let removed = sparse_arena.remove(first_key);
     assert_eq!(removed, Some(Identity(42)));
 
     assert_eq!(sparse_arena.len(), 1);
     assert_eq!(sparse_arena.get(first_key), None);
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
     assert!(sparse_arena.contains_key(first_key).not());
     assert!(sparse_arena.contains_key(second_key));
 }
@@ -675,15 +675,15 @@ fn two_items_swap_remove_first() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
 
     let removed = sparse_arena.swap_remove(first_key);
     assert_eq!(removed, Some(Identity(42)));
 
     assert_eq!(sparse_arena.len(), 1);
     assert_eq!(sparse_arena.get(first_key), None);
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
     assert!(sparse_arena.contains_key(first_key).not());
     assert!(sparse_arena.contains_key(second_key));
 }
@@ -699,14 +699,14 @@ fn two_items_remove_second() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
 
     let removed = sparse_arena.remove(second_key);
     assert_eq!(removed, Some(Identity(69)));
 
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
     assert_eq!(sparse_arena.get(second_key), None);
     assert!(sparse_arena.contains_key(first_key));
     assert!(sparse_arena.contains_key(second_key).not());
@@ -723,14 +723,14 @@ fn two_items_swap_remove_second() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
 
     let removed = sparse_arena.swap_remove(second_key);
     assert_eq!(removed, Some(Identity(69)));
 
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
     assert_eq!(sparse_arena.get(second_key), None);
     assert!(sparse_arena.contains_key(first_key));
     assert!(sparse_arena.contains_key(second_key).not());
@@ -753,8 +753,8 @@ fn two_items_remove_one_insert_one() {
     sparse_arena
         .insert(0, Identity(34))
         .expect("key-to-usize conversions should not fail");
-    assert_eq!(sparse_arena.get(0), Some(&34));
-    assert_eq!(sparse_arena.get(1), Some(&69));
+    assert_eq!(sparse_arena.get(0), Some(&34.into()));
+    assert_eq!(sparse_arena.get(1), Some(&69.into()));
     assert!(sparse_arena.contains_key(0));
     assert!(sparse_arena.contains_key(1));
 }
@@ -776,8 +776,8 @@ fn two_items_swap_remove_one_insert_one() {
     sparse_arena
         .insert(0, Identity(34))
         .expect("key-to-usize conversions should not fail");
-    assert_eq!(sparse_arena.get(0), Some(&34));
-    assert_eq!(sparse_arena.get(1), Some(&69));
+    assert_eq!(sparse_arena.get(0), Some(&34.into()));
+    assert_eq!(sparse_arena.get(1), Some(&69.into()));
     assert!(sparse_arena.contains_key(0));
     assert!(sparse_arena.contains_key(1));
 }
@@ -801,8 +801,8 @@ fn two_items_remove_one_push_one() {
         .expect("key-to-usize conversions should not fail");
     assert_eq!(key, first_key);
 
-    assert_eq!(sparse_arena.get(first_key), Some(&34));
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(first_key), Some(&34.into()));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
     assert!(sparse_arena.contains_key(first_key));
     assert!(sparse_arena.contains_key(second_key));
 }
@@ -826,8 +826,8 @@ fn two_items_swap_remove_one_push_one() {
         .expect("key-to-usize conversions should not fail");
     assert_eq!(key, first_key);
 
-    assert_eq!(sparse_arena.get(first_key), Some(&34));
-    assert_eq!(sparse_arena.get(second_key), Some(&69));
+    assert_eq!(sparse_arena.get(first_key), Some(&34.into()));
+    assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
     assert!(sparse_arena.contains_key(first_key));
     assert!(sparse_arena.contains_key(second_key));
 }
@@ -844,21 +844,21 @@ fn two_items_swap() {
 
     sparse_arena.swap(first_key, first_key);
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.as_slices(), &[42, 69]);
-    assert_eq!(sparse_arena.get(0), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&69));
+    assert_eq!(sparse_arena.as_slices(), &[42.into(), 69.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&69.into()));
 
     sparse_arena.swap(first_key, second_key);
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.as_slices(), &[69, 42]);
-    assert_eq!(sparse_arena.get(0), Some(&69));
-    assert_eq!(sparse_arena.get(1), Some(&42));
+    assert_eq!(sparse_arena.as_slices(), &[69.into(), 42.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&69.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
 
     sparse_arena.swap(second_key, second_key);
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.as_slices(), &[69, 42]);
-    assert_eq!(sparse_arena.get(0), Some(&69));
-    assert_eq!(sparse_arena.get(1), Some(&42));
+    assert_eq!(sparse_arena.as_slices(), &[69.into(), 42.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&69.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
 }
 
 #[test]
@@ -873,21 +873,21 @@ fn two_items_swap_keys() {
 
     sparse_arena.swap_keys(first_key, first_key);
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.as_slices(), &[42, 69]);
-    assert_eq!(sparse_arena.get(0), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&69));
+    assert_eq!(sparse_arena.as_slices(), &[42.into(), 69.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&69.into()));
 
     sparse_arena.swap_keys(first_key, second_key);
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.as_slices(), &[42, 69]);
-    assert_eq!(sparse_arena.get(0), Some(&69));
-    assert_eq!(sparse_arena.get(1), Some(&42));
+    assert_eq!(sparse_arena.as_slices(), &[42.into(), 69.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&69.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
 
     sparse_arena.swap_keys(second_key, second_key);
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.as_slices(), &[42, 69]);
-    assert_eq!(sparse_arena.get(0), Some(&69));
-    assert_eq!(sparse_arena.get(1), Some(&42));
+    assert_eq!(sparse_arena.as_slices(), &[42.into(), 69.into()]);
+    assert_eq!(sparse_arena.get(0), Some(&69.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
 }
 
 #[test]
@@ -903,7 +903,7 @@ fn two_items_insert_pop() {
     let popped = sparse_arena.pop();
     assert_eq!(popped, Some((2, Identity(69))));
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(5), Some(&42));
+    assert_eq!(sparse_arena.get(5), Some(&42.into()));
     assert_eq!(sparse_arena.get(2), None);
 }
 
@@ -920,7 +920,7 @@ fn two_items_push_pop() {
     let popped = sparse_arena.pop();
     assert_eq!(popped, Some((second_key, Identity(69))));
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
     assert_eq!(sparse_arena.get(second_key), None);
 }
 
@@ -941,7 +941,7 @@ fn two_items_insert_pop_epoch() {
     let popped = sparse_arena.pop();
     assert_eq!(popped, Some((second_key, Identity(69))));
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
     assert_eq!(sparse_arena.get(second_key), None);
 
     assert_eq!(
@@ -963,7 +963,7 @@ fn two_items_push_pop_epoch() {
     let popped = sparse_arena.pop();
     assert_eq!(popped, Some((second_key, Identity(69))));
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.get(first_key), Some(&42));
+    assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
     assert_eq!(sparse_arena.get(second_key), None);
 
     assert_eq!(
@@ -993,7 +993,7 @@ fn two_items_invalidate_epoch() {
     assert_eq!(new_first_key.epoch(), &first_key.epoch().next());
     assert_eq!(new_first_key, Key::new(5, 2));
     assert_eq!(sparse_arena.get(first_key), None);
-    assert_eq!(sparse_arena.get(new_first_key), Some(&42));
+    assert_eq!(sparse_arena.get(new_first_key), Some(&42.into()));
 
     let new_second_key = sparse_arena
         .invalidate_epoch(second_key)
@@ -1002,7 +1002,7 @@ fn two_items_invalidate_epoch() {
     assert_eq!(new_second_key.epoch(), &second_key.epoch().next());
     assert_eq!(new_second_key, Key::new(2, 1));
     assert_eq!(sparse_arena.get(second_key), None);
-    assert_eq!(sparse_arena.get(new_second_key), Some(&69));
+    assert_eq!(sparse_arena.get(new_second_key), Some(&69.into()));
 }
 
 #[test]
@@ -1023,8 +1023,8 @@ fn three_items_insert_remove_middle() {
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(2), None);
-    assert_eq!(sparse_arena.get(1), Some(&42));
-    assert_eq!(sparse_arena.get(5), Some(&69));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
+    assert_eq!(sparse_arena.get(5), Some(&69.into()));
     assert!(sparse_arena.contains_key(2).not());
     assert!(sparse_arena.contains_key(1));
     assert!(sparse_arena.contains_key(5));
@@ -1047,9 +1047,9 @@ fn three_items_push_remove_middle() {
     assert_eq!(removed, Some(Identity(42)));
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(first_key), Some(&34));
+    assert_eq!(sparse_arena.get(first_key), Some(&34.into()));
     assert_eq!(sparse_arena.get(middle_key), None);
-    assert_eq!(sparse_arena.get(last_key), Some(&69));
+    assert_eq!(sparse_arena.get(last_key), Some(&69.into()));
     assert!(sparse_arena.contains_key(first_key));
     assert!(sparse_arena.contains_key(middle_key).not());
     assert!(sparse_arena.contains_key(last_key));
@@ -1072,9 +1072,9 @@ fn three_items_swap_remove_middle() {
     assert_eq!(removed, Some(Identity(42)));
 
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.get(first_key), Some(&34));
+    assert_eq!(sparse_arena.get(first_key), Some(&34.into()));
     assert_eq!(sparse_arena.get(middle_key), None);
-    assert_eq!(sparse_arena.get(last_key), Some(&69));
+    assert_eq!(sparse_arena.get(last_key), Some(&69.into()));
     assert!(sparse_arena.contains_key(first_key));
     assert!(sparse_arena.contains_key(middle_key).not());
     assert!(sparse_arena.contains_key(last_key));
@@ -1096,7 +1096,7 @@ fn three_items_parts() {
     let (mut dense, sparse) = sparse_arena.into_parts();
     let (keys, values) = dense.as_slices().into();
     assert_eq!(keys, &[2, 1, 5]);
-    assert_eq!(values, &[34, 42, 69]);
+    assert_eq!(values, &[34.into(), 42.into(), 69.into()]);
     assert_eq!(
         sparse,
         &[
@@ -1113,9 +1113,9 @@ fn three_items_parts() {
     let sparse_arena = SparseArena::from_parts(dense, sparse)
         .expect("creation of sparse arena from valid parts should not fail");
     assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.as_slices(), &[69, 42]);
+    assert_eq!(sparse_arena.as_slices(), &[69.into(), 42.into()]);
     assert_eq!(sparse_arena.as_keys_slice(), &[5, 1]);
-    assert_eq!(sparse_arena.get(5), Some(&69));
+    assert_eq!(sparse_arena.get(5), Some(&69.into()));
 }
 
 #[test]
@@ -1169,7 +1169,7 @@ fn three_items_values() {
 
     let values = sparse_arena.values();
     assert_eq!(values.len(), 3);
-    assert_eq!(values.as_slice(), &[34, 42, 69]);
+    assert_eq!(values.as_slice(), &[34.into(), 42.into(), 69.into()]);
 }
 
 #[test]
@@ -1187,7 +1187,10 @@ fn three_items_values_mut() {
 
     let values_mut = sparse_arena.values_mut();
     assert_eq!(values_mut.len(), 3);
-    assert_eq!(values_mut.into_slice(), &mut [34, 42, 69]);
+    assert_eq!(
+        values_mut.into_slice(),
+        &mut [34.into(), 42.into(), 69.into()],
+    );
 }
 
 #[test]
@@ -1205,7 +1208,7 @@ fn three_items_into_values() {
 
     let values = sparse_arena.into_values();
     assert_eq!(values.len(), 3);
-    assert_eq!(values.as_slice(), &[34, 42, 69]);
+    assert_eq!(values.as_slice(), &[34.into(), 42.into(), 69.into()]);
 }
 
 #[test]
@@ -1224,7 +1227,7 @@ fn three_items_iter() {
     let iter = sparse_arena.iter();
     assert_eq!(iter.len(), 3);
     assert_eq!(iter.as_keys_slice(), &[2, 1, 5]);
-    assert_eq!(iter.as_values_slice(), &[34, 42, 69]);
+    assert_eq!(iter.as_values_slice(), &[34.into(), 42.into(), 69.into()]);
 }
 
 #[test]
@@ -1243,7 +1246,10 @@ fn three_items_iter_mut() {
     let iter_mut = sparse_arena.iter_mut();
     assert_eq!(iter_mut.len(), 3);
     assert_eq!(iter_mut.as_keys_slice(), &[2, 1, 5]);
-    assert_eq!(iter_mut.into_values_slice(), &[34, 42, 69]);
+    assert_eq!(
+        iter_mut.into_values_slice(),
+        &[34.into(), 42.into(), 69.into()],
+    );
 }
 
 #[test]
@@ -1262,7 +1268,10 @@ fn three_items_into_iter() {
     let into_iter = sparse_arena.into_iter();
     assert_eq!(into_iter.len(), 3);
     assert_eq!(into_iter.as_keys_slice(), &[2, 1, 5]);
-    assert_eq!(into_iter.as_values_slice(), &[34, 42, 69]);
+    assert_eq!(
+        into_iter.as_values_slice(),
+        &[34.into(), 42.into(), 69.into()],
+    );
 }
 
 #[test]
@@ -1307,7 +1316,7 @@ fn five_items_remove_insert() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(previous, None);
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let key = 2;
@@ -1317,7 +1326,7 @@ fn five_items_remove_insert() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(previous, Some(42.into()));
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let key = 4;
@@ -1327,7 +1336,7 @@ fn five_items_remove_insert() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(previous, None);
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 }
 
@@ -1373,7 +1382,7 @@ fn five_items_swap_remove_insert() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(previous, None);
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let key = 2;
@@ -1383,7 +1392,7 @@ fn five_items_swap_remove_insert() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(previous, Some(Identity(42)));
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let key = 4;
@@ -1393,7 +1402,7 @@ fn five_items_swap_remove_insert() {
         .expect("key-to-usize conversions should not fail");
 
     assert_eq!(previous, None);
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 }
 
@@ -1432,21 +1441,21 @@ fn five_items_remove_push() {
     let key = sparse_arena
         .push(value)
         .expect("key-to-usize conversions should not fail");
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let value = Identity(1);
     let key = sparse_arena
         .push(value)
         .expect("key-to-usize conversions should not fail");
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let value = Identity(10);
     let key = sparse_arena
         .push(value)
         .expect("key-to-usize conversions should not fail");
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 }
 
@@ -1485,21 +1494,21 @@ fn five_items_swap_remove_push() {
     let key = sparse_arena
         .push(value)
         .expect("key-to-usize conversions should not fail");
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let value = Identity(1);
     let key = sparse_arena
         .push(value)
         .expect("key-to-usize conversions should not fail");
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let value = Identity(10);
     let key = sparse_arena
         .push(value)
         .expect("key-to-usize conversions should not fail");
-    assert_eq!(sparse_arena.get(key), Some(&value.0));
+    assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 }
 
@@ -1525,22 +1534,25 @@ fn five_items_retain() {
     sparse_arena.retain(|key, _| key % 2 == 0);
     assert_eq!(sparse_arena.len(), 3);
     assert_eq!(sparse_arena.as_keys_slice(), &[8, 4, 6]);
-    assert_eq!(sparse_arena.as_slices(), &[34, 69, 666]);
+    assert_eq!(
+        sparse_arena.as_slices(),
+        &[34.into(), 69.into(), 666.into()],
+    );
 
-    assert_eq!(sparse_arena.get(8), Some(&34));
+    assert_eq!(sparse_arena.get(8), Some(&34.into()));
     assert_eq!(sparse_arena.get(1), None);
-    assert_eq!(sparse_arena.get(4), Some(&69));
+    assert_eq!(sparse_arena.get(4), Some(&69.into()));
     assert_eq!(sparse_arena.get(3), None);
-    assert_eq!(sparse_arena.get(6), Some(&666));
+    assert_eq!(sparse_arena.get(6), Some(&666.into()));
 
-    sparse_arena.retain(|_, value| *value % 2 == 1);
+    sparse_arena.retain(|_, value| **value % 2 == 1);
     assert_eq!(sparse_arena.len(), 1);
     assert_eq!(sparse_arena.as_keys_slice(), &[4]);
-    assert_eq!(sparse_arena.as_slices(), &[69]);
+    assert_eq!(sparse_arena.as_slices(), &[69.into()]);
 
     assert_eq!(sparse_arena.get(8), None);
     assert_eq!(sparse_arena.get(1), None);
-    assert_eq!(sparse_arena.get(4), Some(&69));
+    assert_eq!(sparse_arena.get(4), Some(&69.into()));
     assert_eq!(sparse_arena.get(3), None);
     assert_eq!(sparse_arena.get(6), None);
 }
@@ -1566,7 +1578,10 @@ fn five_items_drain() {
 
     let drain = sparse_arena.drain();
     assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
-    assert_eq!(drain.as_values_slice(), &[34, 42, 69, 228, 666]);
+    assert_eq!(
+        drain.as_values_slice(),
+        &[34.into(), 42.into(), 69.into(), 228.into(), 666.into()],
+    );
 
     forget(drain);
     assert_eq!(sparse_arena.len(), 0);
@@ -1597,18 +1612,21 @@ fn five_items_insert_truncate() {
     sparse_arena.truncate(usize::MAX, 5);
     assert_eq!(sparse_arena.sparse_len(), 5);
     assert_eq!(sparse_arena.as_keys_slice(), &[1, 4, 3]);
-    assert_eq!(sparse_arena.as_slices(), &[42, 69, 228]);
+    assert_eq!(
+        sparse_arena.as_slices(),
+        &[42.into(), 69.into(), 228.into()],
+    );
 
-    assert_eq!(sparse_arena.get(1), Some(&42));
-    assert_eq!(sparse_arena.get(4), Some(&69));
-    assert_eq!(sparse_arena.get(3), Some(&228));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
+    assert_eq!(sparse_arena.get(4), Some(&69.into()));
+    assert_eq!(sparse_arena.get(3), Some(&228.into()));
 
     sparse_arena.truncate(1, usize::MAX);
     assert_eq!(sparse_arena.len(), 1);
     assert_eq!(sparse_arena.as_keys_slice(), &[1]);
-    assert_eq!(sparse_arena.as_slices(), &[42]);
+    assert_eq!(sparse_arena.as_slices(), &[42.into()]);
 
-    assert_eq!(sparse_arena.get(1), Some(&42));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
 }
 
 #[test]
@@ -1633,20 +1651,20 @@ fn five_items_push_truncate() {
     sparse_arena.truncate(usize::MAX, 3);
     assert_eq!(sparse_arena.sparse_len(), 3);
     assert_eq!(sparse_arena.as_keys_slice(), &[key0, key1, key2]);
-    assert_eq!(sparse_arena.as_slices(), &[34, 42, 69]);
+    assert_eq!(sparse_arena.as_slices(), &[34.into(), 42.into(), 69.into()]);
 
-    assert_eq!(sparse_arena.get(key0), Some(&34));
-    assert_eq!(sparse_arena.get(key1), Some(&42));
-    assert_eq!(sparse_arena.get(key2), Some(&69));
+    assert_eq!(sparse_arena.get(key0), Some(&34.into()));
+    assert_eq!(sparse_arena.get(key1), Some(&42.into()));
+    assert_eq!(sparse_arena.get(key2), Some(&69.into()));
     assert_eq!(sparse_arena.get(key3), None);
     assert_eq!(sparse_arena.get(key4), None);
 
     sparse_arena.truncate(1, usize::MAX);
     assert_eq!(sparse_arena.len(), 1);
     assert_eq!(sparse_arena.as_keys_slice(), &[key0]);
-    assert_eq!(sparse_arena.as_slices(), &[34]);
+    assert_eq!(sparse_arena.as_slices(), &[34.into()]);
 
-    assert_eq!(sparse_arena.get(key0), Some(&34));
+    assert_eq!(sparse_arena.get(key0), Some(&34.into()));
 }
 
 #[test]
@@ -1670,13 +1688,16 @@ fn five_items_sort() {
 
     sparse_arena.sort();
     assert_eq!(sparse_arena.as_keys_slice(), &[6, 8, 4, 1, 3]);
-    assert_eq!(sparse_arena.as_slices(), &[34, 42, 69, 228, 666]);
+    assert_eq!(
+        sparse_arena.as_slices(),
+        &[34.into(), 42.into(), 69.into(), 228.into(), 666.into()],
+    );
 
-    assert_eq!(sparse_arena.get(8), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&228));
-    assert_eq!(sparse_arena.get(4), Some(&69));
-    assert_eq!(sparse_arena.get(3), Some(&666));
-    assert_eq!(sparse_arena.get(6), Some(&34));
+    assert_eq!(sparse_arena.get(8), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&228.into()));
+    assert_eq!(sparse_arena.get(4), Some(&69.into()));
+    assert_eq!(sparse_arena.get(3), Some(&666.into()));
+    assert_eq!(sparse_arena.get(6), Some(&34.into()));
 }
 
 #[test]
@@ -1700,13 +1721,16 @@ fn five_items_sort_keys() {
 
     sparse_arena.sort_keys();
     assert_eq!(sparse_arena.as_keys_slice(), &[1, 3, 4, 6, 8]);
-    assert_eq!(sparse_arena.as_slices(), &[228, 666, 69, 34, 42]);
+    assert_eq!(
+        sparse_arena.as_slices(),
+        &[228.into(), 666.into(), 69.into(), 34.into(), 42.into()],
+    );
 
-    assert_eq!(sparse_arena.get(8), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&228));
-    assert_eq!(sparse_arena.get(4), Some(&69));
-    assert_eq!(sparse_arena.get(3), Some(&666));
-    assert_eq!(sparse_arena.get(6), Some(&34));
+    assert_eq!(sparse_arena.get(8), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&228.into()));
+    assert_eq!(sparse_arena.get(4), Some(&69.into()));
+    assert_eq!(sparse_arena.get(3), Some(&666.into()));
+    assert_eq!(sparse_arena.get(6), Some(&34.into()));
 }
 
 #[test]
@@ -1730,13 +1754,16 @@ fn five_items_sort_by() {
 
     sparse_arena.sort_by(|(_, a), (_, b)| Ord::cmp(b, a));
     assert_eq!(sparse_arena.as_keys_slice(), &[3, 1, 4, 8, 6]);
-    assert_eq!(sparse_arena.as_slices(), &[666, 228, 69, 42, 34]);
+    assert_eq!(
+        sparse_arena.as_slices(),
+        &[666.into(), 228.into(), 69.into(), 42.into(), 34.into()],
+    );
 
-    assert_eq!(sparse_arena.get(8), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&228));
-    assert_eq!(sparse_arena.get(4), Some(&69));
-    assert_eq!(sparse_arena.get(3), Some(&666));
-    assert_eq!(sparse_arena.get(6), Some(&34));
+    assert_eq!(sparse_arena.get(8), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&228.into()));
+    assert_eq!(sparse_arena.get(4), Some(&69.into()));
+    assert_eq!(sparse_arena.get(3), Some(&666.into()));
+    assert_eq!(sparse_arena.get(6), Some(&34.into()));
 }
 
 #[test]
@@ -1764,7 +1791,7 @@ fn five_items_entry() {
     assert_eq!(entry.key(), 0);
     assert_eq!(entry.get(), None);
 
-    let entry = entry.and_modify(|value| *value += 1);
+    let entry = entry.and_modify(|value| **value += 1);
     assert_eq!(entry.key(), 0);
     assert_eq!(entry.get(), None);
 
@@ -1772,10 +1799,10 @@ fn five_items_entry() {
         .replace_key(1)
         .expect("key-to-usize conversions should not fail");
     assert_eq!(entry.key(), 1);
-    assert_eq!(entry.get(), Some(&228));
+    assert_eq!(entry.get(), Some(&228.into()));
 
-    let value = entry.and_modify(|value| *value += 1).or_insert(47.into());
-    assert_eq!(value, &mut 229);
+    let value = entry.and_modify(|value| **value += 1).or_insert(47.into());
+    assert_eq!(value, &mut 229.into());
 }
 
 #[test]
@@ -1792,12 +1819,15 @@ fn from_keys_values_iter() {
     let sparse_arena: SparseArena<Identity<_>> = keys.into_iter().zip(values).collect();
     assert_eq!(sparse_arena.len(), 4);
     assert_eq!(sparse_arena.keys().as_slice(), &[3, 10, 5, 1]);
-    assert_eq!(sparse_arena.values().as_slice(), &[34, 228, 69, 666]);
+    assert_eq!(
+        sparse_arena.values().as_slice(),
+        &[34.into(), 228.into(), 69.into(), 666.into()],
+    );
 
-    assert_eq!(sparse_arena.get(3), Some(&34));
-    assert_eq!(sparse_arena.get(10), Some(&228));
-    assert_eq!(sparse_arena.get(5), Some(&69));
-    assert_eq!(sparse_arena.get(1), Some(&666));
+    assert_eq!(sparse_arena.get(3), Some(&34.into()));
+    assert_eq!(sparse_arena.get(10), Some(&228.into()));
+    assert_eq!(sparse_arena.get(5), Some(&69.into()));
+    assert_eq!(sparse_arena.get(1), Some(&666.into()));
 }
 
 #[test]
@@ -1816,13 +1846,16 @@ fn from_keys_values_iter_too_large_key() {
     let sparse_arena: SparseArena<Identity<_>> = keys.into_iter().zip(values).collect();
     assert_eq!(sparse_arena.len(), 4);
     assert_eq!(sparse_arena.keys().as_slice(), &[3, 10, 5, 1, usize::MAX]);
-    assert_eq!(sparse_arena.values().as_slice(), &[34, 228, 69, 666, 999]);
+    assert_eq!(
+        sparse_arena.values().as_slice(),
+        &[34.into(), 228.into(), 69.into(), 666.into(), 999.into()],
+    );
 
-    assert_eq!(sparse_arena.get(3), Some(&34));
-    assert_eq!(sparse_arena.get(10), Some(&228));
-    assert_eq!(sparse_arena.get(5), Some(&69));
-    assert_eq!(sparse_arena.get(1), Some(&666));
-    assert_eq!(sparse_arena.get(usize::MAX), Some(&999));
+    assert_eq!(sparse_arena.get(3), Some(&34.into()));
+    assert_eq!(sparse_arena.get(10), Some(&228.into()));
+    assert_eq!(sparse_arena.get(5), Some(&69.into()));
+    assert_eq!(sparse_arena.get(1), Some(&666.into()));
+    assert_eq!(sparse_arena.get(usize::MAX), Some(&999.into()));
 }
 
 #[test]
@@ -1838,13 +1871,16 @@ fn from_values_iter() {
 
     assert_eq!(sparse_arena.len(), 5);
     assert_eq!(sparse_arena.keys().as_slice(), &[0, 1, 2, 3, 4]);
-    assert_eq!(sparse_arena.values().as_slice(), &[34, 42, 69, 228, 666]);
+    assert_eq!(
+        sparse_arena.values().as_slice(),
+        &[34.into(), 42.into(), 69.into(), 228.into(), 666.into()]
+    );
 
-    assert_eq!(sparse_arena.get(0), Some(&34));
-    assert_eq!(sparse_arena.get(1), Some(&42));
-    assert_eq!(sparse_arena.get(2), Some(&69));
-    assert_eq!(sparse_arena.get(3), Some(&228));
-    assert_eq!(sparse_arena.get(4), Some(&666));
+    assert_eq!(sparse_arena.get(0), Some(&34.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
+    assert_eq!(sparse_arena.get(2), Some(&69.into()));
+    assert_eq!(sparse_arena.get(3), Some(&228.into()));
+    assert_eq!(sparse_arena.get(4), Some(&666.into()));
 }
 
 #[test]
@@ -1867,15 +1903,15 @@ fn extend_keys_values() {
     assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 5, 3, 0, 8]);
     assert_eq!(
         sparse_arena.values().as_slice(),
-        &[42, 42, 69, 228, 666, 69],
+        &[42, 42, 69, 228, 666, 69].map(Identity),
     );
 
-    assert_eq!(sparse_arena.get(2), Some(&42));
-    assert_eq!(sparse_arena.get(1), Some(&42));
-    assert_eq!(sparse_arena.get(5), Some(&69));
-    assert_eq!(sparse_arena.get(3), Some(&228));
-    assert_eq!(sparse_arena.get(0), Some(&666));
-    assert_eq!(sparse_arena.get(8), Some(&69));
+    assert_eq!(sparse_arena.get(2), Some(&42.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
+    assert_eq!(sparse_arena.get(5), Some(&69.into()));
+    assert_eq!(sparse_arena.get(3), Some(&228.into()));
+    assert_eq!(sparse_arena.get(0), Some(&666.into()));
+    assert_eq!(sparse_arena.get(8), Some(&69.into()));
 }
 
 #[test]
@@ -1897,15 +1933,15 @@ fn extend_values() {
     assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 4, 3, 0, 5]);
     assert_eq!(
         sparse_arena.values().as_slice(),
-        &[34, 42, 69, 228, 666, 201],
+        &[34, 42, 69, 228, 666, 201].map(Identity),
     );
 
-    assert_eq!(sparse_arena.get(2), Some(&34));
-    assert_eq!(sparse_arena.get(1), Some(&42));
-    assert_eq!(sparse_arena.get(4), Some(&69));
-    assert_eq!(sparse_arena.get(3), Some(&228));
-    assert_eq!(sparse_arena.get(0), Some(&666));
-    assert_eq!(sparse_arena.get(5), Some(&201));
+    assert_eq!(sparse_arena.get(2), Some(&34.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
+    assert_eq!(sparse_arena.get(4), Some(&69.into()));
+    assert_eq!(sparse_arena.get(3), Some(&228.into()));
+    assert_eq!(sparse_arena.get(0), Some(&666.into()));
+    assert_eq!(sparse_arena.get(5), Some(&201.into()));
 }
 
 #[test]
@@ -1924,9 +1960,12 @@ fn from_set() {
     let sparse_arena = SparseArena::from(sparse_set);
     assert_eq!(sparse_arena.len(), 3);
     assert_eq!(sparse_arena.keys().as_slice(), &[2, 1, 5]);
-    assert_eq!(sparse_arena.values().as_slice(), &[34, 42, 69]);
+    assert_eq!(
+        sparse_arena.values().as_slice(),
+        &[34.into(), 42.into(), 69.into()],
+    );
 
-    assert_eq!(sparse_arena.get(2), Some(&34));
-    assert_eq!(sparse_arena.get(1), Some(&42));
-    assert_eq!(sparse_arena.get(5), Some(&69));
+    assert_eq!(sparse_arena.get(2), Some(&34.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
+    assert_eq!(sparse_arena.get(5), Some(&69.into()));
 }

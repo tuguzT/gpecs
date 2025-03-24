@@ -7,9 +7,11 @@ use core::{
     slice,
 };
 
-use crate::traits::{debug_assert_ptr_is_aligned, impls::collect_array, FieldDescriptor, Soa};
+use crate::traits::{
+    debug_assert_ptr_is_aligned, impls::collect_array, FieldDescriptor, Soa, SoaToOwned,
+};
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
 #[repr(transparent)]
 pub struct Identity<T>(pub T)
 where
@@ -116,9 +118,24 @@ where
     }
 }
 
+impl<T> Clone for Identity<T>
+where
+    T: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        (**self).clone().into()
+    }
+
+    #[inline]
+    fn clone_from(&mut self, source: &Self) {
+        (**self).clone_from(source);
+    }
+}
+
 unsafe impl<T> Soa for Identity<T> {
     type Context = ();
-    type Fields = T;
+    type Fields = Identity<T>;
 
     type FieldDescriptors<'a> = [FieldDescriptor; 1];
 
@@ -147,8 +164,8 @@ unsafe impl<T> Soa for Identity<T> {
             .unwrap_or(usize::MAX)
     }
 
-    type Ptrs = *const T;
-    type MutPtrs = *mut T;
+    type Ptrs = *const Self;
+    type MutPtrs = *mut Self;
 
     type ErasedPtrs = [*const u8; 1];
     type ErasedMutPtrs = [*mut u8; 1];
@@ -250,14 +267,12 @@ unsafe impl<T> Soa for Identity<T> {
 
     #[inline]
     unsafe fn ptrs_read(_: &Self::Context, src: Self::Ptrs) -> Self {
-        let value = unsafe { ptr::read(src) };
-        value.into()
+        unsafe { ptr::read(src) }
     }
 
     #[inline]
     unsafe fn ptrs_write(_: &Self::Context, dst: Self::MutPtrs, value: Self) {
-        let src = value.into_inner();
-        unsafe { ptr::write(dst, src) }
+        unsafe { ptr::write(dst, value) }
     }
 
     #[inline]
@@ -265,7 +280,7 @@ unsafe impl<T> Soa for Identity<T> {
         unsafe { ptr::drop_in_place(ptrs) }
     }
 
-    type NonNullPtrs = NonNull<T>;
+    type NonNullPtrs = NonNull<Self>;
 
     #[inline]
     unsafe fn ptrs_to_nonnull(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
@@ -277,7 +292,7 @@ unsafe impl<T> Soa for Identity<T> {
         ptrs.as_ptr()
     }
 
-    type Vecs = Vec<T>;
+    type Vecs = Vec<Self>;
 
     #[inline]
     fn vecs_with_capacity(_: &Self::Context, capacity: usize) -> Self::Vecs {
@@ -305,12 +320,12 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     type Refs<'a>
-        = &'a T
+        = &'a Self
     where
         Self: 'a;
 
     type RefsMut<'a>
-        = &'a mut T
+        = &'a mut Self
     where
         Self: 'a;
 
@@ -339,8 +354,8 @@ unsafe impl<T> Soa for Identity<T> {
         &*refs
     }
 
-    type SlicePtrs = *const [T];
-    type SliceMutPtrs = *mut [T];
+    type SlicePtrs = *const [Self];
+    type SliceMutPtrs = *mut [Self];
 
     #[inline]
     fn slices_from_raw_parts(_: &Self::Context, ptrs: Self::Ptrs, len: usize) -> Self::SlicePtrs {
@@ -387,12 +402,12 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     type Slices<'a>
-        = &'a [T]
+        = &'a [Self]
     where
         Self: 'a;
 
     type SlicesMut<'a>
-        = &'a mut [T]
+        = &'a mut [Self]
     where
         Self: 'a;
 
@@ -460,5 +475,34 @@ unsafe impl<T> Soa for Identity<T> {
     #[inline]
     unsafe fn slices_drop_in_place(_: &Self::Context, slices: Self::SliceMutPtrs) {
         unsafe { ptr::drop_in_place(slices) }
+    }
+}
+
+impl<'a, T> SoaToOwned<'a> for &'a Identity<T>
+where
+    T: Clone,
+{
+    type Owned
+        = Identity<T>
+    where
+        Self: 'a;
+
+    #[inline]
+    fn to_owned(&self) -> Self::Owned {
+        (*self).clone()
+    }
+
+    #[inline]
+    fn clone_into(&self, target: &mut Self::Owned) {
+        target.clone_from(self);
+    }
+
+    #[inline]
+    fn clone_into_refs(
+        &self,
+        _: &<Self::Owned as Soa>::Context,
+        target: <Self::Owned as Soa>::RefsMut<'_>,
+    ) {
+        target.clone_from(self);
     }
 }

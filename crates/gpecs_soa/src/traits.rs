@@ -37,6 +37,7 @@ impl FieldDescriptor {
         let drop_fn = if mem::needs_drop::<T>() {
             let drop_fn: DropFn = |to_drop| unsafe {
                 let to_drop = to_drop.cast();
+                debug_assert_ptr_is_aligned(to_drop);
                 ptr::drop_in_place::<T>(to_drop);
             };
             Some(drop_fn)
@@ -69,18 +70,23 @@ impl FieldDescriptor {
 #[allow(clippy::missing_safety_doc)]
 #[inline]
 #[track_caller]
-pub unsafe fn drop_unaligned(to_drop: *mut u8, descriptor: &FieldDescriptor, temp: &mut [u8]) {
-    let Some(drop_fn) = descriptor.drop_fn() else {
+pub unsafe fn drop_unaligned(to_drop: *mut u8, desc: &FieldDescriptor, temp: &mut [u8]) {
+    let Some(drop_fn) = desc.drop_fn() else {
         return;
     };
+    assert!(
+        temp.len() >= desc.layout().size() * 2,
+        "temp buffer should be at least twice as big as the field layout size {} to hold for any buffer alignment",
+        desc.layout().size(),
+    );
 
-    let offset = to_drop.align_offset(descriptor.layout().align());
-    assert!(offset + descriptor.layout().size() <= temp.len());
+    let offset = temp.as_mut_ptr().align_offset(desc.layout().align());
+    let temp = &mut temp[offset..];
 
-    let temp = &raw mut temp[offset];
+    let dst = temp.as_mut_ptr();
     unsafe {
-        ptr::copy_nonoverlapping(to_drop, temp, descriptor.layout().size());
-        drop_fn(temp);
+        ptr::copy_nonoverlapping(to_drop, dst, desc.layout().size());
+        drop_fn(dst);
     }
 }
 

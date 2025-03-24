@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use core::{
     fmt::{self, Debug},
+    iter,
     mem::ManuallyDrop,
     ptr, slice,
 };
@@ -223,9 +224,7 @@ where
         if F::ALIGNED {
             unsafe { drop_fn(to_drop) }
         } else {
-            let offset = to_drop.align_offset(desc.layout().align());
-            let len = offset + desc.layout().size();
-            let mut temp = unsafe { Box::new_uninit_slice(len).assume_init() };
+            let mut temp = iter::repeat_n(0, desc.layout().size() * 2).collect::<Box<[_]>>();
             unsafe { drop_unaligned(to_drop, desc, &mut temp) }
         }
     }

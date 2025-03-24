@@ -7,6 +7,7 @@ version = "0.0.0"
 authors = ["tuguzT <timurka.tugushev@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
+rust-version = "1.84.0"
 
 [workspace.dependencies]
 gpecs_soa = { path = "crates/gpecs_soa" }

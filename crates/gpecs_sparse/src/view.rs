@@ -12,9 +12,10 @@ use crate::{
         sparse_get_with_key, sparse_index, sparse_index_mut,
     },
     assert::{
-        check_equal_epoch, check_equal_key, unwrap_dense, unwrap_dense_from_sparse_index,
-        unwrap_dense_index, unwrap_dense_index_mut, unwrap_dense_pair, unwrap_into_index,
-        unwrap_into_usize, unwrap_sparse_item, unwrap_sparse_items_pair_mut,
+        check_compatible_key, check_equal_epoch, check_equal_key, unwrap_dense,
+        unwrap_dense_from_sparse_index, unwrap_dense_index, unwrap_dense_index_mut,
+        unwrap_dense_pair, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item,
+        unwrap_sparse_items_pair_mut,
     },
     item::SparseItem,
     iter::{Iter, IterMut, Keys, Values, ValuesMut},
@@ -666,6 +667,23 @@ where
         sparse_item.epoch = sparse_item.epoch.next();
         *dense_key = K::new(sparse_index, sparse_item.epoch);
 
+        Some(*dense_key)
+    }
+
+    pub fn replace_key(&mut self, key: K) -> Option<K> {
+        let Self { dense, sparse } = self;
+
+        let sparse_index = key.sparse_index();
+        let sparse_item = sparse
+            .get_mut(sparse_index.try_into().ok()?)
+            .take_if(|item| item.epoch == key.epoch())?;
+        let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
+
+        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        let dense_key: &mut K = unwrap_dense(keys, dense_index);
+        check_compatible_key(key, *dense_key);
+
+        *dense_key = key;
         Some(*dense_key)
     }
 

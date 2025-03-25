@@ -242,6 +242,26 @@ where
 #[cold]
 #[track_caller]
 #[inline(never)]
+const fn check_compatible_key_failed() -> ! {
+    panic!("provided key and key from dense should have the same sparse index")
+}
+
+#[inline]
+#[track_caller]
+pub fn check_compatible_key<K>(key: K, dense_key: K)
+where
+    K: Key,
+{
+    check_equal_epoch(key.epoch(), dense_key.epoch());
+    if key.sparse_index() == dense_key.sparse_index() {
+        return;
+    }
+    check_compatible_key_failed()
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
 const fn check_equal_epoch_failed() -> ! {
     panic!("epoch provided by key does not match an actual epoch")
 }

@@ -3,44 +3,78 @@ use std::{
     num::Wrapping,
 };
 
-use gpecs_sparse::key::{EpochKey, Key};
+use gpecs_sparse::key::Key;
+
+use crate::world::registry::WorldId;
 
 pub mod registry;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Entity {
-    inner: EpochKey<u32, Wrapping<u16>>,
+    index: u32,
+    epoch: u16,
+    world: WorldId,
 }
 
 impl Entity {
     #[inline]
-    pub const fn new(sparse_index: u32, epoch: u16) -> Self {
-        let inner = EpochKey::new(sparse_index, Wrapping(epoch));
-        Self { inner }
+    pub const fn null() -> Self {
+        Self {
+            index: 0,
+            epoch: 0,
+            world: WorldId::null(),
+        }
     }
 
     #[inline]
-    pub const fn sparse_index(&self) -> u32 {
-        let Self { inner } = self;
-        *inner.sparse_index()
+    pub const fn new(index: u32, epoch: u16, world: WorldId) -> Self {
+        Self {
+            index,
+            epoch,
+            world,
+        }
     }
 
     #[inline]
-    pub const fn sparse_index_mut(&mut self) -> &mut u32 {
-        let Self { inner } = self;
-        inner.sparse_index_mut()
+    pub const fn is_null(&self) -> bool {
+        let Self { world, .. } = self;
+        world.is_null()
+    }
+
+    #[inline]
+    pub const fn index(&self) -> u32 {
+        let Self { index, .. } = *self;
+        index
+    }
+
+    #[inline]
+    pub const fn index_mut(&mut self) -> &mut u32 {
+        let Self { index, .. } = self;
+        index
     }
 
     #[inline]
     pub const fn epoch(&self) -> u16 {
-        let Self { inner } = self;
-        inner.epoch().0
+        let Self { epoch, .. } = *self;
+        epoch
     }
 
     #[inline]
     pub const fn epoch_mut(&mut self) -> &mut u16 {
-        let Self { inner } = self;
-        &mut inner.epoch_mut().0
+        let Self { epoch, .. } = self;
+        epoch
+    }
+
+    #[inline]
+    pub const fn world(&self) -> WorldId {
+        let Self { world, .. } = *self;
+        world
+    }
+
+    #[inline]
+    pub const fn world_mut(&mut self) -> &mut WorldId {
+        let Self { world, .. } = self;
+        world
     }
 }
 
@@ -49,11 +83,12 @@ impl Key for Entity {
     type Epoch = Wrapping<u16>;
 
     fn new(sparse_index: Self::SparseIndex, epoch: Self::Epoch) -> Self {
-        Entity::new(sparse_index, epoch.0)
+        let Wrapping(epoch) = epoch;
+        Entity::new(sparse_index, epoch, WorldId::null())
     }
 
     fn sparse_index(self) -> Self::SparseIndex {
-        Entity::sparse_index(&self)
+        Entity::index(&self)
     }
 
     fn epoch(self) -> Self::Epoch {
@@ -63,7 +98,16 @@ impl Key for Entity {
 
 impl Display for Entity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner } = self;
-        write!(f, "{}v{}", inner.sparse_index(), inner.epoch())
+        let Self {
+            index,
+            epoch,
+            world,
+        } = self;
+        if world.is_null() {
+            return write!(f, "null");
+        }
+
+        let world = world.index();
+        write!(f, "{index}v{epoch}w{world}")
     }
 }

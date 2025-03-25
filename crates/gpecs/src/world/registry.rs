@@ -56,7 +56,7 @@ impl WorldRegistry {
     }
 
     #[inline]
-    pub const fn create(&mut self) -> WorldId {
+    pub const fn spawn(&mut self) -> WorldId {
         let Self { next_id, len } = self;
 
         let id = *next_id;

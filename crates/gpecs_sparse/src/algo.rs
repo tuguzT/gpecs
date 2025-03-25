@@ -1,7 +1,10 @@
 use core::{fmt::Debug, ops};
 
 use crate::{
-    assert::{check_dense_index_bounds, check_equal_key, unwrap_dense, unwrap_into_usize},
+    assert::{
+        check_compatible_key, check_dense_index_bounds, check_equal_key, unwrap_dense,
+        unwrap_into_usize,
+    },
     item::{SparseItem, SparseItemKind},
     key::Key,
     pair::{KeyValueRefs, KeyValueRefsMut},
@@ -158,10 +161,10 @@ where
     let dense_index = sparse_item.dense_index()?;
     let dense_index = unwrap_into_usize(*dense_index);
 
-    let (&key, value) = unwrap_dense(dense, dense_index).into();
-    check_equal_key(key, K::new(sparse_index, sparse_item.epoch));
+    let (&dense_key, value) = unwrap_dense(dense, dense_index).into();
+    check_compatible_key(K::new(sparse_index, sparse_item.epoch), dense_key);
 
-    Some((key, value))
+    Some((dense_key, value))
 }
 
 pub fn sparse_get_mut_with_key<'a, K, V>(
@@ -177,10 +180,10 @@ where
     let dense_index = sparse_item.dense_index()?;
     let dense_index = unwrap_into_usize(*dense_index);
 
-    let (&mut key, value) = unwrap_dense(dense, dense_index).into();
-    check_equal_key(key, K::new(sparse_index, sparse_item.epoch));
+    let (&mut dense_key, value) = unwrap_dense(dense, dense_index).into();
+    check_compatible_key(K::new(sparse_index, sparse_item.epoch), dense_key);
 
-    Some((key, value))
+    Some((dense_key, value))
 }
 
 pub fn sparse_get_epoch<K>(
@@ -195,8 +198,8 @@ where
     let epoch = sparse_item.epoch;
     if let Some(dense_index) = sparse_item.dense_index() {
         let dense_index = unwrap_into_usize(*dense_index);
-        let key = *unwrap_dense(dense_keys, dense_index);
-        check_equal_key(key, K::new(sparse_index, epoch));
+        let dense_key = *unwrap_dense(dense_keys, dense_index);
+        check_compatible_key(K::new(sparse_index, epoch), dense_key);
     }
 
     Some(epoch)

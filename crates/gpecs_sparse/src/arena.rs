@@ -731,6 +731,12 @@ where
         view_mut.invalidate_epoch(key)
     }
 
+    #[inline]
+    pub fn replace_key(&mut self, key: K) -> Option<K> {
+        let mut view_mut = self.as_mut_view();
+        view_mut.replace_key(key)
+    }
+
     pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
         for dense_index in (dense_len..self.len()).rev() {
             let (&key, _) = self.dense.deref().index(dense_index).into();

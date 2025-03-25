@@ -5,6 +5,7 @@ use gpecs::{
     },
     component::{registry::ComponentRegistry, Component},
     entity::registry::EntityRegistry,
+    world::registry::WorldRegistry,
 };
 
 #[test]
@@ -14,8 +15,13 @@ fn storage_unit() {
         .expect("creation of storage for empty archetype should succeed");
     assert_eq!(storage.entities(), []);
 
+    let mut worlds = WorldRegistry::new();
+    let world = worlds.spawn();
+
     let mut entities = EntityRegistry::new();
-    let entity = entities.spawn();
+    let entity = entities
+        .spawn(world)
+        .expect("should not fail because world is non-null");
 
     let value = storage
         .insert::<()>(&mut components, &(), entity, ())
@@ -66,8 +72,13 @@ fn storage_tuple() {
         .expect("creation of storage for bundle `(Position, Mass)` should succeed");
     assert_eq!(storage.entities(), []);
 
+    let mut worlds = WorldRegistry::new();
+    let world = worlds.spawn();
+
     let mut entities = EntityRegistry::new();
-    let entity = entities.spawn();
+    let entity = entities
+        .spawn(world)
+        .expect("should not fail because world is non-null");
 
     let slices = storage
         .components::<(Position,)>(&mut components, &())

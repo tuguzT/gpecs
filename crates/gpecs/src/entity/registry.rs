@@ -1,10 +1,37 @@
 use std::{ops::Deref, slice::Iter, vec::IntoIter};
 
-use gpecs_sparse::{arena::EpochSparseArena, error::TryInvalidKeyError};
+use gpecs_sparse::{
+    arena::EpochSparseArena,
+    error::{TryInvalidKeyError, TryReserveError as AllocTryReserveError},
+};
+
+use crate::world::registry::WorldId;
 
 use super::Entity;
 
-pub type TryReserveError = gpecs_sparse::error::TryReserveError;
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TryReserveError {
+    TryReserve(AllocTryReserveError),
+    NullWorldId(WorldId),
+}
+
+impl From<AllocTryReserveError> for TryReserveError {
+    fn from(value: AllocTryReserveError) -> Self {
+        Self::TryReserve(value)
+    }
+}
+
+impl From<WorldId> for TryReserveError {
+    fn from(value: WorldId) -> Self {
+        Self::NullWorldId(value)
+    }
+}
+
+impl From<Entity> for TryReserveError {
+    fn from(value: Entity) -> Self {
+        value.world().into()
+    }
+}
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EntityRegistry {
@@ -63,13 +90,17 @@ impl EntityRegistry {
     #[inline]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let Self { inner } = self;
-        inner.try_reserve(additional, additional)
+
+        inner.try_reserve(additional, additional)?;
+        Ok(())
     }
 
     #[inline]
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
         let Self { inner } = self;
-        inner.try_reserve_exact(additional, additional)
+
+        inner.try_reserve_exact(additional, additional)?;
+        Ok(())
     }
 
     #[inline]
@@ -97,42 +128,76 @@ impl EntityRegistry {
     }
 
     #[inline]
-    pub fn insert(&mut self, entity: Entity) {
+    pub fn insert(&mut self, entity: Entity) -> Result<(), Entity> {
         let Self { inner } = self;
-        inner.insert(entity, ()).unwrap();
+        if entity.is_null() {
+            return Err(entity);
+        }
+
+        match inner.insert(entity, ()) {
+            Ok(_) => Ok(()),
+            Err(error) => todo!("what can we do here? {error}"),
+        }
     }
 
     #[inline]
     pub fn try_insert(&mut self, entity: Entity) -> Result<(), TryReserveError> {
         let Self { inner } = self;
+        if entity.is_null() {
+            return Err(entity.into());
+        }
 
         match inner.try_insert(entity, ()) {
             Ok(_) => Ok(()),
-            Err(TryInvalidKeyError::TryReserve(error)) => Err(error),
-            Err(_) => todo!(),
+            Err(TryInvalidKeyError::TryReserve(error)) => return Err(error.into()),
+            Err(error) => todo!("what can we do here? {error}"),
         }
     }
 
     #[inline]
-    pub fn spawn(&mut self) -> Entity {
+    pub fn spawn(&mut self, world: WorldId) -> Result<Entity, WorldId> {
         let Self { inner } = self;
-        inner.push(()).unwrap()
-    }
-
-    #[inline]
-    pub fn try_spawn(&mut self) -> Result<Entity, TryReserveError> {
-        let Self { inner } = self;
-        match inner.try_push(()) {
-            Ok(entity) => Ok(entity),
-            Err(TryInvalidKeyError::TryReserve(error)) => Err(error),
-            Err(_) => todo!(),
+        if world.is_null() {
+            return Err(world);
         }
+
+        let entity = match inner.push(()) {
+            Ok(entity) => entity,
+            Err(error) => todo!("what can we do here? {error}"),
+        };
+        let entity = inner
+            .replace_key(Entity::new(entity.index(), entity.epoch(), world))
+            .expect("entity should exist: it was just created");
+        Ok(entity)
     }
 
     #[inline]
-    pub fn despawn(&mut self, entity: Entity) {
+    pub fn try_spawn(&mut self, world: WorldId) -> Result<Entity, TryReserveError> {
         let Self { inner } = self;
+        if world.is_null() {
+            return Err(world.into());
+        }
+
+        let entity = match inner.try_push(()) {
+            Ok(entity) => entity,
+            Err(TryInvalidKeyError::TryReserve(error)) => return Err(error.into()),
+            Err(error) => todo!("what can we do here? {error}"),
+        };
+        let entity = inner
+            .replace_key(Entity::new(entity.index(), entity.epoch(), world))
+            .expect("entity should exist: it was just created");
+        Ok(entity)
+    }
+
+    #[inline]
+    pub fn despawn(&mut self, entity: Entity) -> Result<(), Entity> {
+        let Self { inner } = self;
+        if entity.is_null() {
+            return Err(entity);
+        }
+
         inner.remove(entity);
+        Ok(())
     }
 
     #[inline]
@@ -142,9 +207,20 @@ impl EntityRegistry {
     }
 
     #[inline]
-    pub fn invalidate_epoch(&mut self, entity: Entity) -> Option<Entity> {
+    pub fn invalidate_epoch(&mut self, entity: Entity) -> Result<Option<Entity>, Entity> {
         let Self { inner } = self;
-        inner.invalidate_epoch(entity)
+        if entity.is_null() {
+            return Err(entity);
+        }
+
+        let world = entity.world();
+        let Some(entity) = inner.invalidate_epoch(entity) else {
+            return Ok(None);
+        };
+        let entity = inner
+            .replace_key(Entity::new(entity.index(), entity.epoch(), world))
+            .expect("entity should exist: it was just created");
+        Ok(Some(entity))
     }
 
     #[inline]
@@ -165,6 +241,10 @@ impl EntityRegistry {
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner } = self;
+        if entity.is_null() {
+            return false;
+        }
+
         inner.contains_key(entity)
     }
 

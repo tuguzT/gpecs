@@ -13,3 +13,4 @@ pub mod bundle;
 pub mod component;
 pub mod entity;
 pub mod prelude;
+pub mod world;

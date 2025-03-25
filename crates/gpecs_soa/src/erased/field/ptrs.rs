@@ -11,7 +11,7 @@ use super::{
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedFieldPtr {
     desc: FieldDescriptor,
-    buffer: *const [u8],
+    ptr: *const u8,
 }
 
 impl ErasedFieldPtr {
@@ -21,7 +21,8 @@ impl ErasedFieldPtr {
         assert_value_buffer_len(buffer.len(), desc.layout().size());
         assert_buffer_align(buffer.cast(), desc.layout().align());
 
-        Self { desc, buffer }
+        let ptr = buffer.cast();
+        Self { desc, ptr }
     }
 
     #[inline]
@@ -41,23 +42,24 @@ impl ErasedFieldPtr {
     #[inline]
     #[track_caller]
     pub fn into<T>(self) -> *const T {
-        let Self { desc, buffer } = self;
+        let Self { desc, ptr } = self;
         assert_layout::<T>(desc.layout());
 
-        buffer.cast()
+        ptr.cast()
     }
 
     #[inline]
     pub fn cast_mut(self) -> ErasedFieldMutPtr {
-        let Self { desc, buffer } = self;
-        ErasedFieldMutPtr::new(desc, buffer.cast_mut())
+        let Self { desc, ptr } = self;
+        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast_mut(), desc.layout().size());
+        ErasedFieldMutPtr::new(desc, buffer)
     }
 
     #[inline]
     pub unsafe fn add(self, count: usize) -> Self {
-        let Self { desc, buffer } = self;
+        let Self { desc, ptr } = self;
 
-        let data = unsafe { buffer.cast::<u8>().add(count * desc.layout().size()) };
+        let data = unsafe { ptr.add(count * desc.layout().size()) };
         let len = desc.layout().size();
         let buffer = ptr::slice_from_raw_parts(data, len);
         Self::new(desc, buffer)
@@ -66,10 +68,10 @@ impl ErasedFieldPtr {
     #[inline]
     #[track_caller]
     pub unsafe fn offset_from(self, origin: Self) -> isize {
-        let Self { desc, .. } = self;
+        let Self { desc, ptr } = self;
         assert_layouts(desc.layout(), origin.descriptor().layout());
 
-        let offset = unsafe { self.as_ptr().offset_from(origin.as_ptr()) };
+        let offset = unsafe { ptr.offset_from(origin.as_ptr()) };
         let field_size = desc
             .layout()
             .size()
@@ -82,8 +84,8 @@ impl ErasedFieldPtr {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
-        let Self { desc, buffer } = self;
-        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), desc.layout().size()) };
+        let Self { desc, ptr } = self;
+        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size()) };
         ErasedFieldRef::new(desc, buffer)
     }
 
@@ -95,25 +97,26 @@ impl ErasedFieldPtr {
 
     #[inline]
     pub fn buffer(&self) -> *const [u8] {
-        let Self { buffer, .. } = *self;
-        buffer
+        let Self { desc, ptr } = *self;
+        ptr::slice_from_raw_parts(ptr, desc.layout().size())
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
-        let Self { buffer, .. } = self;
-        buffer.cast()
+        let Self { ptr, .. } = *self;
+        ptr
     }
 
     #[inline]
     pub fn into_ptr(self) -> *const u8 {
-        let Self { buffer, .. } = self;
-        buffer.cast()
+        let Self { ptr, .. } = self;
+        ptr
     }
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, *const [u8]) {
-        let Self { desc, buffer } = self;
+        let Self { desc, ptr } = self;
+        let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
         (desc, buffer)
     }
 }

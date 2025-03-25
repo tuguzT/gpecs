@@ -7,7 +7,7 @@ use super::assert::{assert_buffer_align, assert_layout, assert_value_buffer_len}
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedFieldNonNullPtr {
     desc: FieldDescriptor,
-    buffer: NonNull<[u8]>,
+    ptr: NonNull<u8>,
 }
 
 impl ErasedFieldNonNullPtr {
@@ -17,24 +17,25 @@ impl ErasedFieldNonNullPtr {
         assert_value_buffer_len(buffer.len(), desc.layout().size());
         assert_buffer_align(buffer.as_ptr().cast(), desc.layout().align());
 
-        Self { desc, buffer }
+        let ptr = buffer.cast();
+        Self { desc, ptr }
     }
 
     #[inline]
     pub fn from<T>(ptr: NonNull<T>) -> Self {
         let desc = FieldDescriptor::of::<T>();
         let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
-        let buffer = NonNull::new(ptr).expect("input pointer should be nonnull");
+        let buffer = unsafe { NonNull::new_unchecked(ptr) };
         Self::new(desc, buffer)
     }
 
     #[inline]
     #[track_caller]
     pub fn into<T>(self) -> NonNull<T> {
-        let Self { desc, buffer } = self;
+        let Self { desc, ptr } = self;
         assert_layout::<T>(desc.layout());
 
-        buffer.cast()
+        ptr.cast()
     }
 
     #[inline]
@@ -45,19 +46,22 @@ impl ErasedFieldNonNullPtr {
 
     #[inline]
     pub fn buffer(&self) -> NonNull<[u8]> {
-        let Self { buffer, .. } = *self;
-        buffer
+        let Self { ptr, desc } = *self;
+        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
+        unsafe { NonNull::new_unchecked(ptr) }
     }
 
     #[inline]
     pub fn as_ptr(&self) -> NonNull<u8> {
-        let Self { buffer, .. } = self;
+        let Self { ptr: buffer, .. } = self;
         buffer.cast()
     }
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, NonNull<[u8]>) {
-        let Self { desc, buffer } = self;
+        let Self { desc, ptr } = self;
+        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
+        let buffer = unsafe { NonNull::new_unchecked(ptr) };
         (desc, buffer)
     }
 }

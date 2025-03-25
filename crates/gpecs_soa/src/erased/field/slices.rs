@@ -16,10 +16,9 @@ use super::{
 #[derive(Clone, Copy)]
 pub struct ErasedFieldSlice<'a> {
     desc: FieldDescriptor,
-    // data is stored inline in a single buffer
-    buffer: &'a [u8],
+    ptr: *const u8,
     len: usize,
-    no_send_sync: PhantomData<*const u8>,
+    phantom: PhantomData<&'a [u8]>,
 }
 
 impl<'a> ErasedFieldSlice<'a> {
@@ -29,11 +28,12 @@ impl<'a> ErasedFieldSlice<'a> {
         assert_slice_buffer_len(buffer.len(), desc.layout().size(), len);
         assert_buffer_align(buffer.as_ptr(), desc.layout().align());
 
+        let ptr = buffer.as_ptr();
         Self {
             desc,
-            buffer,
+            ptr,
             len,
-            no_send_sync: PhantomData,
+            phantom: PhantomData,
         }
     }
 
@@ -49,24 +49,20 @@ impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     #[track_caller]
     pub unsafe fn into<T>(self) -> &'a [T] {
-        let Self {
-            desc, buffer, len, ..
-        } = self;
+        let Self { desc, ptr, len, .. } = self;
         assert_layout::<T>(desc.layout());
 
-        let data = buffer.as_ptr().cast();
+        let data = ptr.cast();
         unsafe { slice::from_raw_parts(data, len) }
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn cast<T>(&self) -> &[T] {
-        let Self {
-            desc, buffer, len, ..
-        } = *self;
+        let Self { desc, ptr, len, .. } = *self;
         assert_layout::<T>(desc.layout());
 
-        let data = buffer.as_ptr().cast();
+        let data = ptr.cast();
         unsafe { slice::from_raw_parts(data, len) }
     }
 
@@ -89,51 +85,47 @@ impl<'a> ErasedFieldSlice<'a> {
 
     #[inline]
     pub fn buffer(&self) -> &[u8] {
-        let Self { buffer, .. } = self;
-        buffer
+        let Self { desc, ptr, len, .. } = *self;
+        unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) }
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
-        let Self { buffer, .. } = self;
-        buffer.as_ptr()
+        let Self { ptr, .. } = *self;
+        ptr
     }
 
     #[inline]
     pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr {
-        let Self {
-            desc, buffer, len, ..
-        } = *self;
-        let buffer = ptr::from_ref(buffer);
+        let Self { desc, ptr, len, .. } = *self;
+        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
         ErasedFieldSlicePtr::new(desc, buffer, len)
     }
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
-        let Self { desc, buffer, .. } = *self;
-        let buffer = ptr::slice_from_raw_parts(buffer.as_ptr(), desc.layout().size());
+        let Self { desc, ptr, .. } = *self;
+        let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
         ErasedFieldPtr::new(desc, buffer)
     }
 
     #[inline]
     pub fn into_buffer(self) -> &'a [u8] {
-        let Self { buffer, .. } = self;
+        let (_, buffer, _) = self.into_parts();
         buffer
     }
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, &'a [u8], usize) {
-        let Self {
-            desc, buffer, len, ..
-        } = self;
+        let Self { desc, ptr, len, .. } = self;
+        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
         (desc, buffer, len)
     }
 
     #[inline]
     pub fn iter(&self) -> ErasedFieldSliceIter<'_> {
-        let Self {
-            desc, buffer, len, ..
-        } = *self;
+        let Self { desc, ptr, len, .. } = *self;
+        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
         let slice = ErasedFieldSlice::new(desc, buffer, len);
         ErasedFieldSliceIter::new(slice)
     }
@@ -141,9 +133,8 @@ impl<'a> ErasedFieldSlice<'a> {
 
 impl Debug for ErasedFieldSlice<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            desc, buffer, len, ..
-        } = self;
+        let Self { desc, len, .. } = self;
+        let buffer = &self.buffer();
         f.debug_struct("ErasedFieldSlice")
             .field("desc", desc)
             .field("buffer", buffer)

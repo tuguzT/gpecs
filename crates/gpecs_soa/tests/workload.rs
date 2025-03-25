@@ -1518,7 +1518,13 @@ fn three_items_erased() {
         ),
     );
 
-    vec.truncate(0);
+    // use `drain` instead of `truncate` to drop all the contents,
+    // erased vec does not do it automatically
+    for erased in vec.drain(..) {
+        let (t, u, v, w) = unsafe { erased.into::<Soa>(&context) };
+        assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
+    }
+
     vec.insert(
         0,
         ErasedSoa::from::<Soa>(&context, (1, "2".to_owned(), 3, ())),
@@ -1739,11 +1745,21 @@ fn three_items_erased() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.truncate(1);
+    // use `drain` instead of `truncate` to drop needed contents,
+    // erased vec does not do it automatically
+    for erased in vec.drain(1..) {
+        let (t, u, v, w) = unsafe { erased.into::<Soa>(&context) };
+        assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
+    }
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
 
-    vec.clear();
+    // use `drain` instead of `clear` to drop all the contents,
+    // erased vec does not do it automatically
+    for erased in vec.drain(..) {
+        let (t, u, v, w) = unsafe { erased.into::<Soa>(&context) };
+        assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
+    }
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
 
@@ -1757,15 +1773,18 @@ fn three_items_erased() {
         vec.push(ErasedSoa::from::<Soa>(&context, (4, "5".to_owned(), 6, ())));
         vec.push(ErasedSoa::from::<Soa>(&context, (7, "8".to_owned(), 9, ())));
     }
-    vec.retain_mut(|refs| {
-        let (x, _, _, _) = unsafe { refs.into::<Soa>(&context) };
+
+    // use this code instead of `retain_mut` to drop needed contents,
+    // erased vec does not do it automatically
+    for index in (0..vec.len()).rev() {
+        let (x, _, _, _) = unsafe { vec.index_mut(index).into::<Soa>(&context) };
         if *x <= 3 {
             *x += 1;
-            true
         } else {
-            false
+            let erased = vec.remove(index);
+            let _ = unsafe { erased.into::<Soa>(&context) };
         }
-    });
+    }
 
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= (1 + 2 * 10));

@@ -1,12 +1,11 @@
 use alloc::boxed::Box;
 use core::{
     fmt::{self, Debug},
-    iter,
     mem::ManuallyDrop,
     ptr, slice,
 };
 
-use crate::traits::{drop_unaligned, FieldDescriptor};
+use crate::traits::FieldDescriptor;
 
 use super::{
     super::{
@@ -180,7 +179,7 @@ impl<F> ErasedField<Aligned<F>> {
     }
 
     #[inline]
-    pub fn unaligned(self) -> ErasedField<Unaligned> {
+    pub fn into_unaligned(self) -> ErasedField<Unaligned> {
         let (desc, buffer) = self.into_parts();
         ErasedField::new(desc, &buffer)
     }
@@ -188,7 +187,7 @@ impl<F> ErasedField<Aligned<F>> {
 
 impl ErasedField<Unaligned> {
     #[inline]
-    pub fn aligned<F>(self) -> ErasedField<Aligned<F>> {
+    pub fn into_aligned<F>(self) -> ErasedField<Aligned<F>> {
         let (desc, buffer) = self.into_parts();
         ErasedField::new(desc, &buffer)
     }
@@ -207,25 +206,5 @@ where
             .field("buffer", buffer)
             .field("aligned", aligned)
             .finish()
-    }
-}
-
-impl<F> Drop for ErasedField<F>
-where
-    F: Fields,
-{
-    fn drop(&mut self) {
-        let Self { ref desc, buffer } = self;
-        let Some(drop_fn) = desc.drop_fn() else {
-            return;
-        };
-
-        let to_drop = buffer.as_mut_ptr().cast::<u8>();
-        if F::ALIGNED {
-            unsafe { drop_fn(to_drop) }
-        } else {
-            let mut temp = iter::repeat_n(0, desc.layout().size() * 2).collect::<Box<[_]>>();
-            unsafe { drop_unaligned(to_drop, desc, &mut temp) }
-        }
     }
 }

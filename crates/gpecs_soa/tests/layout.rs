@@ -60,7 +60,7 @@ fn into_iter_null_opt() {
 #[cfg_attr(miri, ignore)]
 fn erased_context() {
     let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
-    let _context = ErasedSoaContext::<i16>::new(descriptors, None);
+    let _context = ErasedSoaContext::<i16>::new(descriptors);
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn erased_context() {
 #[cfg_attr(miri, ignore)]
 fn erased_context_fail() {
     let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
-    let _context = ErasedSoaContext::<u8>::new(descriptors, None);
+    let _context = ErasedSoaContext::<u8>::new(descriptors);
 }
 
 #[test]
@@ -201,8 +201,7 @@ fn erased_value() {
 
     let mut fields = erased_value.into_fields().into_vec();
     let field = fields.pop().expect("string field should exist");
-    assert_eq!(unsafe { field.as_field_ref().into::<String>() }, &str);
-    drop(field.unaligned());
+    assert_eq!(unsafe { field.into::<String>() }, str);
 
     let erased_value = ErasedSoa::new(fields.into_iter().map(ErasedField::into_parts));
     assert!(erased_value

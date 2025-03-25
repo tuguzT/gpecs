@@ -2,10 +2,9 @@ use core::{
     alloc::{Layout, LayoutError},
     any::type_name,
     borrow::Borrow,
-    ptr,
 };
 
-pub use desc::{DropFn, FieldDescriptor};
+pub use desc::FieldDescriptor;
 
 #[doc(hidden)]
 pub mod impls;
@@ -346,26 +345,4 @@ pub(super) fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
         align_of::<T>(),
         ptr.cast::<u8>().align_offset(align_of::<T>()),
     )
-}
-
-#[inline]
-#[track_caller]
-pub(super) unsafe fn drop_unaligned(to_drop: *mut u8, desc: &FieldDescriptor, temp: &mut [u8]) {
-    let Some(drop_fn) = desc.drop_fn() else {
-        return;
-    };
-    assert!(
-        temp.len() >= desc.layout().size() * 2,
-        "temp buffer should be at least twice as big as the field layout size of {} to hold for any buffer alignment",
-        desc.layout().size(),
-    );
-
-    let offset = temp.as_mut_ptr().align_offset(desc.layout().align());
-    let temp = &mut temp[offset..];
-
-    let dst = temp.as_mut_ptr();
-    unsafe {
-        ptr::copy_nonoverlapping(to_drop, dst, desc.layout().size());
-        drop_fn(dst);
-    }
 }

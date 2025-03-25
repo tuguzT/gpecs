@@ -447,7 +447,7 @@ where
     let erased_value = ErasedSoa::from(context, value).into_fields();
     validate_components::<B>(components, context)
         .zip(erased_value)
-        .map(|(component_id, field)| (component_id, field.unaligned()))
+        .map(|(component_id, field)| (component_id, field.into_unaligned()))
         .collect()
 }
 

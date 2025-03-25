@@ -53,7 +53,7 @@ mod value;
 mod vecs;
 
 unsafe impl<Fields> Soa for ErasedSoa<Fields> {
-    type Context = ErasedSoaContext<'static, Fields>;
+    type Context = ErasedSoaContext<Fields>;
 
     type Fields = Fields;
 
@@ -387,9 +387,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             })
     }
 
-    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs) {
-        let iter = iter::once(ptrs.field_ptrs());
-        context.drop_in_place(iter);
+    unsafe fn ptrs_drop_in_place(_: &Self::Context, _: Self::MutPtrs) {
+        // do nothing; it's safe to not drop anything
     }
 
     type NonNullPtrs = ErasedSoaNonNullPtrs<Fields>;
@@ -822,8 +821,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs) {
-        let iter = slices.into_iter().map(ErasedSoaMutPtrs::into_field_ptrs);
-        context.drop_in_place(iter);
+    unsafe fn slices_drop_in_place(_: &Self::Context, _: Self::SliceMutPtrs) {
+        // do nothing; it's safe to not drop anything
     }
 }

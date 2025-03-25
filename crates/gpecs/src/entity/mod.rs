@@ -64,6 +64,6 @@ impl Key for Entity {
 impl Display for Entity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner } = self;
-        inner.fmt(f)
+        write!(f, "{}v{}", inner.sparse_index(), inner.epoch())
     }
 }

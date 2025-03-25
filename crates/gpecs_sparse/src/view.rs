@@ -1,6 +1,6 @@
 use core::{
     cmp,
-    fmt::{self, Debug, Display},
+    fmt::{self, Debug},
     hash::{self, Hash},
     mem::swap,
     ops::{Index, IndexMut},
@@ -215,7 +215,7 @@ where
     #[track_caller]
     pub fn index(&self, key: K) -> V::Refs<'_>
     where
-        K: Display,
+        K: Debug,
     {
         let (_, refs) = self.index_with_context(key);
         refs
@@ -225,7 +225,7 @@ where
     #[track_caller]
     pub fn index_with_context(&self, key: K) -> (&V::Context, V::Refs<'_>)
     where
-        K: Display,
+        K: Debug,
     {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.iter_with_context();
@@ -236,7 +236,7 @@ where
     #[track_caller]
     pub fn into_index(self, key: K) -> V::Refs<'a>
     where
-        K: Display,
+        K: Debug,
     {
         let (_, refs) = self.into_index_with_context(key);
         refs
@@ -246,7 +246,7 @@ where
     #[track_caller]
     pub fn into_index_with_context(self, key: K) -> (&'a V::Context, V::Refs<'a>)
     where
-        K: Display,
+        K: Debug,
     {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.iter_with_context();
@@ -365,7 +365,7 @@ where
 
 impl<T, K, V> Index<K> for EpochSparseView<'_, K, V>
 where
-    K: Key + Display,
+    K: Key + Debug,
     for<'a> V: Soa<Refs<'a> = &'a T> + 'a,
 {
     type Output = T;
@@ -983,7 +983,7 @@ where
     #[track_caller]
     pub fn index(&self, key: K) -> V::Refs<'_>
     where
-        K: Display,
+        K: Debug,
     {
         let (_, refs) = self.index_with_context(key);
         refs
@@ -993,7 +993,7 @@ where
     #[track_caller]
     pub fn index_with_context(&self, key: K) -> (&V::Context, V::Refs<'_>)
     where
-        K: Display,
+        K: Debug,
     {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.iter_with_context();
@@ -1004,7 +1004,7 @@ where
     #[track_caller]
     pub fn into_index(self, key: K) -> V::Refs<'a>
     where
-        K: Display,
+        K: Debug,
     {
         let (_, refs) = self.into_index_with_context(key);
         refs
@@ -1014,7 +1014,7 @@ where
     #[track_caller]
     pub fn into_index_with_context(self, key: K) -> (&'a V::Context, V::Refs<'a>)
     where
-        K: Display,
+        K: Debug,
     {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.iter_with_context();
@@ -1025,7 +1025,7 @@ where
     #[track_caller]
     pub fn index_mut(&mut self, key: K) -> V::RefsMut<'_>
     where
-        K: Display,
+        K: Debug,
     {
         let (_, refs) = self.index_mut_with_context(key);
         refs
@@ -1035,7 +1035,7 @@ where
     #[track_caller]
     pub fn index_mut_with_context(&mut self, key: K) -> (&V::Context, V::RefsMut<'_>)
     where
-        K: Display,
+        K: Debug,
     {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.iter_mut_with_context();
@@ -1045,7 +1045,7 @@ where
     #[inline]
     pub fn into_index_mut(self, key: K) -> V::RefsMut<'a>
     where
-        K: Display,
+        K: Debug,
     {
         let (_, refs) = self.into_index_mut_with_context(key);
         refs
@@ -1055,7 +1055,7 @@ where
     #[track_caller]
     pub fn into_index_mut_with_context(self, key: K) -> (&'a V::Context, V::RefsMut<'a>)
     where
-        K: Display,
+        K: Debug,
     {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.iter_mut_with_context();
@@ -1156,7 +1156,7 @@ where
 
 impl<T, K, V> Index<K> for EpochSparseViewMut<'_, K, V>
 where
-    K: Key + Display,
+    K: Key + Debug,
     for<'a> V: Soa<Refs<'a> = &'a T> + 'a,
 {
     type Output = T;
@@ -1169,7 +1169,7 @@ where
 
 impl<T, K, V> IndexMut<K> for EpochSparseViewMut<'_, K, V>
 where
-    K: Key + Display,
+    K: Key + Debug,
     for<'a> V: Soa<Refs<'a> = &'a T, RefsMut<'a> = &'a mut T> + 'a,
 {
     #[inline]

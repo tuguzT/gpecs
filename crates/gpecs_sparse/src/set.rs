@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::{
     cmp,
-    fmt::{self, Debug, Display},
+    fmt::{self, Debug},
     hash::{self, Hash},
     ops::{Deref, DerefMut, Index, IndexMut},
 };
@@ -726,7 +726,7 @@ where
     #[inline]
     pub fn index(&self, key: K) -> V::Refs<'_>
     where
-        K: Display,
+        K: Debug,
     {
         let view = self.as_view();
         view.into_index(key)
@@ -735,7 +735,7 @@ where
     #[inline]
     pub fn index_mut(&mut self, key: K) -> V::RefsMut<'_>
     where
-        K: Display,
+        K: Debug,
     {
         let view_mut = self.as_mut_view();
         view_mut.into_index_mut(key)
@@ -970,7 +970,7 @@ where
 
 impl<T, K, V> Index<K> for EpochSparseSet<K, V>
 where
-    K: Key + Display,
+    K: Key + Debug,
     for<'a> V: Soa<Refs<'a> = &'a T> + 'a,
 {
     type Output = T;
@@ -983,7 +983,7 @@ where
 
 impl<T, K, V> IndexMut<K> for EpochSparseSet<K, V>
 where
-    K: Key + Display,
+    K: Key + Debug,
     for<'a> V: Soa<Refs<'a> = &'a T, RefsMut<'a> = &'a mut T> + 'a,
 {
     #[inline]

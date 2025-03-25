@@ -1,4 +1,4 @@
-use core::{fmt::Display, ops};
+use core::{fmt::Debug, ops};
 
 use crate::{
     assert::{check_dense_index_bounds, check_equal_key, unwrap_dense, unwrap_into_usize},
@@ -84,9 +84,9 @@ where
 #[inline(never)]
 fn sparse_index_failed<K>(key: &K) -> !
 where
-    K: Display,
+    K: Debug,
 {
-    panic!("key {key} not found")
+    panic!("key {key:?} not found")
 }
 
 #[inline]
@@ -97,7 +97,7 @@ pub fn sparse_index<'a, K, V>(
     key: K,
 ) -> V::Refs<'a>
 where
-    K: Key + Display + 'a,
+    K: Key + Debug + 'a,
     V: Soa,
 {
     match sparse_get(dense, sparse, key) {
@@ -136,7 +136,7 @@ pub fn sparse_index_mut<'a, K, V>(
     key: K,
 ) -> V::RefsMut<'a>
 where
-    K: Key + Display + 'a,
+    K: Key + Debug + 'a,
     V: Soa,
 {
     match sparse_get_mut(dense, sparse, key) {

@@ -1,8 +1,4 @@
-use core::{
-    fmt::{self, Display},
-    num::Wrapping,
-    ops::Add,
-};
+use core::{num::Wrapping, ops::Add};
 
 pub trait Key: Copy + Ord {
     type SparseIndex: SparseIndex;
@@ -75,21 +71,6 @@ impl<I, E> EpochKey<I, E> {
     pub const fn epoch_mut(&mut self) -> &mut E {
         let Self { epoch, .. } = self;
         epoch
-    }
-}
-
-impl<I, E> Display for EpochKey<I, E>
-where
-    I: Display,
-    E: Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            sparse_index,
-            epoch,
-        } = self;
-
-        write!(f, "{sparse_index}v{epoch}")
     }
 }
 

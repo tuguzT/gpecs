@@ -463,3 +463,13 @@ impl ExactSizeIterator for ErasedFieldSliceMutPtrIter {
 }
 
 impl FusedIterator for ErasedFieldSliceMutPtrIter {}
+
+#[inline]
+pub fn field_slice_from_raw_parts_mut(
+    data: ErasedFieldMutPtr,
+    len: usize,
+) -> ErasedFieldSliceMutPtr {
+    let (desc, data) = data.into_parts();
+    let buffer = ptr::slice_from_raw_parts_mut(data.cast(), len * desc.layout().size());
+    ErasedFieldSliceMutPtr::new(desc, buffer, len)
+}

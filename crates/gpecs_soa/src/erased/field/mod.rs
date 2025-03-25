@@ -4,8 +4,10 @@ pub use self::{
     ptrs_mut::ErasedFieldMutPtr,
     refs::ErasedFieldRef,
     refs_mut::ErasedFieldRefMut,
-    slice_ptrs::{ErasedFieldSlicePtr, ErasedFieldSlicePtrIter},
-    slice_ptrs_mut::{ErasedFieldSliceMutPtr, ErasedFieldSliceMutPtrIter},
+    slice_ptrs::{field_slice_from_raw_parts, ErasedFieldSlicePtr, ErasedFieldSlicePtrIter},
+    slice_ptrs_mut::{
+        field_slice_from_raw_parts_mut, ErasedFieldSliceMutPtr, ErasedFieldSliceMutPtrIter,
+    },
     slices::{ErasedFieldSlice, ErasedFieldSliceIter},
     slices_mut::{ErasedFieldSliceIterMut, ErasedFieldSliceMut},
     value::ErasedField,

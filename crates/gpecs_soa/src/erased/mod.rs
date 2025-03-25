@@ -14,8 +14,8 @@ use self::{
     assert::assert_layouts,
     byte::ErasedByte,
     field::{
-        ErasedFieldMutPtr, ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldSliceMutPtr,
-        ErasedFieldSlicePtr,
+        field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
+        ErasedFieldNonNullPtr, ErasedFieldPtr,
     },
 };
 
@@ -601,12 +601,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .iter()
             .zip(ptrs.into_fields())
             .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
-            .map(|(_, ptr)| {
-                let desc = ptr.descriptor();
-                let data = ptr.as_ptr();
-                let buffer = ptr::slice_from_raw_parts(data, len * desc.layout().size());
-                ErasedFieldSlicePtr::new(desc, buffer, len)
-            });
+            .map(|(_, data)| field_slice_from_raw_parts(data, len));
         ErasedSoaSlicePtrs::new(len, slices)
     }
 
@@ -622,12 +617,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .iter()
             .zip(ptrs.into_fields())
             .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
-            .map(|(_, ptr)| {
-                let desc = ptr.descriptor();
-                let data = ptr.as_ptr();
-                let buffer = ptr::slice_from_raw_parts_mut(data, len * desc.layout().size());
-                ErasedFieldSliceMutPtr::new(desc, buffer, len)
-            });
+            .map(|(_, data)| field_slice_from_raw_parts_mut(data, len));
         ErasedSoaSliceMutPtrs::new(len, slices)
     }
 

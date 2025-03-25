@@ -437,3 +437,10 @@ impl ExactSizeIterator for ErasedFieldSlicePtrIter {
 }
 
 impl FusedIterator for ErasedFieldSlicePtrIter {}
+
+#[inline]
+pub fn field_slice_from_raw_parts(data: ErasedFieldPtr, len: usize) -> ErasedFieldSlicePtr {
+    let (desc, data) = data.into_parts();
+    let buffer = ptr::slice_from_raw_parts(data.cast(), len * desc.layout().size());
+    ErasedFieldSlicePtr::new(desc, buffer, len)
+}

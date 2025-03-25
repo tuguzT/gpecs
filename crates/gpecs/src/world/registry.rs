@@ -1,12 +1,35 @@
+use std::num::NonZeroU16;
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
-pub struct WorldId(u16);
+pub struct WorldId(Option<NonZeroU16>);
 
 impl WorldId {
     #[inline]
-    pub fn index(&self) -> u16 {
+    pub const fn null() -> Self {
+        Self(None)
+    }
+
+    #[inline]
+    pub const fn is_null(&self) -> bool {
+        let Self(id) = self;
+        id.is_none()
+    }
+
+    #[inline]
+    pub const fn index(&self) -> u16 {
         let Self(id) = *self;
-        id
+        match id {
+            Some(id) => id.get(),
+            None => 0,
+        }
+    }
+}
+
+impl Default for WorldId {
+    #[inline]
+    fn default() -> Self {
+        Self::null()
     }
 }
 
@@ -17,39 +40,47 @@ impl From<WorldId> for u16 {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct WorldRegistry {
-    next_id: u16,
-    max_id: u16,
+    next_id: NonZeroU16,
+    len: u16,
 }
 
 impl WorldRegistry {
     #[inline]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
-            next_id: 0,
-            max_id: 0,
+            next_id: NonZeroU16::MIN,
+            len: 0,
         }
     }
 
     #[inline]
-    pub fn create(&mut self) -> WorldId {
-        let Self { next_id, max_id } = self;
+    pub const fn create(&mut self) -> WorldId {
+        let Self { next_id, len } = self;
 
         let id = *next_id;
-        *next_id = next_id.wrapping_add(1);
-        *max_id = max_id.saturating_add(1);
-        WorldId(id)
+        *next_id = wrapping_inc(*next_id);
+        *len = len.saturating_add(1);
+        WorldId(Some(id))
     }
 
     #[inline]
-    pub fn len(&self) -> u16 {
-        let Self { max_id, .. } = *self;
-        max_id
+    pub const fn len(&self) -> u16 {
+        let Self { len, .. } = *self;
+        len
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+#[inline]
+const fn wrapping_inc(value: NonZeroU16) -> NonZeroU16 {
+    match value.checked_add(1) {
+        Some(value) => value,
+        None => NonZeroU16::MIN,
     }
 }

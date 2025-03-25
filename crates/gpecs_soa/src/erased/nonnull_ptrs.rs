@@ -91,12 +91,6 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     }
 
     #[inline]
-    pub fn field_ptrs_mut(&mut self) -> &mut [ErasedFieldNonNullPtr] {
-        let Self { ptrs, .. } = self;
-        ptrs.as_mut()
-    }
-
-    #[inline]
     pub fn into_field_ptrs(self) -> Box<[ErasedFieldNonNullPtr]> {
         let Self { ptrs, .. } = self;
         ptrs

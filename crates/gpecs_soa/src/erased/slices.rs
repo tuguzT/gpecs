@@ -109,12 +109,6 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     }
 
     #[inline]
-    pub fn field_slices_mut(&mut self) -> &mut [ErasedFieldSlice<'a>] {
-        let Self { slices, .. } = self;
-        slices.as_mut()
-    }
-
-    #[inline]
     pub fn into_field_slices(self) -> Box<[ErasedFieldSlice<'a>]> {
         let Self { slices, .. } = self;
         slices

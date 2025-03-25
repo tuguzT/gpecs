@@ -87,19 +87,19 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
     }
 
     #[inline]
-    pub fn fields(&self) -> &[ErasedFieldRef<'a>] {
+    pub fn field_refs(&self) -> &[ErasedFieldRef<'a>] {
         let Self { refs, .. } = self;
         refs.as_ref()
     }
 
     #[inline]
-    pub fn fields_mut(&mut self) -> &mut [ErasedFieldRef<'a>] {
+    pub fn field_refs_mut(&mut self) -> &mut [ErasedFieldRef<'a>] {
         let Self { refs, .. } = self;
         refs.as_mut()
     }
 
     #[inline]
-    pub fn into_fields(self) -> Box<[ErasedFieldRef<'a>]> {
+    pub fn into_field_refs(self) -> Box<[ErasedFieldRef<'a>]> {
         let Self { refs, .. } = self;
         refs
     }

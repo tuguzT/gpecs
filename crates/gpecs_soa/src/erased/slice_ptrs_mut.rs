@@ -100,19 +100,19 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
     }
 
     #[inline]
-    pub fn fields(&self) -> &[ErasedFieldSliceMutPtr] {
+    pub fn field_slices(&self) -> &[ErasedFieldSliceMutPtr] {
         let Self { slices, .. } = self;
         slices.as_ref()
     }
 
     #[inline]
-    pub fn fields_mut(&mut self) -> &mut [ErasedFieldSliceMutPtr] {
+    pub fn field_slices_mut(&mut self) -> &mut [ErasedFieldSliceMutPtr] {
         let Self { slices, .. } = self;
         slices.as_mut()
     }
 
     #[inline]
-    pub fn into_fields(self) -> Box<[ErasedFieldSliceMutPtr]> {
+    pub fn into_field_slices(self) -> Box<[ErasedFieldSliceMutPtr]> {
         let Self { slices, .. } = self;
         slices
     }

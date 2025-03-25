@@ -475,7 +475,7 @@ fn into_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let erased_refs = ErasedSoaRefs::from::<B>(context, refs).into_fields();
+    let erased_refs = ErasedSoaRefs::from::<B>(context, refs).into_field_refs();
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -505,7 +505,7 @@ fn into_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs).into_fields();
+    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs).into_field_refs();
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -539,7 +539,7 @@ where
     let erased_slices = ErasedSoaSlices::from::<B>(context, slices);
     let len = erased_slices.len();
     let fields = validate_components::<B>(components, context)
-        .zip(erased_slices.into_fields())
+        .zip(erased_slices.into_field_slices())
         .collect();
     (len, fields)
 }
@@ -572,7 +572,7 @@ where
     let erased_slices = ErasedSoaSlicesMut::from::<B>(context, slices);
     let len = erased_slices.len();
     let fields = validate_components::<B>(components, context)
-        .zip(erased_slices.into_fields())
+        .zip(erased_slices.into_field_slices())
         .collect();
     (len, fields)
 }

@@ -85,19 +85,19 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     }
 
     #[inline]
-    pub fn fields(&self) -> &[ErasedFieldNonNullPtr] {
+    pub fn field_ptrs(&self) -> &[ErasedFieldNonNullPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_ref()
     }
 
     #[inline]
-    pub fn fields_mut(&mut self) -> &mut [ErasedFieldNonNullPtr] {
+    pub fn field_ptrs_mut(&mut self) -> &mut [ErasedFieldNonNullPtr] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut()
     }
 
     #[inline]
-    pub fn into_fields(self) -> Box<[ErasedFieldNonNullPtr]> {
+    pub fn into_field_ptrs(self) -> Box<[ErasedFieldNonNullPtr]> {
         let Self { ptrs, .. } = self;
         ptrs
     }

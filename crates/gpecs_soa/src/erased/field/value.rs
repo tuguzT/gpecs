@@ -12,8 +12,8 @@ use super::{
         assert::validate_layout,
         byte::{Aligned, ErasedByte, Fields, Unaligned},
     },
-    assert::{assert_layout, assert_value_buffer_len},
-    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
+    assert::{assert_value_buffer_len, check_layout},
+    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut, LayoutMismatchError,
 };
 
 pub struct ErasedField<F>
@@ -62,18 +62,15 @@ where
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn into<T>(self) -> T {
-        let me = ManuallyDrop::new(self);
-        let desc = unsafe { ptr::read(&me.desc) };
-        let buffer = unsafe { ptr::read(&me.buffer) };
-        assert_layout::<T>(desc.layout());
+    pub unsafe fn into<T>(self) -> Result<T, LayoutMismatchError<Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { buffer, .. } = me;
 
         let src = buffer.as_ptr().cast();
         if F::ALIGNED {
-            unsafe { ptr::read(src) }
+            Ok(unsafe { ptr::read(src) })
         } else {
-            unsafe { ptr::read_unaligned(src) }
+            Ok(unsafe { ptr::read_unaligned(src) })
         }
     }
 
@@ -119,9 +116,7 @@ where
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, Box<[u8]>) {
-        let me = ManuallyDrop::new(self);
-        let desc = unsafe { ptr::read(&me.desc) };
-        let buffer = unsafe { ptr::read(&me.buffer) };
+        let Self { desc, buffer } = self;
 
         let data = buffer.as_ptr().cast();
         let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
@@ -132,22 +127,22 @@ where
 impl<F> ErasedField<Aligned<F>> {
     #[inline]
     #[track_caller]
-    pub unsafe fn cast<T>(&self) -> &T {
-        let Self { ref desc, buffer } = self;
-        assert_layout::<T>(desc.layout());
+    pub unsafe fn cast<T>(&self) -> Result<&T, LayoutMismatchError<&Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { buffer, .. } = me;
 
         let ptr = buffer.as_ptr().cast();
-        unsafe { &*ptr }
+        Ok(unsafe { &*ptr })
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
-        let Self { ref desc, buffer } = self;
-        assert_layout::<T>(desc.layout());
+    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, LayoutMismatchError<&mut Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { buffer, .. } = me;
 
         let ptr = buffer.as_mut_ptr().cast();
-        unsafe { &mut *ptr }
+        Ok(unsafe { &mut *ptr })
     }
 
     #[inline]

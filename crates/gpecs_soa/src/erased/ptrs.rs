@@ -49,7 +49,7 @@ impl<Fields> ErasedSoaPtrs<Fields> {
             .map(|(desc, ptr)| {
                 let len = desc.layout().size();
                 let buffer = ptr::slice_from_raw_parts(ptr, len);
-                ErasedFieldPtr::new(desc, buffer)
+                unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
             })
             .collect();
         Self {

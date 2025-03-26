@@ -7,8 +7,8 @@ use core::{
 use crate::traits::FieldDescriptor;
 
 use super::{
-    assert::{assert_buffer_align, assert_layout, assert_value_buffer_len},
-    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
+    assert::{assert_value_buffer_len, check_buffer_align, check_layout},
+    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, LayoutMismatchError, PtrNotAlignedError,
 };
 
 pub struct ErasedFieldRefMut<'a> {
@@ -20,23 +20,24 @@ pub struct ErasedFieldRefMut<'a> {
 impl<'a> ErasedFieldRefMut<'a> {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &'a mut [u8]) -> Self {
+    pub fn new(desc: FieldDescriptor, buffer: &'a mut [u8]) -> Result<Self, PtrNotAlignedError> {
         assert_value_buffer_len(buffer.len(), desc.layout().size());
-        assert_buffer_align(buffer.as_ptr(), desc.layout().align());
 
         let ptr = buffer.as_mut_ptr();
-        Self {
+        check_buffer_align(ptr, desc.layout())?;
+
+        Ok(Self {
             desc,
             ptr,
             phantom: PhantomData,
-        }
+        })
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a mut [u8]) -> Self {
         if cfg!(debug_assertions) {
-            return Self::new(desc, buffer);
+            return Self::new(desc, buffer).expect("incorrect inputs");
         }
 
         let ptr = buffer.as_mut_ptr();
@@ -56,33 +57,30 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn into<T>(self) -> &'a mut T {
-        let Self { desc, ptr, .. } = self;
-        assert_layout::<T>(desc.layout());
+    pub unsafe fn into<T>(self) -> Result<&'a mut T, LayoutMismatchError<Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { ptr, .. } = me;
 
         let ptr = ptr.cast();
-        unsafe { &mut *ptr }
+        Ok(unsafe { &mut *ptr })
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn cast<T>(&self) -> &T {
-        let Self { desc, ptr, .. } = self;
-        assert_layout::<T>(desc.layout());
+    pub unsafe fn cast<T>(&self) -> Result<&T, LayoutMismatchError<&Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { ptr, .. } = me;
 
         let ptr = ptr.cast();
-        unsafe { &*ptr }
+        Ok(unsafe { &*ptr })
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
-        let Self { desc, ptr, .. } = self;
-        assert_layout::<T>(desc.layout());
+    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, LayoutMismatchError<&mut Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { ptr, .. } = me;
 
         let ptr = ptr.cast();
-        unsafe { &mut *ptr }
+        Ok(unsafe { &mut *ptr })
     }
 
     #[inline]

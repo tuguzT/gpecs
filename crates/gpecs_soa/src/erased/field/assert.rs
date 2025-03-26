@@ -1,4 +1,6 @@
-use core::{alloc::Layout, any::type_name};
+use core::alloc::Layout;
+
+use super::{error::LayoutMismatchError, PtrNotAlignedError};
 
 #[cold]
 #[track_caller]
@@ -35,36 +37,19 @@ pub fn assert_slice_buffer_len(buffer_len: usize, layout_size: usize, len: usize
     assert_slice_buffer_len_failed(buffer_len, layout_size, len)
 }
 
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn assert_buffer_align_failed(layout_align: usize) -> ! {
-    panic!("buffer should be aligned to {layout_align}")
+#[inline]
+pub fn check_buffer_align(ptr: *const u8, target_layout: Layout) -> Result<(), PtrNotAlignedError> {
+    match ptr.align_offset(target_layout.align()) {
+        0 => Ok(()),
+        _ => Err(PtrNotAlignedError::new(ptr, target_layout)),
+    }
 }
 
 #[inline]
-#[track_caller]
-pub fn assert_buffer_align(buffer: *const u8, layout_align: usize) {
-    if buffer.align_offset(layout_align) == 0 {
-        return;
+pub fn check_layout<T, U>(layout: Layout, value: U) -> Result<U, LayoutMismatchError<U>> {
+    let expected = Layout::new::<T>();
+    match layout == expected {
+        true => Ok(value),
+        false => Err(LayoutMismatchError::new(value, expected, layout)),
     }
-    assert_buffer_align_failed(layout_align)
-}
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn assert_layout_failed<T>(layout: Layout) -> ! {
-    let target_layout = Layout::new::<T>();
-    let type_name = type_name::<T>();
-    panic!("layout {target_layout:?} of type {type_name} should match layout {layout:?}")
-}
-
-#[inline]
-#[track_caller]
-pub fn assert_layout<T>(layout: Layout) {
-    if layout == Layout::new::<T>() {
-        return;
-    }
-    assert_layout_failed::<T>(layout)
 }

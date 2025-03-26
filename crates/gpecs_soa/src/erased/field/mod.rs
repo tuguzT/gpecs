@@ -1,4 +1,5 @@
 pub use self::{
+    error::{LayoutMismatchError, PtrNotAlignedError},
     nonnull_ptrs::ErasedFieldNonNullPtr,
     ptrs::ErasedFieldPtr,
     ptrs_mut::ErasedFieldMutPtr,
@@ -14,6 +15,7 @@ pub use self::{
 };
 
 mod assert;
+mod error;
 mod nonnull_ptrs;
 mod ptrs;
 mod ptrs_mut;

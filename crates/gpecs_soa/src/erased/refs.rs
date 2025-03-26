@@ -53,7 +53,7 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
             .map(|(desc, ptr)| {
                 let len = desc.layout().size();
                 let buffer = unsafe { slice::from_raw_parts(ptr, len) };
-                ErasedFieldRef::new(desc, buffer)
+                unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
             })
             .collect();
         Self {

@@ -114,7 +114,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(ptrs)
             .map(|(desc, ptr)| {
                 let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
-                ErasedFieldPtr::new(*desc, buffer)
+                ErasedFieldPtr::new(*desc, buffer).expect("buffer should be aligned")
             })
             .collect();
         assert_eq!(descriptors.len(), ptrs.len());
@@ -133,7 +133,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(ptrs)
             .map(|(desc, ptr)| {
                 let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size());
-                ErasedFieldMutPtr::new(*desc, buffer)
+                ErasedFieldMutPtr::new(*desc, buffer).expect("buffer should be aligned")
             })
             .collect();
         assert_eq!(descriptors.len(), ptrs.len());
@@ -404,7 +404,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .map(|(_, ptr)| {
                 let desc = ptr.descriptor();
                 let buffer = unsafe { NonNull::new_unchecked(ptr.buffer()) };
-                ErasedFieldNonNullPtr::new(desc, buffer)
+                ErasedFieldNonNullPtr::new(desc, buffer).expect("buffer should be aligned")
             });
         ErasedSoaNonNullPtrs::new(ptrs)
     }
@@ -420,7 +420,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .map(|(_, ptr)| {
                 let desc = ptr.descriptor();
                 let buffer = ptr.buffer().as_ptr();
-                ErasedFieldMutPtr::new(desc, buffer)
+                ErasedFieldMutPtr::new(desc, buffer).expect("buffer should be aligned")
             });
         ErasedSoaMutPtrs::new(ptrs)
     }
@@ -456,7 +456,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                 let data = buffer.as_ptr().cast();
                 let len = desc.layout().size();
                 let buffer = ptr::slice_from_raw_parts(data, len);
-                ErasedFieldPtr::new(*desc, buffer)
+                ErasedFieldPtr::new(*desc, buffer).expect("buffer should be aligned")
             });
         ErasedSoaPtrs::new(ptrs)
     }
@@ -476,7 +476,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                 let data = buffer.as_mut_ptr().cast();
                 let len = desc.layout().size();
                 let buffer = ptr::slice_from_raw_parts_mut(data, len);
-                ErasedFieldMutPtr::new(*desc, buffer)
+                ErasedFieldMutPtr::new(*desc, buffer).expect("buffer should be aligned")
             });
         ErasedSoaMutPtrs::new(ptrs)
     }

@@ -4,8 +4,8 @@ use crate::traits::FieldDescriptor;
 
 use super::{
     super::assert::assert_layouts,
-    assert::{assert_buffer_align, assert_layout, assert_value_buffer_len},
-    ErasedFieldMutPtr, ErasedFieldRef,
+    assert::{assert_value_buffer_len, check_buffer_align, check_layout},
+    ErasedFieldMutPtr, ErasedFieldRef, LayoutMismatchError, PtrNotAlignedError,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -17,19 +17,20 @@ pub struct ErasedFieldPtr {
 impl ErasedFieldPtr {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: *const [u8]) -> Self {
+    pub fn new(desc: FieldDescriptor, buffer: *const [u8]) -> Result<Self, PtrNotAlignedError> {
         assert_value_buffer_len(buffer.len(), desc.layout().size());
-        assert_buffer_align(buffer.cast(), desc.layout().align());
 
         let ptr = buffer.cast();
-        Self { desc, ptr }
+        check_buffer_align(ptr, desc.layout())?;
+
+        Ok(Self { desc, ptr })
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: *const [u8]) -> Self {
         if cfg!(debug_assertions) {
-            return Self::new(desc, buffer);
+            return Self::new(desc, buffer).expect("incorrect inputs");
         }
 
         let ptr = buffer.cast();
@@ -51,12 +52,10 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
-    #[track_caller]
-    pub fn into<T>(self) -> *const T {
-        let Self { desc, ptr } = self;
-        assert_layout::<T>(desc.layout());
-
-        ptr.cast()
+    pub fn into<T>(self) -> Result<*const T, LayoutMismatchError<Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { ptr, .. } = me;
+        Ok(ptr.cast())
     }
 
     #[inline]

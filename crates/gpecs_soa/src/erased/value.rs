@@ -170,7 +170,7 @@ impl<Fields> ErasedSoa<Fields> {
             let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
             let len = desc.layout().size();
             let r#ref = unsafe { slice::from_raw_parts(data, len) };
-            ErasedFieldRef::new(desc.clone(), r#ref)
+            unsafe { ErasedFieldRef::new_unchecked(desc.clone(), r#ref) }
         });
         ErasedSoaRefs::new(refs)
     }
@@ -194,7 +194,7 @@ impl<Fields> ErasedSoa<Fields> {
             let data = unsafe { buffer.as_mut_ptr().cast::<u8>().add(offset) };
             let len = desc.layout().size();
             let r#ref = unsafe { slice::from_raw_parts_mut(data, len) };
-            ErasedFieldRefMut::new(desc.clone(), r#ref)
+            unsafe { ErasedFieldRefMut::new_unchecked(desc.clone(), r#ref) }
         });
         ErasedSoaRefsMut::new(refs)
     }

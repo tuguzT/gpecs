@@ -340,7 +340,8 @@ pub trait SoaToOwned<'a> {
 pub(super) fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
     debug_assert!(
         ptr.is_aligned(),
-        "pointer of {} should be aligned to {}\nits current align offset (in bytes) is {}",
+        "pointer {:p} of {} is not aligned to {}\nits current align offset (in bytes) is {}",
+        ptr,
         type_name::<T>(),
         align_of::<T>(),
         ptr.cast::<u8>().align_offset(align_of::<T>()),

@@ -55,7 +55,7 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
             .zip(ptrs)
             .map(|(desc, ptr)| {
                 let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size() * len);
-                ErasedFieldSlicePtr::new(desc, buffer, len)
+                unsafe { ErasedFieldSlicePtr::new_unchecked(desc, buffer, len) }
             })
             .collect();
         Self {

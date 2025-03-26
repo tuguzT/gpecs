@@ -51,7 +51,7 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
                 let len = desc.layout().size();
                 let ptr = ptr::slice_from_raw_parts_mut(ptr, len);
                 let buffer = unsafe { NonNull::new_unchecked(ptr) };
-                ErasedFieldNonNullPtr::new(desc, buffer)
+                unsafe { ErasedFieldNonNullPtr::new_unchecked(desc, buffer) }
             })
             .collect();
         Self {

@@ -2,7 +2,10 @@ use core::ptr::{self, NonNull};
 
 use crate::traits::FieldDescriptor;
 
-use super::assert::{assert_buffer_align, assert_layout, assert_value_buffer_len};
+use super::{
+    assert::{assert_value_buffer_len, check_buffer_align, check_layout},
+    LayoutMismatchError, PtrNotAlignedError,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedFieldNonNullPtr {
@@ -13,19 +16,20 @@ pub struct ErasedFieldNonNullPtr {
 impl ErasedFieldNonNullPtr {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: NonNull<[u8]>) -> Self {
+    pub fn new(desc: FieldDescriptor, buffer: NonNull<[u8]>) -> Result<Self, PtrNotAlignedError> {
         assert_value_buffer_len(buffer.len(), desc.layout().size());
-        assert_buffer_align(buffer.as_ptr().cast(), desc.layout().align());
 
         let ptr = buffer.cast();
-        Self { desc, ptr }
+        check_buffer_align(ptr.as_ptr(), desc.layout())?;
+
+        Ok(Self { desc, ptr })
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: NonNull<[u8]>) -> Self {
         if cfg!(debug_assertions) {
-            return Self::new(desc, buffer);
+            return Self::new(desc, buffer).expect("incorrect inputs");
         }
 
         let ptr = buffer.cast();
@@ -41,12 +45,10 @@ impl ErasedFieldNonNullPtr {
     }
 
     #[inline]
-    #[track_caller]
-    pub fn into<T>(self) -> NonNull<T> {
-        let Self { desc, ptr } = self;
-        assert_layout::<T>(desc.layout());
-
-        ptr.cast()
+    pub fn into<T>(self) -> Result<NonNull<T>, LayoutMismatchError<Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { ptr, .. } = me;
+        Ok(ptr.cast())
     }
 
     #[inline]

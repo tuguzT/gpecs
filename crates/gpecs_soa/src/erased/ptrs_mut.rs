@@ -49,7 +49,7 @@ impl<Fields> ErasedSoaMutPtrs<Fields> {
             .map(|(desc, ptr)| {
                 let len = desc.layout().size();
                 let ptr = ptr::slice_from_raw_parts_mut(ptr, len);
-                ErasedFieldMutPtr::new(desc, ptr)
+                unsafe { ErasedFieldMutPtr::new_unchecked(desc, ptr) }
             })
             .collect();
         Self {

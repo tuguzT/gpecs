@@ -53,7 +53,7 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
             .map(|(desc, ptr)| {
                 let len = desc.layout().size();
                 let buffer = unsafe { slice::from_raw_parts_mut(ptr, len) };
-                ErasedFieldRefMut::new(desc, buffer)
+                unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
             })
             .collect();
         Self {

@@ -9,8 +9,8 @@ use core::{
 use crate::traits::FieldDescriptor;
 
 use super::{
-    assert::{assert_buffer_align, assert_layout, assert_slice_buffer_len},
-    ErasedFieldPtr, ErasedFieldRef, ErasedFieldSlicePtr,
+    assert::{assert_slice_buffer_len, check_buffer_align, check_layout},
+    ErasedFieldPtr, ErasedFieldRef, ErasedFieldSlicePtr, LayoutMismatchError, PtrNotAlignedError,
 };
 
 #[derive(Clone, Copy)]
@@ -24,24 +24,29 @@ pub struct ErasedFieldSlice<'a> {
 impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &'a [u8], len: usize) -> Self {
+    pub fn new(
+        desc: FieldDescriptor,
+        buffer: &'a [u8],
+        len: usize,
+    ) -> Result<Self, PtrNotAlignedError> {
         assert_slice_buffer_len(buffer.len(), desc.layout().size(), len);
-        assert_buffer_align(buffer.as_ptr(), desc.layout().align());
 
         let ptr = buffer.as_ptr();
-        Self {
+        check_buffer_align(buffer.as_ptr(), desc.layout())?;
+
+        Ok(Self {
             desc,
             ptr,
             len,
             phantom: PhantomData,
-        }
+        })
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [u8], len: usize) -> Self {
         if cfg!(debug_assertions) {
-            return Self::new(desc, buffer, len);
+            return Self::new(desc, buffer, len).expect("incorrect inputs");
         }
 
         let ptr = buffer.as_ptr();
@@ -63,23 +68,21 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn into<T>(self) -> &'a [T] {
-        let Self { desc, ptr, len, .. } = self;
-        assert_layout::<T>(desc.layout());
+    pub unsafe fn into<T>(self) -> Result<&'a [T], LayoutMismatchError<Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { ptr, len, .. } = me;
 
         let data = ptr.cast();
-        unsafe { slice::from_raw_parts(data, len) }
+        Ok(unsafe { slice::from_raw_parts(data, len) })
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn cast<T>(&self) -> &[T] {
-        let Self { desc, ptr, len, .. } = *self;
-        assert_layout::<T>(desc.layout());
+    pub unsafe fn cast<T>(&self) -> Result<&[T], LayoutMismatchError<&Self>> {
+        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let Self { ptr, len, .. } = *me;
 
         let data = ptr.cast();
-        unsafe { slice::from_raw_parts(data, len) }
+        Ok(unsafe { slice::from_raw_parts(data, len) })
     }
 
     #[inline]

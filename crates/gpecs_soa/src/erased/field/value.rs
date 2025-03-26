@@ -154,28 +154,28 @@ impl<F> ErasedField<Aligned<F>> {
     pub fn as_field_ref(&self) -> ErasedFieldRef<'_> {
         let Self { desc, .. } = *self;
         let buffer = self.buffer();
-        ErasedFieldRef::new(desc, buffer)
+        unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
     }
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
         let Self { desc, .. } = *self;
         let buffer = ptr::from_ref(self.buffer());
-        ErasedFieldPtr::new(desc, buffer)
+        unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]
     pub fn as_field_ref_mut(&mut self) -> ErasedFieldRefMut<'_> {
         let Self { desc, .. } = *self;
         let buffer = self.buffer_mut();
-        ErasedFieldRefMut::new(desc, buffer)
+        unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
     }
 
     #[inline]
     pub fn as_field_ptr_mut(&mut self) -> ErasedFieldMutPtr {
         let Self { desc, .. } = *self;
         let buffer = ptr::from_mut(self.buffer_mut());
-        ErasedFieldMutPtr::new(desc, buffer)
+        unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]

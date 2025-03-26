@@ -32,11 +32,22 @@ impl ErasedFieldSliceMutPtr {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: *mut [u8], len: usize) -> Self {
+        if cfg!(debug_assertions) {
+            return Self::new(desc, buffer, len);
+        }
+
+        let ptr = buffer.cast();
+        Self { desc, ptr, len }
+    }
+
+    #[inline]
     pub fn from<T>(ptr: *mut [T]) -> Self {
         let len = ptr.len();
         let desc = FieldDescriptor::of::<T>();
         let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), desc.layout().size() * len);
-        Self::new(desc, buffer, len)
+        unsafe { Self::new_unchecked(desc, buffer, len) }
     }
 
     #[inline]
@@ -52,21 +63,21 @@ impl ErasedFieldSliceMutPtr {
     pub fn cast_const(self) -> ErasedFieldSlicePtr {
         let Self { desc, ptr, len } = self;
         let buffer = ptr::slice_from_raw_parts(ptr.cast_const(), desc.layout().size() * len);
-        ErasedFieldSlicePtr::new(desc, buffer, len)
+        unsafe { ErasedFieldSlicePtr::new_unchecked(desc, buffer, len) }
     }
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedFieldSlice<'a> {
         let Self { desc, ptr, len } = self;
         let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
-        ErasedFieldSlice::new(desc, buffer, len)
+        unsafe { ErasedFieldSlice::new_unchecked(desc, buffer, len) }
     }
 
     #[inline]
     pub unsafe fn deref_mut<'a>(self) -> ErasedFieldSliceMut<'a> {
         let Self { desc, ptr, len } = self;
         let buffer = unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size() * len) };
-        ErasedFieldSliceMut::new(desc, buffer, len)
+        unsafe { ErasedFieldSliceMut::new_unchecked(desc, buffer, len) }
     }
 
     #[inline]
@@ -102,7 +113,7 @@ impl ErasedFieldSliceMutPtr {
     pub fn as_field_ptr(&self) -> ErasedFieldMutPtr {
         let Self { desc, ptr, .. } = *self;
         let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size());
-        ErasedFieldMutPtr::new(desc, buffer)
+        unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -116,7 +127,7 @@ impl ErasedFieldSliceMutPtr {
     pub fn iter(&self) -> ErasedFieldSlicePtrIter {
         let Self { desc, ptr, len } = *self;
         let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size() * len);
-        let slice = ErasedFieldSlicePtr::new(desc, buffer, len);
+        let slice = unsafe { ErasedFieldSlicePtr::new_unchecked(desc, buffer, len) };
         ErasedFieldSlicePtrIter::new(slice)
     }
 
@@ -124,7 +135,7 @@ impl ErasedFieldSliceMutPtr {
     pub fn iter_mut(&mut self) -> ErasedFieldSliceMutPtrIter {
         let Self { desc, ptr, len } = *self;
         let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size() * len);
-        let slice = ErasedFieldSliceMutPtr::new(desc, buffer, len);
+        let slice = unsafe { ErasedFieldSliceMutPtr::new_unchecked(desc, buffer, len) };
         ErasedFieldSliceMutPtrIter::new(slice)
     }
 }
@@ -192,7 +203,7 @@ impl ErasedFieldSliceMutPtrIter {
         let Self { desc, buffer, .. } = *self;
         let len = self.len();
         let buffer = ptr::slice_from_raw_parts_mut(buffer.as_ptr(), len * desc.layout().size());
-        ErasedFieldSliceMutPtr::new(desc, buffer, len)
+        unsafe { ErasedFieldSliceMutPtr::new_unchecked(desc, buffer, len) }
     }
 
     #[inline]
@@ -248,7 +259,8 @@ impl Iterator for ErasedFieldSliceMutPtrIter {
 
         let ptr = unsafe { self.post_inc_start(1) };
         let buffer = ptr::slice_from_raw_parts_mut(ptr, self.desc.layout().size());
-        Some(ErasedFieldMutPtr::new(self.desc, buffer))
+        let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(self.desc, buffer) };
+        Some(ptr)
     }
 
     #[inline]
@@ -312,7 +324,7 @@ impl Iterator for ErasedFieldSliceMutPtrIter {
                 let desc = self.desc;
                 let data = ptr.add(i * self.desc.layout().size());
                 let buffer = ptr::slice_from_raw_parts_mut(data, self.desc.layout().size());
-                ErasedFieldMutPtr::new(desc, buffer)
+                ErasedFieldMutPtr::new_unchecked(desc, buffer)
             };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
@@ -439,7 +451,8 @@ impl DoubleEndedIterator for ErasedFieldSliceMutPtrIter {
 
         let ptr = unsafe { self.pre_dec_end(1) };
         let buffer = ptr::slice_from_raw_parts_mut(ptr, self.desc.layout().size());
-        Some(ErasedFieldMutPtr::new(self.desc, buffer))
+        let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(self.desc, buffer) };
+        Some(ptr)
     }
 
     #[inline]
@@ -471,5 +484,5 @@ pub fn field_slice_from_raw_parts_mut(
 ) -> ErasedFieldSliceMutPtr {
     let (desc, data) = data.into_parts();
     let buffer = ptr::slice_from_raw_parts_mut(data.cast(), len * desc.layout().size());
-    ErasedFieldSliceMutPtr::new(desc, buffer, len)
+    unsafe { ErasedFieldSliceMutPtr::new_unchecked(desc, buffer, len) }
 }

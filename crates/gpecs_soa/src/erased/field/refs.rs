@@ -34,11 +34,26 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [u8]) -> Self {
+        if cfg!(debug_assertions) {
+            return Self::new(desc, buffer);
+        }
+
+        let ptr = buffer.as_ptr();
+        Self {
+            desc,
+            ptr,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
     pub fn from<T>(r#ref: &'a T) -> Self {
         let desc = FieldDescriptor::of::<T>();
         let data = ptr::from_ref(r#ref).cast();
         let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -83,7 +98,7 @@ impl<'a> ErasedFieldRef<'a> {
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
         let Self { desc, ptr, .. } = *self;
         let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size()) };
-        ErasedFieldPtr::new(desc, buffer)
+        unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]

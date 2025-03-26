@@ -26,17 +26,28 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: *const [u8]) -> Self {
+        if cfg!(debug_assertions) {
+            return Self::new(desc, buffer);
+        }
+
+        let ptr = buffer.cast();
+        Self { desc, ptr }
+    }
+
+    #[inline]
     pub fn dangling(desc: FieldDescriptor) -> Self {
         let data = ptr::without_provenance(desc.layout().align());
         let buffer = ptr::slice_from_raw_parts(data, desc.layout().size());
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]
     pub fn from<T>(ptr: *const T) -> Self {
         let desc = FieldDescriptor::of::<T>();
         let buffer = ptr::slice_from_raw_parts(ptr.cast(), desc.layout().size());
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -52,7 +63,7 @@ impl ErasedFieldPtr {
     pub fn cast_mut(self) -> ErasedFieldMutPtr {
         let Self { desc, ptr } = self;
         let buffer = ptr::slice_from_raw_parts_mut(ptr.cast_mut(), desc.layout().size());
-        ErasedFieldMutPtr::new(desc, buffer)
+        unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -62,7 +73,7 @@ impl ErasedFieldPtr {
         let data = unsafe { ptr.add(count * desc.layout().size()) };
         let len = desc.layout().size();
         let buffer = ptr::slice_from_raw_parts(data, len);
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -86,7 +97,7 @@ impl ErasedFieldPtr {
     pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
         let Self { desc, ptr } = self;
         let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size()) };
-        ErasedFieldRef::new(desc, buffer)
+        unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
     }
 
     #[inline]

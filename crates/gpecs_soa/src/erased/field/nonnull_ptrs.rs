@@ -22,11 +22,22 @@ impl ErasedFieldNonNullPtr {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: NonNull<[u8]>) -> Self {
+        if cfg!(debug_assertions) {
+            return Self::new(desc, buffer);
+        }
+
+        let ptr = buffer.cast();
+        Self { desc, ptr }
+    }
+
+    #[inline]
     pub fn from<T>(ptr: NonNull<T>) -> Self {
         let desc = FieldDescriptor::of::<T>();
         let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
         let buffer = unsafe { NonNull::new_unchecked(ptr) };
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]

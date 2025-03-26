@@ -38,12 +38,28 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [u8], len: usize) -> Self {
+        if cfg!(debug_assertions) {
+            return Self::new(desc, buffer, len);
+        }
+
+        let ptr = buffer.as_ptr();
+        Self {
+            desc,
+            ptr,
+            len,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
     pub fn from<T>(ptr: &'a [T]) -> Self {
         let len = ptr.len();
         let desc = FieldDescriptor::of::<T>();
         let data = ptr.as_ptr().cast();
         let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size() * len) };
-        Self::new(desc, buffer, len)
+        unsafe { Self::new_unchecked(desc, buffer, len) }
     }
 
     #[inline]
@@ -99,14 +115,14 @@ impl<'a> ErasedFieldSlice<'a> {
     pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr {
         let Self { desc, ptr, len, .. } = *self;
         let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
-        ErasedFieldSlicePtr::new(desc, buffer, len)
+        unsafe { ErasedFieldSlicePtr::new_unchecked(desc, buffer, len) }
     }
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
         let Self { desc, ptr, .. } = *self;
         let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
-        ErasedFieldPtr::new(desc, buffer)
+        unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -126,7 +142,7 @@ impl<'a> ErasedFieldSlice<'a> {
     pub fn iter(&self) -> ErasedFieldSliceIter<'_> {
         let Self { desc, ptr, len, .. } = *self;
         let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
-        let slice = ErasedFieldSlice::new(desc, buffer, len);
+        let slice = unsafe { ErasedFieldSlice::new_unchecked(desc, buffer, len) };
         ErasedFieldSliceIter::new(slice)
     }
 }
@@ -199,7 +215,7 @@ impl<'a> ErasedFieldSliceIter<'a> {
         let Self { desc, buffer, .. } = *self;
         let len = self.len();
         let buffer = unsafe { slice::from_raw_parts(buffer.as_ptr(), len * desc.layout().size()) };
-        ErasedFieldSlice::new(desc, buffer, len)
+        unsafe { ErasedFieldSlice::new_unchecked(desc, buffer, len) }
     }
 
     #[inline]
@@ -256,7 +272,8 @@ impl<'a> Iterator for ErasedFieldSliceIter<'a> {
 
         let ptr = unsafe { self.post_inc_start(1) };
         let buffer = unsafe { slice::from_raw_parts(ptr, self.desc.layout().size()) };
-        Some(ErasedFieldRef::new(self.desc, buffer))
+        let item = unsafe { ErasedFieldRef::new_unchecked(self.desc, buffer) };
+        Some(item)
     }
 
     #[inline]
@@ -319,7 +336,7 @@ impl<'a> Iterator for ErasedFieldSliceIter<'a> {
             let item = unsafe {
                 let data = ptr.add(i * self.desc.layout().size());
                 let buffer = slice::from_raw_parts(data, self.desc.layout().size());
-                ErasedFieldRef::new(self.desc, buffer)
+                ErasedFieldRef::new_unchecked(self.desc, buffer)
             };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
@@ -446,7 +463,8 @@ impl DoubleEndedIterator for ErasedFieldSliceIter<'_> {
 
         let ptr = unsafe { self.pre_dec_end(1) };
         let buffer = unsafe { slice::from_raw_parts(ptr, self.desc.layout().size()) };
-        Some(ErasedFieldRef::new(self.desc, buffer))
+        let item = unsafe { ErasedFieldRef::new_unchecked(self.desc, buffer) };
+        Some(item)
     }
 
     #[inline]

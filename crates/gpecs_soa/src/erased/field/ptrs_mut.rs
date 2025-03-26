@@ -26,17 +26,28 @@ impl ErasedFieldMutPtr {
     }
 
     #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: *mut [u8]) -> Self {
+        if cfg!(debug_assertions) {
+            return Self::new(desc, buffer);
+        }
+
+        let ptr = buffer.cast();
+        Self { desc, ptr }
+    }
+
+    #[inline]
     pub fn dangling(desc: FieldDescriptor) -> Self {
         let data = ptr::without_provenance_mut(desc.layout().align());
         let buffer = ptr::slice_from_raw_parts_mut(data, desc.layout().size());
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]
     pub fn from<T>(ptr: *mut T) -> Self {
         let desc = FieldDescriptor::of::<T>();
         let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), desc.layout().size());
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -52,7 +63,7 @@ impl ErasedFieldMutPtr {
     pub fn cast_const(self) -> ErasedFieldPtr {
         let Self { desc, ptr } = self;
         let buffer = ptr::slice_from_raw_parts(ptr.cast_const(), desc.layout().size());
-        ErasedFieldPtr::new(desc, buffer)
+        unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -62,7 +73,7 @@ impl ErasedFieldMutPtr {
         let data = unsafe { ptr.add(count * desc.layout().size()) };
         let len = desc.layout().size();
         let buffer = ptr::slice_from_raw_parts_mut(data, len);
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -135,14 +146,14 @@ impl ErasedFieldMutPtr {
     pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
         let Self { desc, ptr } = self;
         let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size()) };
-        ErasedFieldRef::new(desc, buffer)
+        unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
     }
 
     #[inline]
     pub unsafe fn deref_mut<'a>(self) -> ErasedFieldRefMut<'a> {
         let Self { desc, ptr } = self;
         let buffer = unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size()) };
-        ErasedFieldRefMut::new(desc, buffer)
+        unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
     }
 
     #[inline]

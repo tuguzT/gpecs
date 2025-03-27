@@ -33,12 +33,33 @@ impl<Fields> ErasedSoaSlicePtrs<Fields> {
                 check_same_len(slice.len(), len)?;
                 Ok(slice)
             })
-            .collect::<Result<_, _>>()?;
-        Ok(Self {
+            .collect::<Result<Box<[_]>, _>>()?;
+        let me = unsafe { Self::actual_new(len, slices) };
+        Ok(me)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked<I>(len: usize, slices: I) -> Self
+    where
+        I: IntoIterator<Item = ErasedFieldSlicePtr>,
+    {
+        if cfg!(debug_assertions) {
+            return Self::new(len, slices).expect("incorrect inputs");
+        }
+        unsafe { Self::actual_new(len, slices) }
+    }
+
+    #[inline]
+    unsafe fn actual_new<I>(len: usize, slices: I) -> Self
+    where
+        I: IntoIterator<Item = ErasedFieldSlicePtr>,
+    {
+        Self {
             len,
-            slices,
+            slices: slices.into_iter().collect(),
             phantom: PhantomData,
-        })
+        }
     }
 
     #[inline]

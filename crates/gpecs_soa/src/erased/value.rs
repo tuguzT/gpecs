@@ -23,16 +23,38 @@ impl<Fields> ErasedSoa<Fields> {
         I: IntoIterator<Item = (FieldDescriptor, F)>,
         F: AsRef<[u8]>,
     {
-        let (descriptors, fields): (Vec<_>, Vec<_>) = fields
+        let fields = fields
             .into_iter()
             .map(|(desc, src)| {
                 validate_layout::<Fields>(desc.layout());
                 check_same_len(src.as_ref().len(), desc.layout().size())?;
                 Ok((desc, src))
             })
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .unzip();
+            .collect::<Result<Box<_>, _>>()?;
+        let me = unsafe { Self::actual_new(fields) };
+        Ok(me)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked<I, F>(fields: I) -> Self
+    where
+        I: IntoIterator<Item = (FieldDescriptor, F)>,
+        F: AsRef<[u8]>,
+    {
+        if cfg!(debug_assertions) {
+            return Self::new(fields).expect("incorrect inputs");
+        }
+        unsafe { Self::actual_new(fields) }
+    }
+
+    #[inline]
+    unsafe fn actual_new<I, F>(fields: I) -> Self
+    where
+        I: IntoIterator<Item = (FieldDescriptor, F)>,
+        F: AsRef<[u8]>,
+    {
+        let (descriptors, fields): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
         let descriptors = descriptors.into_boxed_slice();
 
         let (buffer_layout, offsets): (_, Box<[_]>) =
@@ -52,10 +74,10 @@ impl<Fields> ErasedSoa<Fields> {
                 ptr::copy_nonoverlapping(src, dst, len);
             }
         }
-        Ok(Self {
+        Self {
             buffer: unsafe { buffer.assume_init() },
             descriptors,
-        })
+        }
     }
 
     #[inline]

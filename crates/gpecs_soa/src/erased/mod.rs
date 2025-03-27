@@ -365,7 +365,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(src.into_field_ptrs())
             .inspect(|(desc, src)| assert_layouts(desc.layout(), src.descriptor().layout()))
             .map(|(desc, src)| (desc.clone(), unsafe { src.deref().into_buffer() }));
-        Self::new(fields).expect("all the fields should have the same length")
+        unsafe { Self::new_unchecked(fields) }
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
@@ -602,7 +602,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(ptrs.into_field_ptrs())
             .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, data)| field_slice_from_raw_parts(data, len));
-        ErasedSoaSlicePtrs::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
 
     fn slices_from_raw_parts_mut(
@@ -618,7 +618,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(ptrs.into_field_ptrs())
             .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, data)| field_slice_from_raw_parts_mut(data, len));
-        ErasedSoaSliceMutPtrs::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
 
     fn slice_ptrs_cast_const(
@@ -634,7 +634,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(slices.into_field_slices())
             .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.cast_const());
-        ErasedSoaSlicePtrs::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
 
     fn slice_ptrs_cast_mut(context: &Self::Context, slices: Self::SlicePtrs) -> Self::SliceMutPtrs {
@@ -647,7 +647,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(slices.into_field_slices())
             .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.cast_mut());
-        ErasedSoaSliceMutPtrs::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
 
     fn slice_ptrs_len(context: &Self::Context, slices: Self::SlicePtrs) -> usize {
@@ -714,7 +714,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(slices.into_field_slices())
             .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| unsafe { slice.deref() });
-        ErasedSoaSlices::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
     }
 
     unsafe fn slice_ptrs_to_slices_mut<'a>(
@@ -730,7 +730,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(slices.into_field_slices())
             .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| unsafe { slice.deref_mut() });
-        ErasedSoaSlicesMut::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSlicesMut::new_unchecked(len, slices) }
     }
 
     fn slices_len(context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
@@ -760,7 +760,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(slices.into_field_slices())
             .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.as_field_slice_ptr());
-        ErasedSoaSlicePtrs::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
 
     fn mut_slice_refs_as_slice_ptrs(
@@ -776,7 +776,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(slices.into_field_slices())
             .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, mut slice)| slice.as_field_slice_mut_ptr());
-        ErasedSoaSliceMutPtrs::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
 
     fn mut_slices_as_slices<'a>(
@@ -792,7 +792,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(slices.into_field_slices())
             .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| From::from(slice));
-        ErasedSoaSlices::new(len, slices).expect("all the slices should have the same length")
+        unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
     }
 
     fn slice_refs_as_ptrs(context: &Self::Context, slices: Self::Slices<'_>) -> Self::Ptrs {

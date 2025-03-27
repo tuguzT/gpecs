@@ -184,7 +184,7 @@ impl Display for BufferSliceLenError {
 
         write!(
             f,
-            "expected buffer len to be {item_size} item size * {len} items, but got {actual}",
+            "expected buffer len to be item size of {item_size} * {len} items, but got {actual}",
         )
     }
 }
@@ -279,7 +279,7 @@ where
         let Self {
             expected, actual, ..
         } = self;
-        write!(f, "{expected:?} does not match expected {actual:?}")
+        write!(f, "{actual:?} does not match expected {expected:?}")
     }
 }
 

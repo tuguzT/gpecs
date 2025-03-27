@@ -431,7 +431,8 @@ where
     B: Bundle,
 {
     let fields = reorder_fields::<B, _>(components, context, fields).map(ErasedField::into_parts);
-    let erased_value = ErasedSoa::<B::Fields>::new(fields);
+    let erased_value =
+        ErasedSoa::<B::Fields>::new(fields).expect("all the fields should have the same length");
     unsafe { erased_value.into::<B>(context) }
 }
 
@@ -523,7 +524,8 @@ where
     B: Bundle,
 {
     let slices = reorder_fields::<B, _>(components, context, fields);
-    let erased_slices = ErasedSoaSlices::<B::Fields>::new(len, slices);
+    let erased_slices = ErasedSoaSlices::<B::Fields>::new(len, slices)
+        .expect("all the slices should have the same length");
     unsafe { erased_slices.into::<B>(context) }
 }
 
@@ -556,7 +558,8 @@ where
     B: Bundle,
 {
     let slices = reorder_fields::<B, _>(components, context, fields);
-    let erased_slices = ErasedSoaSlicesMut::<B::Fields>::new(len, slices);
+    let erased_slices = ErasedSoaSlicesMut::<B::Fields>::new(len, slices)
+        .expect("all the slices should have the same length");
     unsafe { erased_slices.into::<B>(context) }
 }
 

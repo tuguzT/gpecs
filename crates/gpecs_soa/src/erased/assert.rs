@@ -1,5 +1,7 @@
 use core::alloc::Layout;
 
+use super::error::LenMismatchError;
+
 #[cold]
 #[track_caller]
 #[inline(never)]
@@ -18,20 +20,12 @@ pub fn validate_layout<Fields>(layout: Layout) {
     validate_layout_failed(input_align, max_align)
 }
 
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn assert_same_len_failed(base_len: usize, len: usize) -> ! {
-    panic!("length {len} should be equal to {base_len}")
-}
-
 #[inline]
-#[track_caller]
-pub fn assert_same_len(base_len: usize, len: usize) {
-    if base_len == len {
-        return;
+pub fn check_same_len(len: usize, expected_len: usize) -> Result<(), LenMismatchError> {
+    if len != expected_len {
+        return Err(LenMismatchError::new(expected_len, len));
     }
-    assert_same_len_failed(base_len, len)
+    Ok(())
 }
 
 #[cold]

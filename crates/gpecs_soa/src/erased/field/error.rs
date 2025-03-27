@@ -2,18 +2,33 @@ use core::{
     alloc::Layout,
     error::Error,
     fmt::{self, Debug, Display},
+    num::NonZeroUsize,
 };
+
+use super::super::error::LenMismatchError;
 
 #[derive(Clone)]
 pub struct PtrNotAlignedError {
     ptr: *const u8,
-    target_align: usize,
+    target_align: NonZeroUsize,
 }
+
+const _: () = assert!(
+    size_of::<PtrNotAlignedError>() == size_of::<Option<PtrNotAlignedError>>(),
+    "non-zero usize should allow for non-zero field optimization",
+);
+const _: () = assert!(
+    align_of::<PtrNotAlignedError>() == align_of::<Option<PtrNotAlignedError>>(),
+    "non-zero usize should allow for non-zero field optimization",
+);
 
 impl PtrNotAlignedError {
     #[inline]
     pub(super) fn new(ptr: *const u8, target_layout: Layout) -> Self {
-        let target_align = target_layout.align();
+        let target_align = target_layout
+            .align()
+            .try_into()
+            .expect("alignment should not be zero because it is power of two");
         Self { ptr, target_align }
     }
 
@@ -26,7 +41,7 @@ impl PtrNotAlignedError {
     #[inline]
     pub fn target_align(&self) -> usize {
         let Self { target_align, .. } = *self;
-        target_align
+        target_align.get()
     }
 }
 
@@ -47,7 +62,7 @@ impl Debug for PtrNotAlignedError {
 impl Display for PtrNotAlignedError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { ptr, target_align } = self;
-        let align_offset = ptr.align_offset(*target_align);
+        let align_offset = ptr.align_offset(target_align.get());
         write!(f, "pointer {ptr:p} is not aligned to {target_align} (its current align offset is {align_offset})")
     }
 }
@@ -55,73 +70,20 @@ impl Display for PtrNotAlignedError {
 impl Error for PtrNotAlignedError {}
 
 #[derive(Clone)]
-pub struct BufferLenError {
-    expected: usize,
-    actual: usize,
-}
-
-impl BufferLenError {
-    #[inline]
-    #[track_caller]
-    pub(super) fn new(expected: usize, actual: usize) -> Self {
-        assert_ne!(
-            expected, actual,
-            "expected and actual buffer lengths should differ from each other",
-        );
-        Self { expected, actual }
-    }
-
-    #[inline]
-    pub fn expected(&self) -> usize {
-        let Self { expected, .. } = *self;
-        expected
-    }
-
-    #[inline]
-    pub fn actual(&self) -> usize {
-        let Self { actual, .. } = *self;
-        actual
-    }
-}
-
-impl Debug for BufferLenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("BufferLenError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
-    }
-}
-
-impl Display for BufferLenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { expected, actual } = self;
-        write!(f, "expected buffer len to be {expected}, but got {actual}")
-    }
-}
-
-impl Error for BufferLenError {}
-
-#[derive(Clone)]
-pub struct BufferSliceLenError {
+pub struct SliceLenMismatchError {
     item_size: usize,
     len: usize,
     actual: usize,
 }
 
-impl BufferSliceLenError {
+impl SliceLenMismatchError {
     #[inline]
     #[track_caller]
     pub(super) fn new(item_size: usize, len: usize, actual: usize) -> Self {
         assert_ne!(
             item_size * len,
             actual,
-            "expected and actual buffer lengths should differ from each other",
+            "expected and actual lengths should differ from each other",
         );
         Self {
             item_size,
@@ -155,7 +117,7 @@ impl BufferSliceLenError {
     }
 }
 
-impl Debug for BufferSliceLenError {
+impl Debug for SliceLenMismatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !f.alternate() {
             return Display::fmt(self, f);
@@ -166,7 +128,7 @@ impl Debug for BufferSliceLenError {
             len,
             actual,
         } = self;
-        f.debug_struct("BufferSliceLenError")
+        f.debug_struct("SliceLenMismatchError")
             .field("item_size", item_size)
             .field("len", len)
             .field("actual", actual)
@@ -174,7 +136,7 @@ impl Debug for BufferSliceLenError {
     }
 }
 
-impl Display for BufferSliceLenError {
+impl Display for SliceLenMismatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             item_size,
@@ -184,12 +146,12 @@ impl Display for BufferSliceLenError {
 
         write!(
             f,
-            "expected buffer len to be item size of {item_size} * {len} items, but got {actual}",
+            "expected length to be item size of {item_size} * {len} items, but got {actual}",
         )
     }
 }
 
-impl Error for BufferSliceLenError {}
+impl Error for SliceLenMismatchError {}
 
 #[derive(Clone)]
 pub struct LayoutMismatchError<T>
@@ -288,7 +250,7 @@ impl<T> Error for LayoutMismatchError<T> where T: ?Sized {}
 #[derive(Clone)]
 pub enum ErasedFieldError {
     PtrNotAligned(PtrNotAlignedError),
-    BufferLen(BufferLenError),
+    LenMismatch(LenMismatchError),
 }
 
 impl From<PtrNotAlignedError> for ErasedFieldError {
@@ -298,10 +260,10 @@ impl From<PtrNotAlignedError> for ErasedFieldError {
     }
 }
 
-impl From<BufferLenError> for ErasedFieldError {
+impl From<LenMismatchError> for ErasedFieldError {
     #[inline]
-    fn from(error: BufferLenError) -> Self {
-        Self::BufferLen(error)
+    fn from(error: LenMismatchError) -> Self {
+        Self::LenMismatch(error)
     }
 }
 
@@ -312,7 +274,7 @@ impl Debug for ErasedFieldError {
         }
         match self {
             Self::PtrNotAligned(error) => f.debug_tuple("PtrNotAligned").field(error).finish(),
-            Self::BufferLen(error) => f.debug_tuple("BufferLen").field(error).finish(),
+            Self::LenMismatch(error) => f.debug_tuple("BufferLen").field(error).finish(),
         }
     }
 }
@@ -321,7 +283,7 @@ impl Display for ErasedFieldError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::PtrNotAligned(error) => Display::fmt(error, f),
-            Self::BufferLen(error) => Display::fmt(error, f),
+            Self::LenMismatch(error) => Display::fmt(error, f),
         }
     }
 }
@@ -330,7 +292,7 @@ impl Error for ErasedFieldError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::PtrNotAligned(error) => Some(error),
-            Self::BufferLen(error) => Some(error),
+            Self::LenMismatch(error) => Some(error),
         }
     }
 }
@@ -338,7 +300,7 @@ impl Error for ErasedFieldError {
 #[derive(Clone)]
 pub enum ErasedFieldSliceError {
     PtrNotAligned(PtrNotAlignedError),
-    BufferLen(BufferSliceLenError),
+    LenMismatch(SliceLenMismatchError),
 }
 
 impl From<PtrNotAlignedError> for ErasedFieldSliceError {
@@ -348,10 +310,10 @@ impl From<PtrNotAlignedError> for ErasedFieldSliceError {
     }
 }
 
-impl From<BufferSliceLenError> for ErasedFieldSliceError {
+impl From<SliceLenMismatchError> for ErasedFieldSliceError {
     #[inline]
-    fn from(error: BufferSliceLenError) -> Self {
-        Self::BufferLen(error)
+    fn from(error: SliceLenMismatchError) -> Self {
+        Self::LenMismatch(error)
     }
 }
 
@@ -362,7 +324,7 @@ impl Debug for ErasedFieldSliceError {
         }
         match self {
             Self::PtrNotAligned(error) => f.debug_tuple("PtrNotAligned").field(error).finish(),
-            Self::BufferLen(error) => f.debug_tuple("BufferLen").field(error).finish(),
+            Self::LenMismatch(error) => f.debug_tuple("BufferLen").field(error).finish(),
         }
     }
 }
@@ -371,7 +333,7 @@ impl Display for ErasedFieldSliceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::PtrNotAligned(error) => Display::fmt(error, f),
-            Self::BufferLen(error) => Display::fmt(error, f),
+            Self::LenMismatch(error) => Display::fmt(error, f),
         }
     }
 }
@@ -380,7 +342,7 @@ impl Error for ErasedFieldSliceError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::PtrNotAligned(error) => Some(error),
-            Self::BufferLen(error) => Some(error),
+            Self::LenMismatch(error) => Some(error),
         }
     }
 }

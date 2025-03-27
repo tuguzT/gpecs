@@ -9,11 +9,12 @@ use crate::traits::FieldDescriptor;
 
 use super::{
     super::{
-        assert::validate_layout,
+        assert::{check_same_len, validate_layout},
         byte::{Aligned, ErasedByte, Fields, Unaligned},
+        error::LenMismatchError,
     },
-    assert::{check_layout, check_value_buffer_len},
-    error::{BufferLenError, LayoutMismatchError},
+    assert::check_layout,
+    error::LayoutMismatchError,
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
 };
 
@@ -31,11 +32,11 @@ where
 {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Result<Self, BufferLenError> {
+    pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Result<Self, LenMismatchError> {
         if F::ALIGNED {
             validate_layout::<F>(desc.layout());
         }
-        check_value_buffer_len(buffer.len(), desc.layout().size())?;
+        check_same_len(buffer.len(), desc.layout().size())?;
 
         let me = unsafe { Self::actual_new(desc, buffer) };
         Ok(me)

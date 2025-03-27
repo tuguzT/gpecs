@@ -227,7 +227,8 @@ fn erased_value() {
         str,
     );
 
-    let erased_value = ErasedSoa::new(fields.into_iter().map(ErasedField::into_parts));
+    let erased_value = ErasedSoa::new(fields.into_iter().map(ErasedField::into_parts))
+        .expect("all the fields should have the same length");
     assert!(erased_value
         .as_refs()
         .field_refs()

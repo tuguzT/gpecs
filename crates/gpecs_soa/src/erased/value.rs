@@ -4,8 +4,9 @@ use core::{iter, ptr, slice};
 use crate::traits::{buffer_layout, FieldDescriptor, Soa};
 
 use super::{
-    assert::{assert_same_len, validate_layout},
+    assert::{check_same_len, validate_layout},
     byte::{Aligned, ErasedByte},
+    error::LenMismatchError,
     field::{ErasedField, ErasedFieldRef, ErasedFieldRefMut},
     ErasedSoaRefs, ErasedSoaRefsMut,
 };
@@ -17,17 +18,20 @@ pub struct ErasedSoa<Fields> {
 
 impl<Fields> ErasedSoa<Fields> {
     #[inline]
-    pub fn new<I, F>(fields: I) -> Self
+    pub fn new<I, F>(fields: I) -> Result<Self, LenMismatchError>
     where
         I: IntoIterator<Item = (FieldDescriptor, F)>,
         F: AsRef<[u8]>,
     {
         let (descriptors, fields): (Vec<_>, Vec<_>) = fields
             .into_iter()
-            .inspect(|(desc, src)| {
+            .map(|(desc, src)| {
                 validate_layout::<Fields>(desc.layout());
-                assert_same_len(desc.layout().size(), src.as_ref().len());
+                check_same_len(src.as_ref().len(), desc.layout().size())?;
+                Ok((desc, src))
             })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
             .unzip();
         let descriptors = descriptors.into_boxed_slice();
 
@@ -48,10 +52,10 @@ impl<Fields> ErasedSoa<Fields> {
                 ptr::copy_nonoverlapping(src, dst, len);
             }
         }
-        Self {
+        Ok(Self {
             buffer: unsafe { buffer.assume_init() },
             descriptors,
-        }
+        })
     }
 
     #[inline]

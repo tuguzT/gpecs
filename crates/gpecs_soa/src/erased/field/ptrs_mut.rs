@@ -4,8 +4,9 @@ use crate::traits::FieldDescriptor;
 
 use super::{
     super::assert::assert_layouts,
-    assert::{assert_value_buffer_len, check_buffer_align, check_layout},
-    ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut, LayoutMismatchError, PtrNotAlignedError,
+    assert::{check_buffer_align, check_layout, check_value_buffer_len},
+    error::{ErasedFieldError, LayoutMismatchError},
+    ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -17,11 +18,10 @@ pub struct ErasedFieldMutPtr {
 impl ErasedFieldMutPtr {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: *mut [u8]) -> Result<Self, PtrNotAlignedError> {
-        assert_value_buffer_len(buffer.len(), desc.layout().size());
-
+    pub fn new(desc: FieldDescriptor, buffer: *mut [u8]) -> Result<Self, ErasedFieldError> {
         let ptr = buffer.cast();
         check_buffer_align(ptr, desc.layout())?;
+        check_value_buffer_len(buffer.len(), desc.layout().size())?;
 
         Ok(Self { desc, ptr })
     }

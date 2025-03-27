@@ -3,8 +3,8 @@ use core::ptr::{self, NonNull};
 use crate::traits::FieldDescriptor;
 
 use super::{
-    assert::{assert_value_buffer_len, check_buffer_align, check_layout},
-    LayoutMismatchError, PtrNotAlignedError,
+    assert::{check_buffer_align, check_layout, check_value_buffer_len},
+    error::{ErasedFieldError, LayoutMismatchError},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -16,11 +16,10 @@ pub struct ErasedFieldNonNullPtr {
 impl ErasedFieldNonNullPtr {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: NonNull<[u8]>) -> Result<Self, PtrNotAlignedError> {
-        assert_value_buffer_len(buffer.len(), desc.layout().size());
-
+    pub fn new(desc: FieldDescriptor, buffer: NonNull<[u8]>) -> Result<Self, ErasedFieldError> {
         let ptr = buffer.cast();
         check_buffer_align(ptr.as_ptr(), desc.layout())?;
+        check_value_buffer_len(buffer.len(), desc.layout().size())?;
 
         Ok(Self { desc, ptr })
     }

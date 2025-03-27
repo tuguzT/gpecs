@@ -12,8 +12,9 @@ use super::{
         assert::validate_layout,
         byte::{Aligned, ErasedByte, Fields, Unaligned},
     },
-    assert::{assert_value_buffer_len, check_layout},
-    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut, LayoutMismatchError,
+    assert::{check_layout, check_value_buffer_len},
+    error::{BufferLenError, LayoutMismatchError},
+    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
 };
 
 pub struct ErasedField<F>
@@ -30,12 +31,27 @@ where
 {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Self {
+    pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Result<Self, BufferLenError> {
         if F::ALIGNED {
             validate_layout::<F>(desc.layout());
         }
-        assert_value_buffer_len(buffer.len(), desc.layout().size());
+        check_value_buffer_len(buffer.len(), desc.layout().size())?;
 
+        let me = unsafe { Self::actual_new(desc, buffer) };
+        Ok(me)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &[u8]) -> Self {
+        if cfg!(debug_assertions) {
+            return Self::new(desc, buffer).expect("incorrect inputs");
+        }
+        unsafe { Self::actual_new(desc, buffer) }
+    }
+
+    #[inline]
+    unsafe fn actual_new(desc: FieldDescriptor, buffer: &[u8]) -> Self {
         let buffer_len = buffer.len().div_ceil(size_of::<ErasedByte<F>>());
         let mut r#box = Box::new_uninit_slice(buffer_len);
         unsafe {
@@ -46,10 +62,8 @@ where
             );
         }
 
-        Self {
-            desc,
-            buffer: unsafe { r#box.assume_init() },
-        }
+        let buffer = unsafe { r#box.assume_init() };
+        Self { desc, buffer }
     }
 
     #[inline]
@@ -58,7 +72,7 @@ where
         let desc = FieldDescriptor::of::<T>();
         let data = ptr::from_ref(&value).cast();
         let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-        Self::new(desc, buffer)
+        unsafe { Self::new_unchecked(desc, buffer) }
     }
 
     #[inline]
@@ -176,7 +190,7 @@ impl<F> ErasedField<Aligned<F>> {
     #[inline]
     pub fn into_unaligned(self) -> ErasedField<Unaligned> {
         let (desc, buffer) = self.into_parts();
-        ErasedField::new(desc, &buffer)
+        unsafe { ErasedField::new_unchecked(desc, &buffer) }
     }
 }
 
@@ -184,7 +198,7 @@ impl ErasedField<Unaligned> {
     #[inline]
     pub fn into_aligned<F>(self) -> ErasedField<Aligned<F>> {
         let (desc, buffer) = self.into_parts();
-        ErasedField::new(desc, &buffer)
+        unsafe { ErasedField::new_unchecked(desc, &buffer) }
     }
 }
 

@@ -9,8 +9,9 @@ use core::{
 use crate::traits::FieldDescriptor;
 
 use super::{
-    assert::{assert_slice_buffer_len, check_buffer_align, check_layout},
-    ErasedFieldPtr, ErasedFieldRef, ErasedFieldSlicePtr, LayoutMismatchError, PtrNotAlignedError,
+    assert::{check_buffer_align, check_layout, check_slice_buffer_len},
+    error::{ErasedFieldSliceError, LayoutMismatchError},
+    ErasedFieldPtr, ErasedFieldRef, ErasedFieldSlicePtr,
 };
 
 #[derive(Clone, Copy)]
@@ -28,11 +29,10 @@ impl<'a> ErasedFieldSlice<'a> {
         desc: FieldDescriptor,
         buffer: &'a [u8],
         len: usize,
-    ) -> Result<Self, PtrNotAlignedError> {
-        assert_slice_buffer_len(buffer.len(), desc.layout().size(), len);
-
+    ) -> Result<Self, ErasedFieldSliceError> {
         let ptr = buffer.as_ptr();
         check_buffer_align(buffer.as_ptr(), desc.layout())?;
+        check_slice_buffer_len(buffer.len(), desc.layout().size(), len)?;
 
         Ok(Self {
             desc,

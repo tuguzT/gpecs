@@ -7,8 +7,9 @@ use core::{
 use crate::traits::FieldDescriptor;
 
 use super::{
-    assert::{assert_value_buffer_len, check_buffer_align, check_layout},
-    ErasedFieldPtr, LayoutMismatchError, PtrNotAlignedError,
+    assert::{check_buffer_align, check_layout, check_value_buffer_len},
+    error::{ErasedFieldError, LayoutMismatchError},
+    ErasedFieldPtr,
 };
 
 #[derive(Clone, Copy)]
@@ -21,11 +22,10 @@ pub struct ErasedFieldRef<'a> {
 impl<'a> ErasedFieldRef<'a> {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &'a [u8]) -> Result<Self, PtrNotAlignedError> {
-        assert_value_buffer_len(buffer.len(), desc.layout().size());
-
+    pub fn new(desc: FieldDescriptor, buffer: &'a [u8]) -> Result<Self, ErasedFieldError> {
         let ptr = buffer.as_ptr();
         check_buffer_align(ptr, desc.layout())?;
+        check_value_buffer_len(buffer.len(), desc.layout().size())?;
 
         Ok(Self {
             desc,

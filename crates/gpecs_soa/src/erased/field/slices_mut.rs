@@ -9,10 +9,10 @@ use core::{
 use crate::traits::FieldDescriptor;
 
 use super::{
-    assert::{assert_slice_buffer_len, check_buffer_align, check_layout},
+    assert::{check_buffer_align, check_layout, check_slice_buffer_len},
+    error::{ErasedFieldSliceError, LayoutMismatchError},
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
-    ErasedFieldSliceIter, ErasedFieldSliceMutPtr, ErasedFieldSlicePtr, LayoutMismatchError,
-    PtrNotAlignedError,
+    ErasedFieldSliceIter, ErasedFieldSliceMutPtr, ErasedFieldSlicePtr,
 };
 
 pub struct ErasedFieldSliceMut<'a> {
@@ -29,11 +29,10 @@ impl<'a> ErasedFieldSliceMut<'a> {
         desc: FieldDescriptor,
         buffer: &'a mut [u8],
         len: usize,
-    ) -> Result<Self, PtrNotAlignedError> {
-        assert_slice_buffer_len(buffer.len(), desc.layout().size(), len);
-
+    ) -> Result<Self, ErasedFieldSliceError> {
         let ptr = buffer.as_mut_ptr();
         check_buffer_align(ptr, desc.layout())?;
+        check_slice_buffer_len(buffer.len(), desc.layout().size(), len)?;
 
         Ok(Self {
             desc,

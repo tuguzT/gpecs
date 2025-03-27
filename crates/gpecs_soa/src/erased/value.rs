@@ -140,7 +140,7 @@ impl<Fields> ErasedSoa<Fields> {
             .map(|(desc, offset)| {
                 let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
                 let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-                ErasedField::new(desc, buffer)
+                unsafe { ErasedField::new_unchecked(desc, buffer) }
             })
             .collect()
     }

@@ -17,7 +17,7 @@ pub(super) trait WithCapacity: Soa<Context: Default + 'static> {
 
     fn soa_ser_with_capacity(capacity: usize) -> SoaVec<ErasedSoa<Self::Fields>> {
         let capacity = black_box(capacity);
-        let context = ErasedSoaContext::of::<Self>(Default::default());
+        let context = ErasedSoaContext::of::<Self>(&Default::default()).expect("should not fail");
         let vec = SoaVec::with_context_and_capacity(context, capacity);
         black_box(vec)
     }

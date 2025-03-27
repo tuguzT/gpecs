@@ -11,10 +11,10 @@ use super::{
     super::{
         assert::{check_same_len, validate_layout},
         byte::{Aligned, ErasedByte, Fields, Unaligned},
-        error::LenMismatchError,
+        error::ErasedSoaError,
     },
     assert::check_layout,
-    error::LayoutMismatchError,
+    error::IntoValueError,
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
 };
 
@@ -32,9 +32,9 @@ where
 {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Result<Self, LenMismatchError> {
+    pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Result<Self, ErasedSoaError> {
         if F::ALIGNED {
-            validate_layout::<F>(desc.layout());
+            validate_layout::<F>(desc.layout())?;
         }
         check_same_len(buffer.len(), desc.layout().size())?;
 
@@ -77,7 +77,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn into<T>(self) -> Result<T, LayoutMismatchError<Self>> {
+    pub unsafe fn into<T>(self) -> Result<T, IntoValueError<Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { buffer, .. } = me;
 
@@ -142,7 +142,7 @@ where
 impl<F> ErasedField<Aligned<F>> {
     #[inline]
     #[track_caller]
-    pub unsafe fn cast<T>(&self) -> Result<&T, LayoutMismatchError<&Self>> {
+    pub unsafe fn cast<T>(&self) -> Result<&T, IntoValueError<&Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { buffer, .. } = me;
 
@@ -152,7 +152,7 @@ impl<F> ErasedField<Aligned<F>> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, LayoutMismatchError<&mut Self>> {
+    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, IntoValueError<&mut Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { buffer, .. } = me;
 

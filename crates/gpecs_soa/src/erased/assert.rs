@@ -1,23 +1,14 @@
 use core::alloc::Layout;
 
-use super::error::LenMismatchError;
-
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn validate_layout_failed(input_align: usize, max_align: usize) -> ! {
-    panic!("input alignment {input_align} must be less than or equal to {max_align}")
-}
+use super::error::{InvalidLayoutError, LenMismatchError};
 
 #[inline]
-#[track_caller]
-pub fn validate_layout<Fields>(layout: Layout) {
-    let input_align = layout.align();
-    let max_align = align_of::<Fields>();
-    if input_align <= max_align {
-        return;
+pub fn validate_layout<Fields>(layout: Layout) -> Result<(), InvalidLayoutError> {
+    let max_align = Layout::new::<Fields>();
+    if layout.align() > max_align.align() {
+        return Err(InvalidLayoutError::new(layout, max_align));
     }
-    validate_layout_failed(input_align, max_align)
+    Ok(())
 }
 
 #[inline]

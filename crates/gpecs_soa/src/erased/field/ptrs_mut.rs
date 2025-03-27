@@ -5,7 +5,7 @@ use crate::traits::FieldDescriptor;
 use super::{
     super::assert::{assert_layouts, check_same_len},
     assert::{check_buffer_align, check_layout},
-    error::{ErasedFieldError, LayoutMismatchError},
+    error::{ErasedFieldError, IntoValueError},
     ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
 };
 
@@ -52,7 +52,7 @@ impl ErasedFieldMutPtr {
     }
 
     #[inline]
-    pub fn into<T>(self) -> Result<*mut T, LayoutMismatchError<Self>> {
+    pub fn into<T>(self) -> Result<*mut T, IntoValueError<Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
         Ok(ptr.cast())

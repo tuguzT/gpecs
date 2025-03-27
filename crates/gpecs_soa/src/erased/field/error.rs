@@ -5,7 +5,7 @@ use core::{
     num::NonZeroUsize,
 };
 
-use super::super::error::LenMismatchError;
+use crate::erased::error::{LayoutMismatchError, LenMismatchError};
 
 #[derive(Clone)]
 pub struct PtrNotAlignedError {
@@ -154,98 +154,51 @@ impl Display for SliceLenMismatchError {
 impl Error for SliceLenMismatchError {}
 
 #[derive(Clone)]
-pub struct LayoutMismatchError<T>
+#[non_exhaustive]
+pub struct IntoValueError<T>
 where
     T: ?Sized,
 {
-    expected: Layout,
-    actual: Layout,
+    pub reason: LayoutMismatchError,
     pub value: T,
 }
 
-impl<T> LayoutMismatchError<T> {
+impl<T> IntoValueError<T> {
     #[inline]
-    #[track_caller]
-    pub(super) fn new(value: T, expected: Layout, actual: Layout) -> Self {
-        assert_ne!(
-            expected, actual,
-            "expected and actual layouts should differ from each other",
-        );
-        Self {
-            value,
-            expected,
-            actual,
-        }
-    }
-
-    #[inline]
-    pub fn map<U, F>(self, f: F) -> LayoutMismatchError<U>
-    where
-        F: FnOnce(T) -> U,
-    {
-        let Self {
-            expected,
-            actual,
-            value,
-        } = self;
-
-        LayoutMismatchError {
-            expected,
-            actual,
-            value: f(value),
-        }
+    pub(super) fn new(value: T, reason: LayoutMismatchError) -> Self {
+        Self { reason, value }
     }
 }
 
-impl<T> LayoutMismatchError<T>
-where
-    T: ?Sized,
-{
-    #[inline]
-    pub fn expected(&self) -> Layout {
-        let Self { expected, .. } = *self;
-        expected
-    }
-
-    #[inline]
-    pub fn actual(&self) -> Layout {
-        let Self { actual, .. } = *self;
-        actual
-    }
-}
-
-impl<T> Debug for LayoutMismatchError<T>
+impl<T> Debug for IntoValueError<T>
 where
     T: ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self {
-            expected, actual, ..
-        } = self;
-        f.debug_struct("LayoutMismatchError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
+        let Self { reason, .. } = self;
+        Debug::fmt(reason, f)
     }
 }
 
-impl<T> Display for LayoutMismatchError<T>
+impl<T> Display for IntoValueError<T>
 where
     T: ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            expected, actual, ..
-        } = self;
-        write!(f, "{actual:?} does not match expected {expected:?}")
+        let Self { reason, .. } = self;
+        Display::fmt(reason, f)
     }
 }
 
-impl<T> Error for LayoutMismatchError<T> where T: ?Sized {}
+impl<T> Error for IntoValueError<T>
+where
+    T: ?Sized,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
 
 #[derive(Clone)]
 pub enum ErasedFieldError {

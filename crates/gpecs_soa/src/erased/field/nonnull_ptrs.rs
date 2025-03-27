@@ -5,7 +5,7 @@ use crate::traits::FieldDescriptor;
 use super::{
     super::assert::check_same_len,
     assert::{check_buffer_align, check_layout},
-    error::{ErasedFieldError, LayoutMismatchError},
+    error::{ErasedFieldError, IntoValueError},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -45,7 +45,7 @@ impl ErasedFieldNonNullPtr {
     }
 
     #[inline]
-    pub fn into<T>(self) -> Result<NonNull<T>, LayoutMismatchError<Self>> {
+    pub fn into<T>(self) -> Result<NonNull<T>, IntoValueError<Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
         Ok(ptr.cast())

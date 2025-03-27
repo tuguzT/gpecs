@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use core::{
     fmt::{self, Debug},
+    iter,
     marker::PhantomData,
     ptr::{self, NonNull},
 };
@@ -9,6 +10,7 @@ use crate::traits::Soa;
 
 use super::{
     assert::{assert_layouts, validate_layout},
+    error::{FromValueError, InvalidLayoutError},
     field::ErasedFieldNonNullPtr,
 };
 
@@ -19,60 +21,98 @@ pub struct ErasedSoaNonNullPtrs<Fields> {
 
 impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     #[inline]
+    pub fn new<I>(ptrs: I) -> Result<Self, InvalidLayoutError>
+    where
+        I: IntoIterator<Item = ErasedFieldNonNullPtr>,
+    {
+        let ptrs = ptrs
+            .into_iter()
+            .map(|ptr| {
+                validate_layout::<Fields>(ptr.descriptor().layout())?;
+                Ok(ptr)
+            })
+            .collect::<Result<Box<[_]>, _>>()?;
+        let me = unsafe { Self::actual_new(ptrs) };
+        Ok(me)
+    }
+
+    #[inline]
     #[track_caller]
-    pub fn new<I>(ptrs: I) -> Self
+    pub unsafe fn new_unchecked<I>(ptrs: I) -> Self
+    where
+        I: IntoIterator<Item = ErasedFieldNonNullPtr>,
+    {
+        if cfg!(debug_assertions) {
+            return Self::new(ptrs).expect("incorrect inputs");
+        }
+        unsafe { Self::actual_new(ptrs) }
+    }
+
+    #[inline]
+    unsafe fn actual_new<I>(ptrs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldNonNullPtr>,
     {
         Self {
-            ptrs: ptrs
-                .into_iter()
-                .inspect(|ptr| validate_layout::<Fields>(ptr.descriptor().layout()))
-                .collect(),
+            ptrs: ptrs.into_iter().collect(),
             phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, ptrs: T::NonNullPtrs) -> Self
+    pub fn from<T>(
+        context: &T::Context,
+        ptrs: T::NonNullPtrs,
+    ) -> Result<Self, FromValueError<T::NonNullPtrs>>
     where
         T: Soa<Fields = Fields>,
     {
-        let ptrs = T::nonnull_to_ptrs(context, ptrs);
-        let ptrs = T::ptrs_erase_mut(context, ptrs);
         let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
-            .map(|desc| desc.as_ref().clone());
-
-        let ptrs = descriptors
-            .zip(ptrs)
-            .map(|(desc, ptr)| {
-                let len = desc.layout().size();
-                let ptr = ptr::slice_from_raw_parts_mut(ptr, len);
-                let buffer = unsafe { NonNull::new_unchecked(ptr) };
-                unsafe { ErasedFieldNonNullPtr::new_unchecked(desc, buffer) }
+            .map(|desc| {
+                validate_layout::<T::Fields>(desc.as_ref().layout())?;
+                Ok(desc.as_ref().clone())
             })
-            .collect();
-        Self {
-            ptrs,
-            phantom: PhantomData,
-        }
+            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
+        let descriptors = match descriptors {
+            Ok(descriptors) => descriptors,
+            Err(error) => return Err(FromValueError::new(ptrs, error)),
+        };
+
+        let ptrs = T::nonnull_to_ptrs(context, ptrs);
+        let ptrs = T::ptrs_erase_mut(context, ptrs);
+        let ptrs = iter::zip(descriptors, ptrs).map(|(desc, ptr)| {
+            let len = desc.layout().size();
+            let ptr = ptr::slice_from_raw_parts_mut(ptr, len);
+            let buffer = unsafe { NonNull::new_unchecked(ptr) };
+            unsafe { ErasedFieldNonNullPtr::new_unchecked(desc, buffer) }
+        });
+        let me = unsafe { Self::actual_new(ptrs) };
+        Ok(me)
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn into<T>(self, context: &T::Context) -> T::NonNullPtrs
+    pub unsafe fn into<T>(
+        self,
+        context: &T::Context,
+    ) -> Result<T::NonNullPtrs, FromValueError<Self>>
     where
         T: Soa<Fields = Fields>,
     {
-        let Self { ptrs, .. } = self;
-
-        let descriptors: Box<[_]> = T::field_descriptors(context)
+        let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
-            .map(|desc| desc.as_ref().clone())
-            .collect();
+            .map(|desc| {
+                validate_layout::<T::Fields>(desc.as_ref().layout())?;
+                Ok(desc.as_ref().clone())
+            })
+            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
+        let descriptors = match descriptors {
+            Ok(descriptors) => descriptors,
+            Err(error) => return Err(FromValueError::new(self, error)),
+        };
+
+        let Self { ptrs, .. } = self;
         assert_eq!(descriptors.len(), ptrs.len());
 
         let ptrs = descriptors
@@ -81,7 +121,8 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
             .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
             .map(|(_, ptr)| ptr.as_ptr().as_ptr());
         let ptrs = T::ptrs_restore_mut(context, ptrs);
-        unsafe { T::ptrs_to_nonnull(context, ptrs) }
+        let ptrs = unsafe { T::ptrs_to_nonnull(context, ptrs) };
+        Ok(ptrs)
     }
 
     #[inline]

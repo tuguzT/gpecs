@@ -26,7 +26,7 @@ pub(super) trait Work: Push {
         let mut vec = Self::soa_ser_with_capacity(count);
         for index in 0..count {
             let value = black_box(Self::work_item(index));
-            let value = ErasedSoa::from(&context, value);
+            let value = ErasedSoa::from(&context, value).unwrap();
             Self::soa_ser_push(&mut vec, value);
         }
         black_box(vec)
@@ -92,7 +92,7 @@ impl Work for Tiny {
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
         let mut result = 0;
         for refs in iter {
-            let (i,) = unsafe { refs.into::<Self>(&()) };
+            let (i,) = unsafe { refs.into::<Self>(&()) }.unwrap();
             result += *i;
         }
         black_box(result);
@@ -157,7 +157,7 @@ impl Work for Small {
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
         let mut result = 0.0;
         for refs in iter {
-            let (x, y, _) = unsafe { refs.into::<Self>(&()) };
+            let (x, y, _) = unsafe { refs.into::<Self>(&()) }.unwrap();
             result += *x + *y;
         }
         black_box(result);
@@ -229,7 +229,7 @@ impl Work for Big {
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
         let mut result = 0;
         for (index, refs) in iter.enumerate() {
-            let (_, _, array, _, str) = unsafe { refs.into::<Self>(&()) };
+            let (_, _, array, _, str) = unsafe { refs.into::<Self>(&()) }.unwrap();
             result += index + array.iter().sum::<usize>() + str.len();
         }
         black_box(result);
@@ -317,7 +317,7 @@ impl Work for Large {
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
         let mut result = 0;
         for refs in iter {
-            let (_, b, _, _, e, f, _, _, i, _) = unsafe { refs.into::<Self>(&()) };
+            let (_, b, _, _, e, f, _, _, i, _) = unsafe { refs.into::<Self>(&()) }.unwrap();
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
                 - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);

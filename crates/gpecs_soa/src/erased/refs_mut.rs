@@ -9,6 +9,7 @@ use crate::traits::Soa;
 
 use super::{
     assert::{assert_layouts, validate_layout},
+    error::{FromValueError, InvalidLayoutError},
     field::ErasedFieldRefMut,
 };
 
@@ -22,59 +23,97 @@ where
 
 impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
     #[inline]
+    pub fn new<I>(refs: I) -> Result<Self, InvalidLayoutError>
+    where
+        I: IntoIterator<Item = ErasedFieldRefMut<'a>>,
+    {
+        let refs = refs
+            .into_iter()
+            .map(|r#ref| {
+                validate_layout::<Fields>(r#ref.descriptor().layout())?;
+                Ok(r#ref)
+            })
+            .collect::<Result<Box<[_]>, _>>()?;
+        let me = unsafe { Self::actual_new(refs) };
+        Ok(me)
+    }
+
+    #[inline]
     #[track_caller]
-    pub fn new<I>(refs: I) -> Self
+    pub unsafe fn new_unchecked<I>(refs: I) -> Self
+    where
+        I: IntoIterator<Item = ErasedFieldRefMut<'a>>,
+    {
+        if cfg!(debug_assertions) {
+            return Self::new(refs).expect("incorrect inputs");
+        }
+        unsafe { Self::actual_new(refs) }
+    }
+
+    #[inline]
+    unsafe fn actual_new<I>(refs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldRefMut<'a>>,
     {
         Self {
-            refs: refs
-                .into_iter()
-                .inspect(|r#ref| validate_layout::<Fields>(r#ref.descriptor().layout()))
-                .collect(),
+            refs: refs.into_iter().collect(),
             phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, refs: T::RefsMut<'a>) -> Self
+    pub fn from<T>(
+        context: &T::Context,
+        refs: T::RefsMut<'a>,
+    ) -> Result<Self, FromValueError<T::RefsMut<'a>>>
     where
         T: Soa<Fields = Fields>,
     {
-        let ptrs = T::mut_refs_as_ptrs(context, refs);
-        let ptrs = T::ptrs_erase_mut(context, ptrs);
         let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<Fields>(desc.as_ref().layout()))
-            .map(|desc| desc.as_ref().clone());
-
-        let refs = descriptors
-            .zip(ptrs)
-            .map(|(desc, ptr)| {
-                let len = desc.layout().size();
-                let buffer = unsafe { slice::from_raw_parts_mut(ptr, len) };
-                unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
+            .map(|desc| {
+                validate_layout::<Fields>(desc.as_ref().layout())?;
+                Ok(desc.as_ref().clone())
             })
-            .collect();
-        Self {
-            refs,
-            phantom: PhantomData,
-        }
+            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
+        let descriptors = match descriptors {
+            Ok(descriptors) => descriptors,
+            Err(error) => return Err(FromValueError::new(refs, error)),
+        };
+
+        let ptrs = T::mut_refs_as_ptrs(context, refs);
+        let ptrs = T::ptrs_erase_mut(context, ptrs);
+        let refs = core::iter::zip(descriptors, ptrs).map(|(desc, ptr)| {
+            let len = desc.layout().size();
+            let buffer = unsafe { slice::from_raw_parts_mut(ptr, len) };
+            unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
+        });
+        let me = unsafe { Self::actual_new(refs) };
+        Ok(me)
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn into<T>(self, context: &T::Context) -> T::RefsMut<'a>
+    pub unsafe fn into<T>(
+        self,
+        context: &T::Context,
+    ) -> Result<T::RefsMut<'a>, FromValueError<Self>>
     where
         T: Soa<Fields = Fields>,
     {
-        let Self { refs, .. } = self;
-
-        let descriptors: Box<[_]> = T::field_descriptors(context)
+        let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<Fields>(desc.as_ref().layout()))
-            .map(|desc| desc.as_ref().clone())
-            .collect();
+            .map(|desc| {
+                validate_layout::<Fields>(desc.as_ref().layout())?;
+                Ok(desc.as_ref().clone())
+            })
+            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
+        let descriptors = match descriptors {
+            Ok(descriptors) => descriptors,
+            Err(error) => return Err(FromValueError::new(self, error)),
+        };
+
+        let Self { refs, .. } = self;
         assert_eq!(descriptors.len(), refs.len());
 
         let ptrs = descriptors
@@ -83,7 +122,8 @@ impl<'a, Fields> ErasedSoaRefsMut<'a, Fields> {
             .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
             .map(|(_, r#ref)| r#ref.into_buffer().as_mut_ptr());
         let ptrs = T::ptrs_restore_mut(context, ptrs);
-        unsafe { T::ptrs_to_refs_mut(context, ptrs) }
+        let refs = unsafe { T::ptrs_to_refs_mut(context, ptrs) };
+        Ok(refs)
     }
 
     #[inline]

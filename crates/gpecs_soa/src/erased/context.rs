@@ -6,7 +6,7 @@ use core::{
 
 use crate::traits::{FieldDescriptor, Soa};
 
-use super::assert::validate_layout;
+use super::{assert::validate_layout, error::InvalidLayoutError};
 
 pub struct ErasedSoaContext<Fields> {
     descriptors: Box<[FieldDescriptor]>,
@@ -15,34 +15,54 @@ pub struct ErasedSoaContext<Fields> {
 
 impl<Fields> ErasedSoaContext<Fields> {
     #[inline]
-    pub fn new<I>(descriptors: I) -> Self
+    pub fn new<I>(descriptors: I) -> Result<Self, InvalidLayoutError>
     where
         I: IntoIterator<Item: AsRef<FieldDescriptor>>,
     {
-        Self {
-            descriptors: descriptors
-                .into_iter()
-                .inspect(|desc| validate_layout::<Fields>(desc.as_ref().layout()))
-                .map(|desc| desc.as_ref().clone())
-                .collect(),
-            phantom: PhantomData,
-        }
+        let descriptors = descriptors
+            .into_iter()
+            .map(|desc| {
+                validate_layout::<Fields>(desc.as_ref().layout())?;
+                Ok(desc)
+            })
+            .collect::<Result<Box<[_]>, _>>()?;
+        let me = unsafe { Self::actual_new(descriptors) };
+        Ok(me)
     }
 
     #[inline]
-    pub fn of<T>(context: T::Context) -> Self
+    pub unsafe fn new_unchecked<I>(descriptors: I) -> Self
     where
-        T: Soa<Fields = Fields>,
+        I: IntoIterator<Item: AsRef<FieldDescriptor>>,
     {
-        let descriptors = T::field_descriptors(&context)
+        if cfg!(debug_assertions) {
+            return Self::new(descriptors).expect("incorrect inputs");
+        }
+        unsafe { Self::actual_new(descriptors) }
+    }
+
+    #[inline]
+    unsafe fn actual_new<I>(descriptors: I) -> Self
+    where
+        I: IntoIterator<Item: AsRef<FieldDescriptor>>,
+    {
+        let descriptors = descriptors
             .into_iter()
-            .inspect(|desc| validate_layout::<T::Fields>(desc.as_ref().layout()))
             .map(|desc| desc.as_ref().clone())
             .collect();
         Self {
             descriptors,
             phantom: PhantomData,
         }
+    }
+
+    #[inline]
+    pub fn of<T>(context: &T::Context) -> Result<Self, InvalidLayoutError>
+    where
+        T: Soa<Fields = Fields>,
+    {
+        let descriptors = T::field_descriptors(context);
+        Self::new(descriptors)
     }
 
     #[inline]

@@ -9,7 +9,7 @@ use crate::traits::FieldDescriptor;
 
 use super::{
     assert::{check_buffer_align, check_layout, check_slice_buffer_len},
-    error::{ErasedFieldSliceError, LayoutMismatchError},
+    error::{ErasedFieldSliceError, IntoValueError},
     ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMutPtr,
 };
 
@@ -55,7 +55,7 @@ impl ErasedFieldSlicePtr {
     }
 
     #[inline]
-    pub fn into<T>(self) -> Result<*const [T], LayoutMismatchError<Self>> {
+    pub fn into<T>(self) -> Result<*const [T], IntoValueError<Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, len, .. } = me;
         Ok(ptr::slice_from_raw_parts(ptr.cast(), len))

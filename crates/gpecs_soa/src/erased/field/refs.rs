@@ -9,7 +9,7 @@ use crate::traits::FieldDescriptor;
 use super::{
     super::assert::check_same_len,
     assert::{check_buffer_align, check_layout},
-    error::{ErasedFieldError, LayoutMismatchError},
+    error::{ErasedFieldError, IntoValueError},
     ErasedFieldPtr,
 };
 
@@ -59,7 +59,7 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self) -> Result<&'a T, LayoutMismatchError<Self>> {
+    pub unsafe fn into<T>(self) -> Result<&'a T, IntoValueError<Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 
@@ -68,7 +68,7 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&T, LayoutMismatchError<&Self>> {
+    pub unsafe fn cast<T>(&self) -> Result<&T, IntoValueError<&Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 

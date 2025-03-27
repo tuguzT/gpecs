@@ -9,7 +9,7 @@ use crate::traits::FieldDescriptor;
 use super::{
     super::assert::check_same_len,
     assert::{check_buffer_align, check_layout},
-    error::{ErasedFieldError, LayoutMismatchError},
+    error::{ErasedFieldError, IntoValueError},
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
 };
 
@@ -58,7 +58,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self) -> Result<&'a mut T, LayoutMismatchError<Self>> {
+    pub unsafe fn into<T>(self) -> Result<&'a mut T, IntoValueError<Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 
@@ -67,7 +67,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&T, LayoutMismatchError<&Self>> {
+    pub unsafe fn cast<T>(&self) -> Result<&T, IntoValueError<&Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 
@@ -76,7 +76,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, LayoutMismatchError<&mut Self>> {
+    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, IntoValueError<&mut Self>> {
         let me = check_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 

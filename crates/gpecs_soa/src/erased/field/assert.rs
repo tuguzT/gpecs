@@ -1,6 +1,9 @@
 use core::alloc::Layout;
 
-use super::error::{LayoutMismatchError, PtrNotAlignedError, SliceLenMismatchError};
+use super::{
+    super::error::LayoutMismatchError,
+    error::{IntoValueError, PtrNotAlignedError, SliceLenMismatchError},
+};
 
 #[inline]
 pub fn check_slice_buffer_len(
@@ -30,10 +33,11 @@ pub fn check_buffer_align(ptr: *const u8, target_layout: Layout) -> Result<(), P
 }
 
 #[inline]
-pub fn check_layout<T, U>(layout: Layout, value: U) -> Result<U, LayoutMismatchError<U>> {
+pub fn check_layout<T, U>(layout: Layout, value: U) -> Result<U, IntoValueError<U>> {
     let expected = Layout::new::<T>();
     if layout != expected {
-        return Err(LayoutMismatchError::new(value, expected, layout));
+        let reason = LayoutMismatchError::new(expected, layout);
+        return Err(IntoValueError::new(value, reason));
     }
     Ok(value)
 }

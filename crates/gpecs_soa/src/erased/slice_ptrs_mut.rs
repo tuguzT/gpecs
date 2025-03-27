@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use core::{
     fmt::{self, Debug},
+    iter,
     marker::PhantomData,
     ptr,
 };
@@ -9,7 +10,7 @@ use crate::traits::Soa;
 
 use super::{
     assert::{assert_layouts, check_same_len, validate_layout},
-    error::LenMismatchError,
+    error::{ErasedSoaError, FromValueError, InvalidLayoutError},
     field::{ErasedFieldSliceMutPtr, ErasedFieldSliceMutPtrIter},
     ErasedSoaMutPtrs, ErasedSoaPtrs, ErasedSoaSlicePtrsIter,
 };
@@ -22,18 +23,18 @@ pub struct ErasedSoaSliceMutPtrs<Fields> {
 
 impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
     #[inline]
-    pub fn new<I>(len: usize, slices: I) -> Result<Self, LenMismatchError>
+    pub fn new<I>(len: usize, slices: I) -> Result<Self, ErasedSoaError>
     where
         I: IntoIterator<Item = ErasedFieldSliceMutPtr>,
     {
         let slices = slices
             .into_iter()
             .map(|slice| {
-                validate_layout::<Fields>(slice.descriptor().layout());
+                validate_layout::<Fields>(slice.descriptor().layout())?;
                 check_same_len(slice.len(), len)?;
                 Ok(slice)
             })
-            .collect::<Result<Box<[_]>, _>>()?;
+            .collect::<Result<Box<[_]>, ErasedSoaError>>()?;
         let me = unsafe { Self::actual_new(len, slices) };
         Ok(me)
     }
@@ -63,44 +64,57 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, slices: T::SliceMutPtrs) -> Self
+    pub fn from<T>(
+        context: &T::Context,
+        slices: T::SliceMutPtrs,
+    ) -> Result<Self, FromValueError<T::SliceMutPtrs>>
     where
         T: Soa<Fields = Fields>,
     {
+        let descriptors = T::field_descriptors(context)
+            .into_iter()
+            .map(|desc| {
+                validate_layout::<Fields>(desc.as_ref().layout())?;
+                Ok(desc.as_ref().clone())
+            })
+            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
+        let descriptors = match descriptors {
+            Ok(descriptors) => descriptors,
+            Err(error) => return Err(FromValueError::new(slices, error)),
+        };
+
         let len = T::slice_ptrs_len_mut(context, slices.clone());
         let ptrs = T::mut_slice_ptrs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
-        let descriptors = T::field_descriptors(context)
-            .into_iter()
-            .inspect(|desc| validate_layout::<Fields>(desc.as_ref().layout()))
-            .map(|desc| desc.as_ref().clone());
-
-        let slices = descriptors
-            .zip(ptrs)
-            .map(|(desc, ptr)| {
-                let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size() * len);
-                unsafe { ErasedFieldSliceMutPtr::new_unchecked(desc, buffer, len) }
-            })
-            .collect();
-        Self {
-            len,
-            slices,
-            phantom: PhantomData,
-        }
+        let slices = iter::zip(descriptors, ptrs).map(|(desc, ptr)| {
+            let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size() * len);
+            unsafe { ErasedFieldSliceMutPtr::new_unchecked(desc, buffer, len) }
+        });
+        let me = unsafe { Self::actual_new(len, slices) };
+        Ok(me)
     }
 
     #[inline]
-    pub unsafe fn into<T>(self, context: &T::Context) -> T::SliceMutPtrs
+    pub unsafe fn into<T>(
+        self,
+        context: &T::Context,
+    ) -> Result<T::SliceMutPtrs, FromValueError<Self>>
     where
         T: Soa<Fields = Fields>,
     {
-        let Self { slices, len, .. } = self;
-
-        let descriptors: Box<[_]> = T::field_descriptors(context)
+        let descriptors = T::field_descriptors(context)
             .into_iter()
-            .inspect(|desc| validate_layout::<Fields>(desc.as_ref().layout()))
-            .map(|desc| desc.as_ref().clone())
-            .collect();
+            .map(|desc| {
+                validate_layout::<Fields>(desc.as_ref().layout())?;
+                Ok(desc.as_ref().clone())
+            })
+            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
+        let descriptors = match descriptors {
+            Ok(descriptors) => descriptors,
+            Err(error) => return Err(FromValueError::new(self, error)),
+        };
+
+        let Self { slices, len, .. } = self;
         assert_eq!(slices.len(), descriptors.len());
 
         let ptrs = descriptors
@@ -109,7 +123,8 @@ impl<Fields> ErasedSoaSliceMutPtrs<Fields> {
             .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
             .map(|(_, slice)| slice.as_ptr());
         let ptrs = T::ptrs_restore_mut(context, ptrs);
-        T::slices_from_raw_parts_mut(context, ptrs, len)
+        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        Ok(slices)
     }
 
     #[inline]
@@ -259,7 +274,8 @@ impl<Fields> Iterator for ErasedSoaSliceMutPtrsIter<Fields> {
         }
 
         let ptrs = self.slices.iter_mut().flat_map(Iterator::next);
-        Some(ErasedSoaMutPtrs::new(ptrs))
+        let item = unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) };
+        Some(item)
     }
 
     #[inline]
@@ -280,7 +296,8 @@ impl<Fields> DoubleEndedIterator for ErasedSoaSliceMutPtrsIter<Fields> {
             .slices
             .iter_mut()
             .flat_map(DoubleEndedIterator::next_back);
-        Some(ErasedSoaMutPtrs::new(ptrs))
+        let item = unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) };
+        Some(item)
     }
 }
 

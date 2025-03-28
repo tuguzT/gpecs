@@ -3,7 +3,7 @@ use core::{ptr, slice};
 use crate::traits::FieldDescriptor;
 
 use super::{
-    super::assert::{assert_layouts, check_same_len},
+    super::assert::{check_same_layout, check_same_len},
     assert::{check_buffer_align, check_layout},
     error::{ErasedFieldError, IntoValueError},
     ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
@@ -79,7 +79,8 @@ impl ErasedFieldMutPtr {
     #[track_caller]
     pub unsafe fn offset_from(self, origin: ErasedFieldPtr) -> isize {
         let Self { desc, ptr } = self;
-        assert_layouts(desc.layout(), origin.descriptor().layout());
+        check_same_layout(origin.descriptor().layout(), desc.layout())
+            .expect("layouts should match");
 
         let offset = unsafe { ptr.offset_from(origin.as_ptr()) };
         let field_size = desc
@@ -96,7 +97,7 @@ impl ErasedFieldMutPtr {
     #[track_caller]
     pub unsafe fn swap(self, with: Self, temp: &mut [u8]) {
         let Self { desc, .. } = self;
-        assert_layouts(desc.layout(), with.descriptor().layout());
+        check_same_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let count = desc.layout().size();
         assert!(temp.len() >= count);
@@ -114,7 +115,7 @@ impl ErasedFieldMutPtr {
     #[track_caller]
     pub unsafe fn copy_from(self, from: ErasedFieldPtr, count: usize, temp: &mut [u8]) {
         let Self { desc, .. } = self;
-        assert_layouts(desc.layout(), from.descriptor().layout());
+        check_same_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let count = count * desc.layout().size();
         assert!(temp.len() >= count);
@@ -131,7 +132,7 @@ impl ErasedFieldMutPtr {
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping(self, from: ErasedFieldPtr, count: usize) {
         let Self { desc, .. } = self;
-        assert_layouts(desc.layout(), from.descriptor().layout());
+        check_same_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let count = count * desc.layout().size();
         let src = from.as_ptr();

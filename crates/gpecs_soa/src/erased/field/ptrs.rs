@@ -3,7 +3,7 @@ use core::{ptr, slice};
 use crate::traits::FieldDescriptor;
 
 use super::{
-    super::assert::{assert_layouts, check_same_len},
+    super::assert::{check_same_layout, check_same_len},
     assert::{check_buffer_align, check_layout},
     error::{ErasedFieldError, IntoValueError},
     ErasedFieldMutPtr, ErasedFieldRef,
@@ -79,7 +79,8 @@ impl ErasedFieldPtr {
     #[track_caller]
     pub unsafe fn offset_from(self, origin: Self) -> isize {
         let Self { desc, ptr } = self;
-        assert_layouts(desc.layout(), origin.descriptor().layout());
+        check_same_layout(origin.descriptor().layout(), desc.layout())
+            .expect("layouts should match");
 
         let offset = unsafe { ptr.offset_from(origin.as_ptr()) };
         let field_size = desc

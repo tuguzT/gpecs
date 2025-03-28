@@ -11,7 +11,7 @@ use core::{
 use crate::traits::{buffer_layout, FieldDescriptor, Soa};
 
 use self::{
-    assert::assert_layouts,
+    assert::check_same_layout,
     byte::ErasedByte,
     field::{
         field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
@@ -158,7 +158,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, ptr)| ptr.cast_const());
         unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
     }
@@ -170,7 +173,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, ptr)| ptr.cast_mut());
         unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
     }
@@ -182,7 +188,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, ptr)| unsafe { ptr.add(offset) });
         unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
     }
@@ -198,7 +207,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, ptr)| unsafe { ptr.add(offset) });
         unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
     }
@@ -217,8 +229,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(ptrs.into_field_ptrs())
             .zip(origin.into_field_ptrs())
             .inspect(|((desc, ptr), origin)| {
-                assert_layouts(desc.layout(), ptr.descriptor().layout());
-                assert_layouts(desc.layout(), origin.descriptor().layout());
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
+                check_same_layout(origin.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
             })
             .map(|((_, ptr), origin)| unsafe { ptr.offset_from(origin) });
 
@@ -241,8 +255,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(ptrs.into_field_ptrs())
             .zip(origin.into_field_ptrs())
             .inspect(|((desc, ptr), origin)| {
-                assert_layouts(desc.layout(), ptr.descriptor().layout());
-                assert_layouts(desc.layout(), origin.descriptor().layout());
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
+                check_same_layout(origin.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
             })
             .map(|((_, ptr), origin)| unsafe { ptr.offset_from(origin) });
 
@@ -262,8 +278,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(a.into_field_ptrs())
             .zip(b.into_field_ptrs())
             .inspect(|((desc, a), b)| {
-                assert_layouts(desc.layout(), a.descriptor().layout());
-                assert_layouts(desc.layout(), b.descriptor().layout());
+                check_same_layout(a.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
+                check_same_layout(b.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
             })
             .for_each(|((_, a), b)| {
                 let count = a.descriptor().layout().size();
@@ -288,8 +306,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(src.into_field_ptrs())
             .zip(dst.into_field_ptrs())
             .inspect(|((desc, src), dst)| {
-                assert_layouts(desc.layout(), src.descriptor().layout());
-                assert_layouts(desc.layout(), dst.descriptor().layout());
+                check_same_layout(src.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
+                check_same_layout(dst.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
             })
             .for_each(|((_, src), dst)| {
                 let count = len * src.descriptor().layout().size();
@@ -320,8 +340,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(dst.into_field_ptrs())
             .rev()
             .inspect(|((desc, src), dst)| {
-                assert_layouts(desc.layout(), src.descriptor().layout());
-                assert_layouts(desc.layout(), dst.descriptor().layout());
+                check_same_layout(src.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
+                check_same_layout(dst.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
             })
             .for_each(|((_, src), dst)| {
                 let count = len * src.descriptor().layout().size();
@@ -350,8 +372,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .zip(src.into_field_ptrs())
             .zip(dst.into_field_ptrs())
             .inspect(|((desc, src), dst)| {
-                assert_layouts(desc.layout(), src.descriptor().layout());
-                assert_layouts(desc.layout(), dst.descriptor().layout());
+                check_same_layout(src.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
+                check_same_layout(dst.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
             })
             .for_each(|((_, src), dst)| unsafe { dst.copy_from_nonoverlapping(src, len) })
     }
@@ -363,25 +387,29 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let fields = descriptors
             .iter()
             .zip(src.into_field_ptrs())
-            .inspect(|(desc, src)| assert_layouts(desc.layout(), src.descriptor().layout()))
-            .map(|(desc, src)| (desc.clone(), unsafe { src.deref().into_buffer() }));
+            .inspect(|(desc, src)| {
+                check_same_layout(src.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
+            .map(|(desc, src)| (*desc, unsafe { src.deref().into_buffer() }));
         unsafe { Self::new_unchecked(fields) }
     }
 
     unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), dst.field_ptrs().len());
-        assert!(value
-            .field_descriptors()
-            .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout)));
+        assert_eq!(descriptors.len(), value.field_descriptors().len());
 
         descriptors
             .iter()
             .zip(dst.into_field_ptrs())
             .zip(value.as_refs().into_field_refs())
-            .inspect(|((desc, dst), _)| assert_layouts(desc.layout(), dst.descriptor().layout()))
+            .inspect(|((desc, dst), src)| {
+                check_same_layout(src.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
+                check_same_layout(dst.descriptor().layout(), desc.layout())
+                    .expect("layouts should match");
+            })
             .for_each(|((_, dst), src)| {
                 let src = src.as_field_ptr();
                 unsafe { dst.copy_from_nonoverlapping(src, 1) }
@@ -401,7 +429,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, ptr)| {
                 let desc = ptr.descriptor();
                 let buffer = unsafe { NonNull::new_unchecked(ptr.buffer()) };
@@ -417,7 +448,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, ptr)| {
                 let desc = ptr.descriptor();
                 let buffer = ptr.buffer().as_ptr();
@@ -450,7 +484,9 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(vecs)
-            .inspect(|(desc, vec)| assert_layouts(desc.layout(), vec.desc.layout()))
+            .inspect(|(desc, vec)| {
+                check_same_layout(vec.desc.layout(), desc.layout()).expect("layouts should match")
+            })
             .map(|(_, vec)| {
                 let ErasedFieldVec { buffer, desc, .. } = vec;
 
@@ -470,7 +506,9 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(vecs)
-            .inspect(|(desc, vec)| assert_layouts(desc.layout(), vec.desc.layout()))
+            .inspect(|(desc, vec)| {
+                check_same_layout(vec.desc.layout(), desc.layout()).expect("layouts should match")
+            })
             .map(|(_, vec)| {
                 let ErasedFieldVec { buffer, desc, .. } = vec;
 
@@ -502,7 +540,9 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         descriptors
             .iter()
             .zip(vecs)
-            .inspect(|(desc, vec)| assert_layouts(desc.layout(), vec.desc.layout()))
+            .inspect(|(desc, vec)| {
+                check_same_layout(vec.desc.layout(), desc.layout()).expect("layouts should match")
+            })
             .for_each(|(_, vec)| {
                 let ErasedFieldVec { buffer, desc } = vec;
                 let len =
@@ -529,7 +569,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let refs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, ptr)| unsafe { ptr.deref() });
         unsafe { ErasedSoaRefs::new_unchecked(refs) }
     }
@@ -544,7 +587,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let refs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, ptr)| unsafe { ptr.deref_mut() });
         unsafe { ErasedSoaRefsMut::new_unchecked(refs) }
     }
@@ -556,7 +602,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(refs.into_field_refs())
-            .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
+            .inspect(|(desc, r#ref)| {
+                check_same_layout(r#ref.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, r#ref)| r#ref.as_field_ptr());
         unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
     }
@@ -568,7 +617,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(refs.into_field_refs())
-            .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
+            .inspect(|(desc, r#ref)| {
+                check_same_layout(r#ref.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, mut r#ref)| r#ref.as_field_mut_ptr());
         unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
     }
@@ -580,7 +632,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let refs = descriptors
             .iter()
             .zip(refs.into_field_refs())
-            .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
+            .inspect(|(desc, r#ref)| {
+                check_same_layout(r#ref.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, r#ref)| From::from(r#ref));
         unsafe { ErasedSoaRefs::new_unchecked(refs) }
     }
@@ -600,7 +655,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, data)| field_slice_from_raw_parts(data, len));
         unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
@@ -616,7 +674,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
-            .inspect(|(desc, ptr)| assert_layouts(desc.layout(), ptr.descriptor().layout()))
+            .inspect(|(desc, ptr)| {
+                check_same_layout(ptr.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, data)| field_slice_from_raw_parts_mut(data, len));
         unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
@@ -632,7 +693,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| slice.cast_const());
         unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
@@ -645,7 +709,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| slice.cast_mut());
         unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
@@ -671,7 +738,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| slice.as_field_ptr());
         unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
     }
@@ -686,7 +756,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| slice.as_field_ptr());
         unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
     }
@@ -712,7 +785,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| unsafe { slice.deref() });
         unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
     }
@@ -728,7 +804,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| unsafe { slice.deref_mut() });
         unsafe { ErasedSoaSlicesMut::new_unchecked(len, slices) }
     }
@@ -758,7 +837,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| slice.as_field_slice_ptr());
         unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
@@ -774,7 +856,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, mut slice)| slice.as_field_slice_mut_ptr());
         unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
@@ -790,7 +875,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| From::from(slice));
         unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
     }
@@ -802,7 +890,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, slice)| slice.as_field_ptr());
         unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
     }
@@ -817,7 +908,10 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         let ptrs = descriptors
             .iter()
             .zip(slices.into_field_slices())
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
+            .inspect(|(desc, slice)| {
+                check_same_layout(slice.descriptor().layout(), desc.layout())
+                    .expect("layouts should match")
+            })
             .map(|(_, mut slice)| slice.as_field_mut_ptr());
         unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
     }

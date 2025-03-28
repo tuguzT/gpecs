@@ -1,7 +1,7 @@
 use core::alloc::Layout;
 
 use super::{
-    super::error::LayoutMismatchError,
+    super::assert::check_same_layout,
     error::{IntoValueError, PtrNotAlignedError, SliceLenMismatchError},
 };
 
@@ -34,10 +34,8 @@ pub fn check_buffer_align(ptr: *const u8, target_layout: Layout) -> Result<(), P
 
 #[inline]
 pub fn check_layout<T, U>(layout: Layout, value: U) -> Result<U, IntoValueError<U>> {
-    let expected = Layout::new::<T>();
-    if layout != expected {
-        let reason = LayoutMismatchError::new(expected, layout);
-        return Err(IntoValueError::new(value, reason));
+    match check_same_layout(layout, Layout::new::<T>()) {
+        Ok(()) => Ok(value),
+        Err(reason) => Err(IntoValueError::new(value, reason)),
     }
-    Ok(value)
 }

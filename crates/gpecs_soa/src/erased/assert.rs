@@ -1,6 +1,6 @@
 use core::alloc::Layout;
 
-use super::error::{InvalidLayoutError, LenMismatchError};
+use super::error::{InvalidLayoutError, LayoutMismatchError, LenMismatchError};
 
 #[inline]
 pub fn validate_layout<Fields>(layout: Layout) -> Result<(), InvalidLayoutError> {
@@ -19,18 +19,10 @@ pub fn check_same_len(len: usize, expected_len: usize) -> Result<(), LenMismatch
     Ok(())
 }
 
-#[cold]
-#[track_caller]
-#[inline(never)]
-fn assert_layouts_failed(first: Layout, second: Layout) -> ! {
-    panic!("layouts {first:?} and {second:?} should match")
-}
-
 #[inline]
-#[track_caller]
-pub fn assert_layouts(first: Layout, second: Layout) {
-    if first == second {
-        return;
+pub fn check_same_layout(layout: Layout, expected: Layout) -> Result<(), LayoutMismatchError> {
+    if layout != expected {
+        return Err(LayoutMismatchError::new(expected, layout));
     }
-    assert_layouts_failed(first, second)
+    Ok(())
 }

@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use core::{
     fmt::{self, Debug},
-    iter,
     marker::PhantomData,
     slice,
 };
@@ -9,8 +8,8 @@ use core::{
 use crate::traits::Soa;
 
 use super::{
-    assert::{assert_layouts, check_same_len, validate_layout},
-    error::{ErasedSoaError, FromValueError, InvalidLayoutError},
+    assert::{check_same_layout, check_same_len, validate_layout},
+    error::{ErasedSoaError, FromValueError, IntoValueError, InvalidLayoutError},
     field::{ErasedFieldSliceIterMut, ErasedFieldSliceMut},
     ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlicesIter,
 };
@@ -89,10 +88,14 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
         let len = T::slices_len_mut(context, &slices);
         let ptrs = T::mut_slice_refs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
-        let slices = iter::zip(descriptors, ptrs).map(|(desc, ptr)| {
-            let buffer = unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size() * len) };
-            unsafe { ErasedFieldSliceMut::new_unchecked(desc, buffer, len) }
-        });
+        let slices = descriptors
+            .into_vec()
+            .into_iter()
+            .zip(ptrs)
+            .map(|(desc, ptr)| {
+                let buffer = unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size() * len) };
+                unsafe { ErasedFieldSliceMut::new_unchecked(desc, buffer, len) }
+            });
         let me = unsafe { Self::actual_new(len, slices) };
         Ok(me)
     }
@@ -101,30 +104,33 @@ impl<'a, Fields> ErasedSoaSlicesMut<'a, Fields> {
     pub unsafe fn into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::SlicesMut<'a>, FromValueError<Self>>
+    ) -> Result<T::SlicesMut<'a>, IntoValueError<Self>>
     where
         T: Soa<Fields = Fields>,
     {
-        let descriptors = T::field_descriptors(context)
+        let Self { slices, .. } = &self;
+        let result = T::field_descriptors(context)
             .into_iter()
-            .map(|desc| {
+            .zip(slices)
+            .try_fold(0, |len, (desc, slice)| {
                 validate_layout::<Fields>(desc.as_ref().layout())?;
-                Ok(desc.as_ref().clone())
+                check_same_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
+                Ok(len + 1)
             })
-            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
-        let descriptors = match descriptors {
-            Ok(descriptors) => descriptors,
-            Err(error) => return Err(FromValueError::new(self, error)),
-        };
+            .and_then(|len| {
+                check_same_len(len, slices.len())?;
+                Ok(())
+            });
+        if let Err(error) = result {
+            return Err(IntoValueError::new(self, error));
+        }
 
         let Self { slices, len, .. } = self;
-        assert_eq!(slices.len(), descriptors.len());
+        let ptrs = slices
+            .into_vec()
+            .into_iter()
+            .map(|slice| slice.into_buffer().as_mut_ptr());
 
-        let ptrs = descriptors
-            .iter()
-            .zip(slices)
-            .inspect(|(desc, slice)| assert_layouts(desc.layout(), slice.descriptor().layout()))
-            .map(|(_, slice)| slice.into_buffer().as_mut_ptr());
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
         let slices = unsafe { T::slice_ptrs_to_slices_mut(context, slices) };

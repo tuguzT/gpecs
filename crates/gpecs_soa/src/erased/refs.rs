@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use core::{
     fmt::{self, Debug},
-    iter,
     marker::PhantomData,
     slice,
 };
@@ -9,8 +8,8 @@ use core::{
 use crate::traits::Soa;
 
 use super::{
-    assert::{assert_layouts, validate_layout},
-    error::{FromValueError, InvalidLayoutError},
+    assert::{check_same_layout, check_same_len, validate_layout},
+    error::{FromValueError, IntoValueError, InvalidLayoutError},
     field::ErasedFieldRef,
 };
 
@@ -84,41 +83,48 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
 
         let ptrs = T::refs_as_ptrs(context, refs);
         let ptrs = T::ptrs_erase(context, ptrs);
-        let refs = iter::zip(descriptors, ptrs).map(|(desc, ptr)| {
-            let len = desc.layout().size();
-            let buffer = unsafe { slice::from_raw_parts(ptr, len) };
-            unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
-        });
+        let refs = descriptors
+            .into_vec()
+            .into_iter()
+            .zip(ptrs)
+            .map(|(desc, ptr)| {
+                let len = desc.layout().size();
+                let buffer = unsafe { slice::from_raw_parts(ptr, len) };
+                unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
+            });
         let me = unsafe { Self::actual_new(refs) };
         Ok(me)
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Refs<'a>, FromValueError<Self>>
+    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Refs<'a>, IntoValueError<Self>>
     where
         T: Soa<Fields = Fields>,
     {
-        let descriptors = T::field_descriptors(context)
+        let Self { refs, .. } = &self;
+        let result = T::field_descriptors(context)
             .into_iter()
-            .map(|desc| {
+            .zip(refs)
+            .try_fold(0, |len, (desc, r#ref)| {
                 validate_layout::<Fields>(desc.as_ref().layout())?;
-                Ok(desc.as_ref().clone())
+                check_same_layout(r#ref.descriptor().layout(), desc.as_ref().layout())?;
+                Ok(len + 1)
             })
-            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
-        let descriptors = match descriptors {
-            Ok(descriptors) => descriptors,
-            Err(error) => return Err(FromValueError::new(self, error)),
-        };
+            .and_then(|len| {
+                check_same_len(len, refs.len())?;
+                Ok(())
+            });
+        if let Err(error) = result {
+            return Err(IntoValueError::new(self, error));
+        }
 
         let Self { refs, .. } = self;
-        assert_eq!(descriptors.len(), refs.len());
+        let ptrs = refs
+            .into_vec()
+            .into_iter()
+            .map(|r#ref| r#ref.into_buffer().as_ptr());
 
-        let ptrs = descriptors
-            .iter()
-            .zip(refs)
-            .inspect(|(desc, r#ref)| assert_layouts(desc.layout(), r#ref.descriptor().layout()))
-            .map(|(_, r#ref)| r#ref.into_buffer().as_ptr());
         let ptrs = T::ptrs_restore(context, ptrs);
         let refs = unsafe { T::ptrs_to_refs(context, ptrs) };
         Ok(refs)

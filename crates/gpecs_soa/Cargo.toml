@@ -9,6 +9,7 @@ rust-version.workspace = true
 
 [dev-dependencies]
 criterion = { workspace = true }
+gpecs_soa_erased = { workspace = true }
 
 [[bench]]
 name = "soa"

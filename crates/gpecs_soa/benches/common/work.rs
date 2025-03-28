@@ -1,7 +1,8 @@
 use std::{any::type_name, array, hint::black_box, iter::Zip, slice};
 
 use criterion::{criterion_group, BenchmarkId, Criterion};
-use gpecs_soa::{erased::ErasedSoa, prelude::*, slice as soa_slice};
+use gpecs_soa::{prelude::*, slice as soa_slice};
+use gpecs_soa_erased::erased::ErasedSoa;
 
 use super::{push_many::Push, *};
 

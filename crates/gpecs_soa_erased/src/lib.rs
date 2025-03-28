@@ -7,15 +7,12 @@
 
 extern crate alloc;
 
-pub use self::traits::Soa;
+pub use gpecs_soa as soa;
 
-pub mod identity;
-pub mod mem;
-pub mod prelude;
-pub mod ptr;
-pub mod slice;
-pub mod traits;
-pub mod vec;
+pub mod align;
+pub mod erased;
+pub mod error;
+pub mod field;
 
-mod raw_vec;
-mod set_len_on_drop;
+mod assert;
+mod byte;

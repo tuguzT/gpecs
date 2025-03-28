@@ -9,4 +9,5 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_sparse = { workspace = true }
+gpecs_soa_erased = { workspace = true }
 as-any = { workspace = true }

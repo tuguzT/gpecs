@@ -1,7 +1,8 @@
 use std::{any::type_name, hint::black_box};
 
 use criterion::{criterion_group, BenchmarkId, Criterion};
-use gpecs_soa::{erased::ErasedSoa, prelude::*};
+use gpecs_soa::prelude::*;
+use gpecs_soa_erased::erased::ErasedSoa;
 
 use super::{with_capacity::WithCapacity, *};
 

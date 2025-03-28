@@ -3,23 +3,20 @@ use std::{
     fmt::{self, Debug},
 };
 
+use gpecs_soa_erased::{
+    align::Unaligned,
+    erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut},
+    field::{
+        ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
+    },
+};
 use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
     bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
-    soa::{
-        erased::{
-            field::{
-                ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
-                ErasedFieldSliceMut,
-            },
-            ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut,
-            Unaligned,
-        },
-        traits::FieldDescriptor,
-    },
+    soa::traits::FieldDescriptor,
 };
 
 use super::error::{

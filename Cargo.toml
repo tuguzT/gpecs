@@ -12,6 +12,7 @@ rust-version = "1.84.0"
 [workspace.dependencies]
 gpecs_soa = { path = "crates/gpecs_soa" }
 gpecs_sparse = { path = "crates/gpecs_sparse" }
+gpecs_soa_erased = { path = "crates/gpecs_soa_erased" }
 as-any = { version = "0.3" }
 rspirv = { version = "0.12" }
 criterion = { version = "0.5", features = ["html_reports"] }

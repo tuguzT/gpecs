@@ -1,12 +1,12 @@
 use alloc::{boxed::Box, vec::Vec};
-use core::{iter, ptr, slice};
+use core::{ptr, slice};
 
 use crate::traits::{buffer_layout, FieldDescriptor, Soa};
 
 use super::{
-    assert::{check_same_len, validate_layout},
+    assert::{check_same_layout, check_same_len, validate_layout},
     byte::{Aligned, ErasedByte},
-    error::{ErasedSoaError, FromValueError, InvalidLayoutError},
+    error::{ErasedSoaError, FromValueError, IntoValueError, InvalidLayoutError},
     field::{ErasedField, ErasedFieldRef, ErasedFieldRefMut},
     ErasedSoaRefs, ErasedSoaRefsMut,
 };
@@ -120,35 +120,38 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T, FromValueError<Self>>
+    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T, IntoValueError<Self>>
     where
         T: Soa<Fields = Fields>,
     {
-        let target_layouts = T::field_descriptors(context)
-            .into_iter()
-            .map(|desc| {
-                validate_layout::<T::Fields>(desc.as_ref().layout())?;
-                Ok(desc.as_ref().layout())
-            })
-            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
-        let target_layouts = match target_layouts {
-            Ok(target_layouts) => target_layouts,
-            Err(error) => return Err(FromValueError::new(self, error)),
-        };
-
         let Self {
             buffer,
             descriptors,
-        } = self;
-        let field_layouts = descriptors.iter().map(FieldDescriptor::layout);
-        assert!(target_layouts.iter().copied().eq(field_layouts));
+        } = &self;
+        let result = T::field_descriptors(context)
+            .into_iter()
+            .zip(descriptors)
+            .try_fold(0, |len, (desc, self_desc)| {
+                validate_layout::<T::Fields>(desc.as_ref().layout())?;
+                check_same_layout(self_desc.layout(), desc.as_ref().layout())?;
+                Ok(len + 1)
+            })
+            .and_then(|len| {
+                check_same_len(len, descriptors.len())?;
+                Ok(())
+            });
+        if let Err(error) = result {
+            return Err(IntoValueError::new(self, error));
+        }
 
         let (buffer_layout, offsets) =
             T::buffer_layout(context, 1).expect("layout size should not exceed `isize::MAX`");
         let buffer_len = buffer_layout
             .size()
             .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
-        assert_eq!(buffer_len, buffer.len());
+        if let Err(error) = check_same_len(buffer_len, buffer.len()) {
+            return Err(IntoValueError::new(self, error.into()));
+        }
 
         let value = unsafe {
             let src = {
@@ -174,9 +177,12 @@ impl<Fields> ErasedSoa<Fields> {
         let buffer_len = buffer_layout
             .size()
             .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
-        assert_eq!(buffer_len, buffer.len());
+        check_same_len(buffer_len, buffer.len()).expect("buffer length should match");
 
-        iter::zip(descriptors, offsets)
+        descriptors
+            .into_vec()
+            .into_iter()
+            .zip(offsets)
             .map(|(desc, offset)| {
                 let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
                 let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
@@ -204,7 +210,7 @@ impl<Fields> ErasedSoa<Fields> {
         let buffer_len = buffer_layout
             .size()
             .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
-        assert_eq!(buffer_len, buffer.len());
+        check_same_len(buffer_len, buffer.len()).expect("buffer length should match");
 
         let refs = descriptors.iter().zip(offsets).map(|(desc, offset)| {
             let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
@@ -228,7 +234,7 @@ impl<Fields> ErasedSoa<Fields> {
         let buffer_len = buffer_layout
             .size()
             .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
-        assert_eq!(buffer_len, buffer.len());
+        check_same_len(buffer_len, buffer.len()).expect("buffer length should match");
 
         let refs = descriptors.iter().zip(offsets).map(|(desc, offset)| {
             let data = unsafe { buffer.as_mut_ptr().cast::<u8>().add(offset) };

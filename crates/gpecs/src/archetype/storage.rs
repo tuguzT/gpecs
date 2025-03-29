@@ -1,6 +1,6 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug},
+    iter::FusedIterator,
 };
 
 use gpecs_soa_erased::{
@@ -11,6 +11,7 @@ use gpecs_soa_erased::{
     },
 };
 use gpecs_sparse::set::EpochSparseSet;
+use indexmap::{set::Iter as IndexSetIter, IndexMap, IndexSet};
 
 use crate::{
     bundle::{error::DuplicateComponentError, Bundle},
@@ -25,7 +26,7 @@ use super::error::{
 };
 
 pub struct ArchetypeStorage {
-    component_ids: BTreeSet<ComponentId>,
+    component_ids: IndexSet<ComponentId>,
     erased_storage: Box<dyn ErasedStorage>,
 }
 
@@ -45,11 +46,17 @@ impl ArchetypeStorage {
             .collect();
         let storage = SparseSet::<B>::with_context(context);
 
-        let this = Self {
+        Ok(Self {
             component_ids,
             erased_storage: Box::new(storage),
-        };
-        Ok(this)
+        })
+    }
+
+    #[inline]
+    pub fn component_ids(&self) -> ComponentIds<'_> {
+        let Self { component_ids, .. } = self;
+        let inner = component_ids.iter();
+        ComponentIds { inner }
     }
 
     #[inline]
@@ -73,7 +80,7 @@ impl ArchetypeStorage {
         } = self;
 
         let mut target_component_ids = B::component_ids(context, components)?.into_iter();
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(&id)) {
+        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
             return Err(ExclusiveComponentError { component_id }.into());
         }
 
@@ -97,7 +104,7 @@ impl ArchetypeStorage {
         } = self;
 
         let mut target_component_ids = B::component_ids(context, components)?.into_iter();
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(&id)) {
+        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
             return Err(ExclusiveComponentError { component_id }.into());
         }
 
@@ -122,7 +129,7 @@ impl ArchetypeStorage {
         } = self;
 
         let mut target_component_ids = B::component_ids(context, components)?.into_iter();
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(&id)) {
+        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
             return Err(ExclusiveComponentError { component_id }.into());
         }
 
@@ -149,7 +156,7 @@ impl ArchetypeStorage {
         } = self;
 
         let mut target_component_ids = B::component_ids(context, components)?.into_iter();
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(&id)) {
+        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
             return Err(ExclusiveComponentError { component_id }.into());
         }
 
@@ -186,7 +193,7 @@ impl ArchetypeStorage {
                 return Err(IncompatibleBundleValueError { value, reason });
             }
         };
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(&id)) {
+        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
             let reason = ExclusiveComponentError { component_id }.into();
             return Err(IncompatibleBundleValueError { value, reason });
         }
@@ -224,7 +231,7 @@ impl ArchetypeStorage {
         let mut target_component_ids = B::component_ids(context, components)?
             .into_iter()
             .inspect(|_| target_component_ids_count += 1);
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(&id)) {
+        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
             return Err(ExclusiveComponentError { component_id }.into());
         }
 
@@ -251,7 +258,92 @@ impl Debug for ArchetypeStorage {
     }
 }
 
-type ErasedComponents<T> = BTreeMap<ComponentId, T>;
+#[derive(Clone)]
+pub struct ComponentIds<'a> {
+    inner: IndexSetIter<'a, ComponentId>,
+}
+
+impl Debug for ComponentIds<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { inner } = self;
+        Debug::fmt(inner, f)
+    }
+}
+
+impl Iterator for ComponentIds<'_> {
+    type Item = ComponentId;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next().copied()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { inner } = self;
+        inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.count()
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth(n).copied()
+    }
+
+    #[inline]
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.last().copied()
+    }
+
+    #[inline]
+    fn collect<B: FromIterator<Self::Item>>(self) -> B
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.copied().collect()
+    }
+}
+
+impl DoubleEndedIterator for ComponentIds<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next_back().copied()
+    }
+
+    #[inline]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth_back(n).copied()
+    }
+}
+
+impl ExactSizeIterator for ComponentIds<'_> {
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+}
+
+impl FusedIterator for ComponentIds<'_> {}
+
+type ErasedComponents<T> = IndexMap<ComponentId, T>;
 
 trait ErasedStorage {
     fn entities(&self) -> &[Entity];
@@ -412,7 +504,7 @@ where
         .inspect(|(id, desc)| validate_component(components, *id, desc))
         .map(move |(id, _)| {
             fields
-                .remove(&id)
+                .swap_remove(&id)
                 .unwrap_or_else(|| panic!("field of component {id:?} should be present"))
         })
 }

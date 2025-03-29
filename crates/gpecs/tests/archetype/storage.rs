@@ -3,6 +3,7 @@ use gpecs::{
         error::{ExclusiveComponentError, IncompatibleBundleValueError, TooFewComponentsError},
         storage::ArchetypeStorage,
     },
+    bundle::Bundle,
     component::{registry::ComponentRegistry, Component},
     entity::registry::EntityRegistry,
     world::registry::WorldRegistry,
@@ -14,6 +15,9 @@ fn storage_unit() {
     let mut storage = ArchetypeStorage::of::<()>(&mut components, ())
         .expect("creation of storage for empty archetype should succeed");
     assert_eq!(storage.entities(), []);
+
+    let component_ids = <()>::component_ids(&(), &mut components).unwrap();
+    assert!(storage.component_ids().eq(component_ids));
 
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
@@ -71,6 +75,9 @@ fn storage_tuple() {
     let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components, ())
         .expect("creation of storage for bundle `(Position, Mass)` should succeed");
     assert_eq!(storage.entities(), []);
+
+    let component_ids = <(Position, Mass)>::component_ids(&(), &mut components).unwrap();
+    assert!(storage.component_ids().eq(component_ids));
 
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();

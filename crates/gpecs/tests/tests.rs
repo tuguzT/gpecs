@@ -11,5 +11,6 @@ mod component {
 }
 
 mod archetype {
+    mod registry;
     mod storage;
 }

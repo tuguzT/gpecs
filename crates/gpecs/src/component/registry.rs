@@ -20,13 +20,6 @@ impl ComponentId {
     }
 }
 
-impl From<ComponentId> for usize {
-    #[inline]
-    fn from(value: ComponentId) -> Self {
-        value.index()
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct ComponentDescriptor {
     name: Cow<'static, str>,
@@ -36,7 +29,10 @@ pub struct ComponentDescriptor {
 
 impl ComponentDescriptor {
     #[inline]
-    pub fn new(name: impl Into<Cow<'static, str>>, desc: FieldDescriptor) -> Self {
+    pub fn new<N>(name: N, desc: FieldDescriptor) -> Self
+    where
+        N: Into<Cow<'static, str>>,
+    {
         Self {
             name: name.into(),
             type_id: None,
@@ -84,8 +80,8 @@ pub struct ComponentInfo {
 impl ComponentInfo {
     #[inline]
     pub fn id(&self) -> ComponentId {
-        let Self { id, .. } = self;
-        id.clone()
+        let Self { id, .. } = *self;
+        id
     }
 
     #[inline]
@@ -164,12 +160,14 @@ impl ComponentRegistry {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.components.len()
+        let Self { components, .. } = self;
+        components.len()
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.components.is_empty()
+        let Self { components, .. } = self;
+        components.is_empty()
     }
 
     #[inline]

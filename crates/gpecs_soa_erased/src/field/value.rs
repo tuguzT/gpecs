@@ -32,11 +32,14 @@ where
 {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &[u8]) -> Result<Self, ErasedSoaError> {
+    pub fn new<B>(desc: FieldDescriptor, buffer: B) -> Result<Self, ErasedSoaError>
+    where
+        B: AsRef<[u8]>,
+    {
         if A::IS_ALIGNED {
             validate_layout::<A>(desc.layout())?;
         }
-        check_same_len(buffer.len(), desc.layout().size())?;
+        check_same_len(buffer.as_ref().len(), desc.layout().size())?;
 
         let me = unsafe { Self::actual_new(desc, buffer) };
         Ok(me)
@@ -44,7 +47,10 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &[u8]) -> Self {
+    pub unsafe fn new_unchecked<B>(desc: FieldDescriptor, buffer: B) -> Self
+    where
+        B: AsRef<[u8]>,
+    {
         if cfg!(debug_assertions) {
             return Self::new(desc, buffer).expect("incorrect inputs");
         }
@@ -52,12 +58,15 @@ where
     }
 
     #[inline]
-    unsafe fn actual_new(desc: FieldDescriptor, buffer: &[u8]) -> Self {
-        let buffer_len = buffer.len().div_ceil(size_of::<ErasedByte<A>>());
+    unsafe fn actual_new<B>(desc: FieldDescriptor, buffer: B) -> Self
+    where
+        B: AsRef<[u8]>,
+    {
+        let buffer_len = buffer.as_ref().len().div_ceil(size_of::<ErasedByte<A>>());
         let mut r#box = Box::new_uninit_slice(buffer_len);
         unsafe {
             ptr::copy_nonoverlapping(
-                buffer.as_ptr(),
+                buffer.as_ref().as_ptr(),
                 r#box.as_mut_ptr().cast(),
                 desc.layout().size(),
             );
@@ -216,5 +225,25 @@ where
             .field("buffer", buffer)
             .field("aligned", aligned)
             .finish()
+    }
+}
+
+impl<A> AsRef<[u8]> for ErasedField<A>
+where
+    A: Align,
+{
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.buffer()
+    }
+}
+
+impl<A> AsMut<[u8]> for ErasedField<A>
+where
+    A: Align,
+{
+    #[inline]
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.buffer_mut()
     }
 }

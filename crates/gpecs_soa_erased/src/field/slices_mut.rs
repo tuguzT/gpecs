@@ -205,6 +205,20 @@ impl Debug for ErasedFieldSliceMut<'_> {
     }
 }
 
+impl AsRef<[u8]> for ErasedFieldSliceMut<'_> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.buffer()
+    }
+}
+
+impl AsMut<[u8]> for ErasedFieldSliceMut<'_> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.buffer_mut()
+    }
+}
+
 impl<'a> From<ErasedFieldSliceMut<'a>> for ErasedFieldSlice<'a> {
     fn from(value: ErasedFieldSliceMut<'a>) -> Self {
         let (desc, buffer, len) = value.into_parts();

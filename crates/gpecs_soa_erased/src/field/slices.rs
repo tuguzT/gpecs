@@ -162,6 +162,13 @@ impl Debug for ErasedFieldSlice<'_> {
     }
 }
 
+impl AsRef<[u8]> for ErasedFieldSlice<'_> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.buffer()
+    }
+}
+
 impl<'a> IntoIterator for &'a ErasedFieldSlice<'_> {
     type Item = ErasedFieldRef<'a>;
     type IntoIter = ErasedFieldSliceIter<'a>;

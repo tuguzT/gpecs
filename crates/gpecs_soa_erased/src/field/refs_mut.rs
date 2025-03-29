@@ -153,6 +153,20 @@ impl Debug for ErasedFieldRefMut<'_> {
     }
 }
 
+impl AsRef<[u8]> for ErasedFieldRefMut<'_> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.buffer()
+    }
+}
+
+impl AsMut<[u8]> for ErasedFieldRefMut<'_> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.buffer_mut()
+    }
+}
+
 impl<'a> From<ErasedFieldRefMut<'a>> for ErasedFieldRef<'a> {
     fn from(value: ErasedFieldRefMut<'a>) -> Self {
         let (desc, buffer) = value.into_parts();

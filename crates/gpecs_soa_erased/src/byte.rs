@@ -1,4 +1,4 @@
-use core::mem::{ManuallyDrop, MaybeUninit};
+use core::mem::ManuallyDrop;
 
 use crate::align::Align;
 
@@ -7,7 +7,7 @@ where
     A: Align,
 {
     _byte: u8,
-    _align: ManuallyDrop<MaybeUninit<A>>,
+    _align: ManuallyDrop<A>,
 }
 
 unsafe impl<A> Send for ErasedByte<A> where A: Align + Send {}

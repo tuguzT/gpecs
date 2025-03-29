@@ -1,6 +1,8 @@
+use core::mem::MaybeUninit;
+
 pub struct Unaligned(());
 
-pub struct Aligned<Fields>(Fields);
+pub struct Aligned<Fields>(MaybeUninit<Fields>);
 
 pub trait Align: private::Sealed {
     const IS_ALIGNED: bool;

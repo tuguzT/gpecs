@@ -1,6 +1,5 @@
 use core::{
     alloc::{Layout, LayoutError},
-    any::type_name,
     borrow::Borrow,
 };
 
@@ -333,17 +332,4 @@ pub trait SoaToOwned<'a> {
             self.clone_into_ptrs(context, target);
         }
     }
-}
-
-#[inline]
-#[track_caller]
-pub(super) fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
-    debug_assert!(
-        ptr.is_aligned(),
-        "pointer {:p} of {} is not aligned to {} [its current align offset (in bytes) is {}]",
-        ptr,
-        type_name::<T>(),
-        align_of::<T>(),
-        ptr.cast::<u8>().align_offset(align_of::<T>()),
-    )
 }

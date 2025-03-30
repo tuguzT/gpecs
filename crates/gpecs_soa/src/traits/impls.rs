@@ -1,13 +1,50 @@
 use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
+    any::type_name,
     array, iter,
     marker::PhantomData,
     ptr::{self, NonNull},
     slice,
 };
 
-use super::{debug_assert_ptr_is_aligned, FieldDescriptor, Soa, SoaToOwned};
+use super::{FieldDescriptor, Soa, SoaToOwned};
+
+#[inline]
+#[track_caller]
+pub fn collect_array<T, const N: usize>(iter: impl IntoIterator<Item = T>) -> [T; N] {
+    #[cold]
+    #[inline(never)]
+    #[track_caller]
+    fn collect_fail(actual_len: usize, required_len: usize) -> ! {
+        panic!("iterator should have {required_len} items, but got {actual_len}")
+    }
+
+    let mut iter = iter.into_iter();
+    let array = array::from_fn(|index| {
+        let Some(offset) = iter.next() else {
+            collect_fail(index, N);
+        };
+        offset
+    });
+    match iter.count() {
+        0 => array,
+        len => collect_fail(len + N, N),
+    }
+}
+
+#[inline]
+#[track_caller]
+pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
+    debug_assert!(
+        ptr.is_aligned(),
+        "pointer {:p} of {} is not aligned to {} [its current align offset (in bytes) is {}]",
+        ptr,
+        type_name::<T>(),
+        align_of::<T>(),
+        ptr.cast::<u8>().align_offset(align_of::<T>()),
+    )
+}
 
 unsafe impl Soa for () {
     type Context = Self;
@@ -369,29 +406,6 @@ impl<'a> SoaToOwned<'a> for &'a () {
         _: &<Self::Owned as Soa>::Context,
         _: <Self::Owned as Soa>::RefsMut<'_>,
     ) {
-    }
-}
-
-#[inline]
-#[track_caller]
-pub fn collect_array<T, const N: usize>(iter: impl IntoIterator<Item = T>) -> [T; N] {
-    #[cold]
-    #[inline(never)]
-    #[track_caller]
-    fn collect_fail(actual_len: usize, required_len: usize) -> ! {
-        panic!("iterator should have {required_len} items, but got {actual_len}")
-    }
-
-    let mut iter = iter.into_iter();
-    let array = array::from_fn(|index| {
-        let Some(offset) = iter.next() else {
-            collect_fail(index, N);
-        };
-        offset
-    });
-    match iter.count() {
-        0 => array,
-        len => collect_fail(len + N, N),
     }
 }
 

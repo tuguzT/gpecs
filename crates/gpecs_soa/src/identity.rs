@@ -8,7 +8,8 @@ use core::{
 };
 
 use crate::traits::{
-    debug_assert_ptr_is_aligned, impls::collect_array, FieldDescriptor, Soa, SoaToOwned,
+    impls::{collect_array, debug_assert_ptr_is_aligned},
+    FieldDescriptor, Soa, SoaToOwned,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]

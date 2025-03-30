@@ -58,8 +58,8 @@ pub union BufferData<T>
 where
     T: Soa,
 {
-    _required_align: [usize; 0],
-    _size_align: ManuallyDrop<MaybeUninit<T::Fields>>,
+    _len_align: [usize; 0],
+    _fields: ManuallyDrop<MaybeUninit<T::Fields>>,
     _context: ManuallyDrop<MaybeUninit<T::Context>>,
 }
 
@@ -219,7 +219,7 @@ pub(crate) struct BufferPrefix<T>
 where
     T: Soa,
 {
-    _required_align: [T::Fields; 0],
+    _fields_align: [T::Fields; 0],
     context: T::Context,
     len: usize,
 }

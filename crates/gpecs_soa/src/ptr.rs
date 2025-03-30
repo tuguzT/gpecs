@@ -4,7 +4,10 @@ use core::{
     ptr,
 };
 
-use crate::{slice::SoaSlice, traits::Soa};
+use crate::{
+    slice::SoaSlice,
+    traits::{Soa, SoaTrustedFields},
+};
 
 #[allow(clippy::missing_safety_doc)]
 #[inline]
@@ -14,7 +17,7 @@ pub unsafe fn slice_from_raw_parts<T>(
     capacity: usize,
 ) -> *const SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     let context = unsafe { &*data.ptr_to_context() };
     let len = len_for_inner::<T>(context, len, capacity);
@@ -29,7 +32,7 @@ pub unsafe fn slice_from_raw_parts_mut<T>(
     capacity: usize,
 ) -> *mut SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     let context = unsafe { &*data.ptr_to_context() };
     let len = len_for_inner::<T>(context, len, capacity);
@@ -65,7 +68,7 @@ where
 
 pub trait SoaSlicePtr<T>: Copy + private_slice_ptr::Sealed
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[allow(clippy::missing_safety_doc)]
     unsafe fn context<'a>(self) -> &'a T::Context;
@@ -87,7 +90,7 @@ where
 
 impl<T> SoaSlicePtr<T> for *const SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
@@ -120,7 +123,7 @@ where
 
 pub trait SoaSlicePtrMut<T>: Copy + private_slice_ptr::Sealed
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[allow(clippy::missing_safety_doc)]
     unsafe fn context<'a>(self) -> &'a T::Context;
@@ -142,7 +145,7 @@ where
 
 impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
@@ -171,7 +174,7 @@ where
 
 fn slice_buffer_layout<T>(ptr: *const SoaSlice<T>) -> Layout
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     let buffer = ptr.into_inner();
 
@@ -182,14 +185,14 @@ where
 
 trait SoaSlicePtrIntoInner<T>: Copy
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     fn into_inner(self) -> *const [BufferData<T>];
 }
 
 impl<T> SoaSlicePtrIntoInner<T> for *const SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline(always)]
     fn into_inner(self) -> *const [BufferData<T>] {
@@ -199,14 +202,14 @@ where
 
 trait SoaSlicePtrIntoInnerMut<T>: Copy
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     fn into_inner_mut(self) -> *mut [BufferData<T>];
 }
 
 impl<T> SoaSlicePtrIntoInnerMut<T> for *mut SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline(always)]
     fn into_inner_mut(self) -> *mut [BufferData<T>] {
@@ -296,12 +299,12 @@ where
 }
 
 mod private_slice_ptr {
-    use super::{Soa, SoaSlice};
+    use super::{SoaSlice, SoaTrustedFields};
 
     pub trait Sealed {}
 
-    impl<T> Sealed for *const SoaSlice<T> where T: Soa {}
-    impl<T> Sealed for *mut SoaSlice<T> where T: Soa {}
+    impl<T> Sealed for *const SoaSlice<T> where T: SoaTrustedFields {}
+    impl<T> Sealed for *mut SoaSlice<T> where T: SoaTrustedFields {}
 }
 
 #[inline]

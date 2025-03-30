@@ -1,4 +1,4 @@
-use alloc::{borrow::ToOwned, boxed::Box};
+use alloc::boxed::Box;
 use core::{
     borrow::{Borrow, BorrowMut},
     cmp,
@@ -19,7 +19,7 @@ use crate::{
         from_raw_parts, from_raw_parts_mut, slice_range, IndexHelper, IndexHelperMut, Iter,
         IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
     },
-    traits::{Soa, SoaToOwned},
+    traits::{Soa, SoaToOwned, SoaTrustedFields},
 };
 
 pub use self::{drain::Drain, into_iter::IntoIter};
@@ -249,17 +249,6 @@ where
         self.buffer.shrink_to_fit(new_capacity);
     }
 
-    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T>> {
-        self.shrink_to_fit();
-        let me = ManuallyDrop::new(self);
-
-        unsafe {
-            let buffer = ptr::read(&me.buffer);
-            let len = me.len;
-            buffer.into_box(len)
-        }
-    }
-
     pub fn into_vecs(mut self) -> (T::Context, T::Vecs) {
         let len = self.len();
         let context = self.context();
@@ -319,16 +308,6 @@ where
             let context = self.context();
             T::slices_drop_in_place(context, slices);
         }
-    }
-
-    #[inline]
-    pub fn as_slice(&self) -> &SoaSlice<T> {
-        self
-    }
-
-    #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T> {
-        self
     }
 
     #[inline]
@@ -675,29 +654,6 @@ where
     }
 
     #[track_caller]
-    pub fn extend_from_slice<'other>(&mut self, other: &'other SoaSlice<T>)
-    where
-        T::Refs<'other>: SoaToOwned<'other, Owned = T>,
-    {
-        self.reserve(other.len());
-
-        let ptrs = self.as_mut_ptrs();
-        let mut set_len_on_drop = SetLenOnDrop {
-            local_len: self.len(),
-            vec: self,
-        };
-
-        let context = set_len_on_drop.vec.context();
-        for refs in other.iter() {
-            unsafe {
-                let dst = T::ptrs_add_mut(context, ptrs.clone(), set_len_on_drop.local_len);
-                refs.clone_into_ptrs(context, dst);
-            }
-            set_len_on_drop.local_len += 1;
-        }
-    }
-
-    #[track_caller]
     pub fn extend_from_within<R>(&mut self, src: R)
     where
         R: RangeBounds<usize>,
@@ -715,7 +671,8 @@ where
         let context = set_len_on_drop.vec.context();
         for index in range {
             unsafe {
-                let refs = T::ptrs_to_refs(context, set_len_on_drop.vec.get_unchecked(index));
+                let refs =
+                    T::ptrs_to_refs(context, set_len_on_drop.vec.slices().get_unchecked(index));
                 let dst = T::ptrs_add_mut(context, ptrs.clone(), set_len_on_drop.local_len);
                 refs.clone_into_ptrs(context, dst);
             }
@@ -763,6 +720,61 @@ where
     }
 }
 
+impl<T> SoaVec<T>
+where
+    T: SoaTrustedFields,
+{
+    #[inline]
+    pub fn as_slice(&self) -> &SoaSlice<T>
+    where
+        T: SoaTrustedFields,
+    {
+        self
+    }
+
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T>
+    where
+        T: SoaTrustedFields,
+    {
+        self
+    }
+
+    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T>> {
+        self.shrink_to_fit();
+        let me = ManuallyDrop::new(self);
+
+        unsafe {
+            let buffer = ptr::read(&me.buffer);
+            let len = me.len;
+            buffer.into_box(len)
+        }
+    }
+
+    #[track_caller]
+    pub fn extend_from_slice<'other>(&mut self, other: &'other SoaSlice<T>)
+    where
+        T::Refs<'other>: SoaToOwned<'other, Owned = T>,
+    {
+        self.reserve(other.len());
+
+        let ptrs = self.as_mut_ptrs();
+        let mut set_len_on_drop = SetLenOnDrop {
+            local_len: self.len(),
+            vec: self,
+        };
+
+        let context = set_len_on_drop.vec.context();
+        for refs in other.iter() {
+            unsafe {
+                let dst = T::ptrs_add_mut(context, ptrs.clone(), set_len_on_drop.local_len);
+                refs.clone_into_ptrs(context, dst);
+            }
+            set_len_on_drop.local_len += 1;
+        }
+    }
+}
+
 impl<T> Debug for SoaVec<T>
 where
     T: Soa,
@@ -798,7 +810,7 @@ where
 
 impl<T> AsRef<SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn as_ref(&self) -> &SoaSlice<T> {
@@ -818,7 +830,7 @@ where
 
 impl<T> AsMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut SoaSlice<T> {
@@ -828,7 +840,7 @@ where
 
 impl<T> Borrow<SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn borrow(&self) -> &SoaSlice<T> {
@@ -838,7 +850,7 @@ where
 
 impl<T> BorrowMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn borrow_mut(&mut self) -> &mut SoaSlice<T> {
@@ -870,7 +882,8 @@ where
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        Hash::hash(&**self, state)
+        let slices = self.slices();
+        Hash::hash(&slices, state)
     }
 }
 
@@ -882,33 +895,40 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        self.to_vec()
+        self.slices().to_vec()
     }
 
+    #[inline]
     fn clone_from(&mut self, source: &Self) {
-        source.as_slice().clone_into(self);
+        self.slices_mut().clone_from_slices(source.slices());
     }
 }
 
 impl<T> Deref for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     type Target = SoaSlice<T>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { from_raw_parts(self.as_ptr(), self.len(), self.capacity()) }
+        let data = self.as_ptr();
+        let len = self.len();
+        let capacity = self.capacity();
+        unsafe { from_raw_parts(data, len, capacity) }
     }
 }
 
 impl<T> DerefMut for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { from_raw_parts_mut(self.as_mut_ptr(), self.len(), self.capacity()) }
+        let data = self.as_mut_ptr();
+        let len = self.len();
+        let capacity = self.capacity();
+        unsafe { from_raw_parts_mut(data, len, capacity) }
     }
 }
 
@@ -921,7 +941,7 @@ where
     type Output = U;
 
     fn index(&self, index: I) -> &Self::Output {
-        Index::index(&**self, index)
+        self.slices().into_index(index)
     }
 }
 
@@ -932,7 +952,7 @@ where
     for<'a> I: IndexHelperMut<'a, T, Output = U>,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
-        IndexMut::index_mut(&mut **self, index)
+        self.slices_mut().into_index_mut(index)
     }
 }
 
@@ -974,7 +994,7 @@ where
 
 impl<T> From<Box<SoaSlice<T>>> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn from(value: Box<SoaSlice<T>>) -> Self {
@@ -984,7 +1004,7 @@ where
 
 impl<'me, T> From<&'me SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     T::Context: Clone,
     T::Refs<'me>: SoaToOwned<'me, Owned = T>,
 {
@@ -996,7 +1016,7 @@ where
 
 impl<'me, T> From<&'me mut SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     T::Context: Clone,
     T::Refs<'me>: SoaToOwned<'me, Owned = T>,
 {
@@ -1015,7 +1035,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        self.slices().into_iter()
     }
 }
 
@@ -1028,7 +1048,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
+        self.slices_mut().into_iter()
     }
 }
 

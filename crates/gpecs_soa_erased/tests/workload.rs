@@ -38,11 +38,11 @@ fn new_erased() {
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
-    let slice = vec.as_slice();
-    assert!(slice.is_empty());
+    let slices = vec.slices();
+    assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slice.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -52,21 +52,12 @@ fn new_erased() {
     let vec = Vec::from_vecs(erased_context, vecs);
     assert!(vec.is_empty());
 
-    let boxed_slice = vec.into_boxed_slice();
-    assert!(boxed_slice.is_empty());
-
-    let vec = boxed_slice.into_vec();
-    assert!(vec.is_empty());
-
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let boxed_slice = vec.into_boxed_slice();
-    assert!(boxed_slice.is_empty());
-
-    let into_iter = boxed_slice.into_iter();
+    let into_iter = vec.into_iter();
     assert!(into_iter.is_empty());
 
     assert_eq!(
@@ -109,12 +100,11 @@ fn with_capacity_erased() {
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
-    let slice = vec.as_slice();
-    assert!(slice.is_empty());
-    assert!(slice.capacity() >= 10);
+    let slices = vec.slices();
+    assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slice.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -124,21 +114,12 @@ fn with_capacity_erased() {
     let vec = Vec::from_vecs(erased_context, vecs);
     assert!(vec.is_empty());
 
-    let boxed_slice = vec.into_boxed_slice();
-    assert!(boxed_slice.is_empty());
-
-    let vec = boxed_slice.into_vec();
-    assert!(vec.is_empty());
-
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let boxed_slice = vec.into_boxed_slice();
-    assert!(boxed_slice.is_empty());
-
-    let into_iter = boxed_slice.into_iter();
+    let into_iter = vec.into_iter();
     assert!(into_iter.is_empty());
 
     assert_eq!(
@@ -176,7 +157,8 @@ fn one_item_erased() {
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
-        vec.get(0)
+        vec.slices()
+            .into_get(0)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&u8, &u64, &u16, &())),
     );
@@ -196,11 +178,10 @@ fn one_item_erased() {
         ),
     );
 
-    let slice = vec.as_slice();
-    assert_eq!(slice.len(), 1);
-    assert!(slice.capacity() >= 1);
+    let slices = vec.slices();
+    assert_eq!(slices.len(), 1);
     assert_eq!(
-        unsafe { slice.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -209,13 +190,14 @@ fn one_item_erased() {
         ),
     );
     assert_eq!(
-        vec.get(0)
+        vec.slices()
+            .into_get(0)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&u8, &u64, &u16, &())),
     );
 
     assert_eq!(
-        unsafe { slice.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -240,7 +222,7 @@ fn one_item_erased() {
         ),
     );
 
-    let mut iter = vec.iter();
+    let mut iter = vec.slices().into_iter();
     assert_eq!(iter.len(), 1);
     assert_eq!(
         iter.next_back()
@@ -252,7 +234,7 @@ fn one_item_erased() {
     let value = vec.pop().expect("vector should not be empty");
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
-    assert!(vec.get(0).is_none());
+    assert!(vec.slices().into_get(0).is_none());
 
     let value = unsafe { value.into::<Soa>(&context) }.unwrap();
     assert_eq!(value, (u8, u64, u16, ()));
@@ -262,21 +244,12 @@ fn one_item_erased() {
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
-    let boxed_slice = vec.into_boxed_slice();
-    assert!(boxed_slice.is_empty());
-
-    let vec = boxed_slice.into_vec();
-    assert!(vec.is_empty());
-
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let boxed_slice = vec.into_boxed_slice();
-    assert!(boxed_slice.is_empty());
-
-    let into_iter = boxed_slice.into_iter();
+    let into_iter = vec.into_iter();
     assert!(into_iter.is_empty());
 }
 
@@ -311,17 +284,20 @@ fn three_items_erased() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        vec.get(0)
+        vec.slices()
+            .into_get(0)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
     assert_eq!(
-        vec.get(1)
+        vec.slices()
+            .into_get(1)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
     assert_eq!(
-        vec.get(2)
+        vec.slices()
+            .into_get(2)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
@@ -374,12 +350,11 @@ fn three_items_erased() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let slice = vec.as_slice();
-    assert_eq!(slice.len(), 3);
-    assert!(slice.capacity() >= 3);
+    let slices = vec.slices();
+    assert_eq!(slices.len(), 3);
 
     assert_eq!(
-        unsafe { slice.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
         (
             [4, 7, 1].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
@@ -389,19 +364,19 @@ fn three_items_erased() {
     );
 
     assert_eq!(
-        slice
+        slices
             .get(0)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&4, &"5".to_owned(), &6, &())),
     );
     assert_eq!(
-        slice
+        slices
             .get(1)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&7, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
-        slice
+        slices
             .get(2)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&1, &"2".to_owned(), &3, &())),
@@ -428,7 +403,7 @@ fn three_items_erased() {
         *t += 1;
     }
 
-    let mut iter = vec.iter();
+    let mut iter = vec.slices().into_iter();
     assert_eq!(iter.len(), 3);
 
     assert_eq!(
@@ -465,27 +440,32 @@ fn three_items_erased() {
     assert!(vec.capacity() >= 5);
 
     assert_eq!(
-        vec.get(0)
+        vec.slices()
+            .into_get(0)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&5, &"5".to_owned(), &6, &())),
     );
     assert_eq!(
-        vec.get(1)
+        vec.slices()
+            .into_get(1)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
-        vec.get(2)
+        vec.slices()
+            .into_get(2)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
     assert_eq!(
-        vec.get(3)
+        vec.slices()
+            .into_get(3)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
-        vec.get(4)
+        vec.slices()
+            .into_get(4)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
@@ -601,7 +581,8 @@ fn three_items_erased() {
     // use this code instead of `retain_mut` to drop needed contents,
     // erased vec does not do it automatically
     for index in (0..vec.len()).rev() {
-        let (x, _, _, _) = unsafe { vec.index_mut(index).into::<Soa>(&context) }.unwrap();
+        let refs = vec.slices_mut().into_index_mut(index);
+        let (x, _, _, _) = unsafe { refs.into::<Soa>(&context) }.unwrap();
         if *x <= 3 {
             *x += 1;
         } else {
@@ -628,41 +609,7 @@ fn three_items_erased() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let boxed_slice = vec.into_boxed_slice();
-    assert_eq!(boxed_slice.len(), 1);
-    assert!(boxed_slice.capacity() >= 1);
-    assert_eq!(
-        boxed_slice
-            .get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
-        Some((&2, &"2".to_owned(), &3, &())),
-    );
-
-    let vec = boxed_slice.into_vec();
-    assert_eq!(vec.len(), 1);
-    assert!(vec.capacity() >= 1);
-    assert_eq!(
-        vec.get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
-        Some((&2, &"2".to_owned(), &3, &())),
-    );
-
-    let vec = {
-        let (ptr, len, capacity) = vec.into_raw_parts();
-        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
-    };
-
-    let boxed_slice = vec.into_boxed_slice();
-    assert_eq!(boxed_slice.len(), 1);
-    assert!(boxed_slice.capacity() >= 1);
-    assert_eq!(
-        boxed_slice
-            .get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
-        Some((&2, &"2".to_owned(), &3, &())),
-    );
-
-    let mut into_iter = boxed_slice.into_iter();
+    let mut into_iter = vec.into_iter();
     assert_eq!(into_iter.len(), 1);
 
     let value = into_iter.next_back().expect("iterator should not be empty");

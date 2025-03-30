@@ -9,9 +9,8 @@ use core::{
     ptr::{self, NonNull},
     slice,
 };
-use gpecs_soa::traits::FieldDescriptor;
 
-use crate::soa::traits::{Soa, SoaToOwned};
+use crate::soa::traits::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct KeyValuePair<K, V> {
@@ -663,6 +662,9 @@ where
         }
     }
 }
+
+#[allow(unsafe_code)]
+unsafe impl<K, V> SoaTrustedFields for KeyValuePair<K, V> where V: SoaTrustedFields {}
 
 pub struct KeyValueFieldDescriptors<'a, K, V>
 where

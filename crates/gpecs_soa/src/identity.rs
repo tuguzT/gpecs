@@ -9,7 +9,7 @@ use core::{
 
 use crate::traits::{
     impls::{collect_array, debug_assert_ptr_is_aligned},
-    FieldDescriptor, Soa, SoaToOwned,
+    FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
@@ -507,3 +507,5 @@ where
         target.clone_from(self);
     }
 }
+
+unsafe impl<T> SoaTrustedFields for Identity<T> {}

@@ -14,7 +14,7 @@ where
     let mut group = c.benchmark_group(format!("Work for `{}`", type_name::<T>()));
     for count in COUNT_RANGE {
         let vec = T::soa_slf_prepare_vec(count);
-        let iter = T::soa_slf_prepare_iter(&vec);
+        let iter = T::soa_slf_prepare_iter(vec.slices());
         group.bench_with_input(
             BenchmarkId::new(SOA_SLF_FUNCTION_NAME, count),
             &count,
@@ -22,7 +22,7 @@ where
         );
 
         let vec = T::soa_ser_prepare_vec(count);
-        let iter = T::soa_ser_prepare_iter(&vec);
+        let iter = T::soa_ser_prepare_iter(vec.slices());
         group.bench_with_input(
             BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
             &count,

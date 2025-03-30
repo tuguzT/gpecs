@@ -17,7 +17,7 @@ use crate::{
         BufferData, BufferDataPtr, BufferDataPtrMut,
     },
     slice::SoaSlice,
-    traits::Soa,
+    traits::{Soa, SoaTrustedFields},
 };
 
 use self::TryReserveErrorKind::*;
@@ -204,7 +204,10 @@ where
 
     #[inline]
     #[must_use]
-    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>> {
+    pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>>
+    where
+        T: SoaTrustedFields,
+    {
         debug_assert!(
             len <= self.capacity(),
             "`len` must be smaller than or equal to `self.capacity()`",

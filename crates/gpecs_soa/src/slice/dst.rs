@@ -9,7 +9,7 @@ use core::{
 
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
-    traits::{Soa, SoaToOwned},
+    traits::{SoaToOwned, SoaTrustedFields},
     vec::{IntoIter, SoaVec},
 };
 
@@ -18,14 +18,14 @@ use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, SoaSlices
 #[repr(transparent)]
 pub struct SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     buffer: [BufferData<T>],
 }
 
 impl<T> SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     pub fn context(&self) -> &T::Context {
@@ -132,7 +132,7 @@ where
 
     #[inline]
     pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, T>) {
-        self.slices_mut().into_iter_with_context()
+        self.slices_mut().into_iter_mut_with_context()
     }
 
     #[inline]
@@ -308,7 +308,7 @@ where
 
 impl<T> Debug for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     for<'any> T::Slices<'any>: Debug,
 {
     #[inline]
@@ -320,7 +320,7 @@ where
 
 impl<T> Default for &SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn default() -> Self {
@@ -331,7 +331,7 @@ where
 
 impl<T> Default for &mut SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn default() -> Self {
@@ -342,7 +342,7 @@ where
 
 impl<T> Default for Box<SoaSlice<T>>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn default() -> Self {
@@ -353,7 +353,7 @@ where
 
 impl<T> AsRef<SoaSlice<T>> for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -363,7 +363,7 @@ where
 
 impl<T, U> AsRef<[U]> for SoaSlice<T>
 where
-    for<'a> T: Soa<Slices<'a> = &'a [U]> + 'a,
+    for<'any> T: SoaTrustedFields<Slices<'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
         self.as_slices()
@@ -372,7 +372,7 @@ where
 
 impl<T> AsMut<SoaSlice<T>> for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -382,7 +382,7 @@ where
 
 impl<T, U> AsMut<[U]> for SoaSlice<T>
 where
-    for<'a> T: Soa<SlicesMut<'a> = &'a mut [U]> + 'a,
+    for<'any> T: SoaTrustedFields<SlicesMut<'any> = &'any mut [U]> + 'any,
 {
     fn as_mut(&mut self) -> &mut [U] {
         self.as_mut_slices()
@@ -391,7 +391,7 @@ where
 
 impl<T> PartialEq for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     for<'any> T::Slices<'any>: PartialEq,
 {
     #[inline]
@@ -407,14 +407,14 @@ where
 
 impl<T> Eq for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     for<'any> T::Slices<'any>: Eq,
 {
 }
 
 impl<T> PartialOrd for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     for<'any> T::Slices<'any>: PartialOrd,
 {
     #[inline]
@@ -425,7 +425,7 @@ where
 
 impl<T> Ord for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     for<'any> T::Slices<'any>: Ord,
 {
     #[inline]
@@ -436,13 +436,13 @@ where
 
 impl<T> Hash for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     for<'any> T::Slices<'any>: Hash,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let len = self.len();
-        state.write_usize(len);
+        let capacity = self.capacity();
+        state.write_usize(capacity);
 
         let slices = self.as_slices();
         slices.hash(state);
@@ -451,7 +451,7 @@ where
 
 impl<T> Drop for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     #[inline]
     fn drop(&mut self) {
@@ -471,7 +471,7 @@ where
 
 impl<T> ToOwned for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     T::Context: Clone,
     for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T> + 'any,
 {
@@ -494,9 +494,9 @@ where
 
 impl<T, U, I> Index<I> for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     U: ?Sized,
-    for<'a> I: IndexHelper<'a, T, Output = U>,
+    for<'any> I: IndexHelper<'any, T, Output = U>,
 {
     type Output = U;
 
@@ -507,9 +507,9 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     U: ?Sized,
-    for<'a> I: IndexHelperMut<'a, T, Output = U>,
+    for<'any> I: IndexHelperMut<'any, T, Output = U>,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         SoaSlice::index_mut(self, index)
@@ -518,7 +518,7 @@ where
 
 impl<'a, T> IntoIterator for &'a SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     type Item = T::Refs<'a>;
     type IntoIter = Iter<'a, T>;
@@ -531,7 +531,7 @@ where
 
 impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     type Item = T::Refs<'a>;
     type IntoIter = Iter<'a, T>;
@@ -544,7 +544,7 @@ where
 
 impl<'a, T> IntoIterator for &'a mut SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     type Item = T::RefsMut<'a>;
     type IntoIter = IterMut<'a, T>;
@@ -557,7 +557,7 @@ where
 
 impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     type Item = T::RefsMut<'a>;
     type IntoIter = IterMut<'a, T>;
@@ -570,7 +570,7 @@ where
 
 impl<T> IntoIterator for Box<SoaSlice<T>>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;
@@ -581,17 +581,17 @@ where
     }
 }
 
-unsafe impl<'a, T> Send for SoaSlice<T>
+unsafe impl<T> Send for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     T::Fields: Send,
     T::Context: Send,
 {
 }
 
-unsafe impl<'a, T> Sync for SoaSlice<T>
+unsafe impl<T> Sync for SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
     T::Fields: Sync,
     T::Context: Sync,
 {
@@ -605,7 +605,7 @@ pub unsafe fn from_raw_parts<'slice, T>(
     capacity: usize,
 ) -> &'slice SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     unsafe { &*slice_from_raw_parts(data, len, capacity) }
 }
@@ -618,7 +618,7 @@ pub unsafe fn from_raw_parts_mut<'slice, T>(
     capacity: usize,
 ) -> &'slice mut SoaSlice<T>
 where
-    T: Soa,
+    T: SoaTrustedFields,
 {
     unsafe { &mut *slice_from_raw_parts_mut(data, len, capacity) }
 }

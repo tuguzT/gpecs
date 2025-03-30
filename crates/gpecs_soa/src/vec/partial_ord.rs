@@ -1,11 +1,16 @@
-use super::{Soa, SoaSlice, SoaVec};
+use crate::{
+    slice::SoaSlice,
+    traits::{Soa, SoaTrustedFields},
+};
+
+use super::SoaVec;
 
 // Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
 macro_rules! __impl_slice_ord {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
         impl<T, $($vars)*> PartialOrd<$rhs> for $lhs
         where
-            T: Soa,
+            T: SoaTrustedFields,
             for<'any> T::Slices<'any>: PartialOrd,
             $($ty: $bound)?
         {
@@ -17,7 +22,16 @@ macro_rules! __impl_slice_ord {
     }
 }
 
-__impl_slice_ord! { [] SoaVec<T>, SoaVec<T> }
+impl<T> PartialOrd<SoaVec<T>> for SoaVec<T>
+where
+    T: Soa,
+    for<'any> T::Slices<'any>: PartialOrd,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &SoaVec<T>) -> Option<::core::cmp::Ordering> {
+        PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
+    }
+}
 
 __impl_slice_ord! { [] SoaVec<T>, SoaSlice<T> }
 __impl_slice_ord! { [] SoaVec<T>, &SoaSlice<T> }

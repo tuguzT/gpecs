@@ -23,7 +23,7 @@ use crate::{
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueSlices, KeyValueSlicesMut},
     soa::{
         mem::swap as soa_swap,
-        slice::{Iter as SoaIter, SoaSlice, SoaSlicesMut},
+        slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
         traits::Soa,
     },
 };
@@ -35,7 +35,7 @@ where
     K: Key,
     V: Soa,
 {
-    dense: &'a SoaSlice<KeyValuePair<K, V>>,
+    dense: SoaSlices<'a, KeyValuePair<K, V>>,
     sparse: &'a [SparseItem<K>],
 }
 
@@ -46,7 +46,7 @@ where
 {
     #[inline]
     pub(crate) fn new(
-        dense: &'a SoaSlice<KeyValuePair<K, V>>,
+        dense: SoaSlices<'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
     ) -> Self {
         Self { dense, sparse }
@@ -84,7 +84,7 @@ where
     pub fn as_slices_with_context(&self) -> (&V::Context, V::Slices<'_>) {
         let Self { dense, .. } = self;
 
-        let (context, slices) = dense.slices().into_slices_with_context();
+        let (context, slices) = dense.as_slices_with_context();
         let KeyValueSlices { values, .. } = slices;
         (context, values)
     }
@@ -99,7 +99,7 @@ where
     pub fn into_slices_with_context(self) -> (&'a V::Context, V::Slices<'a>) {
         let Self { dense, .. } = self;
 
-        let (context, slices) = dense.slices().into_slices_with_context();
+        let (context, slices) = dense.into_slices_with_context();
         let KeyValueSlices { values, .. } = slices;
         (context, values)
     }
@@ -116,7 +116,7 @@ where
     pub fn as_keys_slice(&self) -> &'a [K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let KeyValueSlices { keys, .. } = dense.clone().into_slices();
         keys
     }
 
@@ -162,14 +162,14 @@ where
     #[inline]
     pub fn into_get_with_context(self, key: K) -> (&'a V::Context, Option<V::Refs<'a>>) {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.iter_with_context();
+        let (context, dense) = dense.into_iter_with_context();
         (context, sparse_get(dense, sparse, key))
     }
 
     #[inline]
     pub fn get_with_key(&self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'_>)> {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(*dense, sparse, sparse_index)
+        sparse_get_with_key(dense, sparse, sparse_index)
     }
 
     #[inline]
@@ -195,21 +195,24 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) -> Keys<'a, K, V> {
+    pub fn keys(&self) -> Keys<'_, K, V> {
         let Self { dense, .. } = self;
-        Keys::new(dense.iter())
+        let inner = dense.iter();
+        Keys::new(inner)
     }
 
     #[inline]
-    pub fn values(&self) -> Values<'a, K, V> {
+    pub fn values(&self) -> Values<'_, K, V> {
         let Self { dense, .. } = self;
-        Values::new(dense.iter())
+        let inner = dense.iter();
+        Values::new(inner)
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'a, K, V> {
+    pub fn iter(&self) -> Iter<'_, K, V> {
         let Self { dense, .. } = self;
-        Iter::new(dense.iter())
+        let inner = dense.iter();
+        Iter::new(inner)
     }
 
     #[inline]
@@ -250,7 +253,7 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.iter_with_context();
+        let (context, dense) = dense.into_iter_with_context();
         (context, sparse_index(dense, sparse, key))
     }
 }
@@ -260,7 +263,7 @@ where
     K: Key,
     V: Soa,
     SparseItem<K>: Debug,
-    SoaSlice<KeyValuePair<K, V>>: Debug,
+    SoaSlices<'a, KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EpochSparseView")
@@ -270,15 +273,14 @@ where
     }
 }
 
-impl<K, V> Default for EpochSparseView<'_, K, V>
+impl<'a, K, V> From<&'a V::Context> for EpochSparseView<'a, K, V>
 where
     K: Key,
     V: Soa,
 {
-    #[inline]
-    fn default() -> Self {
+    fn from(context: &'a V::Context) -> Self {
         Self {
-            dense: Default::default(),
+            dense: context.into(),
             sparse: Default::default(),
         }
     }
@@ -291,7 +293,9 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        *self
+        let Self { dense, sparse } = self;
+        let dense = dense.clone();
+        Self { dense, sparse }
     }
 }
 
@@ -299,6 +303,7 @@ impl<K, V> Copy for EpochSparseView<'_, K, V>
 where
     K: Key,
     V: Soa,
+    V::Ptrs: Copy,
 {
 }
 
@@ -306,7 +311,7 @@ impl<'a, K, V> PartialEq for EpochSparseView<'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlice<KeyValuePair<K, V>>: PartialEq,
+    SoaSlices<'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.dense == other.dense && self.sparse == other.sparse
@@ -317,7 +322,7 @@ impl<'a, K, V> Eq for EpochSparseView<'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlice<KeyValuePair<K, V>>: Eq,
+    SoaSlices<'a, KeyValuePair<K, V>>: Eq,
 {
 }
 
@@ -325,7 +330,7 @@ impl<'a, K, V> PartialOrd for EpochSparseView<'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlice<KeyValuePair<K, V>>: PartialOrd,
+    SoaSlices<'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.dense.partial_cmp(&other.dense) {
@@ -340,7 +345,7 @@ impl<'a, K, V> Ord for EpochSparseView<'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlice<KeyValuePair<K, V>>: Ord,
+    SoaSlices<'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.dense.cmp(&other.dense) {
@@ -356,7 +361,7 @@ where
     K: Key,
     V: Soa,
     SparseItem<K>: Hash,
-    SoaSlice<KeyValuePair<K, V>>: Hash,
+    SoaSlices<'a, KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.dense.hash(state);
@@ -388,18 +393,6 @@ where
     }
 }
 
-impl<K, V> AsRef<SoaSlice<KeyValuePair<K, V>>> for EpochSparseView<'_, K, V>
-where
-    K: Key,
-    V: Soa,
-{
-    #[inline]
-    fn as_ref(&self) -> &SoaSlice<KeyValuePair<K, V>> {
-        let Self { dense, .. } = self;
-        dense
-    }
-}
-
 impl<'a, K, V> AsRef<EpochSparseView<'a, K, V>> for EpochSparseView<'a, K, V>
 where
     K: Key,
@@ -411,7 +404,7 @@ where
     }
 }
 
-impl<'a, K, V> IntoIterator for &EpochSparseView<'a, K, V>
+impl<'a, K, V> IntoIterator for &'a EpochSparseView<'_, K, V>
 where
     K: Key,
     V: Soa,
@@ -437,7 +430,9 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        let Self { dense, .. } = self;
+        let inner = dense.into_iter();
+        Iter::new(inner)
     }
 }
 
@@ -448,7 +443,7 @@ where
     K: Key,
     V: Soa,
 {
-    dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
+    dense: SoaSlicesMut<'a, KeyValuePair<K, V>>,
     sparse: &'a mut [SparseItem<K>],
 }
 
@@ -459,7 +454,7 @@ where
 {
     #[inline]
     pub(crate) fn new(
-        dense: &'a mut SoaSlice<KeyValuePair<K, V>>,
+        dense: SoaSlicesMut<'a, KeyValuePair<K, V>>,
         sparse: &'a mut [SparseItem<K>],
     ) -> Self {
         Self { dense, sparse }
@@ -497,7 +492,7 @@ where
     pub fn as_slices_with_context(&self) -> (&V::Context, V::Slices<'_>) {
         let Self { dense, .. } = self;
 
-        let (context, slices) = dense.slices().into_slices_with_context();
+        let (context, slices) = dense.as_slices_with_context();
         let KeyValueSlices { values, .. } = slices;
         (context, values)
     }
@@ -512,7 +507,7 @@ where
     pub fn as_mut_slices_with_context(&mut self) -> (&V::Context, V::SlicesMut<'_>) {
         let Self { dense, .. } = self;
 
-        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let (context, slices) = dense.as_mut_slices_with_context();
         let KeyValueSlicesMut { values, .. } = slices;
         (context, values)
     }
@@ -527,7 +522,7 @@ where
     pub fn into_slices_with_context(self) -> (&'a V::Context, V::SlicesMut<'a>) {
         let Self { dense, .. } = self;
 
-        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let (context, slices) = dense.into_slices_with_context();
         let KeyValueSlicesMut { values, .. } = slices;
         (context, values)
     }
@@ -560,7 +555,7 @@ where
     pub fn into_keys_slice(self) -> &'a [K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let KeyValueSlicesMut { keys, .. } = dense.into_slices();
         keys
     }
 
@@ -594,7 +589,7 @@ where
     pub fn swap(&mut self, first_key: K, second_key: K) {
         let Self { dense, sparse } = self;
 
-        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let (context, slices) = dense.as_mut_slices_with_context();
         let KeyValueSlicesMut { values, .. } = slices;
         let dense = SoaSlicesMut::<V>::new(context, values);
 
@@ -824,7 +819,7 @@ where
     {
         let Self { dense, sparse } = self;
 
-        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let (context, slices) = dense.as_mut_slices_with_context();
         let KeyValueSlicesMut { keys, values } = slices;
         let mut values = SoaSlicesMut::new(context, values);
 
@@ -885,7 +880,7 @@ where
     #[inline]
     pub fn into_get_with_context(self, key: K) -> (&'a V::Context, Option<V::Refs<'a>>) {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.iter_with_context();
+        let (context, dense) = dense.into_iter_with_context();
         (context, sparse_get(dense, sparse, key))
     }
 
@@ -911,20 +906,21 @@ where
     #[inline]
     pub fn into_get_mut_with_context(self, key: K) -> (&'a V::Context, Option<V::RefsMut<'a>>) {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.iter_mut_with_context();
+        let (context, dense) = dense.into_iter_mut_with_context();
         (context, sparse_get_mut(dense, sparse, key))
     }
 
     #[inline]
     pub fn get_with_key(&self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'_>)> {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(&**dense, sparse, sparse_index)
+        sparse_get_with_key(dense, sparse, sparse_index)
     }
 
     #[inline]
     pub fn into_get_with_key(self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'a>)> {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(&*dense, sparse, sparse_index)
+        let (_, dense) = dense.into_iter_with_context();
+        sparse_get_with_key(dense, sparse, sparse_index)
     }
 
     #[inline]
@@ -933,7 +929,7 @@ where
         sparse_index: K::SparseIndex,
     ) -> Option<(K, V::RefsMut<'_>)> {
         let Self { dense, sparse } = self;
-        sparse_get_mut_with_key(&mut **dense, sparse, sparse_index)
+        sparse_get_mut_with_key(dense, sparse, sparse_index)
     }
 
     #[inline]
@@ -964,37 +960,43 @@ where
     #[inline]
     pub fn keys(&self) -> Keys<'_, K, V> {
         let Self { dense, .. } = self;
-        Keys::new(dense.iter())
+        let inner = dense.iter();
+        Keys::new(inner)
     }
 
     #[inline]
     pub fn values(&self) -> Values<'_, K, V> {
         let Self { dense, .. } = self;
-        Values::new(dense.iter())
+        let inner = dense.iter();
+        Values::new(inner)
     }
 
     #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
         let Self { dense, .. } = self;
-        ValuesMut::new(dense.iter_mut())
+        let inner = dense.iter_mut();
+        ValuesMut::new(inner)
     }
 
     #[inline]
     pub fn into_values_mut(self) -> ValuesMut<'a, K, V> {
         let Self { dense, .. } = self;
-        ValuesMut::new(dense.iter_mut())
+        let inner = dense.into_iter();
+        ValuesMut::new(inner)
     }
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, K, V> {
         let Self { dense, .. } = self;
-        Iter::new(dense.iter())
+        let inner = dense.iter();
+        Iter::new(inner)
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         let Self { dense, .. } = self;
-        IterMut::new(dense.iter_mut())
+        let inner = dense.iter_mut();
+        IterMut::new(inner)
     }
 
     #[inline]
@@ -1035,7 +1037,7 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.iter_with_context();
+        let (context, dense) = dense.into_iter_with_context();
         (context, sparse_index(dense, sparse, key))
     }
 
@@ -1076,7 +1078,7 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.iter_mut_with_context();
+        let (context, dense) = dense.into_iter_mut_with_context();
         (context, sparse_index_mut(dense, sparse, key))
     }
 }
@@ -1086,7 +1088,7 @@ where
     K: Key,
     V: Soa,
     SparseItem<K>: Debug,
-    SoaSlice<KeyValuePair<K, V>>: Debug,
+    SoaSlicesMut<'a, KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EpochSparseViewMut")
@@ -1096,15 +1098,14 @@ where
     }
 }
 
-impl<K, V> Default for EpochSparseViewMut<'_, K, V>
+impl<'a, K, V> From<&'a V::Context> for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
     V: Soa,
 {
-    #[inline]
-    fn default() -> Self {
+    fn from(context: &'a V::Context) -> Self {
         Self {
-            dense: Default::default(),
+            dense: context.into(),
             sparse: Default::default(),
         }
     }
@@ -1114,7 +1115,7 @@ impl<'a, K, V> PartialEq for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlice<KeyValuePair<K, V>>: PartialEq,
+    SoaSlicesMut<'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.dense == other.dense && self.sparse == other.sparse
@@ -1125,7 +1126,7 @@ impl<'a, K, V> Eq for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlice<KeyValuePair<K, V>>: Eq,
+    SoaSlicesMut<'a, KeyValuePair<K, V>>: Eq,
 {
 }
 
@@ -1133,7 +1134,7 @@ impl<'a, K, V> PartialOrd for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlice<KeyValuePair<K, V>>: PartialOrd,
+    SoaSlicesMut<'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.dense.partial_cmp(&other.dense) {
@@ -1148,7 +1149,7 @@ impl<'a, K, V> Ord for EpochSparseViewMut<'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlice<KeyValuePair<K, V>>: Ord,
+    SoaSlicesMut<'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match self.dense.cmp(&other.dense) {
@@ -1164,7 +1165,7 @@ where
     K: Key,
     V: Soa,
     SparseItem<K>: Hash,
-    SoaSlice<KeyValuePair<K, V>>: Hash,
+    SoaSlicesMut<'a, KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.dense.hash(state);
@@ -1204,18 +1205,6 @@ where
     #[inline]
     fn as_ref(&self) -> &[T] {
         self.as_slices()
-    }
-}
-
-impl<K, V> AsRef<SoaSlice<KeyValuePair<K, V>>> for EpochSparseViewMut<'_, K, V>
-where
-    K: Key,
-    V: Soa,
-{
-    #[inline]
-    fn as_ref(&self) -> &SoaSlice<KeyValuePair<K, V>> {
-        let Self { dense, .. } = self;
-        dense
     }
 }
 
@@ -1294,7 +1283,8 @@ where
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { dense, .. } = self;
-        IterMut::new(dense.iter_mut())
+        let inner = dense.into_iter();
+        IterMut::new(inner)
     }
 }
 
@@ -1306,6 +1296,6 @@ where
     #[inline]
     fn from(value: EpochSparseViewMut<'a, K, V>) -> Self {
         let EpochSparseViewMut { dense, sparse } = value;
-        Self::new(dense, sparse)
+        Self::new(dense.into(), sparse)
     }
 }

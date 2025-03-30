@@ -8,7 +8,7 @@ use core::{
     slice,
 };
 
-use super::{FieldDescriptor, Soa, SoaToOwned};
+use super::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
 
 #[inline]
 #[track_caller]
@@ -953,6 +953,8 @@ macro_rules! soa_tuple_impl {
                 $(target.$indices.clone_from(self.$indices);)*
             }
         }
+
+        unsafe impl<$($types,)*> SoaTrustedFields for ($($types,)*) {}
     };
 }
 

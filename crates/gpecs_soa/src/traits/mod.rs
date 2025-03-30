@@ -10,6 +10,8 @@ pub mod impls;
 
 mod desc;
 
+/// The main trait of the [crate] which defines behavior of this type
+/// in the context of Structure of Arrays (or SoA) pattern.
 #[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
     /// Type of context used to perform all operations of this trait.
@@ -18,9 +20,10 @@ pub unsafe trait Soa: Sized {
     /// This is true for all the types with fields' size and alignment known at compile-time.
     type Context;
 
-    /// Special type used to properly allocate a buffer in memory.
-    /// This should contain all the fields which are stored inside of a buffer
-    /// ([`Copy`], [`Send`], [`Sync`] and some other bounds are defined with account to this type, not `Self`).
+    /// Special type containing all the fields which are stored inside of a buffer.
+    ///
+    /// This type is used for checking bounds of stored fields.
+    /// [`Copy`], [`Send`], [`Sync`] and some other bounds are defined with account to this type, not `Self`.
     ///
     /// Most of the time, this should be the same as `Self`.
     /// This is true for such implementations which store all the fields of self.
@@ -28,10 +31,7 @@ pub unsafe trait Soa: Sized {
 
     /// Collection of [descriptors][`FieldDescriptor`] for each field.
     ///
-    /// Safety requirements:
-    /// - order of descriptors should resemble their order inside of a buffer in memory
-    /// - sum of layouts' sizes of descriptors should be less or equal to the size of [`Fields`](`Soa::Fields`)
-    /// - alignment of each layout of descriptors should be less or equal to the alignment of [`Fields`](`Soa::Fields`)
+    /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
     type FieldDescriptors<'a>: IntoIterator<Item: AsRef<FieldDescriptor>>;
 
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_>;
@@ -333,3 +333,13 @@ pub trait SoaToOwned<'a> {
         }
     }
 }
+
+/// Marker trait which places additional safety requirements
+/// on the [`Fields`](`Soa::Fields`) associated type of [`Soa`] trait implementations.
+///
+/// These safety requirements are:
+/// - sum of layouts' sizes of [`FieldDescriptors`](`Soa::FieldDescriptors`)
+///   should be less or equal to the size of [`Fields`](`Soa::Fields`)
+/// - alignment of each layout of [`FieldDescriptors`](`Soa::FieldDescriptors`)
+///   should be less or equal to the alignment of [`Fields`](`Soa::Fields`)
+pub unsafe trait SoaTrustedFields: Soa {}

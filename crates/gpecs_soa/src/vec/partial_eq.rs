@@ -1,11 +1,16 @@
-use super::{Soa, SoaSlice, SoaVec};
+use crate::{
+    slice::SoaSlice,
+    traits::{Soa, SoaTrustedFields},
+};
+
+use super::SoaVec;
 
 // Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
 macro_rules! __impl_slice_eq {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
         impl<T, $($vars)*> PartialEq<$rhs> for $lhs
         where
-            T: Soa,
+            T: SoaTrustedFields,
             for<'any> T::Slices<'any>: PartialEq,
             $($ty: $bound)?
         {
@@ -18,7 +23,21 @@ macro_rules! __impl_slice_eq {
     }
 }
 
-__impl_slice_eq! { [] SoaVec<T>, SoaVec<T> }
+impl<T> PartialEq<SoaVec<T>> for SoaVec<T>
+where
+    T: Soa,
+    for<'any> T::Slices<'any>: PartialEq,
+{
+    #[inline]
+    fn eq(&self, other: &SoaVec<T>) -> bool {
+        self.as_slices() == other.as_slices()
+    }
+    #[inline]
+    #[allow(clippy::partialeq_ne_impl)]
+    fn ne(&self, other: &SoaVec<T>) -> bool {
+        self.as_slices() != other.as_slices()
+    }
+}
 
 __impl_slice_eq! { [] SoaVec<T>, SoaSlice<T> }
 __impl_slice_eq! { [] SoaVec<T>, &SoaSlice<T> }

@@ -283,6 +283,17 @@ where
     }
 }
 
+impl<'a, T> From<&'a T::Context> for SoaSlices<'a, T>
+where
+    T: Soa,
+{
+    fn from(context: &'a T::Context) -> Self {
+        let ptrs = T::ptrs_dangling(context);
+        let ptrs = T::ptrs_cast_const(context, ptrs);
+        unsafe { Self::from_parts(context, ptrs, 0) }
+    }
+}
+
 impl<T> Debug for SoaSlices<'_, T>
 where
     T: Soa,
@@ -816,7 +827,13 @@ where
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'a T::Context, IterMut<'a, T>) {
+    pub fn into_iter_with_context(self) -> (&'a T::Context, Iter<'a, T>) {
+        let Self { context, .. } = self;
+        (context, Iter::new(self.into()))
+    }
+
+    #[inline]
+    pub fn into_iter_mut_with_context(self) -> (&'a T::Context, IterMut<'a, T>) {
         let Self { context, .. } = self;
         (context, IterMut::new(self))
     }
@@ -1117,6 +1134,16 @@ where
     fn from(slices: SoaSlicesMut<'a, T>) -> Self {
         let SoaSlicesMut { context, ptrs, len } = slices;
         unsafe { Self::from_parts(context, T::ptrs_cast_const(context, ptrs), len) }
+    }
+}
+
+impl<'a, T> From<&'a T::Context> for SoaSlicesMut<'a, T>
+where
+    T: Soa,
+{
+    fn from(context: &'a T::Context) -> Self {
+        let ptrs = T::ptrs_dangling(context);
+        unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }
 

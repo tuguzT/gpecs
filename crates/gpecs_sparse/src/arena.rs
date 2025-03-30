@@ -3,7 +3,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    ops::{Deref, DerefMut, Index, IndexMut},
+    ops::{Index, IndexMut},
 };
 
 use crate::{
@@ -27,7 +27,7 @@ use crate::{
     set,
     soa::{
         mem::replace as soa_replace,
-        slice::{SoaSlice, SoaSlices, SoaSlicesMut},
+        slice::{SoaSlices, SoaSlicesMut},
         traits::Soa,
         vec::SoaVec,
     },
@@ -344,13 +344,13 @@ where
     #[inline]
     pub fn as_view(&self) -> EpochSparseView<'_, K, V> {
         let Self { dense, sparse, .. } = self;
-        EpochSparseView::new(dense, sparse)
+        EpochSparseView::new(dense.slices(), sparse)
     }
 
     #[inline]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, K, V> {
         let Self { dense, sparse, .. } = self;
-        EpochSparseViewMut::new(dense, sparse)
+        EpochSparseViewMut::new(dense.slices_mut(), sparse)
     }
 
     #[inline]
@@ -365,7 +365,7 @@ where
     ) -> Result<Self, InvalidKeyError<K>> {
         sparse.clear();
         let mut sparse_vacant_head = 0;
-        for (dense_index, KeyValueRefs { key, .. }) in dense.iter().enumerate() {
+        for (dense_index, KeyValueRefs { key, .. }) in dense.slices().into_iter().enumerate() {
             let sparse_index = key
                 .sparse_index()
                 .try_into()
@@ -660,7 +660,7 @@ where
         let (dense_key, value) = dense.swap_remove(dense_index_usize).into();
         check_equal_key(key, dense_key);
 
-        if let Some(KeyValueRefs { key, .. }) = dense.get(dense_index_usize) {
+        if let Some(KeyValueRefs { key, .. }) = dense.slices().into_get(dense_index_usize) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             match sparse_item.kind_mut() {
@@ -693,7 +693,7 @@ where
         let (dense_key, value) = dense.remove(dense_index).into();
         check_equal_key(key, dense_key);
 
-        for KeyValueRefs { key, .. } in dense.iter().skip(dense_index) {
+        for KeyValueRefs { key, .. } in dense.slices().into_iter().skip(dense_index) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
@@ -739,7 +739,7 @@ where
 
     pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
         for dense_index in (dense_len..self.len()).rev() {
-            let (&key, _) = self.dense.deref().index(dense_index).into();
+            let (&key, _) = self.dense.slices().into_index(dense_index).into();
             self.remove(key);
         }
         self.dense.truncate(dense_len);
@@ -760,7 +760,7 @@ where
             sparse_vacant_head,
         } = self;
 
-        for KeyValueRefs { key, .. } in dense.iter() {
+        for KeyValueRefs { key, .. } in dense.slices() {
             let sparse_index = unwrap_into_usize(key.sparse_index());
 
             let next_vacant = unwrap_into_index(*sparse_vacant_head);
@@ -784,7 +784,7 @@ where
 
         let mut last = 0;
         for curr in 0..old_len {
-            let (&mut key, value) = dense.deref_mut().index_mut(curr).into();
+            let (&mut key, value) = dense.slices_mut().into_index_mut(curr).into();
             if !f(key, value) {
                 let sparse_index = unwrap_into_usize(key.sparse_index());
 
@@ -794,7 +794,7 @@ where
                 continue;
             }
 
-            dense.swap(curr, last);
+            dense.slices_mut().swap(curr, last);
 
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
@@ -972,7 +972,7 @@ where
             sparse_vacant_head,
         } = self;
 
-        for KeyValueRefs { key, .. } in dense.iter() {
+        for KeyValueRefs { key, .. } in dense.slices() {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             sparse[sparse_index] =
                 SparseItem::vacant(unwrap_into_index(*sparse_vacant_head), key.epoch().next());
@@ -996,20 +996,23 @@ where
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, K, V> {
-        let view = self.as_view();
-        view.keys()
+        let Self { dense, .. } = self;
+        let inner = dense.slices().into_iter();
+        Keys::new(inner)
     }
 
     #[inline]
     pub fn into_keys(self) -> IntoKeys<K, V> {
         let Self { dense, .. } = self;
-        IntoKeys::new(dense.into_iter())
+        let inner = dense.into_iter();
+        IntoKeys::new(inner)
     }
 
     #[inline]
     pub fn values(&self) -> Values<'_, K, V> {
-        let view = self.as_view();
-        view.values()
+        let Self { dense, .. } = self;
+        let inner = dense.slices().into_iter();
+        Values::new(inner)
     }
 
     #[inline]
@@ -1021,13 +1024,14 @@ where
     #[inline]
     pub fn into_values(self) -> IntoValues<K, V> {
         let Self { dense, .. } = self;
-        IntoValues::new(dense.into_iter())
+        let inner = dense.into_iter();
+        IntoValues::new(inner)
     }
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, K, V> {
         let view = self.as_view();
-        view.iter()
+        view.into_iter()
     }
 
     #[inline]
@@ -1208,19 +1212,6 @@ where
     #[inline]
     fn as_ref(&self) -> &[T] {
         self.as_slices()
-    }
-}
-
-// TODO impl AsMut for this type?
-impl<K, V> AsRef<SoaSlice<KeyValuePair<K, V>>> for EpochSparseArena<K, V>
-where
-    K: Key,
-    V: Soa,
-{
-    #[inline]
-    fn as_ref(&self) -> &SoaSlice<KeyValuePair<K, V>> {
-        let Self { dense, .. } = self;
-        dense
     }
 }
 

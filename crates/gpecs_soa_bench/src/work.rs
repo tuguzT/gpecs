@@ -18,7 +18,7 @@ pub trait Work: WithCapacity + Push {
     }
 
     type SoaSlfIter<'a>: Iterator + Clone;
-    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_>;
+    fn soa_slf_prepare_iter(data: SoaSlices<Self>) -> Self::SoaSlfIter<'_>;
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>);
 
     fn soa_ser_prepare_vec(count: usize) -> SoaVec<ErasedSoa<Self::Fields>> {
@@ -32,7 +32,7 @@ pub trait Work: WithCapacity + Push {
     }
 
     type SoaSerIter<'a>: Iterator + Clone;
-    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_>;
+    fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_>;
     fn soa_ser_work(iter: Self::SoaSerIter<'_>);
 
     fn soa_std_prepare_vec(count: usize) -> Self::Vecs {
@@ -70,8 +70,8 @@ impl Work for Tiny {
 
     type SoaSlfIter<'a> = soa_slice::Iter<'a, Self>;
 
-    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_> {
-        data.iter()
+    fn soa_slf_prepare_iter(data: SoaSlices<Self>) -> Self::SoaSlfIter<'_> {
+        data.into_iter()
     }
 
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
@@ -84,8 +84,8 @@ impl Work for Tiny {
 
     type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa<Self::Fields>>;
 
-    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
-        data.iter()
+    fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
+        data.into_iter()
     }
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
@@ -135,8 +135,8 @@ impl Work for Small {
 
     type SoaSlfIter<'a> = soa_slice::Iter<'a, Self>;
 
-    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_> {
-        data.iter()
+    fn soa_slf_prepare_iter(data: SoaSlices<Self>) -> Self::SoaSlfIter<'_> {
+        data.into_iter()
     }
 
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
@@ -149,8 +149,8 @@ impl Work for Small {
 
     type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa<Self::Fields>>;
 
-    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
-        data.iter()
+    fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
+        data.into_iter()
     }
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
@@ -207,8 +207,8 @@ impl Work for Big {
 
     type SoaSlfIter<'a> = soa_slice::Iter<'a, Self>;
 
-    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_> {
-        data.iter()
+    fn soa_slf_prepare_iter(data: SoaSlices<Self>) -> Self::SoaSlfIter<'_> {
+        data.into_iter()
     }
 
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
@@ -221,8 +221,8 @@ impl Work for Big {
 
     type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa<Self::Fields>>;
 
-    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
-        data.iter()
+    fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
+        data.into_iter()
     }
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
@@ -293,8 +293,8 @@ impl Work for Large {
 
     type SoaSlfIter<'a> = soa_slice::Iter<'a, Self>;
 
-    fn soa_slf_prepare_iter(data: &SoaSlice<Self>) -> Self::SoaSlfIter<'_> {
-        data.iter()
+    fn soa_slf_prepare_iter(data: SoaSlices<Self>) -> Self::SoaSlfIter<'_> {
+        data.into_iter()
     }
 
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>) {
@@ -309,8 +309,8 @@ impl Work for Large {
 
     type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa<Self::Fields>>;
 
-    fn soa_ser_prepare_iter(data: &SoaSlice<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
-        data.iter()
+    fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa<Self::Fields>>) -> Self::SoaSerIter<'_> {
+        data.into_iter()
     }
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {

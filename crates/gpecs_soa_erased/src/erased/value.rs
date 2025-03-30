@@ -169,7 +169,7 @@ impl<Fields> ErasedSoa<Fields> {
     }
 
     #[inline]
-    pub fn into_fields(self) -> Box<[ErasedField<Aligned<Fields>>]> {
+    pub fn into_fields(self) -> Box<[ErasedField]> {
         let Self {
             buffer,
             descriptors,

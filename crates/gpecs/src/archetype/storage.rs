@@ -4,7 +4,6 @@ use std::{
 };
 
 use gpecs_soa_erased::{
-    align::Unaligned,
     erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut},
     field::{
         ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
@@ -362,14 +361,14 @@ trait ErasedStorage {
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-        fields: ErasedComponents<ErasedField<Unaligned>>,
-    ) -> Option<ErasedComponents<ErasedField<Unaligned>>>;
+        fields: ErasedComponents<ErasedField>,
+    ) -> Option<ErasedComponents<ErasedField>>;
 
     fn remove(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedField<Unaligned>>>;
+    ) -> Option<ErasedComponents<ErasedField>>;
 
     fn get(
         &self,
@@ -416,8 +415,8 @@ where
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-        fields: ErasedComponents<ErasedField<Unaligned>>,
-    ) -> Option<ErasedComponents<ErasedField<Unaligned>>> {
+        fields: ErasedComponents<ErasedField>,
+    ) -> Option<ErasedComponents<ErasedField>> {
         let value = from_erased_fields::<B>(components, self.context(), fields);
         let value = SparseSet::insert(self, entity, value).unwrap()?;
         let fields = into_erased_fields::<B>(components, self.context(), value);
@@ -429,7 +428,7 @@ where
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedField<Unaligned>>> {
+    ) -> Option<ErasedComponents<ErasedField>> {
         let value = SparseSet::remove(self, entity)?;
         let fields = into_erased_fields::<B>(components, self.context(), value);
         Some(fields)
@@ -514,7 +513,7 @@ where
 fn from_erased_fields<B>(
     components: &mut ComponentRegistry,
     context: &B::Context,
-    fields: ErasedComponents<ErasedField<Unaligned>>,
+    fields: ErasedComponents<ErasedField>,
 ) -> B
 where
     B: Bundle,
@@ -529,7 +528,7 @@ fn into_erased_fields<B>(
     components: &mut ComponentRegistry,
     context: &B::Context,
     value: B,
-) -> ErasedComponents<ErasedField<Unaligned>>
+) -> ErasedComponents<ErasedField>
 where
     B: Bundle,
 {
@@ -538,7 +537,6 @@ where
         .into_fields();
     validate_components::<B>(components, context)
         .zip(erased_value)
-        .map(|(component_id, field)| (component_id, field.into_unaligned()))
         .collect()
 }
 

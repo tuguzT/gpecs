@@ -14,5 +14,6 @@ pub mod erased;
 pub mod error;
 pub mod field;
 
+mod aligned_bytes;
 mod assert;
 mod byte;

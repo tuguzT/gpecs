@@ -1,7 +1,15 @@
-pub mod push_many;
+//! Nothing too special for now...
+
+#![warn(clippy::all)]
+// TODO `#![warn(missing_docs)]` after implementation & tests
+#![forbid(unsafe_op_in_unsafe_fn)]
+
+pub mod clear;
+pub mod push;
 pub mod with_capacity;
 pub mod work;
 
+// TODO: convert these into normal structs when derive macro is ready
 pub type Zero = ();
 pub type Tiny = (u32,);
 pub type Small = (f64, f64, f64);
@@ -19,8 +27,3 @@ pub type Large = (
     [u32; 32],
     [u32; 32],
 );
-
-pub const SOA_SLF_FUNCTION_NAME: &str = "SoA (mine)";
-pub const SOA_SER_FUNCTION_NAME: &str = "SoA (mine, erased)";
-pub const SOA_STD_FUNCTION_NAME: &str = "SoA (std)";
-pub const AOS_STD_FUNCTION_NAME: &str = "AoS (std)";

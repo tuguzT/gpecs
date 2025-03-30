@@ -1,12 +1,11 @@
-use std::{any::type_name, array, hint::black_box, iter::Zip, slice};
+use std::{array, hint::black_box, iter::Zip, slice};
 
-use criterion::{criterion_group, BenchmarkId, Criterion};
 use gpecs_soa::{prelude::*, slice as soa_slice};
 use gpecs_soa_erased::erased::ErasedSoa;
 
-use super::{push_many::Push, *};
+use crate::{push::Push, with_capacity::WithCapacity, Big, Large, Small, Tiny};
 
-pub(super) trait Work: Push {
+pub trait Work: WithCapacity + Push {
     fn work_item(index: usize) -> Self;
 
     fn soa_slf_prepare_vec(count: usize) -> SoaVec<Self> {
@@ -23,11 +22,10 @@ pub(super) trait Work: Push {
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>);
 
     fn soa_ser_prepare_vec(count: usize) -> SoaVec<ErasedSoa<Self::Fields>> {
-        let context = Default::default();
         let mut vec = Self::soa_ser_with_capacity(count);
         for index in 0..count {
             let value = black_box(Self::work_item(index));
-            let value = ErasedSoa::from(&context, value).unwrap();
+            let value = ErasedSoa::from(&Default::default(), value).unwrap();
             Self::soa_ser_push(&mut vec, value);
         }
         black_box(vec)
@@ -392,54 +390,3 @@ impl Work for Large {
         black_box(result);
     }
 }
-
-fn work<T>(c: &mut Criterion)
-where
-    T: Work,
-{
-    const COUNT_RANGE: [usize; 5] = [10, 100, 1_000, 10_000, 100_000];
-
-    let mut group = c.benchmark_group(format!("Work for `{}`", type_name::<T>()));
-    for count in COUNT_RANGE {
-        let vec = T::soa_slf_prepare_vec(count);
-        let iter = T::soa_slf_prepare_iter(&vec);
-        group.bench_with_input(
-            BenchmarkId::new(SOA_SLF_FUNCTION_NAME, count),
-            &count,
-            |b, _| b.iter(|| T::soa_slf_work(iter.clone())),
-        );
-
-        let vec = T::soa_ser_prepare_vec(count);
-        let iter = T::soa_ser_prepare_iter(&vec);
-        group.bench_with_input(
-            BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
-            &count,
-            |b, _| b.iter(|| T::soa_ser_work(iter.clone())),
-        );
-
-        let vec = T::soa_std_prepare_vec(count);
-        let iter = T::soa_std_prepare_iter(&vec);
-        group.bench_with_input(
-            BenchmarkId::new(SOA_STD_FUNCTION_NAME, count),
-            &count,
-            |b, _| b.iter(|| T::soa_std_work(iter.clone())),
-        );
-
-        let vec = T::aos_std_prepare_vec(count);
-        let iter = T::aos_std_prepare_iter(&vec);
-        group.bench_with_input(
-            BenchmarkId::new(AOS_STD_FUNCTION_NAME, count),
-            &count,
-            |b, _| b.iter(|| T::aos_std_work(iter.clone())),
-        );
-    }
-}
-
-criterion_group!(
-    benches,
-    work::<Tiny>,
-    work::<Small>,
-    // work::<Medium>,
-    work::<Big>,
-    work::<Large>,
-);

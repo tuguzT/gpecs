@@ -4,6 +4,6 @@ mod common;
 
 criterion_main!(
     common::with_capacity::benches,
-    common::push_many::benches,
+    common::push::benches,
     common::work::benches,
 );

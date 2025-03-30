@@ -1,0 +1,19 @@
+[package]
+name = "gpecs_soa_bench"
+description = "Benchmarks of SoA implementation for (probably) ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpecs_soa = { workspace = true }
+gpecs_soa_erased = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "soa"
+harness = false

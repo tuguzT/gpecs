@@ -1,98 +1,47 @@
 use alloc::boxed::Box;
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-    ptr::{self, NonNull},
-};
+use core::ptr::{self, NonNull};
 
 use crate::{
-    assert::{check_same_layout, check_same_len, validate_layout},
-    error::InvalidLayoutError,
+    assert::{check_same_layout, check_same_len},
     field::ErasedFieldNonNullPtr,
     soa::traits::Soa,
 };
 
-use super::error::{FromValueError, IntoValueError};
+use super::error::IntoValueError;
 
-pub struct ErasedSoaNonNullPtrs<Fields> {
+#[derive(Debug, Clone)]
+pub struct ErasedSoaNonNullPtrs {
     ptrs: Box<[ErasedFieldNonNullPtr]>,
-    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<Fields> ErasedSoaNonNullPtrs<Fields> {
+impl ErasedSoaNonNullPtrs {
     #[inline]
-    pub fn new<I>(ptrs: I) -> Result<Self, InvalidLayoutError>
+    pub fn new<I>(ptrs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldNonNullPtr>,
     {
-        let ptrs = ptrs
-            .into_iter()
-            .map(|ptr| {
-                validate_layout::<Fields>(ptr.descriptor().layout())?;
-                Ok(ptr)
-            })
-            .collect::<Result<Box<[_]>, _>>()?;
-        let me = unsafe { Self::actual_new(ptrs) };
-        Ok(me)
+        let ptrs = ptrs.into_iter().collect();
+        Self { ptrs }
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked<I>(ptrs: I) -> Self
+    pub fn from<T>(context: &T::Context, ptrs: T::NonNullPtrs) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldNonNullPtr>,
+        T: Soa,
     {
-        if cfg!(debug_assertions) {
-            return Self::new(ptrs).expect("incorrect inputs");
-        }
-        unsafe { Self::actual_new(ptrs) }
-    }
-
-    #[inline]
-    unsafe fn actual_new<I>(ptrs: I) -> Self
-    where
-        I: IntoIterator<Item = ErasedFieldNonNullPtr>,
-    {
-        Self {
-            ptrs: ptrs.into_iter().collect(),
-            phantom: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub fn from<T>(
-        context: &T::Context,
-        ptrs: T::NonNullPtrs,
-    ) -> Result<Self, FromValueError<T::NonNullPtrs>>
-    where
-        T: Soa<Fields = Fields>,
-    {
-        let descriptors = T::field_descriptors(context)
-            .into_iter()
-            .map(|desc| {
-                validate_layout::<T::Fields>(desc.as_ref().layout())?;
-                Ok(desc.as_ref().clone())
-            })
-            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
-        let descriptors = match descriptors {
-            Ok(descriptors) => descriptors,
-            Err(error) => return Err(FromValueError::new(ptrs, error)),
-        };
-
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
-        let ptrs = descriptors
-            .into_vec()
+        let ptrs = T::field_descriptors(context)
             .into_iter()
             .zip(ptrs)
             .map(|(desc, ptr)| {
+                let desc = desc.as_ref().clone();
                 let len = desc.layout().size();
                 let ptr = ptr::slice_from_raw_parts_mut(ptr, len);
                 let buffer = unsafe { NonNull::new_unchecked(ptr) };
                 unsafe { ErasedFieldNonNullPtr::new_unchecked(desc, buffer) }
             });
-        let me = unsafe { Self::actual_new(ptrs) };
-        Ok(me)
+        Self::new(ptrs)
     }
 
     #[inline]
@@ -102,14 +51,13 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
         context: &T::Context,
     ) -> Result<T::NonNullPtrs, IntoValueError<Self>>
     where
-        T: Soa<Fields = Fields>,
+        T: Soa,
     {
         let Self { ptrs, .. } = &self;
         let result = T::field_descriptors(context)
             .into_iter()
             .zip(ptrs)
             .try_fold(0, |len, (desc, slice)| {
-                validate_layout::<Fields>(desc.as_ref().layout())?;
                 check_same_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
                 Ok(len + 1)
             })
@@ -142,22 +90,5 @@ impl<Fields> ErasedSoaNonNullPtrs<Fields> {
     pub fn into_field_ptrs(self) -> Box<[ErasedFieldNonNullPtr]> {
         let Self { ptrs, .. } = self;
         ptrs
-    }
-}
-
-impl<Fields> Debug for ErasedSoaNonNullPtrs<Fields> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { ptrs, .. } = self;
-        f.debug_tuple("ErasedSoaNonNullPtrs").field(ptrs).finish()
-    }
-}
-
-impl<Fields> Clone for ErasedSoaNonNullPtrs<Fields> {
-    fn clone(&self) -> Self {
-        let Self { ptrs, phantom } = self;
-        Self {
-            ptrs: ptrs.clone(),
-            phantom: phantom.clone(),
-        }
     }
 }

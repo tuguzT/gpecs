@@ -1,5 +1,6 @@
 pub use self::{
     context::ErasedSoaContext,
+    fields::ErasedSoaFields,
     nonnull_ptrs::ErasedSoaNonNullPtrs,
     ptrs::ErasedSoaPtrs,
     ptrs_mut::ErasedSoaMutPtrs,
@@ -16,6 +17,7 @@ pub use self::{
 pub mod error;
 
 mod context;
+mod fields;
 mod nonnull_ptrs;
 mod ptrs;
 mod ptrs_mut;

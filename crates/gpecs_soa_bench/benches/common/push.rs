@@ -37,7 +37,7 @@ where
                 let mut vec = T::soa_ser_with_capacity(0);
                 b.iter(|| {
                     for _ in 0..count {
-                        let value = ErasedSoa::from::<T>(&context, Default::default()).unwrap();
+                        let value = ErasedSoa::from::<T>(&context, Default::default());
                         T::soa_ser_push(&mut vec, value);
                     }
                     black_box(&mut vec);
@@ -98,7 +98,7 @@ where
             |b, &count| {
                 b.iter(|| {
                     for _ in 0..count {
-                        let value = ErasedSoa::from::<T>(&context, Default::default()).unwrap();
+                        let value = ErasedSoa::from::<T>(&context, Default::default());
                         T::soa_ser_push(&mut vec, value);
                     }
                     black_box(&mut vec);

@@ -11,7 +11,7 @@ pub trait Push: Soa {
         vec.push(value);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<ErasedSoa<Self::Fields>>, value: ErasedSoa<Self::Fields>) {
+    fn soa_ser_push(vec: &mut SoaVec<ErasedSoa>, value: ErasedSoa) {
         let value = black_box(value);
         vec.push(value);
     }

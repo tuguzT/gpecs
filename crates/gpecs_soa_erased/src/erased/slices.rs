@@ -1,45 +1,34 @@
 use alloc::boxed::Box;
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-    slice,
-};
+use core::{iter::FusedIterator, slice};
 
 use crate::{
-    assert::{check_same_layout, check_same_len, validate_layout},
-    error::InvalidLayoutError,
+    assert::{check_same_layout, check_same_len},
+    error::LenMismatchError,
     field::{ErasedFieldSlice, ErasedFieldSliceIter},
     soa::traits::Soa,
 };
 
-use super::{
-    error::{ErasedSoaError, FromValueError, IntoValueError},
-    ErasedSoaRefs,
-};
+use super::{error::IntoValueError, ErasedSoaRefs};
 
-pub struct ErasedSoaSlices<'a, Fields>
-where
-    Fields: 'a,
-{
+#[derive(Debug, Clone)]
+pub struct ErasedSoaSlices<'a> {
     len: usize,
     slices: Box<[ErasedFieldSlice<'a>]>,
-    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
+impl<'a> ErasedSoaSlices<'a> {
     #[inline]
-    pub fn new<I>(len: usize, slices: I) -> Result<Self, ErasedSoaError>
+    pub fn new<I>(len: usize, slices: I) -> Result<Self, LenMismatchError>
     where
         I: IntoIterator<Item = ErasedFieldSlice<'a>>,
     {
         let slices = slices
             .into_iter()
             .map(|slice| {
-                validate_layout::<Fields>(slice.descriptor().layout())?;
                 check_same_len(slice.len(), len)?;
                 Ok(slice)
             })
-            .collect::<Result<Box<[_]>, ErasedSoaError>>()?;
+            .collect::<Result<Box<[_]>, _>>()?;
         let me = unsafe { Self::actual_new(len, slices) };
         Ok(me)
     }
@@ -61,59 +50,39 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     where
         I: IntoIterator<Item = ErasedFieldSlice<'a>>,
     {
-        Self {
-            len,
-            slices: slices.into_iter().collect(),
-            phantom: PhantomData,
-        }
+        let slices = slices.into_iter().collect();
+        Self { len, slices }
     }
 
     #[inline]
-    pub fn from<T>(
-        context: &T::Context,
-        slices: T::Slices<'a>,
-    ) -> Result<Self, FromValueError<T::Slices<'a>>>
+    pub fn from<T>(context: &T::Context, slices: T::Slices<'a>) -> Self
     where
-        T: Soa<Fields = Fields>,
+        T: Soa,
     {
-        let descriptors = T::field_descriptors(context)
-            .into_iter()
-            .map(|desc| {
-                validate_layout::<Fields>(desc.as_ref().layout())?;
-                Ok(desc.as_ref().clone())
-            })
-            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
-        let descriptors = match descriptors {
-            Ok(descriptors) => descriptors,
-            Err(error) => return Err(FromValueError::new(slices, error)),
-        };
-
         let len = T::slices_len(context, &slices);
         let ptrs = T::slice_refs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase(context, ptrs);
-        let slices = descriptors
-            .into_vec()
+        let slices = T::field_descriptors(context)
             .into_iter()
             .zip(ptrs)
             .map(|(desc, ptr)| {
+                let desc = desc.as_ref().clone();
                 let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
                 unsafe { ErasedFieldSlice::new_unchecked(desc, buffer, len) }
             });
-        let me = unsafe { Self::actual_new(len, slices) };
-        Ok(me)
+        unsafe { Self::new_unchecked(len, slices) }
     }
 
     #[inline]
     pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Slices<'a>, IntoValueError<Self>>
     where
-        T: Soa<Fields = Fields>,
+        T: Soa,
     {
         let Self { slices, .. } = &self;
         let result = T::field_descriptors(context)
             .into_iter()
             .zip(slices)
             .try_fold(0, |len, (desc, slice)| {
-                validate_layout::<Fields>(desc.as_ref().layout())?;
                 check_same_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
                 Ok(len + 1)
             })
@@ -160,43 +129,16 @@ impl<'a, Fields> ErasedSoaSlices<'a, Fields> {
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedSoaSlicesIter<'_, Fields> {
+    pub fn iter(&self) -> ErasedSoaSlicesIter<'_> {
         let Self { slices, .. } = self;
         let slices = slices.iter().map(IntoIterator::into_iter);
         ErasedSoaSlicesIter::new(slices)
     }
 }
 
-impl<Fields> Debug for ErasedSoaSlices<'_, Fields> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { len, slices, .. } = self;
-
-        f.debug_struct("ErasedSoaSlices")
-            .field("len", len)
-            .field("slices", slices)
-            .finish()
-    }
-}
-
-impl<Fields> Clone for ErasedSoaSlices<'_, Fields> {
-    fn clone(&self) -> Self {
-        let Self {
-            len,
-            slices,
-            phantom,
-        } = self;
-
-        Self {
-            len: len.clone(),
-            slices: slices.clone(),
-            phantom: phantom.clone(),
-        }
-    }
-}
-
-impl<'a, Fields> IntoIterator for &'a ErasedSoaSlices<'_, Fields> {
-    type Item = ErasedSoaRefs<'a, Fields>;
-    type IntoIter = ErasedSoaSlicesIter<'a, Fields>;
+impl<'a> IntoIterator for &'a ErasedSoaSlices<'_> {
+    type Item = ErasedSoaRefs<'a>;
+    type IntoIter = ErasedSoaSlicesIter<'a>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -204,9 +146,9 @@ impl<'a, Fields> IntoIterator for &'a ErasedSoaSlices<'_, Fields> {
     }
 }
 
-impl<'a, Fields> IntoIterator for ErasedSoaSlices<'a, Fields> {
-    type Item = ErasedSoaRefs<'a, Fields>;
-    type IntoIter = ErasedSoaSlicesIter<'a, Fields>;
+impl<'a> IntoIterator for ErasedSoaSlices<'a> {
+    type Item = ErasedSoaRefs<'a>;
+    type IntoIter = ErasedSoaSlicesIter<'a>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -216,18 +158,11 @@ impl<'a, Fields> IntoIterator for ErasedSoaSlices<'a, Fields> {
     }
 }
 
-unsafe impl<Fields> Send for ErasedSoaSlices<'_, Fields> where Fields: Sync {}
-unsafe impl<Fields> Sync for ErasedSoaSlices<'_, Fields> where Fields: Sync {}
-
-pub struct ErasedSoaSlicesIter<'a, Fields>
-where
-    Fields: 'a,
-{
+pub struct ErasedSoaSlicesIter<'a> {
     slices: Box<[ErasedFieldSliceIter<'a>]>,
-    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, Fields> ErasedSoaSlicesIter<'a, Fields> {
+impl<'a> ErasedSoaSlicesIter<'a> {
     #[inline]
     pub(super) fn new<I>(slices: I) -> Self
     where
@@ -244,10 +179,7 @@ impl<'a, Fields> ErasedSoaSlicesIter<'a, Fields> {
                 check_same_len(iter.len(), len).expect("input slices should have the same length")
             })
             .collect();
-        Self {
-            slices,
-            phantom: PhantomData,
-        }
+        Self { slices }
     }
 
     #[inline]
@@ -262,8 +194,8 @@ impl<'a, Fields> ErasedSoaSlicesIter<'a, Fields> {
     }
 }
 
-impl<'a, Fields> Iterator for ErasedSoaSlicesIter<'a, Fields> {
-    type Item = ErasedSoaRefs<'a, Fields>;
+impl<'a> Iterator for ErasedSoaSlicesIter<'a> {
+    type Item = ErasedSoaRefs<'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -272,8 +204,7 @@ impl<'a, Fields> Iterator for ErasedSoaSlicesIter<'a, Fields> {
         }
 
         let refs = self.slices.iter_mut().flat_map(Iterator::next);
-        let item = unsafe { ErasedSoaRefs::new_unchecked(refs) };
-        Some(item)
+        Some(ErasedSoaRefs::new(refs))
     }
 
     #[inline]
@@ -283,7 +214,7 @@ impl<'a, Fields> Iterator for ErasedSoaSlicesIter<'a, Fields> {
     }
 }
 
-impl<Fields> DoubleEndedIterator for ErasedSoaSlicesIter<'_, Fields> {
+impl DoubleEndedIterator for ErasedSoaSlicesIter<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if ErasedSoaSlicesIter::is_empty(self) {
@@ -294,17 +225,15 @@ impl<Fields> DoubleEndedIterator for ErasedSoaSlicesIter<'_, Fields> {
             .slices
             .iter_mut()
             .flat_map(DoubleEndedIterator::next_back);
-        let item = unsafe { ErasedSoaRefs::new_unchecked(refs) };
-        Some(item)
+        Some(ErasedSoaRefs::new(refs))
     }
 }
 
-impl<Fields> ExactSizeIterator for ErasedSoaSlicesIter<'_, Fields> {
+impl ExactSizeIterator for ErasedSoaSlicesIter<'_> {
     #[inline]
     fn len(&self) -> usize {
         ErasedSoaSlicesIter::len(self)
     }
 }
 
-unsafe impl<Fields> Send for ErasedSoaSlicesIter<'_, Fields> where Fields: Sync {}
-unsafe impl<Fields> Sync for ErasedSoaSlicesIter<'_, Fields> where Fields: Sync {}
+impl FusedIterator for ErasedSoaSlicesIter<'_> {}

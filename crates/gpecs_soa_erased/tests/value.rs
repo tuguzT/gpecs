@@ -11,7 +11,7 @@ fn erased_value() {
     let context = ();
 
     let value = ();
-    let erased_value = ErasedSoa::from(&context, value).expect("all the fields should be valid");
+    let erased_value = ErasedSoa::from(&context, value);
 
     let descriptors = [FieldDescriptor::of::<()>()];
     assert!(erased_value
@@ -40,7 +40,7 @@ fn erased_value() {
     let i3 = 3;
     let str = "hello";
     let value = ((), str.to_owned(), i1, i2, i3);
-    let erased_value = ErasedSoa::from(&(), value).expect("all the fields should be valid");
+    let erased_value = ErasedSoa::from(&(), value);
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -154,8 +154,7 @@ fn erased_value() {
     assert_eq!(value, ((), i1, i2, i3));
 
     let refs = (&(), &str.to_owned(), &i1, &i2, &i3);
-    let erased_refs = ErasedSoaRefs::from::<((), String, u32, u16, u8)>(&context, refs)
-        .expect("all the fields should be valid");
+    let erased_refs = ErasedSoaRefs::from::<((), String, u32, u16, u8)>(&context, refs);
     assert_eq!(erased_refs.field_refs().len(), 5);
 
     let field_ref = erased_refs.field_refs()[0];
@@ -225,8 +224,7 @@ fn erased_value() {
     let i789_slices = i789.as_slice();
 
     let slices = (units_slices, i123_slices, i456_slices, i789_slices);
-    let erased_slices = ErasedSoaSlices::from::<((), u32, u16, u8)>(&(), slices)
-        .expect("all the fields should be valid");
+    let erased_slices = ErasedSoaSlices::from::<((), u32, u16, u8)>(&(), slices);
     assert_eq!(erased_slices.field_slices().len(), 4);
 
     let field_slice = erased_slices.field_slices()[0];
@@ -366,8 +364,7 @@ fn erased_value() {
     for (idx, refs) in erased_slices.iter().enumerate().rev() {
         let static_refs = (&units[idx], &i123[idx], &i456[idx], &i789[idx]);
 
-        let target_refs = ErasedSoaRefs::from::<((), u32, u16, u8)>(&context, static_refs)
-            .expect("all the fields should be valid");
+        let target_refs = ErasedSoaRefs::from::<((), u32, u16, u8)>(&context, static_refs);
         let target_fields = target_refs
             .field_refs()
             .into_iter()

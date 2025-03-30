@@ -519,7 +519,7 @@ where
     B: Bundle,
 {
     let fields = reorder_fields::<B, _>(components, context, fields).map(ErasedField::into_parts);
-    let erased_value = ErasedSoa::<B::Fields>::new(fields).expect("all the fields should be valid");
+    let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
     unsafe { erased_value.into::<B>(context) }.expect("all the fields should be valid")
 }
 
@@ -532,9 +532,7 @@ fn into_erased_fields<B>(
 where
     B: Bundle,
 {
-    let erased_value = ErasedSoa::from(context, value)
-        .expect("all the fields should be valid")
-        .into_fields();
+    let erased_value = ErasedSoa::from(context, value).into_fields();
     validate_components::<B>(components, context)
         .zip(erased_value)
         .collect()
@@ -551,8 +549,7 @@ where
     B: Bundle,
 {
     let refs = reorder_fields::<B, _>(components, context, fields);
-    let erased_refs =
-        ErasedSoaRefs::<B::Fields>::new(refs).expect("all the fields should be valid");
+    let erased_refs = ErasedSoaRefs::new(refs);
     unsafe { erased_refs.into::<B>(context) }.expect("all the fields should be valid")
 }
 
@@ -565,9 +562,7 @@ fn into_erased_field_refs<'a, B>(
 where
     B: Bundle,
 {
-    let erased_refs = ErasedSoaRefs::from::<B>(context, refs)
-        .expect("all the fields should be valid")
-        .into_field_refs();
+    let erased_refs = ErasedSoaRefs::from::<B>(context, refs).into_field_refs();
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -584,8 +579,7 @@ where
     B: Bundle,
 {
     let refs = reorder_fields::<B, _>(components, context, fields);
-    let erased_refs =
-        ErasedSoaRefsMut::<B::Fields>::new(refs).expect("all the fields should be valid");
+    let erased_refs = ErasedSoaRefsMut::new(refs);
     unsafe { erased_refs.into::<B>(context) }.expect("all the fields should be valid")
 }
 
@@ -598,9 +592,7 @@ fn into_erased_field_refs_mut<'a, B>(
 where
     B: Bundle,
 {
-    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs)
-        .expect("all the fields should be valid")
-        .into_field_refs();
+    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs).into_field_refs();
     validate_components::<B>(components, context)
         .zip(erased_refs)
         .collect()
@@ -618,8 +610,7 @@ where
     B: Bundle,
 {
     let slices = reorder_fields::<B, _>(components, context, fields);
-    let erased_slices =
-        ErasedSoaSlices::<B::Fields>::new(len, slices).expect("all the fields should be valid");
+    let erased_slices = ErasedSoaSlices::new(len, slices).expect("all the fields should be valid");
     unsafe { erased_slices.into::<B>(context) }.expect("all the fields should be valid")
 }
 
@@ -632,8 +623,7 @@ fn into_erased_field_slices<'a, B>(
 where
     B: Bundle,
 {
-    let erased_slices =
-        ErasedSoaSlices::from::<B>(context, slices).expect("all the fields should be valid");
+    let erased_slices = ErasedSoaSlices::from::<B>(context, slices);
     let len = erased_slices.len();
     let fields = validate_components::<B>(components, context)
         .zip(erased_slices.into_field_slices())
@@ -654,7 +644,7 @@ where
 {
     let slices = reorder_fields::<B, _>(components, context, fields);
     let erased_slices =
-        ErasedSoaSlicesMut::<B::Fields>::new(len, slices).expect("all the fields should be valid");
+        ErasedSoaSlicesMut::new(len, slices).expect("all the fields should be valid");
     unsafe { erased_slices.into::<B>(context) }.expect("all the fields should be valid")
 }
 
@@ -667,8 +657,7 @@ fn into_erased_field_slices_mut<'a, B>(
 where
     B: Bundle,
 {
-    let erased_slices =
-        ErasedSoaSlicesMut::from::<B>(context, slices).expect("all the fields should be valid");
+    let erased_slices = ErasedSoaSlicesMut::from::<B>(context, slices);
     let len = erased_slices.len();
     let fields = validate_components::<B>(components, context)
         .zip(erased_slices.into_field_slices())

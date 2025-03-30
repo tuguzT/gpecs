@@ -8,7 +8,7 @@ pub trait Clear: Soa {
         vec.clear();
     }
 
-    fn soa_ser_clear(vec: &mut SoaVec<ErasedSoa<Self::Fields>>) {
+    fn soa_ser_clear(vec: &mut SoaVec<ErasedSoa>) {
         vec.clear();
     }
 

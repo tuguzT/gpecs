@@ -8,10 +8,10 @@ use gpecs_soa_erased::{
 #[test]
 fn new_erased() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<ErasedSoa<Soa>>;
+    type Vec = SoaVec<ErasedSoa>;
 
     let context = ();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -69,10 +69,10 @@ fn new_erased() {
 #[test]
 fn with_capacity_erased() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<ErasedSoa<Soa>>;
+    type Vec = SoaVec<ErasedSoa>;
 
     let context = ();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -131,10 +131,10 @@ fn with_capacity_erased() {
 #[test]
 fn one_item_erased() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<ErasedSoa<Soa>>;
+    type Vec = SoaVec<ErasedSoa>;
 
     let context = ();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -153,7 +153,7 @@ fn one_item_erased() {
     let u8 = 1;
     let u64 = 2;
     let u16 = 3;
-    vec.push(ErasedSoa::from(&context, (u8, u64, u16, ())).unwrap());
+    vec.push(ErasedSoa::from(&context, (u8, u64, u16, ())));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
@@ -256,10 +256,10 @@ fn one_item_erased() {
 #[test]
 fn three_items_erased() {
     type Soa = (u8, String, u64, ());
-    type Vec = SoaVec<ErasedSoa<Soa>>;
+    type Vec = SoaVec<ErasedSoa>;
 
     let context = ();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -276,8 +276,7 @@ fn three_items_erased() {
     let mut vec = Vec::with_context(erased_context);
 
     let iter =
-        iter::repeat_with(|| ErasedSoa::from::<Soa>(&context, (0, "0".to_owned(), 0, ())).unwrap())
-            .take(3);
+        iter::repeat_with(|| ErasedSoa::from::<Soa>(&context, (0, "0".to_owned(), 0, ()))).take(3);
     vec.extend(iter);
 
     assert_eq!(vec.len(), 3);
@@ -321,15 +320,15 @@ fn three_items_erased() {
 
     vec.insert(
         0,
-        ErasedSoa::from::<Soa>(&context, (1, "2".to_owned(), 3, ())).unwrap(),
+        ErasedSoa::from::<Soa>(&context, (1, "2".to_owned(), 3, ())),
     );
     vec.insert(
         0,
-        ErasedSoa::from::<Soa>(&context, (4, "5".to_owned(), 6, ())).unwrap(),
+        ErasedSoa::from::<Soa>(&context, (4, "5".to_owned(), 6, ())),
     );
     vec.insert(
         1,
-        ErasedSoa::from::<Soa>(&context, (7, "8".to_owned(), 9, ())).unwrap(),
+        ErasedSoa::from::<Soa>(&context, (7, "8".to_owned(), 9, ())),
     );
 
     assert_eq!(vec.len(), 3);
@@ -434,8 +433,8 @@ fn three_items_erased() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.push(ErasedSoa::from::<Soa>(&context, (8, "8".to_owned(), 9, ())).unwrap());
-    vec.push(ErasedSoa::from::<Soa>(&context, (2, "2".to_owned(), 3, ())).unwrap());
+    vec.push(ErasedSoa::from::<Soa>(&context, (8, "8".to_owned(), 9, ())));
+    vec.push(ErasedSoa::from::<Soa>(&context, (2, "2".to_owned(), 3, ())));
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
 
@@ -530,8 +529,7 @@ fn three_items_erased() {
     assert!(vec.capacity() >= 3);
 
     let iter =
-        iter::repeat_with(|| ErasedSoa::from::<Soa>(&context, (0, "0".to_owned(), 0, ())).unwrap())
-            .take(3);
+        iter::repeat_with(|| ErasedSoa::from::<Soa>(&context, (0, "0".to_owned(), 0, ()))).take(3);
     vec.extend(iter);
 
     vec.reserve(1);
@@ -572,10 +570,10 @@ fn three_items_erased() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.push(ErasedSoa::from::<Soa>(&context, (1, "2".to_owned(), 3, ())).unwrap());
+    vec.push(ErasedSoa::from::<Soa>(&context, (1, "2".to_owned(), 3, ())));
     for _ in 0..10 {
-        vec.push(ErasedSoa::from::<Soa>(&context, (4, "5".to_owned(), 6, ())).unwrap());
-        vec.push(ErasedSoa::from::<Soa>(&context, (7, "8".to_owned(), 9, ())).unwrap());
+        vec.push(ErasedSoa::from::<Soa>(&context, (4, "5".to_owned(), 6, ())));
+        vec.push(ErasedSoa::from::<Soa>(&context, (7, "8".to_owned(), 9, ())));
     }
 
     // use this code instead of `retain_mut` to drop needed contents,

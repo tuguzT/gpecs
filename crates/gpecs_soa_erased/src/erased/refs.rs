@@ -1,114 +1,59 @@
 use alloc::boxed::Box;
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-    slice,
-};
+use core::slice;
 
 use crate::{
-    assert::{check_same_layout, check_same_len, validate_layout},
-    error::InvalidLayoutError,
+    assert::{check_same_layout, check_same_len},
     field::ErasedFieldRef,
     soa::traits::Soa,
 };
 
-use super::error::{FromValueError, IntoValueError};
+use super::error::IntoValueError;
 
-pub struct ErasedSoaRefs<'a, Fields>
-where
-    Fields: 'a,
-{
+#[derive(Debug, Clone)]
+pub struct ErasedSoaRefs<'a> {
     refs: Box<[ErasedFieldRef<'a>]>,
-    phantom: PhantomData<fn() -> Fields>,
 }
 
-impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
+impl<'a> ErasedSoaRefs<'a> {
     #[inline]
-    pub fn new<I>(refs: I) -> Result<Self, InvalidLayoutError>
+    pub fn new<I>(refs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldRef<'a>>,
     {
-        let refs = refs
-            .into_iter()
-            .map(|r#ref| {
-                validate_layout::<Fields>(r#ref.descriptor().layout())?;
-                Ok(r#ref)
-            })
-            .collect::<Result<Box<[_]>, _>>()?;
-        let me = unsafe { Self::actual_new(refs) };
-        Ok(me)
+        let refs = refs.into_iter().collect();
+        Self { refs }
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked<I>(refs: I) -> Self
+    pub fn from<T>(context: &T::Context, refs: T::Refs<'a>) -> Self
     where
-        I: IntoIterator<Item = ErasedFieldRef<'a>>,
+        T: Soa,
     {
-        if cfg!(debug_assertions) {
-            return Self::new(refs).expect("incorrect inputs");
-        }
-        unsafe { Self::actual_new(refs) }
-    }
-
-    #[inline]
-    unsafe fn actual_new<I>(refs: I) -> Self
-    where
-        I: IntoIterator<Item = ErasedFieldRef<'a>>,
-    {
-        Self {
-            refs: refs.into_iter().collect(),
-            phantom: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub fn from<T>(
-        context: &T::Context,
-        refs: T::Refs<'a>,
-    ) -> Result<Self, FromValueError<T::Refs<'a>>>
-    where
-        T: Soa<Fields = Fields>,
-    {
-        let descriptors = T::field_descriptors(context)
-            .into_iter()
-            .map(|desc| {
-                validate_layout::<Fields>(desc.as_ref().layout())?;
-                Ok(desc.as_ref().clone())
-            })
-            .collect::<Result<Box<[_]>, InvalidLayoutError>>();
-        let descriptors = match descriptors {
-            Ok(descriptors) => descriptors,
-            Err(error) => return Err(FromValueError::new(refs, error)),
-        };
-
         let ptrs = T::refs_as_ptrs(context, refs);
         let ptrs = T::ptrs_erase(context, ptrs);
-        let refs = descriptors
-            .into_vec()
+        let refs = T::field_descriptors(context)
             .into_iter()
             .zip(ptrs)
             .map(|(desc, ptr)| {
+                let desc = desc.as_ref().clone();
                 let len = desc.layout().size();
                 let buffer = unsafe { slice::from_raw_parts(ptr, len) };
                 unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
             });
-        let me = unsafe { Self::actual_new(refs) };
-        Ok(me)
+        Self::new(refs)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Refs<'a>, IntoValueError<Self>>
     where
-        T: Soa<Fields = Fields>,
+        T: Soa,
     {
         let Self { refs, .. } = &self;
         let result = T::field_descriptors(context)
             .into_iter()
             .zip(refs)
             .try_fold(0, |len, (desc, r#ref)| {
-                validate_layout::<Fields>(desc.as_ref().layout())?;
                 check_same_layout(r#ref.descriptor().layout(), desc.as_ref().layout())?;
                 Ok(len + 1)
             })
@@ -143,23 +88,3 @@ impl<'a, Fields> ErasedSoaRefs<'a, Fields> {
         refs
     }
 }
-
-impl<'a, Fields> Debug for ErasedSoaRefs<'a, Fields> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { refs, .. } = self;
-        f.debug_tuple("ErasedSoaRefs").field(refs).finish()
-    }
-}
-
-impl<'a, Fields> Clone for ErasedSoaRefs<'a, Fields> {
-    fn clone(&self) -> Self {
-        let Self { refs, phantom } = self;
-        Self {
-            refs: refs.clone(),
-            phantom: phantom.clone(),
-        }
-    }
-}
-
-unsafe impl<'a, Fields> Send for ErasedSoaRefs<'a, Fields> where Fields: Sync {}
-unsafe impl<'a, Fields> Sync for ErasedSoaRefs<'a, Fields> where Fields: Sync {}

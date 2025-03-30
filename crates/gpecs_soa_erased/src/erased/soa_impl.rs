@@ -9,9 +9,8 @@ use core::{
 };
 
 use crate::{
-    align::Aligned,
+    aligned_bytes::AlignedBytes,
     assert::check_same_layout,
-    byte::ErasedByte,
     field::{
         field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
         ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldVec,
@@ -20,15 +19,14 @@ use crate::{
 };
 
 use super::{
-    ErasedSoa, ErasedSoaContext, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs, ErasedSoaPtrs,
-    ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs, ErasedSoaSlices,
-    ErasedSoaSlicesMut, ErasedSoaVecs,
+    ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs,
+    ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs,
+    ErasedSoaSlices, ErasedSoaSlicesMut, ErasedSoaVecs,
 };
 
-unsafe impl<Fields> Soa for ErasedSoa<Fields> {
-    type Context = ErasedSoaContext<Fields>;
-
-    type Fields = Fields;
+unsafe impl Soa for ErasedSoa {
+    type Context = ErasedSoaContext;
+    type Fields = ErasedSoaFields;
 
     type FieldDescriptors<'a> = &'a [FieldDescriptor];
 
@@ -49,8 +47,8 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         buffer_layout(field_layouts, capacity)
     }
 
-    type Ptrs = ErasedSoaPtrs<Fields>;
-    type MutPtrs = ErasedSoaMutPtrs<Fields>;
+    type Ptrs = ErasedSoaPtrs;
+    type MutPtrs = ErasedSoaMutPtrs;
 
     type ErasedPtrs = iter::Map<vec::IntoIter<ErasedFieldPtr>, fn(ErasedFieldPtr) -> *const u8>;
     type ErasedMutPtrs =
@@ -92,7 +90,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .collect();
         assert_eq!(descriptors.len(), ptrs.len());
 
-        unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
+        ErasedSoaPtrs::new(ptrs)
     }
 
     fn ptrs_restore_mut(
@@ -111,7 +109,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .collect();
         assert_eq!(descriptors.len(), ptrs.len());
 
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
@@ -120,7 +118,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .iter()
             .copied()
             .map(ErasedFieldMutPtr::dangling);
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
     fn ptrs_cast_const(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs {
@@ -135,7 +133,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| ptr.cast_const());
-        unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
+        ErasedSoaPtrs::new(ptrs)
     }
 
     fn ptrs_cast_mut(context: &Self::Context, ptrs: Self::Ptrs) -> Self::MutPtrs {
@@ -150,7 +148,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| ptr.cast_mut());
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
     unsafe fn ptrs_add(context: &Self::Context, ptrs: Self::Ptrs, offset: usize) -> Self::Ptrs {
@@ -165,7 +163,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| unsafe { ptr.add(offset) });
-        unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
+        ErasedSoaPtrs::new(ptrs)
     }
 
     unsafe fn ptrs_add_mut(
@@ -184,7 +182,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| unsafe { ptr.add(offset) });
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
     unsafe fn ptrs_offset_from(
@@ -392,7 +390,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
         // do nothing; it's safe to not drop anything
     }
 
-    type NonNullPtrs = ErasedSoaNonNullPtrs<Fields>;
+    type NonNullPtrs = ErasedSoaNonNullPtrs;
 
     unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
         let descriptors = context.field_descriptors();
@@ -410,7 +408,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                 let buffer = unsafe { NonNull::new_unchecked(ptr.buffer()) };
                 ErasedFieldNonNullPtr::new(desc, buffer).expect("buffer should be aligned")
             });
-        unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) }
+        ErasedSoaNonNullPtrs::new(ptrs)
     }
 
     fn nonnull_to_ptrs(context: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
@@ -429,19 +427,20 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                 let buffer = ptr.buffer().as_ptr();
                 ErasedFieldMutPtr::new(desc, buffer).expect("buffer should be aligned")
             });
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
-    type Vecs = ErasedSoaVecs<Fields>;
+    type Vecs = ErasedSoaVecs;
 
     fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
         let vecs = context
             .field_descriptors()
             .iter()
             .map(|&desc| {
-                let capacity = (capacity * desc.layout().size())
-                    .div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
-                let buffer = Vec::with_capacity(capacity);
+                let size = capacity * desc.layout().size();
+                let layout = Layout::from_size_align(size, desc.layout().align())
+                    .expect("layout should be valid");
+                let buffer = AlignedBytes::new(layout);
                 ErasedFieldVec { buffer, desc }
             })
             .collect();
@@ -467,7 +466,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                 let buffer = ptr::slice_from_raw_parts(data, len);
                 ErasedFieldPtr::new(*desc, buffer).expect("buffer should be aligned")
             });
-        unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
+        ErasedSoaPtrs::new(ptrs)
     }
 
     fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
@@ -489,7 +488,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                 let buffer = ptr::slice_from_raw_parts_mut(data, len);
                 ErasedFieldMutPtr::new(*desc, buffer).expect("buffer should be aligned")
             });
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
     fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
@@ -515,22 +514,21 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
             .inspect(|(desc, vec)| {
                 check_same_layout(vec.desc.layout(), desc.layout()).expect("layouts should match")
             })
-            .for_each(|(_, vec)| {
-                let ErasedFieldVec { buffer, desc } = vec;
-                let len =
-                    (len * desc.layout().size()).div_ceil(size_of::<ErasedByte<Aligned<Fields>>>());
-                unsafe { buffer.set_len(len) }
+            .for_each(|(_, _vec)| {
+                // let ErasedFieldVec { buffer, desc } = vec;
+                // let len = len * desc.layout().size();
+                // unsafe { buffer.set_len(len) }
             });
         *vecs_len = len;
     }
 
     type Refs<'a>
-        = ErasedSoaRefs<'a, Fields>
+        = ErasedSoaRefs<'a>
     where
         Self: 'a;
 
     type RefsMut<'a>
-        = ErasedSoaRefsMut<'a, Fields>
+        = ErasedSoaRefsMut<'a>
     where
         Self: 'a;
 
@@ -546,7 +544,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| unsafe { ptr.deref() });
-        unsafe { ErasedSoaRefs::new_unchecked(refs) }
+        ErasedSoaRefs::new(refs)
     }
 
     unsafe fn ptrs_to_refs_mut<'a>(
@@ -564,7 +562,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| unsafe { ptr.deref_mut() });
-        unsafe { ErasedSoaRefsMut::new_unchecked(refs) }
+        ErasedSoaRefsMut::new(refs)
     }
 
     fn refs_as_ptrs(context: &Self::Context, refs: Self::Refs<'_>) -> Self::Ptrs {
@@ -579,7 +577,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, r#ref)| r#ref.as_field_ptr());
-        unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
+        ErasedSoaPtrs::new(ptrs)
     }
 
     fn mut_refs_as_ptrs(context: &Self::Context, refs: Self::RefsMut<'_>) -> Self::MutPtrs {
@@ -594,7 +592,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, mut r#ref)| r#ref.as_field_mut_ptr());
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
     fn mut_refs_as_refs<'a>(context: &Self::Context, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
@@ -609,11 +607,11 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, r#ref)| From::from(r#ref));
-        unsafe { ErasedSoaRefs::new_unchecked(refs) }
+        ErasedSoaRefs::new(refs)
     }
 
-    type SlicePtrs = ErasedSoaSlicePtrs<Fields>;
-    type SliceMutPtrs = ErasedSoaSliceMutPtrs<Fields>;
+    type SlicePtrs = ErasedSoaSlicePtrs;
+    type SliceMutPtrs = ErasedSoaSliceMutPtrs;
 
     fn slices_from_raw_parts(
         context: &Self::Context,
@@ -714,7 +712,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.as_field_ptr());
-        unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
+        ErasedSoaPtrs::new(ptrs)
     }
 
     fn mut_slice_ptrs_as_ptrs(
@@ -732,16 +730,16 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.as_field_ptr());
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
     type Slices<'a>
-        = ErasedSoaSlices<'a, Fields>
+        = ErasedSoaSlices<'a>
     where
         Self: 'a;
 
     type SlicesMut<'a>
-        = ErasedSoaSlicesMut<'a, Fields>
+        = ErasedSoaSlicesMut<'a>
     where
         Self: 'a;
 
@@ -866,7 +864,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.as_field_ptr());
-        unsafe { ErasedSoaPtrs::new_unchecked(ptrs) }
+        ErasedSoaPtrs::new(ptrs)
     }
 
     fn mut_slice_refs_as_ptrs(
@@ -884,7 +882,7 @@ unsafe impl<Fields> Soa for ErasedSoa<Fields> {
                     .expect("layouts should match")
             })
             .map(|(_, mut slice)| slice.as_field_mut_ptr());
-        unsafe { ErasedSoaMutPtrs::new_unchecked(ptrs) }
+        ErasedSoaMutPtrs::new(ptrs)
     }
 
     unsafe fn slices_drop_in_place(_: &Self::Context, _: Self::SliceMutPtrs) {

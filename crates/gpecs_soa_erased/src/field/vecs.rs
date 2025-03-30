@@ -1,10 +1,8 @@
-use alloc::vec::Vec;
-
-use crate::{align::Aligned, byte::ErasedByte, soa::traits::FieldDescriptor};
+use crate::{aligned_bytes::AlignedBytes, soa::traits::FieldDescriptor};
 
 // TODO: implement some API (in the future)
-pub struct ErasedFieldVec<Fields> {
+pub struct ErasedFieldVec {
     pub(crate) desc: FieldDescriptor,
     // data is stored inline in a single buffer
-    pub(crate) buffer: Vec<ErasedByte<Aligned<Fields>>>,
+    pub(crate) buffer: AlignedBytes,
 }

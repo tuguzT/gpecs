@@ -4,21 +4,13 @@ use gpecs_soa_erased::{erased::ErasedSoaContext, soa::traits::FieldDescriptor};
 #[cfg_attr(miri, ignore)]
 fn erased_context() {
     let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
-    let _context = ErasedSoaContext::<i16>::new(descriptors).unwrap();
-}
-
-#[test]
-#[should_panic]
-#[cfg_attr(miri, ignore)]
-fn erased_context_fail() {
-    let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
-    let _context = ErasedSoaContext::<u8>::new(descriptors).unwrap();
+    let _context = ErasedSoaContext::new(descriptors);
 }
 
 #[test]
 #[cfg_attr(miri, ignore)]
 fn erased_context_of() {
-    let context = ErasedSoaContext::of::<()>(&()).unwrap();
+    let context = ErasedSoaContext::of::<()>(&());
     let descriptors = [FieldDescriptor::of::<()>()];
     assert!(context
         .field_descriptors()
@@ -26,7 +18,7 @@ fn erased_context_of() {
         .map(FieldDescriptor::layout)
         .eq(descriptors.iter().map(FieldDescriptor::layout)));
 
-    let context = ErasedSoaContext::of::<(u32, u16, u8)>(&()).unwrap();
+    let context = ErasedSoaContext::of::<(u32, u16, u8)>(&());
     let descriptors = [
         FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<u16>(),

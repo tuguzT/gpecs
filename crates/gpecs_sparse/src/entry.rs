@@ -9,7 +9,7 @@ use crate::{
     error::InvalidKeyError,
     key::Key,
     set::EpochSparseSet,
-    soa::{mem::replace as soa_replace, Soa},
+    soa::{mem::replace as soa_replace, traits::Soa},
 };
 
 pub struct OccupiedEntry<'a, K, V, C>

@@ -495,7 +495,7 @@ where
     }
 
     #[inline]
-    fn slice_ptrs_len(context: &Self::Context, slices: Self::SlicePtrs) -> usize {
+    fn slice_ptrs_len(context: &Self::Context, slices: &Self::SlicePtrs) -> usize {
         let KeyValueSlicePtrs { keys, values } = slices;
 
         let keys_len = keys.len();
@@ -505,7 +505,7 @@ where
     }
 
     #[inline]
-    fn slice_ptrs_len_mut(context: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
+    fn slice_ptrs_len_mut(context: &Self::Context, slices: &Self::SliceMutPtrs) -> usize {
         let KeyValueSliceMutPtrs { keys, values } = slices;
 
         let keys_len = keys.len();
@@ -550,9 +550,9 @@ where
         context: &Self::Context,
         slices: Self::SlicePtrs,
     ) -> Self::Slices<'a> {
-        let KeyValueSlicePtrs { keys, values } = slices.clone();
+        let len = Self::slice_ptrs_len(context, &slices);
+        let KeyValueSlicePtrs { keys, values } = slices;
 
-        let len = Self::slice_ptrs_len(context, slices);
         KeyValueSlices {
             keys: unsafe { slice::from_raw_parts(keys.cast(), len) },
             values: unsafe { V::slice_ptrs_to_slices(context, values) },
@@ -564,9 +564,9 @@ where
         context: &Self::Context,
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicesMut<'a> {
-        let KeyValueSliceMutPtrs { keys, values } = slices.clone();
+        let len = Self::slice_ptrs_len_mut(context, &slices);
+        let KeyValueSliceMutPtrs { keys, values } = slices;
 
-        let len = Self::slice_ptrs_len_mut(context, slices);
         KeyValueSlicesMut {
             keys: unsafe { slice::from_raw_parts_mut(keys.cast(), len) },
             values: unsafe { V::slice_ptrs_to_slices_mut(context, values) },

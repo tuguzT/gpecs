@@ -686,14 +686,14 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
 
-    fn slice_ptrs_len(context: &Self::Context, slices: Self::SlicePtrs) -> usize {
+    fn slice_ptrs_len(context: &Self::Context, slices: &Self::SlicePtrs) -> usize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         slices.len()
     }
 
-    fn slice_ptrs_len_mut(context: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
+    fn slice_ptrs_len_mut(context: &Self::Context, slices: &Self::SliceMutPtrs) -> usize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 

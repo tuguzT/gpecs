@@ -35,8 +35,8 @@ where
         let slices = T::slice_refs_as_slice_ptrs(context, slices);
         Self {
             context,
-            ptrs: T::slice_ptrs_as_ptrs(context, slices.clone()),
-            len: T::slice_ptrs_len(context, slices),
+            len: T::slice_ptrs_len(context, &slices),
+            ptrs: T::slice_ptrs_as_ptrs(context, slices),
         }
     }
 
@@ -479,8 +479,8 @@ where
         let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
         Self {
             context,
-            ptrs: T::mut_slice_ptrs_as_ptrs(context, slices.clone()),
-            len: T::slice_ptrs_len_mut(context, slices),
+            len: T::slice_ptrs_len_mut(context, &slices),
+            ptrs: T::mut_slice_ptrs_as_ptrs(context, slices),
         }
     }
 

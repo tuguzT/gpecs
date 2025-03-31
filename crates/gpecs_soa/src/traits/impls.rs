@@ -287,12 +287,12 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn slice_ptrs_len(_: &Self::Context, slices: Self::SlicePtrs) -> usize {
+    fn slice_ptrs_len(_: &Self::Context, slices: &Self::SlicePtrs) -> usize {
         slices.len()
     }
 
     #[inline]
-    fn slice_ptrs_len_mut(_: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
+    fn slice_ptrs_len_mut(_: &Self::Context, slices: &Self::SliceMutPtrs) -> usize {
         slices.len()
     }
 
@@ -322,7 +322,7 @@ unsafe impl Soa for () {
         slices: Self::SlicePtrs,
     ) -> Self::Slices<'a> {
         let data = Self::slice_ptrs_as_ptrs(context, slices);
-        let len = Self::slice_ptrs_len(context, slices);
+        let len = Self::slice_ptrs_len(context, &slices);
         unsafe { slice::from_raw_parts(data, len) }
     }
 
@@ -332,7 +332,7 @@ unsafe impl Soa for () {
         slices: Self::SliceMutPtrs,
     ) -> Self::SlicesMut<'a> {
         let data = Self::mut_slice_ptrs_as_ptrs(context, slices);
-        let len = Self::slice_ptrs_len_mut(context, slices);
+        let len = Self::slice_ptrs_len_mut(context, &slices);
         unsafe { slice::from_raw_parts_mut(data, len) }
     }
 
@@ -820,14 +820,14 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn slice_ptrs_len(_: &Self::Context, slices: Self::SlicePtrs) -> usize {
+            fn slice_ptrs_len(_: &Self::Context, slices: &Self::SlicePtrs) -> usize {
                 let lens = [$(slices.$indices.len(),)*];
                 assert!(lens.iter().all(|len| lens[0].eq(len)));
                 lens[0]
             }
 
             #[inline]
-            fn slice_ptrs_len_mut(_: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
+            fn slice_ptrs_len_mut(_: &Self::Context, slices: &Self::SliceMutPtrs) -> usize {
                 let lens = [$(slices.$indices.len(),)*];
                 assert!(lens.iter().all(|len| lens[0].eq(len)));
                 lens[0]
@@ -861,7 +861,7 @@ macro_rules! soa_tuple_impl {
                 slices: Self::SlicePtrs,
             ) -> Self::Slices<'a> {
                 let data = Self::slice_ptrs_as_ptrs(context, slices);
-                let len = Self::slice_ptrs_len(context, slices);
+                let len = Self::slice_ptrs_len(context, &slices);
                 let slices = unsafe { ($(slice::from_raw_parts(data.$indices, len),)*) };
                 slices
             }
@@ -872,7 +872,7 @@ macro_rules! soa_tuple_impl {
                 slices: Self::SliceMutPtrs,
             ) -> Self::SlicesMut<'a> {
                 let data = Self::mut_slice_ptrs_as_ptrs(context, slices);
-                let len = Self::slice_ptrs_len_mut(context, slices);
+                let len = Self::slice_ptrs_len_mut(context, &slices);
                 let slices = unsafe { ($(slice::from_raw_parts_mut(data.$indices, len),)*) };
                 slices
             }

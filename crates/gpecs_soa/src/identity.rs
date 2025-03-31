@@ -383,12 +383,12 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn slice_ptrs_len(_: &Self::Context, slices: Self::SlicePtrs) -> usize {
+    fn slice_ptrs_len(_: &Self::Context, slices: &Self::SlicePtrs) -> usize {
         slices.len()
     }
 
     #[inline]
-    fn slice_ptrs_len_mut(_: &Self::Context, slices: Self::SliceMutPtrs) -> usize {
+    fn slice_ptrs_len_mut(_: &Self::Context, slices: &Self::SliceMutPtrs) -> usize {
         slices.len()
     }
 

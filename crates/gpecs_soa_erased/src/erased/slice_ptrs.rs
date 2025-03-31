@@ -59,7 +59,7 @@ impl ErasedSoaSlicePtrs {
     where
         T: Soa,
     {
-        let len = T::slice_ptrs_len(context, slices.clone());
+        let len = T::slice_ptrs_len(context, &slices);
         let ptrs = T::slice_ptrs_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase(context, ptrs);
         let slices = T::field_descriptors(context)

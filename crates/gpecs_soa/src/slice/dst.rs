@@ -247,6 +247,14 @@ where
     }
 
     #[inline]
+    pub fn sort_with_permutation(&mut self, permutation: &mut [usize])
+    where
+        for<'any> T::Refs<'any>: Ord,
+    {
+        self.slices_mut().sort_with_permutation(permutation);
+    }
+
+    #[inline]
     pub fn sort(&mut self)
     where
         for<'any> T::Refs<'any>: Ord,
@@ -255,11 +263,30 @@ where
     }
 
     #[inline]
+    pub fn sort_with_permutation_by<F>(&mut self, permutation: &mut [usize], compare: F)
+    where
+        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
+    {
+        self.slices_mut()
+            .sort_with_permutation_by(permutation, compare);
+    }
+
+    #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
         for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
         self.slices_mut().sort_by(compare);
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], f: F)
+    where
+        F: FnMut(T::Refs<'_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut()
+            .sort_with_permutation_by_key(permutation, f);
     }
 
     #[inline]
@@ -272,12 +299,31 @@ where
     }
 
     #[inline]
+    pub fn sort_with_permutation_by_cached_key<K, F>(&mut self, permutation: &mut [usize], f: F)
+    where
+        F: FnMut(T::Refs<'_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut()
+            .sort_with_permutation_by_cached_key(permutation, f);
+    }
+
+    #[inline]
     pub fn sort_by_cached_key<K, F>(&mut self, f: F)
     where
         F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
         self.slices_mut().sort_by_cached_key(f);
+    }
+
+    #[inline]
+    pub fn sort_unstable_with_permutation(&mut self, permutation: &mut [usize])
+    where
+        for<'any> T::Refs<'any>: Ord,
+    {
+        self.slices_mut()
+            .sort_unstable_with_permutation(permutation);
     }
 
     #[inline]
@@ -289,11 +335,30 @@ where
     }
 
     #[inline]
+    pub fn sort_unstable_with_permutation_by<F>(&mut self, permutation: &mut [usize], compare: F)
+    where
+        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
+    {
+        self.slices_mut()
+            .sort_unstable_with_permutation_by(permutation, compare);
+    }
+
+    #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
         for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
         self.slices_mut().sort_unstable_by(compare);
+    }
+
+    #[inline]
+    pub fn sort_unstable_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], f: F)
+    where
+        F: FnMut(T::Refs<'_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut()
+            .sort_unstable_with_permutation_by_key(permutation, f);
     }
 
     #[inline]

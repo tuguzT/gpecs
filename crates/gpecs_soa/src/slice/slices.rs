@@ -986,17 +986,35 @@ where
     where
         for<'any> T::Refs<'any>: Ord,
     {
-        self.sort_by(|a, b| Ord::cmp(&a, &b))
+        let mut permutation = (0..self.len()).collect::<Box<_>>();
+        self.sort_with_permutation(&mut permutation)
     }
 
     #[inline]
-    pub fn sort_by<F>(&mut self, mut compare: F)
+    pub fn sort_with_permutation(&mut self, permutation: &mut [usize])
+    where
+        for<'any> T::Refs<'any>: Ord,
+    {
+        self.sort_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b))
+    }
+
+    #[inline]
+    pub fn sort_by<F>(&mut self, compare: F)
+    where
+        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
+    {
+        let mut permutation = (0..self.len()).collect::<Box<_>>();
+        self.sort_with_permutation_by(&mut permutation, compare)
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by<F>(&mut self, permutation: &mut [usize], mut compare: F)
     where
         for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
         let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|context, indices| {
-            indices.sort_by(|&a, &b| {
+        self.sort_impl(permutation, |context, permutation| {
+            permutation.sort_by(|&a, &b| {
                 let a = unsafe {
                     let ptrs = T::ptrs_add_mut(context, ptrs.clone(), a);
                     let ptrs = T::ptrs_cast_const(context, ptrs);
@@ -1013,14 +1031,24 @@ where
     }
 
     #[inline]
-    pub fn sort_by_key<K, F>(&mut self, mut f: F)
+    pub fn sort_by_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(T::Refs<'_>) -> K,
+        K: Ord,
+    {
+        let mut permutation = (0..self.len()).collect::<Box<_>>();
+        self.sort_with_permutation_by_key(&mut permutation, f)
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], mut f: F)
     where
         F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
         let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|context, indices| {
-            indices.sort_by_key(|&index| unsafe {
+        self.sort_impl(permutation, |context, permutation| {
+            permutation.sort_by_key(|&index| unsafe {
                 let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
@@ -1030,14 +1058,24 @@ where
     }
 
     #[inline]
-    pub fn sort_by_cached_key<K, F>(&mut self, mut f: F)
+    pub fn sort_by_cached_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(T::Refs<'_>) -> K,
+        K: Ord,
+    {
+        let mut permutation = (0..self.len()).collect::<Box<_>>();
+        self.sort_with_permutation_by_cached_key(&mut permutation, f)
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by_cached_key<K, F>(&mut self, permutation: &mut [usize], mut f: F)
     where
         F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
         let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|context, indices| {
-            indices.sort_by_cached_key(|&index| unsafe {
+        self.sort_impl(permutation, |context, permutation| {
+            permutation.sort_by_cached_key(|&index| unsafe {
                 let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
@@ -1051,17 +1089,38 @@ where
     where
         for<'any> T::Refs<'any>: Ord,
     {
-        self.sort_unstable_by(|a, b| Ord::cmp(&a, &b))
+        let mut permutation = (0..self.len()).collect::<Box<_>>();
+        self.sort_unstable_with_permutation(&mut permutation)
     }
 
     #[inline]
-    pub fn sort_unstable_by<F>(&mut self, mut compare: F)
+    pub fn sort_unstable_with_permutation(&mut self, permutation: &mut [usize])
+    where
+        for<'any> T::Refs<'any>: Ord,
+    {
+        self.sort_unstable_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b))
+    }
+
+    #[inline]
+    pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
         for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
+        let mut permutation = (0..self.len()).collect::<Box<_>>();
+        self.sort_unstable_with_permutation_by(&mut permutation, compare)
+    }
+
+    #[inline]
+    pub fn sort_unstable_with_permutation_by<F>(
+        &mut self,
+        permutation: &mut [usize],
+        mut compare: F,
+    ) where
+        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
+    {
         let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|context, indices| {
-            indices.sort_unstable_by(|&a, &b| {
+        self.sort_impl(permutation, |context, permutation| {
+            permutation.sort_unstable_by(|&a, &b| {
                 let a = unsafe {
                     let ptrs = T::ptrs_add_mut(context, ptrs.clone(), a);
                     let ptrs = T::ptrs_cast_const(context, ptrs);
@@ -1078,14 +1137,27 @@ where
     }
 
     #[inline]
-    pub fn sort_unstable_by_key<K, F>(&mut self, mut f: F)
+    pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
         F: FnMut(T::Refs<'_>) -> K,
         K: Ord,
     {
+        let mut permutation = (0..self.len()).collect::<Box<_>>();
+        self.sort_unstable_with_permutation_by_key(&mut permutation, f)
+    }
+
+    #[inline]
+    pub fn sort_unstable_with_permutation_by_key<K, F>(
+        &mut self,
+        permutation: &mut [usize],
+        mut f: F,
+    ) where
+        F: FnMut(T::Refs<'_>) -> K,
+        K: Ord,
+    {
         let ptrs = self.as_mut_ptrs();
-        self.sort_impl(|context, indices| {
-            indices.sort_unstable_by_key(|&index| unsafe {
+        self.sort_impl(permutation, |context, permutation| {
+            permutation.sort_unstable_by_key(|&index| unsafe {
                 let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
@@ -1094,17 +1166,26 @@ where
         })
     }
 
-    fn sort_impl<F>(&mut self, f: F)
+    fn sort_impl<F>(&mut self, permutation: &mut [usize], f: F)
     where
         F: FnOnce(&T::Context, &mut [usize]),
     {
+        #[inline(never)]
+        #[cold]
+        #[track_caller]
+        fn permutation_len_fail(permutation_len: usize, len: usize) -> ! {
+            panic!("permutation must be at least {len} long, but its length is {permutation_len}")
+        }
+
         let len = self.len();
         if is_zst::<T>() || len < 2 {
             return;
         }
+        if permutation.len() < len {
+            permutation_len_fail(permutation.len(), len);
+        }
 
-        let mut permutation: Box<_> = (0..len).collect();
-        f(self.context(), &mut permutation);
+        f(self.context(), permutation);
 
         for src in 0..len {
             let dst = permutation[src];
@@ -1121,10 +1202,7 @@ where
 #[cold]
 #[track_caller]
 fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
-    panic!(
-        "source slice length ({}) does not match destination slice length ({})",
-        src_len, dst_len,
-    );
+    panic!("source slice length ({src_len}) does not match destination slice length ({dst_len})")
 }
 
 impl<'a, T> From<SoaSlicesMut<'a, T>> for SoaSlices<'a, T>

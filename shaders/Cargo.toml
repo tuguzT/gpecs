@@ -11,8 +11,8 @@ rust-version = "1.84.0"
 
 [workspace.dependencies]
 gpecs_spirv_analysis = { path = "../crates/gpecs_spirv_analysis" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "6e2c84d4" }
-spirv-builder = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "6e2c84d4", default-features = false }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "698f10ac" }
+spirv-builder = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "698f10ac", default-features = false }
 rspirv = { version = "0.12" }
 unroll = { version = "0.1.5" }
 static_assertions = { version = "1.1.0" }

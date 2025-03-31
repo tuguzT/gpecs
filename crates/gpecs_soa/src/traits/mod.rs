@@ -562,17 +562,30 @@ fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
     Layout::from_size_align(size, layout.align())
 }
 
+/// A generalization of [`Clone`] to borrowed data
+/// specifically for the [`Soa`] trait.
+///
+/// This trait is analogous to [`ToOwned`](alloc::borrow::ToOwned) trait from the standard library.
 pub trait SoaToOwned<'a> {
+    /// The resulting type after obtaining ownership.
     type Owned: Soa<Refs<'a> = Self>
     where
         Self: 'a;
 
+    /// Creates owned data from borrowed data,
+    /// usually by cloning each field of [`Fields`](Soa::Fields).
     fn to_owned(&self) -> Self::Owned;
 
+    /// Uses borrowed data to replace owned data,
+    /// usually by cloning each field of [`Fields`](Soa::Fields).
+    ///
+    /// This is borrow-generalized version of [`Clone::clone_from()`].
     fn clone_into(&self, target: &mut Self::Owned) {
         *target = self.to_owned();
     }
 
+    /// Uses borrowed data to replace owned data located by `target` pointers,
+    /// usually by cloning each field of [`Fields`](Soa::Fields).
     unsafe fn clone_into_ptrs(
         &self,
         context: &<Self::Owned as Soa>::Context,
@@ -584,6 +597,8 @@ pub trait SoaToOwned<'a> {
         }
     }
 
+    /// Uses borrowed data to replace owned data located by `target` references,
+    /// usually by cloning each field of [`Fields`](Soa::Fields).
     fn clone_into_refs(
         &self,
         context: &<Self::Owned as Soa>::Context,

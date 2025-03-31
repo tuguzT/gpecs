@@ -8,7 +8,7 @@ use core::{
     slice,
 };
 
-use super::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
+use super::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields, SoaVecs};
 
 #[inline]
 #[track_caller]
@@ -195,35 +195,6 @@ unsafe impl Soa for () {
         ptrs.as_ptr()
     }
 
-    type Vecs = Vec<Self>;
-
-    #[inline]
-    fn vecs_with_capacity(_: &Self::Context, capacity: usize) -> Self::Vecs {
-        Vec::with_capacity(capacity)
-    }
-
-    #[inline]
-    fn vecs_as_ptrs(_: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
-        vecs.as_ptr()
-    }
-
-    #[inline]
-    fn mut_vecs_as_ptrs(_: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
-        vecs.as_mut_ptr()
-    }
-
-    #[inline]
-    fn vecs_len(_: &Self::Context, vecs: &Self::Vecs) -> usize {
-        vecs.len()
-    }
-
-    #[inline]
-    unsafe fn vecs_set_len(_: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-        unsafe {
-            vecs.set_len(len);
-        }
-    }
-
     type Refs<'a>
         = &'a Self
     where
@@ -406,6 +377,37 @@ impl<'a> SoaToOwned<'a> for &'a () {
         _: &<Self::Owned as Soa>::Context,
         _: <Self::Owned as Soa>::RefsMut<'_>,
     ) {
+    }
+}
+
+unsafe impl SoaVecs for () {
+    type Vecs = Vec<Self>;
+
+    #[inline]
+    fn vecs_with_capacity(_: &Self::Context, capacity: usize) -> Self::Vecs {
+        Vec::with_capacity(capacity)
+    }
+
+    #[inline]
+    fn vecs_as_ptrs(_: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
+        vecs.as_ptr()
+    }
+
+    #[inline]
+    fn mut_vecs_as_ptrs(_: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
+        vecs.as_mut_ptr()
+    }
+
+    #[inline]
+    fn vecs_len(_: &Self::Context, vecs: &Self::Vecs) -> usize {
+        vecs.len()
+    }
+
+    #[inline]
+    unsafe fn vecs_set_len(_: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
+        unsafe {
+            vecs.set_len(len);
+        }
     }
 }
 
@@ -706,38 +708,6 @@ macro_rules! soa_tuple_impl {
                 ptrs
             }
 
-            type Vecs = ($(Vec<$types>,)*);
-
-            #[inline]
-            fn vecs_with_capacity(_: &Self::Context, capacity: usize) -> Self::Vecs {
-                let vecs = ($(Vec::<$types>::with_capacity(capacity),)*);
-                vecs
-            }
-
-            #[inline]
-            fn vecs_as_ptrs(_: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
-                let ptrs = ($(vecs.$indices.as_ptr(),)*);
-                ptrs
-            }
-
-            #[inline]
-            fn mut_vecs_as_ptrs(_: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
-                let ptrs = ($(vecs.$indices.as_mut_ptr(),)*);
-                ptrs
-            }
-
-            #[inline]
-            fn vecs_len(_: &Self::Context, vecs: &Self::Vecs) -> usize {
-                let lens = [$(vecs.$indices.len(),)*];
-                assert!(lens.iter().all(|len| lens[0].eq(len)));
-                lens[0]
-            }
-
-            #[inline]
-            unsafe fn vecs_set_len(_: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-                unsafe { $(vecs.$indices.set_len(len);)* }
-            }
-
             type Refs<'a>
                 = ($(&'a $types,)*)
             where
@@ -951,6 +921,40 @@ macro_rules! soa_tuple_impl {
                 target: <Self::Owned as Soa>::RefsMut<'_>,
             ) {
                 $(target.$indices.clone_from(self.$indices);)*
+            }
+        }
+
+        unsafe impl<$($types,)*> SoaVecs for ($($types,)*) {
+            type Vecs = ($(Vec<$types>,)*);
+
+            #[inline]
+            fn vecs_with_capacity(_: &Self::Context, capacity: usize) -> Self::Vecs {
+                let vecs = ($(Vec::<$types>::with_capacity(capacity),)*);
+                vecs
+            }
+
+            #[inline]
+            fn vecs_as_ptrs(_: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
+                let ptrs = ($(vecs.$indices.as_ptr(),)*);
+                ptrs
+            }
+
+            #[inline]
+            fn mut_vecs_as_ptrs(_: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
+                let ptrs = ($(vecs.$indices.as_mut_ptr(),)*);
+                ptrs
+            }
+
+            #[inline]
+            fn vecs_len(_: &Self::Context, vecs: &Self::Vecs) -> usize {
+                let lens = [$(vecs.$indices.len(),)*];
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
+                lens[0]
+            }
+
+            #[inline]
+            unsafe fn vecs_set_len(_: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
+                unsafe { $(vecs.$indices.set_len(len);)* }
             }
         }
 

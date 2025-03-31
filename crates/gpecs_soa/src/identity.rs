@@ -9,7 +9,7 @@ use core::{
 
 use crate::traits::{
     impls::{collect_array, debug_assert_ptr_is_aligned},
-    FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields,
+    FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields, SoaVecs,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
@@ -293,33 +293,6 @@ unsafe impl<T> Soa for Identity<T> {
         ptrs.as_ptr()
     }
 
-    type Vecs = Vec<Self>;
-
-    #[inline]
-    fn vecs_with_capacity(_: &Self::Context, capacity: usize) -> Self::Vecs {
-        Vec::with_capacity(capacity)
-    }
-
-    #[inline]
-    fn vecs_as_ptrs(_: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
-        vecs.as_ptr()
-    }
-
-    #[inline]
-    fn mut_vecs_as_ptrs(_: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
-        vecs.as_mut_ptr()
-    }
-
-    #[inline]
-    fn vecs_len(_: &Self::Context, vecs: &Self::Vecs) -> usize {
-        vecs.len()
-    }
-
-    #[inline]
-    unsafe fn vecs_set_len(_: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-        unsafe { vecs.set_len(len) }
-    }
-
     type Refs<'a>
         = &'a Self
     where
@@ -505,6 +478,35 @@ where
         target: <Self::Owned as Soa>::RefsMut<'_>,
     ) {
         target.clone_from(self);
+    }
+}
+
+unsafe impl<T> SoaVecs for Identity<T> {
+    type Vecs = Vec<Self>;
+
+    #[inline]
+    fn vecs_with_capacity(_: &Self::Context, capacity: usize) -> Self::Vecs {
+        Vec::with_capacity(capacity)
+    }
+
+    #[inline]
+    fn vecs_as_ptrs(_: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
+        vecs.as_ptr()
+    }
+
+    #[inline]
+    fn mut_vecs_as_ptrs(_: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
+        vecs.as_mut_ptr()
+    }
+
+    #[inline]
+    fn vecs_len(_: &Self::Context, vecs: &Self::Vecs) -> usize {
+        vecs.len()
+    }
+
+    #[inline]
+    unsafe fn vecs_set_len(_: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
+        unsafe { vecs.set_len(len) }
     }
 }
 

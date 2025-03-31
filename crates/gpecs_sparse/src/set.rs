@@ -5,6 +5,7 @@ use core::{
     hash::{self, Hash},
     ops::{Index, IndexMut},
 };
+use gpecs_soa::traits::SoaVecs;
 
 use crate::{
     arena,
@@ -270,14 +271,6 @@ where
     }
 
     #[inline]
-    pub fn into_vecs(self) -> (V::Context, V::Vecs) {
-        let Self { dense, .. } = self;
-
-        let (context, KeyValueVecs { values, .. }) = dense.into_vecs();
-        (context, values)
-    }
-
-    #[inline]
     pub fn as_ptrs(&self) -> V::Ptrs {
         let Self { dense, .. } = self;
 
@@ -298,14 +291,6 @@ where
         let Self { dense, .. } = self;
 
         let KeyValueSlices { keys, .. } = dense.as_slices();
-        keys
-    }
-
-    #[inline]
-    pub fn into_keys_vec(self) -> Vec<K> {
-        let Self { dense, .. } = self;
-
-        let (_, KeyValueVecs { keys, .. }) = dense.into_vecs();
         keys
     }
 
@@ -859,6 +844,28 @@ where
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         let view_mut = self.as_mut_view();
         view_mut.into_iter()
+    }
+}
+
+impl<K, V> EpochSparseSet<K, V>
+where
+    K: Key,
+    V: SoaVecs,
+{
+    #[inline]
+    pub fn into_vecs(self) -> (V::Context, V::Vecs) {
+        let Self { dense, .. } = self;
+
+        let (context, KeyValueVecs { values, .. }) = dense.into_vecs();
+        (context, values)
+    }
+
+    #[inline]
+    pub fn into_keys_vec(self) -> Vec<K> {
+        let Self { dense, .. } = self;
+
+        let (_, KeyValueVecs { keys, .. }) = dense.into_vecs();
+        keys
     }
 }
 

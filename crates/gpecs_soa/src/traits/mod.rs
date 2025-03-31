@@ -291,37 +291,6 @@ pub unsafe trait Soa: Sized {
     /// Acquires the underlying pointers from non-null pointers to each field of [`Fields`](Soa::Fields).
     fn nonnull_to_ptrs(context: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs;
 
-    /// Collection of properly typed [vectors](alloc::vec::Vec) of each field of [`Fields`](Soa::Fields).
-    ///
-    /// Order of such vectors **may not** resemble their order inside of a buffer in memory.
-    type Vecs;
-
-    /// Constructs new, empty vectors for each field of [`Fields`](Soa::Fields)
-    /// with at least the specified capacity.
-    fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs;
-
-    /// Returns properly typed pointers to the vectors' buffers of each field of [`Fields`](Soa::Fields),
-    /// or a dangling pointers valid for zero sized reads if these vectors didn’t allocate.
-    fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs;
-
-    /// Returns properly typed mutable pointers to the vectors' buffers of each field of [`Fields`](Soa::Fields),
-    /// or a dangling pointers valid for zero sized reads if these vectors didn’t allocate.
-    fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs;
-
-    /// Returns the number of elements in each vector of [`Fields`](Soa::Fields),
-    /// also referred to as their 'length'.
-    ///
-    /// Note that resulting lengths should be the same for all the vectors,
-    /// or else this method could panic.
-    fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize;
-
-    /// Forces the length of the vectors of [`Fields`](Soa::Fields) to `new_len`.
-    ///
-    /// All the safety requirements resulting from applying
-    /// [`Vec::set_len()`](alloc::vec::Vec::set_len) method to each vector
-    /// should be satisfied to be safe to call this method.
-    unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize);
-
     /// Collection of properly typed references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
@@ -609,6 +578,43 @@ pub trait SoaToOwned<'a> {
             self.clone_into_ptrs(context, target);
         }
     }
+}
+
+/// Extension trait which allows to convert [`SoaVec`](crate::vec::SoaVec)
+/// into vectors of each field of [`Fields`](Soa::Fields).
+pub unsafe trait SoaVecs: Soa {
+    /// Collection of properly typed vectors of each field of [`Fields`](Soa::Fields).
+    ///
+    /// Order of such vectors **may not** resemble their order inside of a buffer in memory.
+    ///
+    /// Most of the time type of these vectors is [`Vec`](alloc::vec::Vec).
+    type Vecs;
+
+    /// Constructs new, empty vectors for each field of [`Fields`](Soa::Fields)
+    /// with at least the specified capacity.
+    fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs;
+
+    /// Returns properly typed pointers to the vectors' buffers of each field of [`Fields`](Soa::Fields),
+    /// or a dangling pointers valid for zero sized reads if these vectors didn’t allocate.
+    fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs;
+
+    /// Returns properly typed mutable pointers to the vectors' buffers of each field of [`Fields`](Soa::Fields),
+    /// or a dangling pointers valid for zero sized reads if these vectors didn’t allocate.
+    fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs;
+
+    /// Returns the number of elements in each vector of [`Fields`](Soa::Fields),
+    /// also referred to as their 'length'.
+    ///
+    /// Note that resulting lengths should be the same for all the vectors,
+    /// or else this method could panic.
+    fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize;
+
+    /// Forces the length of the vectors of [`Fields`](Soa::Fields) to `new_len`.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`Vec::set_len()`](alloc::vec::Vec::set_len) method to each vector
+    /// should be satisfied to be safe to call this method.
+    unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize);
 }
 
 /// Marker trait which places additional safety requirements

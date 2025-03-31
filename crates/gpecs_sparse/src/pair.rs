@@ -9,6 +9,7 @@ use core::{
     ptr::{self, NonNull},
     slice,
 };
+use gpecs_soa::traits::SoaVecs;
 
 use crate::soa::traits::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
 
@@ -336,55 +337,6 @@ where
         }
     }
 
-    type Vecs = KeyValueVecs<K, V>;
-
-    #[inline]
-    fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
-        KeyValueVecs {
-            keys: Vec::with_capacity(capacity),
-            values: V::vecs_with_capacity(context, capacity),
-        }
-    }
-
-    #[inline]
-    fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
-        let KeyValueVecs { keys, values } = vecs;
-        KeyValuePtrs {
-            key: keys.as_ptr(),
-            value: V::vecs_as_ptrs(context, values),
-        }
-    }
-
-    #[inline]
-    fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
-        let KeyValueVecs { keys, values } = vecs;
-        KeyValueMutPtrs {
-            key: keys.as_mut_ptr(),
-            value: V::mut_vecs_as_ptrs(context, values),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
-        let KeyValueVecs { keys, values } = vecs;
-
-        let keys_len = keys.len();
-        let values_len = V::vecs_len(context, values);
-        assert_eq!(keys_len, values_len);
-        keys_len
-    }
-
-    #[inline]
-    unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-        let KeyValueVecs { keys, values } = vecs;
-
-        unsafe {
-            keys.set_len(len);
-            V::vecs_set_len(context, values, len);
-        }
-    }
-
     type Refs<'a>
         = KeyValueRefs<'a, K, V>
     where
@@ -659,6 +611,61 @@ where
         unsafe {
             ptr::drop_in_place(keys);
             V::slices_drop_in_place(context, values);
+        }
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe impl<K, V> SoaVecs for KeyValuePair<K, V>
+where
+    V: SoaVecs,
+{
+    type Vecs = KeyValueVecs<K, V>;
+
+    #[inline]
+    fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
+        KeyValueVecs {
+            keys: Vec::with_capacity(capacity),
+            values: V::vecs_with_capacity(context, capacity),
+        }
+    }
+
+    #[inline]
+    fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
+        let KeyValueVecs { keys, values } = vecs;
+        KeyValuePtrs {
+            key: keys.as_ptr(),
+            value: V::vecs_as_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
+        let KeyValueVecs { keys, values } = vecs;
+        KeyValueMutPtrs {
+            key: keys.as_mut_ptr(),
+            value: V::mut_vecs_as_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
+        let KeyValueVecs { keys, values } = vecs;
+
+        let keys_len = keys.len();
+        let values_len = V::vecs_len(context, values);
+        assert_eq!(keys_len, values_len);
+        keys_len
+    }
+
+    #[inline]
+    unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
+        let KeyValueVecs { keys, values } = vecs;
+
+        unsafe {
+            keys.set_len(len);
+            V::vecs_set_len(context, values, len);
         }
     }
 }
@@ -1264,7 +1271,7 @@ where
 
 pub struct KeyValueVecs<K, V>
 where
-    V: Soa,
+    V: SoaVecs,
 {
     pub keys: Vec<K>,
     pub values: V::Vecs,
@@ -1272,7 +1279,7 @@ where
 
 impl<K, V> From<(Vec<K>, V::Vecs)> for KeyValueVecs<K, V>
 where
-    V: Soa,
+    V: SoaVecs,
 {
     #[inline]
     fn from(value: (Vec<K>, V::Vecs)) -> Self {
@@ -1283,7 +1290,7 @@ where
 
 impl<K, V> From<KeyValueVecs<K, V>> for (Vec<K>, V::Vecs)
 where
-    V: Soa,
+    V: SoaVecs,
 {
     #[inline]
     fn from(value: KeyValueVecs<K, V>) -> Self {
@@ -1295,7 +1302,7 @@ where
 impl<K, V> Debug for KeyValueVecs<K, V>
 where
     K: Debug,
-    V: Soa,
+    V: SoaVecs,
     V::Vecs: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1308,7 +1315,7 @@ where
 
 impl<K, V> Default for KeyValueVecs<K, V>
 where
-    V: Soa,
+    V: SoaVecs,
     V::Vecs: Default,
 {
     #[inline]
@@ -1323,7 +1330,7 @@ where
 impl<K, V> PartialEq for KeyValueVecs<K, V>
 where
     K: PartialEq,
-    V: Soa,
+    V: SoaVecs,
     V::Vecs: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1334,7 +1341,7 @@ where
 impl<K, V> Eq for KeyValueVecs<K, V>
 where
     K: Eq,
-    V: Soa,
+    V: SoaVecs,
     V::Vecs: Eq,
 {
 }
@@ -1342,7 +1349,7 @@ where
 impl<K, V> PartialOrd for KeyValueVecs<K, V>
 where
     K: PartialOrd,
-    V: Soa,
+    V: SoaVecs,
     V::Vecs: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1357,7 +1364,7 @@ where
 impl<K, V> Ord for KeyValueVecs<K, V>
 where
     K: Ord,
-    V: Soa,
+    V: SoaVecs,
     V::Vecs: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1372,7 +1379,7 @@ where
 impl<K, V> Hash for KeyValueVecs<K, V>
 where
     K: Hash,
-    V: Soa,
+    V: SoaVecs,
     V::Vecs: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1384,7 +1391,7 @@ where
 impl<K, V> Clone for KeyValueVecs<K, V>
 where
     K: Clone,
-    V: Soa,
+    V: SoaVecs,
     V::Vecs: Clone,
 {
     #[inline]

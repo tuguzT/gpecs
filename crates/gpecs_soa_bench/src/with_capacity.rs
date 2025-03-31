@@ -1,11 +1,11 @@
 use std::hint::black_box;
 
-use gpecs_soa::prelude::*;
+use gpecs_soa::{prelude::*, traits::SoaVecs};
 use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaContext};
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero};
 
-pub trait WithCapacity: Soa<Context: Default> {
+pub trait WithCapacity: SoaVecs<Context: Default> {
     fn soa_slf_with_capacity(capacity: usize) -> SoaVec<Self> {
         let capacity = black_box(capacity);
         let context = Default::default();

@@ -478,12 +478,12 @@ where
     type Owned = SoaVec<T>;
 
     #[inline]
-    fn to_owned(&self) -> Self::Owned {
+    fn to_owned(&self) -> <Self as ToOwned>::Owned {
         self.to_vec()
     }
 
     #[inline]
-    fn clone_into(&self, target: &mut Self::Owned) {
+    fn clone_into(&self, target: &mut <Self as ToOwned>::Owned) {
         // FIXME: decide if this impl will be better:
         // https://github.com/rust-lang/rust/blob/019fc4de2f3d49a2ef862d180599194d2be05193/library/alloc/src/slice.rs#L860
 

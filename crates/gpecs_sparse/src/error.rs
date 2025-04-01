@@ -6,7 +6,7 @@ use core::{
 
 use crate::{key::Key, soa::vec::TryReserveError as SoaTryReserveError};
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum TryReserveError {
     Sparse(AllocTryReserveError),
     Dense(SoaTryReserveError),
@@ -21,6 +21,19 @@ impl From<AllocTryReserveError> for TryReserveError {
 impl From<SoaTryReserveError> for TryReserveError {
     fn from(value: SoaTryReserveError) -> Self {
         Self::Dense(value)
+    }
+}
+
+impl Debug for TryReserveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+
+        match self {
+            Self::Sparse(error) => f.debug_tuple("Sparse").field(error).finish(),
+            Self::Dense(error) => f.debug_tuple("Dense").field(error).finish(),
+        }
     }
 }
 
@@ -71,8 +84,9 @@ where
     <K::SparseIndex as TryInto<usize>>::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { inner } = self;
         f.debug_struct("TooLargeSparseIndexError")
-            .field("inner", &self.inner)
+            .field("inner", inner)
             .finish()
     }
 }
@@ -124,8 +138,9 @@ where
     <K::SparseIndex as TryFrom<usize>>::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { inner } = self;
         f.debug_struct("TooSmallSparseIndexError")
-            .field("inner", &self.inner)
+            .field("inner", inner)
             .finish()
     }
 }
@@ -146,6 +161,541 @@ where
     K: Key,
     <K::SparseIndex as TryFrom<usize>>::Error: Error,
 {
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct DenseIndexOutOfBoundsError {
+    dense_index: usize,
+    dense_len: usize,
+}
+
+impl DenseIndexOutOfBoundsError {
+    #[inline]
+    pub(crate) fn new(dense_index: usize, dense_len: usize) -> Self {
+        Self {
+            dense_index,
+            dense_len,
+        }
+    }
+
+    #[inline]
+    pub fn dense_index(&self) -> usize {
+        let Self { dense_index, .. } = *self;
+        dense_index
+    }
+
+    #[inline]
+    pub fn dense_len(&self) -> usize {
+        let Self { dense_len, .. } = *self;
+        dense_len
+    }
+}
+
+impl Debug for DenseIndexOutOfBoundsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+
+        let Self {
+            dense_index,
+            dense_len,
+        } = self;
+        f.debug_struct("DenseIndexOutOfBoundsError")
+            .field("dense_index", dense_index)
+            .field("dense_len", dense_len)
+            .finish()
+    }
+}
+
+impl Display for DenseIndexOutOfBoundsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            dense_index,
+            dense_len,
+        } = *self;
+        write!(
+            f,
+            "dense index {dense_index} is out of bounds for dense slice of length {dense_len}",
+        )
+    }
+}
+
+impl Error for DenseIndexOutOfBoundsError {}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct SparseIndexOutOfBoundsError {
+    sparse_index: usize,
+    sparse_len: usize,
+}
+
+impl SparseIndexOutOfBoundsError {
+    #[inline]
+    pub(crate) fn new(sparse_index: usize, sparse_len: usize) -> Self {
+        Self {
+            sparse_index,
+            sparse_len,
+        }
+    }
+
+    #[inline]
+    pub fn sparse_index(&self) -> usize {
+        let Self { sparse_index, .. } = *self;
+        sparse_index
+    }
+
+    #[inline]
+    pub fn sparse_len(&self) -> usize {
+        let Self { sparse_len, .. } = *self;
+        sparse_len
+    }
+}
+
+impl Debug for SparseIndexOutOfBoundsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+
+        let Self {
+            sparse_index,
+            sparse_len,
+        } = self;
+        f.debug_struct("SparseIndexOutOfBoundsError")
+            .field("sparse_index", sparse_index)
+            .field("sparse_len", sparse_len)
+            .finish()
+    }
+}
+
+impl Display for SparseIndexOutOfBoundsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            sparse_index,
+            sparse_len,
+        } = *self;
+        write!(
+            f,
+            "sparse index {sparse_index} is out of bounds for sparse slice of length {sparse_len}",
+        )
+    }
+}
+
+impl Error for SparseIndexOutOfBoundsError {}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct DenseIndexMismatchError<K>
+where
+    K: Key,
+{
+    actual: K::SparseIndex,
+    expected: K::SparseIndex,
+}
+
+impl<K> DenseIndexMismatchError<K>
+where
+    K: Key,
+{
+    #[inline]
+    pub(crate) fn new(actual: K::SparseIndex, expected: K::SparseIndex) -> Self {
+        Self { actual, expected }
+    }
+
+    #[inline]
+    pub fn actual(&self) -> K::SparseIndex {
+        let Self { actual, .. } = *self;
+        actual
+    }
+
+    #[inline]
+    pub fn expected(&self) -> K::SparseIndex {
+        let Self { expected, .. } = *self;
+        expected
+    }
+}
+
+impl<K> Debug for DenseIndexMismatchError<K>
+where
+    K: Key,
+    K::SparseIndex: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { actual, expected } = self;
+        f.debug_struct("DenseIndexMismatchError")
+            .field("actual", actual)
+            .field("expected", expected)
+            .finish()
+    }
+}
+
+impl<K> Display for DenseIndexMismatchError<K>
+where
+    K: Key,
+    K::SparseIndex: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { actual, expected } = *self;
+        write!(
+            f,
+            "dense index {actual} does not match expected dense index {expected}",
+        )
+    }
+}
+
+impl<K> Error for DenseIndexMismatchError<K>
+where
+    K: Key,
+    K::SparseIndex: Debug + Display,
+{
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct SparseIndexMismatchError<K>
+where
+    K: Key,
+{
+    actual: K::SparseIndex,
+    expected: K::SparseIndex,
+}
+
+impl<K> SparseIndexMismatchError<K>
+where
+    K: Key,
+{
+    #[inline]
+    pub(crate) fn new(actual: K::SparseIndex, expected: K::SparseIndex) -> Self {
+        Self { actual, expected }
+    }
+
+    #[inline]
+    pub fn actual(&self) -> K::SparseIndex {
+        let Self { actual, .. } = *self;
+        actual
+    }
+
+    #[inline]
+    pub fn expected(&self) -> K::SparseIndex {
+        let Self { expected, .. } = *self;
+        expected
+    }
+}
+
+impl<K> Debug for SparseIndexMismatchError<K>
+where
+    K: Key,
+    K::SparseIndex: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { actual, expected } = self;
+        f.debug_struct("SparseIndexMismatchError")
+            .field("actual", actual)
+            .field("expected", expected)
+            .finish()
+    }
+}
+
+impl<K> Display for SparseIndexMismatchError<K>
+where
+    K: Key,
+    K::SparseIndex: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { actual, expected } = *self;
+        write!(
+            f,
+            "sparse index {actual} does not match expected sparse index {expected}",
+        )
+    }
+}
+
+impl<K> Error for SparseIndexMismatchError<K>
+where
+    K: Key,
+    K::SparseIndex: Debug + Display,
+{
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct EpochMismatchError<K>
+where
+    K: Key,
+{
+    actual: K::Epoch,
+    expected: K::Epoch,
+}
+
+impl<K> EpochMismatchError<K>
+where
+    K: Key,
+{
+    #[inline]
+    pub(crate) fn new(actual: K::Epoch, expected: K::Epoch) -> Self {
+        Self { actual, expected }
+    }
+
+    #[inline]
+    pub fn actual(&self) -> K::Epoch {
+        let Self { actual, .. } = *self;
+        actual
+    }
+
+    #[inline]
+    pub fn expected(&self) -> K::Epoch {
+        let Self { expected, .. } = *self;
+        expected
+    }
+}
+
+impl<K> Debug for EpochMismatchError<K>
+where
+    K: Key,
+    K::Epoch: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { actual, expected } = self;
+        f.debug_struct("EpochMismatchError")
+            .field("actual", actual)
+            .field("expected", expected)
+            .finish()
+    }
+}
+
+impl<K> Display for EpochMismatchError<K>
+where
+    K: Key,
+    K::Epoch: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { actual, expected } = *self;
+        write!(f, "epoch {actual} does not match expected epoch {expected}")
+    }
+}
+
+impl<K> Error for EpochMismatchError<K>
+where
+    K: Key,
+    K::Epoch: Debug + Display,
+{
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct OccupiedSparseItemExpectedError<K>
+where
+    K: Key,
+{
+    next_vacant: K::SparseIndex,
+}
+
+impl<K> OccupiedSparseItemExpectedError<K>
+where
+    K: Key,
+{
+    #[inline]
+    pub(crate) fn new(next_vacant: K::SparseIndex) -> Self {
+        Self { next_vacant }
+    }
+
+    #[inline]
+    pub fn next_vacant(&self) -> K::SparseIndex {
+        let Self { next_vacant, .. } = *self;
+        next_vacant
+    }
+}
+
+impl<K> Debug for OccupiedSparseItemExpectedError<K>
+where
+    K: Key,
+    K::SparseIndex: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { next_vacant } = self;
+        f.debug_struct("OccupiedSparseItemExpectedError")
+            .field("next_vacant", next_vacant)
+            .finish()
+    }
+}
+
+impl<K> Display for OccupiedSparseItemExpectedError<K>
+where
+    K: Key,
+    K::SparseIndex: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { next_vacant } = *self;
+        write!(
+            f,
+            "occupied sparse item expected, but got vacant one with next vacant index {next_vacant}",
+        )
+    }
+}
+
+impl<K> Error for OccupiedSparseItemExpectedError<K>
+where
+    K: Key,
+    K::SparseIndex: Debug + Display,
+{
+}
+
+pub enum FromPartsError<K>
+where
+    K: Key,
+{
+    TooLargeSparseIndex(TooLargeSparseIndexError<K>),
+    TooSmallSparseIndex(TooSmallSparseIndexError<K>),
+    OccupiedSparseItemExpected(OccupiedSparseItemExpectedError<K>),
+    DenseIndexOutOfBounds(DenseIndexOutOfBoundsError),
+    SparseIndexOutOfBounds(SparseIndexOutOfBoundsError),
+    DenseIndexMismatch(DenseIndexMismatchError<K>),
+    SparseIndexMismatch(SparseIndexMismatchError<K>),
+    EpochMismatch(EpochMismatchError<K>),
+}
+
+impl<K> Debug for FromPartsError<K>
+where
+    K: Key,
+    TooLargeSparseIndexError<K>: Debug,
+    TooSmallSparseIndexError<K>: Debug,
+    OccupiedSparseItemExpectedError<K>: Debug,
+    DenseIndexMismatchError<K>: Debug,
+    SparseIndexMismatchError<K>: Debug,
+    EpochMismatchError<K>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TooLargeSparseIndex(error) => {
+                f.debug_tuple("TooLargeSparseIndex").field(error).finish()
+            }
+            Self::TooSmallSparseIndex(error) => {
+                f.debug_tuple("TooSmallSparseIndex").field(error).finish()
+            }
+            Self::OccupiedSparseItemExpected(error) => f
+                .debug_tuple("OccupiedSparseItemExpected")
+                .field(error)
+                .finish(),
+            Self::DenseIndexOutOfBounds(error) => {
+                f.debug_tuple("DenseIndexOutOfBounds").field(error).finish()
+            }
+            Self::SparseIndexOutOfBounds(error) => f
+                .debug_tuple("SparseIndexOutOfBounds")
+                .field(error)
+                .finish(),
+            Self::DenseIndexMismatch(error) => {
+                f.debug_tuple("DenseIndexMismatch").field(error).finish()
+            }
+            Self::SparseIndexMismatch(error) => {
+                f.debug_tuple("SparseIndexMismatch").field(error).finish()
+            }
+            Self::EpochMismatch(error) => f.debug_tuple("EpochMismatch").field(error).finish(),
+        }
+    }
+}
+
+impl<K> Display for FromPartsError<K>
+where
+    K: Key,
+    TooLargeSparseIndexError<K>: Display,
+    TooSmallSparseIndexError<K>: Display,
+    OccupiedSparseItemExpectedError<K>: Display,
+    DenseIndexMismatchError<K>: Display,
+    SparseIndexMismatchError<K>: Display,
+    EpochMismatchError<K>: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TooLargeSparseIndex(error) => Display::fmt(error, f),
+            Self::TooSmallSparseIndex(error) => Display::fmt(error, f),
+            Self::OccupiedSparseItemExpected(error) => Display::fmt(error, f),
+            Self::DenseIndexOutOfBounds(error) => Display::fmt(error, f),
+            Self::SparseIndexOutOfBounds(error) => Display::fmt(error, f),
+            Self::DenseIndexMismatch(error) => Display::fmt(error, f),
+            Self::SparseIndexMismatch(error) => Display::fmt(error, f),
+            Self::EpochMismatch(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl<K> Error for FromPartsError<K>
+where
+    K: Key,
+    TooLargeSparseIndexError<K>: Error,
+    TooSmallSparseIndexError<K>: Error,
+    OccupiedSparseItemExpectedError<K>: Error,
+    DenseIndexMismatchError<K>: Error,
+    SparseIndexMismatchError<K>: Error,
+    EpochMismatchError<K>: Error,
+{
+}
+
+impl<K> From<TooLargeSparseIndexError<K>> for FromPartsError<K>
+where
+    K: Key,
+{
+    fn from(value: TooLargeSparseIndexError<K>) -> Self {
+        Self::TooLargeSparseIndex(value)
+    }
+}
+
+impl<K> From<TooSmallSparseIndexError<K>> for FromPartsError<K>
+where
+    K: Key,
+{
+    fn from(value: TooSmallSparseIndexError<K>) -> Self {
+        Self::TooSmallSparseIndex(value)
+    }
+}
+
+impl<K> From<OccupiedSparseItemExpectedError<K>> for FromPartsError<K>
+where
+    K: Key,
+{
+    fn from(value: OccupiedSparseItemExpectedError<K>) -> Self {
+        Self::OccupiedSparseItemExpected(value)
+    }
+}
+
+impl<K> From<DenseIndexOutOfBoundsError> for FromPartsError<K>
+where
+    K: Key,
+{
+    fn from(value: DenseIndexOutOfBoundsError) -> Self {
+        Self::DenseIndexOutOfBounds(value)
+    }
+}
+
+impl<K> From<SparseIndexOutOfBoundsError> for FromPartsError<K>
+where
+    K: Key,
+{
+    fn from(value: SparseIndexOutOfBoundsError) -> Self {
+        Self::SparseIndexOutOfBounds(value)
+    }
+}
+
+impl<K> From<DenseIndexMismatchError<K>> for FromPartsError<K>
+where
+    K: Key,
+{
+    fn from(value: DenseIndexMismatchError<K>) -> Self {
+        Self::DenseIndexMismatch(value)
+    }
+}
+
+impl<K> From<SparseIndexMismatchError<K>> for FromPartsError<K>
+where
+    K: Key,
+{
+    fn from(value: SparseIndexMismatchError<K>) -> Self {
+        Self::SparseIndexMismatch(value)
+    }
+}
+
+impl<K> From<EpochMismatchError<K>> for FromPartsError<K>
+where
+    K: Key,
+{
+    fn from(value: EpochMismatchError<K>) -> Self {
+        Self::EpochMismatch(value)
+    }
 }
 
 pub enum InvalidKeyError<K>

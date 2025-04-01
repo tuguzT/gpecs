@@ -5,7 +5,6 @@ use core::{
     hash::{self, Hash},
     ops::{Index, IndexMut},
 };
-use gpecs_soa::traits::SoaVecs;
 
 use crate::{
     assert::{
@@ -15,8 +14,8 @@ use crate::{
     },
     entry::generate_entry_types,
     error::{
-        InvalidKeyError, TooLargeSparseIndexError, TooSmallSparseIndexError, TryInvalidKeyError,
-        TryReserveError,
+        FromPartsError, InvalidKeyError, TooLargeSparseIndexError, TooSmallSparseIndexError,
+        TryInvalidKeyError, TryReserveError,
     },
     item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
@@ -29,7 +28,7 @@ use crate::{
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
-        traits::Soa,
+        traits::{Soa, SoaVecs},
         vec::SoaVec,
     },
     view::{EpochSparseView, EpochSparseViewMut},
@@ -383,7 +382,7 @@ where
     pub fn from_parts(
         dense: SoaVec<KeyValuePair<K, V>>,
         mut sparse: Vec<SparseItem<K>>,
-    ) -> Result<Self, InvalidKeyError<K>> {
+    ) -> Result<Self, FromPartsError<K>> {
         let _view = EpochSparseView::new(dense.slices(), sparse.as_slice())?;
 
         sparse.clear();

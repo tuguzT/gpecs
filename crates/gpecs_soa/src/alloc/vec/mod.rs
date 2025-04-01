@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use core::{
     borrow::{Borrow, BorrowMut},
     cmp,
@@ -8,19 +7,23 @@ use core::{
     ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
     ptr,
 };
+use core_alloc::boxed::Box;
 
-pub use crate::raw_vec::{TryReserveError, TryReserveErrorKind};
+pub use super::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{actual_capacity, ptrs, should_allocate, BufferData, BufferDataPtr, BufferDataPtrMut},
-    raw_vec::RawSoaVec,
-    set_len_on_drop::SetLenOnDrop,
+    ptr::{
+        buffer_layout, capacity_from, ptrs, should_allocate, BufferData, BufferDataPtr,
+        BufferDataPtrMut,
+    },
     slice::{
         from_raw_parts, from_raw_parts_mut, slice_range, IndexHelper, IndexHelperMut, Iter,
         IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
     },
     traits::{Soa, SoaToOwned, SoaTrustedFields, SoaVecs},
 };
+
+use super::{raw_vec::RawSoaVec, set_len_on_drop::SetLenOnDrop};
 
 pub use self::{drain::Drain, into_iter::IntoIter};
 
@@ -1123,4 +1126,14 @@ where
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
         unsafe { T::slices_drop_in_place(context, slices) }
     }
+}
+
+#[inline]
+fn actual_capacity<T>(context: &T::Context, capacity: usize) -> usize
+where
+    T: Soa,
+{
+    let buffer_layout =
+        buffer_layout::<T>(context, capacity).expect("layout size should not exceed `isize::MAX`");
+    capacity_from::<T>(context, buffer_layout)
 }

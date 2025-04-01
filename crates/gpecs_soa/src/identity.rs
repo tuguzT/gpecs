@@ -7,7 +7,7 @@ use core::{
 };
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use core_alloc::vec::Vec;
 
 #[cfg(feature = "alloc")]
 use crate::traits::SoaVecs;

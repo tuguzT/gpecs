@@ -582,15 +582,16 @@ pub trait SoaToOwned<'a> {
     }
 }
 
-/// Extension trait which allows to convert [`SoaVec`](crate::vec::SoaVec)
+/// Extension trait which allows to convert SoA vector of [`Fields`](Soa::Fields)
 /// into vectors of each field of [`Fields`](Soa::Fields).
-#[cfg(feature = "alloc")]
 pub unsafe trait SoaVecs: Soa {
     /// Collection of properly typed vectors of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such vectors **may not** resemble their order inside of a buffer in memory.
     ///
-    /// Most of the time type of these vectors is [`Vec`](alloc::vec::Vec).
+    /// Most of the time type of these vectors is [`Vec`].
+    ///
+    /// [`Vec`]: https://doc.rust-lang.org/stable/alloc/vec/struct.Vec.html
     type Vecs;
 
     /// Constructs new, empty vectors for each field of [`Fields`](Soa::Fields)
@@ -615,8 +616,10 @@ pub unsafe trait SoaVecs: Soa {
     /// Forces the length of the vectors of [`Fields`](Soa::Fields) to `new_len`.
     ///
     /// All the safety requirements resulting from applying
-    /// [`Vec::set_len()`](alloc::vec::Vec::set_len) method to each vector
+    /// [`Vec::set_len()`] method to each vector
     /// should be satisfied to be safe to call this method.
+    ///
+    /// [`Vec::set_len()`]: https://doc.rust-lang.org/stable/alloc/vec/struct.Vec.html#method.set_len
     unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize);
 }
 

@@ -6,12 +6,11 @@
 #![cfg_attr(not(test), no_std)]
 
 #[cfg(feature = "alloc")]
-extern crate alloc;
-
-pub use self::traits::Soa;
+extern crate alloc as core_alloc;
 
 #[cfg(feature = "alloc")]
-pub mod vec;
+pub use self::alloc::vec;
+pub use self::traits::Soa;
 
 pub mod identity;
 pub mod mem;
@@ -21,6 +20,4 @@ pub mod slice;
 pub mod traits;
 
 #[cfg(feature = "alloc")]
-mod raw_vec;
-#[cfg(feature = "alloc")]
-mod set_len_on_drop;
+mod alloc;

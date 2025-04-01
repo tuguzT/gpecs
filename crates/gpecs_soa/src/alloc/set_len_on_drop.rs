@@ -1,4 +1,6 @@
-use crate::{traits::Soa, vec::SoaVec};
+use crate::traits::Soa;
+
+use super::vec::SoaVec;
 
 pub(crate) struct SetLenOnDrop<'a, T>
 where

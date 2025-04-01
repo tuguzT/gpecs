@@ -149,20 +149,24 @@ where
 {
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
-        let this = self.cast_const();
-        unsafe { this.context() }
+        let buffer = self.as_mut_ptr();
+        unsafe { &*buffer.ptr_to_context_mut() }
     }
 
     #[inline]
     unsafe fn len(self) -> usize {
-        let this = self.cast_const();
-        unsafe { this.len() }
+        let buffer_layout = slice_buffer_layout(self);
+        match buffer_layout.size() {
+            0 => self.into_inner().len(),
+            _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_len_mut()) },
+        }
     }
 
     #[inline]
     unsafe fn capacity(self) -> usize {
-        let this = self.cast_const();
-        unsafe { this.capacity() }
+        let buffer_layout = slice_buffer_layout(self);
+        let context = unsafe { self.context() };
+        capacity_from::<T>(context, buffer_layout)
     }
 
     #[inline]
@@ -273,7 +277,6 @@ where
     }
 }
 
-#[cfg(feature = "alloc")]
 pub(crate) trait BufferDataPtrMut<T>: Copy
 where
     T: Soa,
@@ -282,7 +285,6 @@ where
     fn ptr_to_context_mut(self) -> *mut T::Context;
 }
 
-#[cfg(feature = "alloc")]
 impl<T> BufferDataPtrMut<T> for *mut BufferData<T>
 where
     T: Soa,
@@ -334,17 +336,6 @@ where
 {
     let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>() || capacity == 0);
     !should_not_allocate
-}
-
-#[cfg(feature = "alloc")]
-#[inline]
-pub(crate) fn actual_capacity<T>(context: &T::Context, capacity: usize) -> usize
-where
-    T: Soa,
-{
-    let buffer_layout =
-        buffer_layout::<T>(context, capacity).expect("layout size should not exceed `isize::MAX`");
-    capacity_from::<T>(context, buffer_layout)
 }
 
 #[inline]

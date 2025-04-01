@@ -6,8 +6,7 @@ use core::{
     mem::ManuallyDrop,
     ptr::{self, NonNull},
 };
-
-use alloc::{
+use core_alloc::{
     alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc},
     boxed::Box,
 };

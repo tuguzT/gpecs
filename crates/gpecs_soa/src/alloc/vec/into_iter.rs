@@ -5,9 +5,9 @@ use core::{
     ptr::{self, NonNull},
 };
 
+use super::super::raw_vec::RawSoaVec;
 use crate::{
     ptr::{BufferData, BufferDataPtr},
-    raw_vec::RawSoaVec,
     traits::Soa,
     vec::SoaVec,
 };

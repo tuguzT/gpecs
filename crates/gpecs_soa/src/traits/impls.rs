@@ -6,9 +6,8 @@ use core::{
     ptr::{self, NonNull},
     slice,
 };
-
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use core_alloc::vec::Vec;
 
 #[cfg(feature = "alloc")]
 use super::SoaVecs;

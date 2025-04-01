@@ -142,6 +142,12 @@ where
     }
 
     #[inline]
+    pub fn into_parts(self) -> (SoaSlices<'a, KeyValuePair<K, V>>, &'a [SparseItem<K>]) {
+        let Self { dense, sparse } = self;
+        (dense, sparse)
+    }
+
+    #[inline]
     pub fn get(&self, key: K) -> Option<V::Refs<'_>> {
         let (_, refs) = self.get_with_context(key);
         refs
@@ -638,6 +644,17 @@ where
     pub unsafe fn as_sparse_ptr_mut(&mut self) -> *mut SparseItem<K> {
         let Self { sparse, .. } = self;
         sparse.as_mut_ptr()
+    }
+
+    #[inline]
+    pub fn into_parts(
+        self,
+    ) -> (
+        SoaSlicesMut<'a, KeyValuePair<K, V>>,
+        &'a mut [SparseItem<K>],
+    ) {
+        let Self { dense, sparse } = self;
+        (dense, sparse)
     }
 
     #[inline]

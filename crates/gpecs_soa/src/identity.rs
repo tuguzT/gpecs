@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
     borrow::{Borrow, BorrowMut},
@@ -7,9 +6,14 @@ use core::{
     slice,
 };
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
+#[cfg(feature = "alloc")]
+use crate::traits::SoaVecs;
 use crate::traits::{
     impls::{collect_array, debug_assert_ptr_is_aligned},
-    FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields, SoaVecs,
+    FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
@@ -481,6 +485,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 unsafe impl<T> SoaVecs for Identity<T> {
     type Vecs = Vec<Self>;
 

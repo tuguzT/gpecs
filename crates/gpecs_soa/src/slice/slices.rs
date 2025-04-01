@@ -1,19 +1,21 @@
+#[cfg(feature = "alloc")]
+use core::mem;
 use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem,
     ops::{Index, IndexMut},
 };
 
+#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 use crate::{
     ptr::is_zst,
-    set_len_on_drop::SetLenOnDrop,
     traits::{Soa, SoaToOwned},
-    vec::SoaVec,
 };
+#[cfg(feature = "alloc")]
+use crate::{set_len_on_drop::SetLenOnDrop, vec::SoaVec};
 
 use super::{slice_index_usize_fail, IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex};
 
@@ -249,6 +251,7 @@ where
         iter.any(|item| item == refs)
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
@@ -874,6 +877,7 @@ where
         slices.contains_by_refs(refs)
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
@@ -981,6 +985,7 @@ where
         }
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort(&mut self)
     where
@@ -990,6 +995,7 @@ where
         self.sort_with_permutation(&mut permutation)
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_with_permutation(&mut self, permutation: &mut [usize])
     where
@@ -998,6 +1004,7 @@ where
         self.sort_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
@@ -1007,6 +1014,7 @@ where
         self.sort_with_permutation_by(&mut permutation, compare)
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_with_permutation_by<F>(&mut self, permutation: &mut [usize], mut compare: F)
     where
@@ -1030,6 +1038,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_by_key<K, F>(&mut self, f: F)
     where
@@ -1040,6 +1049,7 @@ where
         self.sort_with_permutation_by_key(&mut permutation, f)
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], mut f: F)
     where
@@ -1057,6 +1067,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_by_cached_key<K, F>(&mut self, f: F)
     where
@@ -1067,6 +1078,7 @@ where
         self.sort_with_permutation_by_cached_key(&mut permutation, f)
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_with_permutation_by_cached_key<K, F>(&mut self, permutation: &mut [usize], mut f: F)
     where
@@ -1084,6 +1096,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_unstable(&mut self)
     where
@@ -1101,6 +1114,7 @@ where
         self.sort_unstable_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
@@ -1136,6 +1150,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
@@ -1233,7 +1248,7 @@ where
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
-        f.debug_tuple("SoaSlices").field(&slices).finish()
+        f.debug_tuple("SoaSlicesMut").field(&slices).finish()
     }
 }
 

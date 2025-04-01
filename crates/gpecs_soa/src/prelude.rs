@@ -1,5 +1,7 @@
+#[cfg(feature = "alloc")]
+pub use crate::vec::SoaVec;
 pub use crate::{
-    slice::{SoaSlice, SoaSlices, SoaSlicesMut},
+    slice::SoaSlice,
+    slice::{SoaSlices, SoaSlicesMut},
     traits::Soa,
-    vec::SoaVec,
 };

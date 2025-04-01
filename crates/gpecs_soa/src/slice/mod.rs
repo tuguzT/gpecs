@@ -1,3 +1,4 @@
+#[cfg(feature = "alloc")]
 use core::ops;
 
 use crate::traits::Soa;
@@ -47,6 +48,7 @@ where
 }
 
 /// Just a copy of unstable [`core::slice::range`]
+#[cfg(feature = "alloc")]
 #[track_caller]
 #[must_use]
 pub(crate) fn slice_range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>

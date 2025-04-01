@@ -273,6 +273,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 pub(crate) trait BufferDataPtrMut<T>: Copy
 where
     T: Soa,
@@ -281,6 +282,7 @@ where
     fn ptr_to_context_mut(self) -> *mut T::Context;
 }
 
+#[cfg(feature = "alloc")]
 impl<T> BufferDataPtrMut<T> for *mut BufferData<T>
 where
     T: Soa,
@@ -334,6 +336,7 @@ where
     !should_not_allocate
 }
 
+#[cfg(feature = "alloc")]
 #[inline]
 pub(crate) fn actual_capacity<T>(context: &T::Context, capacity: usize) -> usize
 where

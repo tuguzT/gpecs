@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
     any::type_name,
@@ -8,7 +7,12 @@ use core::{
     slice,
 };
 
-use super::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields, SoaVecs};
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
+#[cfg(feature = "alloc")]
+use super::SoaVecs;
+use super::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
 
 #[inline]
 #[track_caller]
@@ -380,6 +384,7 @@ impl<'a> SoaToOwned<'a> for &'a () {
     }
 }
 
+#[cfg(feature = "alloc")]
 unsafe impl SoaVecs for () {
     type Vecs = Vec<Self>;
 
@@ -924,6 +929,7 @@ macro_rules! soa_tuple_impl {
             }
         }
 
+        #[cfg(feature = "alloc")]
         unsafe impl<$($types,)*> SoaVecs for ($($types,)*) {
             type Vecs = ($(Vec<$types>,)*);
 

@@ -534,7 +534,9 @@ fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
 /// A generalization of [`Clone`] to borrowed data
 /// specifically for the [`Soa`] trait.
 ///
-/// This trait is analogous to [`ToOwned`](alloc::borrow::ToOwned) trait from the standard library.
+/// This trait is analogous to [`ToOwned`] trait from the standard library.
+///
+/// [`ToOwned`]: https://doc.rust-lang.org/stable/alloc/borrow/trait.ToOwned.html
 pub trait SoaToOwned<'a> {
     /// The resulting type after obtaining ownership.
     type Owned: Soa<Refs<'a> = Self>
@@ -582,6 +584,7 @@ pub trait SoaToOwned<'a> {
 
 /// Extension trait which allows to convert [`SoaVec`](crate::vec::SoaVec)
 /// into vectors of each field of [`Fields`](Soa::Fields).
+#[cfg(feature = "alloc")]
 pub unsafe trait SoaVecs: Soa {
     /// Collection of properly typed vectors of each field of [`Fields`](Soa::Fields).
     ///

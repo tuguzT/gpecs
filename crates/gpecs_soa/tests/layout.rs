@@ -1,11 +1,13 @@
+#[cfg(feature = "alloc")]
+use gpecs_soa::vec::IntoIter as SoaIntoIter;
 use gpecs_soa::{
     prelude::*,
     slice::{Iter as SoaIter, IterMut as SoaIterMut},
-    vec::IntoIter as SoaIntoIter,
 };
 
 #[test]
 #[cfg_attr(miri, ignore)]
+#[cfg(feature = "alloc")]
 fn vec_null_opt() {
     type Vec = SoaVec<(u32, u16, u8)>;
 
@@ -43,6 +45,7 @@ fn iter_mut_null_opt() {
 
 #[test]
 #[cfg_attr(miri, ignore)]
+#[cfg(feature = "alloc")]
 fn into_iter_null_opt() {
     type IntoIter = SoaIntoIter<(u32, u16, u8)>;
 

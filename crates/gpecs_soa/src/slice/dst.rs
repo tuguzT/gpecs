@@ -1,4 +1,3 @@
-use alloc::{borrow::ToOwned, boxed::Box};
 use core::{
     cmp,
     fmt::{self, Debug},
@@ -7,10 +6,14 @@ use core::{
     ptr::{self, NonNull},
 };
 
+#[cfg(feature = "alloc")]
+use alloc::{borrow::ToOwned, boxed::Box};
+
+#[cfg(feature = "alloc")]
+use crate::vec::{IntoIter, SoaVec};
 use crate::{
     ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
     traits::{SoaToOwned, SoaTrustedFields},
-    vec::{IntoIter, SoaVec},
 };
 
 use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, SoaSlices, SoaSlicesMut};
@@ -152,23 +155,6 @@ where
     }
 
     #[inline]
-    pub fn into_vec(self: Box<Self>) -> SoaVec<T> {
-        let len = self.len();
-        let capacity = self.capacity();
-        let ptr = Box::into_raw(self).cast();
-        unsafe { SoaVec::from_raw_parts(ptr, len, capacity) }
-    }
-
-    #[inline]
-    pub fn to_vec<'me>(&'me self) -> SoaVec<T>
-    where
-        T::Refs<'me>: SoaToOwned<'me, Owned = T>,
-        T::Context: Clone,
-    {
-        self.slices().to_vec()
-    }
-
-    #[inline]
     #[track_caller]
     pub fn clone_from_slice<'src>(&mut self, src: &'src SoaSlice<T>)
     where
@@ -247,6 +233,57 @@ where
     }
 
     #[inline]
+    pub fn sort_unstable_with_permutation(&mut self, permutation: &mut [usize])
+    where
+        for<'any> T::Refs<'any>: Ord,
+    {
+        self.slices_mut()
+            .sort_unstable_with_permutation(permutation);
+    }
+
+    #[inline]
+    pub fn sort_unstable_with_permutation_by<F>(&mut self, permutation: &mut [usize], compare: F)
+    where
+        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
+    {
+        self.slices_mut()
+            .sort_unstable_with_permutation_by(permutation, compare);
+    }
+
+    #[inline]
+    pub fn sort_unstable_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], f: F)
+    where
+        F: FnMut(T::Refs<'_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut()
+            .sort_unstable_with_permutation_by_key(permutation, f);
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T> SoaSlice<T>
+where
+    T: SoaTrustedFields,
+{
+    #[inline]
+    pub fn into_vec(self: Box<Self>) -> SoaVec<T> {
+        let len = self.len();
+        let capacity = self.capacity();
+        let ptr = Box::into_raw(self).cast();
+        unsafe { SoaVec::from_raw_parts(ptr, len, capacity) }
+    }
+
+    #[inline]
+    pub fn to_vec<'me>(&'me self) -> SoaVec<T>
+    where
+        T::Refs<'me>: SoaToOwned<'me, Owned = T>,
+        T::Context: Clone,
+    {
+        self.slices().to_vec()
+    }
+
+    #[inline]
     pub fn sort_with_permutation(&mut self, permutation: &mut [usize])
     where
         for<'any> T::Refs<'any>: Ord,
@@ -318,15 +355,6 @@ where
     }
 
     #[inline]
-    pub fn sort_unstable_with_permutation(&mut self, permutation: &mut [usize])
-    where
-        for<'any> T::Refs<'any>: Ord,
-    {
-        self.slices_mut()
-            .sort_unstable_with_permutation(permutation);
-    }
-
-    #[inline]
     pub fn sort_unstable(&mut self)
     where
         for<'any> T::Refs<'any>: Ord,
@@ -335,30 +363,11 @@ where
     }
 
     #[inline]
-    pub fn sort_unstable_with_permutation_by<F>(&mut self, permutation: &mut [usize], compare: F)
-    where
-        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
-    {
-        self.slices_mut()
-            .sort_unstable_with_permutation_by(permutation, compare);
-    }
-
-    #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
         for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
     {
         self.slices_mut().sort_unstable_by(compare);
-    }
-
-    #[inline]
-    pub fn sort_unstable_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], f: F)
-    where
-        F: FnMut(T::Refs<'_>) -> K,
-        K: Ord,
-    {
-        self.slices_mut()
-            .sort_unstable_with_permutation_by_key(permutation, f);
     }
 
     #[inline]
@@ -405,6 +414,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> Default for Box<SoaSlice<T>>
 where
     T: SoaTrustedFields,
@@ -534,6 +544,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> ToOwned for SoaSlice<T>
 where
     T: SoaTrustedFields,
@@ -594,6 +605,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
 where
     T: SoaTrustedFields,
@@ -620,6 +632,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
 where
     T: SoaTrustedFields,
@@ -633,6 +646,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> IntoIterator for Box<SoaSlice<T>>
 where
     T: SoaTrustedFields,

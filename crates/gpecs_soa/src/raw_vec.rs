@@ -1,7 +1,3 @@
-use alloc::{
-    alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc},
-    boxed::Box,
-};
 use core::{
     alloc::{Layout, LayoutError},
     cmp,
@@ -9,6 +5,11 @@ use core::{
     fmt::{self, Display},
     mem::ManuallyDrop,
     ptr::{self, NonNull},
+};
+
+use alloc::{
+    alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc},
+    boxed::Box,
 };
 
 use crate::{

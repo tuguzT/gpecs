@@ -45,7 +45,8 @@ where
     V: Soa,
 {
     #[inline]
-    pub(crate) fn new(
+    #[allow(unsafe_code)]
+    pub unsafe fn new_unchecked(
         dense: SoaSlices<'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
     ) -> Self {
@@ -266,9 +267,10 @@ where
     SoaSlices<'a, KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { dense, sparse } = self;
         f.debug_struct("EpochSparseView")
-            .field("dense", &self.dense)
-            .field("sparse", &self.sparse)
+            .field("dense", dense)
+            .field("sparse", sparse)
             .finish()
     }
 }
@@ -314,7 +316,8 @@ where
     SoaSlices<'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.dense == other.dense && self.sparse == other.sparse
+        let Self { dense, sparse } = self;
+        *dense == other.dense && *sparse == other.sparse
     }
 }
 
@@ -333,11 +336,12 @@ where
     SoaSlices<'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.dense.partial_cmp(&other.dense) {
+        let Self { dense, sparse } = self;
+        match dense.partial_cmp(&other.dense) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.sparse.partial_cmp(&other.sparse)
+        sparse.partial_cmp(&other.sparse)
     }
 }
 
@@ -348,11 +352,12 @@ where
     SoaSlices<'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.dense.cmp(&other.dense) {
+        let Self { dense, sparse } = self;
+        match dense.cmp(&other.dense) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.sparse.cmp(&other.sparse)
+        sparse.cmp(&other.sparse)
     }
 }
 
@@ -364,8 +369,9 @@ where
     SoaSlices<'a, KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.dense.hash(state);
-        self.sparse.hash(state);
+        let Self { dense, sparse } = self;
+        dense.hash(state);
+        sparse.hash(state);
     }
 }
 
@@ -453,7 +459,8 @@ where
     V: Soa,
 {
     #[inline]
-    pub(crate) fn new(
+    #[allow(unsafe_code)]
+    pub unsafe fn new_unchecked(
         dense: SoaSlicesMut<'a, KeyValuePair<K, V>>,
         sparse: &'a mut [SparseItem<K>],
     ) -> Self {
@@ -552,7 +559,25 @@ where
     }
 
     #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn as_keys_slice_mut(&mut self) -> &mut [K] {
+        let Self { dense, .. } = self;
+
+        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        keys
+    }
+
+    #[inline]
     pub fn into_keys_slice(self) -> &'a [K] {
+        let Self { dense, .. } = self;
+
+        let KeyValueSlicesMut { keys, .. } = dense.into_slices();
+        keys
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn into_keys_slice_mut(self) -> &'a mut [K] {
         let Self { dense, .. } = self;
 
         let KeyValueSlicesMut { keys, .. } = dense.into_slices();
@@ -568,7 +593,23 @@ where
     }
 
     #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn as_keys_ptr_mut(&mut self) -> *mut K {
+        let Self { dense, .. } = self;
+
+        let KeyValueMutPtrs { key, .. } = dense.as_mut_ptrs();
+        key
+    }
+
+    #[inline]
     pub fn as_sparse_slice(&self) -> &[SparseItem<K>] {
+        let Self { sparse, .. } = self;
+        sparse
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn as_sparse_slice_mut(&mut self) -> &mut [SparseItem<K>] {
         let Self { sparse, .. } = self;
         sparse
     }
@@ -580,9 +621,23 @@ where
     }
 
     #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn into_sparse_slice_mut(self) -> &'a mut [SparseItem<K>] {
+        let Self { sparse, .. } = self;
+        sparse
+    }
+
+    #[inline]
     pub fn as_sparse_ptr(&self) -> *const SparseItem<K> {
         let Self { sparse, .. } = self;
         sparse.as_ptr()
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn as_sparse_ptr_mut(&mut self) -> *mut SparseItem<K> {
+        let Self { sparse, .. } = self;
+        sparse.as_mut_ptr()
     }
 
     #[inline]
@@ -1091,9 +1146,10 @@ where
     SoaSlicesMut<'a, KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { dense, sparse } = self;
         f.debug_struct("EpochSparseViewMut")
-            .field("dense", &self.dense)
-            .field("sparse", &self.sparse)
+            .field("dense", dense)
+            .field("sparse", sparse)
             .finish()
     }
 }
@@ -1118,7 +1174,8 @@ where
     SoaSlicesMut<'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.dense == other.dense && self.sparse == other.sparse
+        let Self { dense, sparse } = self;
+        *dense == other.dense && *sparse == other.sparse
     }
 }
 
@@ -1137,11 +1194,12 @@ where
     SoaSlicesMut<'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.dense.partial_cmp(&other.dense) {
+        let Self { dense, sparse } = self;
+        match dense.partial_cmp(&other.dense) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.sparse.partial_cmp(&other.sparse)
+        sparse.partial_cmp(&other.sparse)
     }
 }
 
@@ -1152,11 +1210,12 @@ where
     SoaSlicesMut<'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.dense.cmp(&other.dense) {
+        let Self { dense, sparse } = self;
+        match dense.cmp(&other.dense) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.sparse.cmp(&other.sparse)
+        sparse.cmp(&other.sparse)
     }
 }
 
@@ -1168,8 +1227,9 @@ where
     SoaSlicesMut<'a, KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.dense.hash(state);
-        self.sparse.hash(state);
+        let Self { dense, sparse } = self;
+        dense.hash(state);
+        sparse.hash(state);
     }
 }
 
@@ -1294,8 +1354,9 @@ where
     V: Soa,
 {
     #[inline]
+    #[allow(unsafe_code)]
     fn from(value: EpochSparseViewMut<'a, K, V>) -> Self {
         let EpochSparseViewMut { dense, sparse } = value;
-        Self::new(dense.into(), sparse)
+        unsafe { Self::new_unchecked(dense.into(), sparse) }
     }
 }

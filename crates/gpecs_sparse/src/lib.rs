@@ -2,7 +2,7 @@
 
 #![warn(clippy::all)]
 // TODO `#![warn(missing_docs)]` after implementation & tests
-#![deny(unsafe_code)] // allow it only for key-value pair struct impl
+#![deny(unsafe_code)] // allow it only for key-value pair & for mutable access to keys and items
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(not(test), no_std)]
 

@@ -301,6 +301,15 @@ where
     }
 
     #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn as_keys_slice_mut(&mut self) -> &mut [K] {
+        let Self { dense, .. } = self;
+
+        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        keys
+    }
+
+    #[inline]
     pub fn as_keys_ptr(&self) -> *const K {
         let Self { dense, .. } = self;
 
@@ -309,9 +318,25 @@ where
     }
 
     #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn as_keys_ptr_mut(&mut self) -> *mut K {
+        let Self { dense, .. } = self;
+
+        let KeyValueMutPtrs { key, .. } = dense.as_mut_ptrs();
+        key
+    }
+
+    #[inline]
     pub fn as_sparse_slice(&self) -> &[SparseItem<K>] {
         let Self { sparse, .. } = self;
         sparse.as_slice()
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn as_sparse_slice_mut(&mut self) -> &mut [SparseItem<K>] {
+        let Self { sparse, .. } = self;
+        sparse.as_mut_slice()
     }
 
     #[inline]
@@ -327,15 +352,24 @@ where
     }
 
     #[inline]
-    pub fn as_view(&self) -> EpochSparseView<'_, K, V> {
-        let Self { dense, sparse, .. } = self;
-        EpochSparseView::new(dense.slices(), sparse)
+    #[allow(unsafe_code)]
+    pub unsafe fn as_sparse_ptr_mut(&mut self) -> *mut SparseItem<K> {
+        let Self { sparse, .. } = self;
+        sparse.as_mut_ptr()
     }
 
     #[inline]
+    #[allow(unsafe_code)]
+    pub fn as_view(&self) -> EpochSparseView<'_, K, V> {
+        let Self { dense, sparse, .. } = self;
+        unsafe { EpochSparseView::new_unchecked(dense.slices(), sparse) }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, K, V> {
         let Self { dense, sparse, .. } = self;
-        EpochSparseViewMut::new(dense.slices_mut(), sparse)
+        unsafe { EpochSparseViewMut::new_unchecked(dense.slices_mut(), sparse) }
     }
 
     #[inline]

@@ -372,27 +372,13 @@ where
         (dense, sparse)
     }
 
+    #[inline]
+    #[track_caller]
     pub fn from_parts(
         dense: SoaVec<KeyValuePair<K, V>>,
-        mut sparse: Vec<SparseItem<K>>,
+        sparse: Vec<SparseItem<K>>,
     ) -> Result<Self, InvalidKeyError<K>> {
-        sparse.clear();
-        for (dense_index, KeyValueRefs { key, .. }) in dense.slices().into_iter().enumerate() {
-            let sparse_index = key
-                .sparse_index()
-                .try_into()
-                .map_err(TooLargeSparseIndexError::new)?;
-            let epoch = key.epoch();
-
-            let dense_index = dense_index
-                .try_into()
-                .map_err(TooSmallSparseIndexError::new)?;
-            let item = SparseItem::occupied(dense_index, epoch);
-
-            extend_sparse(&mut sparse, sparse_index.saturating_add(1));
-            sparse[sparse_index] = item;
-        }
-
+        let _view = EpochSparseView::new(dense.slices(), sparse.as_slice())?;
         Ok(Self { dense, sparse })
     }
 

@@ -378,10 +378,14 @@ where
         (dense, sparse)
     }
 
+    #[inline]
+    #[track_caller]
     pub fn from_parts(
         dense: SoaVec<KeyValuePair<K, V>>,
         mut sparse: Vec<SparseItem<K>>,
     ) -> Result<Self, InvalidKeyError<K>> {
+        let _view = EpochSparseView::new(dense.slices(), sparse.as_slice())?;
+
         sparse.clear();
         let mut sparse_vacant_head = 0;
         for (dense_index, KeyValueRefs { key, .. }) in dense.slices().into_iter().enumerate() {

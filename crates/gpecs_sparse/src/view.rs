@@ -12,15 +12,19 @@ use crate::{
         sparse_get_with_key, sparse_index, sparse_index_mut,
     },
     assert::{
-        check_compatible_key, check_equal_epoch, check_equal_key, unwrap_dense,
-        unwrap_dense_from_sparse_index, unwrap_dense_index, unwrap_dense_index_mut,
+        check_compatible_key, check_equal_dense_index, check_equal_epoch, check_equal_key,
+        unwrap_dense, unwrap_dense_from_sparse_index, unwrap_dense_index, unwrap_dense_index_mut,
         unwrap_dense_pair, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item,
         unwrap_sparse_items_pair_mut,
     },
+    error::{InvalidKeyError, TooLargeSparseIndexError, TooSmallSparseIndexError},
     item::SparseItem,
     iter::{Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
-    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueSlices, KeyValueSlicesMut},
+    pair::{
+        KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs, KeyValueSlices,
+        KeyValueSlicesMut,
+    },
     soa::{
         mem::swap as soa_swap,
         slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
@@ -45,11 +49,55 @@ where
     V: Soa,
 {
     #[inline]
+    #[track_caller]
+    pub fn new(
+        dense: SoaSlices<'a, KeyValuePair<K, V>>,
+        sparse: &'a [SparseItem<K>],
+    ) -> Result<Self, InvalidKeyError<K>> {
+        for (sparse_index, sparse_item) in sparse.iter().enumerate() {
+            let sparse_index = sparse_index
+                .try_into()
+                .map_err(TooSmallSparseIndexError::new)?;
+            let Some(dense_index) = sparse_item.dense_index().copied() else {
+                continue;
+            };
+            let dense_index = dense_index
+                .try_into()
+                .map_err(TooLargeSparseIndexError::new)?;
+
+            let KeyValueRefs { key, .. } = unwrap_dense(&dense, dense_index);
+            check_compatible_key(K::new(sparse_index, sparse_item.epoch), *key);
+        }
+        for (dense_index, KeyValueRefs { key, .. }) in dense.iter().enumerate() {
+            let sparse_index = key
+                .sparse_index()
+                .try_into()
+                .map_err(TooLargeSparseIndexError::new)?;
+            let sparse_item = unwrap_sparse_item(sparse, sparse_index);
+
+            let dense_index = dense_index
+                .try_into()
+                .map_err(TooSmallSparseIndexError::new)?;
+            check_equal_dense_index(dense_index, *unwrap_dense_index(sparse_item.kind()));
+        }
+
+        Ok(Self { dense, sparse })
+    }
+
+    #[inline]
+    #[track_caller]
     #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(
         dense: SoaSlices<'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
     ) -> Self {
+        if cfg!(debug_assertions) {
+            let Ok(view) = Self::new(dense, sparse) else {
+                panic!("incorrect inputs");
+            };
+            return view;
+        }
+
         Self { dense, sparse }
     }
 
@@ -465,11 +513,55 @@ where
     V: Soa,
 {
     #[inline]
+    #[track_caller]
+    pub fn new(
+        dense: SoaSlicesMut<'a, KeyValuePair<K, V>>,
+        sparse: &'a mut [SparseItem<K>],
+    ) -> Result<Self, InvalidKeyError<K>> {
+        for (sparse_index, sparse_item) in sparse.iter().enumerate() {
+            let sparse_index = sparse_index
+                .try_into()
+                .map_err(TooSmallSparseIndexError::new)?;
+            let Some(dense_index) = sparse_item.dense_index().copied() else {
+                continue;
+            };
+            let dense_index = dense_index
+                .try_into()
+                .map_err(TooLargeSparseIndexError::new)?;
+
+            let KeyValueRefs { key, .. } = unwrap_dense(&dense, dense_index);
+            check_compatible_key(K::new(sparse_index, sparse_item.epoch), *key);
+        }
+        for (dense_index, KeyValueRefs { key, .. }) in dense.iter().enumerate() {
+            let sparse_index = key
+                .sparse_index()
+                .try_into()
+                .map_err(TooLargeSparseIndexError::new)?;
+            let sparse_item = unwrap_sparse_item(sparse, sparse_index);
+
+            let dense_index = dense_index
+                .try_into()
+                .map_err(TooSmallSparseIndexError::new)?;
+            check_equal_dense_index(dense_index, *unwrap_dense_index(sparse_item.kind()));
+        }
+
+        Ok(Self { dense, sparse })
+    }
+
+    #[inline]
+    #[track_caller]
     #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(
         dense: SoaSlicesMut<'a, KeyValuePair<K, V>>,
         sparse: &'a mut [SparseItem<K>],
     ) -> Self {
+        if cfg!(debug_assertions) {
+            let Ok(view) = Self::new(dense, sparse) else {
+                panic!("incorrect inputs");
+            };
+            return view;
+        }
+
         Self { dense, sparse }
     }
 

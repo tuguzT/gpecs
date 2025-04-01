@@ -1093,7 +1093,7 @@ fn three_items_parts() {
         .insert(5, Identity(69))
         .expect("key-to-usize conversions should not fail");
 
-    let (mut dense, sparse) = sparse_arena.into_parts();
+    let (dense, sparse) = sparse_arena.into_parts();
     let (keys, values) = dense.as_slices().into();
     assert_eq!(keys, &[2, 1, 5]);
     assert_eq!(values, &[34.into(), 42.into(), 69.into()]);
@@ -1109,12 +1109,14 @@ fn three_items_parts() {
         ],
     );
 
-    dense.swap_remove(0);
     let sparse_arena = SparseArena::from_parts(dense, sparse)
         .expect("creation of sparse arena from valid parts should not fail");
-    assert_eq!(sparse_arena.len(), 2);
-    assert_eq!(sparse_arena.as_slices(), &[69.into(), 42.into()]);
-    assert_eq!(sparse_arena.as_keys_slice(), &[5, 1]);
+    assert_eq!(sparse_arena.len(), 3);
+    assert_eq!(sparse_arena.as_slices(), &[34.into(), 42.into(), 69.into()]);
+    assert_eq!(sparse_arena.as_keys_slice(), &[2, 1, 5]);
+
+    assert_eq!(sparse_arena.get(2), Some(&34.into()));
+    assert_eq!(sparse_arena.get(1), Some(&42.into()));
     assert_eq!(sparse_arena.get(5), Some(&69.into()));
 }
 

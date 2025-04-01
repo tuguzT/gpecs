@@ -277,3 +277,22 @@ where
     }
     check_equal_epoch_failed()
 }
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+const fn check_equal_dense_index_failed() -> ! {
+    panic!("dense indices should be equal")
+}
+
+#[inline]
+#[track_caller]
+pub fn check_equal_dense_index<I>(first: I, second: I)
+where
+    I: PartialEq,
+{
+    if first == second {
+        return;
+    }
+    check_equal_dense_index_failed()
+}

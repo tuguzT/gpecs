@@ -767,16 +767,9 @@ where
 
     #[inline]
     pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, T>) {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-        } = *self;
-
-        let slices = unsafe {
-            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
-            SoaSlices::from_parts(context, ptrs, len)
-        };
+        let (context, ptrs, len) = unsafe { self.as_parts() };
+        let ptrs = T::ptrs_cast_const(context, ptrs);
+        let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
         (context, Iter::new(slices))
     }
 
@@ -788,12 +781,7 @@ where
 
     #[inline]
     pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, T>) {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-        } = *self;
-
+        let (context, ptrs, len) = unsafe { self.as_parts() };
         let slices = unsafe { Self::from_parts(context, ptrs.clone(), len) };
         (context, IterMut::new(slices))
     }
@@ -815,16 +803,9 @@ where
     where
         T::Refs<'a>: PartialEq<T>,
     {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-        } = *self;
-
-        let slices = unsafe {
-            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
-            SoaSlices::from_parts(context, ptrs, len)
-        };
+        let (context, ptrs, len) = unsafe { self.as_parts() };
+        let ptrs = T::ptrs_cast_const(context, ptrs.clone());
+        let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
         slices.contains(value)
     }
 
@@ -833,16 +814,9 @@ where
     where
         T::Refs<'a>: PartialEq<T::Refs<'r>>,
     {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-        } = *self;
-
-        let slices = unsafe {
-            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
-            SoaSlices::<T>::from_parts(context, ptrs, len)
-        };
+        let (context, ptrs, len) = unsafe { self.as_parts() };
+        let ptrs = T::ptrs_cast_const(context, ptrs.clone());
+        let slices = unsafe { SoaSlices::<T>::from_parts(context, ptrs, len) };
         slices.contains_by_refs(refs)
     }
 

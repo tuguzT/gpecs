@@ -1,5 +1,8 @@
 use alloc::{boxed::Box, vec::Vec};
-use core::{ptr, slice};
+use core::{
+    fmt::{self, Debug},
+    ptr, slice,
+};
 
 use crate::{
     aligned_bytes::AlignedBytes,
@@ -224,5 +227,13 @@ impl ErasedSoa {
             unsafe { ErasedFieldRefMut::new_unchecked(desc.clone(), r#ref) }
         });
         ErasedSoaRefsMut::new(refs)
+    }
+}
+
+impl Debug for ErasedSoa {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let refs = self.as_refs();
+        let fields = &refs.field_refs();
+        f.debug_struct("ErasedSoa").field("fields", fields).finish()
     }
 }

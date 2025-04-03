@@ -12,12 +12,16 @@ use gpecs::{
 #[test]
 fn storage_unit() {
     let mut components = ComponentRegistry::new();
-    let mut storage = ArchetypeStorage::of::<()>(&mut components, ())
+    let mut storage = ArchetypeStorage::of::<()>(&mut components, &())
         .expect("creation of storage for empty archetype should succeed");
     assert_eq!(storage.entities(), []);
 
     let component_ids = <()>::component_ids(&(), &mut components).unwrap();
     assert!(storage.component_ids().eq(component_ids));
+
+    let storage_from_ids = ArchetypeStorage::new(&components, component_ids)
+        .expect("empty component should be already registered");
+    assert!(storage_from_ids.component_ids().eq(storage.component_ids()));
 
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
@@ -65,19 +69,23 @@ impl Component for Mass {}
 fn storage_tuple() {
     let mut components = ComponentRegistry::new();
 
-    let error = ArchetypeStorage::of::<(Position, Position)>(&mut components, ())
+    let error = ArchetypeStorage::of::<(Position, Position)>(&mut components, &())
         .expect_err("creation of storage for bundle `(Position, Position)` should fail");
     assert_eq!(
         error.component_id(),
         components.register_component::<Position>(),
     );
 
-    let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components, ())
+    let mut storage = ArchetypeStorage::of::<(Position, Mass)>(&mut components, &())
         .expect("creation of storage for bundle `(Position, Mass)` should succeed");
     assert_eq!(storage.entities(), []);
 
     let component_ids = <(Position, Mass)>::component_ids(&(), &mut components).unwrap();
     assert!(storage.component_ids().eq(component_ids));
+
+    let storage_from_ids = ArchetypeStorage::new(&components, component_ids)
+        .expect("`Position` and `Mass` components should be already registered");
+    assert!(storage_from_ids.component_ids().eq(storage.component_ids()));
 
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();

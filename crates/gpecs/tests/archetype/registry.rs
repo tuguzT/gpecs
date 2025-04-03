@@ -1,5 +1,6 @@
 use gpecs::{
     archetype::registry::ArchetypeRegistry,
+    bundle::Bundle,
     component::{registry::ComponentRegistry, Component},
 };
 
@@ -31,31 +32,56 @@ fn register_archetype() {
     assert_eq!(archetypes.len(), 0);
 
     let id = archetypes
-        .register_archetype::<(Position,)>((), &mut components)
+        .register_archetype::<(Position,)>(&mut components, &())
         .expect("archetype of single component should be registered successfully");
     assert_eq!(archetypes.len(), 1);
     assert_eq!(id.index(), 0);
     assert_eq!(
         archetypes
-            .archetype_id::<(Position,)>(&(), &mut components)
+            .archetype_id::<(Position,)>(&mut components, &())
             .unwrap(),
         Some(id)
     );
 
     let same_id = archetypes
-        .register_archetype::<(Position,)>((), &mut components)
+        .register_archetype::<(Position,)>(&mut components, &())
         .expect("archetype of single component should be registered successfully");
     assert_eq!(same_id, id);
 
+    let component_ids = <(Position,)>::component_ids(&(), &mut components).unwrap();
+    let same_id = archetypes
+        .register_archetype_with_components(&components, component_ids)
+        .expect("`Position` component should be already registered");
+    assert_eq!(same_id, id);
+    assert_eq!(
+        archetypes.archetype_id_from(component_ids).unwrap(),
+        Some(id)
+    );
+
     let id = archetypes
-        .register_archetype::<(Position, Mass)>((), &mut components)
+        .register_archetype::<(Position, Mass)>(&mut components, &())
         .expect("archetype of two components should be registered successfully");
     assert_eq!(archetypes.len(), 2);
     assert_eq!(id.index(), 1);
     assert_eq!(
         archetypes
-            .archetype_id::<(Position, Mass)>(&(), &mut components)
+            .archetype_id::<(Position, Mass)>(&mut components, &())
             .unwrap(),
+        Some(id)
+    );
+
+    let same_id = archetypes
+        .register_archetype::<(Mass, Position)>(&mut components, &())
+        .expect("archetype of two components should be registered successfully");
+    assert_eq!(same_id, id);
+
+    let component_ids = <(Mass, Position)>::component_ids(&(), &mut components).unwrap();
+    let same_id = archetypes
+        .register_archetype_with_components(&components, component_ids)
+        .expect("`Position` and `Mass` components should be already registered");
+    assert_eq!(same_id, id);
+    assert_eq!(
+        archetypes.archetype_id_from(component_ids).unwrap(),
         Some(id)
     );
 }

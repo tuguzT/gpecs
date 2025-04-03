@@ -4,7 +4,10 @@ use std::{
 };
 
 use gpecs_soa_erased::{
-    erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut},
+    erased::{
+        ErasedSoa, ErasedSoaContext, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices,
+        ErasedSoaSlicesMut,
+    },
     field::{
         ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
@@ -16,7 +19,7 @@ use crate::{
     bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
-    soa::traits::FieldDescriptor,
+    soa::traits::{FieldDescriptor, Soa},
 };
 
 use super::error::{
@@ -24,30 +27,66 @@ use super::error::{
     IncompatibleBundleValueError, TooFewComponentsError,
 };
 
+type ErasedStorage = EpochSparseSet<Entity, ErasedSoa>;
+
 pub struct ArchetypeStorage {
     component_ids: IndexSet<ComponentId>,
-    erased_storage: Box<dyn ErasedStorage>,
+    erased_storage: ErasedStorage,
 }
-
-type SparseSet<V> = EpochSparseSet<Entity, V>;
 
 impl ArchetypeStorage {
     #[inline]
+    #[track_caller]
+    pub fn new<I>(
+        components: &ComponentRegistry,
+        component_ids: I,
+    ) -> Result<Self, DuplicateComponentError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let component_ids = {
+            let mut component_ids_set = IndexSet::new();
+            for component_id in component_ids {
+                let is_unique = component_ids_set.insert(component_id);
+                if is_unique {
+                    continue;
+                }
+                return Err(DuplicateComponentError::new(component_id));
+            }
+            component_ids_set
+        };
+
+        let descriptors = component_ids.iter().map(|&id| {
+            let info = components
+                .get_info(id)
+                .unwrap_or_else(|| get_component_info_fail(&id));
+            info.descriptor()
+        });
+        let context = ErasedSoaContext::new(descriptors);
+        let erased_storage = ErasedStorage::with_context(context);
+
+        Ok(Self {
+            component_ids,
+            erased_storage,
+        })
+    }
+
+    #[inline]
     pub fn of<B>(
         components: &mut ComponentRegistry,
-        context: B::Context,
+        context: &B::Context,
     ) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
     {
-        let component_ids = B::component_ids(&context, components)?
-            .into_iter()
-            .collect();
-        let storage = SparseSet::<B>::with_context(context);
+        let component_ids = B::component_ids(context, components)?.into_iter().collect();
+
+        let context = ErasedSoaContext::of::<B>(context);
+        let erased_storage = ErasedStorage::with_context(context);
 
         Ok(Self {
             component_ids,
-            erased_storage: Box::new(storage),
+            erased_storage,
         })
     }
 
@@ -61,10 +100,11 @@ impl ArchetypeStorage {
     #[inline]
     pub fn entities(&self) -> &[Entity] {
         let Self { erased_storage, .. } = self;
-        erased_storage.entities()
+        ErasedStorageExt::entities(erased_storage)
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn components<B>(
         &self,
         components: &mut ComponentRegistry,
@@ -78,17 +118,22 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut target_component_ids = B::component_ids(context, components)?.into_iter();
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
-            return Err(ExclusiveComponentError { component_id }.into());
+        let mut bundle_component_ids = B::component_ids(context, components)?.into_iter();
+        if let Some(component_id) = bundle_component_ids.find(|id| !component_ids.contains(id)) {
+            return Err(ExclusiveComponentError::new(component_id).into());
         }
 
-        let (len, fields) = erased_storage.components(components);
-        let slices = from_erased_field_slices::<B>(components, context, len, fields);
+        let (len, fields) = ErasedStorageExt::components(erased_storage, components, component_ids);
+        let bundle_component_ids = B::component_ids(context, components)
+            .expect("components of the bundle should be unique");
+        let slices = unsafe {
+            from_erased_field_slices::<B>(components, context, bundle_component_ids, len, fields)
+        };
         Ok(slices)
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn components_mut<B>(
         &mut self,
         components: &mut ComponentRegistry,
@@ -102,17 +147,29 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut target_component_ids = B::component_ids(context, components)?.into_iter();
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
-            return Err(ExclusiveComponentError { component_id }.into());
+        let mut bundle_component_ids = B::component_ids(context, components)?.into_iter();
+        if let Some(component_id) = bundle_component_ids.find(|id| !component_ids.contains(id)) {
+            return Err(ExclusiveComponentError::new(component_id).into());
         }
 
-        let (len, fields) = erased_storage.components_mut(components);
-        let slices = from_erased_field_slices_mut::<B>(components, context, len, fields);
+        let (len, fields) =
+            ErasedStorageExt::components_mut(erased_storage, components, component_ids);
+        let bundle_component_ids = B::component_ids(context, components)
+            .expect("components of the bundle should be unique");
+        let slices = unsafe {
+            from_erased_field_slices_mut::<B>(
+                components,
+                context,
+                bundle_component_ids,
+                len,
+                fields,
+            )
+        };
         Ok(slices)
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn get<B>(
         &self,
         components: &mut ComponentRegistry,
@@ -127,19 +184,25 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut target_component_ids = B::component_ids(context, components)?.into_iter();
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
-            return Err(ExclusiveComponentError { component_id }.into());
+        let mut bundle_component_ids = B::component_ids(context, components)?.into_iter();
+        if let Some(component_id) = bundle_component_ids.find(|id| !component_ids.contains(id)) {
+            return Err(ExclusiveComponentError::new(component_id).into());
         }
 
-        let Some(fields) = erased_storage.get(components, entity) else {
+        let Some(fields) = ErasedStorageExt::get(erased_storage, components, component_ids, entity)
+        else {
             return Ok(None);
         };
-        let refs = from_erased_field_refs::<B>(components, context, fields);
+        let bundle_component_ids = B::component_ids(context, components)
+            .expect("components of the bundle should be unique");
+        let refs = unsafe {
+            from_erased_field_refs::<B>(components, context, bundle_component_ids, fields)
+        };
         Ok(Some(refs))
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn get_mut<B>(
         &mut self,
         components: &mut ComponentRegistry,
@@ -154,19 +217,26 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut target_component_ids = B::component_ids(context, components)?.into_iter();
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
-            return Err(ExclusiveComponentError { component_id }.into());
+        let mut bundle_component_ids = B::component_ids(context, components)?.into_iter();
+        if let Some(component_id) = bundle_component_ids.find(|id| !component_ids.contains(id)) {
+            return Err(ExclusiveComponentError::new(component_id).into());
         }
 
-        let Some(fields) = erased_storage.get_mut(components, entity) else {
+        let Some(fields) =
+            ErasedStorageExt::get_mut(erased_storage, components, component_ids, entity)
+        else {
             return Ok(None);
         };
-        let refs = from_erased_field_refs_mut::<B>(components, context, fields);
+        let bundle_component_ids = B::component_ids(context, components)
+            .expect("components of the bundle should be unique");
+        let refs = unsafe {
+            from_erased_field_refs_mut::<B>(components, context, bundle_component_ids, fields)
+        };
         Ok(Some(refs))
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn insert<B>(
         &mut self,
         components: &mut ComponentRegistry,
@@ -182,36 +252,44 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut target_component_ids_count = 0;
-        let mut target_component_ids = match B::component_ids(context, components) {
-            Ok(target_component_ids) => target_component_ids
+        let mut bundle_component_ids_count = 0;
+        let mut bundle_component_ids = match B::component_ids(context, components) {
+            Ok(bundle_component_ids) => bundle_component_ids
                 .into_iter()
-                .inspect(|_| target_component_ids_count += 1),
+                .inspect(|_| bundle_component_ids_count += 1),
             Err(error) => {
                 let reason = error.into();
                 return Err(IncompatibleBundleValueError { value, reason });
             }
         };
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
-            let reason = ExclusiveComponentError { component_id }.into();
+        if let Some(component_id) = bundle_component_ids.find(|id| !component_ids.contains(id)) {
+            let reason = ExclusiveComponentError::new(component_id).into();
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
-        target_component_ids.for_each(drop);
-        if target_component_ids_count != component_ids.len() {
+        bundle_component_ids.for_each(drop);
+        if bundle_component_ids_count != component_ids.len() {
             let reason = TooFewComponentsError.into();
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
-        let fields = into_erased_fields::<B>(components, context, value);
-        let Some(fields) = erased_storage.insert(components, entity, fields) else {
+        let bundle_component_ids = B::component_ids(context, components)
+            .expect("components of the bundle should be unique");
+        let fields = into_erased_fields::<B>(components, context, bundle_component_ids, value);
+        let Some(fields) =
+            ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
+        else {
             return Ok(None);
         };
-        let value = from_erased_fields::<B>(components, context, fields);
+        let bundle_component_ids = B::component_ids(context, components)
+            .expect("components of the bundle should be unique");
+        let value =
+            unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn remove<B>(
         &mut self,
         components: &mut ComponentRegistry,
@@ -226,23 +304,28 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut target_component_ids_count = 0;
-        let mut target_component_ids = B::component_ids(context, components)?
+        let mut bundle_component_ids_count = 0;
+        let mut bundle_component_ids = B::component_ids(context, components)?
             .into_iter()
-            .inspect(|_| target_component_ids_count += 1);
-        if let Some(component_id) = target_component_ids.find(|id| !component_ids.contains(id)) {
-            return Err(ExclusiveComponentError { component_id }.into());
+            .inspect(|_| bundle_component_ids_count += 1);
+        if let Some(component_id) = bundle_component_ids.find(|id| !component_ids.contains(id)) {
+            return Err(ExclusiveComponentError::new(component_id).into());
         }
 
-        target_component_ids.for_each(drop);
-        if target_component_ids_count != component_ids.len() {
+        bundle_component_ids.for_each(drop);
+        if bundle_component_ids_count != component_ids.len() {
             return Err(TooFewComponentsError.into());
         }
 
-        let Some(fields) = erased_storage.remove(components, entity) else {
+        let Some(fields) =
+            ErasedStorageExt::remove(erased_storage, components, component_ids, entity)
+        else {
             return Ok(None);
         };
-        let value = from_erased_fields::<B>(components, context, fields);
+        let bundle_component_ids = B::component_ids(context, components)
+            .expect("components of the bundle should be unique");
+        let value =
+            unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))
     }
 }
@@ -344,22 +427,25 @@ impl FusedIterator for ComponentIds<'_> {}
 
 type ErasedComponents<T> = IndexMap<ComponentId, T>;
 
-trait ErasedStorage {
+trait ErasedStorageExt {
     fn entities(&self) -> &[Entity];
 
     fn components(
         &self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
     ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>);
 
     fn components_mut(
         &mut self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
     ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'_>>);
 
     fn insert(
         &mut self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
         entity: Entity,
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>>;
@@ -367,26 +453,26 @@ trait ErasedStorage {
     fn remove(
         &mut self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>>;
 
     fn get(
         &self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>>;
 
     fn get_mut(
         &mut self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>>;
 }
 
-impl<B> ErasedStorage for SparseSet<B>
-where
-    B: Bundle,
-{
+impl ErasedStorageExt for ErasedStorage {
     #[inline]
     fn entities(&self) -> &[Entity] {
         self.as_keys_slice()
@@ -396,30 +482,56 @@ where
     fn components(
         &self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
     ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>) {
         let (context, slices) = self.as_view().into_slices_with_context();
-        into_erased_field_slices::<B>(components, context, slices)
+        into_erased_field_slices::<ErasedSoa>(
+            components,
+            context,
+            component_ids.iter().copied(),
+            slices,
+        )
     }
 
     #[inline]
     fn components_mut(
         &mut self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
     ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'_>>) {
         let (context, slices) = self.as_mut_view().into_slices_with_context();
-        into_erased_field_slices_mut::<B>(components, context, slices)
+        into_erased_field_slices_mut::<ErasedSoa>(
+            components,
+            context,
+            component_ids.iter().copied(),
+            slices,
+        )
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     fn insert(
         &mut self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
         entity: Entity,
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>> {
-        let value = from_erased_fields::<B>(components, self.context(), fields);
-        let value = SparseSet::insert(self, entity, value).unwrap()?;
-        let fields = into_erased_fields::<B>(components, self.context(), value);
+        let value = unsafe {
+            from_erased_fields::<ErasedSoa>(
+                components,
+                self.context(),
+                component_ids.iter().copied(),
+                fields,
+            )
+        };
+        let value = ErasedStorage::insert(self, entity, value).unwrap()?;
+        let fields = into_erased_fields::<ErasedSoa>(
+            components,
+            self.context(),
+            component_ids.iter().copied(),
+            value,
+        );
         Some(fields)
     }
 
@@ -427,10 +539,16 @@ where
     fn remove(
         &mut self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
-        let value = SparseSet::remove(self, entity)?;
-        let fields = into_erased_fields::<B>(components, self.context(), value);
+        let value = ErasedStorage::remove(self, entity)?;
+        let fields = into_erased_fields::<ErasedSoa>(
+            components,
+            self.context(),
+            component_ids.iter().copied(),
+            value,
+        );
         Some(fields)
     }
 
@@ -438,10 +556,16 @@ where
     fn get(
         &self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
         let (context, refs) = self.as_view().into_get_with_context(entity);
-        let refs = into_erased_field_refs::<B>(components, context, refs?);
+        let refs = into_erased_field_refs::<ErasedSoa>(
+            components,
+            context,
+            component_ids.iter().copied(),
+            refs?,
+        );
         Some(refs)
     }
 
@@ -449,12 +573,25 @@ where
     fn get_mut(
         &mut self,
         components: &mut ComponentRegistry,
+        component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {
         let (context, refs) = self.as_mut_view().into_get_mut_with_context(entity);
-        let refs = into_erased_field_refs_mut::<B>(components, context, refs?);
+        let refs = into_erased_field_refs_mut::<ErasedSoa>(
+            components,
+            context,
+            component_ids.iter().copied(),
+            refs?,
+        );
         Some(refs)
     }
+}
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+fn get_component_info_fail(component_id: &ComponentId) -> ! {
+    panic!("info of component {component_id:?} should be present")
 }
 
 #[inline]
@@ -465,201 +602,222 @@ where
 {
     let info = components
         .get_info(id)
-        .unwrap_or_else(|| panic!("info of component {id:?} should be present"));
+        .unwrap_or_else(|| get_component_info_fail(&id));
     assert_eq!(info.descriptor().layout(), desc.as_ref().layout());
 }
 
 #[inline]
 #[track_caller]
-fn validate_components<'components, 'context, B>(
+fn validate_components<'components, 'context, T, I>(
     components: &'components mut ComponentRegistry,
-    context: &'context B::Context,
-) -> impl Iterator<Item = ComponentId> + use<'components, 'context, B>
+    context: &'context T::Context,
+    component_ids: I,
+) -> impl Iterator<Item = ComponentId> + use<'components, 'context, T, I>
 where
-    B: Bundle,
+    T: Soa,
+    I: IntoIterator<Item = ComponentId>,
 {
-    B::component_ids(context, components)
-        .expect("components of the bundle should be unique")
+    component_ids
         .into_iter()
-        .zip(B::field_descriptors(context))
+        .zip(T::field_descriptors(context))
         .inspect(|(id, desc)| validate_component(components, *id, desc))
         .map(|(id, _)| id)
 }
 
 #[inline]
 #[track_caller]
-fn reorder_fields<'components, 'context, B, F>(
+fn reorder_fields<'components, 'context, T, I, F>(
     components: &'components mut ComponentRegistry,
-    context: &'context B::Context,
+    context: &'context T::Context,
+    component_ids: I,
     mut fields: ErasedComponents<F>,
-) -> impl Iterator<Item = F> + use<'components, 'context, B, F>
+) -> impl Iterator<Item = F> + use<'components, 'context, T, I, F>
 where
-    B: Bundle,
+    T: Soa,
+    I: IntoIterator<Item = ComponentId>,
 {
-    B::component_ids(context, components)
-        .expect("components of the bundle should be unique")
+    #[cold]
+    #[track_caller]
+    #[inline(never)]
+    fn remove_field_fail(component_id: &ComponentId) -> ! {
+        panic!("field of component {component_id:?} should be present")
+    }
+
+    let remove_field = move |(id, _)| {
+        fields
+            .swap_remove(&id)
+            .unwrap_or_else(|| remove_field_fail(&id))
+    };
+    component_ids
         .into_iter()
-        .zip(B::field_descriptors(context))
+        .zip(T::field_descriptors(context))
         .inspect(|(id, desc)| validate_component(components, *id, desc))
-        .map(move |(id, _)| {
-            fields
-                .swap_remove(&id)
-                .unwrap_or_else(|| panic!("field of component {id:?} should be present"))
-        })
+        .map(remove_field)
 }
 
+#[inline]
 #[allow(unsafe_code)]
-#[inline]
-fn from_erased_fields<B>(
+unsafe fn from_erased_fields<T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedField>,
-) -> B
+) -> T
 where
-    B: Bundle,
+    T: Soa,
 {
-    let fields = reorder_fields::<B, _>(components, context, fields).map(ErasedField::into_parts);
+    let fields = reorder_fields::<T, _, _>(components, context, component_ids, fields)
+        .map(ErasedField::into_parts);
     let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
-    unsafe { erased_value.into::<B>(context) }.expect("all the fields should be valid")
+    unsafe { erased_value.into::<T>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]
-fn into_erased_fields<B>(
+fn into_erased_fields<T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
-    value: B,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
+    value: T,
 ) -> ErasedComponents<ErasedField>
 where
-    B: Bundle,
+    T: Soa,
 {
     let erased_value = ErasedSoa::from(context, value).into_fields();
-    validate_components::<B>(components, context)
+    validate_components::<T, _>(components, context, component_ids)
         .zip(erased_value)
         .collect()
 }
 
-#[allow(unsafe_code)]
 #[inline]
-fn from_erased_field_refs<'a, B>(
+#[allow(unsafe_code)]
+unsafe fn from_erased_field_refs<'a, T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedFieldRef<'a>>,
-) -> B::Refs<'a>
+) -> T::Refs<'a>
 where
-    B: Bundle,
+    T: Soa,
 {
-    let refs = reorder_fields::<B, _>(components, context, fields);
+    let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
     let erased_refs = ErasedSoaRefs::new(refs);
-    unsafe { erased_refs.into::<B>(context) }.expect("all the fields should be valid")
+    unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]
-fn into_erased_field_refs<'a, B>(
+fn into_erased_field_refs<'a, T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
-    refs: B::Refs<'a>,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
+    refs: T::Refs<'a>,
 ) -> ErasedComponents<ErasedFieldRef<'a>>
 where
-    B: Bundle,
+    T: Soa,
 {
-    let erased_refs = ErasedSoaRefs::from::<B>(context, refs).into_field_refs();
-    validate_components::<B>(components, context)
+    let erased_refs = ErasedSoaRefs::from::<T>(context, refs).into_field_refs();
+    validate_components::<T, _>(components, context, component_ids)
         .zip(erased_refs)
         .collect()
 }
 
-#[allow(unsafe_code)]
 #[inline]
-fn from_erased_field_refs_mut<'a, B>(
+#[allow(unsafe_code)]
+unsafe fn from_erased_field_refs_mut<'a, T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedFieldRefMut<'a>>,
-) -> B::RefsMut<'a>
+) -> T::RefsMut<'a>
 where
-    B: Bundle,
+    T: Soa,
 {
-    let refs = reorder_fields::<B, _>(components, context, fields);
+    let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
     let erased_refs = ErasedSoaRefsMut::new(refs);
-    unsafe { erased_refs.into::<B>(context) }.expect("all the fields should be valid")
+    unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]
-fn into_erased_field_refs_mut<'a, B>(
+fn into_erased_field_refs_mut<'a, T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
-    refs: B::RefsMut<'a>,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
+    refs: T::RefsMut<'a>,
 ) -> ErasedComponents<ErasedFieldRefMut<'a>>
 where
-    B: Bundle,
+    T: Soa,
 {
-    let erased_refs = ErasedSoaRefsMut::from::<B>(context, refs).into_field_refs();
-    validate_components::<B>(components, context)
+    let erased_refs = ErasedSoaRefsMut::from::<T>(context, refs).into_field_refs();
+    validate_components::<T, _>(components, context, component_ids)
         .zip(erased_refs)
         .collect()
 }
 
-#[allow(unsafe_code)]
 #[inline]
-fn from_erased_field_slices<'a, B>(
+#[allow(unsafe_code)]
+unsafe fn from_erased_field_slices<'a, T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
     fields: ErasedComponents<ErasedFieldSlice<'a>>,
-) -> B::Slices<'a>
+) -> T::Slices<'a>
 where
-    B: Bundle,
+    T: Soa,
 {
-    let slices = reorder_fields::<B, _>(components, context, fields);
+    let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
     let erased_slices = ErasedSoaSlices::new(len, slices).expect("all the fields should be valid");
-    unsafe { erased_slices.into::<B>(context) }.expect("all the fields should be valid")
+    unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]
-fn into_erased_field_slices<'a, B>(
+fn into_erased_field_slices<'a, T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
-    slices: B::Slices<'a>,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
+    slices: T::Slices<'a>,
 ) -> (usize, ErasedComponents<ErasedFieldSlice<'a>>)
 where
-    B: Bundle,
+    T: Soa,
 {
-    let erased_slices = ErasedSoaSlices::from::<B>(context, slices);
+    let erased_slices = ErasedSoaSlices::from::<T>(context, slices);
     let len = erased_slices.len();
-    let fields = validate_components::<B>(components, context)
+    let fields = validate_components::<T, _>(components, context, component_ids)
         .zip(erased_slices.into_field_slices())
         .collect();
     (len, fields)
 }
 
-#[allow(unsafe_code)]
 #[inline]
-fn from_erased_field_slices_mut<'a, B>(
+#[allow(unsafe_code)]
+unsafe fn from_erased_field_slices_mut<'a, T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
     fields: ErasedComponents<ErasedFieldSliceMut<'a>>,
-) -> B::SlicesMut<'a>
+) -> T::SlicesMut<'a>
 where
-    B: Bundle,
+    T: Soa,
 {
-    let slices = reorder_fields::<B, _>(components, context, fields);
+    let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
     let erased_slices =
         ErasedSoaSlicesMut::new(len, slices).expect("all the fields should be valid");
-    unsafe { erased_slices.into::<B>(context) }.expect("all the fields should be valid")
+    unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]
-fn into_erased_field_slices_mut<'a, B>(
+fn into_erased_field_slices_mut<'a, T>(
     components: &mut ComponentRegistry,
-    context: &B::Context,
-    slices: B::SlicesMut<'a>,
+    context: &T::Context,
+    component_ids: impl IntoIterator<Item = ComponentId>,
+    slices: T::SlicesMut<'a>,
 ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'a>>)
 where
-    B: Bundle,
+    T: Soa,
 {
-    let erased_slices = ErasedSoaSlicesMut::from::<B>(context, slices);
+    let erased_slices = ErasedSoaSlicesMut::from::<T>(context, slices);
     let len = erased_slices.len();
-    let fields = validate_components::<B>(components, context)
+    let fields = validate_components::<T, _>(components, context, component_ids)
         .zip(erased_slices.into_field_slices())
         .collect();
     (len, fields)

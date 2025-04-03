@@ -47,9 +47,11 @@ impl ArchetypeInfo {
     }
 }
 
+type ArchetypeKey = BTreeSet<ComponentId>;
+
 #[derive(Debug, Default)]
 pub struct ArchetypeRegistry {
-    archetypes: IndexMap<BTreeSet<ComponentId>, ArchetypeInfo>,
+    archetypes: IndexMap<ArchetypeKey, ArchetypeInfo>,
 }
 
 impl ArchetypeRegistry {
@@ -63,17 +65,15 @@ impl ArchetypeRegistry {
     #[inline]
     pub fn register_archetype<B>(
         &mut self,
-        context: B::Context,
         components: &mut ComponentRegistry,
+        context: &B::Context,
     ) -> Result<ArchetypeId, DuplicateComponentError>
     where
         B: Bundle,
     {
         let Self { archetypes } = self;
 
-        let component_ids = B::component_ids(&context, components)?
-            .into_iter()
-            .collect::<BTreeSet<_>>();
+        let component_ids = B::component_ids(context, components)?.into_iter().collect();
         if let Some(id) = archetypes
             .get_full(&component_ids)
             .map(|(index, _, _)| ArchetypeId(index))
@@ -88,9 +88,34 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
+    pub fn register_archetype_with_components<I>(
+        &mut self,
+        components: &ComponentRegistry,
+        component_ids: I,
+    ) -> Result<ArchetypeId, DuplicateComponentError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let Self { archetypes } = self;
+
+        let component_ids = Self::component_ids_to_key(component_ids)?;
+        if let Some(id) = archetypes
+            .get_full(&component_ids)
+            .map(|(index, _, _)| ArchetypeId(index))
+        {
+            return Ok(id);
+        }
+
+        let storage = ArchetypeStorage::new(components, component_ids.iter().copied())
+            .expect("component ids of this bundle should be unique");
+        let id = Self::register_inner(archetypes, component_ids, storage);
+        Ok(id)
+    }
+
+    #[inline]
     fn register_inner(
-        archetypes: &mut IndexMap<BTreeSet<ComponentId>, ArchetypeInfo>,
-        component_ids: BTreeSet<ComponentId>,
+        archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
+        component_ids: ArchetypeKey,
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
         let id = ArchetypeId(archetypes.len());
@@ -122,22 +147,48 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn archetype_id<B>(
+    pub fn archetype_id_from<I>(
         &self,
-        context: &B::Context,
-        components: &mut ComponentRegistry,
+        component_ids: I,
     ) -> Result<Option<ArchetypeId>, DuplicateComponentError>
     where
-        B: Bundle,
+        I: IntoIterator<Item = ComponentId>,
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = B::component_ids(context, components)?
-            .into_iter()
-            .collect::<BTreeSet<_>>();
+        let component_ids = Self::component_ids_to_key(component_ids)?;
         let id = archetypes
             .get_full(&component_ids)
             .map(|(index, _, _)| ArchetypeId(index));
         Ok(id)
+    }
+
+    #[inline]
+    pub fn archetype_id<B>(
+        &self,
+        components: &mut ComponentRegistry,
+        context: &B::Context,
+    ) -> Result<Option<ArchetypeId>, DuplicateComponentError>
+    where
+        B: Bundle,
+    {
+        let component_ids = B::component_ids(context, components)?;
+        self.archetype_id_from(component_ids)
+    }
+
+    #[inline]
+    fn component_ids_to_key<I>(component_ids: I) -> Result<ArchetypeKey, DuplicateComponentError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let mut archetype_key = BTreeSet::new();
+        for component_id in component_ids {
+            let is_unique = archetype_key.insert(component_id);
+            if is_unique {
+                continue;
+            }
+            return Err(DuplicateComponentError::new(component_id));
+        }
+        Ok(archetype_key)
     }
 }

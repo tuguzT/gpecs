@@ -10,7 +10,7 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct ExclusiveComponentError {
-    pub(super) component_id: ComponentId,
+    component_id: ComponentId,
 }
 
 impl ExclusiveComponentError {

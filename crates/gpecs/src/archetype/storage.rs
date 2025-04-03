@@ -22,9 +22,12 @@ use crate::{
     soa::traits::{FieldDescriptor, Soa},
 };
 
-use super::error::{
-    ExclusiveComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
-    IncompatibleBundleValueError, TooFewComponentsError,
+use super::{
+    error::{
+        ExclusiveComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
+        IncompatibleBundleValueError, TooFewComponentsError,
+    },
+    utils::try_collect_component_ids,
 };
 
 type ErasedStorage = EpochSparseSet<Entity, ErasedSoa>;
@@ -44,17 +47,7 @@ impl ArchetypeStorage {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids = {
-            let mut component_ids_set = IndexSet::new();
-            for component_id in component_ids {
-                let is_unique = component_ids_set.insert(component_id);
-                if is_unique {
-                    continue;
-                }
-                return Err(DuplicateComponentError::new(component_id));
-            }
-            component_ids_set
-        };
+        let component_ids = try_collect_component_ids(component_ids, IndexSet::insert)?;
 
         let descriptors = component_ids.iter().map(|&id| {
             let info = components

@@ -7,7 +7,7 @@ use crate::{
     component::registry::{ComponentId, ComponentRegistry},
 };
 
-use super::storage::ArchetypeStorage;
+use super::{storage::ArchetypeStorage, utils::try_collect_component_ids};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
@@ -74,10 +74,7 @@ impl ArchetypeRegistry {
         let Self { archetypes } = self;
 
         let component_ids = B::component_ids(context, components)?.into_iter().collect();
-        if let Some(id) = archetypes
-            .get_full(&component_ids)
-            .map(|(index, _, _)| ArchetypeId(index))
-        {
+        if let Some(id) = Self::archetype_id_from_inner(archetypes, &component_ids) {
             return Ok(id);
         }
 
@@ -98,11 +95,8 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes } = self;
 
-        let component_ids = Self::component_ids_to_key(component_ids)?;
-        if let Some(id) = archetypes
-            .get_full(&component_ids)
-            .map(|(index, _, _)| ArchetypeId(index))
-        {
+        let component_ids = try_collect_component_ids(component_ids, ArchetypeKey::insert)?;
+        if let Some(id) = Self::archetype_id_from_inner(archetypes, &component_ids) {
             return Ok(id);
         }
 
@@ -156,10 +150,8 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = Self::component_ids_to_key(component_ids)?;
-        let id = archetypes
-            .get_full(&component_ids)
-            .map(|(index, _, _)| ArchetypeId(index));
+        let component_ids = try_collect_component_ids(component_ids, ArchetypeKey::insert)?;
+        let id = Self::archetype_id_from_inner(archetypes, &component_ids);
         Ok(id)
     }
 
@@ -172,23 +164,19 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let component_ids = B::component_ids(context, components)?;
-        self.archetype_id_from(component_ids)
+        let Self { archetypes, .. } = self;
+
+        let component_ids = B::component_ids(context, components)?.into_iter().collect();
+        let id = Self::archetype_id_from_inner(archetypes, &component_ids);
+        Ok(id)
     }
 
     #[inline]
-    fn component_ids_to_key<I>(component_ids: I) -> Result<ArchetypeKey, DuplicateComponentError>
-    where
-        I: IntoIterator<Item = ComponentId>,
-    {
-        let mut archetype_key = BTreeSet::new();
-        for component_id in component_ids {
-            let is_unique = archetype_key.insert(component_id);
-            if is_unique {
-                continue;
-            }
-            return Err(DuplicateComponentError::new(component_id));
-        }
-        Ok(archetype_key)
+    fn archetype_id_from_inner(
+        archetypes: &IndexMap<ArchetypeKey, ArchetypeInfo>,
+        component_ids: &ArchetypeKey,
+    ) -> Option<ArchetypeId> {
+        let (index, _, _) = archetypes.get_full(component_ids)?;
+        Some(ArchetypeId(index))
     }
 }

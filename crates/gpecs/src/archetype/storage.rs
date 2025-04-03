@@ -120,7 +120,7 @@ impl ArchetypeStorage {
         let bundle_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique");
         let slices = unsafe {
-            from_erased_field_slices::<B>(components, context, bundle_component_ids, len, fields)
+            from_erased_slices::<B>(components, context, bundle_component_ids, len, fields)
         };
         Ok(slices)
     }
@@ -150,13 +150,7 @@ impl ArchetypeStorage {
         let bundle_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique");
         let slices = unsafe {
-            from_erased_field_slices_mut::<B>(
-                components,
-                context,
-                bundle_component_ids,
-                len,
-                fields,
-            )
+            from_erased_slices_mut::<B>(components, context, bundle_component_ids, len, fields)
         };
         Ok(slices)
     }
@@ -188,9 +182,8 @@ impl ArchetypeStorage {
         };
         let bundle_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique");
-        let refs = unsafe {
-            from_erased_field_refs::<B>(components, context, bundle_component_ids, fields)
-        };
+        let refs =
+            unsafe { from_erased_refs::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(refs))
     }
 
@@ -222,9 +215,8 @@ impl ArchetypeStorage {
         };
         let bundle_component_ids = B::component_ids(context, components)
             .expect("components of the bundle should be unique");
-        let refs = unsafe {
-            from_erased_field_refs_mut::<B>(components, context, bundle_component_ids, fields)
-        };
+        let refs =
+            unsafe { from_erased_refs_mut::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(refs))
     }
 
@@ -477,13 +469,9 @@ impl ErasedStorageExt for ErasedStorage {
         components: &mut ComponentRegistry,
         component_ids: &IndexSet<ComponentId>,
     ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>) {
-        let (context, slices) = self.as_view().into_slices_with_context();
-        into_erased_field_slices::<ErasedSoa>(
-            components,
-            context,
-            component_ids.iter().copied(),
-            slices,
-        )
+        let (context, slices) = ErasedStorage::as_view(self).into_slices_with_context();
+        let component_ids = component_ids.iter().copied();
+        into_erased_slices::<ErasedSoa>(components, context, component_ids, slices)
     }
 
     #[inline]
@@ -492,13 +480,9 @@ impl ErasedStorageExt for ErasedStorage {
         components: &mut ComponentRegistry,
         component_ids: &IndexSet<ComponentId>,
     ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'_>>) {
-        let (context, slices) = self.as_mut_view().into_slices_with_context();
-        into_erased_field_slices_mut::<ErasedSoa>(
-            components,
-            context,
-            component_ids.iter().copied(),
-            slices,
-        )
+        let (context, slices) = ErasedStorage::as_mut_view(self).into_slices_with_context();
+        let component_ids = component_ids.iter().copied();
+        into_erased_slices_mut::<ErasedSoa>(components, context, component_ids, slices)
     }
 
     #[inline]
@@ -511,20 +495,14 @@ impl ErasedStorageExt for ErasedStorage {
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>> {
         let value = unsafe {
-            from_erased_fields::<ErasedSoa>(
-                components,
-                self.context(),
-                component_ids.iter().copied(),
-                fields,
-            )
+            let component_ids = component_ids.iter().copied();
+            from_erased_fields::<ErasedSoa>(components, self.context(), component_ids, fields)
         };
         let value = ErasedStorage::insert(self, entity, value).unwrap()?;
-        let fields = into_erased_fields::<ErasedSoa>(
-            components,
-            self.context(),
-            component_ids.iter().copied(),
-            value,
-        );
+
+        let component_ids = component_ids.iter().copied();
+        let context = self.context();
+        let fields = into_erased_fields::<ErasedSoa>(components, context, component_ids, value);
         Some(fields)
     }
 
@@ -536,12 +514,10 @@ impl ErasedStorageExt for ErasedStorage {
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
         let value = ErasedStorage::remove(self, entity)?;
-        let fields = into_erased_fields::<ErasedSoa>(
-            components,
-            self.context(),
-            component_ids.iter().copied(),
-            value,
-        );
+
+        let component_ids = component_ids.iter().copied();
+        let context = self.context();
+        let fields = into_erased_fields::<ErasedSoa>(components, context, component_ids, value);
         Some(fields)
     }
 
@@ -552,13 +528,10 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
-        let (context, refs) = self.as_view().into_get_with_context(entity);
-        let refs = into_erased_field_refs::<ErasedSoa>(
-            components,
-            context,
-            component_ids.iter().copied(),
-            refs?,
-        );
+        let (context, refs) = ErasedStorage::as_view(self).into_get_with_context(entity);
+
+        let component_ids = component_ids.iter().copied();
+        let refs = into_erased_refs::<ErasedSoa>(components, context, component_ids, refs?);
         Some(refs)
     }
 
@@ -569,13 +542,10 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {
-        let (context, refs) = self.as_mut_view().into_get_mut_with_context(entity);
-        let refs = into_erased_field_refs_mut::<ErasedSoa>(
-            components,
-            context,
-            component_ids.iter().copied(),
-            refs?,
-        );
+        let (context, refs) = ErasedStorage::as_mut_view(self).into_get_mut_with_context(entity);
+
+        let component_ids = component_ids.iter().copied();
+        let refs = into_erased_refs_mut::<ErasedSoa>(components, context, component_ids, refs?);
         Some(refs)
     }
 }
@@ -683,7 +653,7 @@ where
 
 #[inline]
 #[allow(unsafe_code)]
-unsafe fn from_erased_field_refs<'a, T>(
+unsafe fn from_erased_refs<'a, T>(
     components: &mut ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
@@ -698,7 +668,7 @@ where
 }
 
 #[inline]
-fn into_erased_field_refs<'a, T>(
+fn into_erased_refs<'a, T>(
     components: &mut ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
@@ -715,7 +685,7 @@ where
 
 #[inline]
 #[allow(unsafe_code)]
-unsafe fn from_erased_field_refs_mut<'a, T>(
+unsafe fn from_erased_refs_mut<'a, T>(
     components: &mut ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
@@ -730,7 +700,7 @@ where
 }
 
 #[inline]
-fn into_erased_field_refs_mut<'a, T>(
+fn into_erased_refs_mut<'a, T>(
     components: &mut ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
@@ -747,7 +717,7 @@ where
 
 #[inline]
 #[allow(unsafe_code)]
-unsafe fn from_erased_field_slices<'a, T>(
+unsafe fn from_erased_slices<'a, T>(
     components: &mut ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
@@ -763,7 +733,7 @@ where
 }
 
 #[inline]
-fn into_erased_field_slices<'a, T>(
+fn into_erased_slices<'a, T>(
     components: &mut ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
@@ -782,7 +752,7 @@ where
 
 #[inline]
 #[allow(unsafe_code)]
-unsafe fn from_erased_field_slices_mut<'a, T>(
+unsafe fn from_erased_slices_mut<'a, T>(
     components: &mut ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
@@ -799,7 +769,7 @@ where
 }
 
 #[inline]
-fn into_erased_field_slices_mut<'a, T>(
+fn into_erased_slices_mut<'a, T>(
     components: &mut ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,

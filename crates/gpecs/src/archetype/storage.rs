@@ -12,7 +12,7 @@ use gpecs_soa_erased::{
         ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
 };
-use gpecs_sparse::set::EpochSparseSet;
+use gpecs_sparse::{error::TryReserveError, set::EpochSparseSet};
 use indexmap::{set::Iter as IndexSetIter, IndexMap, IndexSet};
 
 use crate::{
@@ -88,6 +88,116 @@ impl ArchetypeStorage {
         let Self { component_ids, .. } = self;
         let inner = component_ids.iter();
         ComponentIds { inner }
+    }
+
+    #[inline]
+    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
+        let Self { erased_storage, .. } = self;
+        erased_storage.context().field_descriptors()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { erased_storage, .. } = self;
+        erased_storage.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        let Self { erased_storage, .. } = self;
+        erased_storage.is_empty()
+    }
+
+    #[inline]
+    pub fn sparse_len(&self) -> usize {
+        let Self { erased_storage, .. } = self;
+        erased_storage.sparse_len()
+    }
+
+    #[inline]
+    pub fn sparse_is_empty(&self) -> bool {
+        let Self { erased_storage, .. } = self;
+        erased_storage.sparse_is_empty()
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { erased_storage, .. } = self;
+        erased_storage.capacity()
+    }
+
+    #[inline]
+    pub fn sparse_capacity(&self) -> usize {
+        let Self { erased_storage, .. } = self;
+        erased_storage.sparse_capacity()
+    }
+
+    #[inline]
+    pub fn reserve(&mut self, additional_dense: usize, additional_sparse: usize) {
+        let Self { erased_storage, .. } = self;
+        erased_storage.reserve(additional_dense, additional_sparse);
+    }
+
+    #[inline]
+    pub fn reserve_exact(&mut self, additional_dense: usize, additional_sparse: usize) {
+        let Self { erased_storage, .. } = self;
+        erased_storage.reserve_exact(additional_dense, additional_sparse);
+    }
+
+    #[inline]
+    pub fn try_reserve(
+        &mut self,
+        additional_dense: usize,
+        additional_sparse: usize,
+    ) -> Result<(), TryReserveError> {
+        let Self { erased_storage, .. } = self;
+        erased_storage.try_reserve(additional_dense, additional_sparse)
+    }
+
+    #[inline]
+    pub fn try_reserve_exact(
+        &mut self,
+        additional_dense: usize,
+        additional_sparse: usize,
+    ) -> Result<(), TryReserveError> {
+        let Self { erased_storage, .. } = self;
+        erased_storage.try_reserve_exact(additional_dense, additional_sparse)
+    }
+
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        let Self { erased_storage, .. } = self;
+        erased_storage.shrink_to_fit();
+    }
+
+    #[inline]
+    pub fn dense_shrink_to_fit(&mut self) {
+        let Self { erased_storage, .. } = self;
+        erased_storage.dense_shrink_to_fit();
+    }
+
+    #[inline]
+    pub fn sparse_shrink_to_fit(&mut self) {
+        let Self { erased_storage, .. } = self;
+        erased_storage.sparse_shrink_to_fit();
+    }
+
+    #[inline]
+    pub fn shrink_to(&mut self, min_capacity: usize) {
+        let Self { erased_storage, .. } = self;
+        erased_storage.shrink_to(min_capacity);
+    }
+
+    #[inline]
+    pub fn dense_shrink_to(&mut self, min_capacity: usize) {
+        let Self { erased_storage, .. } = self;
+        erased_storage.dense_shrink_to(min_capacity);
+    }
+
+    #[inline]
+    pub fn sparse_shrink_to(&mut self, min_capacity: usize) {
+        let Self { erased_storage, .. } = self;
+        erased_storage.sparse_shrink_to(min_capacity);
     }
 
     #[inline]

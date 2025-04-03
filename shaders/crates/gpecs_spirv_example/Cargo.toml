@@ -11,6 +11,7 @@ rust-version.workspace = true
 crate-type = ["dylib", "lib"]
 
 [dependencies]
+gpecs_soa = { workspace = true }
 spirv-std = { workspace = true }
 unroll = { workspace = true }
 static_assertions = { workspace = true }

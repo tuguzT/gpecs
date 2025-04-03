@@ -2,7 +2,8 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![feature(asm_experimental_arch)]
 
-use spirv_std::{arch::IndexUnchecked, glam::UVec3, spirv};
+use gpecs_soa::prelude::*;
+use spirv_std::{arch::IndexUnchecked, glam::UVec3, spirv, TypedBuffer};
 use static_assertions as sa;
 use unroll::unroll_for_loops;
 
@@ -16,10 +17,11 @@ sa::const_assert_eq!(ITER_COUNT, 8);
 #[unroll_for_loops]
 pub fn compute_shader(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] data: &mut [u32],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] data: &mut TypedBuffer<[u32]>,
 ) {
+    let data: <(_,) as Soa>::SlicesMut<'_> = (data,);
     for index in 0..8 {
-        let item = unsafe { data.index_unchecked_mut(index) };
+        let item = unsafe { data.0.index_unchecked_mut(index) };
         *item = id.x;
     }
 }

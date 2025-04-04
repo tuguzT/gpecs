@@ -33,18 +33,18 @@ fn register_archetype() {
 
     let id = archetypes
         .register_archetype::<(Position,)>(&mut components, &())
-        .expect("archetype of single component should be registered successfully");
+        .expect("archetype of only `Position` should be registered successfully");
     assert_eq!(archetypes.len(), 1);
     assert_eq!(
         archetypes
             .archetype_id::<(Position,)>(&mut components, &())
             .unwrap(),
-        Some(id)
+        Some(id),
     );
 
     let same_id = archetypes
         .register_archetype::<(Position,)>(&mut components, &())
-        .expect("archetype of single component should be registered successfully");
+        .expect("archetype of only `Position` should be registered successfully");
     assert_eq!(same_id, id);
 
     let component_ids = <(Position,)>::component_ids(&(), &mut components).unwrap();
@@ -54,23 +54,23 @@ fn register_archetype() {
     assert_eq!(same_id, id);
     assert_eq!(
         archetypes.archetype_id_from(component_ids).unwrap(),
-        Some(id)
+        Some(id),
     );
 
     let id = archetypes
         .register_archetype::<(Position, Mass)>(&mut components, &())
-        .expect("archetype of two components should be registered successfully");
+        .expect("archetype of `Position` and `Mass` should be registered successfully");
     assert_eq!(archetypes.len(), 2);
     assert_eq!(
         archetypes
             .archetype_id::<(Position, Mass)>(&mut components, &())
             .unwrap(),
-        Some(id)
+        Some(id),
     );
 
     let same_id = archetypes
         .register_archetype::<(Mass, Position)>(&mut components, &())
-        .expect("archetype of two components should be registered successfully");
+        .expect("archetype of `Position` and `Mass` should be registered successfully");
     assert_eq!(same_id, id);
 
     let component_ids = <(Mass, Position)>::component_ids(&(), &mut components).unwrap();
@@ -80,6 +80,6 @@ fn register_archetype() {
     assert_eq!(same_id, id);
     assert_eq!(
         archetypes.archetype_id_from(component_ids).unwrap(),
-        Some(id)
+        Some(id),
     );
 }

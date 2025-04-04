@@ -9,14 +9,19 @@ use gpecs::{
     world::registry::WorldRegistry,
 };
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+struct Tag;
+
+impl Component for Tag {}
+
 #[test]
-fn storage_unit() {
+fn storage_tag() {
     let mut components = ComponentRegistry::new();
-    let mut storage = ArchetypeStorage::of::<()>(&mut components, &())
+    let mut storage = ArchetypeStorage::of::<(Tag,)>(&mut components, &())
         .expect("creation of storage for empty archetype should succeed");
     assert_eq!(storage.entities(), []);
 
-    let component_ids = <()>::component_ids(&(), &mut components).unwrap();
+    let component_ids = <(Tag,)>::component_ids(&(), &mut components).unwrap();
     assert!(storage.component_ids().eq(component_ids));
 
     let storage_from_ids = ArchetypeStorage::new(&components, component_ids)
@@ -32,21 +37,21 @@ fn storage_unit() {
         .expect("should not fail because world is non-null");
 
     let value = storage
-        .insert::<()>(&mut components, &(), entity, ())
+        .insert::<(Tag,)>(&mut components, &(), entity, (Tag,))
         .expect("archetype storage should store unit");
     assert_eq!(value, None);
     assert_eq!(storage.entities(), [entity]);
 
     let refs = storage
-        .get::<()>(&mut components, &(), entity)
+        .get::<(Tag,)>(&mut components, &(), entity)
         .expect("components by given entity should exist");
-    assert_eq!(refs, Some(&()));
+    assert_eq!(refs, Some((&Tag,)));
     assert_eq!(storage.entities(), [entity]);
 
     let value = storage
-        .remove::<()>(&mut components, &(), entity)
+        .remove::<(Tag,)>(&mut components, &(), entity)
         .expect("components by given entity should exist");
-    assert_eq!(value, Some(()));
+    assert_eq!(value, Some((Tag,)));
     assert_eq!(storage.entities(), []);
 }
 
@@ -62,12 +67,8 @@ struct Mass {
     value: u16,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Tag;
-
 impl Component for Position {}
 impl Component for Mass {}
-impl Component for Tag {}
 
 #[test]
 fn storage_tuple() {

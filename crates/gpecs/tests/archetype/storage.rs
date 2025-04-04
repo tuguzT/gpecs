@@ -18,14 +18,14 @@ impl Component for Tag {}
 fn storage_tag() {
     let mut components = ComponentRegistry::new();
     let mut storage = ArchetypeStorage::of::<(Tag,)>(&mut components, &())
-        .expect("creation of storage for empty archetype should succeed");
+        .expect("creation of storage for tag archetype should succeed");
     assert_eq!(storage.entities(), []);
 
     let component_ids = <(Tag,)>::component_ids(&(), &mut components).unwrap();
     assert!(storage.component_ids().eq(component_ids));
 
     let storage_from_ids = ArchetypeStorage::new(&components, component_ids)
-        .expect("empty component should be already registered");
+        .expect("tag component should be already registered");
     assert!(storage_from_ids.component_ids().eq(storage.component_ids()));
 
     let mut worlds = WorldRegistry::new();
@@ -38,7 +38,7 @@ fn storage_tag() {
 
     let value = storage
         .insert::<(Tag,)>(&mut components, &(), entity, (Tag,))
-        .expect("archetype storage should store unit");
+        .expect("archetype storage should store tag");
     assert_eq!(value, None);
     assert_eq!(storage.entities(), [entity]);
 

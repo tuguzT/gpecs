@@ -207,6 +207,12 @@ impl ArchetypeStorage {
     }
 
     #[inline]
+    pub fn contains(&self, entity: Entity) -> bool {
+        let Self { erased_storage, .. } = self;
+        erased_storage.contains_key(entity)
+    }
+
+    #[inline]
     #[allow(unsafe_code)]
     pub fn components<B>(
         &self,

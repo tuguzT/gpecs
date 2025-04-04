@@ -1,7 +1,7 @@
 use core::{
     alloc::{Layout, LayoutError},
     any::type_name,
-    array, iter,
+    array,
     marker::PhantomData,
     ptr::{self, NonNull},
     slice,
@@ -77,17 +77,17 @@ unsafe impl Soa for () {
     type Ptrs = *const Self;
     type MutPtrs = *mut Self;
 
-    type ErasedPtrs = iter::Once<*const u8>;
-    type ErasedMutPtrs = iter::Once<*mut u8>;
+    type ErasedPtrs = [*const u8; 1];
+    type ErasedMutPtrs = [*mut u8; 1];
 
     #[inline]
     fn ptrs_erase(_: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
-        iter::once(ptrs.cast())
+        [ptrs.cast()]
     }
 
     #[inline]
     fn ptrs_erase_mut(_: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
-        iter::once(ptrs.cast())
+        [ptrs.cast()]
     }
 
     #[track_caller]

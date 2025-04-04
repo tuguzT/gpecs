@@ -157,12 +157,14 @@ fn storage_tuple() {
         .expect("insertion of `Mass` and `Position` should succeed");
     assert_eq!(value, None);
     assert_eq!(storage.entities(), [entity]);
+    assert!(storage.contains(entity));
 
     let refs = storage
         .get::<(Position,)>(&mut components, &(), entity)
         .expect("retrieval of just `Position` should succeed");
     assert_eq!(refs, Some((&position,)));
     assert_eq!(storage.entities(), [entity]);
+    assert!(storage.contains(entity));
 
     let error = storage
         .get::<(Position, Mass, ())>(&mut components, &(), entity)
@@ -177,12 +179,14 @@ fn storage_tuple() {
         .expect("retrieval of `Mass` and `Position` should succeed");
     assert_eq!(refs, Some((&mass, &position)));
     assert_eq!(storage.entities(), [entity]);
+    assert!(storage.contains(entity));
 
     let refs_mut = storage
         .get_mut::<(Position,)>(&mut components, &(), entity)
         .expect("retrieval of just `Position` should succeed");
     assert_eq!(refs_mut, Some((&mut position,)));
     assert_eq!(storage.entities(), [entity]);
+    assert!(storage.contains(entity));
 
     let error = storage
         .get_mut::<(Position, Mass, ())>(&mut components, &(), entity)
@@ -197,6 +201,7 @@ fn storage_tuple() {
         .expect("retrieval of `Mass` and `Position` should succeed");
     assert_eq!(refs_mut, Some((&mut mass, &mut position)));
     assert_eq!(storage.entities(), [entity]);
+    assert!(storage.contains(entity));
 
     let slices = storage
         .components::<(Position,)>(&mut components, &())
@@ -252,4 +257,5 @@ fn storage_tuple() {
         .expect("removal of `Mass` and `Position` should succeed");
     assert_eq!(value, Some((mass, position)));
     assert_eq!(storage.entities(), []);
+    assert!(!storage.contains(entity));
 }

@@ -11,12 +11,11 @@ where
     F: FnMut(&mut S, ComponentId) -> bool,
 {
     let mut set = S::default();
-    for component_id in component_ids {
+    component_ids.into_iter().try_for_each(|component_id| {
         let is_unique = insert_fn(&mut set, component_id);
-        if is_unique {
-            continue;
-        }
-        return Err(DuplicateComponentError::new(component_id));
-    }
+        is_unique
+            .then(Default::default)
+            .ok_or_else(|| DuplicateComponentError::new(component_id))
+    })?;
     Ok(set)
 }

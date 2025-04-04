@@ -1,10 +1,15 @@
-use std::num::NonZeroU16;
+use std::{
+    fmt::{self, Debug},
+    num::NonZeroU16,
+};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct WorldId(Option<NonZeroU16>);
 
 impl WorldId {
+    pub const NULL_NAME: &str = "WorldIdNull";
+
     #[inline]
     pub const fn null() -> Self {
         Self(None)
@@ -23,6 +28,17 @@ impl WorldId {
             Some(id) => id.get(),
             None => 0,
         }
+    }
+}
+
+impl Debug for WorldId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_null() {
+            return f.write_str(Self::NULL_NAME);
+        }
+
+        let index = &self.index();
+        f.debug_tuple("WorldId").field(index).finish()
     }
 }
 

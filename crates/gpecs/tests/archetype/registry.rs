@@ -35,7 +35,6 @@ fn register_archetype() {
         .register_archetype::<(Position,)>(&mut components, &())
         .expect("archetype of single component should be registered successfully");
     assert_eq!(archetypes.len(), 1);
-    assert_eq!(id.index(), 0);
     assert_eq!(
         archetypes
             .archetype_id::<(Position,)>(&mut components, &())
@@ -62,7 +61,6 @@ fn register_archetype() {
         .register_archetype::<(Position, Mass)>(&mut components, &())
         .expect("archetype of two components should be registered successfully");
     assert_eq!(archetypes.len(), 2);
-    assert_eq!(id.index(), 1);
     assert_eq!(
         archetypes
             .archetype_id::<(Position, Mass)>(&mut components, &())

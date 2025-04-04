@@ -11,3 +11,4 @@ rust-version.workspace = true
 gpecs_sparse = { workspace = true }
 gpecs_soa_erased = { workspace = true }
 indexmap = { workspace = true }
+petgraph = { workspace = true }

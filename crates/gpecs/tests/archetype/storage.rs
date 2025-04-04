@@ -62,8 +62,12 @@ struct Mass {
     value: u16,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+struct Tag;
+
 impl Component for Position {}
 impl Component for Mass {}
+impl Component for Tag {}
 
 #[test]
 fn storage_tuple() {
@@ -101,11 +105,11 @@ fn storage_tuple() {
     assert_eq!(slices, ([].as_slice(),));
 
     let error = storage
-        .components::<(Position, Mass, ())>(&mut components, &())
-        .expect_err("retrieval of slice of `(Position, Mass, ())` should fail");
+        .components::<(Position, Mass, Tag)>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Mass, Tag)` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let slices = storage
@@ -119,11 +123,11 @@ fn storage_tuple() {
     assert_eq!(slices, ([].as_mut_slice(),));
 
     let error = storage
-        .components_mut::<(Position, Mass, ())>(&mut components, &())
-        .expect_err("retrieval of slice of `(Position, Mass, ())` should fail");
+        .components_mut::<(Position, Mass, Tag)>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Mass, Tag)` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let slices = storage
@@ -143,13 +147,14 @@ fn storage_tuple() {
     assert_eq!(reason, TooFewComponentsError::new().into());
 
     let mut mass = Mass { value: 4 };
+    let tag = Tag;
     let IncompatibleBundleValueError { value, reason, .. } = storage
-        .insert::<(Position, Mass, ())>(&mut components, &(), entity, (position, mass, ()))
-        .expect_err("insertion of `Position`, `Mass` and `()` should fail");
-    assert_eq!(value, (position, mass, ()));
+        .insert::<(Position, Mass, Tag)>(&mut components, &(), entity, (position, mass, tag))
+        .expect_err("insertion of `Position`, `Mass` and `Tag` should fail");
+    assert_eq!(value, (position, mass, tag));
     assert_eq!(
         reason,
-        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let value = storage
@@ -167,11 +172,11 @@ fn storage_tuple() {
     assert!(storage.contains(entity));
 
     let error = storage
-        .get::<(Position, Mass, ())>(&mut components, &(), entity)
-        .expect_err("retrieval of `Position`, `Mass` and `()` should fail");
+        .get::<(Position, Mass, Tag)>(&mut components, &(), entity)
+        .expect_err("retrieval of `Position`, `Mass` and `Tag` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let refs = storage
@@ -189,11 +194,11 @@ fn storage_tuple() {
     assert!(storage.contains(entity));
 
     let error = storage
-        .get_mut::<(Position, Mass, ())>(&mut components, &(), entity)
-        .expect_err("retrieval of `Position`, `Mass` and `()` should fail");
+        .get_mut::<(Position, Mass, Tag)>(&mut components, &(), entity)
+        .expect_err("retrieval of `Position`, `Mass` and `Tag` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let refs_mut = storage
@@ -209,11 +214,11 @@ fn storage_tuple() {
     assert_eq!(slices, ([position].as_slice(),));
 
     let error = storage
-        .components::<(Position, Mass, ())>(&mut components, &())
-        .expect_err("retrieval of slice of `(Position, Mass, ())` should fail");
+        .components::<(Position, Mass, Tag)>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Mass, Tag)` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let slices = storage
@@ -227,11 +232,11 @@ fn storage_tuple() {
     assert_eq!(slices, ([position].as_mut_slice(),));
 
     let error = storage
-        .components_mut::<(Position, Mass, ())>(&mut components, &())
-        .expect_err("retrieval of slice of `(Position, Mass, ())` should fail");
+        .components_mut::<(Position, Mass, Tag)>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Mass, Tag)` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let slices = storage
@@ -245,11 +250,11 @@ fn storage_tuple() {
     assert_eq!(error, TooFewComponentsError::new().into());
 
     let error = storage
-        .remove::<(Position, Mass, ())>(&mut components, &(), entity)
-        .expect_err("removal of `Position`, `Mass` and `()` should fail");
+        .remove::<(Position, Mass, Tag)>(&mut components, &(), entity)
+        .expect_err("removal of `Position`, `Mass` and `Tag` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<()>()).into(),
+        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let value = storage

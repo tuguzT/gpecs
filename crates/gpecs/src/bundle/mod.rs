@@ -1,5 +1,8 @@
 use crate::{
-    component::registry::{ComponentId, ComponentRegistry},
+    component::{
+        registry::{ComponentId, ComponentRegistry},
+        Component,
+    },
     soa::traits::Soa,
 };
 
@@ -19,6 +22,10 @@ pub unsafe trait Bundle: Soa + 'static {
     ) -> Result<Self::ComponentIds, DuplicateComponentError>;
 }
 
+enum NullComponent {}
+
+impl Component for NullComponent {}
+
 #[allow(unsafe_code)]
 unsafe impl Bundle for () {
     type ComponentIds = [ComponentId; 1];
@@ -28,7 +35,7 @@ unsafe impl Bundle for () {
         _: &Self::Context,
         components: &mut ComponentRegistry,
     ) -> Result<Self::ComponentIds, DuplicateComponentError> {
-        let component_ids = [components.register_component::<Self>()];
+        let component_ids = [components.register_component::<NullComponent>()];
         Ok(component_ids)
     }
 }

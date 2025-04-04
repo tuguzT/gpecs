@@ -83,8 +83,9 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = B::component_ids(context, components)?.into_iter().collect();
-        if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &component_ids) {
+        let component_ids: Vec<_> = B::component_ids(context, components)?.into_iter().collect();
+        let archetype_key = component_ids.iter().copied().collect();
+        if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &archetype_key) {
             return Ok(archetype_id);
         }
 
@@ -105,8 +106,12 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = try_collect_component_ids(component_ids, ArchetypeKey::insert)?;
-        if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &component_ids) {
+        let component_ids: Vec<_> = component_ids.into_iter().collect();
+        let archetype_key = {
+            let component_ids = component_ids.iter().copied();
+            try_collect_component_ids(component_ids, ArchetypeKey::insert)?
+        };
+        if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &archetype_key) {
             return Ok(archetype_id);
         }
 
@@ -120,7 +125,7 @@ impl ArchetypeRegistry {
     fn register_range_to_inclusive(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: ArchetypeKey,
+        component_ids: Vec<ComponentId>,
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
         let Self { archetypes, graph } = self;
@@ -129,14 +134,14 @@ impl ArchetypeRegistry {
         let mut ids = Vec::with_capacity(count);
         let mut storage = Some(storage);
         for (index, &component_id) in component_ids.iter().enumerate() {
-            let component_ids = component_ids.range(..=component_id).copied().collect();
-            if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &component_ids) {
+            let component_ids: Vec<_> = component_ids[..=index].iter().copied().collect();
+            let archetype_key = component_ids.iter().copied().collect();
+            if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &archetype_key) {
                 ids.push((component_id, archetype_id));
                 continue;
             }
 
             let storage = if index < count - 1 {
-                let component_ids = component_ids.iter().copied();
                 ArchetypeStorage::new(components, component_ids)
                     .expect("component ids of this bundle should be unique")
             } else {
@@ -144,7 +149,7 @@ impl ArchetypeRegistry {
                     .take()
                     .expect("this should be the last iteration of the loop")
             };
-            let archetype_id = Self::register_inner(archetypes, graph, component_ids, storage);
+            let archetype_id = Self::register_inner(archetypes, graph, archetype_key, storage);
             ids.push((component_id, archetype_id));
         }
 
@@ -167,13 +172,13 @@ impl ArchetypeRegistry {
     fn register_inner(
         archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
         graph: &mut Graph<(), ComponentId, Directed, usize>,
-        component_ids: ArchetypeKey,
+        archetype_key: ArchetypeKey,
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
         let id = ArchetypeId(archetypes.len());
 
         let info = ArchetypeInfo { id, storage };
-        if let Some(_) = archetypes.insert(component_ids, info) {
+        if let Some(_) = archetypes.insert(archetype_key, info) {
             panic!("duplicate archetype registration")
         }
 
@@ -217,8 +222,8 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = try_collect_component_ids(component_ids, ArchetypeKey::insert)?;
-        let id = Self::archetype_id_from_inner(archetypes, &component_ids);
+        let archetype_key = try_collect_component_ids(component_ids, ArchetypeKey::insert)?;
+        let id = Self::archetype_id_from_inner(archetypes, &archetype_key);
         Ok(id)
     }
 
@@ -233,17 +238,17 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = B::component_ids(context, components)?.into_iter().collect();
-        let id = Self::archetype_id_from_inner(archetypes, &component_ids);
+        let archetype_key = B::component_ids(context, components)?.into_iter().collect();
+        let id = Self::archetype_id_from_inner(archetypes, &archetype_key);
         Ok(id)
     }
 
     #[inline]
     fn archetype_id_from_inner(
         archetypes: &IndexMap<ArchetypeKey, ArchetypeInfo>,
-        component_ids: &ArchetypeKey,
+        archetype_key: &ArchetypeKey,
     ) -> Option<ArchetypeId> {
-        let (index, _, _) = archetypes.get_full(component_ids)?;
+        let (index, _, _) = archetypes.get_full(archetype_key)?;
         Some(ArchetypeId(index))
     }
 }

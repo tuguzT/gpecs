@@ -4,6 +4,7 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use itertools::Itertools;
 use petgraph::{
     dot::{Config as DotConfig, Dot},
     graph::{EdgeReference, NodeIndex},
@@ -81,17 +82,17 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let Self { archetypes, .. } = self;
+        let Self { archetypes, graph } = self;
 
         let component_ids: Vec<_> = B::component_ids(context, components)?.into_iter().collect();
         let archetype_key = component_ids.iter().copied().collect();
-        if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &archetype_key) {
+        if let Some(archetype_id) = Self::find_archetype(archetypes, &archetype_key) {
             return Ok(archetype_id);
         }
 
         let storage = ArchetypeStorage::of::<B>(components, context)
             .expect("component ids of this bundle should be unique");
-        let archetype_id = self.register_range_to_inclusive(components, component_ids, storage);
+        let archetype_id = Self::register(archetypes, graph, components, component_ids, storage);
         Ok(archetype_id)
     }
 
@@ -104,72 +105,95 @@ impl ArchetypeRegistry {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let Self { archetypes, .. } = self;
+        let Self { archetypes, graph } = self;
 
         let component_ids: Vec<_> = component_ids.into_iter().collect();
         let archetype_key = {
             let component_ids = component_ids.iter().copied();
             try_collect_component_ids(component_ids, ArchetypeKey::insert)?
         };
-        if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &archetype_key) {
+        if let Some(archetype_id) = Self::find_archetype(archetypes, &archetype_key) {
             return Ok(archetype_id);
         }
 
         let storage = ArchetypeStorage::new(components, component_ids.iter().copied())
             .expect("component ids of this bundle should be unique");
-        let archetype_id = self.register_range_to_inclusive(components, component_ids, storage);
+        let archetype_id = Self::register(archetypes, graph, components, component_ids, storage);
         Ok(archetype_id)
     }
 
     #[inline]
-    fn register_range_to_inclusive(
-        &mut self,
+    fn register(
+        archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
+        graph: &mut Graph<(), ComponentId, Directed, usize>,
         components: &ComponentRegistry,
         component_ids: Vec<ComponentId>,
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
-        let Self { archetypes, graph } = self;
+        let archetype_key = component_ids.iter().copied().collect();
+        let (before, archetype_to) = match Self::find_archetype(archetypes, &archetype_key) {
+            Some(archetype_id) => (Default::default(), archetype_id),
+            None => (
+                Self::register_before(archetypes, graph, components, component_ids, &archetype_key),
+                Self::register_one(archetypes, graph, archetype_key, storage),
+            ),
+        };
 
-        let count = component_ids.len();
-        let mut ids = Vec::with_capacity(count);
-        let mut storage = Some(storage);
-        for (index, &component_id) in component_ids.iter().enumerate() {
-            let component_ids: Vec<_> = component_ids[..=index].iter().copied().collect();
-            let archetype_key = component_ids.iter().copied().collect();
-            if let Some(archetype_id) = Self::archetype_id_from_inner(archetypes, &archetype_key) {
-                ids.push((component_id, archetype_id));
-                continue;
-            }
-
-            let storage = if index < count - 1 {
-                ArchetypeStorage::new(components, component_ids)
-                    .expect("component ids of this bundle should be unique")
-            } else {
-                storage
-                    .take()
-                    .expect("this should be the last iteration of the loop")
-            };
-            let archetype_id = Self::register_inner(archetypes, graph, archetype_key, storage);
-            ids.push((component_id, archetype_id));
-        }
-
-        for ids in ids.windows(2) {
-            let [(_, archetype_from), (component_id, archetype_to)] = ids else {
-                unreachable!("slice of id pairs should contain two elements")
-            };
+        for (archetype_from, component_id) in before {
             let archetype_from_index = archetype_from.index().into();
             let archetype_to_index = archetype_to.index().into();
-            let _ = graph.update_edge(archetype_from_index, archetype_to_index, *component_id);
+            let _ = graph.update_edge(archetype_from_index, archetype_to_index, component_id);
         }
-
-        let (_, archetype_id) = ids
-            .pop()
-            .expect("input set of component should not be empty");
-        archetype_id
+        archetype_to
     }
 
     #[inline]
-    fn register_inner(
+    fn register_before(
+        archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
+        graph: &mut Graph<(), ComponentId, Directed, usize>,
+        components: &ComponentRegistry,
+        component_ids: Vec<ComponentId>,
+        archetype_key: &ArchetypeKey,
+    ) -> Vec<(ArchetypeId, ComponentId)> {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn difference_fail(archetype_key_outer: &ArchetypeKey, archetype_key: &ArchetypeKey) -> ! {
+            panic!("difference of {archetype_key_outer:?} from {archetype_key:?} should contain exactly one element")
+        }
+
+        let len = component_ids.len();
+        if len <= 1 {
+            return Default::default();
+        }
+
+        let archetype_key_outer = archetype_key;
+        component_ids
+            .into_iter()
+            .combinations(len - 1)
+            .map(|component_ids| {
+                let archetype_key = component_ids.iter().copied().collect();
+                let [component_id] = archetype_key_outer
+                    .difference(&archetype_key)
+                    .copied()
+                    .collect_array()
+                    .unwrap_or_else(|| difference_fail(archetype_key_outer, &archetype_key));
+                let archetype_id = match Self::find_archetype(archetypes, &archetype_key) {
+                    Some(archetype_id) => archetype_id,
+                    None => {
+                        let storage =
+                            ArchetypeStorage::new(components, component_ids.iter().copied())
+                                .expect("component ids of this bundle should be unique");
+                        Self::register(archetypes, graph, components, component_ids, storage)
+                    }
+                };
+                (archetype_id, component_id)
+            })
+            .collect()
+    }
+
+    #[inline]
+    fn register_one(
         archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
         graph: &mut Graph<(), ComponentId, Directed, usize>,
         archetype_key: ArchetypeKey,
@@ -179,14 +203,14 @@ impl ArchetypeRegistry {
 
         let info = ArchetypeInfo { id, storage };
         if let Some(_) = archetypes.insert(archetype_key, info) {
-            panic!("duplicate archetype registration")
+            unreachable!("duplicate archetype registration")
         }
 
         let index = id.index();
         let node_index = graph.add_node(()).index();
         assert_eq!(
             index, node_index,
-            "archetype index {index} should be equal to node index {node_index}",
+            "archetype index {index} must be equal to node index {node_index}",
         );
 
         id
@@ -223,7 +247,7 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
 
         let archetype_key = try_collect_component_ids(component_ids, ArchetypeKey::insert)?;
-        let id = Self::archetype_id_from_inner(archetypes, &archetype_key);
+        let id = Self::find_archetype(archetypes, &archetype_key);
         Ok(id)
     }
 
@@ -239,12 +263,12 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
 
         let archetype_key = B::component_ids(context, components)?.into_iter().collect();
-        let id = Self::archetype_id_from_inner(archetypes, &archetype_key);
+        let id = Self::find_archetype(archetypes, &archetype_key);
         Ok(id)
     }
 
     #[inline]
-    fn archetype_id_from_inner(
+    fn find_archetype(
         archetypes: &IndexMap<ArchetypeKey, ArchetypeInfo>,
         archetype_key: &ArchetypeKey,
     ) -> Option<ArchetypeId> {
@@ -265,11 +289,11 @@ impl Debug for ArchetypeRegistry {
                 .get_index(index)
                 .unwrap_or_else(|| panic!("archetype {archetype_id:?} should exist"));
             let component_ids = info.storage().component_ids();
-            format!(r#"label="{archetype_id:?}\n{component_ids:?}" shape=box"#)
+            format!(r#"shape=box label="{archetype_id:?}\n{component_ids:?}" "#)
         };
         let edge_attrs = |_, edge: EdgeReference<'_, _, _>| {
             let component_id = edge.weight();
-            format!(r#"label="{component_id:?}""#)
+            format!(r#"label="{component_id:?}" "#)
         };
         let graph = &Dot::with_attr_getters(graph, &config, &edge_attrs, &node_attrs);
 

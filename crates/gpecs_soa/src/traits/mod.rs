@@ -29,7 +29,7 @@ pub unsafe trait Soa: Sized {
     /// This is true for such implementations which store all the fields of self.
     type Fields;
 
-    /// Collection of [descriptors](FieldDescriptor) for each field.
+    /// Non-empty collection of [descriptors](FieldDescriptor) for each field.
     ///
     /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
     type FieldDescriptors<'a>: IntoIterator<Item: AsRef<FieldDescriptor>>;
@@ -37,7 +37,7 @@ pub unsafe trait Soa: Sized {
     /// Returns [field descriptors](Soa::FieldDescriptors) for each field of [`Fields`](Soa::Fields).
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_>;
 
-    /// Collection of offsets (in bytes) for each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of offsets (in bytes) for each field of [`Fields`](Soa::Fields).
     ///
     /// Each of these offsets **MUST** correspond to the offset of the field in the buffer
     /// in the order defined by [`FieldDescriptors`](Soa::FieldDescriptors).
@@ -47,7 +47,7 @@ pub unsafe trait Soa: Sized {
     type FieldOffsets<'a>: IntoIterator<Item = usize>;
 
     /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
-    /// Also returns offsets of each field in the buffer (in bytes).
+    /// Also returns non-empty collection of offsets for each field of [`Fields`](Soa::Fields) (in bytes).
     ///
     /// This layout should not include [`Context`](Soa::Context),
     /// as it is handled by the crate itself.
@@ -76,27 +76,27 @@ pub unsafe trait Soa: Sized {
         capacity
     }
 
-    /// Collection of properly typed pointers to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of properly typed pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Unlike [`ErasedPtrs`](Soa::ErasedPtrs),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type Ptrs: Clone;
 
-    /// Collection of properly typed mutable pointers to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of properly typed mutable pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Unlike [`ErasedMutPtrs`](Soa::ErasedMutPtrs),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type MutPtrs: Clone;
 
-    /// Collection of pointers to the bytes of each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of pointers to the bytes of each field of [`Fields`](Soa::Fields).
     ///
     /// Unlike [`Ptrs`](Soa::Ptrs),
     /// order of such pointers **MUST** resemble their order inside of a buffer in memory.
     type ErasedPtrs: IntoIterator<Item = *const u8>;
 
-    /// Collection of mutable pointers to the bytes of each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of mutable pointers to the bytes of each field of [`Fields`](Soa::Fields).
     ///
     /// Unlike [`MutPtrs`](Soa::MutPtrs),
     /// order of such pointers **MUST** resemble their order inside of a buffer in memory.
@@ -275,7 +275,7 @@ pub unsafe trait Soa: Sized {
         drop(value);
     }
 
-    /// Collection of properly typed non-null pointers to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of properly typed non-null pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
@@ -291,14 +291,14 @@ pub unsafe trait Soa: Sized {
     /// Acquires the underlying pointers from non-null pointers to each field of [`Fields`](Soa::Fields).
     fn nonnull_to_ptrs(context: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs;
 
-    /// Collection of properly typed references to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of properly typed references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
     type Refs<'a>
     where
         Self: 'a;
 
-    /// Collection of properly typed mutable references to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of properly typed mutable references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
     type RefsMut<'a>
@@ -334,12 +334,12 @@ pub unsafe trait Soa: Sized {
     /// to their references by explicitly converting each one of them via `&*` operator combination.
     fn mut_refs_as_refs<'a>(context: &Self::Context, refs: Self::RefsMut<'a>) -> Self::Refs<'a>;
 
-    /// Collection of slice pointers to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of slice pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
     type SlicePtrs: Clone;
 
-    /// Collection of mutable slice pointers to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of mutable slice pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
     type SliceMutPtrs: Clone;
@@ -396,14 +396,14 @@ pub unsafe trait Soa: Sized {
     fn mut_slice_ptrs_as_ptrs(context: &Self::Context, slices: Self::SliceMutPtrs)
         -> Self::MutPtrs;
 
-    /// Collection of properly typed slices of each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of properly typed slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
     type Slices<'a>
     where
         Self: 'a;
 
-    /// Collection of properly typed mutable slices of each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of properly typed mutable slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
     type SlicesMut<'a>
@@ -585,7 +585,7 @@ pub trait SoaToOwned<'a> {
 /// Extension trait which allows to convert SoA vector of [`Fields`](Soa::Fields)
 /// into vectors of each field of [`Fields`](Soa::Fields).
 pub unsafe trait SoaVecs: Soa {
-    /// Collection of properly typed vectors of each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of properly typed vectors of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such vectors **may not** resemble their order inside of a buffer in memory.
     ///

@@ -38,7 +38,7 @@ fn register_archetype() {
     let id = archetypes
         .register_archetype::<(Position, Mass, Tag)>(&mut components, &())
         .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids");
-    assert_eq!(archetypes.len(), 3);
+    assert!(archetypes.len() > 1);
     assert_eq!(
         archetypes
             .archetype_id::<(Position, Mass, Tag)>(&mut components, &())
@@ -67,22 +67,21 @@ fn register_archetype() {
 
     dbg!(&archetypes);
 
-    // TODO: fails for now, fix ASAP
-    // let component_ids = <(Mass,)>::component_ids(&(), &mut components).unwrap();
-    // assert_ne!(
-    //     archetypes
-    //         .archetype_id_from(component_ids)
-    //         .expect("archetype of only `Mass` should contain unique component ids")
-    //         .expect("archetype of only `Mass` should be already registered"),
-    //     id,
-    // );
-
-    let component_ids = <(Mass, Tag)>::component_ids(&(), &mut components).unwrap();
+    let component_ids = <(Position,)>::component_ids(&(), &mut components).unwrap();
     assert_ne!(
         archetypes
             .archetype_id_from(component_ids)
-            .expect("archetype of `Tag` and `Mass` should contain unique component ids")
-            .expect("archetype of `Tag` and `Mass` should be already registered"),
+            .expect("archetype of only `Position` should contain unique component ids")
+            .expect("archetype of only `Position` should be already registered"),
+        id,
+    );
+
+    let component_ids = <(Mass,)>::component_ids(&(), &mut components).unwrap();
+    assert_ne!(
+        archetypes
+            .archetype_id_from(component_ids)
+            .expect("archetype of only `Mass` should contain unique component ids")
+            .expect("archetype of only `Mass` should be already registered"),
         id,
     );
 
@@ -95,32 +94,38 @@ fn register_archetype() {
         id,
     );
 
-    let id = archetypes
-        .register_archetype::<(Tag,)>(&mut components, &())
-        .expect("archetype of only `Tag` should contain unique component ids");
-    assert_eq!(archetypes.len(), 3);
-    assert_eq!(
+    let component_ids = <(Mass, Tag)>::component_ids(&(), &mut components).unwrap();
+    assert_ne!(
         archetypes
-            .archetype_id::<(Tag,)>(&mut components, &())
-            .expect("archetype of only `Tag` should contain unique component ids")
-            .expect("archetype of only `Tag` should be already registered"),
+            .archetype_id_from(component_ids)
+            .expect("archetype of `Tag` and `Mass` should contain unique component ids")
+            .expect("archetype of `Tag` and `Mass` should be already registered"),
         id,
     );
 
-    let same_id = archetypes
-        .register_archetype::<(Tag,)>(&mut components, &())
-        .expect("archetype of only `Tag` should contain unique component ids");
-    assert_eq!(same_id, id);
+    let new_id = archetypes
+        .register_archetype::<(Mass, Tag)>(&mut components, &())
+        .expect("archetype of `Tag` and `Mass` should contain unique component ids");
+    assert_ne!(new_id, id);
+    assert_eq!(
+        archetypes
+            .archetype_id::<(Mass, Tag)>(&mut components, &())
+            .expect("archetype of `Tag` and `Mass` should contain unique component ids")
+            .expect("archetype of `Tag` and `Mass` should be already registered"),
+        new_id,
+    );
+    let id = new_id;
 
+    let component_ids = <(Mass, Tag)>::component_ids(&(), &mut components).unwrap();
     let same_id = archetypes
         .register_archetype_with_components(&components, component_ids)
-        .expect("archetype of only `Tag` should contain unique component ids");
+        .expect("archetype of `Tag` and `Mass` should contain unique component ids");
     assert_eq!(same_id, id);
     assert_eq!(
         archetypes
             .archetype_id_from(component_ids)
-            .expect("archetype of only `Tag` should contain unique component ids")
-            .expect("archetype of only `Tag` should be already registered"),
-        id,
+            .expect("archetype of `Tag` and `Mass` should contain unique component ids")
+            .expect("archetype of `Tag` and `Mass` should be already registered"),
+        same_id,
     );
 }

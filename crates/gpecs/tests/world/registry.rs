@@ -1,9 +1,10 @@
-use gpecs::world::registry::WorldRegistry;
+use gpecs::world::registry::{WorldId, WorldRegistry};
 
 #[test]
 fn new() {
     let worlds = WorldRegistry::new();
     assert_eq!(worlds.len(), 1);
+    assert_eq!(worlds.worlds().last(), Some(WorldId::new()));
 }
 
 #[test]
@@ -13,6 +14,7 @@ fn one_item() {
 
     assert_eq!(worlds.len(), 2);
     assert_eq!(world.index(), 1);
+    assert!(worlds.worlds().eq([WorldId::new(), world]));
 }
 
 #[test]
@@ -26,9 +28,11 @@ fn three_items() {
     assert_eq!(world1.index(), 1);
     assert_eq!(world2.index(), 2);
     assert_eq!(world3.index(), 3);
+    assert!(worlds.worlds().eq([WorldId::new(), world1, world2, world3]));
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn overflow_items() {
     let mut worlds = WorldRegistry::new();
     for idx in 0..u16::MAX - 1 {

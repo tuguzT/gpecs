@@ -3,6 +3,5 @@ pub use crate::{
     bundle::Bundle,
     component::{registry::ComponentId, Component},
     entity::Entity,
-    soa::prelude::*,
     world::registry::WorldId,
 };

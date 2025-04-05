@@ -46,9 +46,7 @@ fn one_item_reuse() {
     let entity = entities
         .spawn(world)
         .expect("should not fail because world is non-null");
-    entities
-        .despawn(entity)
-        .expect("should not fail because world is non-null");
+    entities.despawn(entity);
     let entity = entities
         .spawn(world)
         .expect("should not fail because world is non-null");
@@ -72,23 +70,18 @@ fn one_item_invalidate() {
     let entity = entities
         .spawn(world)
         .expect("should not fail because world is non-null");
-    entities
-        .despawn(entity)
-        .expect("should not fail because world is non-null");
+    entities.despawn(entity);
     let entity = entities
         .spawn(world)
         .expect("should not fail because world is non-null");
     assert_eq!(entity, Entity::new(0, 1, world));
 
-    assert_eq!(
-        entities.invalidate_epoch(Entity::new(0, 0, world)),
-        Ok(None),
-    );
+    assert_eq!(entities.invalidate_epoch(Entity::new(0, 0, world)), None);
     assert_eq!(
         entities.invalidate_epoch(entity),
-        Ok(Some(Entity::new(0, 2, world))),
+        Some(Entity::new(0, 2, world)),
     );
-    assert_eq!(entities.invalidate_epoch(entity), Ok(None));
+    assert_eq!(entities.invalidate_epoch(entity), None);
 
     assert!(!entities.contains(Entity::new(0, 0, world)));
     assert!(!entities.contains(Entity::new(0, 1, world)));

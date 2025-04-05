@@ -3,7 +3,7 @@ use gpecs::world::registry::WorldRegistry;
 #[test]
 fn new() {
     let worlds = WorldRegistry::new();
-    assert_eq!(worlds.len(), 0);
+    assert_eq!(worlds.len(), 1);
 }
 
 #[test]
@@ -11,7 +11,7 @@ fn one_item() {
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
 
-    assert_eq!(worlds.len(), 1);
+    assert_eq!(worlds.len(), 2);
     assert_eq!(world.index(), 1);
 }
 
@@ -22,7 +22,7 @@ fn three_items() {
     let world2 = worlds.spawn();
     let world3 = worlds.spawn();
 
-    assert_eq!(worlds.len(), 3);
+    assert_eq!(worlds.len(), 4);
     assert_eq!(world1.index(), 1);
     assert_eq!(world2.index(), 2);
     assert_eq!(world3.index(), 3);
@@ -31,14 +31,17 @@ fn three_items() {
 #[test]
 fn overflow_items() {
     let mut worlds = WorldRegistry::new();
-    for idx in 0..u16::MAX {
+    for idx in 0..u16::MAX - 1 {
         let world = worlds.spawn();
         assert_eq!(world.index(), idx + 1);
-        assert_eq!(worlds.len(), idx + 1);
+        assert_eq!(worlds.len(), idx + 2);
     }
+
+    let world = worlds.spawn();
+    assert_eq!(world.index(), u16::MAX);
     assert_eq!(worlds.len(), u16::MAX);
 
     let world = worlds.spawn();
     assert_eq!(worlds.len(), u16::MAX);
-    assert_eq!(world.index(), 1);
+    assert_eq!(world.index(), 0);
 }

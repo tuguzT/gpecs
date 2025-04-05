@@ -1,5 +1,5 @@
 use std::{
-    fmt::{self, Debug, Display},
+    fmt::{self, Display},
     num::Wrapping,
 };
 
@@ -9,7 +9,7 @@ use crate::world::registry::WorldId;
 
 pub mod registry;
 
-#[derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Entity {
     index: u32,
     epoch: u16,
@@ -17,17 +17,6 @@ pub struct Entity {
 }
 
 impl Entity {
-    pub const NULL_NAME: &str = "EntityNull";
-
-    #[inline]
-    pub const fn null() -> Self {
-        Self {
-            index: 0,
-            epoch: 0,
-            world: WorldId::null(),
-        }
-    }
-
     #[inline]
     pub const fn new(index: u32, epoch: u16, world: WorldId) -> Self {
         Self {
@@ -35,12 +24,6 @@ impl Entity {
             epoch,
             world,
         }
-    }
-
-    #[inline]
-    pub const fn is_null(&self) -> bool {
-        let Self { world, .. } = self;
-        world.is_null()
     }
 
     #[inline]
@@ -86,7 +69,7 @@ impl Key for Entity {
 
     fn new(sparse_index: Self::SparseIndex, epoch: Self::Epoch) -> Self {
         let Wrapping(epoch) = epoch;
-        Entity::new(sparse_index, epoch, WorldId::null())
+        Entity::new(sparse_index, epoch, WorldId::default())
     }
 
     fn sparse_index(self) -> Self::SparseIndex {
@@ -98,25 +81,6 @@ impl Key for Entity {
     }
 }
 
-impl Debug for Entity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            index,
-            epoch,
-            world,
-        } = self;
-        if world.is_null() {
-            return f.write_str(Self::NULL_NAME);
-        }
-
-        f.debug_struct("Entity")
-            .field("index", index)
-            .field("epoch", epoch)
-            .field("world", world)
-            .finish()
-    }
-}
-
 impl Display for Entity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -124,11 +88,7 @@ impl Display for Entity {
             epoch,
             world,
         } = self;
-        if world.is_null() {
-            return f.write_str(Self::NULL_NAME);
-        }
-
         let world = world.index();
-        write!(f, "Entity({index}v{epoch}w{world})")
+        write!(f, "{index}v{epoch}w{world}")
     }
 }

@@ -4,7 +4,7 @@ use gpecs::world::registry::{WorldId, WorldRegistry};
 fn new() {
     let worlds = WorldRegistry::new();
     assert_eq!(worlds.len(), 1);
-    assert_eq!(worlds.worlds().last(), Some(WorldId::new()));
+    assert_eq!(worlds.world_ids().last(), Some(WorldId::new()));
 }
 
 #[test]
@@ -14,7 +14,7 @@ fn one_item() {
 
     assert_eq!(worlds.len(), 2);
     assert_eq!(world.index(), 1);
-    assert!(worlds.worlds().eq([WorldId::new(), world]));
+    assert!(worlds.world_ids().eq([WorldId::new(), world]));
 }
 
 #[test]
@@ -28,7 +28,9 @@ fn three_items() {
     assert_eq!(world1.index(), 1);
     assert_eq!(world2.index(), 2);
     assert_eq!(world3.index(), 3);
-    assert!(worlds.worlds().eq([WorldId::new(), world1, world2, world3]));
+    assert!(worlds
+        .world_ids()
+        .eq([WorldId::new(), world1, world2, world3]));
 }
 
 #[test]

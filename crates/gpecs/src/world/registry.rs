@@ -62,7 +62,7 @@ impl WorldRegistry {
     }
 
     #[inline]
-    pub const fn worlds(&self) -> WorldIds {
+    pub const fn world_ids(&self) -> WorldIds {
         let Self { len, .. } = *self;
         WorldIds { inner: 0..len }
     }

@@ -197,7 +197,7 @@ impl ComponentRegistry {
     }
 
     #[inline]
-    pub fn components(&self) -> ComponentIds {
+    pub fn component_ids(&self) -> ComponentIds {
         let len = self.len();
         ComponentIds { inner: 0..len }
     }

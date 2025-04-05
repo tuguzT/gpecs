@@ -1,6 +1,8 @@
 use std::{
     collections::BTreeSet,
     fmt::{self, Debug},
+    iter::FusedIterator,
+    ops::Range,
 };
 
 use indexmap::IndexMap;
@@ -274,6 +276,12 @@ impl ArchetypeRegistry {
         let (index, _, _) = archetypes.get_full(archetype_key)?;
         Some(ArchetypeId(index))
     }
+
+    #[inline]
+    pub fn archetype_ids(&self) -> ArchetypeIds {
+        let len = self.len();
+        ArchetypeIds { inner: 0..len }
+    }
 }
 
 impl Debug for ArchetypeRegistry {
@@ -306,3 +314,108 @@ impl Debug for ArchetypeRegistry {
             .finish()
     }
 }
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ArchetypeIds {
+    inner: Range<usize>,
+}
+
+impl ArchetypeIds {
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        let Self { inner } = self;
+        inner.is_empty()
+    }
+}
+
+impl Debug for ArchetypeIds {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { inner } = self;
+
+        let Range { start, end } = *inner;
+        let inner = ArchetypeId(start)..ArchetypeId(end);
+        write!(f, "{inner:?}")
+    }
+}
+
+impl Iterator for ArchetypeIds {
+    type Item = ArchetypeId;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next().map(ArchetypeId)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { inner } = self;
+        inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        let Self { inner } = self;
+        inner.count()
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth(n).map(ArchetypeId)
+    }
+
+    #[inline]
+    fn last(self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.last().map(ArchetypeId)
+    }
+
+    #[inline]
+    fn min(self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.min().map(ArchetypeId)
+    }
+
+    #[inline]
+    fn max(self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.max().map(ArchetypeId)
+    }
+
+    #[inline]
+    fn is_sorted(self) -> bool {
+        let Self { inner } = self;
+        inner.is_sorted()
+    }
+}
+
+impl DoubleEndedIterator for ArchetypeIds {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next_back().map(ArchetypeId)
+    }
+
+    #[inline]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth_back(n).map(ArchetypeId)
+    }
+}
+
+impl ExactSizeIterator for ArchetypeIds {
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+}
+
+impl FusedIterator for ArchetypeIds {}

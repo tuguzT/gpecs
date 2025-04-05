@@ -27,6 +27,7 @@ impl Component for Tag {}
 fn new() {
     let archetypes = ArchetypeRegistry::new();
     assert_eq!(archetypes.len(), 0);
+    assert!(archetypes.archetype_ids().is_empty());
 }
 
 #[test]
@@ -46,6 +47,7 @@ fn register_archetype() {
             .expect("archetype of `Position`, `Mass` and `Tag` should be already registered"),
         id,
     );
+    assert!(archetypes.archetype_ids().any(|item| item == id));
 
     let same_id = archetypes
         .register_archetype::<(Mass, Tag, Position)>(&mut components, &())
@@ -114,6 +116,7 @@ fn register_archetype() {
             .expect("archetype of `Tag` and `Mass` should be already registered"),
         new_id,
     );
+    assert!(archetypes.archetype_ids().any(|item| item == new_id));
     let id = new_id;
 
     let component_ids = <(Mass, Tag)>::component_ids(&(), &mut components).unwrap();

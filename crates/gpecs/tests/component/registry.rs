@@ -28,7 +28,7 @@ impl Component for Mass {}
 fn new() {
     let components = ComponentRegistry::new();
     assert_eq!(components.len(), 0);
-    assert!(components.components().is_empty());
+    assert!(components.component_ids().is_empty());
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn register_type() {
     assert_eq!(components.len(), 1);
     assert_eq!(id.index(), 0);
     assert_eq!(components.component_id::<Position>(), Some(id));
-    assert!(components.components().eq([id]));
+    assert!(components.component_ids().eq([id]));
 
     assert_eq!(components.register_component::<Position>(), id);
 
@@ -56,7 +56,7 @@ fn register_type() {
     assert_eq!(components.len(), 2);
     assert_eq!(id.index(), 1);
     assert_eq!(components.component_id::<Mass>(), Some(id));
-    assert!(components.components().any(|item| item == id));
+    assert!(components.component_ids().any(|item| item == id));
 
     let info = components
         .get_info(id)
@@ -77,7 +77,7 @@ fn register_with_descriptor() {
     let id = components.register_component_with_descriptor(descriptor);
     assert_eq!(components.len(), 2);
     assert_eq!(id.index(), 1);
-    assert!(components.components().any(|item| item == id));
+    assert!(components.component_ids().any(|item| item == id));
 
     let info = components
         .get_info(id)

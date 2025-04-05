@@ -6,9 +6,8 @@ use std::{
 use indexmap::IndexMap;
 use itertools::Itertools;
 use petgraph::{
-    dot::{Config as DotConfig, Dot},
-    graph::{EdgeReference, NodeIndex},
-    Directed, Graph,
+    dot::{Config as DotConfig, Dot, RankDir},
+    graph::{DiGraph, EdgeReference, NodeIndex},
 };
 
 use crate::{
@@ -61,7 +60,7 @@ type ArchetypeKey = BTreeSet<ComponentId>;
 #[derive(Default)]
 pub struct ArchetypeRegistry {
     archetypes: IndexMap<ArchetypeKey, ArchetypeInfo>,
-    graph: Graph<(), ComponentId, Directed, usize>,
+    graph: DiGraph<(), ComponentId, usize>,
 }
 
 impl ArchetypeRegistry {
@@ -69,7 +68,7 @@ impl ArchetypeRegistry {
     pub fn new() -> Self {
         Self {
             archetypes: IndexMap::new(),
-            graph: Graph::default(),
+            graph: DiGraph::default(),
         }
     }
 
@@ -125,7 +124,7 @@ impl ArchetypeRegistry {
     #[inline]
     fn register(
         archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
-        graph: &mut Graph<(), ComponentId, Directed, usize>,
+        graph: &mut DiGraph<(), ComponentId, usize>,
         components: &ComponentRegistry,
         component_ids: Vec<ComponentId>,
         storage: ArchetypeStorage,
@@ -150,7 +149,7 @@ impl ArchetypeRegistry {
     #[inline]
     fn register_before(
         archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
-        graph: &mut Graph<(), ComponentId, Directed, usize>,
+        graph: &mut DiGraph<(), ComponentId, usize>,
         components: &ComponentRegistry,
         component_ids: Vec<ComponentId>,
         archetype_key: &ArchetypeKey,
@@ -195,7 +194,7 @@ impl ArchetypeRegistry {
     #[inline]
     fn register_one(
         archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
-        graph: &mut Graph<(), ComponentId, Directed, usize>,
+        graph: &mut DiGraph<(), ComponentId, usize>,
         archetype_key: ArchetypeKey,
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
@@ -281,7 +280,11 @@ impl Debug for ArchetypeRegistry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { archetypes, graph } = self;
 
-        let config = [DotConfig::NodeNoLabel, DotConfig::EdgeNoLabel];
+        let config = [
+            DotConfig::NodeNoLabel,
+            DotConfig::EdgeNoLabel,
+            DotConfig::RankDir(RankDir::LR),
+        ];
         let node_attrs = |_, (index, _): (NodeIndex<_>, _)| {
             let index = index.index();
             let archetype_id = ArchetypeId(index);

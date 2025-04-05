@@ -14,7 +14,7 @@ gpecs_soa = { path = "crates/gpecs_soa" }
 gpecs_sparse = { path = "crates/gpecs_sparse" }
 gpecs_soa_erased = { path = "crates/gpecs_soa_erased" }
 indexmap = { version = "2.9" }
-petgraph = { version = "0.7" }
+petgraph = { version = "0.8" }
 itertools = { version = "0.14" }
 rspirv = { git = "https://github.com/gfx-rs/rspirv", rev = "267882d4" }
 criterion = { version = "0.5", features = ["html_reports"] }

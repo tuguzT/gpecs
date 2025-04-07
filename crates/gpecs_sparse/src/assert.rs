@@ -18,6 +18,7 @@ where
 
 #[inline]
 #[track_caller]
+#[allow(dead_code)]
 pub fn unwrap_sparse_item_mut<K>(
     sparse: &mut [SparseItem<K>],
     sparse_index: usize,
@@ -59,12 +60,14 @@ pub fn unwrap_dense_index_mut<I>(kind: &mut SparseItemKind<I>) -> &mut I {
 #[cold]
 #[track_caller]
 #[inline(never)]
+#[allow(dead_code)]
 const fn unwrap_next_vacant_failed() -> ! {
     panic!("current sparse item should be vacant")
 }
 
 #[inline]
 #[track_caller]
+#[allow(dead_code)]
 pub const fn unwrap_next_vacant<I>(kind: &SparseItemKind<I>) -> &I {
     let Some(next_vacant) = kind.next_vacant() else {
         unwrap_next_vacant_failed()
@@ -74,6 +77,7 @@ pub const fn unwrap_next_vacant<I>(kind: &SparseItemKind<I>) -> &I {
 
 #[inline]
 #[track_caller]
+#[allow(dead_code)]
 pub const fn unwrap_next_vacant_mut<I>(kind: &mut SparseItemKind<I>) -> &mut I {
     let Some(next_vacant) = kind.next_vacant_mut() else {
         unwrap_next_vacant_failed()
@@ -213,6 +217,7 @@ const fn check_key_bounds_failed() -> ! {
 
 #[inline]
 #[track_caller]
+#[allow(dead_code)]
 pub const fn check_key_bounds(key: usize, sparse_len: usize) {
     if key < sparse_len {
         return;

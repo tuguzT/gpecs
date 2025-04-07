@@ -9,7 +9,11 @@ use crate::{
     error::InvalidKeyError,
     key::Key,
     set::EpochSparseSet,
-    soa::{mem::replace as soa_replace, traits::Soa},
+    soa::{
+        mem::replace as soa_replace,
+        slice::{SoaSlices, SoaSlicesMut},
+        traits::Soa,
+    },
 };
 
 pub struct OccupiedEntry<'a, K, V, C>
@@ -326,7 +330,7 @@ macro_rules! generate_entry_types {
         pub enum Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: gpecs_soa::traits::Soa,
+            V: $crate::soa::traits::Soa,
         {
             Occupied(OccupiedEntry<'a, K, V>),
             Vacant(VacantEntry<'a, K, V>),
@@ -335,7 +339,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: gpecs_soa::traits::Soa,
+            V: $crate::soa::traits::Soa,
         {
             #[inline]
             pub const fn is_occupied(&self) -> bool {
@@ -444,7 +448,7 @@ macro_rules! generate_entry_types {
         impl<K, V> core::fmt::Debug for Entry<'_, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: gpecs_soa::traits::Soa + core::fmt::Debug,
+            V: $crate::soa::traits::Soa + core::fmt::Debug,
             for<'a> V::Refs<'a>: Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -459,19 +463,19 @@ macro_rules! generate_entry_types {
         pub struct OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: gpecs_soa::traits::Soa,
+            V: $crate::soa::traits::Soa,
         {
-            inner: $crate::entry::OccupiedEntry<'a, K, V, $container>,
+            inner: $crate::alloc::entry::OccupiedEntry<'a, K, V, $container>,
         }
 
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: gpecs_soa::traits::Soa,
+            V: $crate::soa::traits::Soa,
         {
             #[inline]
             fn new(key: K, dense_index: usize, container: &'a mut $container) -> Self {
-                let inner = $crate::entry::OccupiedEntry::new(key, dense_index, container);
+                let inner = $crate::alloc::entry::OccupiedEntry::new(key, dense_index, container);
                 Self { inner }
             }
 
@@ -527,7 +531,7 @@ macro_rules! generate_entry_types {
         impl<K, V> core::fmt::Debug for OccupiedEntry<'_, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: gpecs_soa::traits::Soa + core::fmt::Debug,
+            V: $crate::soa::traits::Soa + core::fmt::Debug,
             for<'a> V::Refs<'a>: core::fmt::Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -540,19 +544,19 @@ macro_rules! generate_entry_types {
         pub struct VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: gpecs_soa::traits::Soa,
+            V: $crate::soa::traits::Soa,
         {
-            inner: $crate::entry::VacantEntry<'a, K, V, $container>,
+            inner: $crate::alloc::entry::VacantEntry<'a, K, V, $container>,
         }
 
         impl<'a, K, V> VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: gpecs_soa::traits::Soa,
+            V: $crate::soa::traits::Soa,
         {
             #[inline]
             fn new(key: K, container: &'a mut $container) -> Self {
-                let inner = $crate::entry::VacantEntry::new(key, container);
+                let inner = $crate::alloc::entry::VacantEntry::new(key, container);
                 Self { inner }
             }
 
@@ -584,7 +588,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> core::fmt::Debug for VacantEntry<'a, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: gpecs_soa::traits::Soa,
+            V: $crate::soa::traits::Soa,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;
@@ -595,4 +599,3 @@ macro_rules! generate_entry_types {
 }
 
 pub(crate) use generate_entry_types;
-use gpecs_soa::slice::{SoaSlices, SoaSlicesMut};

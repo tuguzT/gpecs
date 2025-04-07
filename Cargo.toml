@@ -10,8 +10,8 @@ edition = "2021"
 rust-version = "1.84.0"
 
 [workspace.dependencies]
-gpecs_soa = { path = "crates/gpecs_soa" }
-gpecs_sparse = { path = "crates/gpecs_sparse" }
+gpecs_soa = { path = "crates/gpecs_soa", default-features = false }
+gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
 gpecs_soa_erased = { path = "crates/gpecs_soa_erased" }
 indexmap = { version = "2.9" }
 petgraph = { version = "0.8" }

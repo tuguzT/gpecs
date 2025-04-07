@@ -1,8 +1,11 @@
+#[cfg(feature = "alloc")]
 pub use crate::{
     arena::{EpochSparseArena, SparseArena},
+    set::{EpochSparseSet, SparseSet},
+};
+pub use crate::{
     item::{SparseItem, SparseItemKind},
     key::{Epoch, EpochKey, Key},
-    set::{EpochSparseSet, SparseSet},
     soa::prelude::*,
     view::{EpochSparseView, EpochSparseViewMut, SparseView, SparseViewMut},
 };

@@ -9,3 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_soa = { workspace = true }
+
+[features]
+default = ["alloc"]
+alloc = ["gpecs_soa/alloc"]

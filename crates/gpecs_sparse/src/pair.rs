@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::{
     alloc::{Layout, LayoutError},
     cmp,
@@ -9,8 +8,12 @@ use core::{
     ptr::{self, NonNull},
     slice,
 };
-use gpecs_soa::traits::SoaVecs;
 
+#[cfg(feature = "alloc")]
+use core_alloc::vec::Vec;
+
+#[cfg(feature = "alloc")]
+use crate::soa::traits::SoaVecs;
 use crate::soa::traits::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -616,6 +619,7 @@ where
 }
 
 #[allow(unsafe_code)]
+#[cfg(feature = "alloc")]
 unsafe impl<K, V> SoaVecs for KeyValuePair<K, V>
 where
     V: SoaVecs,
@@ -1269,6 +1273,7 @@ where
 {
 }
 
+#[cfg(feature = "alloc")]
 pub struct KeyValueVecs<K, V>
 where
     V: SoaVecs,
@@ -1277,6 +1282,7 @@ where
     pub values: V::Vecs,
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> From<(Vec<K>, V::Vecs)> for KeyValueVecs<K, V>
 where
     V: SoaVecs,
@@ -1288,6 +1294,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> From<KeyValueVecs<K, V>> for (Vec<K>, V::Vecs)
 where
     V: SoaVecs,
@@ -1299,6 +1306,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> Debug for KeyValueVecs<K, V>
 where
     K: Debug,
@@ -1313,6 +1321,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> Default for KeyValueVecs<K, V>
 where
     V: SoaVecs,
@@ -1327,6 +1336,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> PartialEq for KeyValueVecs<K, V>
 where
     K: PartialEq,
@@ -1338,6 +1348,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> Eq for KeyValueVecs<K, V>
 where
     K: Eq,
@@ -1346,6 +1357,7 @@ where
 {
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> PartialOrd for KeyValueVecs<K, V>
 where
     K: PartialOrd,
@@ -1361,6 +1373,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> Ord for KeyValueVecs<K, V>
 where
     K: Ord,
@@ -1376,6 +1389,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> Hash for KeyValueVecs<K, V>
 where
     K: Hash,
@@ -1388,6 +1402,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> Clone for KeyValueVecs<K, V>
 where
     K: Clone,

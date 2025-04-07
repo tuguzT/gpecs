@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use core::{mem::forget, ops::Not};
 
 use gpecs_sparse::{prelude::*, soa::identity::Identity};

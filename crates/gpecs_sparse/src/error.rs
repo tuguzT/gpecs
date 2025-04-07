@@ -1,59 +1,12 @@
-use alloc::collections::TryReserveError as AllocTryReserveError;
 use core::{
     error::Error,
     fmt::{self, Debug, Display},
 };
 
-use crate::{key::Key, soa::vec::TryReserveError as SoaTryReserveError};
+#[cfg(feature = "alloc")]
+pub use crate::alloc::error::{TryInvalidKeyError, TryReserveError};
 
-#[derive(Clone, PartialEq, Eq)]
-pub enum TryReserveError {
-    Sparse(AllocTryReserveError),
-    Dense(SoaTryReserveError),
-}
-
-impl From<AllocTryReserveError> for TryReserveError {
-    fn from(value: AllocTryReserveError) -> Self {
-        Self::Sparse(value)
-    }
-}
-
-impl From<SoaTryReserveError> for TryReserveError {
-    fn from(value: SoaTryReserveError) -> Self {
-        Self::Dense(value)
-    }
-}
-
-impl Debug for TryReserveError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        match self {
-            Self::Sparse(error) => f.debug_tuple("Sparse").field(error).finish(),
-            Self::Dense(error) => f.debug_tuple("Dense").field(error).finish(),
-        }
-    }
-}
-
-impl Display for TryReserveError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Sparse(e) => write!(f, "sparse: {}", e),
-            Self::Dense(e) => write!(f, "dense: {}", e),
-        }
-    }
-}
-
-impl Error for TryReserveError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Sparse(e) => Some(e),
-            Self::Dense(e) => Some(e),
-        }
-    }
-}
+use crate::key::Key;
 
 pub struct TooLargeSparseIndexError<K>
 where
@@ -761,95 +714,5 @@ where
 {
     fn from(value: TooSmallSparseIndexError<K>) -> Self {
         Self::TooSmallSparseIndex(value)
-    }
-}
-
-pub enum TryInvalidKeyError<K>
-where
-    K: Key,
-{
-    TooLargeSparseIndex(TooLargeSparseIndexError<K>),
-    TooSmallSparseIndex(TooSmallSparseIndexError<K>),
-    TryReserve(TryReserveError),
-}
-
-impl<K> Debug for TryInvalidKeyError<K>
-where
-    K: Key,
-    TooLargeSparseIndexError<K>: Debug,
-    TooSmallSparseIndexError<K>: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TooLargeSparseIndex(error) => {
-                f.debug_tuple("TooLargeSparseIndex").field(error).finish()
-            }
-            Self::TooSmallSparseIndex(error) => {
-                f.debug_tuple("TooSmallSparseIndex").field(error).finish()
-            }
-            Self::TryReserve(error) => f.debug_tuple("TryReserve").field(error).finish(),
-        }
-    }
-}
-
-impl<K> Display for TryInvalidKeyError<K>
-where
-    K: Key,
-    TooLargeSparseIndexError<K>: Display,
-    TooSmallSparseIndexError<K>: Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TooLargeSparseIndex(error) => Display::fmt(error, f),
-            Self::TooSmallSparseIndex(error) => Display::fmt(error, f),
-            Self::TryReserve(error) => Display::fmt(error, f),
-        }
-    }
-}
-
-impl<K> Error for TryInvalidKeyError<K>
-where
-    K: Key,
-    TooLargeSparseIndexError<K>: Error,
-    TooSmallSparseIndexError<K>: Error,
-{
-}
-
-impl<K> From<TooLargeSparseIndexError<K>> for TryInvalidKeyError<K>
-where
-    K: Key,
-{
-    fn from(value: TooLargeSparseIndexError<K>) -> Self {
-        Self::TooLargeSparseIndex(value)
-    }
-}
-
-impl<K> From<TooSmallSparseIndexError<K>> for TryInvalidKeyError<K>
-where
-    K: Key,
-{
-    fn from(value: TooSmallSparseIndexError<K>) -> Self {
-        Self::TooSmallSparseIndex(value)
-    }
-}
-
-impl<K> From<TryReserveError> for TryInvalidKeyError<K>
-where
-    K: Key,
-{
-    fn from(value: TryReserveError) -> Self {
-        Self::TryReserve(value)
-    }
-}
-
-impl<K> From<InvalidKeyError<K>> for TryInvalidKeyError<K>
-where
-    K: Key,
-{
-    fn from(value: InvalidKeyError<K>) -> Self {
-        match value {
-            InvalidKeyError::TooLargeSparseIndex(error) => Self::TooLargeSparseIndex(error),
-            InvalidKeyError::TooSmallSparseIndex(error) => Self::TooSmallSparseIndex(error),
-        }
     }
 }

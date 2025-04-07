@@ -803,78 +803,6 @@ where
     }
 
     #[inline]
-    pub fn sort(&mut self)
-    where
-        for<'any> V::Refs<'any>: Ord,
-    {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_by_cached_key(|&key| {
-                let sparse_index = key.sparse_index();
-                unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse)
-            })
-        });
-    }
-
-    #[inline]
-    pub fn sort_keys(&mut self) {
-        self.sort_impl(|keys, _, _| keys.sort());
-    }
-
-    #[inline]
-    pub fn sort_by<F>(&mut self, mut f: F)
-    where
-        F: FnMut((K, V::Refs<'_>), (K, V::Refs<'_>)) -> cmp::Ordering,
-    {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_by(|&lhs_key, &rhs_key| {
-                let lhs_index = lhs_key.sparse_index();
-                let lhs_value =
-                    unwrap_dense_from_sparse_index::<K, _>(lhs_index, values.clone(), sparse);
-                let lhs = (lhs_key, lhs_value);
-
-                let rhs_index = rhs_key.sparse_index();
-                let rhs_value =
-                    unwrap_dense_from_sparse_index::<K, _>(rhs_index, values.clone(), sparse);
-                let rhs = (rhs_key, rhs_value);
-
-                f(lhs, rhs)
-            })
-        });
-    }
-
-    #[inline]
-    pub fn sort_by_key<T, F>(&mut self, mut f: F)
-    where
-        F: FnMut((K, V::Refs<'_>)) -> T,
-        T: Ord,
-    {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_by_key(|&key| {
-                let sparse_index = key.sparse_index();
-                let value =
-                    unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse);
-                f((key, value))
-            })
-        });
-    }
-
-    #[inline]
-    pub fn sort_by_cached_key<T, F>(&mut self, mut f: F)
-    where
-        F: FnMut((K, V::Refs<'_>)) -> T,
-        T: Ord,
-    {
-        self.sort_impl(|keys, values, sparse| {
-            keys.sort_by_cached_key(|&key| {
-                let sparse_index = key.sparse_index();
-                let value =
-                    unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse);
-                f((key, value))
-            })
-        });
-    }
-
-    #[inline]
     pub fn sort_unstable(&mut self)
     where
         for<'any> V::Refs<'any>: Ord,
@@ -933,7 +861,7 @@ where
     // Implementation was borrowed from the links below:
     // https://skypjack.github.io/2019-09-25-ecs-baf-part-5/#:~:text=Mixing%20in%2Dplace%20sorting%20and%20permutations
     // https://github.com/skypjack/entt/blob/8b0ef2b94234def2053c9a8a2591f4a5e87cf0ea/src/entt/entity/sparse_set.hpp#L964
-    fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
+    pub(crate) fn sort_impl<SortKeys>(&mut self, sort_keys: SortKeys)
     where
         SortKeys: FnOnce(&mut [K], SoaIter<V>, &[SparseItem<K>]),
     {

@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::{
     cmp,
     fmt::{self, Debug},
@@ -6,13 +5,14 @@ use core::{
     ops::{Index, IndexMut},
 };
 
+use core_alloc::vec::Vec;
+
 use crate::{
     assert::{
         check_dense_index_bounds, check_equal_key, check_key_bounds, unwrap_dense,
         unwrap_dense_index_mut, unwrap_into_index, unwrap_into_usize, unwrap_next_vacant,
         unwrap_next_vacant_mut, unwrap_sparse_item, unwrap_sparse_item_mut,
     },
-    entry::generate_entry_types,
     error::{
         FromPartsError, InvalidKeyError, TooLargeSparseIndexError, TooSmallSparseIndexError,
         TryInvalidKeyError, TryReserveError,
@@ -33,6 +33,8 @@ use crate::{
     },
     view::{EpochSparseView, EpochSparseViewMut},
 };
+
+use super::entry::generate_entry_types;
 
 pub type SparseArena<T> = EpochSparseArena<usize, T>;
 

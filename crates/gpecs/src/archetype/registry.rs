@@ -238,6 +238,14 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
+    pub fn get_info_mut(&mut self, id: ArchetypeId) -> Option<&mut ArchetypeInfo> {
+        let Self { archetypes, .. } = self;
+
+        let index = id.index();
+        archetypes.get_index_mut(index).map(|(_, info)| info)
+    }
+
+    #[inline]
     pub fn archetype_id_from<I>(
         &self,
         component_ids: I,

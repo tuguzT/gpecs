@@ -2,6 +2,7 @@ use gpecs::{
     archetype::registry::ArchetypeRegistry,
     bundle::Bundle,
     component::{registry::ComponentRegistry, Component},
+    entity::registry::EntityRegistry,
 };
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -131,4 +132,76 @@ fn register_archetype() {
             .expect("archetype of `Tag` and `Mass` should be already registered"),
         same_id,
     );
+}
+
+#[test]
+fn exchange_components() {
+    let mut entities = EntityRegistry::new();
+    let mut components = ComponentRegistry::new();
+    let mut archetypes = ArchetypeRegistry::new();
+
+    let archetype = archetypes
+        .register_archetype::<(Position, Mass, Tag)>(&mut components, &())
+        .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids");
+    let archetype_subset = archetypes
+        .register_archetype::<(Position, Mass)>(&mut components, &())
+        .expect("archetype of `Position` and `Mass` should contain unique component ids");
+
+    let entity = entities
+        .spawn(Default::default())
+        .expect("entity should be created successfully");
+
+    let position = Position {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+    };
+    let mass = Mass { value: 42 };
+    let tag = Tag;
+    let value = (position, mass, tag);
+
+    let storage = archetypes
+        .get_info_mut(archetype)
+        .expect("archetype should exist")
+        .storage_mut();
+    assert!(!storage.contains(entity));
+
+    let prev_value = storage
+        .insert(&mut components, &(), entity, value)
+        .expect("bundle should be compatible");
+    assert_eq!(prev_value, None);
+    assert!(storage.contains(entity));
+
+    let (position, mass, tag) = storage
+        .remove::<(Position, Mass, Tag)>(&mut components, &(), entity)
+        .expect("bundle should be compatible")
+        .expect("components by entity should exist");
+    assert_eq!(position.x, 1.0);
+    assert_eq!(position.y, 2.0);
+    assert_eq!(position.z, 3.0);
+    assert_eq!(mass, Mass { value: 42 });
+    assert_eq!(tag, Tag);
+    assert!(!storage.contains(entity));
+
+    let storage = archetypes
+        .get_info_mut(archetype_subset)
+        .expect("archetype should exist")
+        .storage_mut();
+    assert!(!storage.contains(entity));
+
+    let prev_value = storage
+        .insert(&mut components, &(), entity, (position, mass))
+        .expect("bundle should be compatible");
+    assert_eq!(prev_value, None);
+    assert!(storage.contains(entity));
+
+    let (position, mass) = storage
+        .remove::<(Position, Mass)>(&mut components, &(), entity)
+        .expect("bundle should be compatible")
+        .expect("components by entity should exist");
+    assert_eq!(position.x, 1.0);
+    assert_eq!(position.y, 2.0);
+    assert_eq!(position.z, 3.0);
+    assert_eq!(mass, Mass { value: 42 });
+    assert!(!storage.contains(entity));
 }

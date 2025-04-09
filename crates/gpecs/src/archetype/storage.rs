@@ -431,6 +431,37 @@ impl ArchetypeStorage {
             unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))
     }
+
+    #[inline]
+    #[track_caller]
+    pub(super) fn insert_erased(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        fields: ErasedComponents<ErasedField>,
+    ) -> Option<ErasedComponents<ErasedField>> {
+        let Self {
+            ref component_ids,
+            erased_storage,
+        } = self;
+
+        ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub(super) fn remove_erased(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+    ) -> Option<ErasedComponents<ErasedField>> {
+        let Self {
+            ref component_ids,
+            erased_storage,
+        } = self;
+
+        ErasedStorageExt::remove(erased_storage, components, component_ids, entity)
+    }
 }
 
 impl Debug for ArchetypeStorage {

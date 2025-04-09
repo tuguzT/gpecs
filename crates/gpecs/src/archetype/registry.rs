@@ -1,10 +1,11 @@
 use std::{
     collections::BTreeSet,
     fmt::{self, Debug},
-    iter::FusedIterator,
+    iter::{self, FusedIterator},
     ops::Range,
 };
 
+use gpecs_soa_erased::field::ErasedField;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use petgraph::{
@@ -14,7 +15,11 @@ use petgraph::{
 
 use crate::{
     bundle::{error::DuplicateComponentError, Bundle},
-    component::registry::{ComponentId, ComponentRegistry},
+    component::{
+        registry::{ComponentId, ComponentRegistry},
+        Component,
+    },
+    entity::Entity,
 };
 
 use super::{storage::ArchetypeStorage, utils::try_collect_component_ids};
@@ -289,6 +294,58 @@ impl ArchetypeRegistry {
     pub fn archetype_ids(&self) -> ArchetypeIds {
         let len = self.len();
         ArchetypeIds { inner: 0..len }
+    }
+
+    #[inline]
+    pub fn insert_component<C>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        component: C,
+    ) where
+        C: Component,
+    {
+        let component_id = components.register_component::<C>();
+        let mut info_with_fields = self
+            .archetypes
+            .iter_mut()
+            .find_map(|(archetype_key, info)| {
+                if archetype_key.contains(&component_id) {
+                    return None;
+                }
+                let Some(fields) = info.storage_mut().remove_erased(components, entity) else {
+                    return None;
+                };
+                Some((info, fields))
+            });
+
+        let component_ids: Vec<_> = match &mut info_with_fields {
+            Some((info, _)) => info
+                .storage()
+                .component_ids()
+                .chain(iter::once(component_id))
+                .collect(),
+            None => iter::once(component_id).collect(),
+        };
+
+        let mut fields = match info_with_fields {
+            Some((_, fields)) => fields,
+            None => Default::default(),
+        };
+        let field = ErasedField::from::<C>(component);
+        if let Some(_) = fields.insert(component_id, field) {
+            unreachable!("duplicate component id {component_id:?}");
+        }
+
+        let archetype_id = self
+            .register_archetype_with_components(components, component_ids)
+            .expect("components of this bundle should be unique");
+
+        let (_, info) = self
+            .archetypes
+            .get_index_mut(archetype_id.index())
+            .expect("archetype should exist");
+        info.storage_mut().insert_erased(components, entity, fields);
     }
 }
 

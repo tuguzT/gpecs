@@ -32,7 +32,7 @@ use super::{
     utils::try_collect_component_ids,
 };
 
-type ErasedStorage = EpochSparseSet<u32, ErasedSoa>;
+type ErasedStorage = EpochSparseSet<Entity, ErasedSoa>;
 
 pub struct ArchetypeStorage {
     component_ids: IndexSet<ComponentId>,
@@ -203,9 +203,15 @@ impl ArchetypeStorage {
     }
 
     #[inline]
+    pub fn entities(&self) -> &[Entity] {
+        let Self { erased_storage, .. } = self;
+        ErasedStorageExt::entities(erased_storage)
+    }
+
+    #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { erased_storage, .. } = self;
-        erased_storage.contains_key(entity.index())
+        erased_storage.contains_key(entity)
     }
 
     #[inline]
@@ -554,6 +560,8 @@ impl ExactSizeIterator for ComponentIds<'_> {
 impl FusedIterator for ComponentIds<'_> {}
 
 trait ErasedStorageExt {
+    fn entities(&self) -> &[Entity];
+
     fn components(
         &self,
         components: &mut ComponentRegistry,
@@ -598,6 +606,11 @@ trait ErasedStorageExt {
 
 impl ErasedStorageExt for ErasedStorage {
     #[inline]
+    fn entities(&self) -> &[Entity] {
+        self.as_keys_slice()
+    }
+
+    #[inline]
     fn components(
         &self,
         components: &mut ComponentRegistry,
@@ -632,7 +645,7 @@ impl ErasedStorageExt for ErasedStorage {
             let component_ids = component_ids.iter().copied();
             from_erased_fields::<ErasedSoa>(components, self.context(), component_ids, fields)
         };
-        let value = ErasedStorage::insert(self, entity.index(), value).unwrap()?;
+        let value = ErasedStorage::insert(self, entity, value).unwrap()?;
 
         let component_ids = component_ids.iter().copied();
         let context = self.context();
@@ -647,7 +660,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
-        let value = ErasedStorage::remove(self, entity.index())?;
+        let value = ErasedStorage::remove(self, entity)?;
 
         let component_ids = component_ids.iter().copied();
         let context = self.context();
@@ -662,7 +675,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
-        let (context, refs) = ErasedStorage::as_view(self).into_get_with_context(entity.index());
+        let (context, refs) = ErasedStorage::as_view(self).into_get_with_context(entity);
 
         let component_ids = component_ids.iter().copied();
         let refs = into_erased_refs::<ErasedSoa>(components, context, component_ids, refs?);
@@ -676,8 +689,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {
-        let (context, refs) =
-            ErasedStorage::as_mut_view(self).into_get_mut_with_context(entity.index());
+        let (context, refs) = ErasedStorage::as_mut_view(self).into_get_mut_with_context(entity);
 
         let component_ids = component_ids.iter().copied();
         let refs = into_erased_refs_mut::<ErasedSoa>(components, context, component_ids, refs?);

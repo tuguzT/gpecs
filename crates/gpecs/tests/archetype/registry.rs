@@ -167,7 +167,7 @@ fn exchange_components() {
     assert!(!storage.contains(entity));
 
     let prev_value = storage
-        .insert(&mut components, &(), entity, value)
+        .insert::<(Position, Mass, Tag)>(&mut components, &(), entity, value)
         .expect("bundle should be compatible");
     assert_eq!(prev_value, None);
     assert!(storage.contains(entity));
@@ -190,7 +190,7 @@ fn exchange_components() {
     assert!(!storage.contains(entity));
 
     let prev_value = storage
-        .insert(&mut components, &(), entity, (position, mass))
+        .insert::<(Position, Mass)>(&mut components, &(), entity, (position, mass))
         .expect("bundle should be compatible");
     assert_eq!(prev_value, None);
     assert!(storage.contains(entity));

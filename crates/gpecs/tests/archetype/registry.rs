@@ -148,7 +148,7 @@ fn exchange_components() {
         .expect("archetype of `Position` and `Mass` should contain unique component ids");
 
     let entity = entities
-        .spawn(Default::default())
+        .spawn(Default::default(), ())
         .expect("entity should be created successfully");
 
     let position = Position {

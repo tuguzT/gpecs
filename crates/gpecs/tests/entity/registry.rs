@@ -5,14 +5,14 @@ use gpecs::{
 
 #[test]
 fn new() {
-    let entities = EntityRegistry::new();
+    let entities = EntityRegistry::<()>::new();
     assert_eq!(entities.len(), 0);
     assert_eq!(entities.capacity(), 0);
 }
 
 #[test]
 fn with_capacity() {
-    let entities = EntityRegistry::with_capacity(10);
+    let entities = EntityRegistry::<()>::with_capacity(10);
     assert_eq!(entities.len(), 0);
     assert!(entities.capacity() >= 10);
 }
@@ -24,7 +24,7 @@ fn one_item_spawn() {
 
     let mut entities = EntityRegistry::new();
     let entity = entities
-        .spawn(world)
+        .spawn(world, ())
         .expect("should not fail because world is non-null");
 
     assert_eq!(entities.len(), 1);
@@ -44,11 +44,11 @@ fn one_item_reuse() {
 
     let mut entities = EntityRegistry::new();
     let entity = entities
-        .spawn(world)
+        .spawn(world, ())
         .expect("should not fail because world is non-null");
     entities.despawn(entity);
     let entity = entities
-        .spawn(world)
+        .spawn(world, ())
         .expect("should not fail because world is non-null");
 
     assert_eq!(entities.len(), 1);
@@ -68,11 +68,11 @@ fn one_item_invalidate() {
 
     let mut entities = EntityRegistry::new();
     let entity = entities
-        .spawn(world)
+        .spawn(world, ())
         .expect("should not fail because world is non-null");
     entities.despawn(entity);
     let entity = entities
-        .spawn(world)
+        .spawn(world, ())
         .expect("should not fail because world is non-null");
     assert_eq!(entity, Entity::new(0, 1, world));
 

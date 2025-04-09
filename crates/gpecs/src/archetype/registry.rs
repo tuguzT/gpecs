@@ -325,6 +325,11 @@ impl ArchetypeRegistry {
                 .storage()
                 .component_ids()
                 .chain(iter::once(component_id))
+                .sorted_by_key(|&component_id| {
+                    components
+                        .get_info(component_id)
+                        .map(|info| info.descriptor().layout().align())
+                })
                 .collect(),
             None => iter::once(component_id).collect(),
         };

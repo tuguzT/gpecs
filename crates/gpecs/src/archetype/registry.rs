@@ -22,7 +22,9 @@ use crate::{
     entity::Entity,
 };
 
-use super::{storage::ArchetypeStorage, utils::try_collect_component_ids};
+use super::{
+    erased::ErasedComponents, storage::ArchetypeStorage, utils::try_collect_component_ids,
+};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
@@ -306,45 +308,39 @@ impl ArchetypeRegistry {
         C: Component,
     {
         let component_id = components.register_component::<C>();
-        let mut info_with_fields = self
+        let (info, fields) = self
             .archetypes
             .iter_mut()
             .find_map(|(archetype_key, info)| {
                 if archetype_key.contains(&component_id) {
                     return None;
                 }
-                let Some(fields) = info.storage_mut().remove_erased(components, entity) else {
-                    return None;
-                };
+                let fields = info.storage_mut().remove_erased(components, entity)?;
                 Some((info, fields))
-            });
+            })
+            .unzip();
 
-        let component_ids: Vec<_> = match &mut info_with_fields {
-            Some((info, _)) => info
+        let component_ids: Vec<_> = match info {
+            Some(info) => info
                 .storage()
                 .component_ids()
                 .chain(iter::once(component_id))
                 .collect(),
             None => iter::once(component_id).collect(),
         };
-
-        let mut fields = match info_with_fields {
-            Some((_, fields)) => fields,
-            None => Default::default(),
-        };
-        let field = ErasedField::from::<C>(component);
-        if let Some(_) = fields.insert(component_id, field) {
-            unreachable!("duplicate component id {component_id:?}");
-        }
-
         let archetype_id = self
             .register_archetype_with_components(components, component_ids)
             .expect("components of this bundle should be unique");
 
-        let (_, info) = self
-            .archetypes
-            .get_index_mut(archetype_id.index())
-            .expect("archetype should exist");
+        let Some(info) = self.get_info_mut(archetype_id) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+
+        let mut fields = fields.unwrap_or_else(|| ErasedComponents::with_capacity(1));
+        if let Some(_) = fields.insert(component_id, ErasedField::from::<C>(component)) {
+            unreachable!("duplicate component {component_id:?}");
+        }
+
         info.storage_mut().insert_erased(components, entity, fields);
     }
 }

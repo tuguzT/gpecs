@@ -191,10 +191,31 @@ fn exchange_components() {
         .storage_mut();
     assert!(storage.contains(entity));
 
+    archetypes.remove_component::<Tag>(&mut components, entity);
+
+    let storage = archetypes
+        .get_info_mut(archetype_subset)
+        .expect("archetype should exist")
+        .storage_mut();
+    assert!(storage.contains(entity));
+
+    let storage = archetypes
+        .get_info_mut(archetype)
+        .expect("archetype should exist")
+        .storage_mut();
+    assert!(!storage.contains(entity));
+}
+
+#[test]
+fn exchange_components_empty_registry() {
+    let mut entities = EntityRegistry::new();
+    let mut components = ComponentRegistry::new();
+    let mut archetypes = ArchetypeRegistry::new();
+
     let entity = entities
         .spawn(Default::default(), ())
         .expect("entity should be created successfully");
-    archetypes.insert_component::<Tag>(&mut components, entity, tag);
+    archetypes.insert_component::<Tag>(&mut components, entity, Tag);
 
     let component_ids = <(Tag,)>::component_ids(&(), &mut components)
         .expect("archetype of only `Tag` should contain unique component ids");
@@ -206,4 +227,12 @@ fn exchange_components() {
         .expect("archetype should exist")
         .storage_mut();
     assert!(storage.contains(entity));
+
+    archetypes.remove_component::<Tag>(&mut components, entity);
+
+    let storage = archetypes
+        .get_info_mut(archetype)
+        .expect("archetype should exist")
+        .storage_mut();
+    assert!(!storage.contains(entity));
 }

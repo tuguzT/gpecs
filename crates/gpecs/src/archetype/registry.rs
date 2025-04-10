@@ -11,6 +11,8 @@ use itertools::Itertools;
 use petgraph::{
     dot::{Config as DotConfig, Dot, RankDir},
     graph::{DiGraph, EdgeReference, NodeIndex},
+    visit::EdgeRef,
+    Direction,
 };
 
 use crate::{
@@ -317,7 +319,7 @@ impl ArchetypeRegistry {
             })
             .map(ArchetypeId);
 
-        let (new_component_ids, mut old_fields): (Vec<_>, _) = match old_archetype {
+        let (new_archetype, mut old_fields) = match old_archetype {
             Some(old_archetype) => {
                 let Some(old_info) = self.get_info_mut(old_archetype) else {
                     unreachable!("old archetype {old_archetype:?} should exist")
@@ -325,28 +327,42 @@ impl ArchetypeRegistry {
                 let Some(fields) = old_info.storage_mut().remove_erased(components, entity) else {
                     unreachable!("{entity:?} should exist in old archetype {old_archetype:?}")
                 };
-                (
-                    old_info
-                        .storage()
-                        .component_ids()
-                        .chain(iter::once(component_id))
-                        .sorted_by_key(|&component_id| {
-                            components
-                                .get_info(component_id)
-                                .map(|info| info.descriptor().layout().align())
-                        })
-                        .collect(),
-                    fields,
-                )
+
+                let new_archetype = self
+                    .graph
+                    .edges_directed(old_archetype.index().into(), Direction::Outgoing)
+                    .find(|edge| *edge.weight() == component_id)
+                    .map(|edge| ArchetypeId(edge.target().index()))
+                    .unwrap_or_else(|| {
+                        let Some(old_info) = self.get_info(old_archetype) else {
+                            unreachable!("old archetype {old_archetype:?} should exist")
+                        };
+                        let new_component_ids = old_info
+                            .storage()
+                            .component_ids()
+                            .chain(iter::once(component_id))
+                            .sorted_by_key(|&component_id| {
+                                components
+                                    .get_info(component_id)
+                                    .map(|info| info.descriptor().layout().align())
+                            });
+                        self.register_archetype_with_components(components, new_component_ids)
+                            .expect("list of new components should contain unique components")
+                    });
+
+                (new_archetype, fields)
             }
-            None => (
-                iter::once(component_id).collect(),
-                ErasedComponents::with_capacity(1),
-            ),
+            None => {
+                let fields = ErasedComponents::with_capacity(1);
+
+                let new_component_ids = iter::once(component_id);
+                let new_archetype = self
+                    .register_archetype_with_components(components, new_component_ids)
+                    .expect("list of new components should contain unique components");
+
+                (new_archetype, fields)
+            }
         };
-        let new_archetype = self
-            .register_archetype_with_components(components, new_component_ids)
-            .expect("list of new components should contain unique components");
         let Some(new_info) = self.get_info_mut(new_archetype) else {
             unreachable!("new archetype {new_archetype:?} should exist")
         };
@@ -400,15 +416,30 @@ impl ArchetypeRegistry {
         };
         let new_fields = old_fields;
 
-        let new_component_ids: Vec<_> = old_info
-            .storage()
-            .component_ids()
-            .filter(|&id| id != component_id)
-            .collect();
-        if !new_component_ids.is_empty() {
-            let new_archetype = self
-                .register_archetype_with_components(components, new_component_ids)
-                .expect("list of new components should contain unique components");
+        let new_archetype = self
+            .graph
+            .edges_directed(old_archetype.index().into(), Direction::Incoming)
+            .find(|edge| *edge.weight() == component_id)
+            .map(|edge| ArchetypeId(edge.source().index()))
+            .or_else(|| {
+                let Some(old_info) = self.get_info(old_archetype) else {
+                    unreachable!("old archetype {old_archetype:?} should exist")
+                };
+                let component_ids = old_info.storage().component_ids();
+                if component_ids.len() <= 1 {
+                    return None;
+                }
+
+                let new_component_ids = component_ids
+                    .filter(|&id| id != component_id)
+                    .collect::<Vec<_>>();
+                let new_archetype = self
+                    .register_archetype_with_components(components, new_component_ids)
+                    .expect("list of new components should contain unique components");
+                Some(new_archetype)
+            });
+
+        if let Some(new_archetype) = new_archetype {
             let Some(new_info) = self.get_info_mut(new_archetype) else {
                 unreachable!("new archetype {new_archetype:?} should exist")
             };

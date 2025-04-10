@@ -308,46 +308,60 @@ impl ArchetypeRegistry {
         C: Component,
     {
         let component_id = components.register_component::<C>();
-        // TODO: replace search with direct indexing to archetype id (store it inside of entity registry)
-        let (info, fields) = self
+        // TODO: replace search with direct usage of archetype id (to be stored inside of entity registry)
+        let old_archetype = self
             .archetypes
-            .iter_mut()
-            .find_map(|(archetype_key, info)| {
-                if archetype_key.contains(&component_id) {
-                    return None;
-                }
-                let fields = info.storage_mut().remove_erased(components, entity)?;
-                Some((info, fields))
+            .iter()
+            .position(|(archetype_key, info)| {
+                !archetype_key.contains(&component_id) && info.storage().contains(entity)
             })
-            .unzip();
+            .map(ArchetypeId);
 
-        let component_ids: Vec<_> = match info {
-            Some(info) => info
-                .storage()
-                .component_ids()
-                .chain(iter::once(component_id))
-                .sorted_by_key(|&component_id| {
-                    components
-                        .get_info(component_id)
-                        .map(|info| info.descriptor().layout().align())
-                })
-                .collect(),
-            None => iter::once(component_id).collect(),
+        let (new_component_ids, mut old_fields): (Vec<_>, _) = match old_archetype {
+            Some(old_archetype) => {
+                let Some(old_info) = self.get_info_mut(old_archetype) else {
+                    unreachable!("old archetype {old_archetype:?} should exist")
+                };
+                let Some(fields) = old_info.storage_mut().remove_erased(components, entity) else {
+                    unreachable!("{entity:?} should exist in old archetype {old_archetype:?}")
+                };
+                (
+                    old_info
+                        .storage()
+                        .component_ids()
+                        .chain(iter::once(component_id))
+                        .sorted_by_key(|&component_id| {
+                            components
+                                .get_info(component_id)
+                                .map(|info| info.descriptor().layout().align())
+                        })
+                        .collect(),
+                    fields,
+                )
+            }
+            None => (
+                iter::once(component_id).collect(),
+                ErasedComponents::with_capacity(1),
+            ),
         };
-        let archetype_id = self
-            .register_archetype_with_components(components, component_ids)
-            .expect("components of this bundle should be unique");
-        let Some(info) = self.get_info_mut(archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+        let new_archetype = self
+            .register_archetype_with_components(components, new_component_ids)
+            .expect("list of new components should contain unique components");
+        let Some(new_info) = self.get_info_mut(new_archetype) else {
+            unreachable!("new archetype {new_archetype:?} should exist")
         };
 
-        let mut fields = fields.unwrap_or_else(|| ErasedComponents::with_capacity(1));
-        if let Some(_) = fields.insert(component_id, ErasedField::from::<C>(component)) {
-            unreachable!("duplicated component {component_id:?}");
+        let field = ErasedField::from::<C>(component);
+        if let Some(_) = old_fields.insert(component_id, field) {
+            unreachable!("duplicated component {component_id:?}")
         }
 
-        if let Some(_) = info.storage_mut().insert_erased(components, entity, fields) {
-            unreachable!("duplicated entity {entity:?}");
+        let new_fields = old_fields;
+        let prev = new_info
+            .storage_mut()
+            .insert_erased(components, entity, new_fields);
+        if let Some(_) = prev {
+            unreachable!("duplicated entity {entity:?}")
         }
     }
 
@@ -362,39 +376,47 @@ impl ArchetypeRegistry {
         C: Component,
     {
         let component_id = components.register_component::<C>();
-        // TODO: replace search with direct indexing to archetype id (store it inside of entity registry)
-        let (info, mut fields) = self
+        // TODO: replace search with direct usage of archetype id (to be stored inside of entity registry)
+        let old_archetype = self
             .archetypes
             .iter_mut()
-            .find_map(|(archetype_key, info)| {
-                if !archetype_key.contains(&component_id) {
-                    return None;
-                }
-                let fields = info.storage_mut().remove_erased(components, entity)?;
-                Some((info, fields))
-            })?;
+            .position(|(archetype_key, info)| {
+                archetype_key.contains(&component_id) && info.storage().contains(entity)
+            })
+            .map(ArchetypeId)?;
 
-        let Some(field) = fields.swap_remove(&component_id) else {
+        let Some(old_info) = self.get_info_mut(old_archetype) else {
+            unreachable!("old archetype {old_archetype:?} should exist")
+        };
+
+        let Some(mut old_fields) = old_info.storage_mut().remove_erased(components, entity) else {
+            unreachable!("{entity:?} should exist in old archetype {old_archetype:?}")
+        };
+        let Some(field) = old_fields.swap_remove(&component_id) else {
             unreachable!("component {component_id:?} should exist")
         };
         let Ok(component) = (unsafe { field.into::<C>() }) else {
-            unreachable!("field should be convertible to {component_id:?}");
+            unreachable!("field should be convertible to {component_id:?}")
         };
+        let new_fields = old_fields;
 
-        let component_ids: Vec<_> = info
+        let new_component_ids: Vec<_> = old_info
             .storage()
             .component_ids()
             .filter(|&id| id != component_id)
             .collect();
-        if !component_ids.is_empty() {
-            let archetype_id = self
-                .register_archetype_with_components(components, component_ids)
-                .expect("components of this bundle should be unique");
-            let Some(info) = self.get_info_mut(archetype_id) else {
-                unreachable!("archetype {archetype_id:?} should exist")
+        if !new_component_ids.is_empty() {
+            let new_archetype = self
+                .register_archetype_with_components(components, new_component_ids)
+                .expect("list of new components should contain unique components");
+            let Some(new_info) = self.get_info_mut(new_archetype) else {
+                unreachable!("new archetype {new_archetype:?} should exist")
             };
-            if let Some(_) = info.storage_mut().insert_erased(components, entity, fields) {
-                unreachable!("duplicated entity {entity:?}");
+            let prev = new_info
+                .storage_mut()
+                .insert_erased(components, entity, new_fields);
+            if let Some(_) = prev {
+                unreachable!("duplicated entity {entity:?}")
             }
         }
 

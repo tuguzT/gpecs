@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    ptr,
 };
 
 use gpecs_soa_erased::{
@@ -9,7 +10,7 @@ use gpecs_soa_erased::{
         ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
 };
-use gpecs_sparse::{error::TryReserveError, set::EpochSparseSet};
+use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
 
 use crate::{
@@ -32,7 +33,41 @@ use super::{
     utils::try_collect_component_ids,
 };
 
-type ErasedStorage = EpochSparseSet<Entity, ErasedSoa>;
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[repr(transparent)]
+struct NoEpochEntity(Entity);
+
+impl Key for NoEpochEntity {
+    type SparseIndex = <Entity as Key>::SparseIndex;
+    type Epoch = ();
+
+    fn new(sparse_index: Self::SparseIndex, _: Self::Epoch) -> Self {
+        let entity = <Entity as Key>::new(sparse_index, Default::default());
+        Self(entity)
+    }
+
+    fn sparse_index(self) -> Self::SparseIndex {
+        let Self(entity) = self;
+        entity.sparse_index()
+    }
+
+    fn epoch(self) -> Self::Epoch {}
+}
+
+impl From<Entity> for NoEpochEntity {
+    fn from(entity: Entity) -> Self {
+        Self(entity)
+    }
+}
+
+impl From<NoEpochEntity> for Entity {
+    fn from(entity: NoEpochEntity) -> Self {
+        let NoEpochEntity(entity) = entity;
+        entity
+    }
+}
+
+type ErasedStorage = EpochSparseSet<NoEpochEntity, ErasedSoa>;
 
 pub struct ArchetypeStorage {
     component_ids: IndexSet<ComponentId>,
@@ -211,7 +246,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { erased_storage, .. } = self;
-        erased_storage.contains_key(entity)
+        erased_storage.contains_key(entity.into())
     }
 
     #[inline]
@@ -606,8 +641,10 @@ trait ErasedStorageExt {
 
 impl ErasedStorageExt for ErasedStorage {
     #[inline]
+    #[allow(unsafe_code)]
     fn entities(&self) -> &[Entity] {
-        self.as_keys_slice()
+        let entities = ptr::from_ref(self.as_keys_slice()) as *const [_];
+        unsafe { &*entities }
     }
 
     #[inline]
@@ -645,7 +682,7 @@ impl ErasedStorageExt for ErasedStorage {
             let component_ids = component_ids.iter().copied();
             from_erased_fields::<ErasedSoa>(components, self.context(), component_ids, fields)
         };
-        let value = ErasedStorage::insert(self, entity, value).unwrap()?;
+        let value = ErasedStorage::insert(self, entity.into(), value).unwrap()?;
 
         let component_ids = component_ids.iter().copied();
         let context = self.context();
@@ -660,7 +697,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
-        let value = ErasedStorage::remove(self, entity)?;
+        let value = ErasedStorage::remove(self, entity.into())?;
 
         let component_ids = component_ids.iter().copied();
         let context = self.context();
@@ -675,7 +712,8 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
-        let (context, refs) = ErasedStorage::as_view(self).into_get_with_context(entity);
+        let view = ErasedStorage::as_view(self);
+        let (context, refs) = view.into_get_with_context(entity.into());
 
         let component_ids = component_ids.iter().copied();
         let refs = into_erased_refs::<ErasedSoa>(components, context, component_ids, refs?);
@@ -689,7 +727,8 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &IndexSet<ComponentId>,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {
-        let (context, refs) = ErasedStorage::as_mut_view(self).into_get_mut_with_context(entity);
+        let view = ErasedStorage::as_mut_view(self);
+        let (context, refs) = view.into_get_mut_with_context(entity.into());
 
         let component_ids = component_ids.iter().copied();
         let refs = into_erased_refs_mut::<ErasedSoa>(components, context, component_ids, refs?);

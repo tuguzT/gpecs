@@ -67,19 +67,21 @@ impl ArchetypeInfo {
 }
 
 type ArchetypeKey = BTreeSet<ComponentId>;
+type Archetypes = IndexMap<ArchetypeKey, ArchetypeInfo>;
+type Graph = DiGraph<(), ComponentId, usize>;
 
 #[derive(Default)]
 pub struct ArchetypeRegistry {
-    archetypes: IndexMap<ArchetypeKey, ArchetypeInfo>,
-    graph: DiGraph<(), ComponentId, usize>,
+    archetypes: Archetypes,
+    graph: Graph,
 }
 
 impl ArchetypeRegistry {
     #[inline]
     pub fn new() -> Self {
         Self {
-            archetypes: IndexMap::new(),
-            graph: DiGraph::default(),
+            archetypes: Archetypes::new(),
+            graph: Graph::default(),
         }
     }
 
@@ -134,8 +136,8 @@ impl ArchetypeRegistry {
 
     #[inline]
     fn register(
-        archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
-        graph: &mut DiGraph<(), ComponentId, usize>,
+        archetypes: &mut Archetypes,
+        graph: &mut Graph,
         components: &ComponentRegistry,
         component_ids: Vec<ComponentId>,
         storage: ArchetypeStorage,
@@ -159,8 +161,8 @@ impl ArchetypeRegistry {
 
     #[inline]
     fn register_before(
-        archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
-        graph: &mut DiGraph<(), ComponentId, usize>,
+        archetypes: &mut Archetypes,
+        graph: &mut Graph,
         components: &ComponentRegistry,
         component_ids: Vec<ComponentId>,
         archetype_key: &ArchetypeKey,
@@ -204,8 +206,8 @@ impl ArchetypeRegistry {
 
     #[inline]
     fn register_one(
-        archetypes: &mut IndexMap<ArchetypeKey, ArchetypeInfo>,
-        graph: &mut DiGraph<(), ComponentId, usize>,
+        archetypes: &mut Archetypes,
+        graph: &mut Graph,
         archetype_key: ArchetypeKey,
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
@@ -287,7 +289,7 @@ impl ArchetypeRegistry {
 
     #[inline]
     fn find_archetype(
-        archetypes: &IndexMap<ArchetypeKey, ArchetypeInfo>,
+        archetypes: &Archetypes,
         archetype_key: &ArchetypeKey,
     ) -> Option<ArchetypeId> {
         let (index, _, _) = archetypes.get_full(archetype_key)?;
@@ -328,11 +330,9 @@ impl ArchetypeRegistry {
                     unreachable!("{entity:?} should exist in old archetype {old_archetype:?}")
                 };
 
-                let new_archetype = self
-                    .graph
-                    .edges_directed(old_archetype.index().into(), Direction::Outgoing)
-                    .find(|edge| *edge.weight() == component_id)
-                    .map(|edge| ArchetypeId(edge.target().index()))
+                let predicate = |id| id == component_id;
+                let graph = &self.graph;
+                let new_archetype = Self::find_archetype_after(graph, old_archetype, predicate)
                     .unwrap_or_else(|| {
                         let Some(old_info) = self.get_info(old_archetype) else {
                             unreachable!("old archetype {old_archetype:?} should exist")
@@ -416,11 +416,8 @@ impl ArchetypeRegistry {
         };
         let new_fields = old_fields;
 
-        let new_archetype = self
-            .graph
-            .edges_directed(old_archetype.index().into(), Direction::Incoming)
-            .find(|edge| *edge.weight() == component_id)
-            .map(|edge| ArchetypeId(edge.source().index()))
+        let predicate = |id| id == component_id;
+        let new_archetype = Self::find_archetype_before(&self.graph, old_archetype, predicate)
             .or_else(|| {
                 let Some(old_info) = self.get_info(old_archetype) else {
                     unreachable!("old archetype {old_archetype:?} should exist")
@@ -452,6 +449,36 @@ impl ArchetypeRegistry {
         }
 
         Some(component)
+    }
+
+    #[inline]
+    fn find_archetype_before<P>(
+        graph: &Graph,
+        archetype_id: ArchetypeId,
+        mut predicate: P,
+    ) -> Option<ArchetypeId>
+    where
+        P: FnMut(ComponentId) -> bool,
+    {
+        graph
+            .edges_directed(archetype_id.index().into(), Direction::Incoming)
+            .find(|edge| predicate(*edge.weight()))
+            .map(|edge| ArchetypeId(edge.source().index()))
+    }
+
+    #[inline]
+    fn find_archetype_after<P>(
+        graph: &Graph,
+        archetype_id: ArchetypeId,
+        mut predicate: P,
+    ) -> Option<ArchetypeId>
+    where
+        P: FnMut(ComponentId) -> bool,
+    {
+        graph
+            .edges_directed(archetype_id.index().into(), Direction::Outgoing)
+            .find(|edge| predicate(*edge.weight()))
+            .map(|edge| ArchetypeId(edge.target().index()))
     }
 }
 

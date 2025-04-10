@@ -264,4 +264,18 @@ fn storage_tuple() {
     assert_eq!(value, Some((mass, position)));
     assert_eq!(storage.entities(), []);
     assert!(!storage.contains(entity));
+
+    let value = storage
+        .insert::<(Mass, Position)>(&mut components, &(), entity, (mass, position))
+        .expect("insertion of `Mass` and `Position` should succeed");
+    assert_eq!(value, None);
+    assert_eq!(storage.entities(), [entity]);
+    assert!(storage.contains(entity));
+
+    let value = storage
+        .remove::<(Mass, Position)>(&mut components, &(), entity)
+        .expect("removal of `Mass` and `Position` should succeed");
+    assert_eq!(value, Some((mass, position)));
+    assert_eq!(storage.entities(), []);
+    assert!(!storage.contains(entity));
 }

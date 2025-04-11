@@ -6,7 +6,7 @@ use core::{
 use crate::{
     arena::EpochSparseArena,
     assert::unwrap_dense,
-    error::InvalidKeyError,
+    error::TryModifyError,
     key::Key,
     set::EpochSparseSet,
     soa::{
@@ -117,7 +117,16 @@ where
     }
 
     #[inline]
-    pub fn replace_key(&mut self, key: K) -> Result<Option<V>, InvalidKeyError<K>> {
+    #[track_caller]
+    pub fn replace_key(&mut self, key: K) -> Option<V> {
+        match self.try_replace_key(key) {
+            Ok(value) => value,
+            Err(_) => panic!("failed to replace key"),
+        }
+    }
+
+    #[inline]
+    pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K>> {
         let new_key = key;
         let Self { key, container, .. } = self;
 
@@ -125,7 +134,7 @@ where
         let value = unwrap_entry_value(value);
 
         *key = new_key;
-        container.insert(*key, value)
+        container.try_insert(*key, value)
     }
 }
 
@@ -189,7 +198,7 @@ where
     pub fn insert(self, value: V) -> V::RefsMut<'a> {
         let Self { key, container, .. } = self;
 
-        if let Err(_) = container.insert(key, value) {
+        if let Err(_) = container.try_insert(key, value) {
             unreachable!()
         }
 
@@ -205,7 +214,7 @@ where
             phantom,
         } = self;
 
-        if let Err(_) = container.insert(key, value) {
+        if let Err(_) = container.try_insert(key, value) {
             unreachable!()
         }
         let dense_index = container.slices().len() - 1;
@@ -256,7 +265,7 @@ where
 
     fn slices_mut(&mut self) -> SoaSlicesMut<'_, V>;
 
-    fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InvalidKeyError<K>>;
+    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>>;
 
     fn remove(&mut self, key: K) -> Option<V>;
 
@@ -279,8 +288,8 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InvalidKeyError<K>> {
-        EpochSparseSet::insert(self, key, value)
+    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>> {
+        EpochSparseSet::try_insert(self, key, value)
     }
 
     #[inline]
@@ -310,8 +319,8 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InvalidKeyError<K>> {
-        EpochSparseArena::insert(self, key, value)
+    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>> {
+        EpochSparseArena::try_insert(self, key, value)
     }
 
     #[inline]
@@ -431,15 +440,24 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn replace_key(self, key: K) -> Result<Self, InvalidKeyError<K>> {
+            #[track_caller]
+            pub fn replace_key(self, key: K) -> Self {
+                match self.try_replace_key(key) {
+                    Ok(entry) => entry,
+                    Err(_) => panic!("failed to replace key"),
+                }
+            }
+
+            #[inline]
+            pub fn try_replace_key(self, key: K) -> Result<Self, TryModifyError<K>> {
                 match self {
                     Self::Occupied(mut entry) => {
-                        entry.replace_key(key)?;
+                        entry.try_replace_key(key)?;
                         Ok(Self::Occupied(entry))
                     }
                     Self::Vacant(entry) => {
                         let container = entry.into_container();
-                        Ok(container.entry(key)?)
+                        Ok(container.try_entry(key)?)
                     }
                 }
             }
@@ -522,9 +540,16 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn replace_key(&mut self, key: K) -> Result<Option<V>, InvalidKeyError<K>> {
+            #[track_caller]
+            pub fn replace_key(&mut self, key: K) -> Option<V> {
                 let Self { inner } = self;
                 inner.replace_key(key)
+            }
+
+            #[inline]
+            pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K>> {
+                let Self { inner } = self;
+                inner.try_replace_key(key)
             }
         }
 

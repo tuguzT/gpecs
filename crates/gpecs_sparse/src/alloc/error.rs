@@ -6,7 +6,7 @@ use core::{
 use core_alloc::collections::TryReserveError as AllocTryReserveError;
 
 use crate::{
-    error::{InvalidKeyError, TooLargeSparseIndexError, TooSmallSparseIndexError},
+    error::{TooLargeSparseIndexError, TooSmallSparseIndexError},
     key::Key,
     soa::vec::TryReserveError as SoaTryReserveError,
 };
@@ -60,7 +60,7 @@ impl Error for TryReserveError {
     }
 }
 
-pub enum TryInvalidKeyError<K>
+pub enum TryModifyError<K>
 where
     K: Key,
 {
@@ -69,7 +69,7 @@ where
     TryReserve(TryReserveError),
 }
 
-impl<K> Debug for TryInvalidKeyError<K>
+impl<K> Debug for TryModifyError<K>
 where
     K: Key,
     TooLargeSparseIndexError<K>: Debug,
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<K> Display for TryInvalidKeyError<K>
+impl<K> Display for TryModifyError<K>
 where
     K: Key,
     TooLargeSparseIndexError<K>: Display,
@@ -103,7 +103,7 @@ where
     }
 }
 
-impl<K> Error for TryInvalidKeyError<K>
+impl<K> Error for TryModifyError<K>
 where
     K: Key,
     TooLargeSparseIndexError<K>: Error,
@@ -111,7 +111,7 @@ where
 {
 }
 
-impl<K> From<TooLargeSparseIndexError<K>> for TryInvalidKeyError<K>
+impl<K> From<TooLargeSparseIndexError<K>> for TryModifyError<K>
 where
     K: Key,
 {
@@ -120,7 +120,7 @@ where
     }
 }
 
-impl<K> From<TooSmallSparseIndexError<K>> for TryInvalidKeyError<K>
+impl<K> From<TooSmallSparseIndexError<K>> for TryModifyError<K>
 where
     K: Key,
 {
@@ -129,23 +129,11 @@ where
     }
 }
 
-impl<K> From<TryReserveError> for TryInvalidKeyError<K>
+impl<K> From<TryReserveError> for TryModifyError<K>
 where
     K: Key,
 {
     fn from(value: TryReserveError) -> Self {
         Self::TryReserve(value)
-    }
-}
-
-impl<K> From<InvalidKeyError<K>> for TryInvalidKeyError<K>
-where
-    K: Key,
-{
-    fn from(value: InvalidKeyError<K>) -> Self {
-        match value {
-            InvalidKeyError::TooLargeSparseIndex(error) => Self::TooLargeSparseIndex(error),
-            InvalidKeyError::TooSmallSparseIndex(error) => Self::TooSmallSparseIndex(error),
-        }
     }
 }

@@ -32,9 +32,7 @@ fn storage_tag() {
     let world = worlds.spawn();
 
     let mut entities = EntityRegistry::new();
-    let entity = entities
-        .spawn(world, ())
-        .expect("should not fail because world is non-null");
+    let entity = entities.spawn(world, ());
 
     let value = storage
         .insert::<(Tag,)>(&mut components, &(), entity, (Tag,))
@@ -96,9 +94,7 @@ fn storage_tuple() {
     let world = worlds.spawn();
 
     let mut entities = EntityRegistry::new();
-    let entity = entities
-        .spawn(world, ())
-        .expect("should not fail because world is non-null");
+    let entity = entities.spawn(world, ());
 
     let slices = storage
         .components::<(Position,)>(&mut components, &())

@@ -23,9 +23,7 @@ fn one_item_spawn() {
     let world = worlds.spawn();
 
     let mut entities = EntityRegistry::new();
-    let entity = entities
-        .spawn(world, ())
-        .expect("should not fail because world is non-null");
+    let entity = entities.spawn(world, ());
 
     assert_eq!(entities.len(), 1);
     assert!(entities.capacity() >= 1);
@@ -43,13 +41,10 @@ fn one_item_reuse() {
     let world = worlds.spawn();
 
     let mut entities = EntityRegistry::new();
-    let entity = entities
-        .spawn(world, ())
-        .expect("should not fail because world is non-null");
+    let entity = entities.spawn(world, ());
+
     entities.despawn(entity);
-    let entity = entities
-        .spawn(world, ())
-        .expect("should not fail because world is non-null");
+    let entity = entities.spawn(world, ());
 
     assert_eq!(entities.len(), 1);
     assert!(entities.capacity() >= 1);
@@ -67,13 +62,10 @@ fn one_item_invalidate() {
     let world = worlds.spawn();
 
     let mut entities = EntityRegistry::new();
-    let entity = entities
-        .spawn(world, ())
-        .expect("should not fail because world is non-null");
+    let entity = entities.spawn(world, ());
     entities.despawn(entity);
-    let entity = entities
-        .spawn(world, ())
-        .expect("should not fail because world is non-null");
+
+    let entity = entities.spawn(world, ());
     assert_eq!(entity, Entity::new(0, 1, world));
 
     assert_eq!(entities.invalidate_epoch(Entity::new(0, 0, world)), None);

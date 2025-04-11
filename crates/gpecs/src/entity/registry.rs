@@ -8,8 +8,7 @@ use std::{
 
 pub use error::TryReserveError;
 
-pub type EntityOverflowError = error::InvalidKeyError<Entity>;
-pub type TryEntityOverflowError = error::TryInvalidKeyError<Entity>;
+pub type TrySpawnError = error::TryModifyError<Entity>;
 
 use gpecs_sparse::{arena::EpochSparseArena, error};
 
@@ -107,22 +106,16 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn spawn(&mut self, world: WorldId, meta: Meta) -> Result<Entity, EntityOverflowError> {
-        let Self { inner } = self;
-
-        let entity = inner.push(meta.into())?;
-        let entity = inner
-            .replace_key(Entity::new(entity.index(), entity.epoch(), world))
-            .expect("entity should exist because it was just created");
-        Ok(entity)
+    #[track_caller]
+    pub fn spawn(&mut self, world: WorldId, meta: Meta) -> Entity {
+        match self.try_spawn(world, meta) {
+            Ok(entity) => entity,
+            Err(error) => panic!("failed to spawn entity: {error}"),
+        }
     }
 
     #[inline]
-    pub fn try_spawn(
-        &mut self,
-        world: WorldId,
-        meta: Meta,
-    ) -> Result<Entity, TryEntityOverflowError> {
+    pub fn try_spawn(&mut self, world: WorldId, meta: Meta) -> Result<Entity, TrySpawnError> {
         let Self { inner } = self;
 
         let entity = inner.try_push(meta.into())?;

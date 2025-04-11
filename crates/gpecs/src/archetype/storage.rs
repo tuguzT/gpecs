@@ -682,7 +682,7 @@ impl ErasedStorageExt for ErasedStorage {
             let component_ids = component_ids.iter().copied();
             from_erased_fields::<ErasedSoa>(components, self.context(), component_ids, fields)
         };
-        let value = ErasedStorage::insert(self, entity.into(), value).unwrap()?;
+        let value = ErasedStorage::insert(self, entity.into(), value)?;
 
         let component_ids = component_ids.iter().copied();
         let context = self.context();

@@ -4,7 +4,7 @@ use core::{
 };
 
 #[cfg(feature = "alloc")]
-pub use crate::alloc::error::{TryInvalidKeyError, TryReserveError};
+pub use crate::alloc::error::{TryModifyError, TryReserveError};
 
 use crate::key::Key;
 
@@ -650,71 +650,5 @@ where
 {
     fn from(value: EpochMismatchError<K>) -> Self {
         Self::EpochMismatch(value)
-    }
-}
-
-pub enum InvalidKeyError<K>
-where
-    K: Key,
-{
-    TooLargeSparseIndex(TooLargeSparseIndexError<K>),
-    TooSmallSparseIndex(TooSmallSparseIndexError<K>),
-}
-
-impl<K> Debug for InvalidKeyError<K>
-where
-    K: Key,
-    TooLargeSparseIndexError<K>: Debug,
-    TooSmallSparseIndexError<K>: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TooLargeSparseIndex(error) => {
-                f.debug_tuple("TooLargeSparseIndex").field(error).finish()
-            }
-            Self::TooSmallSparseIndex(error) => {
-                f.debug_tuple("TooSmallSparseIndex").field(error).finish()
-            }
-        }
-    }
-}
-
-impl<K> Display for InvalidKeyError<K>
-where
-    K: Key,
-    TooLargeSparseIndexError<K>: Display,
-    TooSmallSparseIndexError<K>: Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TooLargeSparseIndex(error) => Display::fmt(error, f),
-            Self::TooSmallSparseIndex(error) => Display::fmt(error, f),
-        }
-    }
-}
-
-impl<K> Error for InvalidKeyError<K>
-where
-    K: Key,
-    TooLargeSparseIndexError<K>: Error,
-    TooSmallSparseIndexError<K>: Error,
-{
-}
-
-impl<K> From<TooLargeSparseIndexError<K>> for InvalidKeyError<K>
-where
-    K: Key,
-{
-    fn from(value: TooLargeSparseIndexError<K>) -> Self {
-        Self::TooLargeSparseIndex(value)
-    }
-}
-
-impl<K> From<TooSmallSparseIndexError<K>> for InvalidKeyError<K>
-where
-    K: Key,
-{
-    fn from(value: TooSmallSparseIndexError<K>) -> Self {
-        Self::TooSmallSparseIndex(value)
     }
 }

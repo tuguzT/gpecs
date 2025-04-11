@@ -111,9 +111,7 @@ fn empty_into_iter() {
 #[test]
 fn empty_insert_one() {
     let mut sparse_arena = SparseArena::new();
-    let previous = sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let previous = sparse_arena.insert(0, Identity(42));
     assert_eq!(previous, None);
 
     assert_eq!(sparse_arena.len(), 1);
@@ -124,9 +122,7 @@ fn empty_insert_one() {
 #[test]
 fn with_capacity_insert_one() {
     let mut sparse_arena = SparseArena::with_capacity(10, 10);
-    let previous = sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let previous = sparse_arena.insert(0, Identity(42));
     assert_eq!(previous, None);
 
     assert_eq!(sparse_arena.len(), 1);
@@ -137,9 +133,7 @@ fn with_capacity_insert_one() {
 #[test]
 fn empty_insert_one_mutate() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
     sparse_arena[0] = 43.into();
 
     assert_eq!(sparse_arena.len(), 1);
@@ -150,9 +144,7 @@ fn empty_insert_one_mutate() {
 #[test]
 fn with_capacity_insert_one_mutate() {
     let mut sparse_arena = SparseArena::with_capacity(10, 10);
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
     sparse_arena[0] = 43.into();
 
     assert_eq!(sparse_arena.len(), 1);
@@ -165,18 +157,14 @@ fn empty_insert_far() {
     let mut sparse_arena = SparseArena::new();
 
     let (key, value) = (3, Identity(42));
-    sparse_arena
-        .insert(key, value)
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(key, value);
 
     assert_eq!(sparse_arena.len(), 1);
     assert_eq!(sparse_arena.get(key), Some(&42.into()));
     assert!(sparse_arena.contains_key(key));
 
     let (key, value) = (6, Identity(69));
-    sparse_arena
-        .insert(key, value)
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(key, value);
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(key), Some(&69.into()));
@@ -186,12 +174,8 @@ fn empty_insert_far() {
 #[test]
 fn empty_insert_far_remove() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(3, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(3, Identity(42));
+    sparse_arena.insert(1, Identity(69));
 
     let key = 3;
     let value = sparse_arena.remove(key).unwrap();
@@ -214,9 +198,7 @@ fn empty_insert_far_remove() {
 fn empty_push() {
     let mut sparse_arena = SparseArena::new();
 
-    let key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(42));
     assert_eq!(key, 0);
     assert_eq!(sparse_arena.len(), 1);
     assert_eq!(sparse_arena.get(key), Some(&42.into()));
@@ -235,9 +217,7 @@ fn empty_pop() {
 #[test]
 fn one_item_insert_remove_one() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let removed = sparse_arena.remove(0);
     assert_eq!(removed, Some(42.into()));
@@ -252,9 +232,7 @@ fn one_item_insert_remove_one_epoch() {
     let mut sparse_arena = EpochSparseArena::new();
 
     let key = Key::new(0, 1);
-    sparse_arena
-        .insert(key, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(key, Identity(42));
 
     let removed = sparse_arena.remove(key);
     assert_eq!(removed, Some(42.into()));
@@ -275,9 +253,7 @@ fn one_item_insert_remove_one_epoch() {
 #[test]
 fn one_item_insert_swap_remove_one() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let removed = sparse_arena.swap_remove(0);
     assert_eq!(removed, Some(42.into()));
@@ -292,9 +268,7 @@ fn one_item_insert_swap_remove_one_epoch() {
     let mut sparse_arena = EpochSparseArena::new();
 
     let key = Key::new(0, 1);
-    sparse_arena
-        .insert(key, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(key, Identity(42));
 
     let removed = sparse_arena.swap_remove(key);
     assert_eq!(removed, Some(42.into()));
@@ -315,9 +289,7 @@ fn one_item_insert_swap_remove_one_epoch() {
 #[test]
 fn one_item_push_remove_one() {
     let mut sparse_arena = SparseArena::new();
-    let key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(42));
 
     let removed = sparse_arena.remove(key);
     assert_eq!(removed, Some(42.into()));
@@ -330,9 +302,7 @@ fn one_item_push_remove_one() {
 #[test]
 fn one_item_push_remove_one_epoch() {
     let mut sparse_arena = EpochSparseArena::<Key, _>::new();
-    let key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(42));
 
     let removed = sparse_arena.remove(key);
     assert_eq!(removed, Some(42.into()));
@@ -353,9 +323,7 @@ fn one_item_push_remove_one_epoch() {
 #[test]
 fn one_item_push_swap_remove_one() {
     let mut sparse_arena = SparseArena::new();
-    let key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(42));
 
     let removed = sparse_arena.swap_remove(key);
     assert_eq!(removed, Some(42.into()));
@@ -368,9 +336,7 @@ fn one_item_push_swap_remove_one() {
 #[test]
 fn one_item_push_swap_remove_one_epoch() {
     let mut sparse_arena = EpochSparseArena::<Key, _>::new();
-    let key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(42));
 
     let removed = sparse_arena.swap_remove(key);
     assert_eq!(removed, Some(42.into()));
@@ -392,9 +358,7 @@ fn one_item_push_swap_remove_one_epoch() {
 #[should_panic]
 fn one_item_swap() {
     let mut sparse_arena = SparseArena::new();
-    let key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(42));
     assert_eq!(key, 0);
 
     sparse_arena.swap(0, 0);
@@ -414,9 +378,7 @@ fn one_item_swap() {
 #[should_panic]
 fn one_item_swap_keys() {
     let mut sparse_arena = SparseArena::new();
-    let key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(42));
     assert_eq!(key, 0);
 
     sparse_arena.swap_keys(0, 0);
@@ -435,9 +397,7 @@ fn one_item_swap_keys() {
 #[test]
 fn one_item_parts() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(42));
 
     let (dense, sparse) = sparse_arena.into_parts();
     let (keys, values) = dense.as_slices().into();
@@ -463,9 +423,7 @@ fn one_item_parts() {
 #[test]
 fn one_item_keys() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let keys = sparse_arena.keys();
     assert_eq!(keys.len(), 1);
@@ -475,9 +433,7 @@ fn one_item_keys() {
 #[test]
 fn one_item_into_keys() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let keys = sparse_arena.into_keys();
     assert_eq!(keys.len(), 1);
@@ -487,9 +443,7 @@ fn one_item_into_keys() {
 #[test]
 fn one_item_values() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let values = sparse_arena.values();
     assert_eq!(values.len(), 1);
@@ -499,9 +453,7 @@ fn one_item_values() {
 #[test]
 fn one_item_values_mut() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let values_mut = sparse_arena.values_mut();
     assert_eq!(values_mut.len(), 1);
@@ -511,9 +463,7 @@ fn one_item_values_mut() {
 #[test]
 fn one_item_into_values() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let values = sparse_arena.into_values();
     assert_eq!(values.len(), 1);
@@ -523,9 +473,7 @@ fn one_item_into_values() {
 #[test]
 fn one_item_iter() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let iter = sparse_arena.iter();
     assert_eq!(iter.len(), 1);
@@ -536,9 +484,7 @@ fn one_item_iter() {
 #[test]
 fn one_item_iter_mut() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let iter_mut = sparse_arena.iter_mut();
     assert_eq!(iter_mut.len(), 1);
@@ -549,9 +495,7 @@ fn one_item_iter_mut() {
 #[test]
 fn one_item_into_iter() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
 
     let into_iter = sparse_arena.into_iter();
     assert_eq!(into_iter.len(), 1);
@@ -562,20 +506,14 @@ fn one_item_into_iter() {
 #[test]
 fn two_items_insert_first() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
+    sparse_arena.insert(1, Identity(69));
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(0), Some(&42.into()));
     assert_eq!(sparse_arena.get(1), Some(&69.into()));
 
-    let previous = sparse_arena
-        .insert(0, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    let previous = sparse_arena.insert(0, Identity(34));
     assert_eq!(previous, Some(Identity(42)));
 
     assert_eq!(sparse_arena.len(), 2);
@@ -590,23 +528,17 @@ fn two_items_insert_first_epoch() {
     let mut sparse_arena = EpochSparseArena::new();
 
     let first_key = Key::new(0, 3);
-    sparse_arena
-        .insert(first_key, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(first_key, Identity(42));
 
     let second_key = Key::new(1, 0);
-    sparse_arena
-        .insert(second_key, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(second_key, Identity(69));
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
     assert_eq!(sparse_arena.get(second_key), Some(&69.into()));
 
     let first_key = Key::new(*first_key.sparse_index(), first_key.epoch().next());
-    let previous = sparse_arena
-        .insert(first_key, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    let previous = sparse_arena.insert(first_key, Identity(34));
     assert_eq!(previous, Some(Identity(42)));
 
     assert_eq!(sparse_arena.len(), 2);
@@ -619,20 +551,14 @@ fn two_items_insert_first_epoch() {
 #[test]
 fn two_items_insert_second() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
+    sparse_arena.insert(1, Identity(69));
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(0), Some(&42.into()));
     assert_eq!(sparse_arena.get(1), Some(&69.into()));
 
-    let previous = sparse_arena
-        .insert(1, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    let previous = sparse_arena.insert(1, Identity(34));
     assert_eq!(previous, Some(Identity(69)));
 
     assert_eq!(sparse_arena.len(), 2);
@@ -645,12 +571,8 @@ fn two_items_insert_second() {
 #[test]
 fn two_items_remove_first() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
@@ -669,12 +591,8 @@ fn two_items_remove_first() {
 #[test]
 fn two_items_swap_remove_first() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
@@ -693,12 +611,8 @@ fn two_items_swap_remove_first() {
 #[test]
 fn two_items_remove_second() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
@@ -717,12 +631,8 @@ fn two_items_remove_second() {
 #[test]
 fn two_items_swap_remove_second() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     assert_eq!(sparse_arena.len(), 2);
     assert_eq!(sparse_arena.get(first_key), Some(&42.into()));
@@ -741,20 +651,14 @@ fn two_items_swap_remove_second() {
 #[test]
 fn two_items_remove_one_insert_one() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
+    sparse_arena.insert(1, Identity(69));
 
     let removed = sparse_arena.remove(0);
     assert_eq!(removed, Some(Identity(42)));
     assert_eq!(sparse_arena.get(0), None);
 
-    sparse_arena
-        .insert(0, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(34));
     assert_eq!(sparse_arena.get(0), Some(&34.into()));
     assert_eq!(sparse_arena.get(1), Some(&69.into()));
     assert!(sparse_arena.contains_key(0));
@@ -764,20 +668,14 @@ fn two_items_remove_one_insert_one() {
 #[test]
 fn two_items_swap_remove_one_insert_one() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(0, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(42));
+    sparse_arena.insert(1, Identity(69));
 
     let removed = sparse_arena.swap_remove(0);
     assert_eq!(removed, Some(Identity(42)));
     assert_eq!(sparse_arena.get(0), None);
 
-    sparse_arena
-        .insert(0, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(0, Identity(34));
     assert_eq!(sparse_arena.get(0), Some(&34.into()));
     assert_eq!(sparse_arena.get(1), Some(&69.into()));
     assert!(sparse_arena.contains_key(0));
@@ -787,20 +685,14 @@ fn two_items_swap_remove_one_insert_one() {
 #[test]
 fn two_items_remove_one_push_one() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     let removed = sparse_arena.remove(first_key);
     assert_eq!(removed, Some(Identity(42)));
     assert_eq!(sparse_arena.get(first_key), None);
 
-    let key = sparse_arena
-        .push(Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(34));
     assert_eq!(key, first_key);
 
     assert_eq!(sparse_arena.get(first_key), Some(&34.into()));
@@ -812,20 +704,14 @@ fn two_items_remove_one_push_one() {
 #[test]
 fn two_items_swap_remove_one_push_one() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     let removed = sparse_arena.swap_remove(first_key);
     assert_eq!(removed, Some(Identity(42)));
     assert_eq!(sparse_arena.get(first_key), None);
 
-    let key = sparse_arena
-        .push(Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(Identity(34));
     assert_eq!(key, first_key);
 
     assert_eq!(sparse_arena.get(first_key), Some(&34.into()));
@@ -837,12 +723,8 @@ fn two_items_swap_remove_one_push_one() {
 #[test]
 fn two_items_swap() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     sparse_arena.swap(first_key, first_key);
     assert_eq!(sparse_arena.len(), 2);
@@ -866,12 +748,8 @@ fn two_items_swap() {
 #[test]
 fn two_items_swap_keys() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     sparse_arena.swap_keys(first_key, first_key);
     assert_eq!(sparse_arena.len(), 2);
@@ -895,12 +773,8 @@ fn two_items_swap_keys() {
 #[test]
 fn two_items_insert_pop() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(5, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(2, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(5, Identity(42));
+    sparse_arena.insert(2, Identity(69));
 
     let popped = sparse_arena.pop();
     assert_eq!(popped, Some((2, Identity(69))));
@@ -912,12 +786,8 @@ fn two_items_insert_pop() {
 #[test]
 fn two_items_push_pop() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     let popped = sparse_arena.pop();
     assert_eq!(popped, Some((second_key, Identity(69))));
@@ -931,14 +801,10 @@ fn two_items_insert_pop_epoch() {
     let mut sparse_arena = EpochSparseArena::new();
 
     let first_key = Key::new(5, 1);
-    sparse_arena
-        .insert(first_key, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(first_key, Identity(42));
 
     let second_key = Key::new(2, 0);
-    sparse_arena
-        .insert(second_key, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(second_key, Identity(69));
 
     let popped = sparse_arena.pop();
     assert_eq!(popped, Some((second_key, Identity(69))));
@@ -955,12 +821,8 @@ fn two_items_insert_pop_epoch() {
 #[test]
 fn two_items_push_pop_epoch() {
     let mut sparse_arena = EpochSparseArena::<Key, _>::new();
-    let first_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let second_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(42));
+    let second_key = sparse_arena.push(Identity(69));
 
     let popped = sparse_arena.pop();
     assert_eq!(popped, Some((second_key, Identity(69))));
@@ -979,14 +841,10 @@ fn two_items_invalidate_epoch() {
     let mut sparse_arena = EpochSparseArena::new();
 
     let first_key = Key::new(5, 1);
-    sparse_arena
-        .insert(first_key, Identity(42))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(first_key, Identity(42));
 
     let second_key = Key::new(2, 0);
-    sparse_arena
-        .insert(second_key, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(second_key, Identity(69));
 
     let new_first_key = sparse_arena
         .invalidate_epoch(first_key)
@@ -1010,15 +868,9 @@ fn two_items_invalidate_epoch() {
 #[test]
 fn three_items_insert_remove_middle() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let removed = sparse_arena.remove(2);
     assert_eq!(removed, Some(Identity(34)));
@@ -1035,15 +887,9 @@ fn three_items_insert_remove_middle() {
 #[test]
 fn three_items_push_remove_middle() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    let middle_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let last_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(34));
+    let middle_key = sparse_arena.push(Identity(42));
+    let last_key = sparse_arena.push(Identity(69));
 
     let removed = sparse_arena.remove(middle_key);
     assert_eq!(removed, Some(Identity(42)));
@@ -1060,15 +906,9 @@ fn three_items_push_remove_middle() {
 #[test]
 fn three_items_swap_remove_middle() {
     let mut sparse_arena = SparseArena::new();
-    let first_key = sparse_arena
-        .push(Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    let middle_key = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let last_key = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    let first_key = sparse_arena.push(Identity(34));
+    let middle_key = sparse_arena.push(Identity(42));
+    let last_key = sparse_arena.push(Identity(69));
 
     let removed = sparse_arena.swap_remove(middle_key);
     assert_eq!(removed, Some(Identity(42)));
@@ -1085,15 +925,9 @@ fn three_items_swap_remove_middle() {
 #[test]
 fn three_items_parts() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let (dense, sparse) = sparse_arena.into_parts();
     let (keys, values) = dense.as_slices().into();
@@ -1125,15 +959,9 @@ fn three_items_parts() {
 #[test]
 fn three_items_keys() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let keys = sparse_arena.keys();
     assert_eq!(keys.len(), 3);
@@ -1143,15 +971,9 @@ fn three_items_keys() {
 #[test]
 fn three_items_into_keys() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let keys = sparse_arena.into_keys();
     assert_eq!(keys.len(), 3);
@@ -1161,15 +983,9 @@ fn three_items_into_keys() {
 #[test]
 fn three_items_values() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let values = sparse_arena.values();
     assert_eq!(values.len(), 3);
@@ -1179,15 +995,9 @@ fn three_items_values() {
 #[test]
 fn three_items_values_mut() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let values_mut = sparse_arena.values_mut();
     assert_eq!(values_mut.len(), 3);
@@ -1200,15 +1010,9 @@ fn three_items_values_mut() {
 #[test]
 fn three_items_into_values() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let values = sparse_arena.into_values();
     assert_eq!(values.len(), 3);
@@ -1218,15 +1022,9 @@ fn three_items_into_values() {
 #[test]
 fn three_items_iter() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let iter = sparse_arena.iter();
     assert_eq!(iter.len(), 3);
@@ -1237,15 +1035,9 @@ fn three_items_iter() {
 #[test]
 fn three_items_iter_mut() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let iter_mut = sparse_arena.iter_mut();
     assert_eq!(iter_mut.len(), 3);
@@ -1259,15 +1051,9 @@ fn three_items_iter_mut() {
 #[test]
 fn three_items_into_iter() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let into_iter = sparse_arena.into_iter();
     assert_eq!(into_iter.len(), 3);
@@ -1281,21 +1067,11 @@ fn three_items_into_iter() {
 #[test]
 fn five_items_remove_insert() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(4, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(2, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(0, Identity(666))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(4, Identity(34));
+    sparse_arena.insert(2, Identity(42));
+    sparse_arena.insert(1, Identity(69));
+    sparse_arena.insert(6, Identity(228));
+    sparse_arena.insert(0, Identity(666));
 
     let key = 1;
     let value = sparse_arena.remove(key).unwrap();
@@ -1315,30 +1091,21 @@ fn five_items_remove_insert() {
 
     let key = 3;
     let value = Identity(0);
-    let previous = sparse_arena
-        .insert(key, value)
-        .expect("key-to-usize conversions should not fail");
-
+    let previous = sparse_arena.insert(key, value);
     assert_eq!(previous, None);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let key = 2;
     let value = Identity(1);
-    let previous = sparse_arena
-        .insert(key, value)
-        .expect("key-to-usize conversions should not fail");
-
+    let previous = sparse_arena.insert(key, value);
     assert_eq!(previous, Some(42.into()));
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let key = 4;
     let value = Identity(10);
-    let previous = sparse_arena
-        .insert(key, value)
-        .expect("key-to-usize conversions should not fail");
-
+    let previous = sparse_arena.insert(key, value);
     assert_eq!(previous, None);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
@@ -1347,21 +1114,11 @@ fn five_items_remove_insert() {
 #[test]
 fn five_items_swap_remove_insert() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(4, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(2, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(0, Identity(666))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(4, Identity(34));
+    sparse_arena.insert(2, Identity(42));
+    sparse_arena.insert(1, Identity(69));
+    sparse_arena.insert(6, Identity(228));
+    sparse_arena.insert(0, Identity(666));
 
     let key = 1;
     let value = sparse_arena.swap_remove(key).unwrap();
@@ -1381,30 +1138,21 @@ fn five_items_swap_remove_insert() {
 
     let key = 3;
     let value = Identity(0);
-    let previous = sparse_arena
-        .insert(key, value)
-        .expect("key-to-usize conversions should not fail");
-
+    let previous = sparse_arena.insert(key, value);
     assert_eq!(previous, None);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let key = 2;
     let value = Identity(1);
-    let previous = sparse_arena
-        .insert(key, value)
-        .expect("key-to-usize conversions should not fail");
-
+    let previous = sparse_arena.insert(key, value);
     assert_eq!(previous, Some(Identity(42)));
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let key = 4;
     let value = Identity(10);
-    let previous = sparse_arena
-        .insert(key, value)
-        .expect("key-to-usize conversions should not fail");
-
+    let previous = sparse_arena.insert(key, value);
     assert_eq!(previous, None);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
@@ -1413,21 +1161,11 @@ fn five_items_swap_remove_insert() {
 #[test]
 fn five_items_remove_push() {
     let mut sparse_arena = SparseArena::new();
-    let _key0 = sparse_arena
-        .push(Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    let key1 = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let key2 = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    let key3 = sparse_arena
-        .push(Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    let key4 = sparse_arena
-        .push(Identity(666))
-        .expect("key-to-usize conversions should not fail");
+    let _key0 = sparse_arena.push(Identity(34));
+    let key1 = sparse_arena.push(Identity(42));
+    let key2 = sparse_arena.push(Identity(69));
+    let key3 = sparse_arena.push(Identity(228));
+    let key4 = sparse_arena.push(Identity(666));
 
     let value = sparse_arena.remove(key1).unwrap();
     assert_eq!(value, 42.into());
@@ -1442,23 +1180,17 @@ fn five_items_remove_push() {
     assert_eq!(value, 69.into());
 
     let value = Identity(0);
-    let key = sparse_arena
-        .push(value)
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(value);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let value = Identity(1);
-    let key = sparse_arena
-        .push(value)
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(value);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let value = Identity(10);
-    let key = sparse_arena
-        .push(value)
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(value);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 }
@@ -1466,21 +1198,11 @@ fn five_items_remove_push() {
 #[test]
 fn five_items_swap_remove_push() {
     let mut sparse_arena = SparseArena::new();
-    let _key0 = sparse_arena
-        .push(Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    let key1 = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let key2 = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    let key3 = sparse_arena
-        .push(Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    let key4 = sparse_arena
-        .push(Identity(666))
-        .expect("key-to-usize conversions should not fail");
+    let _key0 = sparse_arena.push(Identity(34));
+    let key1 = sparse_arena.push(Identity(42));
+    let key2 = sparse_arena.push(Identity(69));
+    let key3 = sparse_arena.push(Identity(228));
+    let key4 = sparse_arena.push(Identity(666));
 
     let value = sparse_arena.swap_remove(key1).unwrap();
     assert_eq!(value, 42.into());
@@ -1495,23 +1217,17 @@ fn five_items_swap_remove_push() {
     assert_eq!(value, 69.into());
 
     let value = Identity(0);
-    let key = sparse_arena
-        .push(value)
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(value);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let value = Identity(1);
-    let key = sparse_arena
-        .push(value)
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(value);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 
     let value = Identity(10);
-    let key = sparse_arena
-        .push(value)
-        .expect("key-to-usize conversions should not fail");
+    let key = sparse_arena.push(value);
     assert_eq!(sparse_arena.get(key), Some(&value));
     assert!(sparse_arena.contains_key(key));
 }
@@ -1519,21 +1235,11 @@ fn five_items_swap_remove_push() {
 #[test]
 fn five_items_retain() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(8, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(4, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(3, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(666))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(8, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(4, Identity(69));
+    sparse_arena.insert(3, Identity(228));
+    sparse_arena.insert(6, Identity(666));
 
     sparse_arena.retain(|key, _| key % 2 == 0);
     assert_eq!(sparse_arena.len(), 3);
@@ -1564,21 +1270,11 @@ fn five_items_retain() {
 #[test]
 fn five_items_drain() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(8, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(4, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(3, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(666))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(8, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(4, Identity(69));
+    sparse_arena.insert(3, Identity(228));
+    sparse_arena.insert(6, Identity(666));
 
     let drain = sparse_arena.drain();
     assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
@@ -1597,21 +1293,11 @@ fn five_items_drain() {
 #[test]
 fn five_items_insert_truncate() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(8, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(4, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(3, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(666))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(8, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(4, Identity(69));
+    sparse_arena.insert(3, Identity(228));
+    sparse_arena.insert(6, Identity(666));
 
     sparse_arena.truncate(usize::MAX, 5);
     assert_eq!(sparse_arena.sparse_len(), 5);
@@ -1636,21 +1322,11 @@ fn five_items_insert_truncate() {
 #[test]
 fn five_items_push_truncate() {
     let mut sparse_arena = SparseArena::new();
-    let key0 = sparse_arena
-        .push(Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    let key1 = sparse_arena
-        .push(Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    let key2 = sparse_arena
-        .push(Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    let key3 = sparse_arena
-        .push(Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    let key4 = sparse_arena
-        .push(Identity(666))
-        .expect("key-to-usize conversions should not fail");
+    let key0 = sparse_arena.push(Identity(34));
+    let key1 = sparse_arena.push(Identity(42));
+    let key2 = sparse_arena.push(Identity(69));
+    let key3 = sparse_arena.push(Identity(228));
+    let key4 = sparse_arena.push(Identity(666));
 
     sparse_arena.truncate(usize::MAX, 3);
     assert_eq!(sparse_arena.sparse_len(), 3);
@@ -1674,21 +1350,11 @@ fn five_items_push_truncate() {
 #[test]
 fn five_items_sort() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(8, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(4, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(3, Identity(666))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(8, Identity(42));
+    sparse_arena.insert(1, Identity(228));
+    sparse_arena.insert(4, Identity(69));
+    sparse_arena.insert(3, Identity(666));
+    sparse_arena.insert(6, Identity(34));
 
     sparse_arena.sort();
     assert_eq!(sparse_arena.as_keys_slice(), &[6, 8, 4, 1, 3]);
@@ -1707,21 +1373,11 @@ fn five_items_sort() {
 #[test]
 fn five_items_sort_keys() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(8, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(4, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(3, Identity(666))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(8, Identity(42));
+    sparse_arena.insert(1, Identity(228));
+    sparse_arena.insert(4, Identity(69));
+    sparse_arena.insert(3, Identity(666));
+    sparse_arena.insert(6, Identity(34));
 
     sparse_arena.sort_keys();
     assert_eq!(sparse_arena.as_keys_slice(), &[1, 3, 4, 6, 8]);
@@ -1740,21 +1396,11 @@ fn five_items_sort_keys() {
 #[test]
 fn five_items_sort_by() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(8, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(4, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(3, Identity(666))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(8, Identity(42));
+    sparse_arena.insert(1, Identity(228));
+    sparse_arena.insert(4, Identity(69));
+    sparse_arena.insert(3, Identity(666));
+    sparse_arena.insert(6, Identity(34));
 
     sparse_arena.sort_by(|(_, a), (_, b)| Ord::cmp(b, a));
     assert_eq!(sparse_arena.as_keys_slice(), &[3, 1, 4, 8, 6]);
@@ -1773,25 +1419,13 @@ fn five_items_sort_by() {
 #[test]
 fn five_items_entry() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(8, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(228))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(4, Identity(69))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(3, Identity(666))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(6, Identity(34))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(8, Identity(42));
+    sparse_arena.insert(1, Identity(228));
+    sparse_arena.insert(4, Identity(69));
+    sparse_arena.insert(3, Identity(666));
+    sparse_arena.insert(6, Identity(34));
 
-    let entry = sparse_arena
-        .entry(0)
-        .expect("key-to-usize conversions should not fail");
+    let entry = sparse_arena.entry(0);
     assert_eq!(entry.key(), 0);
     assert_eq!(entry.get(), None);
 
@@ -1799,9 +1433,7 @@ fn five_items_entry() {
     assert_eq!(entry.key(), 0);
     assert_eq!(entry.get(), None);
 
-    let entry = entry
-        .replace_key(1)
-        .expect("key-to-usize conversions should not fail");
+    let entry = entry.replace_key(1);
     assert_eq!(entry.key(), 1);
     assert_eq!(entry.get(), Some(&228.into()));
 
@@ -1835,7 +1467,7 @@ fn from_keys_values_iter() {
 }
 
 #[test]
-#[should_panic(expected = "capacity overflow")]
+#[should_panic]
 fn from_keys_values_iter_too_large_key() {
     let keys = [3, 10, 5, 10, 1, usize::MAX];
     let values = [
@@ -1890,15 +1522,9 @@ fn from_values_iter() {
 #[test]
 fn extend_keys_values() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(5, Identity(69));
 
     let keys = [3, 0, 2, 8];
     let values = [Identity(228), Identity(666), Identity(42), Identity(69)];
@@ -1921,15 +1547,9 @@ fn extend_keys_values() {
 #[test]
 fn extend_values() {
     let mut sparse_arena = SparseArena::new();
-    sparse_arena
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_arena
-        .insert(4, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_arena.insert(2, Identity(34));
+    sparse_arena.insert(1, Identity(42));
+    sparse_arena.insert(4, Identity(69));
 
     let values = [Identity(228), Identity(666), Identity(201)];
     sparse_arena.extend(values);
@@ -1951,15 +1571,9 @@ fn extend_values() {
 #[test]
 fn from_set() {
     let mut sparse_set = SparseSet::new();
-    sparse_set
-        .insert(2, Identity(34))
-        .expect("key-to-usize conversions should not fail");
-    sparse_set
-        .insert(1, Identity(42))
-        .expect("key-to-usize conversions should not fail");
-    sparse_set
-        .insert(5, Identity(69))
-        .expect("key-to-usize conversions should not fail");
+    sparse_set.insert(2, Identity(34));
+    sparse_set.insert(1, Identity(42));
+    sparse_set.insert(5, Identity(69));
 
     let sparse_arena = SparseArena::from(sparse_set);
     assert_eq!(sparse_arena.len(), 3);

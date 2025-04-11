@@ -153,9 +153,7 @@ fn exchange_components() {
         .register_archetype::<(Position, Mass)>(&mut components, &())
         .expect("archetype of `Position` and `Mass` should contain unique component ids");
 
-    let entity = entities
-        .spawn(Default::default(), ())
-        .expect("entity should be created successfully");
+    let entity = entities.spawn(Default::default(), ());
 
     let position = Position {
         x: 1.0,
@@ -212,9 +210,7 @@ fn exchange_components_empty_registry() {
     let mut components = ComponentRegistry::new();
     let mut archetypes = ArchetypeRegistry::new();
 
-    let entity = entities
-        .spawn(Default::default(), ())
-        .expect("entity should be created successfully");
+    let entity = entities.spawn(Default::default(), ());
     archetypes.insert_component::<Tag>(&mut components, entity, Tag);
 
     let component_ids = <(Tag,)>::component_ids(&(), &mut components)

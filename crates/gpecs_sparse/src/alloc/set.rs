@@ -14,8 +14,8 @@ use crate::{
         unwrap_dense_index_mut, unwrap_into_index, unwrap_into_usize, unwrap_sparse_item_mut,
     },
     error::{
-        FromPartsError, InvalidKeyError, TooLargeSparseIndexError, TooSmallSparseIndexError,
-        TryInvalidKeyError, TryReserveError,
+        FromPartsError, TooLargeSparseIndexError, TooSmallSparseIndexError, TryModifyError,
+        TryReserveError,
     },
     item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
@@ -383,45 +383,16 @@ where
         Ok(Self { dense, sparse })
     }
 
-    pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InvalidKeyError<K>> {
-        let Self { dense, sparse } = self;
-
-        let sparse_index = key
-            .sparse_index()
-            .try_into()
-            .map_err(TooLargeSparseIndexError::new)?;
-        extend_sparse(sparse, sparse_index.saturating_add(1));
-
-        let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
-        if key.epoch() < sparse_item.epoch {
-            return Ok(None);
+    #[inline]
+    #[track_caller]
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        match self.try_insert(key, value) {
+            Ok(result) => result,
+            Err(_) => panic!("failed to insert value by provided key"),
         }
-
-        if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
-            let (context, dense) = dense.slices_mut().into_slices_with_context();
-            let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
-
-            let dense_index = unwrap_into_usize(dense_index);
-            let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
-
-            let value = soa_replace(context, dense_value, value);
-            sparse_item.epoch = key.epoch();
-            *dense_key = key;
-
-            return Ok(Some(value));
-        }
-
-        let dense_index = dense
-            .len()
-            .try_into()
-            .map_err(TooSmallSparseIndexError::new)?;
-        dense.push(KeyValuePair { key, value });
-        *sparse_item = SparseItem::occupied(dense_index, key.epoch());
-
-        Ok(None)
     }
 
-    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryInvalidKeyError<K>> {
+    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>> {
         let Self { dense, sparse } = self;
 
         let sparse_index = key
@@ -465,25 +436,16 @@ where
         Ok(None)
     }
 
-    pub fn push(&mut self, value: V) -> Result<K, InvalidKeyError<K>> {
-        let Self { sparse, .. } = self;
-
-        let (sparse_index, epoch) = sparse
-            .iter()
-            .enumerate()
-            .find(|(_, SparseItem { kind, .. })| kind.is_vacant())
-            .map(|(sparse_index, &SparseItem { epoch, .. })| (sparse_index, epoch))
-            .unwrap_or((self.sparse.len(), Default::default()));
-        let sparse_index = sparse_index
-            .try_into()
-            .map_err(TooSmallSparseIndexError::new)?;
-        let key = K::new(sparse_index, epoch);
-
-        self.insert(key, value)?;
-        Ok(key)
+    #[inline]
+    #[track_caller]
+    pub fn push(&mut self, value: V) -> K {
+        match self.try_push(value) {
+            Ok(key) => key,
+            Err(_) => panic!("failed to push value"),
+        }
     }
 
-    pub fn try_push(&mut self, value: V) -> Result<K, TryInvalidKeyError<K>> {
+    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K>> {
         let Self { sparse, .. } = self;
 
         let (sparse_index, epoch) = sparse
@@ -780,7 +742,17 @@ where
         view.contains_key(key)
     }
 
-    pub fn entry(&mut self, key: K) -> Result<Entry<'_, K, V>, TooLargeSparseIndexError<K>> {
+    #[inline]
+    #[track_caller]
+    pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
+        match self.try_entry(key) {
+            Ok(entry) => entry,
+            Err(_) => panic!("failed to create entry for the key"),
+        }
+    }
+
+    #[inline]
+    pub fn try_entry(&mut self, key: K) -> Result<Entry<'_, K, V>, TooLargeSparseIndexError<K>> {
         let Self { dense, sparse } = self;
 
         let sparse_index: usize = key
@@ -1144,7 +1116,7 @@ where
 
         let mut me = Self::with_capacity(iter_len, iter_len);
         for KeyValuePair { key, value } in iter {
-            me.insert(key, value).unwrap();
+            me.insert(key, value);
         }
 
         me
@@ -1199,7 +1171,7 @@ where
                 let (lower, _) = iter.size_hint();
                 self.reserve(lower.saturating_add(1), 0);
             }
-            self.insert(key, value).unwrap();
+            self.insert(key, value);
         }
     }
 }
@@ -1234,7 +1206,7 @@ where
                 .find(|&key| self.sparse[key].is_vacant())
                 .unwrap_or(self.sparse.len());
             let key = K::new(sparse_index, Default::default());
-            self.insert(key, value).unwrap();
+            self.insert(key, value);
         }
     }
 }

@@ -40,6 +40,17 @@ impl ArchetypeId {
     }
 }
 
+/// Archetype [identifier](ArchetypeId) of some [entity](Entity).
+///
+/// [`None`] means that an entity has no components attached to it.
+pub type EntityArchetype = Option<ArchetypeId>;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub enum EntityArchetypeStatus {
+    Unknown,
+    Known(EntityArchetype),
+}
+
 #[derive(Debug)]
 pub struct ArchetypeInfo {
     id: ArchetypeId,
@@ -311,15 +322,49 @@ impl ArchetypeRegistry {
     ) where
         C: Component,
     {
+        let archetype_status = EntityArchetypeStatus::Unknown;
+        self.insert_component_with(components, entity, archetype_status, component);
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn insert_component_with<C>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        archetype_status: EntityArchetypeStatus,
+        component: C,
+    ) where
+        C: Component,
+    {
         let component_id = components.register_component::<C>();
-        // TODO: replace search with direct usage of archetype id (to be stored inside of entity registry)
-        let old_archetype = self
-            .archetypes
-            .iter()
-            .position(|(archetype_key, info)| {
-                !archetype_key.contains(&component_id) && info.storage().contains(entity)
-            })
-            .map(ArchetypeId);
+
+        let old_archetype = match archetype_status {
+            EntityArchetypeStatus::Unknown => self
+                .archetypes
+                .iter()
+                .position(|(archetype_key, info)| {
+                    !archetype_key.contains(&component_id) && info.storage().contains(entity)
+                })
+                .map(ArchetypeId),
+            EntityArchetypeStatus::Known(archetype_id) => {
+                if let Some(archetype_id) = archetype_id {
+                    let index = archetype_id.index();
+                    let Some((archetype_key, info)) = self.archetypes.get_index(index) else {
+                        panic!("archetype {archetype_id:?} should exist")
+                    };
+                    assert!(
+                        !archetype_key.contains(&component_id),
+                        "archetype {archetype_id:?} should not contain component {component_id:?}",
+                    );
+                    assert!(
+                        info.storage().contains(entity),
+                        "archetype {archetype_id:?} should contain entity {entity:?}",
+                    );
+                }
+                archetype_id
+            }
+        };
 
         let (new_archetype, mut old_fields) = match old_archetype {
             Some(old_archetype) => {
@@ -382,7 +427,6 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn remove_component<C>(
         &mut self,
         components: &mut ComponentRegistry,
@@ -391,15 +435,50 @@ impl ArchetypeRegistry {
     where
         C: Component,
     {
+        let archetype_status = EntityArchetypeStatus::Unknown;
+        self.remove_component_with(components, entity, archetype_status)
+    }
+
+    #[inline]
+    #[track_caller]
+    #[allow(unsafe_code)]
+    pub fn remove_component_with<C>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        archetype_status: EntityArchetypeStatus,
+    ) -> Option<C>
+    where
+        C: Component,
+    {
         let component_id = components.register_component::<C>();
-        // TODO: replace search with direct usage of archetype id (to be stored inside of entity registry)
-        let old_archetype = self
-            .archetypes
-            .iter_mut()
-            .position(|(archetype_key, info)| {
-                archetype_key.contains(&component_id) && info.storage().contains(entity)
-            })
-            .map(ArchetypeId)?;
+
+        let old_archetype = match archetype_status {
+            EntityArchetypeStatus::Unknown => self
+                .archetypes
+                .iter()
+                .position(|(archetype_key, info)| {
+                    archetype_key.contains(&component_id) && info.storage().contains(entity)
+                })
+                .map(ArchetypeId),
+            EntityArchetypeStatus::Known(archetype_id) => {
+                if let Some(archetype_id) = archetype_id {
+                    let index = archetype_id.index();
+                    let Some((archetype_key, info)) = self.archetypes.get_index(index) else {
+                        panic!("archetype {archetype_id:?} should exist")
+                    };
+                    assert!(
+                        archetype_key.contains(&component_id),
+                        "archetype {archetype_id:?} should contain component {component_id:?}",
+                    );
+                    assert!(
+                        info.storage().contains(entity),
+                        "archetype {archetype_id:?} should contain entity {entity:?}",
+                    );
+                }
+                archetype_id
+            }
+        }?;
 
         let Some(old_info) = self.get_info_mut(old_archetype) else {
             unreachable!("old archetype {old_archetype:?} should exist")

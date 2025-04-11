@@ -771,7 +771,7 @@ where
 
         let sparse_index = key.sparse_index();
         let sparse_item = sparse
-            .get_mut(sparse_index.try_into().ok()?)
+            .get_mut::<usize>(sparse_index.try_into().ok()?)
             .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
 
@@ -790,7 +790,7 @@ where
 
         let sparse_index = key.sparse_index();
         let sparse_item = sparse
-            .get_mut(sparse_index.try_into().ok()?)
+            .get_mut::<usize>(sparse_index.try_into().ok()?)
             .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
 
@@ -1362,11 +1362,11 @@ where
     K: Key,
     V: Soa,
 {
-    for (sparse_index, sparse_item) in sparse.iter().enumerate() {
+    for (sparse_index, &SparseItem::<K> { kind, epoch }) in sparse.iter().enumerate() {
         let sparse_index = sparse_index
             .try_into()
             .map_err(TooSmallSparseIndexError::new)?;
-        let Some(dense_index) = sparse_item.dense_index().copied() else {
+        let Some(dense_index) = kind.dense_index().copied() else {
             continue;
         };
 
@@ -1384,13 +1384,13 @@ where
         }
 
         let epoch_from_key = key.epoch();
-        let expected_epoch = sparse_item.epoch;
+        let expected_epoch = epoch;
         if epoch_from_key != expected_epoch {
             let error = EpochMismatchError::new(epoch_from_key, expected_epoch);
             return Err(error.into());
         }
     }
-    for (dense_index, KeyValueRefs { key, .. }) in dense.iter().enumerate() {
+    for (dense_index, KeyValueRefs::<K, _> { key, .. }) in dense.iter().enumerate() {
         let sparse_index = key
             .sparse_index()
             .try_into()

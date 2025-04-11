@@ -69,7 +69,7 @@ where
     K: Key + 'a,
     V: Soa,
 {
-    let sparse_index = key.sparse_index().try_into().ok()?;
+    let sparse_index: usize = key.sparse_index().try_into().ok()?;
     let sparse_item = sparse
         .get(sparse_index)
         .take_if(|item| item.epoch == key.epoch())?;
@@ -118,7 +118,7 @@ where
     K: Key + 'a,
     V: Soa,
 {
-    let sparse_index = key.sparse_index().try_into().ok()?;
+    let sparse_index: usize = key.sparse_index().try_into().ok()?;
     let sparse_item = sparse
         .get(sparse_index)
         .take_if(|item| item.epoch == key.epoch())?;
@@ -157,7 +157,7 @@ where
     K: Key + 'a,
     V: Soa,
 {
-    let sparse_item = sparse.get(sparse_index.try_into().ok()?)?;
+    let sparse_item = sparse.get::<usize>(sparse_index.try_into().ok()?)?;
     let dense_index = sparse_item.dense_index()?;
     let dense_index = unwrap_into_usize(*dense_index);
 
@@ -176,7 +176,7 @@ where
     K: Key + 'a,
     V: Soa,
 {
-    let sparse_item = sparse.get(sparse_index.try_into().ok()?)?;
+    let sparse_item = sparse.get::<usize>(sparse_index.try_into().ok()?)?;
     let dense_index = sparse_item.dense_index()?;
     let dense_index = unwrap_into_usize(*dense_index);
 
@@ -194,7 +194,7 @@ pub fn sparse_get_epoch<K>(
 where
     K: Key,
 {
-    let sparse_item = sparse.get(sparse_index.try_into().ok()?)?;
+    let sparse_item = sparse.get::<usize>(sparse_index.try_into().ok()?)?;
     let epoch = sparse_item.epoch;
     if let Some(dense_index) = sparse_item.dense_index() {
         let dense_index = unwrap_into_usize(*dense_index);
@@ -213,9 +213,8 @@ where
         return false;
     };
     let Some(sparse_item) = sparse
-        .get(sparse_index)
+        .get::<usize>(sparse_index)
         .take_if(|item| item.epoch == key.epoch())
-        .copied()
     else {
         return false;
     };

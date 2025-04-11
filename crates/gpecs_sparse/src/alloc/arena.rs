@@ -389,7 +389,7 @@ where
 
         sparse.clear();
         let mut sparse_vacant_head = 0;
-        for (dense_index, KeyValueRefs { key, .. }) in dense.slices().into_iter().enumerate() {
+        for (dense_index, KeyValueRefs::<K, _> { key, .. }) in dense.slices().iter().enumerate() {
             let sparse_index = key
                 .sparse_index()
                 .try_into()
@@ -434,7 +434,7 @@ where
             sparse_vacant_head,
         } = self;
 
-        let sparse_index = key
+        let sparse_index: usize = key
             .sparse_index()
             .try_into()
             .map_err(TooLargeSparseIndexError::new)?;
@@ -491,7 +491,7 @@ where
             sparse_vacant_head,
         } = self;
 
-        let sparse_index = key
+        let sparse_index: usize = key
             .sparse_index()
             .try_into()
             .map_err(TooLargeSparseIndexError::new)?;
@@ -673,7 +673,7 @@ where
             sparse_vacant_head,
         } = self;
 
-        let sparse_index = key.sparse_index().try_into().ok()?;
+        let sparse_index: usize = key.sparse_index().try_into().ok()?;
         let dense_index = *sparse
             .get(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
@@ -684,7 +684,7 @@ where
         let (dense_key, value) = dense.swap_remove(dense_index_usize).into();
         check_equal_key(key, dense_key);
 
-        if let Some(KeyValueRefs { key, .. }) = dense.slices().into_get(dense_index_usize) {
+        if let Some(KeyValueRefs::<K, _> { key, .. }) = dense.slices().into_get(dense_index_usize) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             match sparse_item.kind_mut() {
@@ -706,7 +706,7 @@ where
             sparse_vacant_head,
         } = self;
 
-        let sparse_index = key.sparse_index().try_into().ok()?;
+        let sparse_index: usize = key.sparse_index().try_into().ok()?;
         let dense_index = sparse
             .get(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
@@ -717,7 +717,7 @@ where
         let (dense_key, value) = dense.remove(dense_index).into();
         check_equal_key(key, dense_key);
 
-        for KeyValueRefs { key, .. } in dense.slices().into_iter().skip(dense_index) {
+        for KeyValueRefs::<K, _> { key, .. } in dense.slices().into_iter().skip(dense_index) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
@@ -834,7 +834,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'a> V::Refs<'a>: Ord,
+        for<'any> V::Refs<'any>: Ord,
     {
         let mut view_mut = self.as_mut_view();
         view_mut.sort()
@@ -969,7 +969,7 @@ where
     pub fn entry(&mut self, key: K) -> Result<Entry<'_, K, V>, TooLargeSparseIndexError<K>> {
         let Self { dense, sparse, .. } = self;
 
-        let sparse_index = key
+        let sparse_index: usize = key
             .sparse_index()
             .try_into()
             .map_err(TooLargeSparseIndexError::new)?;
@@ -996,10 +996,10 @@ where
             sparse_vacant_head,
         } = self;
 
-        for KeyValueRefs { key, .. } in dense.slices() {
+        for KeyValueRefs::<K, _> { key, .. } in dense.slices() {
             let sparse_index = unwrap_into_usize(key.sparse_index());
-            sparse[sparse_index] =
-                SparseItem::vacant(unwrap_into_index(*sparse_vacant_head), key.epoch().next());
+            let next_vacant = unwrap_into_index(*sparse_vacant_head);
+            sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
             *sparse_vacant_head = sparse_index;
         }
         dense.clear();
@@ -1096,10 +1096,16 @@ where
     SoaVec<KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
         f.debug_struct("EpochSparseArena")
-            .field("dense", &self.dense)
-            .field("sparse", &self.sparse)
-            .field("sparse_vacant_head", &self.sparse_vacant_head)
+            .field("dense", dense)
+            .field("sparse", sparse)
+            .field("sparse_vacant_head", sparse_vacant_head)
             .finish()
     }
 }
@@ -1126,9 +1132,15 @@ where
     SoaVec<KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.dense == other.dense
-            && self.sparse == other.sparse
-            && self.sparse_vacant_head == other.sparse_vacant_head
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        *dense == other.dense
+            && *sparse == other.sparse
+            && *sparse_vacant_head == other.sparse_vacant_head
     }
 }
 
@@ -1147,16 +1159,21 @@ where
     SoaVec<KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.dense.partial_cmp(&other.dense) {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        match dense.partial_cmp(&other.dense) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        match self.sparse.partial_cmp(&other.sparse) {
+        match sparse.partial_cmp(&other.sparse) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.sparse_vacant_head
-            .partial_cmp(&other.sparse_vacant_head)
+        sparse_vacant_head.partial_cmp(&other.sparse_vacant_head)
     }
 }
 
@@ -1167,15 +1184,21 @@ where
     SoaVec<KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.dense.cmp(&other.dense) {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        match dense.cmp(&other.dense) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        match self.sparse.cmp(&other.sparse) {
+        match sparse.cmp(&other.sparse) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.sparse_vacant_head.cmp(&other.sparse_vacant_head)
+        sparse_vacant_head.cmp(&other.sparse_vacant_head)
     }
 }
 
@@ -1188,9 +1211,15 @@ where
     SoaVec<KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.dense.hash(state);
-        self.sparse.hash(state);
-        self.sparse_vacant_head.hash(state);
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        dense.hash(state);
+        sparse.hash(state);
+        sparse_vacant_head.hash(state);
     }
 }
 
@@ -1201,10 +1230,16 @@ where
     SoaVec<KeyValuePair<K, V>>: Clone,
 {
     fn clone(&self) -> Self {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
         Self {
-            dense: self.dense.clone(),
-            sparse: self.sparse.clone(),
-            sparse_vacant_head: self.sparse_vacant_head.clone(),
+            dense: dense.clone(),
+            sparse: sparse.clone(),
+            sparse_vacant_head: sparse_vacant_head.clone(),
         }
     }
 

@@ -1,11 +1,11 @@
 use crate::{error::TooLargeSparseIndexError, key::Key};
 
-use super::error::TryModifyError;
+use super::error::TryModifyErrorKind;
 
 #[cold]
 #[inline(never)]
 #[track_caller]
-pub fn try_insert_failed<K>(error: TryModifyError<K>) -> !
+pub fn try_insert_failed<K>(error: TryModifyErrorKind<K>) -> !
 where
     K: Key,
 {
@@ -15,7 +15,7 @@ where
 #[cold]
 #[inline(never)]
 #[track_caller]
-pub fn try_push_failed<K>(error: TryModifyError<K>) -> !
+pub fn try_push_failed<K>(error: TryModifyErrorKind<K>) -> !
 where
     K: Key,
 {
@@ -35,7 +35,7 @@ where
 #[cold]
 #[inline(never)]
 #[track_caller]
-pub fn try_replace_key_failed<K>(error: TryModifyError<K>) -> !
+pub fn try_replace_key_failed<K>(error: TryModifyErrorKind<K>) -> !
 where
     K: Key,
 {
@@ -44,11 +44,11 @@ where
 
 #[inline]
 #[track_caller]
-fn try_modify_failed<K>(error: TryModifyError<K>, message: &str) -> !
+fn try_modify_failed<K>(error: TryModifyErrorKind<K>, message: &str) -> !
 where
     K: Key,
 {
-    use TryModifyError::*;
+    use TryModifyErrorKind::*;
 
     match error {
         TooLargeSparseIndex(_) => panic!("{message} (sparse index is too large for `usize`)"),

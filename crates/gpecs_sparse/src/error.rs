@@ -4,7 +4,7 @@ use core::{
 };
 
 #[cfg(feature = "alloc")]
-pub use crate::alloc::error::{TryModifyError, TryReserveError};
+pub use crate::alloc::error::{TryModifyError, TryModifyErrorKind, TryReserveError};
 
 use crate::key::Key;
 

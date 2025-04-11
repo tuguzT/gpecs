@@ -60,7 +60,7 @@ impl Error for TryReserveError {
     }
 }
 
-pub enum TryModifyError<K>
+pub enum TryModifyErrorKind<K>
 where
     K: Key,
 {
@@ -69,7 +69,7 @@ where
     TryReserve(TryReserveError),
 }
 
-impl<K> Debug for TryModifyError<K>
+impl<K> Debug for TryModifyErrorKind<K>
 where
     K: Key,
     TooLargeSparseIndexError<K>: Debug,
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<K> Display for TryModifyError<K>
+impl<K> Display for TryModifyErrorKind<K>
 where
     K: Key,
     TooLargeSparseIndexError<K>: Display,
@@ -103,7 +103,7 @@ where
     }
 }
 
-impl<K> Error for TryModifyError<K>
+impl<K> Error for TryModifyErrorKind<K>
 where
     K: Key,
     TooLargeSparseIndexError<K>: Error,
@@ -111,7 +111,7 @@ where
 {
 }
 
-impl<K> From<TooLargeSparseIndexError<K>> for TryModifyError<K>
+impl<K> From<TooLargeSparseIndexError<K>> for TryModifyErrorKind<K>
 where
     K: Key,
 {
@@ -120,7 +120,7 @@ where
     }
 }
 
-impl<K> From<TooSmallSparseIndexError<K>> for TryModifyError<K>
+impl<K> From<TooSmallSparseIndexError<K>> for TryModifyErrorKind<K>
 where
     K: Key,
 {
@@ -129,11 +129,76 @@ where
     }
 }
 
-impl<K> From<TryReserveError> for TryModifyError<K>
+impl<K> From<TryReserveError> for TryModifyErrorKind<K>
 where
     K: Key,
 {
     fn from(value: TryReserveError) -> Self {
         Self::TryReserve(value)
     }
+}
+
+#[non_exhaustive]
+pub struct TryModifyError<K, V>
+where
+    K: Key,
+    V: ?Sized,
+{
+    pub kind: TryModifyErrorKind<K>,
+    pub value: V,
+}
+
+impl<K, V> TryModifyError<K, V>
+where
+    K: Key,
+{
+    #[inline]
+    pub(super) fn new(kind: TryModifyErrorKind<K>, value: V) -> Self {
+        Self { kind, value }
+    }
+
+    #[inline]
+    pub fn map_value<F, U>(self, f: F) -> TryModifyError<K, U>
+    where
+        F: FnOnce(V) -> U,
+    {
+        let Self { kind, value } = self;
+        let value = f(value);
+        TryModifyError { kind, value }
+    }
+}
+
+impl<K, V> Debug for TryModifyError<K, V>
+where
+    K: Key,
+    V: Debug + ?Sized,
+    TryModifyErrorKind<K>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { kind, value } = self;
+        f.debug_struct("TryModifyError")
+            .field("kind", kind)
+            .field("value", &value)
+            .finish()
+    }
+}
+
+impl<K, V> Display for TryModifyError<K, V>
+where
+    K: Key,
+    V: Display + ?Sized,
+    TryModifyErrorKind<K>: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { kind, value } = self;
+        write!(f, "invalid key for value {value} ({kind})")
+    }
+}
+
+impl<K, V> Error for TryModifyError<K, V>
+where
+    K: Key,
+    V: Debug + Display + ?Sized,
+    TryModifyErrorKind<K>: Error,
+{
 }

@@ -122,11 +122,11 @@ where
     #[track_caller]
     pub fn replace_key(&mut self, key: K) -> Option<V> {
         self.try_replace_key(key)
-            .unwrap_or_else(|error| try_replace_key_failed(error))
+            .unwrap_or_else(|error| try_replace_key_failed(error.kind))
     }
 
     #[inline]
-    pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K>> {
+    pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K, V>> {
         let new_key = key;
         let Self { key, container, .. } = self;
 
@@ -265,7 +265,7 @@ where
 
     fn slices_mut(&mut self) -> SoaSlicesMut<'_, V>;
 
-    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>>;
+    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>>;
 
     fn remove(&mut self, key: K) -> Option<V>;
 
@@ -288,7 +288,7 @@ where
     }
 
     #[inline]
-    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>> {
+    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>> {
         EpochSparseSet::try_insert(self, key, value)
     }
 
@@ -319,7 +319,7 @@ where
     }
 
     #[inline]
-    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>> {
+    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>> {
         EpochSparseArena::try_insert(self, key, value)
     }
 
@@ -447,10 +447,10 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn try_replace_key(self, key: K) -> Result<Self, TryModifyError<K>> {
+            pub fn try_replace_key(self, key: K) -> Result<Self, TryModifyErrorKind<K>> {
                 match self {
                     Self::Occupied(mut entry) => {
-                        entry.try_replace_key(key)?;
+                        entry.try_replace_key(key).map_err(|error| error.kind)?;
                         Ok(Self::Occupied(entry))
                     }
                     Self::Vacant(entry) => {
@@ -545,7 +545,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K>> {
+            pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K, V>> {
                 let Self { inner } = self;
                 inner.try_replace_key(key)
             }

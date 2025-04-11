@@ -8,7 +8,7 @@ use std::{
 
 pub use error::TryReserveError;
 
-pub type TrySpawnError = error::TryModifyError<Entity>;
+pub type TrySpawnError<Meta> = error::TryModifyError<Entity, Meta>;
 
 use gpecs_sparse::{arena::EpochSparseArena, error};
 
@@ -111,8 +111,9 @@ impl<Meta> EntityRegistry<Meta> {
         #[cold]
         #[inline(never)]
         #[track_caller]
-        fn spawn_failed(error: TrySpawnError) -> ! {
-            panic!("failed to spawn entity: {error}")
+        fn spawn_failed<Meta>(error: TrySpawnError<Meta>) -> ! {
+            let kind = error.kind;
+            panic!("failed to spawn entity: {kind}")
         }
 
         self.try_spawn(world, meta)
@@ -120,10 +121,12 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn try_spawn(&mut self, world: WorldId, meta: Meta) -> Result<Entity, TrySpawnError> {
+    pub fn try_spawn(&mut self, world: WorldId, meta: Meta) -> Result<Entity, TrySpawnError<Meta>> {
         let Self { inner } = self;
 
-        let entity = inner.try_push(meta.into())?;
+        let entity = inner
+            .try_push(meta.into())
+            .map_err(|error| error.map_value(Identity::into_inner))?;
         let entity = inner
             .replace_key(Entity::new(entity.index(), entity.epoch(), world))
             .expect("entity should exist because it was just created");

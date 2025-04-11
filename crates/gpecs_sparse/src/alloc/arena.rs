@@ -15,7 +15,7 @@ use crate::{
     },
     error::{
         FromPartsError, TooLargeSparseIndexError, TooSmallSparseIndexError, TryModifyError,
-        TryReserveError,
+        TryModifyErrorKind, TryReserveError,
     },
     item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
@@ -434,20 +434,23 @@ where
     #[track_caller]
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         self.try_insert(key, value)
-            .unwrap_or_else(|error| try_insert_failed(error))
+            .unwrap_or_else(|error| try_insert_failed(error.kind))
     }
 
-    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>> {
+    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>> {
         let Self {
             dense,
             sparse,
             sparse_vacant_head,
         } = self;
 
-        let sparse_index: usize = key
-            .sparse_index()
-            .try_into()
-            .map_err(TooLargeSparseIndexError::new)?;
+        let sparse_index: usize = match key.sparse_index().try_into() {
+            Ok(sparse_index) => sparse_index,
+            Err(error) => {
+                let kind = TooLargeSparseIndexError::new(error).into();
+                return Err(TryModifyError::new(kind, value));
+            }
+        };
         match sparse.get_mut(sparse_index) {
             Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
                 SparseItemKind::Occupied { dense_index } => {
@@ -467,11 +470,17 @@ where
                     let next_vacant = unwrap_into_usize(next_vacant);
                     remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
 
-                    let dense_index = dense
-                        .len()
-                        .try_into()
-                        .map_err(TooSmallSparseIndexError::new)?;
-                    dense.try_reserve(1).map_err(TryReserveError::Dense)?;
+                    let dense_index = match dense.len().try_into() {
+                        Ok(dense_index) => dense_index,
+                        Err(error) => {
+                            let kind = TooSmallSparseIndexError::new(error).into();
+                            return Err(TryModifyError::new(kind, value));
+                        }
+                    };
+                    if let Err(error) = dense.try_reserve(1) {
+                        let kind = TryReserveError::Dense(error).into();
+                        return Err(TryModifyError::new(kind, value));
+                    }
                     dense.push(KeyValuePair { key, value });
                     sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
 
@@ -481,16 +490,27 @@ where
             Some(_) => Ok(None),
             None => {
                 let new_sparse_len = sparse_index.saturating_add(1);
-                sparse
-                    .try_reserve(new_sparse_len.saturating_sub(sparse.len()))
-                    .map_err(TryReserveError::Sparse)?;
-                extend_sparse(sparse, new_sparse_len, sparse_vacant_head)?;
+                let additional = new_sparse_len.saturating_sub(sparse.len());
+                if let Err(error) = sparse.try_reserve(additional) {
+                    let kind = TryReserveError::Sparse(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+                if let Err(error) = extend_sparse(sparse, new_sparse_len, sparse_vacant_head) {
+                    let kind = error.into();
+                    return Err(TryModifyError::new(kind, value));
+                }
 
-                let dense_index = dense
-                    .len()
-                    .try_into()
-                    .map_err(TooSmallSparseIndexError::new)?;
-                dense.try_reserve(1).map_err(TryReserveError::Dense)?;
+                let dense_index = match dense.len().try_into() {
+                    Ok(dense_index) => dense_index,
+                    Err(error) => {
+                        let kind = TooSmallSparseIndexError::new(error).into();
+                        return Err(TryModifyError::new(kind, value));
+                    }
+                };
+                if let Err(error) = dense.try_reserve(1) {
+                    let kind = TryReserveError::Dense(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
                 dense.push(KeyValuePair { key, value });
                 sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
 
@@ -503,10 +523,10 @@ where
     #[track_caller]
     pub fn push(&mut self, value: V) -> K {
         self.try_push(value)
-            .unwrap_or_else(|error| try_push_failed(error))
+            .unwrap_or_else(|error| try_push_failed(error.kind))
     }
 
-    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K>> {
+    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
         let Self {
             dense,
             sparse,
@@ -514,24 +534,36 @@ where
         } = self;
 
         if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
-            let next_vacant = unwrap_next_vacant(sparse_item.kind())
-                .clone()
-                .try_into()
-                .map_err(TooLargeSparseIndexError::new)?;
+            let next_vacant = match unwrap_next_vacant(sparse_item.kind()).clone().try_into() {
+                Ok(next_vacant) => next_vacant,
+                Err(error) => {
+                    let kind = TooLargeSparseIndexError::new(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+            };
 
-            let sparse_index = sparse_vacant_head
-                .clone()
-                .try_into()
-                .map_err(TooSmallSparseIndexError::new)?;
+            let sparse_index = match sparse_vacant_head.clone().try_into() {
+                Ok(sparse_index) => sparse_index,
+                Err(error) => {
+                    let kind = TooSmallSparseIndexError::new(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+            };
             let key = K::new(sparse_index, sparse_item.epoch);
 
-            let dense_index = dense
-                .len()
-                .try_into()
-                .map_err(TooSmallSparseIndexError::new)?;
+            let dense_index = match dense.len().try_into() {
+                Ok(dense_index) => dense_index,
+                Err(error) => {
+                    let kind = TooSmallSparseIndexError::new(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+            };
             let sparse_item_kind = SparseItemKind::occupied(dense_index);
 
-            dense.try_reserve(1).map_err(TryReserveError::Dense)?;
+            if let Err(error) = dense.try_reserve(1) {
+                let kind = TryReserveError::Dense(error).into();
+                return Err(TryModifyError::new(kind, value));
+            }
             dense.push(KeyValuePair { key, value });
 
             sparse_item.kind = sparse_item_kind;
@@ -540,20 +572,32 @@ where
             return Ok(key);
         }
 
-        let sparse_index = sparse_vacant_head
-            .clone()
-            .try_into()
-            .map_err(TooSmallSparseIndexError::new)?;
+        let sparse_index = match sparse_vacant_head.clone().try_into() {
+            Ok(sparse_index) => sparse_index,
+            Err(error) => {
+                let kind = TooSmallSparseIndexError::new(error).into();
+                return Err(TryModifyError::new(kind, value));
+            }
+        };
         let key = Key::new(sparse_index, Default::default());
 
-        let dense_index = dense
-            .len()
-            .try_into()
-            .map_err(TooSmallSparseIndexError::new)?;
+        let dense_index = match dense.len().try_into() {
+            Ok(dense_index) => dense_index,
+            Err(error) => {
+                let kind = TooSmallSparseIndexError::new(error).into();
+                return Err(TryModifyError::new(kind, value));
+            }
+        };
         let sparse_item = SparseItem::occupied(dense_index, Default::default());
 
-        dense.try_reserve(1).map_err(TryReserveError::Dense)?;
-        sparse.try_reserve(1).map_err(TryReserveError::Sparse)?;
+        if let Err(error) = dense.try_reserve(1) {
+            let kind = TryReserveError::Dense(error).into();
+            return Err(TryModifyError::new(kind, value));
+        }
+        if let Err(error) = sparse.try_reserve(1) {
+            let kind = TryReserveError::Sparse(error).into();
+            return Err(TryModifyError::new(kind, value));
+        }
 
         dense.push(KeyValuePair { key, value });
         sparse.push(sparse_item);

@@ -108,10 +108,15 @@ impl<Meta> EntityRegistry<Meta> {
     #[inline]
     #[track_caller]
     pub fn spawn(&mut self, world: WorldId, meta: Meta) -> Entity {
-        match self.try_spawn(world, meta) {
-            Ok(entity) => entity,
-            Err(error) => panic!("failed to spawn entity: {error}"),
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn spawn_failed(error: TrySpawnError) -> ! {
+            panic!("failed to spawn entity: {error}")
         }
+
+        self.try_spawn(world, meta)
+            .unwrap_or_else(|error| spawn_failed(error))
     }
 
     #[inline]

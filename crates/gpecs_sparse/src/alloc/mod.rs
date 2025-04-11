@@ -4,3 +4,5 @@ pub mod error;
 pub mod iter;
 pub mod set;
 pub mod view;
+
+mod assert;

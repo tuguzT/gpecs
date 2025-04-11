@@ -16,6 +16,8 @@ use crate::{
     },
 };
 
+use super::assert::try_replace_key_failed;
+
 pub struct OccupiedEntry<'a, K, V, C>
 where
     K: Key,
@@ -119,10 +121,8 @@ where
     #[inline]
     #[track_caller]
     pub fn replace_key(&mut self, key: K) -> Option<V> {
-        match self.try_replace_key(key) {
-            Ok(value) => value,
-            Err(_) => panic!("failed to replace key"),
-        }
+        self.try_replace_key(key)
+            .unwrap_or_else(|error| try_replace_key_failed(error))
     }
 
     #[inline]
@@ -442,10 +442,8 @@ macro_rules! generate_entry_types {
             #[inline]
             #[track_caller]
             pub fn replace_key(self, key: K) -> Self {
-                match self.try_replace_key(key) {
-                    Ok(entry) => entry,
-                    Err(_) => panic!("failed to replace key"),
-                }
+                self.try_replace_key(key)
+                    .unwrap_or_else(|error| $crate::alloc::assert::try_replace_key_failed(error))
             }
 
             #[inline]
@@ -623,4 +621,4 @@ macro_rules! generate_entry_types {
     };
 }
 
-pub(crate) use generate_entry_types;
+pub(super) use generate_entry_types;

@@ -33,7 +33,10 @@ use crate::{
     view::{EpochSparseView, EpochSparseViewMut},
 };
 
-use super::entry::generate_entry_types;
+use super::{
+    assert::{try_entry_failed, try_insert_failed, try_push_failed},
+    entry::generate_entry_types,
+};
 
 pub type SparseSet<T> = EpochSparseSet<usize, T>;
 
@@ -386,10 +389,8 @@ where
     #[inline]
     #[track_caller]
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        match self.try_insert(key, value) {
-            Ok(result) => result,
-            Err(_) => panic!("failed to insert value by provided key"),
-        }
+        self.try_insert(key, value)
+            .unwrap_or_else(|error| try_insert_failed(error))
     }
 
     pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K>> {
@@ -439,10 +440,8 @@ where
     #[inline]
     #[track_caller]
     pub fn push(&mut self, value: V) -> K {
-        match self.try_push(value) {
-            Ok(key) => key,
-            Err(_) => panic!("failed to push value"),
-        }
+        self.try_push(value)
+            .unwrap_or_else(|error| try_push_failed(error))
     }
 
     pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K>> {
@@ -745,10 +744,8 @@ where
     #[inline]
     #[track_caller]
     pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
-        match self.try_entry(key) {
-            Ok(entry) => entry,
-            Err(_) => panic!("failed to create entry for the key"),
-        }
+        self.try_entry(key)
+            .unwrap_or_else(|error| try_entry_failed(error))
     }
 
     #[inline]

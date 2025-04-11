@@ -8,6 +8,7 @@ pub use crate::alloc::error::{TryInvalidKeyError, TryReserveError};
 
 use crate::key::Key;
 
+#[non_exhaustive]
 pub struct TooLargeSparseIndexError<K>
 where
     K: Key,
@@ -62,6 +63,7 @@ where
 {
 }
 
+#[non_exhaustive]
 pub struct TooSmallSparseIndexError<K>
 where
     K: Key,

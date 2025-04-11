@@ -153,7 +153,7 @@ impl Display for SliceLenMismatchError {
 
 impl Error for SliceLenMismatchError {}
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct IntoValueError<T>
 where
@@ -170,29 +170,19 @@ impl<T> IntoValueError<T> {
     }
 }
 
-impl<T> Debug for IntoValueError<T>
-where
-    T: ?Sized,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, .. } = self;
-        Debug::fmt(reason, f)
-    }
-}
-
 impl<T> Display for IntoValueError<T>
 where
-    T: ?Sized,
+    T: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, .. } = self;
-        Display::fmt(reason, f)
+        let Self { reason, value } = self;
+        write!(f, "failed to convert {value}: {reason}")
     }
 }
 
 impl<T> Error for IntoValueError<T>
 where
-    T: ?Sized,
+    T: Debug + Display + ?Sized,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         let Self { reason, .. } = self;

@@ -143,6 +143,52 @@ impl ArchetypeStorage {
     }
 
     #[inline]
+    pub fn bundle_compatibility<B>(
+        &self,
+        components: &ComponentRegistry,
+        context: &B::Context,
+    ) -> Result<(), IncompatibleBundleError>
+    where
+        B: Bundle,
+    {
+        let Self { component_ids, .. } = self;
+
+        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
+        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
+            return Err(ExclusiveComponentError::new(component).into());
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    pub fn bundle_compatibility_exact<B>(
+        &self,
+        components: &ComponentRegistry,
+        context: &B::Context,
+    ) -> Result<(), IncompatibleBundleExactError>
+    where
+        B: Bundle,
+    {
+        let Self { component_ids, .. } = self;
+
+        let mut bundle_component_ids_count = 0;
+        let mut bundle_component_ids = B::get_components(context, components)?
+            .into_iter()
+            .inspect(|_| bundle_component_ids_count += 1);
+        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
+            return Err(ExclusiveComponentError::new(component).into());
+        }
+
+        bundle_component_ids.for_each(drop);
+        if bundle_component_ids_count != component_ids.len() {
+            return Err(TooFewComponentsError.into());
+        }
+
+        Ok(())
+    }
+
+    #[inline]
     pub fn field_descriptors(&self) -> &[FieldDescriptor] {
         let Self { erased_storage, .. } = self;
         erased_storage.context().field_descriptors()
@@ -274,15 +320,12 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
+        self.bundle_compatibility::<B>(components, context)?;
+
         let Self {
-            ref component_ids,
+            component_ids,
             erased_storage,
         } = self;
-
-        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
-        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            return Err(ExclusiveComponentError::new(component).into());
-        }
 
         let (len, fields) = ErasedStorageExt::components(erased_storage, components, component_ids);
         let Ok(bundle_component_ids) = B::get_components(context, components) else {
@@ -304,15 +347,12 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
+        self.bundle_compatibility::<B>(components, context)?;
+
         let Self {
             ref component_ids,
             erased_storage,
         } = self;
-
-        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
-        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            return Err(ExclusiveComponentError::new(component).into());
-        }
 
         let (len, fields) =
             ErasedStorageExt::components_mut(erased_storage, components, component_ids);
@@ -336,15 +376,12 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
+        self.bundle_compatibility::<B>(components, context)?;
+
         let Self {
             ref component_ids,
             erased_storage,
         } = self;
-
-        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
-        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            return Err(ExclusiveComponentError::new(component).into());
-        }
 
         let Some(fields) = ErasedStorageExt::get(erased_storage, components, component_ids, entity)
         else {
@@ -369,15 +406,12 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
+        self.bundle_compatibility::<B>(components, context)?;
+
         let Self {
             ref component_ids,
             erased_storage,
         } = self;
-
-        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
-        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            return Err(ExclusiveComponentError::new(component).into());
-        }
 
         let Some(fields) =
             ErasedStorageExt::get_mut(erased_storage, components, component_ids, entity)
@@ -404,31 +438,14 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
+        if let Err(reason) = self.bundle_compatibility_exact::<B>(components, context) {
+            return Err(IncompatibleBundleValueError { value, reason });
+        }
+
         let Self {
             ref component_ids,
             erased_storage,
         } = self;
-
-        let mut bundle_component_ids_count = 0;
-        let mut bundle_component_ids = match B::get_components(context, components) {
-            Ok(bundle_component_ids) => bundle_component_ids
-                .into_iter()
-                .inspect(|_| bundle_component_ids_count += 1),
-            Err(error) => {
-                let reason = error.into();
-                return Err(IncompatibleBundleValueError { value, reason });
-            }
-        };
-        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            let reason = ExclusiveComponentError::new(component).into();
-            return Err(IncompatibleBundleValueError { value, reason });
-        }
-
-        bundle_component_ids.for_each(drop);
-        if bundle_component_ids_count != component_ids.len() {
-            let reason = TooFewComponentsError.into();
-            return Err(IncompatibleBundleValueError { value, reason });
-        }
 
         let Ok(bundle_component_ids) = B::get_components(context, components) else {
             unreachable!("components of the bundle were retrieved before without any errors")
@@ -458,23 +475,12 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
+        self.bundle_compatibility_exact::<B>(components, context)?;
+
         let Self {
             ref component_ids,
             erased_storage,
         } = self;
-
-        let mut bundle_component_ids_count = 0;
-        let mut bundle_component_ids = B::get_components(context, components)?
-            .into_iter()
-            .inspect(|_| bundle_component_ids_count += 1);
-        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            return Err(ExclusiveComponentError::new(component).into());
-        }
-
-        bundle_component_ids.for_each(drop);
-        if bundle_component_ids_count != component_ids.len() {
-            return Err(TooFewComponentsError.into());
-        }
 
         let Some(fields) =
             ErasedStorageExt::remove(erased_storage, components, component_ids, entity)

@@ -528,7 +528,7 @@ impl Debug for ArchetypeStorage {
 impl Drop for ArchetypeStorage {
     fn drop(&mut self) {
         let Self {
-            component_ids,
+            ref component_ids,
             erased_storage,
         } = self;
 
@@ -540,9 +540,8 @@ impl Drop for ArchetypeStorage {
                 .values()
                 .zip(fields)
                 .for_each(|(drop_fn, mut field)| {
-                    if let Some(drop_fn) = drop_fn {
-                        unsafe { drop_fn(field.as_mut_ptr()) }
-                    }
+                    let Some(drop_fn) = drop_fn else { return };
+                    unsafe { drop_fn(field.as_mut_ptr()) }
                 })
         })
     }

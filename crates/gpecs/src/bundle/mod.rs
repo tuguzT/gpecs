@@ -7,13 +7,14 @@ use self::error::DuplicateComponentError;
 
 pub mod error;
 
+/// Non-empty collection of [components](crate::component::Component).
 #[allow(unsafe_code)]
 pub unsafe trait Bundle: Soa + 'static {
     type ComponentIds: IntoIterator<Item = ComponentId>;
 
     /// Order of component identifiers should be the same as
     /// the order of descriptors returned by [`Soa::field_descriptors()`] method.
-    fn component_ids(
+    fn register_components(
         context: &Self::Context,
         components: &mut ComponentRegistry,
     ) -> Result<Self::ComponentIds, DuplicateComponentError>;
@@ -46,7 +47,7 @@ macro_rules! bundle_tuple_impl {
             type ComponentIds = [ComponentId; $crate::soa::traits::impls::count_idents!($($types,)*)];
 
             #[inline]
-            fn component_ids(
+            fn register_components(
                 _: &Self::Context,
                 components: &mut ComponentRegistry,
             ) -> Result<Self::ComponentIds, DuplicateComponentError> {

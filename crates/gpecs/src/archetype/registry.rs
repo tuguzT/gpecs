@@ -146,7 +146,9 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::component_ids(context, components)?.into_iter().collect();
+        let component_ids: Vec<_> = B::register_components(context, components)?
+            .into_iter()
+            .collect();
         let archetype_key = component_ids.iter().copied().collect();
         if let Some(archetype_id) = Self::find_archetype(archetypes, &archetype_key) {
             return Ok(archetype_id);
@@ -332,7 +334,9 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let archetype_key = B::component_ids(context, components)?.into_iter().collect();
+        let archetype_key = B::register_components(context, components)?
+            .into_iter()
+            .collect();
         let id = Self::find_archetype(archetypes, &archetype_key);
         Ok(id)
     }

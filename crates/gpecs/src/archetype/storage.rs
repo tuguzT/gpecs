@@ -116,7 +116,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let component_ids = B::component_ids(context, components)?
+        let component_ids = B::register_components(context, components)?
             .into_iter()
             .map(|component_id| {
                 let info = components
@@ -279,13 +279,13 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut bundle_component_ids = B::component_ids(context, components)?.into_iter();
+        let mut bundle_component_ids = B::register_components(context, components)?.into_iter();
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
             return Err(ExclusiveComponentError::new(component).into());
         }
 
         let (len, fields) = ErasedStorageExt::components(erased_storage, components, component_ids);
-        let bundle_component_ids = B::component_ids(context, components)
+        let bundle_component_ids = B::register_components(context, components)
             .expect("components of the bundle should be unique");
         let slices = unsafe {
             from_erased_slices::<B>(components, context, bundle_component_ids, len, fields)
@@ -308,14 +308,14 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut bundle_component_ids = B::component_ids(context, components)?.into_iter();
+        let mut bundle_component_ids = B::register_components(context, components)?.into_iter();
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
             return Err(ExclusiveComponentError::new(component).into());
         }
 
         let (len, fields) =
             ErasedStorageExt::components_mut(erased_storage, components, component_ids);
-        let bundle_component_ids = B::component_ids(context, components)
+        let bundle_component_ids = B::register_components(context, components)
             .expect("components of the bundle should be unique");
         let slices = unsafe {
             from_erased_slices_mut::<B>(components, context, bundle_component_ids, len, fields)
@@ -339,7 +339,7 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut bundle_component_ids = B::component_ids(context, components)?.into_iter();
+        let mut bundle_component_ids = B::register_components(context, components)?.into_iter();
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
             return Err(ExclusiveComponentError::new(component).into());
         }
@@ -348,7 +348,7 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::component_ids(context, components)
+        let bundle_component_ids = B::register_components(context, components)
             .expect("components of the bundle should be unique");
         let refs =
             unsafe { from_erased_refs::<B>(components, context, bundle_component_ids, fields) };
@@ -371,7 +371,7 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut bundle_component_ids = B::component_ids(context, components)?.into_iter();
+        let mut bundle_component_ids = B::register_components(context, components)?.into_iter();
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
             return Err(ExclusiveComponentError::new(component).into());
         }
@@ -381,7 +381,7 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::component_ids(context, components)
+        let bundle_component_ids = B::register_components(context, components)
             .expect("components of the bundle should be unique");
         let refs =
             unsafe { from_erased_refs_mut::<B>(components, context, bundle_component_ids, fields) };
@@ -406,7 +406,7 @@ impl ArchetypeStorage {
         } = self;
 
         let mut bundle_component_ids_count = 0;
-        let mut bundle_component_ids = match B::component_ids(context, components) {
+        let mut bundle_component_ids = match B::register_components(context, components) {
             Ok(bundle_component_ids) => bundle_component_ids
                 .into_iter()
                 .inspect(|_| bundle_component_ids_count += 1),
@@ -426,7 +426,7 @@ impl ArchetypeStorage {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
-        let bundle_component_ids = B::component_ids(context, components)
+        let bundle_component_ids = B::register_components(context, components)
             .expect("components of the bundle should be unique");
         let fields = into_erased_fields::<B>(components, context, bundle_component_ids, value);
         let Some(fields) =
@@ -434,7 +434,7 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::component_ids(context, components)
+        let bundle_component_ids = B::register_components(context, components)
             .expect("components of the bundle should be unique");
         let value =
             unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
@@ -458,7 +458,7 @@ impl ArchetypeStorage {
         } = self;
 
         let mut bundle_component_ids_count = 0;
-        let mut bundle_component_ids = B::component_ids(context, components)?
+        let mut bundle_component_ids = B::register_components(context, components)?
             .into_iter()
             .inspect(|_| bundle_component_ids_count += 1);
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
@@ -475,7 +475,7 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::component_ids(context, components)
+        let bundle_component_ids = B::register_components(context, components)
             .expect("components of the bundle should be unique");
         let value =
             unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };

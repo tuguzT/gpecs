@@ -1,6 +1,9 @@
 use gpecs::{
     archetype::{
-        error::{ExclusiveComponentError, IncompatibleBundleValueError, TooFewComponentsError},
+        error::{
+            ExclusiveComponentError, IncompatibleBundleError, IncompatibleBundleValueError,
+            TooFewComponentsError,
+        },
         storage::ArchetypeStorage,
     },
     bundle::Bundle,
@@ -83,7 +86,7 @@ fn storage_tuple() {
         .expect("creation of storage for bundle `(Position, Name)` should succeed");
     assert_eq!(storage.entities(), []);
 
-    let component_ids = <(Position, Name)>::register_components(&(), &mut components).unwrap();
+    let component_ids = <(Position, Name)>::get_components(&(), &mut components).unwrap();
     assert!(storage.component_ids().eq(component_ids));
 
     let storage_from_ids = ArchetypeStorage::new(&components, component_ids)
@@ -101,6 +104,15 @@ fn storage_tuple() {
         .expect("retrieval of slice of just `Position` should succeed");
     assert_eq!(slices, ([].as_slice(),));
 
+    let error = storage
+        .components::<(Position, Name, Tag)>(&mut components, &())
+        .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
+    assert!(matches!(
+        error,
+        IncompatibleBundleError::ComponentNotRegistered(_),
+    ));
+
+    components.register_component::<Tag>();
     let error = storage
         .components::<(Position, Name, Tag)>(&mut components, &())
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");

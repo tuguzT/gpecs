@@ -3,21 +3,26 @@ use crate::{
     soa::traits::Soa,
 };
 
-use self::error::DuplicateComponentError;
+use self::error::{ComponentNotRegisteredError, DuplicateComponentError, GetComponentsError};
 
 pub mod error;
 
 /// Non-empty collection of [components](crate::component::Component).
 #[allow(unsafe_code)]
 pub unsafe trait Bundle: Soa + 'static {
+    /// Order of component identifiers should be the same as
+    /// the order of corresponding [descriptors](Soa::FieldDescriptors).
     type ComponentIds: IntoIterator<Item = ComponentId>;
 
-    /// Order of component identifiers should be the same as
-    /// the order of descriptors returned by [`Soa::field_descriptors()`] method.
+    fn get_components(
+        context: &Self::Context,
+        components: &ComponentRegistry,
+    ) -> Result<<Self as Bundle>::ComponentIds, GetComponentsError>;
+
     fn register_components(
         context: &Self::Context,
         components: &mut ComponentRegistry,
-    ) -> Result<Self::ComponentIds, DuplicateComponentError>;
+    ) -> Result<<Self as Bundle>::ComponentIds, DuplicateComponentError>;
 }
 
 #[inline]
@@ -47,13 +52,34 @@ macro_rules! bundle_tuple_impl {
             type ComponentIds = [ComponentId; $crate::soa::traits::impls::count_idents!($($types,)*)];
 
             #[inline]
+            fn get_components(
+                _: &Self::Context,
+                components: &ComponentRegistry,
+            ) -> Result<<Self as Bundle>::ComponentIds, GetComponentsError> {
+                let component_ids = [$(
+                    components
+                        .component_id::<$types>()
+                        .ok_or_else(|| ComponentNotRegisteredError::of::<$types>())?,
+                )*];
+                if let Some(component_id) = find_first_duplicate(component_ids) {
+                    let error = DuplicateComponentError::new(component_id);
+                    return Err(error.into());
+                }
+
+                let permutation = $crate::soa::traits::impls::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+                let component_ids = [$(component_ids[permutation[$indices]],)*];
+                Ok(component_ids)
+            }
+
+            #[inline]
             fn register_components(
                 _: &Self::Context,
                 components: &mut ComponentRegistry,
-            ) -> Result<Self::ComponentIds, DuplicateComponentError> {
+            ) -> Result<<Self as Bundle>::ComponentIds, DuplicateComponentError> {
                 let component_ids = [$(components.register_component::<$types>(),)*];
                 if let Some(component_id) = find_first_duplicate(component_ids) {
-                    return Err(DuplicateComponentError::new(component_id));
+                    let error = DuplicateComponentError::new(component_id);
+                    return Err(error);
                 }
 
                 let permutation = $crate::soa::traits::impls::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;

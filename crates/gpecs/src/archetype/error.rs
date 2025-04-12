@@ -4,11 +4,14 @@ use std::{
 };
 
 use crate::{
-    bundle::{error::DuplicateComponentError, Bundle},
+    bundle::{
+        error::{ComponentNotRegisteredError, DuplicateComponentError, GetComponentsError},
+        Bundle,
+    },
     component::registry::ComponentId,
 };
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ExclusiveComponentError {
     component_id: ComponentId,
 }
@@ -35,11 +38,12 @@ impl Display for ExclusiveComponentError {
 
 impl Error for ExclusiveComponentError {}
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
 pub enum IncompatibleBundleError {
     DuplicateComponent(DuplicateComponentError),
     ExclusiveComponent(ExclusiveComponentError),
+    ComponentNotRegistered(ComponentNotRegisteredError),
 }
 
 impl From<DuplicateComponentError> for IncompatibleBundleError {
@@ -56,12 +60,32 @@ impl From<ExclusiveComponentError> for IncompatibleBundleError {
     }
 }
 
+impl From<GetComponentsError> for IncompatibleBundleError {
+    #[inline]
+    fn from(error: GetComponentsError) -> Self {
+        match error {
+            GetComponentsError::DuplicateComponent(error) => Self::DuplicateComponent(error),
+            GetComponentsError::ComponentNotRegistered(error) => {
+                Self::ComponentNotRegistered(error)
+            }
+        }
+    }
+}
+
+impl From<ComponentNotRegisteredError> for IncompatibleBundleError {
+    #[inline]
+    fn from(error: ComponentNotRegisteredError) -> Self {
+        Self::ComponentNotRegistered(error)
+    }
+}
+
 impl Display for IncompatibleBundleError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "incompatible bundle: ")?;
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
             Self::ExclusiveComponent(error) => Display::fmt(error, f),
+            Self::ComponentNotRegistered(error) => Display::fmt(error, f),
         }
     }
 }
@@ -71,6 +95,7 @@ impl Error for IncompatibleBundleError {
         match self {
             Self::DuplicateComponent(error) => Some(error),
             Self::ExclusiveComponent(error) => Some(error),
+            Self::ComponentNotRegistered(error) => Some(error),
         }
     }
 }
@@ -94,11 +119,12 @@ impl Display for TooFewComponentsError {
 
 impl Error for TooFewComponentsError {}
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
 pub enum IncompatibleBundleExactError {
     DuplicateComponent(DuplicateComponentError),
     ExclusiveComponent(ExclusiveComponentError),
+    ComponentNotRegistered(ComponentNotRegisteredError),
     TooFewComponents(TooFewComponentsError),
 }
 
@@ -116,6 +142,25 @@ impl From<ExclusiveComponentError> for IncompatibleBundleExactError {
     }
 }
 
+impl From<ComponentNotRegisteredError> for IncompatibleBundleExactError {
+    #[inline]
+    fn from(error: ComponentNotRegisteredError) -> Self {
+        Self::ComponentNotRegistered(error)
+    }
+}
+
+impl From<GetComponentsError> for IncompatibleBundleExactError {
+    #[inline]
+    fn from(error: GetComponentsError) -> Self {
+        match error {
+            GetComponentsError::DuplicateComponent(error) => Self::DuplicateComponent(error),
+            GetComponentsError::ComponentNotRegistered(error) => {
+                Self::ComponentNotRegistered(error)
+            }
+        }
+    }
+}
+
 impl From<TooFewComponentsError> for IncompatibleBundleExactError {
     #[inline]
     fn from(error: TooFewComponentsError) -> Self {
@@ -129,6 +174,9 @@ impl From<IncompatibleBundleError> for IncompatibleBundleExactError {
         match error {
             IncompatibleBundleError::DuplicateComponent(error) => Self::DuplicateComponent(error),
             IncompatibleBundleError::ExclusiveComponent(error) => Self::ExclusiveComponent(error),
+            IncompatibleBundleError::ComponentNotRegistered(error) => {
+                Self::ComponentNotRegistered(error)
+            }
         }
     }
 }
@@ -139,6 +187,7 @@ impl Display for IncompatibleBundleExactError {
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
             Self::ExclusiveComponent(error) => Display::fmt(error, f),
+            Self::ComponentNotRegistered(error) => Display::fmt(error, f),
             Self::TooFewComponents(error) => Display::fmt(error, f),
         }
     }
@@ -149,12 +198,13 @@ impl Error for IncompatibleBundleExactError {
         match self {
             Self::DuplicateComponent(error) => Some(error),
             Self::ExclusiveComponent(error) => Some(error),
+            Self::ComponentNotRegistered(error) => Some(error),
             Self::TooFewComponents(error) => Some(error),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
 pub struct IncompatibleBundleValueError<B>
 where

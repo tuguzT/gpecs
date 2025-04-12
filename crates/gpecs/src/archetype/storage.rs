@@ -268,7 +268,7 @@ impl ArchetypeStorage {
     #[allow(unsafe_code)]
     pub fn components<B>(
         &self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         context: &B::Context,
     ) -> Result<B::Slices<'_>, IncompatibleBundleError>
     where
@@ -279,14 +279,15 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut bundle_component_ids = B::register_components(context, components)?.into_iter();
+        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
             return Err(ExclusiveComponentError::new(component).into());
         }
 
         let (len, fields) = ErasedStorageExt::components(erased_storage, components, component_ids);
-        let bundle_component_ids = B::register_components(context, components)
-            .expect("components of the bundle should be unique");
+        let Ok(bundle_component_ids) = B::get_components(context, components) else {
+            unreachable!("components of the bundle were retrieved before without any errors")
+        };
         let slices = unsafe {
             from_erased_slices::<B>(components, context, bundle_component_ids, len, fields)
         };
@@ -297,7 +298,7 @@ impl ArchetypeStorage {
     #[allow(unsafe_code)]
     pub fn components_mut<B>(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         context: &B::Context,
     ) -> Result<B::SlicesMut<'_>, IncompatibleBundleError>
     where
@@ -308,15 +309,16 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut bundle_component_ids = B::register_components(context, components)?.into_iter();
+        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
             return Err(ExclusiveComponentError::new(component).into());
         }
 
         let (len, fields) =
             ErasedStorageExt::components_mut(erased_storage, components, component_ids);
-        let bundle_component_ids = B::register_components(context, components)
-            .expect("components of the bundle should be unique");
+        let Ok(bundle_component_ids) = B::get_components(context, components) else {
+            unreachable!("components of the bundle were retrieved before without any errors")
+        };
         let slices = unsafe {
             from_erased_slices_mut::<B>(components, context, bundle_component_ids, len, fields)
         };
@@ -327,7 +329,7 @@ impl ArchetypeStorage {
     #[allow(unsafe_code)]
     pub fn get<B>(
         &self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         context: &B::Context,
         entity: Entity,
     ) -> Result<Option<B::Refs<'_>>, IncompatibleBundleError>
@@ -339,7 +341,7 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut bundle_component_ids = B::register_components(context, components)?.into_iter();
+        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
             return Err(ExclusiveComponentError::new(component).into());
         }
@@ -348,8 +350,9 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::register_components(context, components)
-            .expect("components of the bundle should be unique");
+        let Ok(bundle_component_ids) = B::get_components(context, components) else {
+            unreachable!("components of the bundle were retrieved before without any errors")
+        };
         let refs =
             unsafe { from_erased_refs::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(refs))
@@ -359,7 +362,7 @@ impl ArchetypeStorage {
     #[allow(unsafe_code)]
     pub fn get_mut<B>(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         context: &B::Context,
         entity: Entity,
     ) -> Result<Option<B::RefsMut<'_>>, IncompatibleBundleError>
@@ -371,7 +374,7 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let mut bundle_component_ids = B::register_components(context, components)?.into_iter();
+        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
             return Err(ExclusiveComponentError::new(component).into());
         }
@@ -381,8 +384,9 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::register_components(context, components)
-            .expect("components of the bundle should be unique");
+        let Ok(bundle_component_ids) = B::get_components(context, components) else {
+            unreachable!("components of the bundle were retrieved before without any errors")
+        };
         let refs =
             unsafe { from_erased_refs_mut::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(refs))
@@ -392,7 +396,7 @@ impl ArchetypeStorage {
     #[allow(unsafe_code)]
     pub fn insert<B>(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         context: &B::Context,
         entity: Entity,
         value: B,
@@ -406,7 +410,7 @@ impl ArchetypeStorage {
         } = self;
 
         let mut bundle_component_ids_count = 0;
-        let mut bundle_component_ids = match B::register_components(context, components) {
+        let mut bundle_component_ids = match B::get_components(context, components) {
             Ok(bundle_component_ids) => bundle_component_ids
                 .into_iter()
                 .inspect(|_| bundle_component_ids_count += 1),
@@ -426,16 +430,18 @@ impl ArchetypeStorage {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
-        let bundle_component_ids = B::register_components(context, components)
-            .expect("components of the bundle should be unique");
+        let Ok(bundle_component_ids) = B::get_components(context, components) else {
+            unreachable!("components of the bundle were retrieved before without any errors")
+        };
         let fields = into_erased_fields::<B>(components, context, bundle_component_ids, value);
         let Some(fields) =
             ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::register_components(context, components)
-            .expect("components of the bundle should be unique");
+        let Ok(bundle_component_ids) = B::get_components(context, components) else {
+            unreachable!("components of the bundle were retrieved before without any errors")
+        };
         let value =
             unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))
@@ -445,7 +451,7 @@ impl ArchetypeStorage {
     #[allow(unsafe_code)]
     pub fn remove<B>(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         context: &B::Context,
         entity: Entity,
     ) -> Result<Option<B>, IncompatibleBundleExactError>
@@ -458,7 +464,7 @@ impl ArchetypeStorage {
         } = self;
 
         let mut bundle_component_ids_count = 0;
-        let mut bundle_component_ids = B::register_components(context, components)?
+        let mut bundle_component_ids = B::get_components(context, components)?
             .into_iter()
             .inspect(|_| bundle_component_ids_count += 1);
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
@@ -475,8 +481,9 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::register_components(context, components)
-            .expect("components of the bundle should be unique");
+        let Ok(bundle_component_ids) = B::get_components(context, components) else {
+            unreachable!("components of the bundle were retrieved before without any errors")
+        };
         let value =
             unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))

@@ -51,6 +51,45 @@ pub enum EntityArchetypeStatus {
     Known(EntityArchetype),
 }
 
+impl EntityArchetypeStatus {
+    #[inline]
+    pub fn from_option(option: Option<EntityArchetype>) -> Self {
+        match option {
+            Some(archetype_id) => Self::Known(archetype_id),
+            None => Self::Unknown,
+        }
+    }
+
+    #[inline]
+    pub fn into_option(self) -> Option<EntityArchetype> {
+        match self {
+            Self::Unknown => None,
+            Self::Known(archetype_id) => Some(archetype_id),
+        }
+    }
+}
+
+impl From<EntityArchetype> for EntityArchetypeStatus {
+    #[inline]
+    fn from(value: EntityArchetype) -> Self {
+        EntityArchetypeStatus::Known(value)
+    }
+}
+
+impl From<Option<EntityArchetype>> for EntityArchetypeStatus {
+    #[inline]
+    fn from(value: Option<EntityArchetype>) -> Self {
+        EntityArchetypeStatus::from_option(value)
+    }
+}
+
+impl From<EntityArchetypeStatus> for Option<EntityArchetype> {
+    #[inline]
+    fn from(value: EntityArchetypeStatus) -> Self {
+        EntityArchetypeStatus::into_option(value)
+    }
+}
+
 #[derive(Debug)]
 pub struct ArchetypeInfo {
     id: ArchetypeId,
@@ -334,7 +373,8 @@ impl ArchetypeRegistry {
         entity: Entity,
         archetype_status: EntityArchetypeStatus,
         component: C,
-    ) where
+    ) -> ArchetypeId
+    where
         C: Component,
     {
         let component_id = components.register_component::<C>();
@@ -424,6 +464,8 @@ impl ArchetypeRegistry {
         if let Some(_) = prev {
             unreachable!("duplicated entity {entity:?}")
         }
+
+        new_archetype
     }
 
     #[inline]
@@ -436,18 +478,20 @@ impl ArchetypeRegistry {
         C: Component,
     {
         let archetype_status = EntityArchetypeStatus::Unknown;
-        self.remove_component_with(components, entity, archetype_status)
+        let (component, _) = self
+            .remove_component_with(components, entity, archetype_status)
+            .unzip();
+        component
     }
 
     #[inline]
     #[track_caller]
-    #[allow(unsafe_code)]
     pub fn remove_component_with<C>(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
         archetype_status: EntityArchetypeStatus,
-    ) -> Option<C>
+    ) -> Option<(C, EntityArchetype)>
     where
         C: Component,
     {
@@ -490,6 +534,7 @@ impl ArchetypeRegistry {
         let Some(field) = old_fields.swap_remove(&component_id) else {
             unreachable!("component {component_id:?} should exist")
         };
+        #[allow(unsafe_code)]
         let Ok(component) = (unsafe { field.into::<C>() }) else {
             unreachable!("field should be convertible to {component_id:?}")
         };
@@ -527,7 +572,7 @@ impl ArchetypeRegistry {
             }
         }
 
-        Some(component)
+        Some((component, new_archetype))
     }
 
     #[inline]

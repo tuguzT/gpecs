@@ -1,10 +1,12 @@
 use std::{
-    any::{type_name, TypeId},
+    any::{self, TypeId},
     borrow::Cow,
     collections::HashMap,
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem,
     ops::Range,
+    ptr,
 };
 
 use crate::soa::traits::FieldDescriptor;
@@ -23,16 +25,19 @@ impl ComponentId {
     }
 }
 
+pub type DropFn = unsafe fn(to_drop: *mut u8);
+
 #[derive(Debug, Clone)]
 pub struct ComponentDescriptor {
     name: Cow<'static, str>,
     type_id: Option<TypeId>,
     desc: FieldDescriptor,
+    drop_fn: Option<DropFn>,
 }
 
 impl ComponentDescriptor {
     #[inline]
-    pub fn new<N>(name: N, desc: FieldDescriptor) -> Self
+    pub fn new<N>(name: N, desc: FieldDescriptor, drop_fn: Option<DropFn>) -> Self
     where
         N: Into<Cow<'static, str>>,
     {
@@ -40,18 +45,26 @@ impl ComponentDescriptor {
             name: name.into(),
             type_id: None,
             desc,
+            drop_fn,
         }
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn of<T>() -> Self
     where
         T: Component,
     {
+        let to_drop: DropFn = |to_drop| {
+            let to_drop = to_drop.cast();
+            unsafe { ptr::drop_in_place::<T>(to_drop) };
+        };
+
         Self {
-            name: type_name::<T>().into(),
+            name: any::type_name::<T>().into(),
             type_id: Some(TypeId::of::<T>()),
             desc: FieldDescriptor::of::<T>(),
+            drop_fn: mem::needs_drop::<T>().then(|| to_drop),
         }
     }
 
@@ -71,6 +84,12 @@ impl ComponentDescriptor {
     pub fn descriptor(&self) -> FieldDescriptor {
         let Self { desc, .. } = *self;
         desc
+    }
+
+    #[inline]
+    pub fn drop_fn(&self) -> Option<DropFn> {
+        let Self { drop_fn, .. } = *self;
+        drop_fn
     }
 }
 
@@ -103,6 +122,12 @@ impl ComponentInfo {
     pub fn descriptor(&self) -> FieldDescriptor {
         let Self { descriptor, .. } = self;
         descriptor.descriptor()
+    }
+
+    #[inline]
+    pub fn drop_fn(&self) -> Option<DropFn> {
+        let Self { descriptor, .. } = self;
+        descriptor.drop_fn()
     }
 }
 

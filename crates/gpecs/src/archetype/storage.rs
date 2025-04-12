@@ -496,6 +496,37 @@ impl ArchetypeStorage {
 
     #[inline]
     #[track_caller]
+    pub fn destroy_in_place(&mut self, entity: Entity) -> bool {
+        let Self {
+            ref component_ids,
+            erased_storage,
+        } = self;
+        let Some(mut erased_fields) = erased_storage.remove(entity.into()) else {
+            return false;
+        };
+
+        let erased_refs_mut = erased_fields.as_refs_mut();
+        Self::destroy_refs_mut(component_ids, erased_refs_mut);
+        true
+    }
+
+    #[inline]
+    fn destroy_refs_mut(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut<'_>) {
+        let fields = erased_refs_mut.into_field_refs();
+        debug_assert_eq!(fields.len(), component_ids.len());
+
+        #[allow(unsafe_code)]
+        component_ids
+            .values()
+            .zip(fields)
+            .for_each(|(drop_fn, mut field)| {
+                let Some(drop_fn) = drop_fn else { return };
+                unsafe { drop_fn(field.as_mut_ptr()) }
+            })
+    }
+
+    #[inline]
+    #[track_caller]
     pub(crate) fn insert_erased(
         &mut self,
         components: &ComponentRegistry,
@@ -523,37 +554,6 @@ impl ArchetypeStorage {
         } = self;
 
         ErasedStorageExt::remove(erased_storage, components, component_ids, entity)
-    }
-
-    #[inline]
-    #[track_caller]
-    pub(crate) fn destroy_in_place(&mut self, entity: Entity) -> bool {
-        let Self {
-            ref component_ids,
-            erased_storage,
-        } = self;
-
-        let Some(mut erased_fields) = ErasedStorage::remove(erased_storage, entity.into()) else {
-            return false;
-        };
-        let erased_refs_mut = erased_fields.as_refs_mut();
-        Self::destroy_refs_mut(component_ids, erased_refs_mut);
-        true
-    }
-
-    #[inline]
-    fn destroy_refs_mut(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut<'_>) {
-        let fields = erased_refs_mut.into_field_refs();
-        debug_assert_eq!(fields.len(), component_ids.len());
-
-        #[allow(unsafe_code)]
-        component_ids
-            .values()
-            .zip(fields)
-            .for_each(|(drop_fn, mut field)| {
-                let Some(drop_fn) = drop_fn else { return };
-                unsafe { drop_fn(field.as_mut_ptr()) }
-            })
     }
 }
 

@@ -14,6 +14,7 @@ use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 use indexmap::{map::Keys, IndexMap};
 
 use crate::{
+    assert::get_component_info_fail,
     bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry, DropFn},
     entity::Entity,
@@ -23,8 +24,8 @@ use crate::{
 use super::{
     erased::{
         from_erased_fields, from_erased_refs, from_erased_refs_mut, from_erased_slices,
-        from_erased_slices_mut, get_component_info_fail, into_erased_fields, into_erased_refs,
-        into_erased_refs_mut, into_erased_slices, into_erased_slices_mut, ErasedComponents,
+        from_erased_slices_mut, into_erased_fields, into_erased_refs, into_erased_refs_mut,
+        into_erased_slices, into_erased_slices_mut, ErasedComponents,
     },
     error::{
         ExclusiveComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
@@ -483,9 +484,9 @@ impl ArchetypeStorage {
 
     #[inline]
     #[track_caller]
-    pub(super) fn insert_erased(
+    pub(crate) fn insert_erased(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         entity: Entity,
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>> {
@@ -499,9 +500,9 @@ impl ArchetypeStorage {
 
     #[inline]
     #[track_caller]
-    pub(super) fn remove_erased(
+    pub(crate) fn remove_erased(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
         let Self {
@@ -637,19 +638,19 @@ trait ErasedStorageExt {
 
     fn components(
         &self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>);
 
     fn components_mut(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'_>>);
 
     fn insert(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
         fields: ErasedComponents<ErasedField>,
@@ -657,21 +658,21 @@ trait ErasedStorageExt {
 
     fn remove(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>>;
 
     fn get(
         &self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>>;
 
     fn get_mut(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>>;
@@ -688,7 +689,7 @@ impl ErasedStorageExt for ErasedStorage {
     #[inline]
     fn components(
         &self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>) {
         let (context, slices) = ErasedStorage::as_view(self).into_slices_with_context();
@@ -699,7 +700,7 @@ impl ErasedStorageExt for ErasedStorage {
     #[inline]
     fn components_mut(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'_>>) {
         let (context, slices) = ErasedStorage::as_mut_view(self).into_slices_with_context();
@@ -711,7 +712,7 @@ impl ErasedStorageExt for ErasedStorage {
     #[allow(unsafe_code)]
     fn insert(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
         fields: ErasedComponents<ErasedField>,
@@ -731,7 +732,7 @@ impl ErasedStorageExt for ErasedStorage {
     #[inline]
     fn remove(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
@@ -746,7 +747,7 @@ impl ErasedStorageExt for ErasedStorage {
     #[inline]
     fn get(
         &self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
@@ -761,7 +762,7 @@ impl ErasedStorageExt for ErasedStorage {
     #[inline]
     fn get_mut(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {

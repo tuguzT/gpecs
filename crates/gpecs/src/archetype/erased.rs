@@ -7,22 +7,16 @@ use gpecs_soa_erased::{
 use indexmap::IndexMap;
 
 use crate::{
+    assert::get_component_info_fail,
     component::registry::{ComponentId, ComponentRegistry},
     soa::{traits::FieldDescriptor, Soa},
 };
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
 
-#[cold]
-#[track_caller]
-#[inline(never)]
-pub fn get_component_info_fail(component_id: &ComponentId) -> ! {
-    panic!("info of component {component_id:?} should be present")
-}
-
 #[inline]
 #[track_caller]
-fn validate_component<D>(components: &mut ComponentRegistry, id: ComponentId, desc: D)
+fn validate_component<D>(components: &ComponentRegistry, id: ComponentId, desc: D)
 where
     D: AsRef<FieldDescriptor>,
 {
@@ -35,7 +29,7 @@ where
 #[inline]
 #[track_caller]
 fn validate_components<'components, 'context, T, I>(
-    components: &'components mut ComponentRegistry,
+    components: &'components ComponentRegistry,
     context: &'context T::Context,
     component_ids: I,
 ) -> impl Iterator<Item = ComponentId> + use<'components, 'context, T, I>
@@ -53,7 +47,7 @@ where
 #[inline]
 #[track_caller]
 fn reorder_fields<'components, 'context, T, I, F>(
-    components: &'components mut ComponentRegistry,
+    components: &'components ComponentRegistry,
     context: &'context T::Context,
     component_ids: I,
     mut fields: ErasedComponents<F>,
@@ -84,7 +78,7 @@ where
 #[inline]
 #[allow(unsafe_code)]
 pub unsafe fn from_erased_fields<T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedField>,
@@ -100,7 +94,7 @@ where
 
 #[inline]
 pub fn into_erased_fields<T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     value: T,
@@ -117,7 +111,7 @@ where
 #[inline]
 #[allow(unsafe_code)]
 pub unsafe fn from_erased_refs<'a, T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedFieldRef<'a>>,
@@ -132,7 +126,7 @@ where
 
 #[inline]
 pub fn into_erased_refs<'a, T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     refs: T::Refs<'a>,
@@ -149,7 +143,7 @@ where
 #[inline]
 #[allow(unsafe_code)]
 pub unsafe fn from_erased_refs_mut<'a, T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedFieldRefMut<'a>>,
@@ -164,7 +158,7 @@ where
 
 #[inline]
 pub fn into_erased_refs_mut<'a, T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     refs: T::RefsMut<'a>,
@@ -181,7 +175,7 @@ where
 #[inline]
 #[allow(unsafe_code)]
 pub unsafe fn from_erased_slices<'a, T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
@@ -197,7 +191,7 @@ where
 
 #[inline]
 pub fn into_erased_slices<'a, T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     slices: T::Slices<'a>,
@@ -216,7 +210,7 @@ where
 #[inline]
 #[allow(unsafe_code)]
 pub unsafe fn from_erased_slices_mut<'a, T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
@@ -233,7 +227,7 @@ where
 
 #[inline]
 pub fn into_erased_slices_mut<'a, T>(
-    components: &mut ComponentRegistry,
+    components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     slices: T::SlicesMut<'a>,

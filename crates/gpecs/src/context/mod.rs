@@ -1,0 +1,143 @@
+use crate::{
+    archetype::registry::{ArchetypeRegistry, EntityArchetype},
+    assert::get_component_info_fail,
+    component::registry::ComponentRegistry,
+    entity::{
+        registry::{self as entities, EntityRegistry},
+        Entity,
+    },
+    world::registry::{WorldId, WorldRegistry},
+};
+
+pub type Worlds = WorldRegistry;
+pub type Entities = EntityRegistry<EntityArchetype>;
+pub type Components = ComponentRegistry;
+pub type Archetypes = ArchetypeRegistry;
+
+pub type ContextPartsRefs<'a> = (&'a Worlds, &'a Entities, &'a Components, &'a Archetypes);
+pub type ContextPartsRefsMut<'a> = (
+    &'a mut Worlds,
+    &'a mut Entities,
+    &'a mut Components,
+    &'a mut Archetypes,
+);
+pub type ContextParts = (Worlds, Entities, Components, Archetypes);
+
+pub type TrySpawnError = entities::TrySpawnError<EntityArchetype>;
+
+#[derive(Debug, Default)]
+pub struct Context {
+    worlds: Worlds,
+    entities: Entities,
+    components: Components,
+    archetypes: Archetypes,
+}
+
+impl Context {
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            worlds: Worlds::new(),
+            entities: Entities::new(),
+            components: Components::new(),
+            archetypes: Archetypes::new(),
+        }
+    }
+
+    #[inline]
+    pub fn as_parts(&self) -> ContextPartsRefs {
+        let Self {
+            worlds,
+            entities,
+            components,
+            archetypes,
+        } = self;
+        (worlds, entities, components, archetypes)
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn as_parts_mut(&mut self) -> ContextPartsRefsMut {
+        let Self {
+            worlds,
+            entities,
+            components,
+            archetypes,
+        } = self;
+        (worlds, entities, components, archetypes)
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> ContextParts {
+        let Self {
+            worlds,
+            entities,
+            components,
+            archetypes,
+        } = self;
+        (worlds, entities, components, archetypes)
+    }
+
+    #[inline]
+    pub fn spawn(&mut self) -> Entity {
+        let world = WorldId::default();
+        self.spawn_in(world)
+    }
+
+    #[inline]
+    pub fn try_spawn(&mut self) -> Result<Entity, TrySpawnError> {
+        let world = WorldId::default();
+        self.try_spawn_in(world)
+    }
+
+    #[inline]
+    pub fn spawn_in(&mut self, world: WorldId) -> Entity {
+        let Self { entities, .. } = self;
+        entities.spawn(world, None)
+    }
+
+    #[inline]
+    pub fn try_spawn_in(&mut self, world: WorldId) -> Result<Entity, TrySpawnError> {
+        let Self { entities, .. } = self;
+        entities.try_spawn(world, None)
+    }
+
+    #[inline]
+    pub fn despawn(&mut self, entity: Entity) {
+        let Self {
+            entities,
+            components,
+            archetypes,
+            ..
+        } = self;
+        let Some(archetype) = entities.despawn(entity).flatten() else {
+            return;
+        };
+
+        let Some(info) = archetypes.get_info_mut(archetype) else {
+            unreachable!("archetype {archetype:?} should exist")
+        };
+        let Some(entity_data) = info.storage_mut().remove_erased(components, entity) else {
+            unreachable!("entity {entity} should exist in archetype {archetype:?}")
+        };
+
+        #[allow(unsafe_code)]
+        entity_data
+            .into_iter()
+            .for_each(|(component_id, mut component)| {
+                let info = components
+                    .get_info(component_id)
+                    .unwrap_or_else(|| get_component_info_fail(&component_id));
+                let Some(drop_fn) = info.drop_fn() else {
+                    return;
+                };
+                unsafe { drop_fn(component.as_mut_ptr()) }
+            })
+    }
+
+    #[inline]
+    pub fn contains(&self, entity: Entity) -> bool {
+        let Self { entities, .. } = self;
+        entities.contains(entity)
+    }
+}

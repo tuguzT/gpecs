@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    num::NonZeroU16,
     ops::Range,
 };
 
@@ -31,13 +32,16 @@ impl From<WorldId> for u16 {
 #[derive(Debug, Clone)]
 pub struct WorldRegistry {
     next_id: u16,
-    len: u16,
+    len: NonZeroU16,
 }
 
 impl WorldRegistry {
     #[inline]
     pub const fn new() -> Self {
-        Self { next_id: 1, len: 1 }
+        Self {
+            next_id: 1,
+            len: NonZeroU16::MIN,
+        }
     }
 
     #[inline]
@@ -53,7 +57,7 @@ impl WorldRegistry {
     #[inline]
     pub const fn len(&self) -> u16 {
         let Self { len, .. } = *self;
-        len
+        len.get()
     }
 
     #[inline]
@@ -63,7 +67,7 @@ impl WorldRegistry {
 
     #[inline]
     pub const fn world_ids(&self) -> WorldIds {
-        let Self { len, .. } = *self;
+        let len = self.len();
         WorldIds { inner: 0..len }
     }
 }

@@ -15,5 +15,3 @@ pub mod context;
 pub mod entity;
 pub mod prelude;
 pub mod world;
-
-mod assert;

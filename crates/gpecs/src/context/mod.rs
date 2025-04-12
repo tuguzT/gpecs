@@ -1,6 +1,5 @@
 use crate::{
     archetype::registry::{ArchetypeRegistry, EntityArchetype},
-    assert::get_component_info_fail,
     component::registry::ComponentRegistry,
     entity::{
         registry::{self as entities, EntityRegistry},
@@ -106,7 +105,6 @@ impl Context {
     pub fn despawn(&mut self, entity: Entity) {
         let Self {
             entities,
-            components,
             archetypes,
             ..
         } = self;
@@ -117,22 +115,9 @@ impl Context {
         let Some(info) = archetypes.get_info_mut(archetype) else {
             unreachable!("archetype {archetype:?} should exist")
         };
-        let Some(entity_data) = info.storage_mut().remove_erased(components, entity) else {
-            unreachable!("entity {entity} should exist in archetype {archetype:?}")
-        };
-
-        #[allow(unsafe_code)]
-        entity_data
-            .into_iter()
-            .for_each(|(component_id, mut component)| {
-                let info = components
-                    .get_info(component_id)
-                    .unwrap_or_else(|| get_component_info_fail(&component_id));
-                let Some(drop_fn) = info.drop_fn() else {
-                    return;
-                };
-                unsafe { drop_fn(component.as_mut_ptr()) }
-            })
+        if !info.storage_mut().destroy_in_place(entity) {
+            unreachable!("entity {entity:?} should exist in archetype {archetype:?}");
+        }
     }
 
     #[inline]

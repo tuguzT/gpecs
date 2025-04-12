@@ -7,12 +7,18 @@ use gpecs_soa_erased::{
 use indexmap::IndexMap;
 
 use crate::{
-    assert::get_component_info_fail,
     component::registry::{ComponentId, ComponentRegistry},
     soa::{traits::FieldDescriptor, Soa},
 };
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
+
+#[cold]
+#[track_caller]
+#[inline(never)]
+pub fn get_component_info_fail(component_id: &ComponentId) -> ! {
+    panic!("info of component {component_id:?} should be present")
+}
 
 #[inline]
 #[track_caller]

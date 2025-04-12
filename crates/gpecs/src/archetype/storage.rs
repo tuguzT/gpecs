@@ -5,7 +5,7 @@ use std::{
 };
 
 use gpecs_soa_erased::{
-    erased::{ErasedSoa, ErasedSoaContext},
+    erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefsMut},
     field::{
         ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
@@ -14,7 +14,6 @@ use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 use indexmap::{map::Keys, IndexMap};
 
 use crate::{
-    assert::get_component_info_fail,
     bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry, DropFn},
     entity::Entity,
@@ -24,8 +23,8 @@ use crate::{
 use super::{
     erased::{
         from_erased_fields, from_erased_refs, from_erased_refs_mut, from_erased_slices,
-        from_erased_slices_mut, into_erased_fields, into_erased_refs, into_erased_refs_mut,
-        into_erased_slices, into_erased_slices_mut, ErasedComponents,
+        from_erased_slices_mut, get_component_info_fail, into_erased_fields, into_erased_refs,
+        into_erased_refs_mut, into_erased_slices, into_erased_slices_mut, ErasedComponents,
     },
     error::{
         ExclusiveComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
@@ -513,7 +512,7 @@ impl ArchetypeStorage {
 
     #[inline]
     #[track_caller]
-    pub(crate) fn remove_erased(
+    pub(super) fn remove_erased(
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
@@ -524,6 +523,37 @@ impl ArchetypeStorage {
         } = self;
 
         ErasedStorageExt::remove(erased_storage, components, component_ids, entity)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub(crate) fn destroy_in_place(&mut self, entity: Entity) -> bool {
+        let Self {
+            ref component_ids,
+            erased_storage,
+        } = self;
+
+        let Some(mut erased_fields) = ErasedStorage::remove(erased_storage, entity.into()) else {
+            return false;
+        };
+        let erased_refs_mut = erased_fields.as_refs_mut();
+        Self::destroy_refs_mut(component_ids, erased_refs_mut);
+        true
+    }
+
+    #[inline]
+    fn destroy_refs_mut(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut<'_>) {
+        let fields = erased_refs_mut.into_field_refs();
+        debug_assert_eq!(fields.len(), component_ids.len());
+
+        #[allow(unsafe_code)]
+        component_ids
+            .values()
+            .zip(fields)
+            .for_each(|(drop_fn, mut field)| {
+                let Some(drop_fn) = drop_fn else { return };
+                unsafe { drop_fn(field.as_mut_ptr()) }
+            })
     }
 }
 
@@ -538,7 +568,6 @@ impl Debug for ArchetypeStorage {
     }
 }
 
-#[allow(unsafe_code)]
 impl Drop for ArchetypeStorage {
     fn drop(&mut self) {
         let Self {
@@ -546,18 +575,9 @@ impl Drop for ArchetypeStorage {
             erased_storage,
         } = self;
 
-        erased_storage.values_mut().for_each(|erased_refs| {
-            let fields = erased_refs.into_field_refs();
-            debug_assert_eq!(fields.len(), component_ids.len());
-
-            component_ids
-                .values()
-                .zip(fields)
-                .for_each(|(drop_fn, mut field)| {
-                    let Some(drop_fn) = drop_fn else { return };
-                    unsafe { drop_fn(field.as_mut_ptr()) }
-                })
-        })
+        erased_storage
+            .values_mut()
+            .for_each(|erased_refs_mut| Self::destroy_refs_mut(component_ids, erased_refs_mut))
     }
 }
 

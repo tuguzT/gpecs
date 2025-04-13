@@ -1,6 +1,15 @@
+use std::any::TypeId;
+
 use crate::{
-    archetype::registry::{ArchetypeRegistry, EntityArchetype},
-    component::registry::ComponentRegistry,
+    archetype::registry::{ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityArchetype},
+    bundle::{
+        error::{DuplicateComponentError, GetComponentsError},
+        Bundle,
+    },
+    component::{
+        registry::{ComponentId, ComponentInfo, ComponentRegistry},
+        Component,
+    },
     entity::{
         registry::{self as entities, EntityRegistry},
         Entity,
@@ -55,6 +64,30 @@ impl Context {
     }
 
     #[inline]
+    pub fn worlds(&self) -> &Worlds {
+        let Self { worlds, .. } = self;
+        worlds
+    }
+
+    #[inline]
+    pub fn entities(&self) -> &Entities {
+        let Self { entities, .. } = self;
+        entities
+    }
+
+    #[inline]
+    pub fn components(&self) -> &Components {
+        let Self { components, .. } = self;
+        components
+    }
+
+    #[inline]
+    pub fn archetypes(&self) -> &Archetypes {
+        let Self { archetypes, .. } = self;
+        archetypes
+    }
+
+    #[inline]
     #[allow(unsafe_code)]
     pub unsafe fn as_parts_mut(&mut self) -> ContextPartsRefsMut {
         let Self {
@@ -64,6 +97,18 @@ impl Context {
             archetypes,
         } = self;
         (worlds, entities, components, archetypes)
+    }
+
+    #[inline]
+    pub fn worlds_mut(&mut self) -> &mut Worlds {
+        let Self { worlds, .. } = self;
+        worlds
+    }
+
+    #[inline]
+    pub fn components_mut(&mut self) -> &mut Components {
+        let Self { components, .. } = self;
+        components
     }
 
     #[inline]
@@ -119,5 +164,75 @@ impl Context {
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { entities, .. } = self;
         entities.contains(entity)
+    }
+
+    #[inline]
+    pub fn register_component<C>(&mut self) -> ComponentId
+    where
+        C: Component,
+    {
+        let Self { components, .. } = self;
+        components.register_component::<C>()
+    }
+
+    #[inline]
+    pub fn get_component_info(&self, id: ComponentId) -> Option<&ComponentInfo> {
+        let Self { components, .. } = self;
+        components.get_component_info(id)
+    }
+
+    #[inline]
+    pub fn component_id_from(&self, type_id: TypeId) -> Option<ComponentId> {
+        let Self { components, .. } = self;
+        components.component_id_from(type_id)
+    }
+
+    #[inline]
+    pub fn component_id<C>(&self) -> Option<ComponentId>
+    where
+        C: Component,
+    {
+        let Self { components, .. } = self;
+        components.component_id::<C>()
+    }
+
+    #[inline]
+    pub fn register_archetype<B>(
+        &mut self,
+        context: &B::Context,
+    ) -> Result<ArchetypeId, DuplicateComponentError>
+    where
+        B: Bundle,
+    {
+        let Self {
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        archetypes.register_archetype::<B>(components, context)
+    }
+
+    #[inline]
+    pub fn get_archetype_info(&self, archetype_id: ArchetypeId) -> Option<&ArchetypeInfo> {
+        let Self { archetypes, .. } = self;
+        archetypes.get_archetype_info(archetype_id)
+    }
+
+    #[inline]
+    pub fn archetype_id<B>(
+        &self,
+        context: &B::Context,
+    ) -> Result<Option<ArchetypeId>, GetComponentsError>
+    where
+        B: Bundle,
+    {
+        let Self {
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        archetypes.archetype_id::<B>(components, context)
     }
 }

@@ -574,33 +574,6 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    fn register_archetype_without_component(
-        graph: &mut Graph,
-        archetypes: &mut Archetypes,
-        components: &ComponentRegistry,
-        archetype_id: ArchetypeId,
-        component_id: ComponentId,
-    ) -> Option<ArchetypeId> {
-        if let Some(archetype_id) = Self::find_archetype_before(graph, archetype_id, component_id) {
-            return Some(archetype_id);
-        }
-
-        let Some(info) = Self::get_archetype_info(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
-        };
-        let component_ids = info.storage().component_ids();
-        if component_ids.len() <= 1 {
-            return None;
-        }
-
-        let component_ids: Vec<_> = component_ids.filter(|&id| id != component_id).collect();
-        let key = component_ids.iter().copied().collect();
-        let archetype_id =
-            Self::register_from_slice(archetypes, graph, components, &component_ids, key);
-        Some(archetype_id)
-    }
-
-    #[inline]
     fn register_archetype_with_component(
         graph: &mut Graph,
         archetypes: &mut Archetypes,
@@ -632,6 +605,33 @@ impl ArchetypeRegistry {
             .collect();
         let key = component_ids.iter().copied().collect();
         Self::register_from_slice(archetypes, graph, components, &component_ids, key)
+    }
+
+    #[inline]
+    fn register_archetype_without_component(
+        graph: &mut Graph,
+        archetypes: &mut Archetypes,
+        components: &ComponentRegistry,
+        archetype_id: ArchetypeId,
+        component_id: ComponentId,
+    ) -> Option<ArchetypeId> {
+        if let Some(archetype_id) = Self::find_archetype_before(graph, archetype_id, component_id) {
+            return Some(archetype_id);
+        }
+
+        let Some(info) = Self::get_archetype_info(archetypes, archetype_id) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+        let component_ids = info.storage().component_ids();
+        if component_ids.len() <= 1 {
+            return None;
+        }
+
+        let component_ids: Vec<_> = component_ids.filter(|&id| id != component_id).collect();
+        let key = component_ids.iter().copied().collect();
+        let archetype_id =
+            Self::register_from_slice(archetypes, graph, components, &component_ids, key);
+        Some(archetype_id)
     }
 
     #[inline]

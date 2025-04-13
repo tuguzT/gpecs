@@ -10,6 +10,8 @@ pub mod impls;
 
 mod desc;
 
+pub type DefaultContext = ();
+
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays (or SoA) pattern.
 #[allow(clippy::missing_safety_doc)]

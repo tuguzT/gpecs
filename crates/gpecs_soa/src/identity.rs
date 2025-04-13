@@ -13,7 +13,7 @@ use core_alloc::vec::Vec;
 use crate::traits::SoaVecs;
 use crate::traits::{
     impls::{collect_array, debug_assert_ptr_is_aligned},
-    FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields,
+    DefaultContext, FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
@@ -139,7 +139,7 @@ where
 }
 
 unsafe impl<T> Soa for Identity<T> {
-    type Context = ();
+    type Context = DefaultContext;
     type Fields = Identity<T>;
 
     type FieldDescriptors<'a> = [FieldDescriptor; 1];

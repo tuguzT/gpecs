@@ -1,7 +1,10 @@
 use std::any::TypeId;
 
 use crate::{
-    archetype::registry::{ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityArchetype},
+    archetype::{
+        error::{IncompatibleBundleError, InsertBundleError, RemoveBundleError},
+        registry::{ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityArchetype},
+    },
     bundle::{
         error::{DuplicateComponentError, GetComponentsError},
         Bundle,
@@ -123,6 +126,12 @@ impl Context {
     }
 
     #[inline]
+    pub fn spawn_world(&mut self) -> WorldId {
+        let Self { worlds, .. } = self;
+        worlds.spawn()
+    }
+
+    #[inline]
     pub fn spawn(&mut self) -> Entity {
         let world = WorldId::default();
         self.spawn_in(world)
@@ -234,5 +243,112 @@ impl Context {
         } = self;
 
         archetypes.archetype_id::<B>(components, context)
+    }
+
+    #[inline]
+    pub fn try_get_bundle<B>(
+        &self,
+        context: &B::Context,
+        entity: Entity,
+    ) -> Option<Result<B::Refs<'_>, IncompatibleBundleError>>
+    where
+        B: Bundle,
+    {
+        let Self {
+            entities,
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        let Some(archetype_id) = entities.get(entity).copied() else {
+            return None;
+        };
+        let location = archetype_id.into();
+        let result = archetypes.try_get_bundle_with::<B>(components, context, entity, location);
+        Some(result)
+    }
+
+    #[inline]
+    pub fn try_get_bundle_mut<B>(
+        &mut self,
+        context: &B::Context,
+        entity: Entity,
+    ) -> Option<Result<B::RefsMut<'_>, IncompatibleBundleError>>
+    where
+        B: Bundle,
+    {
+        let Self {
+            entities,
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        let Some(archetype_id) = entities.get(entity).copied() else {
+            return None;
+        };
+        let location = archetype_id.into();
+        let result = archetypes.try_get_bundle_mut_with::<B>(components, context, entity, location);
+        Some(result)
+    }
+
+    #[inline]
+    pub fn try_insert_bundle<B>(
+        &mut self,
+        context: &B::Context,
+        entity: Entity,
+        value: B,
+    ) -> Result<bool, InsertBundleError<B>>
+    where
+        B: Bundle,
+    {
+        let Self {
+            entities,
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        let Some(archetype_id) = entities.get_mut(entity) else {
+            return Ok(false);
+        };
+        let location = archetype_id.clone().into();
+        let result =
+            archetypes.try_insert_bundle_with::<B>(components, context, entity, value, location);
+
+        let new_archetype_id = result?;
+        *archetype_id = Some(new_archetype_id);
+        Ok(true)
+    }
+
+    #[inline]
+    pub fn try_remove_bundle<B>(
+        &mut self,
+        context: &B::Context,
+        entity: Entity,
+    ) -> Option<Result<B, RemoveBundleError>>
+    where
+        B: Bundle,
+    {
+        let Self {
+            entities,
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        let Some(archetype_id) = entities.get_mut(entity) else {
+            return None;
+        };
+        let location = archetype_id.clone().into();
+        let result = archetypes.try_remove_bundle_with::<B>(components, context, entity, location);
+
+        let (value, new_archetype_id) = match result {
+            Ok((value, new_archetype_id)) => (value, new_archetype_id),
+            Err(error) => return Some(Err(error)),
+        };
+        *archetype_id = new_archetype_id;
+        Some(Ok(value))
     }
 }

@@ -569,13 +569,13 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        let (value, _) = self.try_remove_component_with(components, context, entity, location)?;
+        let (value, _) = self.try_remove_bundle_with(components, context, entity, location)?;
         Ok(value)
     }
 
     #[inline]
     #[track_caller]
-    pub fn try_remove_component_with<B>(
+    pub fn try_remove_bundle_with<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,

@@ -45,7 +45,7 @@ fn register_type() {
     assert_eq!(components.register_component::<Position>(), id);
 
     let info = components
-        .get_info(id)
+        .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.id(), id);
     assert_eq!(info.type_id(), Some(TypeId::of::<Position>()));
@@ -59,7 +59,7 @@ fn register_type() {
     assert!(components.component_ids().any(|item| item == id));
 
     let info = components
-        .get_info(id)
+        .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.id(), id);
     assert_eq!(info.type_id(), Some(TypeId::of::<Mass>()));
@@ -74,13 +74,13 @@ fn register_with_descriptor() {
     assert_eq!(components.len(), 1);
 
     let descriptor = ComponentDescriptor::new("Mass", FieldDescriptor::of::<f32>(), None);
-    let id = components.register_component_with_descriptor(descriptor);
+    let id = components.register_component_with(descriptor);
     assert_eq!(components.len(), 2);
     assert_eq!(id.index(), 1);
     assert!(components.component_ids().any(|item| item == id));
 
     let info = components
-        .get_info(id)
+        .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.id(), id);
     assert_eq!(info.type_id(), None);

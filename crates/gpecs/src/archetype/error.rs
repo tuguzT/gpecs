@@ -12,6 +12,36 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub struct InsertBundleError<B>
+where
+    B: Bundle,
+{
+    pub value: B,
+    pub reason: DuplicateComponentError,
+}
+
+impl<B> Display for InsertBundleError<B>
+where
+    B: Bundle + Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { value, reason } = self;
+        write!(f, "bundle {value} cannot be inserted, reason: {reason}")
+    }
+}
+
+impl<B> Error for InsertBundleError<B>
+where
+    B: Bundle + Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        reason.source()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ExclusiveComponentError {
     component_id: ComponentId,
 }
@@ -37,6 +67,46 @@ impl Display for ExclusiveComponentError {
 }
 
 impl Error for ExclusiveComponentError {}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub enum RemoveBundleError {
+    DuplicateComponent(DuplicateComponentError),
+    ExclusiveComponent(ExclusiveComponentError),
+}
+
+impl From<DuplicateComponentError> for RemoveBundleError {
+    #[inline]
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
+    }
+}
+
+impl From<ExclusiveComponentError> for RemoveBundleError {
+    #[inline]
+    fn from(error: ExclusiveComponentError) -> Self {
+        Self::ExclusiveComponent(error)
+    }
+}
+
+impl Display for RemoveBundleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bundle cannot be removed: ")?;
+        match self {
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::ExclusiveComponent(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for RemoveBundleError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DuplicateComponent(error) => Some(error),
+            Self::ExclusiveComponent(error) => Some(error),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]

@@ -102,22 +102,17 @@ impl Context {
     }
 
     #[inline]
-    pub fn despawn(&mut self, entity: Entity) {
+    pub fn despawn(&mut self, entity: Entity) -> bool {
         let Self {
             entities,
             archetypes,
             ..
         } = self;
-        let Some(archetype) = entities.despawn(entity).flatten() else {
-            return;
-        };
 
-        let Some(info) = archetypes.get_info_mut(archetype) else {
-            unreachable!("archetype {archetype:?} should exist")
+        let Some(archetype_id) = entities.despawn(entity) else {
+            return false;
         };
-        if !info.storage_mut().destroy_in_place(entity) {
-            unreachable!("entity {entity:?} should exist in archetype {archetype:?}");
-        }
+        archetypes.destroy_in_place(entity, archetype_id.into())
     }
 
     #[inline]

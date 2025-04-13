@@ -27,7 +27,7 @@ where
     D: AsRef<FieldDescriptor>,
 {
     let info = components
-        .get_info(id)
+        .get_component_info(id)
         .unwrap_or_else(|| get_component_info_fail(&id));
     assert_eq!(info.descriptor().layout(), desc.as_ref().layout());
 }

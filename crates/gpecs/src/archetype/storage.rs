@@ -11,7 +11,7 @@ use gpecs_soa_erased::{
     },
 };
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
-use indexmap::{map::Keys, IndexMap};
+use indexmap::{map::Keys, IndexMap, IndexSet};
 
 use crate::{
     bundle::{error::DuplicateComponentError, Bundle},
@@ -87,14 +87,14 @@ impl ArchetypeStorage {
     {
         let component_ids = try_collect_component_ids(component_ids, |map, component_id| {
             let info = components
-                .get_info(component_id)
+                .get_component_info(component_id)
                 .unwrap_or_else(|| get_component_info_fail(&component_id));
             ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
         })?;
 
         let descriptors = component_ids.keys().map(|&component_id| {
             let info = components
-                .get_info(component_id)
+                .get_component_info(component_id)
                 .unwrap_or_else(|| get_component_info_fail(&component_id));
             info.descriptor()
         });
@@ -119,7 +119,7 @@ impl ArchetypeStorage {
             .into_iter()
             .map(|component_id| {
                 let info = components
-                    .get_info(component_id)
+                    .get_component_info(component_id)
                     .unwrap_or_else(|| get_component_info_fail(&component_id));
                 (component_id, info.drop_fn())
             })
@@ -142,7 +142,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn bundle_compatibility<B>(
+    pub fn bundle_compatibility_of<B>(
         &self,
         components: &ComponentRegistry,
         context: &B::Context,
@@ -150,18 +150,21 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let Self { component_ids, .. } = self;
-
-        let mut bundle_component_ids = B::get_components(context, components)?.into_iter();
-        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            return Err(ExclusiveComponentError::new(component).into());
-        }
-
-        Ok(())
+        let component_ids = B::get_components(context, components)?;
+        self.bundle_compatibility_inner(component_ids)
     }
 
     #[inline]
-    pub fn bundle_compatibility_exact<B>(
+    pub fn bundle_compatibility<I>(&self, component_ids: I) -> Result<(), IncompatibleBundleError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?;
+        self.bundle_compatibility_inner(component_ids)
+    }
+
+    #[inline]
+    pub fn bundle_compatibility_of_exact<B>(
         &self,
         components: &ComponentRegistry,
         context: &B::Context,
@@ -169,10 +172,53 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
+        let component_ids = B::get_components(context, components)?;
+        self.bundle_compatibility_exact_inner(component_ids)
+    }
+
+    #[inline]
+    pub fn bundle_compatibility_exact<I>(
+        &self,
+        component_ids: I,
+    ) -> Result<(), IncompatibleBundleExactError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?;
+        self.bundle_compatibility_exact_inner(component_ids)
+    }
+
+    #[inline]
+    fn bundle_compatibility_inner<I>(
+        &self,
+        bundle_component_ids: I,
+    ) -> Result<(), IncompatibleBundleError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let Self { component_ids, .. } = self;
+
+        if let Some(component) = bundle_component_ids
+            .into_iter()
+            .find(|id| !component_ids.contains_key(id))
+        {
+            return Err(ExclusiveComponentError::new(component).into());
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn bundle_compatibility_exact_inner<I>(
+        &self,
+        bundle_component_ids: I,
+    ) -> Result<(), IncompatibleBundleExactError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
         let Self { component_ids, .. } = self;
 
         let mut bundle_component_ids_count = 0;
-        let mut bundle_component_ids = B::get_components(context, components)?
+        let mut bundle_component_ids = bundle_component_ids
             .into_iter()
             .inspect(|_| bundle_component_ids_count += 1);
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
@@ -319,7 +365,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility::<B>(components, context)?;
+        self.bundle_compatibility_of::<B>(components, context)?;
 
         let Self {
             component_ids,
@@ -346,7 +392,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility::<B>(components, context)?;
+        self.bundle_compatibility_of::<B>(components, context)?;
 
         let Self {
             ref component_ids,
@@ -375,7 +421,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility::<B>(components, context)?;
+        self.bundle_compatibility_of::<B>(components, context)?;
 
         let Self {
             ref component_ids,
@@ -405,7 +451,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility::<B>(components, context)?;
+        self.bundle_compatibility_of::<B>(components, context)?;
 
         let Self {
             ref component_ids,
@@ -437,7 +483,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        if let Err(reason) = self.bundle_compatibility_exact::<B>(components, context) {
+        if let Err(reason) = self.bundle_compatibility_of_exact::<B>(components, context) {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
@@ -474,7 +520,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility_exact::<B>(components, context)?;
+        self.bundle_compatibility_of_exact::<B>(components, context)?;
 
         let Self {
             ref component_ids,

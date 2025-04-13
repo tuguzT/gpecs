@@ -167,10 +167,7 @@ impl ComponentRegistry {
     }
 
     #[inline]
-    pub fn register_component_with_descriptor(
-        &mut self,
-        descriptor: ComponentDescriptor,
-    ) -> ComponentId {
+    pub fn register_component_with(&mut self, descriptor: ComponentDescriptor) -> ComponentId {
         let Self { components, .. } = self;
         Self::register_inner(components, descriptor)
     }
@@ -199,7 +196,7 @@ impl ComponentRegistry {
     }
 
     #[inline]
-    pub fn get_info(&self, id: ComponentId) -> Option<&ComponentInfo> {
+    pub fn get_component_info(&self, id: ComponentId) -> Option<&ComponentInfo> {
         let Self { components, .. } = self;
 
         let index = id.index();

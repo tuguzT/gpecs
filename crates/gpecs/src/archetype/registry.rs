@@ -27,7 +27,9 @@ use crate::{
 
 use super::{
     erased::{from_erased_fields, into_erased_fields, ErasedComponents},
-    error::{ExclusiveComponentError, InsertBundleError, RemoveBundleError},
+    error::{
+        ExclusiveComponentError, IncompatibleBundleError, InsertBundleError, RemoveBundleError,
+    },
     utils::try_collect_component_ids,
 };
 
@@ -369,7 +371,108 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn insert_bundle<B>(
+    pub fn try_get_bundle<B>(
+        &self,
+        components: &ComponentRegistry,
+        context: &B::Context,
+        entity: Entity,
+    ) -> Result<B::Refs<'_>, IncompatibleBundleError>
+    where
+        B: Bundle,
+    {
+        let location = EntityArchetypeLocation::Unknown;
+        self.try_get_bundle_with::<B>(components, context, entity, location)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn try_get_bundle_with<B>(
+        &self,
+        components: &ComponentRegistry,
+        context: &B::Context,
+        entity: Entity,
+        location: EntityArchetypeLocation,
+    ) -> Result<B::Refs<'_>, IncompatibleBundleError>
+    where
+        B: Bundle,
+    {
+        let Self { archetypes, .. } = self;
+        let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
+        else {
+            let component_ids = B::get_components(context, components)?;
+            let Some(component_id) = component_ids.into_iter().next() else {
+                unreachable!("bundle should contain at least one component")
+            };
+            return Err(ExclusiveComponentError::new(component_id).into());
+        };
+
+        let Some(info) = Self::get_info(archetypes, archetype_id) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+        let Some(refs) = info.storage().get::<B>(components, context, entity)? else {
+            let component_ids = B::get_components(context, components)?;
+            let Some(component_id) = component_ids.into_iter().next() else {
+                unreachable!("bundle should contain at least one component")
+            };
+            return Err(ExclusiveComponentError::new(component_id).into());
+        };
+        Ok(refs)
+    }
+
+    #[inline]
+    pub fn try_get_bundle_mut<B>(
+        &mut self,
+        components: &ComponentRegistry,
+        context: &B::Context,
+        entity: Entity,
+    ) -> Result<B::RefsMut<'_>, IncompatibleBundleError>
+    where
+        B: Bundle,
+    {
+        let location = EntityArchetypeLocation::Unknown;
+        self.try_get_bundle_mut_with::<B>(components, context, entity, location)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn try_get_bundle_mut_with<B>(
+        &mut self,
+        components: &ComponentRegistry,
+        context: &B::Context,
+        entity: Entity,
+        location: EntityArchetypeLocation,
+    ) -> Result<B::RefsMut<'_>, IncompatibleBundleError>
+    where
+        B: Bundle,
+    {
+        let Self { archetypes, .. } = self;
+        let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
+        else {
+            let component_ids = B::get_components(context, components)?;
+            let Some(component_id) = component_ids.into_iter().next() else {
+                unreachable!("bundle should contain at least one component")
+            };
+            return Err(ExclusiveComponentError::new(component_id).into());
+        };
+
+        let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+        let Some(refs) = info
+            .storage_mut()
+            .get_mut::<B>(components, context, entity)?
+        else {
+            let component_ids = B::get_components(context, components)?;
+            let Some(component_id) = component_ids.into_iter().next() else {
+                unreachable!("bundle should contain at least one component")
+            };
+            return Err(ExclusiveComponentError::new(component_id).into());
+        };
+        Ok(refs)
+    }
+
+    #[inline]
+    pub fn try_insert_bundle<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,
@@ -380,13 +483,13 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.insert_bundle_with(components, context, entity, value, location)?;
+        self.try_insert_bundle_with(components, context, entity, value, location)?;
         Ok(())
     }
 
     #[inline]
     #[track_caller]
-    pub fn insert_bundle_with<B>(
+    pub fn try_insert_bundle_with<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,
@@ -456,7 +559,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn remove_bundle<B>(
+    pub fn try_remove_bundle<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,
@@ -466,13 +569,13 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        let (value, _) = self.remove_component_with(components, context, entity, location)?;
+        let (value, _) = self.try_remove_component_with(components, context, entity, location)?;
         Ok(value)
     }
 
     #[inline]
     #[track_caller]
-    pub fn remove_component_with<B>(
+    pub fn try_remove_component_with<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,

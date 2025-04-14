@@ -1,4 +1,4 @@
-use gpecs::prelude::*;
+use gpecs::{context::error::EntityNotFoundError, prelude::*};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 struct Position {
@@ -48,14 +48,12 @@ fn one_entity() {
     let mass = Mass { value: 42 };
     let tag = Tag;
     context
-        .try_insert_bundle(&(), entity, (position, mass, tag))
-        .expect("entity should exist")
-        .expect("entity should not contain `Position` component yet");
+        .insert_bundle_exact(&(), entity, (position, mass, tag))
+        .expect("entity should exist & not contain `Position` component yet");
 
     let (position_mut,) = context
         .try_get_bundle_mut::<(Position,)>(&(), entity)
-        .expect("entity should exist")
-        .expect("entity should contain `Position` component");
+        .expect("entity should exist & contain `Position` component");
     assert_eq!(position_mut.x, 1.0);
     assert_eq!(position_mut.y, 2.0);
     assert_eq!(position_mut.z, 3.0);
@@ -67,31 +65,30 @@ fn one_entity() {
 
     let (&tag, position) = context
         .try_get_bundle::<(Tag, Position)>(&(), entity)
-        .expect("entity should exist")
-        .expect("entity should contain `Tag` and `Position` components");
+        .expect("entity should exist & contain `Tag` and `Position` components");
     assert_eq!(tag, Tag);
     assert_eq!(position.x, 4.0);
     assert_eq!(position.y, 5.0);
     assert_eq!(position.z, 6.0);
 
     let (position,) = context
-        .try_remove_bundle::<(Position,)>(&(), entity)
-        .expect("entity should exist")
-        .expect("entity should contain `Position` component");
+        .remove_bundle_exact::<(Position,)>(&(), entity)
+        .expect("entity should exist & contain `Position` component");
     assert_eq!(position.x, 4.0);
     assert_eq!(position.y, 5.0);
     assert_eq!(position.z, 6.0);
 
     let (mass, tag) = context
-        .try_remove_bundle::<(Mass, Tag)>(&(), entity)
-        .expect("entity should exist")
-        .expect("entity should contain `Mass` and `Tag` components");
+        .remove_bundle_exact::<(Mass, Tag)>(&(), entity)
+        .expect("entity should exist & contain `Mass` and `Tag` components");
     assert_eq!(mass, Mass { value: 42 });
     assert_eq!(tag, Tag);
 
     context.despawn(entity);
     assert!(!context.contains(entity));
-    assert!(context
+
+    let error = context
         .try_get_bundle::<(Position, Mass, Tag)>(&(), entity)
-        .is_none());
+        .expect_err("entity should not exist");
+    assert_eq!(error, EntityNotFoundError::new(entity).into());
 }

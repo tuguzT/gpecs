@@ -371,7 +371,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn try_get_bundle<B>(
+    pub fn get_bundle<B>(
         &self,
         components: &ComponentRegistry,
         context: &B::Context,
@@ -381,12 +381,12 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.try_get_bundle_with::<B>(components, context, entity, location)
+        self.get_bundle_with::<B>(components, context, entity, location)
     }
 
     #[inline]
     #[track_caller]
-    pub fn try_get_bundle_with<B>(
+    pub fn get_bundle_with<B>(
         &self,
         components: &ComponentRegistry,
         context: &B::Context,
@@ -420,7 +420,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn try_get_bundle_mut<B>(
+    pub fn get_bundle_mut<B>(
         &mut self,
         components: &ComponentRegistry,
         context: &B::Context,
@@ -430,12 +430,12 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.try_get_bundle_mut_with::<B>(components, context, entity, location)
+        self.get_bundle_mut_with::<B>(components, context, entity, location)
     }
 
     #[inline]
     #[track_caller]
-    pub fn try_get_bundle_mut_with<B>(
+    pub fn get_bundle_mut_with<B>(
         &mut self,
         components: &ComponentRegistry,
         context: &B::Context,
@@ -472,7 +472,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn try_insert_bundle<B>(
+    pub fn insert_bundle_exact<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,
@@ -483,13 +483,13 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.try_insert_bundle_with(components, context, entity, value, location)?;
+        self.insert_bundle_exact_with(components, context, entity, value, location)?;
         Ok(())
     }
 
     #[inline]
     #[track_caller]
-    pub fn try_insert_bundle_with<B>(
+    pub fn insert_bundle_exact_with<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,
@@ -559,7 +559,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn try_remove_bundle<B>(
+    pub fn remove_bundle_exact<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,
@@ -569,13 +569,13 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        let (value, _) = self.try_remove_bundle_with(components, context, entity, location)?;
+        let (value, _) = self.remove_bundle_exact_with(components, context, entity, location)?;
         Ok(value)
     }
 
     #[inline]
     #[track_caller]
-    pub fn try_remove_bundle_with<B>(
+    pub fn remove_bundle_exact_with<B>(
         &mut self,
         components: &mut ComponentRegistry,
         context: &B::Context,

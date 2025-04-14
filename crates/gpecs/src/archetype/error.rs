@@ -33,6 +33,100 @@ impl Display for DuplicateComponentError {
 impl Error for DuplicateComponentError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct AlreadyHasComponentError {
+    component_id: ComponentId,
+}
+
+impl AlreadyHasComponentError {
+    #[inline]
+    pub fn new(component_id: ComponentId) -> Self {
+        Self { component_id }
+    }
+
+    #[inline]
+    pub fn component_id(&self) -> ComponentId {
+        let Self { component_id } = *self;
+        component_id
+    }
+}
+
+impl Display for AlreadyHasComponentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { component_id } = *self;
+        write!(f, "entity already has component {component_id:?}")
+    }
+}
+
+impl Error for AlreadyHasComponentError {}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub enum InsertBundleExactErrorKind {
+    DuplicateComponent(DuplicateComponentError),
+    AlreadyHasComponent(AlreadyHasComponentError),
+}
+
+impl From<DuplicateComponentError> for InsertBundleExactErrorKind {
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
+    }
+}
+
+impl From<AlreadyHasComponentError> for InsertBundleExactErrorKind {
+    fn from(error: AlreadyHasComponentError) -> Self {
+        Self::AlreadyHasComponent(error)
+    }
+}
+
+impl Display for InsertBundleExactErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::AlreadyHasComponent(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for InsertBundleExactErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DuplicateComponent(error) => Some(error),
+            Self::AlreadyHasComponent(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub struct InsertBundleExactError<B>
+where
+    B: Bundle,
+{
+    pub value: B,
+    pub kind: InsertBundleExactErrorKind,
+}
+
+impl<B> Display for InsertBundleExactError<B>
+where
+    B: Bundle + Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { value, kind } = self;
+        write!(f, "bundle {value} cannot be inserted, reason: {kind}")
+    }
+}
+
+impl<B> Error for InsertBundleExactError<B>
+where
+    B: Bundle + Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { kind, .. } = self;
+        kind.source()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
 pub struct InsertBundleError<B>
 where
@@ -91,26 +185,26 @@ impl Error for MissingComponentError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
-pub enum RemoveBundleError {
+pub enum RemoveBundleExactError {
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
 }
 
-impl From<DuplicateComponentError> for RemoveBundleError {
+impl From<DuplicateComponentError> for RemoveBundleExactError {
     #[inline]
     fn from(error: DuplicateComponentError) -> Self {
         Self::DuplicateComponent(error)
     }
 }
 
-impl From<MissingComponentError> for RemoveBundleError {
+impl From<MissingComponentError> for RemoveBundleExactError {
     #[inline]
     fn from(error: MissingComponentError) -> Self {
         Self::MissingComponent(error)
     }
 }
 
-impl Display for RemoveBundleError {
+impl Display for RemoveBundleExactError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "bundle cannot be removed: ")?;
         match self {
@@ -120,7 +214,7 @@ impl Display for RemoveBundleError {
     }
 }
 
-impl Error for RemoveBundleError {
+impl Error for RemoveBundleExactError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::DuplicateComponent(error) => Some(error),

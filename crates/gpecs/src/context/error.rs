@@ -5,10 +5,12 @@ use std::{
 
 use crate::{
     archetype::error::{
-        ComponentNotRegisteredError, DuplicateComponentError,
+        AlreadyHasComponentError, ComponentNotRegisteredError, DuplicateComponentError,
         IncompatibleBundleError as ArchetypeIncompatibleBundleError,
-        InsertBundleError as ArchetypeInsertBundleError, MissingComponentError,
-        RemoveBundleError as ArchetypeRemoveBundleError,
+        InsertBundleError as ArchetypeInsertBundleError,
+        InsertBundleExactError as ArchetypeInsertBundleExactError,
+        InsertBundleExactErrorKind as ArchetypeInsertBundleExactErrorKind, MissingComponentError,
+        RemoveBundleExactError as ArchetypeRemoveBundleExactError,
     },
     bundle::Bundle,
     entity::Entity,
@@ -119,6 +121,110 @@ impl Error for IncompatibleBundleError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum InsertBundleExactErrorKind {
+    EntityNotFound(EntityNotFoundError),
+    DuplicateComponent(DuplicateComponentError),
+    AlreadyHasComponent(AlreadyHasComponentError),
+}
+
+impl From<EntityNotFoundError> for InsertBundleExactErrorKind {
+    #[inline]
+    fn from(error: EntityNotFoundError) -> Self {
+        Self::EntityNotFound(error)
+    }
+}
+
+impl From<DuplicateComponentError> for InsertBundleExactErrorKind {
+    #[inline]
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
+    }
+}
+
+impl From<AlreadyHasComponentError> for InsertBundleExactErrorKind {
+    #[inline]
+    fn from(error: AlreadyHasComponentError) -> Self {
+        Self::AlreadyHasComponent(error)
+    }
+}
+
+impl From<ArchetypeInsertBundleExactErrorKind> for InsertBundleExactErrorKind {
+    #[inline]
+    fn from(error: ArchetypeInsertBundleExactErrorKind) -> Self {
+        match error {
+            ArchetypeInsertBundleExactErrorKind::DuplicateComponent(error) => {
+                Self::DuplicateComponent(error)
+            }
+            ArchetypeInsertBundleExactErrorKind::AlreadyHasComponent(error) => {
+                Self::AlreadyHasComponent(error)
+            }
+        }
+    }
+}
+
+impl Display for InsertBundleExactErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EntityNotFound(error) => Display::fmt(error, f),
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::AlreadyHasComponent(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for InsertBundleExactErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::EntityNotFound(error) => Some(error),
+            Self::DuplicateComponent(error) => Some(error),
+            Self::AlreadyHasComponent(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub struct InsertBundleExactError<B>
+where
+    B: Bundle,
+{
+    pub value: B,
+    pub kind: InsertBundleExactErrorKind,
+}
+
+impl<B> From<ArchetypeInsertBundleExactError<B>> for InsertBundleExactError<B>
+where
+    B: Bundle,
+{
+    #[inline]
+    fn from(error: ArchetypeInsertBundleExactError<B>) -> Self {
+        let ArchetypeInsertBundleExactError { value, kind } = error;
+        let kind = kind.into();
+        Self { value, kind }
+    }
+}
+
+impl<B> Display for InsertBundleExactError<B>
+where
+    B: Bundle + Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { value, kind } = self;
+        write!(f, "bundle {value} cannot be inserted, reason: {kind}")
+    }
+}
+
+impl<B> Error for InsertBundleExactError<B>
+where
+    B: Bundle + Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { kind, .. } = self;
+        kind.source()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InsertBundleErrorKind {
     EntityNotFound(EntityNotFoundError),
     DuplicateComponent(DuplicateComponentError),
@@ -200,46 +306,48 @@ where
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
-pub enum RemoveBundleError {
+pub enum RemoveBundleExactError {
     EntityNotFound(EntityNotFoundError),
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
 }
 
-impl From<EntityNotFoundError> for RemoveBundleError {
+impl From<EntityNotFoundError> for RemoveBundleExactError {
     #[inline]
     fn from(error: EntityNotFoundError) -> Self {
         Self::EntityNotFound(error)
     }
 }
 
-impl From<DuplicateComponentError> for RemoveBundleError {
+impl From<DuplicateComponentError> for RemoveBundleExactError {
     #[inline]
     fn from(error: DuplicateComponentError) -> Self {
         Self::DuplicateComponent(error)
     }
 }
 
-impl From<MissingComponentError> for RemoveBundleError {
+impl From<MissingComponentError> for RemoveBundleExactError {
     #[inline]
     fn from(error: MissingComponentError) -> Self {
         Self::MissingComponent(error)
     }
 }
 
-impl From<ArchetypeRemoveBundleError> for RemoveBundleError {
+impl From<ArchetypeRemoveBundleExactError> for RemoveBundleExactError {
     #[inline]
-    fn from(error: ArchetypeRemoveBundleError) -> Self {
+    fn from(error: ArchetypeRemoveBundleExactError) -> Self {
         match error {
-            ArchetypeRemoveBundleError::DuplicateComponent(error) => {
+            ArchetypeRemoveBundleExactError::DuplicateComponent(error) => {
                 Self::DuplicateComponent(error)
             }
-            ArchetypeRemoveBundleError::MissingComponent(error) => Self::MissingComponent(error),
+            ArchetypeRemoveBundleExactError::MissingComponent(error) => {
+                Self::MissingComponent(error)
+            }
         }
     }
 }
 
-impl Display for RemoveBundleError {
+impl Display for RemoveBundleExactError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "bundle cannot be removed: ")?;
         match self {
@@ -250,7 +358,7 @@ impl Display for RemoveBundleError {
     }
 }
 
-impl Error for RemoveBundleError {
+impl Error for RemoveBundleExactError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::EntityNotFound(error) => Some(error),

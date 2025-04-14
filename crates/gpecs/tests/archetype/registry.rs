@@ -1,7 +1,7 @@
 use gpecs::{
     archetype::{
         error::{
-            DuplicateComponentError, IncompatibleBundleError, InsertBundleError,
+            AlreadyHasComponentError, IncompatibleBundleError, InsertBundleExactError,
             MissingComponentError,
         },
         registry::ArchetypeRegistry,
@@ -181,12 +181,12 @@ fn exchange_components() {
         .insert_bundle_exact::<(Position, Mass)>(&mut components, entity, (position, mass))
         .expect("entity should not have `Position` and `Mass` components yet");
 
-    let InsertBundleError { value, reason, .. } = archetypes
+    let InsertBundleExactError { value, kind, .. } = archetypes
         .insert_bundle_exact::<(Mass, Position)>(&mut components, entity, (mass, position))
         .expect_err("entity should already have `Position` and `Mass` components");
     assert_eq!(
-        reason,
-        DuplicateComponentError::new(components.register_component::<Mass>()),
+        kind,
+        AlreadyHasComponentError::new(components.register_component::<Mass>()).into(),
     );
     assert_eq!(value, (mass, position));
 
@@ -218,12 +218,12 @@ fn exchange_components() {
         .insert_bundle_exact::<(Tag,)>(&mut components, entity, (tag,))
         .expect("entity should not have `Tag` component yet");
 
-    let InsertBundleError { value, reason, .. } = archetypes
+    let InsertBundleExactError { value, kind, .. } = archetypes
         .insert_bundle_exact::<(Tag,)>(&mut components, entity, (tag,))
         .expect_err("entity already has `Tag` component");
     assert_eq!(
-        reason,
-        DuplicateComponentError::new(components.register_component::<Tag>()),
+        kind,
+        AlreadyHasComponentError::new(components.register_component::<Tag>()).into(),
     );
     assert_eq!(value, (tag,));
 
@@ -371,12 +371,12 @@ fn exchange_components_empty_registry() {
     ));
 
     let mass = Mass { value: 42 };
-    let InsertBundleError { value, reason, .. } = archetypes
+    let InsertBundleExactError { value, kind, .. } = archetypes
         .insert_bundle_exact::<(Mass, Tag)>(&mut components, entity, (mass, tag))
         .expect_err("entity already has `Tag` component");
     assert_eq!(
-        reason,
-        DuplicateComponentError::new(components.register_component::<Tag>()),
+        kind,
+        AlreadyHasComponentError::new(components.register_component::<Tag>()).into(),
     );
     assert_eq!(value, (mass, tag));
 

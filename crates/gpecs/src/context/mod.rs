@@ -19,7 +19,9 @@ use crate::{
     world::registry::{WorldId, WorldRegistry},
 };
 
-use self::error::{IncompatibleBundleError, InsertBundleError, RemoveBundleError};
+use self::error::{
+    IncompatibleBundleError, InsertBundleError, InsertBundleExactError, RemoveBundleExactError,
+};
 
 pub mod error;
 
@@ -304,7 +306,7 @@ impl Context {
         &mut self,
         entity: Entity,
         value: B,
-    ) -> Result<(), InsertBundleError<B>>
+    ) -> Result<(), InsertBundleExactError<B>>
     where
         B: Bundle,
     {
@@ -317,7 +319,7 @@ impl Context {
 
         let Some(archetype_id) = entities.get_mut(entity) else {
             let kind = EntityNotFoundError::new(entity).into();
-            return Err(InsertBundleError { value, kind });
+            return Err(InsertBundleExactError { value, kind });
         };
         let location = archetype_id.clone().into();
         let new_archetype_id =
@@ -350,7 +352,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn remove_bundle_exact<B>(&mut self, entity: Entity) -> Result<B, RemoveBundleError>
+    pub fn remove_bundle_exact<B>(&mut self, entity: Entity) -> Result<B, RemoveBundleExactError>
     where
         B: Bundle,
     {

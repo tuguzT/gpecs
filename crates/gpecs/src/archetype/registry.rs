@@ -26,8 +26,9 @@ use crate::{
 use super::{
     erased::{from_erased_fields, into_erased_fields, ErasedComponents},
     error::{
-        DuplicateComponentError, GetComponentsError, IncompatibleBundleError, InsertBundleError,
-        MissingComponentError, RemoveBundleError,
+        AlreadyHasComponentError, DuplicateComponentError, GetComponentsError,
+        IncompatibleBundleError, InsertBundleError, InsertBundleExactError, MissingComponentError,
+        RemoveBundleExactError,
     },
     utils::{try_collect_component_ids, try_collect_maybe_component_ids},
 };
@@ -477,7 +478,7 @@ impl ArchetypeRegistry {
         components: &mut ComponentRegistry,
         entity: Entity,
         value: B,
-    ) -> Result<(), InsertBundleError<B>>
+    ) -> Result<(), InsertBundleExactError<B>>
     where
         B: Bundle,
     {
@@ -494,17 +495,18 @@ impl ArchetypeRegistry {
         entity: Entity,
         value: B,
         location: EntityArchetypeLocation,
-    ) -> Result<ArchetypeId, InsertBundleError<B>>
+    ) -> Result<ArchetypeId, InsertBundleExactError<B>>
     where
         B: Bundle,
     {
         let Self { archetypes, graph } = self;
 
         let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        if let Err(reason) =
+        if let Err(error) =
             try_collect_component_ids(component_ids.iter().copied(), ArchetypeKey::insert)
         {
-            return Err(InsertBundleError { value, reason });
+            let kind = error.into();
+            return Err(InsertBundleExactError { value, kind });
         }
 
         let old_archetype = Self::find_archetype_with_entity_and_without_components(
@@ -515,7 +517,10 @@ impl ArchetypeRegistry {
         );
         let old_archetype = match old_archetype {
             Ok(old_archetype) => old_archetype,
-            Err(reason) => return Err(InsertBundleError { value, reason }),
+            Err(error) => {
+                let kind = error.into();
+                return Err(InsertBundleExactError { value, kind });
+            }
         };
         let new_archetype = Self::register_archetype_with_components(
             graph,
@@ -660,7 +665,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-    ) -> Result<B, RemoveBundleError>
+    ) -> Result<B, RemoveBundleExactError>
     where
         B: Bundle,
     {
@@ -676,7 +681,7 @@ impl ArchetypeRegistry {
         components: &mut ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<(B, EntityArchetype), RemoveBundleError>
+    ) -> Result<(B, EntityArchetype), RemoveBundleExactError>
     where
         B: Bundle,
     {
@@ -767,7 +772,7 @@ impl ArchetypeRegistry {
         component_ids: &[ComponentId],
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<Option<ArchetypeId>, DuplicateComponentError> {
+    ) -> Result<Option<ArchetypeId>, AlreadyHasComponentError> {
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
             return Ok(None);
@@ -778,7 +783,7 @@ impl ArchetypeRegistry {
         };
         for &component_id in component_ids {
             if key.contains(&component_id) {
-                return Err(DuplicateComponentError::new(component_id));
+                return Err(AlreadyHasComponentError::new(component_id));
             }
         }
 

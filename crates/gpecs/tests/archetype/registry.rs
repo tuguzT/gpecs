@@ -1,8 +1,8 @@
 use gpecs::{
     archetype::{
         error::{
-            DuplicateComponentError, ExclusiveComponentError, IncompatibleBundleError,
-            InsertBundleError,
+            DuplicateComponentError, IncompatibleBundleError, InsertBundleError,
+            MissingComponentError,
         },
         registry::ArchetypeRegistry,
     },
@@ -174,7 +174,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Mass` and `Position` components yet");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Mass>()).into(),
+        MissingComponentError::new(components.register_component::<Mass>()).into(),
     );
 
     archetypes
@@ -211,7 +211,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Tag` component yet");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     archetypes
@@ -266,7 +266,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Tag` component");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let storage = archetypes
@@ -286,7 +286,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Tag` component");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let refs = archetypes
@@ -299,7 +299,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Tag` component");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let value = archetypes
@@ -312,7 +312,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Mass` and `Position` components");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Mass>()).into(),
+        MissingComponentError::new(components.register_component::<Mass>()).into(),
     );
 
     let storage = archetypes
@@ -332,7 +332,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Position` and `Mass` component");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Mass>()).into(),
+        MissingComponentError::new(components.register_component::<Mass>()).into(),
     );
 }
 
@@ -400,7 +400,7 @@ fn exchange_components_empty_registry() {
         .expect_err("entity should not have `Tag` component");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let storage = archetypes

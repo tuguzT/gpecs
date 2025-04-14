@@ -5,9 +5,9 @@ use std::{
 
 use crate::{
     archetype::error::{
-        ComponentNotRegisteredError, DuplicateComponentError, ExclusiveComponentError,
+        ComponentNotRegisteredError, DuplicateComponentError,
         IncompatibleBundleError as ArchetypeIncompatibleBundleError,
-        InsertBundleError as ArchetypeInsertBundleError,
+        InsertBundleError as ArchetypeInsertBundleError, MissingComponentError,
         RemoveBundleError as ArchetypeRemoveBundleError,
     },
     bundle::Bundle,
@@ -46,7 +46,7 @@ impl Error for EntityNotFoundError {}
 pub enum IncompatibleBundleError {
     EntityNotFound(EntityNotFoundError),
     DuplicateComponent(DuplicateComponentError),
-    ExclusiveComponent(ExclusiveComponentError),
+    MissingComponent(MissingComponentError),
     ComponentNotRegistered(ComponentNotRegisteredError),
 }
 
@@ -64,10 +64,10 @@ impl From<DuplicateComponentError> for IncompatibleBundleError {
     }
 }
 
-impl From<ExclusiveComponentError> for IncompatibleBundleError {
+impl From<MissingComponentError> for IncompatibleBundleError {
     #[inline]
-    fn from(error: ExclusiveComponentError) -> Self {
-        Self::ExclusiveComponent(error)
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
     }
 }
 
@@ -85,8 +85,8 @@ impl From<ArchetypeIncompatibleBundleError> for IncompatibleBundleError {
             ArchetypeIncompatibleBundleError::DuplicateComponent(error) => {
                 Self::DuplicateComponent(error)
             }
-            ArchetypeIncompatibleBundleError::ExclusiveComponent(error) => {
-                Self::ExclusiveComponent(error)
+            ArchetypeIncompatibleBundleError::MissingComponent(error) => {
+                Self::MissingComponent(error)
             }
             ArchetypeIncompatibleBundleError::ComponentNotRegistered(error) => {
                 Self::ComponentNotRegistered(error)
@@ -101,7 +101,7 @@ impl Display for IncompatibleBundleError {
         match self {
             Self::EntityNotFound(error) => Display::fmt(error, f),
             Self::DuplicateComponent(error) => Display::fmt(error, f),
-            Self::ExclusiveComponent(error) => Display::fmt(error, f),
+            Self::MissingComponent(error) => Display::fmt(error, f),
             Self::ComponentNotRegistered(error) => Display::fmt(error, f),
         }
     }
@@ -112,7 +112,7 @@ impl Error for IncompatibleBundleError {
         match self {
             Self::EntityNotFound(error) => Some(error),
             Self::DuplicateComponent(error) => Some(error),
-            Self::ExclusiveComponent(error) => Some(error),
+            Self::MissingComponent(error) => Some(error),
             Self::ComponentNotRegistered(error) => Some(error),
         }
     }
@@ -203,7 +203,7 @@ where
 pub enum RemoveBundleError {
     EntityNotFound(EntityNotFoundError),
     DuplicateComponent(DuplicateComponentError),
-    ExclusiveComponent(ExclusiveComponentError),
+    MissingComponent(MissingComponentError),
 }
 
 impl From<EntityNotFoundError> for RemoveBundleError {
@@ -220,10 +220,10 @@ impl From<DuplicateComponentError> for RemoveBundleError {
     }
 }
 
-impl From<ExclusiveComponentError> for RemoveBundleError {
+impl From<MissingComponentError> for RemoveBundleError {
     #[inline]
-    fn from(error: ExclusiveComponentError) -> Self {
-        Self::ExclusiveComponent(error)
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
     }
 }
 
@@ -234,9 +234,7 @@ impl From<ArchetypeRemoveBundleError> for RemoveBundleError {
             ArchetypeRemoveBundleError::DuplicateComponent(error) => {
                 Self::DuplicateComponent(error)
             }
-            ArchetypeRemoveBundleError::ExclusiveComponent(error) => {
-                Self::ExclusiveComponent(error)
-            }
+            ArchetypeRemoveBundleError::MissingComponent(error) => Self::MissingComponent(error),
         }
     }
 }
@@ -247,7 +245,7 @@ impl Display for RemoveBundleError {
         match self {
             Self::EntityNotFound(error) => Display::fmt(error, f),
             Self::DuplicateComponent(error) => Display::fmt(error, f),
-            Self::ExclusiveComponent(error) => Display::fmt(error, f),
+            Self::MissingComponent(error) => Display::fmt(error, f),
         }
     }
 }
@@ -257,7 +255,7 @@ impl Error for RemoveBundleError {
         match self {
             Self::EntityNotFound(error) => Some(error),
             Self::DuplicateComponent(error) => Some(error),
-            Self::ExclusiveComponent(error) => Some(error),
+            Self::MissingComponent(error) => Some(error),
         }
     }
 }

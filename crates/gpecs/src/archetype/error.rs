@@ -63,11 +63,11 @@ where
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ExclusiveComponentError {
+pub struct MissingComponentError {
     component_id: ComponentId,
 }
 
-impl ExclusiveComponentError {
+impl MissingComponentError {
     #[inline]
     pub fn new(component_id: ComponentId) -> Self {
         Self { component_id }
@@ -80,20 +80,20 @@ impl ExclusiveComponentError {
     }
 }
 
-impl Display for ExclusiveComponentError {
+impl Display for MissingComponentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { component_id } = *self;
         write!(f, "component {component_id:?} is exclusive to this bundle")
     }
 }
 
-impl Error for ExclusiveComponentError {}
+impl Error for MissingComponentError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
 pub enum RemoveBundleError {
     DuplicateComponent(DuplicateComponentError),
-    ExclusiveComponent(ExclusiveComponentError),
+    MissingComponent(MissingComponentError),
 }
 
 impl From<DuplicateComponentError> for RemoveBundleError {
@@ -103,10 +103,10 @@ impl From<DuplicateComponentError> for RemoveBundleError {
     }
 }
 
-impl From<ExclusiveComponentError> for RemoveBundleError {
+impl From<MissingComponentError> for RemoveBundleError {
     #[inline]
-    fn from(error: ExclusiveComponentError) -> Self {
-        Self::ExclusiveComponent(error)
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
     }
 }
 
@@ -115,7 +115,7 @@ impl Display for RemoveBundleError {
         write!(f, "bundle cannot be removed: ")?;
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
-            Self::ExclusiveComponent(error) => Display::fmt(error, f),
+            Self::MissingComponent(error) => Display::fmt(error, f),
         }
     }
 }
@@ -124,7 +124,7 @@ impl Error for RemoveBundleError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::DuplicateComponent(error) => Some(error),
-            Self::ExclusiveComponent(error) => Some(error),
+            Self::MissingComponent(error) => Some(error),
         }
     }
 }
@@ -183,7 +183,7 @@ impl Error for GetComponentsError {
 #[non_exhaustive]
 pub enum IncompatibleBundleError {
     DuplicateComponent(DuplicateComponentError),
-    ExclusiveComponent(ExclusiveComponentError),
+    MissingComponent(MissingComponentError),
     ComponentNotRegistered(ComponentNotRegisteredError),
 }
 
@@ -194,10 +194,10 @@ impl From<DuplicateComponentError> for IncompatibleBundleError {
     }
 }
 
-impl From<ExclusiveComponentError> for IncompatibleBundleError {
+impl From<MissingComponentError> for IncompatibleBundleError {
     #[inline]
-    fn from(error: ExclusiveComponentError) -> Self {
-        Self::ExclusiveComponent(error)
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
     }
 }
 
@@ -225,7 +225,7 @@ impl Display for IncompatibleBundleError {
         write!(f, "incompatible bundle: ")?;
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
-            Self::ExclusiveComponent(error) => Display::fmt(error, f),
+            Self::MissingComponent(error) => Display::fmt(error, f),
             Self::ComponentNotRegistered(error) => Display::fmt(error, f),
         }
     }
@@ -235,7 +235,7 @@ impl Error for IncompatibleBundleError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::DuplicateComponent(error) => Some(error),
-            Self::ExclusiveComponent(error) => Some(error),
+            Self::MissingComponent(error) => Some(error),
             Self::ComponentNotRegistered(error) => Some(error),
         }
     }
@@ -264,7 +264,7 @@ impl Error for TooFewComponentsError {}
 #[non_exhaustive]
 pub enum IncompatibleBundleExactError {
     DuplicateComponent(DuplicateComponentError),
-    ExclusiveComponent(ExclusiveComponentError),
+    MissingComponent(MissingComponentError),
     ComponentNotRegistered(ComponentNotRegisteredError),
     TooFewComponents(TooFewComponentsError),
 }
@@ -276,10 +276,10 @@ impl From<DuplicateComponentError> for IncompatibleBundleExactError {
     }
 }
 
-impl From<ExclusiveComponentError> for IncompatibleBundleExactError {
+impl From<MissingComponentError> for IncompatibleBundleExactError {
     #[inline]
-    fn from(error: ExclusiveComponentError) -> Self {
-        Self::ExclusiveComponent(error)
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
     }
 }
 
@@ -314,7 +314,7 @@ impl From<IncompatibleBundleError> for IncompatibleBundleExactError {
     fn from(error: IncompatibleBundleError) -> Self {
         match error {
             IncompatibleBundleError::DuplicateComponent(error) => Self::DuplicateComponent(error),
-            IncompatibleBundleError::ExclusiveComponent(error) => Self::ExclusiveComponent(error),
+            IncompatibleBundleError::MissingComponent(error) => Self::MissingComponent(error),
             IncompatibleBundleError::ComponentNotRegistered(error) => {
                 Self::ComponentNotRegistered(error)
             }
@@ -327,7 +327,7 @@ impl Display for IncompatibleBundleExactError {
         write!(f, "incompatible bundle: ")?;
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
-            Self::ExclusiveComponent(error) => Display::fmt(error, f),
+            Self::MissingComponent(error) => Display::fmt(error, f),
             Self::ComponentNotRegistered(error) => Display::fmt(error, f),
             Self::TooFewComponents(error) => Display::fmt(error, f),
         }
@@ -338,7 +338,7 @@ impl Error for IncompatibleBundleExactError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::DuplicateComponent(error) => Some(error),
-            Self::ExclusiveComponent(error) => Some(error),
+            Self::MissingComponent(error) => Some(error),
             Self::ComponentNotRegistered(error) => Some(error),
             Self::TooFewComponents(error) => Some(error),
         }

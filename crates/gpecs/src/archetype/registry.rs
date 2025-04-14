@@ -26,8 +26,8 @@ use crate::{
 use super::{
     erased::{from_erased_fields, into_erased_fields, ErasedComponents},
     error::{
-        DuplicateComponentError, ExclusiveComponentError, GetComponentsError,
-        IncompatibleBundleError, InsertBundleError, RemoveBundleError,
+        DuplicateComponentError, GetComponentsError, IncompatibleBundleError, InsertBundleError,
+        MissingComponentError, RemoveBundleError,
     },
     utils::{try_collect_component_ids, try_collect_maybe_component_ids},
 };
@@ -402,7 +402,7 @@ impl ArchetypeRegistry {
             let Some(component_id) = component_ids.into_iter().next() else {
                 unreachable!("bundle should contain at least one component")
             };
-            return Err(ExclusiveComponentError::new(component_id).into());
+            return Err(MissingComponentError::new(component_id).into());
         };
 
         let Some(info) = Self::get_info(archetypes, archetype_id) else {
@@ -415,7 +415,7 @@ impl ArchetypeRegistry {
             let Some(component_id) = component_ids.into_iter().next() else {
                 unreachable!("bundle should contain at least one component")
             };
-            return Err(ExclusiveComponentError::new(component_id).into());
+            return Err(MissingComponentError::new(component_id).into());
         };
         Ok(refs)
     }
@@ -453,7 +453,7 @@ impl ArchetypeRegistry {
             let Some(component_id) = component_ids.into_iter().next() else {
                 unreachable!("bundle should contain at least one component")
             };
-            return Err(ExclusiveComponentError::new(component_id).into());
+            return Err(MissingComponentError::new(component_id).into());
         };
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
@@ -466,7 +466,7 @@ impl ArchetypeRegistry {
             let Some(component_id) = component_ids.into_iter().next() else {
                 unreachable!("bundle should contain at least one component")
             };
-            return Err(ExclusiveComponentError::new(component_id).into());
+            return Err(MissingComponentError::new(component_id).into());
         };
         Ok(refs)
     }
@@ -695,7 +695,7 @@ impl ArchetypeRegistry {
             let &[component_id, ..] = component_ids.as_slice() else {
                 unreachable!("bundle should contain at least one component")
             };
-            return Err(ExclusiveComponentError::new(component_id).into());
+            return Err(MissingComponentError::new(component_id).into());
         };
         let new_archetype = Self::register_archetype_without_components(
             graph,
@@ -791,7 +791,7 @@ impl ArchetypeRegistry {
         component_ids: &[ComponentId],
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<Option<ArchetypeId>, ExclusiveComponentError> {
+    ) -> Result<Option<ArchetypeId>, MissingComponentError> {
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
             return Ok(None);
@@ -802,7 +802,7 @@ impl ArchetypeRegistry {
         };
         for &component_id in component_ids {
             if !key.contains(&component_id) {
-                return Err(ExclusiveComponentError::new(component_id));
+                return Err(MissingComponentError::new(component_id));
             }
         }
 

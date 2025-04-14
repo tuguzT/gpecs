@@ -33,8 +33,8 @@ use super::{
         into_erased_refs_mut, into_erased_slices, into_erased_slices_mut, ErasedComponents,
     },
     error::{
-        DuplicateComponentError, ExclusiveComponentError, IncompatibleBundleError,
-        IncompatibleBundleExactError, IncompatibleBundleValueError, TooFewComponentsError,
+        DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
+        IncompatibleBundleValueError, MissingComponentError, TooFewComponentsError,
     },
     utils::{try_collect_component_ids, try_collect_maybe_component_ids},
 };
@@ -206,7 +206,7 @@ impl ArchetypeStorage {
             .into_iter()
             .find(|id| !component_ids.contains_key(id))
         {
-            return Err(ExclusiveComponentError::new(component).into());
+            return Err(MissingComponentError::new(component).into());
         }
         Ok(())
     }
@@ -226,7 +226,7 @@ impl ArchetypeStorage {
             .into_iter()
             .inspect(|_| bundle_component_ids_count += 1);
         if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            return Err(ExclusiveComponentError::new(component).into());
+            return Err(MissingComponentError::new(component).into());
         }
 
         bundle_component_ids.for_each(drop);

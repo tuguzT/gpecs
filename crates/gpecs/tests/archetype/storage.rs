@@ -1,7 +1,7 @@
 use gpecs::{
     archetype::{
         error::{
-            ExclusiveComponentError, IncompatibleBundleError, IncompatibleBundleValueError,
+            IncompatibleBundleError, IncompatibleBundleValueError, MissingComponentError,
             TooFewComponentsError,
         },
         storage::ArchetypeStorage,
@@ -118,7 +118,7 @@ fn storage_tuple() {
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let slices = storage
@@ -136,7 +136,7 @@ fn storage_tuple() {
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let slices = storage
@@ -168,7 +168,7 @@ fn storage_tuple() {
     assert_eq!(value, (position, name.clone(), tag));
     assert_eq!(
         reason,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let value = storage
@@ -190,7 +190,7 @@ fn storage_tuple() {
         .expect_err("retrieval of `Position`, `Name` and `Tag` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let refs = storage
@@ -212,7 +212,7 @@ fn storage_tuple() {
         .expect_err("retrieval of `Position`, `Name` and `Tag` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let refs_mut = storage
@@ -232,7 +232,7 @@ fn storage_tuple() {
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let slices = storage
@@ -256,7 +256,7 @@ fn storage_tuple() {
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let slices = storage
@@ -280,7 +280,7 @@ fn storage_tuple() {
         .expect_err("removal of `Position`, `Name` and `Tag` should fail");
     assert_eq!(
         error,
-        ExclusiveComponentError::new(components.register_component::<Tag>()).into(),
+        MissingComponentError::new(components.register_component::<Tag>()).into(),
     );
 
     let value = storage

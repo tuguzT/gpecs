@@ -53,14 +53,8 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-        } = *self;
-
-        let slices = T::slices_from_raw_parts(context, ptrs.clone(), len);
-        unsafe { T::slice_ptrs_to_slices(context, slices) }
+        let (_, slices) = self.as_slices_with_context();
+        slices
     }
 
     #[inline]
@@ -78,10 +72,8 @@ where
 
     #[inline]
     pub fn into_slices(self) -> T::Slices<'a> {
-        let Self { context, ptrs, len } = self;
-
-        let slices = T::slices_from_raw_parts(context, ptrs, len);
-        unsafe { T::slice_ptrs_to_slices(context, slices) }
+        let (_, slices) = self.into_slices_with_context();
+        slices
     }
 
     #[inline]
@@ -464,15 +456,8 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_> {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-        } = *self;
-
-        let slices = T::slices_from_raw_parts_mut(context, ptrs.clone(), len);
-        let slices = T::slice_ptrs_cast_const(context, slices);
-        unsafe { T::slice_ptrs_to_slices(context, slices) }
+        let (_, slices) = self.as_slices_with_context();
+        slices
     }
 
     #[inline]

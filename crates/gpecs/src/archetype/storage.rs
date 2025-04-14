@@ -10,14 +10,19 @@ use gpecs_soa_erased::{
         ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
 };
-use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
+use gpecs_sparse::{
+    error::TryReserveError,
+    key::Key,
+    pair::{KeyValueSlices, KeyValueSlicesMut},
+    set::EpochSparseSet,
+};
 use indexmap::{map::Keys, IndexMap, IndexSet};
 
 use crate::{
     bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry, DropFn},
     entity::Entity,
-    soa::traits::FieldDescriptor,
+    soa::traits::{FieldDescriptor, Soa},
 };
 
 use super::{
@@ -66,6 +71,9 @@ impl From<NoEpochEntity> for Entity {
         entity
     }
 }
+
+pub type Slices<'a, B> = (&'a [Entity], <B as Soa>::Slices<'a>);
+pub type SlicesMut<'a, B> = (&'a [Entity], <B as Soa>::SlicesMut<'a>);
 
 type ErasedStorage = EpochSparseSet<NoEpochEntity, ErasedSoa>;
 type ComponentIdMap = IndexMap<ComponentId, Option<DropFn>>;
@@ -361,7 +369,7 @@ impl ArchetypeStorage {
         &self,
         components: &ComponentRegistry,
         context: &B::Context,
-    ) -> Result<B::Slices<'_>, IncompatibleBundleError>
+    ) -> Result<Slices<B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -372,14 +380,16 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let (len, fields) = ErasedStorageExt::components(erased_storage, components, component_ids);
+        let (entities, fields) =
+            ErasedStorageExt::components(erased_storage, components, component_ids);
         let Ok(bundle_component_ids) = B::get_components(context, components) else {
             unreachable!("components of the bundle were retrieved before without any errors")
         };
-        let slices = unsafe {
+        let components = unsafe {
+            let len = entities.len();
             from_erased_slices::<B>(components, context, bundle_component_ids, len, fields)
         };
-        Ok(slices)
+        Ok((entities, components))
     }
 
     #[inline]
@@ -388,7 +398,7 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         context: &B::Context,
-    ) -> Result<B::SlicesMut<'_>, IncompatibleBundleError>
+    ) -> Result<SlicesMut<B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -399,15 +409,16 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let (len, fields) =
+        let (entities, fields) =
             ErasedStorageExt::components_mut(erased_storage, components, component_ids);
         let Ok(bundle_component_ids) = B::get_components(context, components) else {
             unreachable!("components of the bundle were retrieved before without any errors")
         };
-        let slices = unsafe {
+        let components = unsafe {
+            let len = entities.len();
             from_erased_slices_mut::<B>(components, context, bundle_component_ids, len, fields)
         };
-        Ok(slices)
+        Ok((entities, components))
     }
 
     #[inline]
@@ -719,13 +730,13 @@ trait ErasedStorageExt {
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>);
+    ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_>>);
 
     fn components_mut(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'_>>);
+    ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_>>);
 
     fn insert(
         &mut self,
@@ -761,30 +772,48 @@ impl ErasedStorageExt for ErasedStorage {
     #[inline]
     #[allow(unsafe_code)]
     fn entities(&self) -> &[Entity] {
-        let entities = ptr::from_ref(self.as_keys_slice()) as *const [_];
-        unsafe { &*entities }
+        let entities = self.as_keys_slice();
+        unsafe { &*(ptr::from_ref(entities) as *const [Entity]) }
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     fn components(
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (usize, ErasedComponents<ErasedFieldSlice<'_>>) {
-        let (context, slices) = ErasedStorage::as_view(self).into_slices_with_context();
+    ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_>>) {
+        let (dense, _) = ErasedStorage::as_view(self).into_parts();
+        let (context, KeyValueSlices { keys, values }) = dense.into_slices_with_context();
+
+        let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
-        into_erased_slices::<ErasedSoa>(components, context, component_ids, slices)
+        let (len, fields) =
+            into_erased_slices::<ErasedSoa>(components, context, component_ids, values);
+        if entities.len() != len {
+            unreachable!("count of entities should match count of components")
+        }
+        (entities, fields)
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     fn components_mut(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'_>>) {
-        let (context, slices) = ErasedStorage::as_mut_view(self).into_slices_with_context();
+    ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_>>) {
+        let (dense, _) = ErasedStorage::as_mut_view(self).into_parts();
+        let (context, KeyValueSlicesMut { keys, values }) = dense.into_slices_with_context();
+
+        let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
-        into_erased_slices_mut::<ErasedSoa>(components, context, component_ids, slices)
+        let (len, fields) =
+            into_erased_slices_mut::<ErasedSoa>(components, context, component_ids, values);
+        if entities.len() != len {
+            unreachable!("count of entities should match count of components")
+        }
+        (entities, fields)
     }
 
     #[inline]

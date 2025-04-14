@@ -102,7 +102,7 @@ fn storage_tuple() {
     let slices = storage
         .components::<(Position,)>(&mut components, &())
         .expect("retrieval of slice of just `Position` should succeed");
-    assert_eq!(slices, ([].as_slice(),));
+    assert_eq!(slices, ([].as_slice(), ([].as_slice(),)));
 
     let error = storage
         .components::<(Position, Name, Tag)>(&mut components, &())
@@ -124,12 +124,12 @@ fn storage_tuple() {
     let slices = storage
         .components::<(Name, Position)>(&mut components, &())
         .expect("retrieval of slice of `(Name, Position)` should succeed");
-    assert_eq!(slices, ([].as_slice(), [].as_slice()));
+    assert_eq!(slices, ([].as_slice(), ([].as_slice(), [].as_slice())));
 
     let slices = storage
         .components_mut::<(Position,)>(&mut components, &())
         .expect("retrieval of slice of just `Position` should succeed");
-    assert_eq!(slices, ([].as_mut_slice(),));
+    assert_eq!(slices, ([].as_slice(), ([].as_mut_slice(),)));
 
     let error = storage
         .components_mut::<(Position, Name, Tag)>(&mut components, &())
@@ -142,7 +142,10 @@ fn storage_tuple() {
     let slices = storage
         .components_mut::<(Name, Position)>(&mut components, &())
         .expect("retrieval of slice of `(Name, Position)` should succeed");
-    assert_eq!(slices, ([].as_mut_slice(), [].as_mut_slice()));
+    assert_eq!(
+        slices,
+        ([].as_slice(), ([].as_mut_slice(), [].as_mut_slice())),
+    );
 
     let mut position = Position {
         x: 1.0,
@@ -227,7 +230,7 @@ fn storage_tuple() {
     let slices = storage
         .components::<(Position,)>(&mut components, &())
         .expect("retrieval of slice of just `Position` should succeed");
-    assert_eq!(slices, ([position].as_slice(),));
+    assert_eq!(slices, ([entity].as_slice(), ([position].as_slice(),)));
 
     let error = storage
         .components::<(Position, Name, Tag)>(&mut components, &())
@@ -240,12 +243,18 @@ fn storage_tuple() {
     let slices = storage
         .components::<(Name, Position)>(&mut components, &())
         .expect("retrieval of slice of `(Name, Position)` should succeed");
-    assert_eq!(slices, ([name.clone()].as_slice(), [position].as_slice()));
+    assert_eq!(
+        slices,
+        (
+            [entity].as_slice(),
+            ([name.clone()].as_slice(), [position].as_slice()),
+        ),
+    );
 
     let slices = storage
         .components_mut::<(Position,)>(&mut components, &())
         .expect("retrieval of slice of just `Position` should succeed");
-    assert_eq!(slices, ([position].as_mut_slice(),));
+    assert_eq!(slices, ([entity].as_slice(), ([position].as_mut_slice(),)));
 
     let error = storage
         .components_mut::<(Position, Name, Tag)>(&mut components, &())
@@ -260,7 +269,10 @@ fn storage_tuple() {
         .expect("retrieval of slice of `(Name, Position)` should succeed");
     assert_eq!(
         slices,
-        ([name.clone()].as_mut_slice(), [position].as_mut_slice())
+        (
+            [entity].as_slice(),
+            ([name.clone()].as_mut_slice(), [position].as_mut_slice()),
+        ),
     );
 
     let error = storage

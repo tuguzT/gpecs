@@ -7,7 +7,7 @@ use gpecs_soa_erased::{
 use indexmap::IndexMap;
 
 use crate::{
-    component::registry::{ComponentId, ComponentRegistry},
+    component::registry::{ComponentId, ComponentRegistry, DropFn},
     soa::{traits::FieldDescriptor, Soa},
 };
 
@@ -247,4 +247,17 @@ where
         .zip(erased_slices.into_field_slices())
         .collect();
     (len, fields)
+}
+
+#[inline]
+#[allow(unsafe_code)]
+pub unsafe fn drop_erased_in_place<I, F>(fields: I)
+where
+    I: IntoIterator<Item = (F, Option<DropFn>)>,
+    F: AsMut<[u8]>,
+{
+    fields.into_iter().for_each(|(mut field, drop_fn)| {
+        let Some(drop_fn) = drop_fn else { return };
+        unsafe { drop_fn(field.as_mut().as_mut_ptr()) }
+    })
 }

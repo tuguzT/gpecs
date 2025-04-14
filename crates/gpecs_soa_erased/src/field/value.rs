@@ -114,7 +114,7 @@ impl ErasedField {
     }
 
     #[inline]
-    pub fn as_field_ptr_mut(&mut self) -> ErasedFieldMutPtr {
+    pub fn as_field_mut_ptr(&mut self) -> ErasedFieldMutPtr {
         let desc = self.descriptor();
         let buffer = ptr::from_mut(self.buffer_mut());
         unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }

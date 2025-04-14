@@ -345,6 +345,34 @@ impl Context {
     }
 
     #[inline]
+    pub fn insert_bundle<B>(
+        &mut self,
+        context: &B::Context,
+        entity: Entity,
+        value: B,
+    ) -> Result<(), InsertBundleError<B>>
+    where
+        B: Bundle,
+    {
+        let Self {
+            entities,
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        let Some(archetype_id) = entities.get_mut(entity) else {
+            let kind = EntityNotFoundError::new(entity).into();
+            return Err(InsertBundleError { value, kind });
+        };
+        let location = archetype_id.clone().into();
+        let new_archetype_id =
+            archetypes.insert_bundle_with::<B>(components, context, entity, value, location)?;
+        *archetype_id = Some(new_archetype_id);
+        Ok(())
+    }
+
+    #[inline]
     pub fn remove_bundle_exact<B>(
         &mut self,
         context: &B::Context,

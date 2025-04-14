@@ -19,6 +19,7 @@ use gpecs_sparse::{
 use indexmap::{map::Keys, IndexMap, IndexSet};
 
 use crate::{
+    archetype::erased::drop_erased_in_place,
     bundle::{error::DuplicateComponentError, Bundle},
     component::registry::{ComponentId, ComponentRegistry, DropFn},
     entity::Entity,
@@ -572,19 +573,19 @@ impl ArchetypeStorage {
         let fields = erased_refs_mut.into_field_refs();
         debug_assert_eq!(fields.len(), component_ids.len());
 
+        let fields = fields
+            .into_vec()
+            .into_iter()
+            .zip(component_ids.values().copied());
         #[allow(unsafe_code)]
-        component_ids
-            .values()
-            .zip(fields)
-            .for_each(|(drop_fn, mut field)| {
-                let Some(drop_fn) = drop_fn else { return };
-                unsafe { drop_fn(field.as_mut_ptr()) }
-            })
+        unsafe {
+            drop_erased_in_place(fields)
+        }
     }
 
     #[inline]
     #[track_caller]
-    pub(crate) fn insert_erased(
+    pub(super) fn insert_erased(
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,

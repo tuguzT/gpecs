@@ -71,12 +71,21 @@ fn one_entity() {
     assert_eq!(position.y, 5.0);
     assert_eq!(position.z, 6.0);
 
+    let position = Position {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+    };
+    context
+        .insert_bundle::<(Position,)>(&(), entity, (position,))
+        .expect("entity should exist & archetype of just `Position` should contain unique component ids");
+
     let (position,) = context
         .remove_bundle_exact::<(Position,)>(&(), entity)
         .expect("entity should exist & contain `Position` component");
-    assert_eq!(position.x, 4.0);
-    assert_eq!(position.y, 5.0);
-    assert_eq!(position.z, 6.0);
+    assert_eq!(position.x, 1.0);
+    assert_eq!(position.y, 2.0);
+    assert_eq!(position.z, 3.0);
 
     let (mass, tag) = context
         .remove_bundle_exact::<(Mass, Tag)>(&(), entity)

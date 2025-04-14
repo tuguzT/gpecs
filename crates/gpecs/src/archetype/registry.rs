@@ -20,6 +20,7 @@ use crate::{
     bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
+    soa::traits::DefaultContext,
 };
 
 use super::{
@@ -142,22 +143,19 @@ impl ArchetypeRegistry {
     pub fn register_archetype<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &B::Context,
     ) -> Result<ArchetypeId, DuplicateComponentError>
     where
         B: Bundle,
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(context, components)
-            .into_iter()
-            .collect();
+        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
         let key = {
             let component_ids = component_ids.iter().copied();
             try_collect_component_ids(component_ids, ArchetypeKey::insert)?
         };
 
-        let f = |components| ArchetypeStorage::of::<B>(components, context);
+        let f = |components| ArchetypeStorage::of::<B>(components);
         let archetype_id = Self::register(archetypes, graph, components, &component_ids, key, f);
         Ok(archetype_id)
     }
@@ -347,14 +345,13 @@ impl ArchetypeRegistry {
     pub fn archetype_id<B>(
         &self,
         components: &ComponentRegistry,
-        context: &B::Context,
     ) -> Result<Option<ArchetypeId>, GetComponentsError>
     where
         B: Bundle,
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = B::get_components(context, components);
+        let component_ids = B::get_components(components);
         let key = try_collect_maybe_component_ids(component_ids, ArchetypeKey::insert)?;
         let archetype_id = Self::find_archetype(archetypes, &key);
         Ok(archetype_id)
@@ -376,14 +373,13 @@ impl ArchetypeRegistry {
     pub fn get_bundle<B>(
         &self,
         components: &ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
     ) -> Result<B::Refs<'_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.get_bundle_with::<B>(components, context, entity, location)
+        self.get_bundle_with::<B>(components, entity, location)
     }
 
     #[inline]
@@ -391,7 +387,6 @@ impl ArchetypeRegistry {
     pub fn get_bundle_with<B>(
         &self,
         components: &ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
         location: EntityArchetypeLocation,
     ) -> Result<B::Refs<'_>, IncompatibleBundleError>
@@ -401,7 +396,7 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
-            let component_ids = B::get_components(context, components);
+            let component_ids = B::get_components(components);
             let component_ids =
                 try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
             let Some(component_id) = component_ids.into_iter().next() else {
@@ -413,8 +408,8 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info(archetypes, archetype_id) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
-        let Some(refs) = info.storage().get::<B>(components, context, entity)? else {
-            let component_ids = B::get_components(context, components);
+        let Some(refs) = info.storage().get::<B>(components, entity)? else {
+            let component_ids = B::get_components(components);
             let component_ids =
                 try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
             let Some(component_id) = component_ids.into_iter().next() else {
@@ -429,14 +424,13 @@ impl ArchetypeRegistry {
     pub fn get_bundle_mut<B>(
         &mut self,
         components: &ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
     ) -> Result<B::RefsMut<'_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.get_bundle_mut_with::<B>(components, context, entity, location)
+        self.get_bundle_mut_with::<B>(components, entity, location)
     }
 
     #[inline]
@@ -444,7 +438,6 @@ impl ArchetypeRegistry {
     pub fn get_bundle_mut_with<B>(
         &mut self,
         components: &ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
         location: EntityArchetypeLocation,
     ) -> Result<B::RefsMut<'_>, IncompatibleBundleError>
@@ -454,7 +447,7 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
-            let component_ids = B::get_components(context, components);
+            let component_ids = B::get_components(components);
             let component_ids =
                 try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
             let Some(component_id) = component_ids.into_iter().next() else {
@@ -466,11 +459,8 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
-        let Some(refs) = info
-            .storage_mut()
-            .get_mut::<B>(components, context, entity)?
-        else {
-            let component_ids = B::get_components(context, components);
+        let Some(refs) = info.storage_mut().get_mut::<B>(components, entity)? else {
+            let component_ids = B::get_components(components);
             let component_ids =
                 try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
             let Some(component_id) = component_ids.into_iter().next() else {
@@ -485,7 +475,6 @@ impl ArchetypeRegistry {
     pub fn insert_bundle_exact<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
         value: B,
     ) -> Result<(), InsertBundleError<B>>
@@ -493,7 +482,7 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.insert_bundle_exact_with(components, context, entity, value, location)?;
+        self.insert_bundle_exact_with(components, entity, value, location)?;
         Ok(())
     }
 
@@ -502,7 +491,6 @@ impl ArchetypeRegistry {
     pub fn insert_bundle_exact_with<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
         value: B,
         location: EntityArchetypeLocation,
@@ -512,9 +500,7 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(context, components)
-            .into_iter()
-            .collect();
+        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
         if let Err(reason) =
             try_collect_component_ids(component_ids.iter().copied(), ArchetypeKey::insert)
         {
@@ -552,7 +538,8 @@ impl ArchetypeRegistry {
             None => ErasedComponents::with_capacity(1),
         };
 
-        let fields = into_erased_fields::<B>(components, context, component_ids, value);
+        let context = DefaultContext::default();
+        let fields = into_erased_fields::<B>(components, &context, component_ids, value);
         fields.into_iter().for_each(|(component_id, field)| {
             if let Some(_) = old_fields.insert(component_id, field) {
                 unreachable!("duplicated component {component_id:?}")
@@ -577,7 +564,6 @@ impl ArchetypeRegistry {
     pub fn insert_bundle<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
         value: B,
     ) -> Result<(), InsertBundleError<B>>
@@ -585,7 +571,7 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.insert_bundle_with(components, context, entity, value, location)?;
+        self.insert_bundle_with(components, entity, value, location)?;
         Ok(())
     }
 
@@ -594,7 +580,6 @@ impl ArchetypeRegistry {
     pub fn insert_bundle_with<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
         value: B,
         location: EntityArchetypeLocation,
@@ -604,9 +589,7 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(context, components)
-            .into_iter()
-            .collect();
+        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
         if let Err(reason) =
             try_collect_component_ids(component_ids.iter().copied(), ArchetypeKey::insert)
         {
@@ -635,7 +618,8 @@ impl ArchetypeRegistry {
             None => ErasedComponents::with_capacity(1),
         };
 
-        let fields = into_erased_fields::<B>(components, context, component_ids, value);
+        let context = DefaultContext::default();
+        let fields = into_erased_fields::<B>(components, &context, component_ids, value);
         let mut fields_to_drop = ErasedComponents::new();
         fields.into_iter().for_each(|(component_id, field)| {
             let Some(to_drop) = old_fields.insert(component_id, field) else {
@@ -675,14 +659,13 @@ impl ArchetypeRegistry {
     pub fn remove_bundle_exact<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
     ) -> Result<B, RemoveBundleError>
     where
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        let (value, _) = self.remove_bundle_exact_with(components, context, entity, location)?;
+        let (value, _) = self.remove_bundle_exact_with(components, entity, location)?;
         Ok(value)
     }
 
@@ -691,7 +674,6 @@ impl ArchetypeRegistry {
     pub fn remove_bundle_exact_with<B>(
         &mut self,
         components: &mut ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
         location: EntityArchetypeLocation,
     ) -> Result<(B, EntityArchetype), RemoveBundleError>
@@ -700,9 +682,7 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(context, components)
-            .into_iter()
-            .collect();
+        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
         try_collect_component_ids(component_ids.iter().copied(), ArchetypeKey::insert)?;
 
         let old_archetype = Self::find_archetype_with_entity_and_with_components(
@@ -743,7 +723,10 @@ impl ArchetypeRegistry {
             })
             .collect();
         #[allow(unsafe_code)]
-        let value = unsafe { from_erased_fields(components, context, component_ids, fields) };
+        let value = unsafe {
+            let context = DefaultContext::default();
+            from_erased_fields(components, &context, component_ids, fields)
+        };
 
         let new_fields = old_fields;
         if let Some(new_archetype) = new_archetype {

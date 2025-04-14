@@ -10,13 +10,9 @@ macro_rules! bundle_tuple_impl {
             $($types: $crate::component::Component,)*
         {
             type MaybeComponentIds = [Option<ComponentId>; $crate::soa::traits::impls::count_idents!($($types,)*)];
-            type ComponentIds = [ComponentId; $crate::soa::traits::impls::count_idents!($($types,)*)];
 
             #[inline]
-            fn get_components(
-                _: &Self::Context,
-                components: &ComponentRegistry,
-            ) -> Self::MaybeComponentIds {
+            fn get_components(components: &ComponentRegistry) -> Self::MaybeComponentIds {
                 let permutation = $crate::soa::traits::impls::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.component_id::<$types>(),)*];
@@ -24,11 +20,10 @@ macro_rules! bundle_tuple_impl {
                 component_ids
             }
 
+            type ComponentIds = [ComponentId; $crate::soa::traits::impls::count_idents!($($types,)*)];
+
             #[inline]
-            fn register_components(
-                _: &Self::Context,
-                components: &mut ComponentRegistry,
-            ) -> Self::ComponentIds {
+            fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds {
                 let permutation = $crate::soa::traits::impls::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.register_component::<$types>(),)*];

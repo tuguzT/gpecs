@@ -23,7 +23,7 @@ use crate::{
     bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry, DropFn},
     entity::Entity,
-    soa::traits::{FieldDescriptor, Soa},
+    soa::traits::{DefaultContext, FieldDescriptor, Soa},
 };
 
 use super::{
@@ -117,14 +117,11 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn of<B>(
-        components: &mut ComponentRegistry,
-        context: &B::Context,
-    ) -> Result<Self, DuplicateComponentError>
+    pub fn of<B>(components: &mut ComponentRegistry) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
     {
-        let component_ids = B::register_components(context, components);
+        let component_ids = B::register_components(components);
         let component_ids = try_collect_component_ids(component_ids, |map, component_id| {
             let info = components
                 .get_component_info(component_id)
@@ -132,7 +129,7 @@ impl ArchetypeStorage {
             ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
         })?;
 
-        let context = ErasedSoaContext::of::<B>(context);
+        let context = ErasedSoaContext::of::<B>(&DefaultContext::default());
         let erased_storage = ErasedStorage::with_context(context);
 
         Ok(Self {
@@ -152,12 +149,11 @@ impl ArchetypeStorage {
     pub fn bundle_compatibility_of<B>(
         &self,
         components: &ComponentRegistry,
-        context: &B::Context,
     ) -> Result<(), IncompatibleBundleError>
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(context, components);
+        let component_ids = B::get_components(components);
         let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
         self.bundle_compatibility_inner(component_ids)
     }
@@ -175,12 +171,11 @@ impl ArchetypeStorage {
     pub fn bundle_compatibility_of_exact<B>(
         &self,
         components: &ComponentRegistry,
-        context: &B::Context,
     ) -> Result<(), IncompatibleBundleExactError>
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(context, components);
+        let component_ids = B::get_components(components);
         let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
         self.bundle_compatibility_exact_inner(component_ids)
     }
@@ -369,12 +364,11 @@ impl ArchetypeStorage {
     pub fn components<B>(
         &self,
         components: &ComponentRegistry,
-        context: &B::Context,
     ) -> Result<Slices<B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of::<B>(components, context)?;
+        self.bundle_compatibility_of::<B>(components)?;
 
         let Self {
             component_ids,
@@ -383,12 +377,13 @@ impl ArchetypeStorage {
 
         let (entities, fields) =
             ErasedStorageExt::components(erased_storage, components, component_ids);
-        let bundle_component_ids = B::get_components(context, components)
+        let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let components = unsafe {
             let len = entities.len();
-            from_erased_slices::<B>(components, context, bundle_component_ids, len, fields)
+            let context = DefaultContext::default();
+            from_erased_slices::<B>(components, &context, bundle_component_ids, len, fields)
         };
         Ok((entities, components))
     }
@@ -398,12 +393,11 @@ impl ArchetypeStorage {
     pub fn components_mut<B>(
         &mut self,
         components: &ComponentRegistry,
-        context: &B::Context,
     ) -> Result<SlicesMut<B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of::<B>(components, context)?;
+        self.bundle_compatibility_of::<B>(components)?;
 
         let Self {
             ref component_ids,
@@ -412,12 +406,13 @@ impl ArchetypeStorage {
 
         let (entities, fields) =
             ErasedStorageExt::components_mut(erased_storage, components, component_ids);
-        let bundle_component_ids = B::get_components(context, components)
+        let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let components = unsafe {
             let len = entities.len();
-            from_erased_slices_mut::<B>(components, context, bundle_component_ids, len, fields)
+            let context = DefaultContext::default();
+            from_erased_slices_mut::<B>(components, &context, bundle_component_ids, len, fields)
         };
         Ok((entities, components))
     }
@@ -427,13 +422,12 @@ impl ArchetypeStorage {
     pub fn get<B>(
         &self,
         components: &ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
     ) -> Result<Option<B::Refs<'_>>, IncompatibleBundleError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of::<B>(components, context)?;
+        self.bundle_compatibility_of::<B>(components)?;
 
         let Self {
             ref component_ids,
@@ -444,11 +438,13 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::get_components(context, components)
+        let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let refs =
-            unsafe { from_erased_refs::<B>(components, context, bundle_component_ids, fields) };
+        let refs = unsafe {
+            let context = DefaultContext::default();
+            from_erased_refs::<B>(components, &context, bundle_component_ids, fields)
+        };
         Ok(Some(refs))
     }
 
@@ -457,13 +453,12 @@ impl ArchetypeStorage {
     pub fn get_mut<B>(
         &mut self,
         components: &ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
     ) -> Result<Option<B::RefsMut<'_>>, IncompatibleBundleError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of::<B>(components, context)?;
+        self.bundle_compatibility_of::<B>(components)?;
 
         let Self {
             ref component_ids,
@@ -475,11 +470,13 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::get_components(context, components)
+        let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let refs =
-            unsafe { from_erased_refs_mut::<B>(components, context, bundle_component_ids, fields) };
+        let refs = unsafe {
+            let context = DefaultContext::default();
+            from_erased_refs_mut::<B>(components, &context, bundle_component_ids, fields)
+        };
         Ok(Some(refs))
     }
 
@@ -488,14 +485,13 @@ impl ArchetypeStorage {
     pub fn insert<B>(
         &mut self,
         components: &ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
         value: B,
     ) -> Result<Option<B>, IncompatibleBundleValueError<B>>
     where
         B: Bundle,
     {
-        if let Err(reason) = self.bundle_compatibility_of_exact::<B>(components, context) {
+        if let Err(reason) = self.bundle_compatibility_of_exact::<B>(components) {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
@@ -504,20 +500,21 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let bundle_component_ids = B::get_components(context, components)
+        let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let fields = into_erased_fields::<B>(components, context, bundle_component_ids, value);
+        let context = DefaultContext::default();
+        let fields = into_erased_fields::<B>(components, &context, bundle_component_ids, value);
         let Some(fields) =
             ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::get_components(context, components)
+        let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let value =
-            unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
+            unsafe { from_erased_fields::<B>(components, &context, bundle_component_ids, fields) };
         Ok(Some(value))
     }
 
@@ -526,13 +523,12 @@ impl ArchetypeStorage {
     pub fn remove<B>(
         &mut self,
         components: &ComponentRegistry,
-        context: &B::Context,
         entity: Entity,
     ) -> Result<Option<B>, IncompatibleBundleExactError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of_exact::<B>(components, context)?;
+        self.bundle_compatibility_of_exact::<B>(components)?;
 
         let Self {
             ref component_ids,
@@ -544,11 +540,13 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::get_components(context, components)
+        let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let value =
-            unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
+        let value = unsafe {
+            let context = DefaultContext::default();
+            from_erased_fields::<B>(components, &context, bundle_component_ids, fields)
+        };
         Ok(Some(value))
     }
 

@@ -209,10 +209,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn register_archetype<B>(
-        &mut self,
-        context: &B::Context,
-    ) -> Result<ArchetypeId, DuplicateComponentError>
+    pub fn register_archetype<B>(&mut self) -> Result<ArchetypeId, DuplicateComponentError>
     where
         B: Bundle,
     {
@@ -221,8 +218,7 @@ impl Context {
             archetypes,
             ..
         } = self;
-
-        archetypes.register_archetype::<B>(components, context)
+        archetypes.register_archetype::<B>(components)
     }
 
     #[inline]
@@ -232,10 +228,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn archetype_id<B>(
-        &self,
-        context: &B::Context,
-    ) -> Result<Option<ArchetypeId>, GetComponentsError>
+    pub fn archetype_id<B>(&self) -> Result<Option<ArchetypeId>, GetComponentsError>
     where
         B: Bundle,
     {
@@ -244,24 +237,19 @@ impl Context {
             archetypes,
             ..
         } = self;
-
-        archetypes.archetype_id::<B>(components, context)
+        archetypes.archetype_id::<B>(components)
     }
 
     #[inline]
-    pub fn get_bundle<B>(&self, context: &B::Context, entity: Entity) -> Option<B::Refs<'_>>
+    pub fn get_bundle<B>(&self, entity: Entity) -> Option<B::Refs<'_>>
     where
         B: Bundle,
     {
-        self.try_get_bundle::<B>(context, entity).ok()
+        self.try_get_bundle::<B>(entity).ok()
     }
 
     #[inline]
-    pub fn try_get_bundle<B>(
-        &self,
-        context: &B::Context,
-        entity: Entity,
-    ) -> Result<B::Refs<'_>, IncompatibleBundleError>
+    pub fn try_get_bundle<B>(&self, entity: Entity) -> Result<B::Refs<'_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -276,26 +264,21 @@ impl Context {
             return Err(EntityNotFoundError::new(entity).into());
         };
         let location = archetype_id.into();
-        let result = archetypes.get_bundle_with::<B>(components, context, entity, location)?;
-        Ok(result)
+        let refs = archetypes.get_bundle_with::<B>(components, entity, location)?;
+        Ok(refs)
     }
 
     #[inline]
-    pub fn get_bundle_mut<B>(
-        &mut self,
-        context: &B::Context,
-        entity: Entity,
-    ) -> Option<B::RefsMut<'_>>
+    pub fn get_bundle_mut<B>(&mut self, entity: Entity) -> Option<B::RefsMut<'_>>
     where
         B: Bundle,
     {
-        self.try_get_bundle_mut::<B>(context, entity).ok()
+        self.try_get_bundle_mut::<B>(entity).ok()
     }
 
     #[inline]
     pub fn try_get_bundle_mut<B>(
         &mut self,
-        context: &B::Context,
         entity: Entity,
     ) -> Result<B::RefsMut<'_>, IncompatibleBundleError>
     where
@@ -312,42 +295,13 @@ impl Context {
             return Err(EntityNotFoundError::new(entity).into());
         };
         let location = archetype_id.into();
-        let result = archetypes.get_bundle_mut_with::<B>(components, context, entity, location)?;
-        Ok(result)
+        let refs_mut = archetypes.get_bundle_mut_with::<B>(components, entity, location)?;
+        Ok(refs_mut)
     }
 
     #[inline]
     pub fn insert_bundle_exact<B>(
         &mut self,
-        context: &B::Context,
-        entity: Entity,
-        value: B,
-    ) -> Result<(), InsertBundleError<B>>
-    where
-        B: Bundle,
-    {
-        let Self {
-            entities,
-            components,
-            archetypes,
-            ..
-        } = self;
-
-        let Some(archetype_id) = entities.get_mut(entity) else {
-            let kind = EntityNotFoundError::new(entity).into();
-            return Err(InsertBundleError { value, kind });
-        };
-        let location = archetype_id.clone().into();
-        let new_archetype_id = archetypes
-            .insert_bundle_exact_with::<B>(components, context, entity, value, location)?;
-        *archetype_id = Some(new_archetype_id);
-        Ok(())
-    }
-
-    #[inline]
-    pub fn insert_bundle<B>(
-        &mut self,
-        context: &B::Context,
         entity: Entity,
         value: B,
     ) -> Result<(), InsertBundleError<B>>
@@ -367,17 +321,36 @@ impl Context {
         };
         let location = archetype_id.clone().into();
         let new_archetype_id =
-            archetypes.insert_bundle_with::<B>(components, context, entity, value, location)?;
+            archetypes.insert_bundle_exact_with::<B>(components, entity, value, location)?;
         *archetype_id = Some(new_archetype_id);
         Ok(())
     }
 
     #[inline]
-    pub fn remove_bundle_exact<B>(
-        &mut self,
-        context: &B::Context,
-        entity: Entity,
-    ) -> Result<B, RemoveBundleError>
+    pub fn insert_bundle<B>(&mut self, entity: Entity, value: B) -> Result<(), InsertBundleError<B>>
+    where
+        B: Bundle,
+    {
+        let Self {
+            entities,
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        let Some(archetype_id) = entities.get_mut(entity) else {
+            let kind = EntityNotFoundError::new(entity).into();
+            return Err(InsertBundleError { value, kind });
+        };
+        let location = archetype_id.clone().into();
+        let new_archetype_id =
+            archetypes.insert_bundle_with::<B>(components, entity, value, location)?;
+        *archetype_id = Some(new_archetype_id);
+        Ok(())
+    }
+
+    #[inline]
+    pub fn remove_bundle_exact<B>(&mut self, entity: Entity) -> Result<B, RemoveBundleError>
     where
         B: Bundle,
     {
@@ -393,7 +366,7 @@ impl Context {
         };
         let location = archetype_id.clone().into();
         let (value, new_archetype_id) =
-            archetypes.remove_bundle_exact_with::<B>(components, context, entity, location)?;
+            archetypes.remove_bundle_exact_with::<B>(components, entity, location)?;
         *archetype_id = new_archetype_id;
         Ok(value)
     }

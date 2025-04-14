@@ -299,7 +299,7 @@ impl Context {
         context: &B::Context,
         entity: Entity,
         value: B,
-    ) -> Result<bool, InsertBundleError<B>>
+    ) -> Option<Result<(), InsertBundleError<B>>>
     where
         B: Bundle,
     {
@@ -311,15 +311,18 @@ impl Context {
         } = self;
 
         let Some(archetype_id) = entities.get_mut(entity) else {
-            return Ok(false);
+            return None;
         };
         let location = archetype_id.clone().into();
         let result =
             archetypes.try_insert_bundle_with::<B>(components, context, entity, value, location);
 
-        let new_archetype_id = result?;
+        let new_archetype_id = match result {
+            Ok(new_archetype_id) => new_archetype_id,
+            Err(error) => return Some(Err(error)),
+        };
         *archetype_id = Some(new_archetype_id);
-        Ok(true)
+        Some(Ok(()))
     }
 
     #[inline]

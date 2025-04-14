@@ -49,6 +49,7 @@ fn one_entity() {
     let tag = Tag;
     context
         .try_insert_bundle(&(), entity, (position, mass, tag))
+        .expect("entity should exist")
         .expect("entity should not contain `Position` component yet");
 
     let (position_mut,) = context

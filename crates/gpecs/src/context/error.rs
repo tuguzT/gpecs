@@ -210,7 +210,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { value, kind } = self;
-        write!(f, "bundle {value} cannot be inserted, reason: {kind}")
+        write!(f, "exact bundle {value} cannot be inserted: {kind}")
     }
 }
 
@@ -290,7 +290,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { value, kind } = self;
-        write!(f, "bundle {value} cannot be inserted, reason: {kind}")
+        write!(f, "bundle {value} cannot be inserted: {kind}")
     }
 }
 

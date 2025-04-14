@@ -112,7 +112,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { value, kind } = self;
-        write!(f, "bundle {value} cannot be inserted, reason: {kind}")
+        write!(f, "exact bundle {value} cannot be inserted: {kind}")
     }
 }
 
@@ -142,7 +142,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { value, reason } = self;
-        write!(f, "bundle {value} cannot be inserted, reason: {reason}")
+        write!(f, "bundle {value} cannot be inserted: {reason}")
     }
 }
 
@@ -206,7 +206,7 @@ impl From<MissingComponentError> for RemoveBundleExactError {
 
 impl Display for RemoveBundleExactError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "bundle cannot be removed: ")?;
+        write!(f, "exact bundle cannot be removed: ")?;
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
             Self::MissingComponent(error) => Display::fmt(error, f),
@@ -459,7 +459,7 @@ where
         let Some(reason) = reason.source() else {
             unreachable!("incompatible bundle exact error should have a source")
         };
-        write!(f, "incompatible bundle value is {value}, reason: {reason}")
+        write!(f, "incompatible bundle {value}: {reason}")
     }
 }
 

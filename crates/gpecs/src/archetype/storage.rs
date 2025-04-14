@@ -20,7 +20,7 @@ use indexmap::{map::Keys, IndexMap, IndexSet};
 
 use crate::{
     archetype::erased::drop_erased_in_place,
-    bundle::{error::DuplicateComponentError, Bundle},
+    bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry, DropFn},
     entity::Entity,
     soa::traits::{FieldDescriptor, Soa},
@@ -33,10 +33,10 @@ use super::{
         into_erased_refs_mut, into_erased_slices, into_erased_slices_mut, ErasedComponents,
     },
     error::{
-        ExclusiveComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
-        IncompatibleBundleValueError, TooFewComponentsError,
+        DuplicateComponentError, ExclusiveComponentError, IncompatibleBundleError,
+        IncompatibleBundleExactError, IncompatibleBundleValueError, TooFewComponentsError,
     },
-    utils::try_collect_component_ids,
+    utils::{try_collect_component_ids, try_collect_maybe_component_ids},
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -124,15 +124,13 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let component_ids = B::register_components(context, components)?
-            .into_iter()
-            .map(|component_id| {
-                let info = components
-                    .get_component_info(component_id)
-                    .unwrap_or_else(|| get_component_info_fail(&component_id));
-                (component_id, info.drop_fn())
-            })
-            .collect();
+        let component_ids = B::register_components(context, components);
+        let component_ids = try_collect_component_ids(component_ids, |map, component_id| {
+            let info = components
+                .get_component_info(component_id)
+                .unwrap_or_else(|| get_component_info_fail(&component_id));
+            ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
+        })?;
 
         let context = ErasedSoaContext::of::<B>(context);
         let erased_storage = ErasedStorage::with_context(context);
@@ -159,7 +157,8 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(context, components)?;
+        let component_ids = B::get_components(context, components);
+        let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
         self.bundle_compatibility_inner(component_ids)
     }
 
@@ -181,7 +180,8 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(context, components)?;
+        let component_ids = B::get_components(context, components);
+        let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
         self.bundle_compatibility_exact_inner(component_ids)
     }
 
@@ -383,9 +383,9 @@ impl ArchetypeStorage {
 
         let (entities, fields) =
             ErasedStorageExt::components(erased_storage, components, component_ids);
-        let Ok(bundle_component_ids) = B::get_components(context, components) else {
-            unreachable!("components of the bundle were retrieved before without any errors")
-        };
+        let bundle_component_ids = B::get_components(context, components)
+            .into_iter()
+            .map(|component_id| component_id.expect("all of components should be registered"));
         let components = unsafe {
             let len = entities.len();
             from_erased_slices::<B>(components, context, bundle_component_ids, len, fields)
@@ -412,9 +412,9 @@ impl ArchetypeStorage {
 
         let (entities, fields) =
             ErasedStorageExt::components_mut(erased_storage, components, component_ids);
-        let Ok(bundle_component_ids) = B::get_components(context, components) else {
-            unreachable!("components of the bundle were retrieved before without any errors")
-        };
+        let bundle_component_ids = B::get_components(context, components)
+            .into_iter()
+            .map(|component_id| component_id.expect("all of components should be registered"));
         let components = unsafe {
             let len = entities.len();
             from_erased_slices_mut::<B>(components, context, bundle_component_ids, len, fields)
@@ -444,9 +444,9 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let Ok(bundle_component_ids) = B::get_components(context, components) else {
-            unreachable!("components of the bundle were retrieved before without any errors")
-        };
+        let bundle_component_ids = B::get_components(context, components)
+            .into_iter()
+            .map(|component_id| component_id.expect("all of components should be registered"));
         let refs =
             unsafe { from_erased_refs::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(refs))
@@ -475,9 +475,9 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let Ok(bundle_component_ids) = B::get_components(context, components) else {
-            unreachable!("components of the bundle were retrieved before without any errors")
-        };
+        let bundle_component_ids = B::get_components(context, components)
+            .into_iter()
+            .map(|component_id| component_id.expect("all of components should be registered"));
         let refs =
             unsafe { from_erased_refs_mut::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(refs))
@@ -504,18 +504,18 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let Ok(bundle_component_ids) = B::get_components(context, components) else {
-            unreachable!("components of the bundle were retrieved before without any errors")
-        };
+        let bundle_component_ids = B::get_components(context, components)
+            .into_iter()
+            .map(|component_id| component_id.expect("all of components should be registered"));
         let fields = into_erased_fields::<B>(components, context, bundle_component_ids, value);
         let Some(fields) =
             ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
         else {
             return Ok(None);
         };
-        let Ok(bundle_component_ids) = B::get_components(context, components) else {
-            unreachable!("components of the bundle were retrieved before without any errors")
-        };
+        let bundle_component_ids = B::get_components(context, components)
+            .into_iter()
+            .map(|component_id| component_id.expect("all of components should be registered"));
         let value =
             unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))
@@ -544,9 +544,9 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let Ok(bundle_component_ids) = B::get_components(context, components) else {
-            unreachable!("components of the bundle were retrieved before without any errors")
-        };
+        let bundle_component_ids = B::get_components(context, components)
+            .into_iter()
+            .map(|component_id| component_id.expect("all of components should be registered"));
         let value =
             unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))

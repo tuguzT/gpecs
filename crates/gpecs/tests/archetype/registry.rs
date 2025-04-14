@@ -1,12 +1,12 @@
 use gpecs::{
     archetype::{
-        error::{ExclusiveComponentError, IncompatibleBundleError, InsertBundleError},
+        error::{
+            DuplicateComponentError, ExclusiveComponentError, IncompatibleBundleError,
+            InsertBundleError,
+        },
         registry::ArchetypeRegistry,
     },
-    bundle::{
-        error::{ComponentNotRegisteredError, DuplicateComponentError},
-        Bundle,
-    },
+    bundle::Bundle,
     component::{registry::ComponentRegistry, Component},
     entity::registry::EntityRegistry,
 };
@@ -61,8 +61,7 @@ fn register_archetype() {
         .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids");
     assert_eq!(same_id, id);
 
-    let component_ids = <(Mass, Tag, Position)>::register_components(&(), &mut components)
-        .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids");
+    let component_ids = <(Mass, Tag, Position)>::register_components(&(), &mut components);
     let same_id = archetypes
         .register_archetype_from(&components, component_ids)
         .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids");
@@ -77,8 +76,7 @@ fn register_archetype() {
 
     dbg!(&archetypes);
 
-    let component_ids = <(Position,)>::register_components(&(), &mut components)
-        .expect("archetype of only `Position` should contain unique component ids");
+    let component_ids = <(Position,)>::register_components(&(), &mut components);
     assert_ne!(
         archetypes
             .archetype_id_from(component_ids)
@@ -87,8 +85,7 @@ fn register_archetype() {
         id,
     );
 
-    let component_ids = <(Mass,)>::register_components(&(), &mut components)
-        .expect("archetype of only `Mass` should contain unique component ids");
+    let component_ids = <(Mass,)>::register_components(&(), &mut components);
     assert_ne!(
         archetypes
             .archetype_id_from(component_ids)
@@ -97,8 +94,7 @@ fn register_archetype() {
         id,
     );
 
-    let component_ids = <(Tag,)>::register_components(&(), &mut components)
-        .expect("archetype of only `Tag` should contain unique component ids");
+    let component_ids = <(Tag,)>::register_components(&(), &mut components);
     assert_ne!(
         archetypes
             .archetype_id_from(component_ids)
@@ -107,8 +103,7 @@ fn register_archetype() {
         id,
     );
 
-    let component_ids = <(Mass, Tag)>::register_components(&(), &mut components)
-        .expect("archetype of `Tag` and `Mass` should contain unique component ids");
+    let component_ids = <(Mass, Tag)>::register_components(&(), &mut components);
     assert_ne!(
         archetypes
             .archetype_id_from(component_ids)
@@ -131,8 +126,7 @@ fn register_archetype() {
     assert!(archetypes.archetype_ids().any(|item| item == new_id));
     let id = new_id;
 
-    let component_ids = <(Mass, Tag)>::register_components(&(), &mut components)
-        .expect("archetype of `Tag` and `Mass` should contain unique component ids");
+    let component_ids = <(Mass, Tag)>::register_components(&(), &mut components);
     let same_id = archetypes
         .register_archetype_from(&components, component_ids)
         .expect("archetype of `Tag` and `Mass` should contain unique component ids");
@@ -353,12 +347,10 @@ fn exchange_components_empty_registry() {
     let error = archetypes
         .get_bundle::<(Mass, Tag)>(&components, &(), entity)
         .expect_err("entity should not have `Mass` and `Tag` components yet");
-    assert_eq!(
-        std::mem::discriminant(&error),
-        std::mem::discriminant(&IncompatibleBundleError::from(
-            ComponentNotRegisteredError::new(),
-        )),
-    );
+    assert!(matches!(
+        error,
+        IncompatibleBundleError::ComponentNotRegistered(_),
+    ));
 
     let tag = Tag;
     archetypes
@@ -373,12 +365,10 @@ fn exchange_components_empty_registry() {
     let error = archetypes
         .get_bundle::<(Mass, Tag)>(&components, &(), entity)
         .expect_err("entity should not have `Mass` and `Tag` components yet");
-    assert_eq!(
-        std::mem::discriminant(&error),
-        std::mem::discriminant(&IncompatibleBundleError::from(
-            ComponentNotRegisteredError::new(),
-        )),
-    );
+    assert!(matches!(
+        error,
+        IncompatibleBundleError::ComponentNotRegistered(_),
+    ));
 
     let mass = Mass { value: 42 };
     let InsertBundleError { value, reason, .. } = archetypes
@@ -390,8 +380,7 @@ fn exchange_components_empty_registry() {
     );
     assert_eq!(value, (mass, tag));
 
-    let component_ids = <(Tag,)>::register_components(&(), &mut components)
-        .expect("archetype of only `Tag` should contain unique component ids");
+    let component_ids = <(Tag,)>::register_components(&(), &mut components);
     let archetype = archetypes
         .register_archetype_from(&components, component_ids)
         .expect("archetype of only `Tag` should contain unique component ids");

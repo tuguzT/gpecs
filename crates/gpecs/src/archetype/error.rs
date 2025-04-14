@@ -3,13 +3,34 @@ use std::{
     fmt::{self, Debug, Display},
 };
 
-use crate::{
-    bundle::{
-        error::{ComponentNotRegisteredError, DuplicateComponentError, GetComponentsError},
-        Bundle,
-    },
-    component::registry::ComponentId,
-};
+use crate::{bundle::Bundle, component::registry::ComponentId};
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct DuplicateComponentError {
+    component_id: ComponentId,
+}
+
+impl DuplicateComponentError {
+    #[inline]
+    pub fn new(component_id: ComponentId) -> Self {
+        Self { component_id }
+    }
+
+    #[inline]
+    pub fn component_id(&self) -> ComponentId {
+        let Self { component_id } = *self;
+        component_id
+    }
+}
+
+impl Display for DuplicateComponentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { component_id } = *self;
+        write!(f, "duplicate component {component_id:?} were found")
+    }
+}
+
+impl Error for DuplicateComponentError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
@@ -104,6 +125,56 @@ impl Error for RemoveBundleError {
         match self {
             Self::DuplicateComponent(error) => Some(error),
             Self::ExclusiveComponent(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub struct ComponentNotRegisteredError;
+
+impl Display for ComponentNotRegisteredError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "component was not registered")
+    }
+}
+
+impl Error for ComponentNotRegisteredError {}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum GetComponentsError {
+    DuplicateComponent(DuplicateComponentError),
+    ComponentNotRegistered(ComponentNotRegisteredError),
+}
+
+impl From<DuplicateComponentError> for GetComponentsError {
+    #[inline]
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
+    }
+}
+
+impl From<ComponentNotRegisteredError> for GetComponentsError {
+    #[inline]
+    fn from(error: ComponentNotRegisteredError) -> Self {
+        Self::ComponentNotRegistered(error)
+    }
+}
+
+impl Display for GetComponentsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::ComponentNotRegistered(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for GetComponentsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DuplicateComponent(error) => Some(error),
+            Self::ComponentNotRegistered(error) => Some(error),
         }
     }
 }

@@ -5,14 +5,12 @@ use std::{
 
 use crate::{
     archetype::error::{
-        ExclusiveComponentError, IncompatibleBundleError as ArchetypeIncompatibleBundleError,
+        ComponentNotRegisteredError, DuplicateComponentError, ExclusiveComponentError,
+        IncompatibleBundleError as ArchetypeIncompatibleBundleError,
         InsertBundleError as ArchetypeInsertBundleError,
         RemoveBundleError as ArchetypeRemoveBundleError,
     },
-    bundle::{
-        error::{ComponentNotRegisteredError, DuplicateComponentError},
-        Bundle,
-    },
+    bundle::Bundle,
     entity::Entity,
 };
 

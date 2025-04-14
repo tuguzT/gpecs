@@ -3,11 +3,11 @@ use std::any::TypeId;
 use error::EntityNotFoundError;
 
 use crate::{
-    archetype::registry::{ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityArchetype},
-    bundle::{
+    archetype::{
         error::{DuplicateComponentError, GetComponentsError},
-        Bundle,
+        registry::{ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityArchetype},
     },
+    bundle::Bundle,
     component::{
         registry::{ComponentId, ComponentInfo, ComponentRegistry},
         Component,

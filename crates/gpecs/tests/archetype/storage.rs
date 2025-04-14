@@ -24,7 +24,7 @@ fn storage_tag() {
         .expect("creation of storage for tag archetype should succeed");
     assert_eq!(storage.entities(), []);
 
-    let component_ids = <(Tag,)>::register_components(&(), &mut components).unwrap();
+    let component_ids = <(Tag,)>::register_components(&(), &mut components);
     assert!(storage.component_ids().eq(component_ids));
 
     let storage_from_ids = ArchetypeStorage::new(&components, component_ids)
@@ -86,7 +86,7 @@ fn storage_tuple() {
         .expect("creation of storage for bundle `(Position, Name)` should succeed");
     assert_eq!(storage.entities(), []);
 
-    let component_ids = <(Position, Name)>::get_components(&(), &mut components).unwrap();
+    let component_ids = <(Position, Name)>::register_components(&(), &mut components);
     assert!(storage.component_ids().eq(component_ids));
 
     let storage_from_ids = ArchetypeStorage::new(&components, component_ids)

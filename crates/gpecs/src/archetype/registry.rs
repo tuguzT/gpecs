@@ -6,7 +6,7 @@ use std::{
     ops::Range,
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use petgraph::{
     dot::{Config as DotConfig, Dot, RankDir},
@@ -17,10 +17,7 @@ use petgraph::{
 
 use crate::{
     archetype::{erased::drop_erased_in_place, storage::ArchetypeStorage},
-    bundle::{
-        error::{DuplicateComponentError, GetComponentsError},
-        Bundle,
-    },
+    bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
 };
@@ -28,9 +25,10 @@ use crate::{
 use super::{
     erased::{from_erased_fields, into_erased_fields, ErasedComponents},
     error::{
-        ExclusiveComponentError, IncompatibleBundleError, InsertBundleError, RemoveBundleError,
+        DuplicateComponentError, ExclusiveComponentError, GetComponentsError,
+        IncompatibleBundleError, InsertBundleError, RemoveBundleError,
     },
-    utils::try_collect_component_ids,
+    utils::{try_collect_component_ids, try_collect_maybe_component_ids},
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -151,10 +149,14 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids = B::register_components(context, components)?;
-        let component_ids: Vec<_> = component_ids.into_iter().collect();
+        let component_ids: Vec<_> = B::register_components(context, components)
+            .into_iter()
+            .collect();
+        let key = {
+            let component_ids = component_ids.iter().copied();
+            try_collect_component_ids(component_ids, ArchetypeKey::insert)?
+        };
 
-        let key = component_ids.iter().copied().collect();
         let f = |components| ArchetypeStorage::of::<B>(components, context);
         let archetype_id = Self::register(archetypes, graph, components, &component_ids, key, f);
         Ok(archetype_id)
@@ -352,8 +354,8 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = B::get_components(context, components)?;
-        let key = component_ids.into_iter().collect();
+        let component_ids = B::get_components(context, components);
+        let key = try_collect_maybe_component_ids(component_ids, ArchetypeKey::insert)?;
         let archetype_id = Self::find_archetype(archetypes, &key);
         Ok(archetype_id)
     }
@@ -399,7 +401,9 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
-            let component_ids = B::get_components(context, components)?;
+            let component_ids = B::get_components(context, components);
+            let component_ids =
+                try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
             let Some(component_id) = component_ids.into_iter().next() else {
                 unreachable!("bundle should contain at least one component")
             };
@@ -410,7 +414,9 @@ impl ArchetypeRegistry {
             unreachable!("archetype {archetype_id:?} should exist")
         };
         let Some(refs) = info.storage().get::<B>(components, context, entity)? else {
-            let component_ids = B::get_components(context, components)?;
+            let component_ids = B::get_components(context, components);
+            let component_ids =
+                try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
             let Some(component_id) = component_ids.into_iter().next() else {
                 unreachable!("bundle should contain at least one component")
             };
@@ -448,7 +454,9 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
-            let component_ids = B::get_components(context, components)?;
+            let component_ids = B::get_components(context, components);
+            let component_ids =
+                try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
             let Some(component_id) = component_ids.into_iter().next() else {
                 unreachable!("bundle should contain at least one component")
             };
@@ -462,7 +470,9 @@ impl ArchetypeRegistry {
             .storage_mut()
             .get_mut::<B>(components, context, entity)?
         else {
-            let component_ids = B::get_components(context, components)?;
+            let component_ids = B::get_components(context, components);
+            let component_ids =
+                try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
             let Some(component_id) = component_ids.into_iter().next() else {
                 unreachable!("bundle should contain at least one component")
             };
@@ -502,10 +512,15 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = match B::register_components(context, components) {
-            Ok(component_ids) => component_ids.into_iter().collect(),
-            Err(reason) => return Err(InsertBundleError { value, reason }),
-        };
+        let component_ids: Vec<_> = B::register_components(context, components)
+            .into_iter()
+            .collect();
+        if let Err(reason) =
+            try_collect_component_ids(component_ids.iter().copied(), ArchetypeKey::insert)
+        {
+            return Err(InsertBundleError { value, reason });
+        }
+
         let old_archetype = Self::find_archetype_with_entity_and_without_components(
             archetypes,
             &component_ids,
@@ -589,10 +604,15 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = match B::register_components(context, components) {
-            Ok(component_ids) => component_ids.into_iter().collect(),
-            Err(reason) => return Err(InsertBundleError { value, reason }),
-        };
+        let component_ids: Vec<_> = B::register_components(context, components)
+            .into_iter()
+            .collect();
+        if let Err(reason) =
+            try_collect_component_ids(component_ids.iter().copied(), ArchetypeKey::insert)
+        {
+            return Err(InsertBundleError { value, reason });
+        }
+
         let old_archetype = Self::find_archetype_with_entity(archetypes, entity, location);
         let new_archetype = Self::register_archetype_with_components(
             graph,
@@ -680,9 +700,10 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(context, components)?
+        let component_ids: Vec<_> = B::register_components(context, components)
             .into_iter()
             .collect();
+        try_collect_component_ids(component_ids.iter().copied(), ArchetypeKey::insert)?;
 
         let old_archetype = Self::find_archetype_with_entity_and_with_components(
             archetypes,

@@ -6,6 +6,7 @@ use std::{
     ops::Range,
 };
 
+use gpecs_soa_erased::field::ErasedField;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use petgraph::{
@@ -530,21 +531,12 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
-        let mut old_fields = match old_archetype {
-            Some(old_archetype) => {
-                let Some(old_info) = Self::get_info_mut(archetypes, old_archetype) else {
-                    unreachable!("archetype {old_archetype:?} should exist")
-                };
-                let Some(fields) = old_info.storage_mut().remove_erased(components, entity) else {
-                    unreachable!("{entity:?} should exist in archetype {old_archetype:?}")
-                };
-                fields
-            }
-            None => ErasedComponents::with_capacity(1),
+        let mut old_fields =
+            Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
+        let fields = {
+            let context = DefaultContext::default();
+            into_erased_fields::<B>(components, &context, component_ids, value)
         };
-
-        let context = DefaultContext::default();
-        let fields = into_erased_fields::<B>(components, &context, component_ids, value);
         fields.into_iter().for_each(|(component_id, field)| {
             if let Some(_) = old_fields.insert(component_id, field) {
                 unreachable!("duplicated component {component_id:?}")
@@ -552,15 +544,8 @@ impl ArchetypeRegistry {
         });
 
         let new_fields = old_fields;
-        let Some(new_info) = Self::get_info_mut(archetypes, new_archetype) else {
-            unreachable!("archetype {new_archetype:?} should exist")
-        };
-        let prev_fields = new_info
-            .storage_mut()
-            .insert_erased(components, entity, new_fields);
-        if let Some(_) = prev_fields {
-            unreachable!("duplicated entity {entity:?}")
-        }
+        let archetype_id = Some(new_archetype);
+        Self::set_in_archetype_by_entity(components, archetypes, archetype_id, entity, new_fields);
 
         Ok(new_archetype)
     }
@@ -610,21 +595,13 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
-        let mut old_fields = match old_archetype {
-            Some(old_archetype) => {
-                let Some(old_info) = Self::get_info_mut(archetypes, old_archetype) else {
-                    unreachable!("archetype {old_archetype:?} should exist")
-                };
-                let Some(fields) = old_info.storage_mut().remove_erased(components, entity) else {
-                    unreachable!("{entity:?} should exist in archetype {old_archetype:?}")
-                };
-                fields
-            }
-            None => ErasedComponents::with_capacity(1),
+        let mut old_fields =
+            Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
+        let fields = {
+            let context = DefaultContext::default();
+            into_erased_fields::<B>(components, &context, component_ids, value)
         };
 
-        let context = DefaultContext::default();
-        let fields = into_erased_fields::<B>(components, &context, component_ids, value);
         let mut fields_to_drop = ErasedComponents::new();
         fields.into_iter().for_each(|(component_id, field)| {
             let Some(to_drop) = old_fields.insert(component_id, field) else {
@@ -634,28 +611,14 @@ impl ArchetypeRegistry {
                 unreachable!("duplicated component {component_id:?}")
             }
         });
-
-        let fields_to_drop = fields_to_drop.into_iter().map(|(component_id, field)| {
-            let Some(info) = components.get_component_info(component_id) else {
-                unreachable!("component {component_id:?} should exist")
-            };
-            (field, info.drop_fn())
-        });
         #[allow(unsafe_code)]
         unsafe {
-            drop_erased_in_place(fields_to_drop)
+            Self::drop_erased_in_place(components, fields_to_drop)
         }
 
         let new_fields = old_fields;
-        let Some(new_info) = Self::get_info_mut(archetypes, new_archetype) else {
-            unreachable!("archetype {new_archetype:?} should exist")
-        };
-        let prev_fields = new_info
-            .storage_mut()
-            .insert_erased(components, entity, new_fields);
-        if let Some(_) = prev_fields {
-            unreachable!("duplicated entity {entity:?}")
-        }
+        let archetype_id = Some(new_archetype);
+        Self::set_in_archetype_by_entity(components, archetypes, archetype_id, entity, new_fields);
 
         Ok(new_archetype)
     }
@@ -710,12 +673,9 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
-        let Some(old_info) = Self::get_info_mut(archetypes, old_archetype) else {
-            unreachable!("archetype {old_archetype:?} should exist")
-        };
-        let Some(mut old_fields) = old_info.storage_mut().remove_erased(components, entity) else {
-            unreachable!("{entity:?} should exist in archetype {old_archetype:?}")
-        };
+        let old_archetype = Some(old_archetype);
+        let mut old_fields =
+            Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
 
         let fields = component_ids
             .iter()
@@ -734,17 +694,7 @@ impl ArchetypeRegistry {
         };
 
         let new_fields = old_fields;
-        if let Some(new_archetype) = new_archetype {
-            let Some(new_info) = Self::get_info_mut(archetypes, new_archetype) else {
-                unreachable!("archetype {new_archetype:?} should exist")
-            };
-            let prev_fields = new_info
-                .storage_mut()
-                .insert_erased(components, entity, new_fields);
-            if let Some(_) = prev_fields {
-                unreachable!("duplicated entity {entity:?}")
-            }
-        }
+        Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);
 
         Ok((value, new_archetype))
     }
@@ -794,37 +744,21 @@ impl ArchetypeRegistry {
             return Ok(new_archetype);
         }
 
-        let Some(old_info) = Self::get_info_mut(archetypes, old_archetype) else {
-            unreachable!("archetype {old_archetype:?} should exist")
-        };
-        let Some(mut old_fields) = old_info.storage_mut().remove_erased(components, entity) else {
-            unreachable!("{entity:?} should exist in archetype {old_archetype:?}")
-        };
+        let old_archetype = Some(old_archetype);
+        let mut old_fields =
+            Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
 
         let fields_to_drop = component_ids.iter().copied().filter_map(|component_id| {
             let field = old_fields.swap_remove(&component_id)?;
-            let Some(info) = components.get_component_info(component_id) else {
-                unreachable!("component {component_id:?} should exist")
-            };
-            Some((field, info.drop_fn()))
+            Some((component_id, field))
         });
         #[allow(unsafe_code)]
         unsafe {
-            drop_erased_in_place(fields_to_drop)
+            Self::drop_erased_in_place(components, fields_to_drop)
         }
 
         let new_fields = old_fields;
-        if let Some(new_archetype) = new_archetype {
-            let Some(new_info) = Self::get_info_mut(archetypes, new_archetype) else {
-                unreachable!("archetype {new_archetype:?} should exist")
-            };
-            let prev_fields = new_info
-                .storage_mut()
-                .insert_erased(components, entity, new_fields);
-            if let Some(_) = prev_fields {
-                unreachable!("duplicated entity {entity:?}")
-            }
-        }
+        Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);
 
         Ok(new_archetype)
     }
@@ -844,6 +778,66 @@ impl ArchetypeRegistry {
             unreachable!("entity {entity:?} should exist in archetype {archetype_id:?}");
         }
         true
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    unsafe fn drop_erased_in_place<I, F>(components: &ComponentRegistry, fields: I)
+    where
+        I: IntoIterator<Item = (ComponentId, F)>,
+        F: AsMut<[u8]>,
+    {
+        let fields = fields.into_iter().map(|(component_id, field)| {
+            let Some(info) = components.get_component_info(component_id) else {
+                unreachable!("component {component_id:?} should exist")
+            };
+            (field, info.drop_fn())
+        });
+        unsafe { drop_erased_in_place(fields) }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    fn set_in_archetype_by_entity(
+        components: &ComponentRegistry,
+        archetypes: &mut Archetypes,
+        archetype_id: Option<ArchetypeId>,
+        entity: Entity,
+        fields: ErasedComponents<ErasedField>,
+    ) {
+        let Some(archetype_id) = archetype_id else {
+            unsafe { Self::drop_erased_in_place(components, fields) }
+            return;
+        };
+
+        let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+        let fields = info.storage_mut().insert_erased(components, entity, fields);
+        if let Some(fields) = fields {
+            unsafe { Self::drop_erased_in_place(components, fields) }
+            unreachable!("duplicated entity {entity:?}")
+        }
+    }
+
+    #[inline]
+    fn move_out_of_archetype_by_entity(
+        components: &ComponentRegistry,
+        archetypes: &mut Archetypes,
+        archetype_id: Option<ArchetypeId>,
+        entity: Entity,
+    ) -> ErasedComponents<ErasedField> {
+        let Some(archetype_id) = archetype_id else {
+            return ErasedComponents::with_capacity(1);
+        };
+
+        let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+        let Some(fields) = info.storage_mut().remove_erased(components, entity) else {
+            unreachable!("{entity:?} should exist in archetype {archetype_id:?}")
+        };
+        fields
     }
 
     #[inline]

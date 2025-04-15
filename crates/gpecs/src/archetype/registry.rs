@@ -486,6 +486,7 @@ impl ArchetypeRegistry {
         const CONTEXT: DefaultContext = ();
 
         self.compatible_archetypes_of::<B>(components)
+            .unwrap() // TODO: handle error properly
             .flat_map(|info| {
                 let Ok((entities, components)) = info.storage().components::<B>(components) else {
                     unreachable!("archetype {info:?} should be compatible with requested bundle")
@@ -497,19 +498,27 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn compatible_archetypes_of<'c, B>(
+    pub fn compatible_archetypes<I>(
         &self,
-        components: &'c ComponentRegistry,
-    ) -> impl Iterator<Item = &ArchetypeInfo> + use<'_, 'c, B>
+        component_ids: I,
+    ) -> Result<CompatibleArchetypes, DuplicateComponentError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let Self { archetypes, .. } = self;
+        CompatibleArchetypes::new(archetypes, component_ids)
+    }
+
+    #[inline]
+    pub fn compatible_archetypes_of<B>(
+        &self,
+        components: &ComponentRegistry,
+    ) -> Result<CompatibleArchetypes, GetComponentsError>
     where
         B: Bundle,
     {
         let Self { archetypes, .. } = self;
-        archetypes.values().filter(|info| {
-            info.storage()
-                .bundle_compatibility_of::<B>(components)
-                .is_ok()
-        })
+        CompatibleArchetypes::new_opt(archetypes, B::get_components(components))
     }
 
     #[inline]
@@ -1181,3 +1190,134 @@ impl ExactSizeIterator for ArchetypeIds {
 }
 
 impl FusedIterator for ArchetypeIds {}
+
+#[derive(Clone)]
+pub struct CompatibleArchetypes<'a> {
+    component_ids: ArchetypeKey,
+    infos: indexmap::map::Values<'a, ArchetypeKey, ArchetypeInfo>,
+}
+
+impl<'a> CompatibleArchetypes<'a> {
+    #[inline]
+    pub fn new<I>(
+        archetypes: &'a Archetypes,
+        component_ids: I,
+    ) -> Result<Self, DuplicateComponentError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let component_ids = try_collect_component_ids(component_ids, ArchetypeKey::insert)?;
+        let infos = archetypes.values();
+        Ok(Self {
+            component_ids,
+            infos,
+        })
+    }
+
+    #[inline]
+    pub fn new_opt<I>(
+        archetypes: &'a Archetypes,
+        component_ids: I,
+    ) -> Result<Self, GetComponentsError>
+    where
+        I: IntoIterator<Item = Option<ComponentId>>,
+    {
+        let component_ids = try_collect_maybe_component_ids(component_ids, ArchetypeKey::insert)?;
+        let infos = archetypes.values();
+        Ok(Self {
+            component_ids,
+            infos,
+        })
+    }
+}
+
+impl Debug for CompatibleArchetypes<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { component_ids, .. } = self;
+        f.debug_struct("CompatibleArchetypes")
+            .field("component_ids", component_ids)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Iterator for CompatibleArchetypes<'a> {
+    type Item = &'a ArchetypeInfo;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref component_ids,
+            infos,
+        } = self;
+
+        infos.find(|info| compatible_archetypes_predicate(info, component_ids))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { infos, .. } = self;
+        let (_, upper) = infos.size_hint();
+        (0, upper) // can't know a lower bound, due to the predicate
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        let Self {
+            infos,
+            ref component_ids,
+        } = self;
+
+        infos
+            .filter(|info| compatible_archetypes_predicate(info, component_ids))
+            .count()
+    }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self {
+            infos,
+            ref component_ids,
+        } = self;
+
+        infos
+            .filter(|info| compatible_archetypes_predicate(info, component_ids))
+            .fold(init, f)
+    }
+}
+
+impl DoubleEndedIterator for CompatibleArchetypes<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref component_ids,
+            infos,
+        } = self;
+
+        infos.rfind(|info| compatible_archetypes_predicate(info, component_ids))
+    }
+
+    fn rfold<B, F>(self, init: B, f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self {
+            ref component_ids,
+            infos,
+        } = self;
+
+        infos
+            .filter(|info| compatible_archetypes_predicate(info, component_ids))
+            .rfold(init, f)
+    }
+}
+
+impl FusedIterator for CompatibleArchetypes<'_> {}
+
+#[inline]
+fn compatible_archetypes_predicate(info: &ArchetypeInfo, component_ids: &ArchetypeKey) -> bool {
+    let component_ids = component_ids.iter().copied();
+    info.storage().bundle_compatibility(component_ids).is_ok()
+}

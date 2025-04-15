@@ -21,7 +21,7 @@ use crate::{
     bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
-    soa::traits::DefaultContext,
+    soa::{slice::SoaSlices, traits::DefaultContext},
 };
 
 use super::{
@@ -116,7 +116,8 @@ impl ArchetypeInfo {
     }
 
     #[inline]
-    pub fn storage_mut(&mut self) -> &mut ArchetypeStorage {
+    #[allow(unsafe_code)]
+    pub unsafe fn storage_mut(&mut self) -> &mut ArchetypeStorage {
         let Self { storage, .. } = self;
         storage
     }
@@ -449,7 +450,7 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
-        let Some(refs) = info.storage_mut().get_mut::<B>(components, entity)? else {
+        let Some(refs) = info.storage.get_mut::<B>(components, entity)? else {
             let component_ids = B::get_components(components);
             let error = Self::make_incompatible_bundle_error(component_ids);
             return Err(error);
@@ -472,6 +473,43 @@ impl ArchetypeRegistry {
             unreachable!("bundle should contain at least one component")
         };
         return MissingComponentError::new(component_id).into();
+    }
+
+    #[inline]
+    pub fn components<'c, B>(
+        &self,
+        components: &'c ComponentRegistry,
+    ) -> impl Iterator<Item = (Entity, B::Refs<'_>)> + use<'_, 'c, B>
+    where
+        B: Bundle,
+    {
+        const CONTEXT: DefaultContext = ();
+
+        self.compatible_archetypes_of::<B>(components)
+            .flat_map(|info| {
+                let Ok((entities, components)) = info.storage().components::<B>(components) else {
+                    unreachable!("archetype {info:?} should be compatible with requested bundle")
+                };
+                let entities = entities.iter().copied();
+                let components = SoaSlices::<B>::new(&CONTEXT, components);
+                entities.zip(components)
+            })
+    }
+
+    #[inline]
+    pub fn compatible_archetypes_of<'c, B>(
+        &self,
+        components: &'c ComponentRegistry,
+    ) -> impl Iterator<Item = &ArchetypeInfo> + use<'_, 'c, B>
+    where
+        B: Bundle,
+    {
+        let Self { archetypes, .. } = self;
+        archetypes.values().filter(|info| {
+            info.storage()
+                .bundle_compatibility_of::<B>(components)
+                .is_ok()
+        })
     }
 
     #[inline]
@@ -775,7 +813,7 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
-        if !info.storage_mut().destroy_in_place(entity) {
+        if !info.storage.destroy_in_place(entity) {
             unreachable!("entity {entity:?} should exist in archetype {archetype_id:?}");
         }
         true
@@ -814,7 +852,7 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
-        let fields = info.storage_mut().insert_erased(components, entity, fields);
+        let fields = info.storage.insert_erased(components, entity, fields);
         if let Some(fields) = fields {
             unsafe { Self::drop_erased_in_place(components, fields) }
             unreachable!("duplicated entity {entity:?}")
@@ -835,7 +873,7 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
-        let Some(fields) = info.storage_mut().remove_erased(components, entity) else {
+        let Some(fields) = info.storage.remove_erased(components, entity) else {
             unreachable!("{entity:?} should exist in archetype {archetype_id:?}")
         };
         fields

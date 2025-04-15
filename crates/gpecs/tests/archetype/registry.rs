@@ -408,3 +408,56 @@ fn exchange_components_empty_registry() {
         .storage();
     assert!(!storage.contains(entity));
 }
+
+#[test]
+fn components() {
+    let mut entities = EntityRegistry::new();
+    let mut components = ComponentRegistry::new();
+    let mut archetypes = ArchetypeRegistry::new();
+
+    let entity1 = entities.spawn(Default::default(), ());
+    let position = Position {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+    };
+    archetypes
+        .insert_bundle::<(Position, Tag)>(&mut components, entity1, (position, Tag))
+        .expect("archetype of `Position` and `Tag` should contain unique component ids");
+
+    let entity2 = entities.spawn(Default::default(), ());
+    let mass = Mass { value: 42 };
+    archetypes
+        .insert_bundle::<(Mass, Tag)>(&mut components, entity2, (mass, Tag))
+        .expect("archetype of `Mass` and `Tag` should contain unique component ids");
+
+    for (entity, (position,)) in archetypes.components::<(Position,)>(&components) {
+        assert_eq!(entity, entity1);
+        assert_eq!(position.x, 1.0);
+        assert_eq!(position.y, 2.0);
+        assert_eq!(position.z, 3.0);
+    }
+
+    for (entity, (mass,)) in archetypes.components::<(Mass,)>(&components) {
+        assert_eq!(entity, entity2);
+        assert_eq!(mass.value, 42);
+    }
+
+    for (entity, (&tag,)) in archetypes.components::<(Tag,)>(&components) {
+        assert!(entity == entity1 || entity == entity2);
+        assert_eq!(tag, Tag);
+    }
+    itertools::assert_equal(
+        archetypes
+            .components::<(Tag,)>(&components)
+            .map(|(entity, _)| entity),
+        [entity1, entity2],
+    );
+
+    assert_eq!(
+        archetypes
+            .components::<(Position, Mass)>(&components)
+            .count(),
+        0,
+    );
+}

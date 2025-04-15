@@ -479,22 +479,25 @@ impl ArchetypeRegistry {
     pub fn components<'c, B>(
         &self,
         components: &'c ComponentRegistry,
-    ) -> impl Iterator<Item = (Entity, B::Refs<'_>)> + use<'_, 'c, B>
+    ) -> Result<
+        impl DoubleEndedIterator<Item = (Entity, B::Refs<'_>)> + FusedIterator + Clone + use<'_, 'c, B>,
+        GetComponentsError,
+    >
     where
         B: Bundle,
     {
         const CONTEXT: DefaultContext = ();
 
-        self.compatible_archetypes_of::<B>(components)
-            .unwrap() // TODO: handle error properly
-            .flat_map(|info| {
+        Ok(self
+            .compatible_archetypes_of::<B>(components)?
+            .flat_map(|info: &ArchetypeInfo| {
                 let Ok((entities, components)) = info.storage().components::<B>(components) else {
                     unreachable!("archetype {info:?} should be compatible with requested bundle")
                 };
                 let entities = entities.iter().copied();
                 let components = SoaSlices::<B>::new(&CONTEXT, components);
                 entities.zip(components)
-            })
+            }))
     }
 
     #[inline]
@@ -1193,7 +1196,7 @@ impl FusedIterator for ArchetypeIds {}
 
 #[derive(Clone)]
 pub struct CompatibleArchetypes<'a> {
-    component_ids: ArchetypeKey,
+    component_ids: IndexSet<ComponentId>,
     infos: indexmap::map::Values<'a, ArchetypeKey, ArchetypeInfo>,
 }
 
@@ -1206,7 +1209,7 @@ impl<'a> CompatibleArchetypes<'a> {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids = try_collect_component_ids(component_ids, ArchetypeKey::insert)?;
+        let component_ids = try_collect_component_ids(component_ids, IndexSet::insert)?;
         let infos = archetypes.values();
         Ok(Self {
             component_ids,
@@ -1222,12 +1225,18 @@ impl<'a> CompatibleArchetypes<'a> {
     where
         I: IntoIterator<Item = Option<ComponentId>>,
     {
-        let component_ids = try_collect_maybe_component_ids(component_ids, ArchetypeKey::insert)?;
+        let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::insert)?;
         let infos = archetypes.values();
         Ok(Self {
             component_ids,
             infos,
         })
+    }
+
+    #[inline]
+    pub fn component_ids(&self) -> &IndexSet<ComponentId> {
+        let Self { component_ids, .. } = self;
+        component_ids
     }
 }
 
@@ -1317,7 +1326,10 @@ impl DoubleEndedIterator for CompatibleArchetypes<'_> {
 impl FusedIterator for CompatibleArchetypes<'_> {}
 
 #[inline]
-fn compatible_archetypes_predicate(info: &ArchetypeInfo, component_ids: &ArchetypeKey) -> bool {
+fn compatible_archetypes_predicate(
+    info: &ArchetypeInfo,
+    component_ids: &IndexSet<ComponentId>,
+) -> bool {
     let component_ids = component_ids.iter().copied();
     info.storage().bundle_compatibility(component_ids).is_ok()
 }

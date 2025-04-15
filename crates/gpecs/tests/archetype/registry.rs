@@ -431,33 +431,35 @@ fn components() {
         .insert_bundle::<(Mass, Tag)>(&mut components, entity2, (mass, Tag))
         .expect("archetype of `Mass` and `Tag` should contain unique component ids");
 
-    for (entity, (position,)) in archetypes.components::<(Position,)>(&components) {
+    let positions = archetypes
+        .components::<(Position,)>(&components)
+        .expect("archetype of just `Position` should exist & contain unique component ids");
+    for (entity, (position,)) in positions {
         assert_eq!(entity, entity1);
         assert_eq!(position.x, 1.0);
         assert_eq!(position.y, 2.0);
         assert_eq!(position.z, 3.0);
     }
 
-    for (entity, (mass,)) in archetypes.components::<(Mass,)>(&components) {
+    let masses = archetypes
+        .components::<(Mass,)>(&components)
+        .expect("archetype of just `Mass` should exist & contain unique component ids");
+    for (entity, (mass,)) in masses {
         assert_eq!(entity, entity2);
         assert_eq!(mass.value, 42);
     }
 
-    for (entity, (&tag,)) in archetypes.components::<(Tag,)>(&components) {
+    let tags = archetypes
+        .components::<(Tag,)>(&components)
+        .expect("archetype of just `Tag` should exist & contain unique component ids");
+    for (entity, (&tag,)) in tags.clone() {
         assert!(entity == entity1 || entity == entity2);
         assert_eq!(tag, Tag);
     }
-    itertools::assert_equal(
-        archetypes
-            .components::<(Tag,)>(&components)
-            .map(|(entity, _)| entity),
-        [entity1, entity2],
-    );
+    itertools::assert_equal(tags.map(|(entity, _)| entity), [entity1, entity2]);
 
-    assert_eq!(
-        archetypes
-            .components::<(Position, Mass)>(&components)
-            .count(),
-        0,
-    );
+    let positions_with_masses = archetypes
+        .components::<(Position, Mass)>(&components)
+        .expect("archetype of `Position` and `Mass` should exist & contain unique component ids");
+    assert_eq!(positions_with_masses.count(), 0);
 }

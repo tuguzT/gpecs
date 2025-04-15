@@ -399,12 +399,8 @@ impl ArchetypeRegistry {
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
             let component_ids = B::get_components(components);
-            let component_ids =
-                try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
-            let Some(component_id) = component_ids.into_iter().next() else {
-                unreachable!("bundle should contain at least one component")
-            };
-            return Err(MissingComponentError::new(component_id).into());
+            let error = Self::make_incompatible_bundle_error(component_ids);
+            return Err(error);
         };
 
         let Some(info) = Self::get_info(archetypes, archetype_id) else {
@@ -412,12 +408,8 @@ impl ArchetypeRegistry {
         };
         let Some(refs) = info.storage().get::<B>(components, entity)? else {
             let component_ids = B::get_components(components);
-            let component_ids =
-                try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
-            let Some(component_id) = component_ids.into_iter().next() else {
-                unreachable!("bundle should contain at least one component")
-            };
-            return Err(MissingComponentError::new(component_id).into());
+            let error = Self::make_incompatible_bundle_error(component_ids);
+            return Err(error);
         };
         Ok(refs)
     }
@@ -450,12 +442,8 @@ impl ArchetypeRegistry {
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
             let component_ids = B::get_components(components);
-            let component_ids =
-                try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
-            let Some(component_id) = component_ids.into_iter().next() else {
-                unreachable!("bundle should contain at least one component")
-            };
-            return Err(MissingComponentError::new(component_id).into());
+            let error = Self::make_incompatible_bundle_error(component_ids);
+            return Err(error);
         };
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
@@ -463,14 +451,27 @@ impl ArchetypeRegistry {
         };
         let Some(refs) = info.storage_mut().get_mut::<B>(components, entity)? else {
             let component_ids = B::get_components(components);
-            let component_ids =
-                try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
-            let Some(component_id) = component_ids.into_iter().next() else {
-                unreachable!("bundle should contain at least one component")
-            };
-            return Err(MissingComponentError::new(component_id).into());
+            let error = Self::make_incompatible_bundle_error(component_ids);
+            return Err(error);
         };
         Ok(refs)
+    }
+
+    #[inline]
+    fn make_incompatible_bundle_error<I>(component_ids: I) -> IncompatibleBundleError
+    where
+        I: IntoIterator<Item = Option<ComponentId>>,
+    {
+        let result = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert);
+        let component_ids = match result {
+            Ok(component_ids) => component_ids,
+            Err(error) => return error.into(),
+        };
+
+        let Some(component_id) = component_ids.into_iter().next() else {
+            unreachable!("bundle should contain at least one component")
+        };
+        return MissingComponentError::new(component_id).into();
     }
 
     #[inline]

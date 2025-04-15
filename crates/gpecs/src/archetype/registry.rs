@@ -483,7 +483,7 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.insert_bundle_exact_with(components, entity, value, location)?;
+        self.insert_bundle_exact_with::<B>(components, entity, value, location)?;
         Ok(())
     }
 
@@ -576,7 +576,7 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        self.insert_bundle_with(components, entity, value, location)?;
+        self.insert_bundle_with::<B>(components, entity, value, location)?;
         Ok(())
     }
 
@@ -670,7 +670,7 @@ impl ArchetypeRegistry {
         B: Bundle,
     {
         let location = EntityArchetypeLocation::Unknown;
-        let (value, _) = self.remove_bundle_exact_with(components, entity, location)?;
+        let (value, _) = self.remove_bundle_exact_with::<B>(components, entity, location)?;
         Ok(value)
     }
 
@@ -747,6 +747,86 @@ impl ArchetypeRegistry {
         }
 
         Ok((value, new_archetype))
+    }
+
+    #[inline]
+    pub fn remove_bundle<B>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+    ) -> Result<(), DuplicateComponentError>
+    where
+        B: Bundle,
+    {
+        let location = EntityArchetypeLocation::Unknown;
+        let _ = self.remove_bundle_with::<B>(components, entity, location)?;
+        Ok(())
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn remove_bundle_with<B>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        location: EntityArchetypeLocation,
+    ) -> Result<EntityArchetype, DuplicateComponentError>
+    where
+        B: Bundle,
+    {
+        let Self { archetypes, graph } = self;
+
+        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
+        try_collect_component_ids(component_ids.iter().copied(), ArchetypeKey::insert)?;
+
+        let old_archetype = Self::find_archetype_with_entity(archetypes, entity, location);
+        let Some(old_archetype) = old_archetype else {
+            return Ok(None);
+        };
+        let new_archetype = Self::register_archetype_without_components(
+            graph,
+            archetypes,
+            components,
+            old_archetype,
+            &component_ids,
+        );
+        if Some(old_archetype) == new_archetype {
+            return Ok(new_archetype);
+        }
+
+        let Some(old_info) = Self::get_info_mut(archetypes, old_archetype) else {
+            unreachable!("archetype {old_archetype:?} should exist")
+        };
+        let Some(mut old_fields) = old_info.storage_mut().remove_erased(components, entity) else {
+            unreachable!("{entity:?} should exist in archetype {old_archetype:?}")
+        };
+
+        let fields_to_drop = component_ids.iter().copied().filter_map(|component_id| {
+            let field = old_fields.swap_remove(&component_id)?;
+            let Some(info) = components.get_component_info(component_id) else {
+                unreachable!("component {component_id:?} should exist")
+            };
+            Some((field, info.drop_fn()))
+        });
+        #[allow(unsafe_code)]
+        unsafe {
+            drop_erased_in_place(fields_to_drop)
+        }
+
+        let new_fields = old_fields;
+        if let Some(new_archetype) = new_archetype {
+            let Some(new_info) = Self::get_info_mut(archetypes, new_archetype) else {
+                unreachable!("archetype {new_archetype:?} should exist")
+            };
+            let prev_fields = new_info
+                .storage_mut()
+                .insert_erased(components, entity, new_fields);
+            if let Some(_) = prev_fields {
+                unreachable!("duplicated entity {entity:?}")
+            }
+        }
+
+        Ok(new_archetype)
     }
 
     #[inline]

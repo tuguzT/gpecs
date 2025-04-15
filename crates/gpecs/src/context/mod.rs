@@ -1,6 +1,6 @@
 use std::any::TypeId;
 
-use error::EntityNotFoundError;
+use error::{EntityNotFoundError, RemoveBundleError};
 
 use crate::{
     archetype::{
@@ -332,6 +332,27 @@ impl Context {
         let new_archetype_id =
             archetypes.insert_bundle_with::<B>(components, entity, value, location)?;
         *archetype_id = Some(new_archetype_id);
+        Ok(())
+    }
+
+    #[inline]
+    pub fn remove_bundle<B>(&mut self, entity: Entity) -> Result<(), RemoveBundleError>
+    where
+        B: Bundle,
+    {
+        let Self {
+            entities,
+            components,
+            archetypes,
+            ..
+        } = self;
+
+        let Some(archetype_id) = entities.get_mut(entity) else {
+            return Err(EntityNotFoundError::new(entity).into());
+        };
+        let location = archetype_id.clone().into();
+        let new_archetype_id = archetypes.remove_bundle_with::<B>(components, entity, location)?;
+        *archetype_id = new_archetype_id;
         Ok(())
     }
 

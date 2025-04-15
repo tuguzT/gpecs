@@ -1,4 +1,6 @@
-use gpecs::{context::error::EntityNotFoundError, prelude::*};
+use gpecs::{
+    archetype::error::MissingComponentError, context::error::EntityNotFoundError, prelude::*,
+};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 struct Position {
@@ -87,11 +89,17 @@ fn one_entity() {
     assert_eq!(position.y, 2.0);
     assert_eq!(position.z, 3.0);
 
-    let (mass, tag) = context
-        .remove_bundle_exact::<(Mass, Tag)>(entity)
-        .expect("entity should exist & contain `Mass` and `Tag` components");
-    assert_eq!(mass, Mass { value: 42 });
-    assert_eq!(tag, Tag);
+    context
+        .remove_bundle::<(Mass, Tag, Position)>(entity)
+        .expect("entity should exist");
+
+    let error = context
+        .get_bundle::<(Position, Mass, Tag)>(entity)
+        .expect_err("entity should not have `Position`, `Mass` and `Tag` components");
+    assert_eq!(
+        error,
+        MissingComponentError::new(context.components_mut().register_component::<Tag>()).into(),
+    );
 
     context.despawn(entity);
     assert!(!context.contains(entity));

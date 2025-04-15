@@ -390,10 +390,9 @@ fn exchange_components_empty_registry() {
         .storage();
     assert!(storage.contains(entity));
 
-    let (tag,) = archetypes
-        .remove_bundle_exact::<(Tag,)>(&mut components, entity)
-        .expect("entity should have `Tag` component");
-    assert_eq!(tag, Tag);
+    archetypes
+        .remove_bundle::<(Tag, Position)>(&mut components, entity)
+        .expect("entity should have `Tag` component, existence of `Position` is not important");
 
     let error = archetypes
         .remove_bundle_exact::<(Tag,)>(&mut components, entity)

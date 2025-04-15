@@ -305,7 +305,45 @@ where
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[non_exhaustive]
+pub enum RemoveBundleError {
+    EntityNotFound(EntityNotFoundError),
+    DuplicateComponent(DuplicateComponentError),
+}
+
+impl From<EntityNotFoundError> for RemoveBundleError {
+    #[inline]
+    fn from(error: EntityNotFoundError) -> Self {
+        Self::EntityNotFound(error)
+    }
+}
+
+impl From<DuplicateComponentError> for RemoveBundleError {
+    #[inline]
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
+    }
+}
+
+impl Display for RemoveBundleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bundle cannot be removed: ")?;
+        match self {
+            Self::EntityNotFound(error) => Display::fmt(error, f),
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for RemoveBundleError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::EntityNotFound(error) => Some(error),
+            Self::DuplicateComponent(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RemoveBundleExactError {
     EntityNotFound(EntityNotFoundError),
     DuplicateComponent(DuplicateComponentError),

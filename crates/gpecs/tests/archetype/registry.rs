@@ -432,14 +432,21 @@ fn components() {
         .expect("archetype of `Mass` and `Tag` should contain unique component ids");
 
     let positions = archetypes
-        .components::<(Position,)>(&components)
+        .components_mut::<(Position,)>(&components)
         .expect("archetype of just `Position` should exist & contain unique component ids");
     for (entity, (position,)) in positions {
         assert_eq!(entity, entity1);
-        assert_eq!(position.x, 1.0);
-        assert_eq!(position.y, 2.0);
-        assert_eq!(position.z, 3.0);
+        position.x -= 1.0;
+        position.y -= 2.0;
+        position.z -= 3.0;
     }
+
+    let (position,) = archetypes
+        .get_bundle::<(Position,)>(&components, entity1)
+        .expect("entity should have `Position` component");
+    assert_eq!(position.x, 0.0);
+    assert_eq!(position.y, 0.0);
+    assert_eq!(position.z, 0.0);
 
     let masses = archetypes
         .components::<(Mass,)>(&components)
@@ -466,7 +473,7 @@ fn components() {
     );
 
     let positions_with_masses = archetypes
-        .components::<(Position, Mass)>(&components)
+        .components_mut::<(Position, Mass)>(&components)
         .expect("archetype of `Position` and `Mass` should exist & contain unique component ids");
     assert_eq!(positions_with_masses.into_iter().count(), 0);
 }

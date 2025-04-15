@@ -24,7 +24,7 @@ use crate::{
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
     soa::{
-        slice::{Iter as SoaIter, SoaSlices},
+        slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
         traits::DefaultContext,
     },
 };
@@ -493,6 +493,18 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
+    pub fn components_mut<'me, 'c, B>(
+        &'me mut self,
+        components: &'c ComponentRegistry,
+    ) -> Result<ComponentsMut<'me, 'c, B>, GetComponentsError>
+    where
+        B: Bundle,
+    {
+        let Self { archetypes, .. } = self;
+        ComponentsMut::new(archetypes, components)
+    }
+
+    #[inline]
     pub fn compatible_archetypes<I>(
         &self,
         component_ids: I,
@@ -514,6 +526,32 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
         CompatibleArchetypes::of::<B>(archetypes, components)
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn compatible_archetypes_mut<I>(
+        &mut self,
+        component_ids: I,
+    ) -> Result<CompatibleArchetypesMut, DuplicateComponentError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let Self { archetypes, .. } = self;
+        CompatibleArchetypesMut::new(archetypes, component_ids)
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn compatible_archetypes_mut_of<B>(
+        &mut self,
+        components: &ComponentRegistry,
+    ) -> Result<CompatibleArchetypesMut, GetComponentsError>
+    where
+        B: Bundle,
+    {
+        let Self { archetypes, .. } = self;
+        CompatibleArchetypesMut::of::<B>(archetypes, components)
     }
 
     #[inline]
@@ -1319,6 +1357,141 @@ impl DoubleEndedIterator for CompatibleArchetypes<'_> {
 
 impl FusedIterator for CompatibleArchetypes<'_> {}
 
+pub struct CompatibleArchetypesMut<'a> {
+    component_ids: Box<[ComponentId]>,
+    infos: indexmap::map::ValuesMut<'a, ArchetypeKey, ArchetypeInfo>,
+}
+
+impl<'a> CompatibleArchetypesMut<'a> {
+    #[inline]
+    fn new<I>(
+        archetypes: &'a mut Archetypes,
+        component_ids: I,
+    ) -> Result<Self, DuplicateComponentError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?
+            .into_iter()
+            .collect();
+        let infos = archetypes.values_mut();
+        Ok(Self {
+            component_ids,
+            infos,
+        })
+    }
+
+    #[inline]
+    fn of<B>(
+        archetypes: &'a mut Archetypes,
+        components: &ComponentRegistry,
+    ) -> Result<Self, GetComponentsError>
+    where
+        B: Bundle,
+    {
+        let component_ids =
+            try_collect_maybe_component_ids(B::get_components(components), IndexSet::<_>::insert)?
+                .into_iter()
+                .collect();
+        let infos = archetypes.values_mut();
+        Ok(Self {
+            component_ids,
+            infos,
+        })
+    }
+
+    #[inline]
+    pub fn component_ids(&self) -> &[ComponentId] {
+        let Self { component_ids, .. } = self;
+        component_ids
+    }
+}
+
+impl Debug for CompatibleArchetypesMut<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { component_ids, .. } = self;
+        f.debug_struct("CompatibleArchetypesMut")
+            .field("component_ids", component_ids)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Iterator for CompatibleArchetypesMut<'a> {
+    type Item = &'a mut ArchetypeInfo;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref component_ids,
+            infos,
+        } = self;
+
+        infos.find(|info| compatible_archetypes_predicate(info, component_ids))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { infos, .. } = self;
+        let (_, upper) = infos.size_hint();
+        (0, upper) // can't know a lower bound, due to the predicate
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        let Self {
+            infos,
+            ref component_ids,
+        } = self;
+
+        infos
+            .filter(|info| compatible_archetypes_predicate(info, component_ids))
+            .count()
+    }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self {
+            infos,
+            ref component_ids,
+        } = self;
+
+        infos
+            .filter(|info| compatible_archetypes_predicate(info, component_ids))
+            .fold(init, f)
+    }
+}
+
+impl DoubleEndedIterator for CompatibleArchetypesMut<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref component_ids,
+            infos,
+        } = self;
+
+        infos.rfind(|info| compatible_archetypes_predicate(info, component_ids))
+    }
+
+    fn rfold<B, F>(self, init: B, f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let Self {
+            ref component_ids,
+            infos,
+        } = self;
+
+        infos
+            .filter(|info| compatible_archetypes_predicate(info, component_ids))
+            .rfold(init, f)
+    }
+}
+
+impl FusedIterator for CompatibleArchetypesMut<'_> {}
+
 #[inline]
 fn compatible_archetypes_predicate(info: &ArchetypeInfo, component_ids: &[ComponentId]) -> bool {
     let component_ids = component_ids.iter().copied();
@@ -1442,8 +1615,9 @@ where
         info: &'a ArchetypeInfo,
         components: &ComponentRegistry,
     ) -> ComponentsIntoIterInner<'a, B> {
+        let archetype_id = info.id();
         let Ok((entities, components)) = info.storage().components::<B>(components) else {
-            unreachable!("archetype {info:?} should be compatible with requested bundle")
+            unreachable!("archetype {archetype_id:?} should be compatible with requested bundle")
         };
 
         let entities = entities.iter().copied();
@@ -1570,6 +1744,225 @@ where
         }
     }
 }
+
+impl<B> FusedIterator for ComponentsIntoIter<'_, '_, B> where B: Bundle {}
+
+pub struct ComponentsMut<'a, 'c, B>
+where
+    B: Bundle,
+{
+    archetypes: CompatibleArchetypesMut<'a>,
+    components: &'c ComponentRegistry,
+    phantom: PhantomData<fn() -> B>,
+}
+
+impl<'a, 'c, B> ComponentsMut<'a, 'c, B>
+where
+    B: Bundle,
+{
+    #[inline]
+    fn new(
+        archetypes: &'a mut Archetypes,
+        components: &'c ComponentRegistry,
+    ) -> Result<Self, GetComponentsError> {
+        let archetypes = CompatibleArchetypesMut::of::<B>(archetypes, components)?;
+        Ok(Self {
+            archetypes,
+            components,
+            phantom: PhantomData,
+        })
+    }
+
+    #[inline]
+    pub fn archetypes(&self) -> &CompatibleArchetypesMut<'a> {
+        let Self { archetypes, .. } = self;
+        archetypes
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn archetypes_mut(&mut self) -> &mut CompatibleArchetypesMut<'a> {
+        let Self { archetypes, .. } = self;
+        archetypes
+    }
+
+    #[inline]
+    pub fn into_archetypes(self) -> CompatibleArchetypesMut<'a> {
+        let Self { archetypes, .. } = self;
+        archetypes
+    }
+}
+
+impl<'a, 'c, B> Debug for ComponentsMut<'a, 'c, B>
+where
+    B: Bundle,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { archetypes, .. } = self;
+        f.debug_struct("ComponentsMut")
+            .field("archetypes", archetypes)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, 'c, B> IntoIterator for ComponentsMut<'a, 'c, B>
+where
+    B: Bundle,
+{
+    type Item = (Entity, B::RefsMut<'a>);
+
+    // this actually should be just `FlatMap`,
+    // but it cannot be returned because `impl Trait` is unstable in associated types
+    type IntoIter = ComponentsMutIntoIter<'a, 'c, B>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let Self {
+            archetypes,
+            components,
+            ..
+        } = self;
+        ComponentsMutIntoIter {
+            archetypes,
+            components,
+            inner_front: None,
+            inner_back: None,
+        }
+    }
+}
+
+type ComponentsMutIntoIterInner<'a, B> =
+    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIterMut<'a, B>>;
+
+pub struct ComponentsMutIntoIter<'a, 'c, B>
+where
+    B: Bundle,
+{
+    archetypes: CompatibleArchetypesMut<'a>,
+    components: &'c ComponentRegistry,
+    inner_front: Option<ComponentsMutIntoIterInner<'a, B>>,
+    inner_back: Option<ComponentsMutIntoIterInner<'a, B>>,
+}
+
+impl<'a, 'c, B> ComponentsMutIntoIter<'a, 'c, B>
+where
+    B: Bundle,
+{
+    #[inline]
+    fn new_inner(
+        info: &'a mut ArchetypeInfo,
+        components: &ComponentRegistry,
+    ) -> ComponentsMutIntoIterInner<'a, B> {
+        let archetype_id = info.id();
+        let Ok((entities, components)) = info.storage.components_mut::<B>(components) else {
+            unreachable!("archetype {archetype_id:?} should be compatible with requested bundle")
+        };
+
+        let entities = entities.iter().copied();
+        let components = {
+            const CONTEXT: DefaultContext = ();
+            SoaSlicesMut::<B>::new(&CONTEXT, components)
+        };
+        entities.zip(components)
+    }
+}
+
+impl<B> Debug for ComponentsMutIntoIter<'_, '_, B>
+where
+    B: Bundle,
+    for<'any> B::Slices<'any>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            archetypes,
+            inner_front,
+            inner_back,
+            ..
+        } = self;
+
+        f.debug_struct("ComponentsIntoIter")
+            .field("archetypes", archetypes)
+            .field("inner_front", inner_front)
+            .field("inner_back", inner_back)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, B> Iterator for ComponentsMutIntoIter<'a, '_, B>
+where
+    B: Bundle,
+{
+    type Item = (Entity, B::RefsMut<'a>);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            archetypes,
+            components,
+            inner_front,
+            inner_back,
+        } = self;
+
+        loop {
+            if let item @ Some(_) = and_then_or_clear(inner_front, Iterator::next) {
+                return item;
+            }
+            match archetypes.next() {
+                None => return and_then_or_clear(inner_back, Iterator::next),
+                Some(info) => *inner_front = Self::new_inner(info, components).into(),
+            }
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self {
+            archetypes,
+            inner_front,
+            inner_back,
+            ..
+        } = self;
+
+        let (flo, fhi) = inner_front
+            .as_ref()
+            .map_or((0, Some(0)), Iterator::size_hint);
+        let (blo, bhi) = inner_back
+            .as_ref()
+            .map_or((0, Some(0)), Iterator::size_hint);
+        let lo = flo.saturating_add(blo);
+
+        match (archetypes.size_hint(), fhi, bhi) {
+            ((0, Some(0)), Some(a), Some(b)) => (lo, a.checked_add(b)),
+            _ => (lo, None),
+        }
+    }
+}
+
+impl<B> DoubleEndedIterator for ComponentsMutIntoIter<'_, '_, B>
+where
+    B: Bundle,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self {
+            archetypes,
+            components,
+            inner_front,
+            inner_back,
+        } = self;
+
+        loop {
+            if let item @ Some(_) = and_then_or_clear(inner_back, DoubleEndedIterator::next_back) {
+                return item;
+            }
+            match archetypes.next_back() {
+                None => return and_then_or_clear(inner_front, DoubleEndedIterator::next_back),
+                Some(info) => *inner_back = Self::new_inner(info, components).into(),
+            }
+        }
+    }
+}
+
+impl<B> FusedIterator for ComponentsMutIntoIter<'_, '_, B> where B: Bundle {}
 
 #[inline]
 fn and_then_or_clear<T, U>(opt: &mut Option<T>, f: impl FnOnce(&mut T) -> Option<U>) -> Option<U> {

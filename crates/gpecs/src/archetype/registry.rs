@@ -476,11 +476,24 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn components<'c, B>(
-        &self,
+    pub fn components<'me, 'c, B>(
+        &'me self,
         components: &'c ComponentRegistry,
     ) -> Result<
-        impl DoubleEndedIterator<Item = (Entity, B::Refs<'_>)> + FusedIterator + Clone + use<'_, 'c, B>,
+        std::iter::FlatMap<
+            CompatibleArchetypes<'me>,
+            std::iter::Zip<
+                std::iter::Copied<std::slice::Iter<'me, Entity>>,
+                crate::soa::slice::Iter<'me, B>,
+            >,
+            impl FnMut(
+                    &'me ArchetypeInfo,
+                ) -> std::iter::Zip<
+                    std::iter::Copied<std::slice::Iter<'me, Entity>>,
+                    crate::soa::slice::Iter<'me, B>,
+                > + Copy
+                + use<'me, 'c, B>,
+        >,
         GetComponentsError,
     >
     where

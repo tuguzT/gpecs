@@ -456,10 +456,13 @@ fn components() {
         assert!(entity == entity1 || entity == entity2);
         assert_eq!(tag, Tag);
     }
-    itertools::assert_equal(tags.map(|(entity, _)| entity), [entity1, entity2]);
+    itertools::assert_equal(
+        tags.into_iter().map(|(entity, _)| entity),
+        [entity1, entity2],
+    );
 
     let positions_with_masses = archetypes
         .components::<(Position, Mass)>(&components)
         .expect("archetype of `Position` and `Mass` should exist & contain unique component ids");
-    assert_eq!(positions_with_masses.count(), 0);
+    assert_eq!(positions_with_masses.into_iter().count(), 0);
 }

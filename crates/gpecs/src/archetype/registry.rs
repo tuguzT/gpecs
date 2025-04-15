@@ -2,8 +2,10 @@ use std::{
     borrow::Borrow,
     collections::BTreeSet,
     fmt::{self, Debug},
-    iter::FusedIterator,
+    iter::{self, FusedIterator},
+    marker::PhantomData,
     ops::Range,
+    slice,
 };
 
 use gpecs_soa_erased::field::ErasedField;
@@ -21,7 +23,10 @@ use crate::{
     bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
-    soa::{slice::SoaSlices, traits::DefaultContext},
+    soa::{
+        slice::{Iter as SoaIter, SoaSlices},
+        traits::DefaultContext,
+    },
 };
 
 use super::{
@@ -479,38 +484,12 @@ impl ArchetypeRegistry {
     pub fn components<'me, 'c, B>(
         &'me self,
         components: &'c ComponentRegistry,
-    ) -> Result<
-        std::iter::FlatMap<
-            CompatibleArchetypes<'me>,
-            std::iter::Zip<
-                std::iter::Copied<std::slice::Iter<'me, Entity>>,
-                crate::soa::slice::Iter<'me, B>,
-            >,
-            impl FnMut(
-                    &'me ArchetypeInfo,
-                ) -> std::iter::Zip<
-                    std::iter::Copied<std::slice::Iter<'me, Entity>>,
-                    crate::soa::slice::Iter<'me, B>,
-                > + Copy
-                + use<'me, 'c, B>,
-        >,
-        GetComponentsError,
-    >
+    ) -> Result<Components<'me, 'c, B>, GetComponentsError>
     where
         B: Bundle,
     {
-        const CONTEXT: DefaultContext = ();
-
-        let archetypes = self.compatible_archetypes_of::<B>(components)?;
-        let components = archetypes.flat_map(|info: &ArchetypeInfo| {
-            let Ok((entities, components)) = info.storage().components::<B>(components) else {
-                unreachable!("archetype {info:?} should be compatible with requested bundle")
-            };
-            let entities = entities.iter().copied();
-            let components = SoaSlices::<B>::new(&CONTEXT, components);
-            entities.zip(components)
-        });
-        Ok(components)
+        let Self { archetypes, .. } = self;
+        Components::new(archetypes, components)
     }
 
     #[inline]
@@ -1344,4 +1323,193 @@ impl FusedIterator for CompatibleArchetypes<'_> {}
 fn compatible_archetypes_predicate(info: &ArchetypeInfo, component_ids: &[ComponentId]) -> bool {
     let component_ids = component_ids.iter().copied();
     info.storage().bundle_compatibility(component_ids).is_ok()
+}
+
+pub struct Components<'a, 'c, B>
+where
+    B: Bundle,
+{
+    archetypes: CompatibleArchetypes<'a>,
+    components: &'c ComponentRegistry,
+    phantom: PhantomData<fn() -> B>,
+}
+
+impl<'a, 'c, B> Components<'a, 'c, B>
+where
+    B: Bundle,
+{
+    #[inline]
+    fn new(
+        archetypes: &'a Archetypes,
+        components: &'c ComponentRegistry,
+    ) -> Result<Self, GetComponentsError> {
+        let archetypes = CompatibleArchetypes::of::<B>(archetypes, components)?;
+        Ok(Self {
+            archetypes,
+            components,
+            phantom: PhantomData,
+        })
+    }
+
+    #[inline]
+    pub fn archetypes(&self) -> &CompatibleArchetypes<'a> {
+        let Self { archetypes, .. } = self;
+        archetypes
+    }
+
+    #[inline]
+    pub fn into_archetypes(self) -> CompatibleArchetypes<'a> {
+        let Self { archetypes, .. } = self;
+        archetypes
+    }
+}
+
+impl<'a, 'c, B> Debug for Components<'a, 'c, B>
+where
+    B: Bundle,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { archetypes, .. } = self;
+        f.debug_struct("Components")
+            .field("archetypes", archetypes)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, 'c, B> Clone for Components<'a, 'c, B>
+where
+    B: Bundle,
+{
+    fn clone(&self) -> Self {
+        let Self {
+            archetypes,
+            components,
+            phantom,
+        } = self;
+
+        Self {
+            archetypes: archetypes.clone(),
+            components,
+            phantom: phantom.clone(),
+        }
+    }
+}
+
+impl<'a, 'c, B> IntoIterator for Components<'a, 'c, B>
+where
+    B: Bundle,
+{
+    type Item = (Entity, B::Refs<'a>);
+
+    // this actually should be just `FlatMap`,
+    // but it cannot be returned because `impl Trait` is unstable in associated types
+    type IntoIter = ComponentsIntoIter<'a, 'c, B>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let Self {
+            archetypes,
+            components,
+            ..
+        } = self;
+        ComponentsIntoIter {
+            archetypes,
+            components,
+            inner_front: None,
+        }
+    }
+}
+
+type ComponentsIntoIterInner<'a, B> =
+    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIter<'a, B>>;
+
+pub struct ComponentsIntoIter<'a, 'c, B>
+where
+    B: Bundle,
+{
+    archetypes: CompatibleArchetypes<'a>,
+    components: &'c ComponentRegistry,
+    inner_front: Option<ComponentsIntoIterInner<'a, B>>,
+}
+
+impl<'a, 'c, B> ComponentsIntoIter<'a, 'c, B>
+where
+    B: Bundle,
+{
+    #[inline]
+    fn new_inner(
+        info: &'a ArchetypeInfo,
+        components: &ComponentRegistry,
+    ) -> ComponentsIntoIterInner<'a, B> {
+        let Ok((entities, components)) = info.storage().components::<B>(components) else {
+            unreachable!("archetype {info:?} should be compatible with requested bundle")
+        };
+
+        let entities = entities.iter().copied();
+        let components = {
+            const CONTEXT: DefaultContext = ();
+            SoaSlices::<B>::new(&CONTEXT, components)
+        };
+        entities.zip(components)
+    }
+}
+
+impl<B> Debug for ComponentsIntoIter<'_, '_, B>
+where
+    B: Bundle,
+    for<'any> B::Slices<'any>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            archetypes,
+            inner_front,
+            ..
+        } = self;
+
+        f.debug_struct("ComponentsIntoIter")
+            .field("archetypes", archetypes)
+            .field("inner_front", inner_front)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<B> Clone for ComponentsIntoIter<'_, '_, B>
+where
+    B: Bundle,
+{
+    fn clone(&self) -> Self {
+        let Self {
+            archetypes,
+            components,
+            inner_front,
+        } = self;
+        Self {
+            archetypes: archetypes.clone(),
+            components,
+            inner_front: inner_front.clone(),
+        }
+    }
+}
+
+impl<'a, B> Iterator for ComponentsIntoIter<'a, '_, B>
+where
+    B: Bundle,
+{
+    type Item = (Entity, B::Refs<'a>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            archetypes,
+            components,
+            inner_front,
+        } = self;
+
+        loop {
+            if let Some(inner) = inner_front {
+                if let Some(item) = inner.next() {
+                    return Some(item);
+                }
+            }
+            *inner_front = Self::new_inner(archetypes.next()?, components).into();
+        }
+    }
 }

@@ -457,8 +457,12 @@ fn components() {
         assert_eq!(tag, Tag);
     }
     itertools::assert_equal(
-        tags.into_iter().map(|(entity, _)| entity),
-        [entity1, entity2],
+        tags.clone().into_iter().map(|(entity, _)| entity),
+        [entity1, entity2].into_iter(),
+    );
+    itertools::assert_equal(
+        tags.into_iter().rev().map(|(entity, _)| entity),
+        [entity1, entity2].into_iter().rev(),
     );
 
     let positions_with_masses = archetypes

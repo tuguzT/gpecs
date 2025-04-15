@@ -1415,6 +1415,7 @@ where
             archetypes,
             components,
             inner_front: None,
+            inner_back: None,
         }
     }
 }
@@ -1429,6 +1430,7 @@ where
     archetypes: CompatibleArchetypes<'a>,
     components: &'c ComponentRegistry,
     inner_front: Option<ComponentsIntoIterInner<'a, B>>,
+    inner_back: Option<ComponentsIntoIterInner<'a, B>>,
 }
 
 impl<'a, 'c, B> ComponentsIntoIter<'a, 'c, B>
@@ -1462,12 +1464,14 @@ where
         let Self {
             archetypes,
             inner_front,
+            inner_back,
             ..
         } = self;
 
         f.debug_struct("ComponentsIntoIter")
             .field("archetypes", archetypes)
             .field("inner_front", inner_front)
+            .field("inner_back", inner_back)
             .finish_non_exhaustive()
     }
 }
@@ -1481,11 +1485,13 @@ where
             archetypes,
             components,
             inner_front,
+            inner_back,
         } = self;
         Self {
             archetypes: archetypes.clone(),
             components,
             inner_front: inner_front.clone(),
+            inner_back: inner_back.clone(),
         }
     }
 }
@@ -1496,20 +1502,80 @@ where
 {
     type Item = (Entity, B::Refs<'a>);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self {
             archetypes,
             components,
             inner_front,
+            inner_back,
         } = self;
 
         loop {
-            if let Some(inner) = inner_front {
-                if let Some(item) = inner.next() {
-                    return Some(item);
-                }
+            if let item @ Some(_) = and_then_or_clear(inner_front, Iterator::next) {
+                return item;
             }
-            *inner_front = Self::new_inner(archetypes.next()?, components).into();
+            match archetypes.next() {
+                None => return and_then_or_clear(inner_back, Iterator::next),
+                Some(info) => *inner_front = Self::new_inner(info, components).into(),
+            }
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self {
+            archetypes,
+            inner_front,
+            inner_back,
+            ..
+        } = self;
+
+        let (flo, fhi) = inner_front
+            .as_ref()
+            .map_or((0, Some(0)), Iterator::size_hint);
+        let (blo, bhi) = inner_back
+            .as_ref()
+            .map_or((0, Some(0)), Iterator::size_hint);
+        let lo = flo.saturating_add(blo);
+
+        match (archetypes.size_hint(), fhi, bhi) {
+            ((0, Some(0)), Some(a), Some(b)) => (lo, a.checked_add(b)),
+            _ => (lo, None),
+        }
+    }
+}
+
+impl<B> DoubleEndedIterator for ComponentsIntoIter<'_, '_, B>
+where
+    B: Bundle,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self {
+            archetypes,
+            components,
+            inner_front,
+            inner_back,
+        } = self;
+
+        loop {
+            if let item @ Some(_) = and_then_or_clear(inner_back, DoubleEndedIterator::next_back) {
+                return item;
+            }
+            match archetypes.next_back() {
+                None => return and_then_or_clear(inner_front, DoubleEndedIterator::next_back),
+                Some(info) => *inner_back = Self::new_inner(info, components).into(),
+            }
+        }
+    }
+}
+
+#[inline]
+fn and_then_or_clear<T, U>(opt: &mut Option<T>, f: impl FnOnce(&mut T) -> Option<U>) -> Option<U> {
+    let x = f(opt.as_mut()?);
+    if x.is_none() {
+        *opt = None;
+    }
+    x
 }

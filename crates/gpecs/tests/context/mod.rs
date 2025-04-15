@@ -52,7 +52,7 @@ fn one_entity() {
         .expect("entity should exist & not contain `Position` component yet");
 
     let (position_mut,) = context
-        .try_get_bundle_mut::<(Position,)>(entity)
+        .get_bundle_mut::<(Position,)>(entity)
         .expect("entity should exist & contain `Position` component");
     assert_eq!(position_mut.x, 1.0);
     assert_eq!(position_mut.y, 2.0);
@@ -64,7 +64,7 @@ fn one_entity() {
     };
 
     let (&tag, position) = context
-        .try_get_bundle::<(Tag, Position)>(entity)
+        .get_bundle::<(Tag, Position)>(entity)
         .expect("entity should exist & contain `Tag` and `Position` components");
     assert_eq!(tag, Tag);
     assert_eq!(position.x, 4.0);
@@ -97,7 +97,7 @@ fn one_entity() {
     assert!(!context.contains(entity));
 
     let error = context
-        .try_get_bundle::<(Position, Mass, Tag)>(entity)
+        .get_bundle::<(Position, Mass, Tag)>(entity)
         .expect_err("entity should not exist");
     assert_eq!(error, EntityNotFoundError::new(entity).into());
 }

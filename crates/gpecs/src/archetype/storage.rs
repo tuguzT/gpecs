@@ -202,11 +202,12 @@ impl ArchetypeStorage {
     {
         let Self { component_ids, .. } = self;
 
-        if let Some(component) = bundle_component_ids
+        if let Some(component_id) = bundle_component_ids
             .into_iter()
             .find(|id| !component_ids.contains_key(id))
         {
-            return Err(MissingComponentError::new(component).into());
+            let error = MissingComponentError::new(component_id);
+            return Err(error.into());
         }
         Ok(())
     }
@@ -225,9 +226,7 @@ impl ArchetypeStorage {
         let mut bundle_component_ids = bundle_component_ids
             .into_iter()
             .inspect(|_| bundle_component_ids_count += 1);
-        if let Some(component) = bundle_component_ids.find(|id| !component_ids.contains_key(id)) {
-            return Err(MissingComponentError::new(component).into());
-        }
+        self.bundle_compatibility_inner(bundle_component_ids.by_ref())?;
 
         bundle_component_ids.for_each(drop);
         if bundle_component_ids_count != component_ids.len() {

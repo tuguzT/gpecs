@@ -60,7 +60,6 @@ impl Display for AlreadyHasComponentError {
 impl Error for AlreadyHasComponentError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[non_exhaustive]
 pub enum InsertBundleExactErrorKind {
     DuplicateComponent(DuplicateComponentError),
     AlreadyHasComponent(AlreadyHasComponentError),
@@ -184,7 +183,6 @@ impl Display for MissingComponentError {
 impl Error for MissingComponentError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[non_exhaustive]
 pub enum RemoveBundleExactError {
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
@@ -274,7 +272,6 @@ impl Error for GetComponentsError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[non_exhaustive]
 pub enum IncompatibleBundleError {
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
@@ -355,7 +352,6 @@ impl Display for TooFewComponentsError {
 impl Error for TooFewComponentsError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[non_exhaustive]
 pub enum IncompatibleBundleExactError {
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),

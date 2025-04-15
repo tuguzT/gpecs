@@ -243,15 +243,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_bundle<B>(&self, entity: Entity) -> Option<B::Refs<'_>>
-    where
-        B: Bundle,
-    {
-        self.try_get_bundle::<B>(entity).ok()
-    }
-
-    #[inline]
-    pub fn try_get_bundle<B>(&self, entity: Entity) -> Result<B::Refs<'_>, IncompatibleBundleError>
+    pub fn get_bundle<B>(&self, entity: Entity) -> Result<B::Refs<'_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -271,15 +263,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_bundle_mut<B>(&mut self, entity: Entity) -> Option<B::RefsMut<'_>>
-    where
-        B: Bundle,
-    {
-        self.try_get_bundle_mut::<B>(entity).ok()
-    }
-
-    #[inline]
-    pub fn try_get_bundle_mut<B>(
+    pub fn get_bundle_mut<B>(
         &mut self,
         entity: Entity,
     ) -> Result<B::RefsMut<'_>, IncompatibleBundleError>

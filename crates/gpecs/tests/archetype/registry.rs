@@ -432,7 +432,7 @@ fn components() {
         .expect("archetype of `Mass` and `Tag` should contain unique component ids");
 
     let positions = archetypes
-        .components_mut::<(Position,)>(&components)
+        .bundles_mut::<(Position,)>(&components)
         .expect("archetype of just `Position` should exist & contain unique component ids");
     for (entity, (position,)) in positions {
         assert_eq!(entity, entity1);
@@ -449,7 +449,7 @@ fn components() {
     assert_eq!(position.z, 0.0);
 
     let masses = archetypes
-        .components::<(Mass,)>(&components)
+        .bundles::<(Mass,)>(&components)
         .expect("archetype of just `Mass` should exist & contain unique component ids");
     for (entity, (mass,)) in masses {
         assert_eq!(entity, entity2);
@@ -457,7 +457,7 @@ fn components() {
     }
 
     let tags = archetypes
-        .components::<(Tag,)>(&components)
+        .bundles::<(Tag,)>(&components)
         .expect("archetype of just `Tag` should exist & contain unique component ids");
     for (entity, (&tag,)) in tags.clone() {
         assert!(entity == entity1 || entity == entity2);
@@ -473,7 +473,7 @@ fn components() {
     );
 
     let positions_with_masses = archetypes
-        .components_mut::<(Position, Mass)>(&components)
+        .bundles_mut::<(Position, Mass)>(&components)
         .expect("archetype of `Position` and `Mass` should exist & contain unique component ids");
     assert_eq!(positions_with_masses.into_iter().count(), 0);
 }

@@ -73,8 +73,8 @@ impl From<NoEpochEntity> for Entity {
     }
 }
 
-pub type Slices<'a, B> = (&'a [Entity], <B as Soa>::Slices<'a>);
-pub type SlicesMut<'a, B> = (&'a [Entity], <B as Soa>::SlicesMut<'a>);
+pub type Bundles<'a, B> = (&'a [Entity], <B as Soa>::Slices<'a>);
+pub type BundlesMut<'a, B> = (&'a [Entity], <B as Soa>::SlicesMut<'a>);
 
 type ErasedStorage = EpochSparseSet<NoEpochEntity, ErasedSoa>;
 type ComponentIdMap = IndexMap<ComponentId, Option<DropFn>>;
@@ -360,10 +360,10 @@ impl ArchetypeStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub fn components<B>(
+    pub fn bundles<B>(
         &self,
         components: &ComponentRegistry,
-    ) -> Result<Slices<B>, IncompatibleBundleError>
+    ) -> Result<Bundles<B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -389,10 +389,10 @@ impl ArchetypeStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub fn components_mut<B>(
+    pub fn bundles_mut<B>(
         &mut self,
         components: &ComponentRegistry,
-    ) -> Result<SlicesMut<B>, IncompatibleBundleError>
+    ) -> Result<BundlesMut<B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -418,7 +418,7 @@ impl ArchetypeStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub fn get<B>(
+    pub fn get_bundle<B>(
         &self,
         components: &ComponentRegistry,
         entity: Entity,
@@ -449,7 +449,7 @@ impl ArchetypeStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub fn get_mut<B>(
+    pub fn get_bundle_mut<B>(
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
@@ -481,7 +481,7 @@ impl ArchetypeStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub fn insert<B>(
+    pub fn insert_bundle<B>(
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
@@ -519,7 +519,7 @@ impl ArchetypeStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub fn remove<B>(
+    pub fn remove_bundle<B>(
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,

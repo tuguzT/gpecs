@@ -50,8 +50,17 @@ fn one_entity() {
     let mass = Mass { value: 42 };
     let tag = Tag;
     context
-        .insert_bundle_exact(entity, (position, mass, tag))
+        .insert_bundle_exact::<(Position, Mass, Tag)>(entity, (position, mass, tag))
         .expect("entity should exist & not contain `Position` component yet");
+
+    itertools::assert_equal(
+        context
+            .bundles::<(Position, Mass, Tag)>()
+            .expect("archetype of `Position`, `Mass` and `Tag` should exist")
+            .into_iter()
+            .map(|(entity, _)| entity),
+        [entity],
+    );
 
     let (position_mut,) = context
         .get_bundle_mut::<(Position,)>(entity)
@@ -85,13 +94,40 @@ fn one_entity() {
     let (position,) = context
         .remove_bundle_exact::<(Position,)>(entity)
         .expect("entity should exist & contain `Position` component");
+    assert!(context.contains(entity));
     assert_eq!(position.x, 1.0);
     assert_eq!(position.y, 2.0);
     assert_eq!(position.z, 3.0);
 
+    itertools::assert_equal(
+        context
+            .bundles::<(Position, Mass, Tag)>()
+            .expect("archetype of `Position`, `Mass` and `Tag` should exist")
+            .into_iter()
+            .map(|(entity, _)| entity),
+        [],
+    );
+    itertools::assert_equal(
+        context
+            .bundles::<(Tag, Mass)>()
+            .expect("archetype of `Position`, `Mass` and `Tag` should exist")
+            .into_iter()
+            .map(|(entity, _)| entity),
+        [entity],
+    );
+
     context
         .remove_bundle::<(Mass, Tag, Position)>(entity)
         .expect("entity should exist");
+    itertools::assert_equal(
+        context
+            .bundles::<(Tag, Mass)>()
+            .expect("archetype of `Position`, `Mass` and `Tag` should exist")
+            .into_iter()
+            .map(|(entity, _)| entity),
+        [],
+    );
+    assert!(context.contains(entity));
 
     let error = context
         .get_bundle::<(Position, Mass, Tag)>(entity)

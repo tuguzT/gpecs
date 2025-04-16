@@ -13,3 +13,6 @@ gpecs_soa_erased = { workspace = true }
 indexmap = { workspace = true }
 petgraph = { workspace = true }
 itertools = { workspace = true }
+
+[dev-dependencies]
+pollster = { workspace = true }

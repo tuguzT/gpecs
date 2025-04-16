@@ -21,4 +21,5 @@ mod context;
 
 mod executor {
     mod cpu;
+    mod gpu;
 }

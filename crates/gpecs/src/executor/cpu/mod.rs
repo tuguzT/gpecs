@@ -12,15 +12,15 @@ use super::Executor;
 pub mod system;
 
 #[derive(Debug)]
-pub struct CpuExecutor<'c> {
-    context: &'c mut Context,
+pub struct CpuExecutor<'context> {
+    context: &'context mut Context,
     systems: SystemRegistry,
     schedule: IndexSet<SystemId>,
 }
 
-impl<'c> CpuExecutor<'c> {
+impl<'context> CpuExecutor<'context> {
     #[inline]
-    pub fn new(context: &'c mut Context) -> Self {
+    pub fn new(context: &'context mut Context) -> Self {
         Self {
             context,
             systems: SystemRegistry::new(),
@@ -41,7 +41,7 @@ impl<'c> CpuExecutor<'c> {
     }
 
     #[inline]
-    pub fn into_context(self) -> &'c mut Context {
+    pub fn into_context(self) -> &'context mut Context {
         let Self { context, .. } = self;
         context
     }
@@ -69,6 +69,7 @@ impl<'c> CpuExecutor<'c> {
 }
 
 impl Executor for CpuExecutor<'_> {
+    #[inline]
     fn execute(&mut self) {
         let Self {
             context,

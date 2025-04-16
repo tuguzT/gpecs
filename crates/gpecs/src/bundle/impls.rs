@@ -1,30 +1,57 @@
-use crate::component::registry::{ComponentId, ComponentRegistry};
+use crate::{
+    component::{
+        registry::{ComponentId, ComponentRegistry},
+        Component,
+    },
+    soa::{
+        identity::Identity,
+        traits::impls::{count_idents, SoaTupleImplHelper},
+    },
+};
 
 use super::Bundle;
+
+#[allow(unsafe_code)]
+unsafe impl<T> Bundle for Identity<T>
+where
+    T: Component,
+{
+    type MaybeComponentIds = [Option<ComponentId>; 1];
+
+    fn get_components(components: &ComponentRegistry) -> Self::MaybeComponentIds {
+        [components.component_id::<T>()]
+    }
+
+    type ComponentIds = [ComponentId; 1];
+
+    fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds {
+        [components.register_component::<T>()]
+    }
+}
 
 macro_rules! bundle_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
         #[allow(unsafe_code)]
         unsafe impl<$($types,)*> Bundle for ($($types,)*)
         where
-            $($types: $crate::component::Component,)*
+            $($types: Component,)*
         {
-            type MaybeComponentIds = [Option<ComponentId>; $crate::soa::traits::impls::count_idents!($($types,)*)];
+            type MaybeComponentIds = [Option<ComponentId>; count_idents!($($types,)*)];
 
             #[inline]
             fn get_components(components: &ComponentRegistry) -> Self::MaybeComponentIds {
-                let permutation = $crate::soa::traits::impls::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.component_id::<$types>(),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
                 component_ids
             }
 
-            type ComponentIds = [ComponentId; $crate::soa::traits::impls::count_idents!($($types,)*)];
+            type ComponentIds = [ComponentId; count_idents!($($types,)*)];
 
             #[inline]
             fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds {
-                let permutation = $crate::soa::traits::impls::SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.register_component::<$types>(),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];

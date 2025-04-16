@@ -22,11 +22,95 @@ pub struct Identity<T>(pub T)
 where
     T: ?Sized;
 
+impl<T> Identity<T>
+where
+    T: ?Sized,
+{
+    #[inline]
+    pub fn as_inner(&self) -> &T {
+        self
+    }
+
+    #[inline]
+    pub fn as_inner_mut(&mut self) -> &mut T {
+        self
+    }
+}
+
 impl<T> Identity<T> {
     #[inline]
     pub fn into_inner(self) -> T {
         let Self(inner) = self;
         inner
+    }
+}
+
+pub trait IdentityPtr<T: ?Sized> {
+    fn as_inner_ptr(self) -> *const T;
+}
+
+impl<T> IdentityPtr<T> for *const Identity<T>
+where
+    T: ?Sized,
+{
+    #[inline]
+    fn as_inner_ptr(self) -> *const T {
+        self as _
+    }
+}
+
+pub trait IdentityMutPtr<T: ?Sized> {
+    fn as_inner_mut_ptr(self) -> *mut T;
+}
+
+impl<T> IdentityMutPtr<T> for *mut Identity<T>
+where
+    T: ?Sized,
+{
+    #[inline]
+    fn as_inner_mut_ptr(self) -> *mut T {
+        self as _
+    }
+}
+
+pub trait IdentitySlicePtr<T> {
+    fn as_inner_ptr(self) -> *const [T];
+}
+
+impl<T> IdentitySlicePtr<T> for *const [Identity<T>] {
+    #[inline]
+    fn as_inner_ptr(self) -> *const [T] {
+        self as _
+    }
+}
+
+pub trait IdentitySliceMutPtr<T> {
+    fn as_inner_mut_ptr(self) -> *mut [T];
+}
+
+impl<T> IdentitySliceMutPtr<T> for *mut [Identity<T>] {
+    #[inline]
+    fn as_inner_mut_ptr(self) -> *mut [T] {
+        self as _
+    }
+}
+
+pub trait IdentitySlice<T> {
+    fn as_inner(&self) -> &[T];
+    fn as_inner_mut(&mut self) -> &mut [T];
+}
+
+impl<T> IdentitySlice<T> for [Identity<T>] {
+    #[inline]
+    fn as_inner(&self) -> &[T] {
+        let inner = ptr::from_ref(self).as_inner_ptr();
+        unsafe { &*inner }
+    }
+
+    #[inline]
+    fn as_inner_mut(&mut self) -> &mut [T] {
+        let inner = ptr::from_mut(self).as_inner_mut_ptr();
+        unsafe { &mut *inner }
     }
 }
 

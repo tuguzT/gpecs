@@ -76,11 +76,11 @@ impl Executor for CpuExecutor<'_> {
             ref schedule,
         } = self;
 
-        for &system_id in schedule {
+        schedule.iter().for_each(|&system_id| {
             let Some(info) = systems.get_system_info_mut(system_id) else {
                 unreachable!("system {system_id:?} should be present");
             };
             info.system_mut().run(context)
-        }
+        });
     }
 }

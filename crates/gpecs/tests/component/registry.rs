@@ -4,25 +4,11 @@ use std::{
 };
 
 use gpecs::{
-    component::{
-        registry::{ComponentDescriptor, ComponentRegistry},
-        Component,
-    },
+    component::registry::{ComponentDescriptor, ComponentRegistry},
     soa::traits::FieldDescriptor,
 };
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Position {
-    x: f32,
-    y: f32,
-    z: f32,
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Mass(f32);
-
-impl Component for Position {}
-impl Component for Mass {}
+use crate::common::{Mass, Position};
 
 #[test]
 fn new() {

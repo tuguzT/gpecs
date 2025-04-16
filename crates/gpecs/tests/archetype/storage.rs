@@ -7,15 +7,12 @@ use gpecs::{
         storage::ArchetypeStorage,
     },
     bundle::Bundle,
-    component::{registry::ComponentRegistry, Component},
+    component::registry::ComponentRegistry,
     entity::registry::EntityRegistry,
     world::registry::WorldRegistry,
 };
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Tag;
-
-impl Component for Tag {}
+use crate::common::{Name, Position, Tag};
 
 #[test]
 fn storage_tag() {
@@ -55,21 +52,6 @@ fn storage_tag() {
     assert_eq!(value, Some((Tag,)));
     assert_eq!(storage.entities(), []);
 }
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Position {
-    x: f32,
-    y: f32,
-    z: f32,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct Name {
-    value: String,
-}
-
-impl Component for Position {}
-impl Component for Name {}
 
 #[test]
 fn storage_tuple() {

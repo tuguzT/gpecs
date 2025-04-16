@@ -1,3 +1,5 @@
+mod common;
+
 mod world {
     mod registry;
 }

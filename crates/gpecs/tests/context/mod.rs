@@ -2,24 +2,7 @@ use gpecs::{
     archetype::error::MissingComponentError, context::error::EntityNotFoundError, prelude::*,
 };
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Position {
-    x: f32,
-    y: f32,
-    z: f32,
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Mass {
-    value: u16,
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Tag;
-
-impl Component for Position {}
-impl Component for Mass {}
-impl Component for Tag {}
+use crate::common::{Mass, Position, Tag};
 
 #[test]
 fn empty() {

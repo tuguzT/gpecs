@@ -58,9 +58,9 @@ impl SystemRegistry {
     }
 
     #[inline]
-    pub fn register_system<S, I>(&mut self, system: S) -> SystemId
+    pub fn register_system<S, In>(&mut self, system: S) -> SystemId
     where
-        S: IntoSystem<I>,
+        S: IntoSystem<In>,
     {
         let Self { systems } = self;
 

@@ -47,9 +47,9 @@ impl<'c> CpuExecutor<'c> {
     }
 
     #[inline]
-    pub fn register_system<I, S>(&mut self, system: S) -> SystemId
+    pub fn register_system<In, S>(&mut self, system: S) -> SystemId
     where
-        S: IntoSystem<I>,
+        S: IntoSystem<In>,
     {
         let Self { systems, .. } = self;
         systems.register_system(system)

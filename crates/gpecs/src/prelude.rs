@@ -1,5 +1,5 @@
 pub use crate::{
-    archetype::registry::ArchetypeId,
+    archetype::registry::{ArchetypeId, Bundles, BundlesMut},
     bundle::Bundle,
     component::{registry::ComponentId, Component},
     context::Context,

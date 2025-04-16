@@ -1,21 +1,33 @@
 use std::{
     any,
+    borrow::Cow,
     fmt::{self, Debug},
     marker::PhantomData,
 };
 
-use crate::context::Context;
+use crate::{
+    archetype::registry::{Bundles, BundlesMut},
+    bundle::Bundle,
+    context::Context,
+};
 
-use super::{IntoSystem, System};
+use super::{IntoSystem, System, SystemParam};
 
-pub struct FnSystem<I, F> {
-    f: F,
-    phantom: PhantomData<fn() -> I>,
+pub struct FnSystem<In, Fn> {
+    f: Fn,
+    phantom: PhantomData<fn() -> In>,
 }
 
-impl<F> System for FnSystem<(), F>
+impl<In, Fn> FnSystem<In, Fn> {
+    #[inline]
+    pub fn fn_name() -> &'static str {
+        any::type_name::<Fn>()
+    }
+}
+
+impl<Fn> System for FnSystem<(), Fn>
 where
-    F: FnMut() + 'static,
+    Fn: FnMut() + 'static,
 {
     fn run(&mut self, _: &mut Context) {
         let Self { f, .. } = self;
@@ -23,16 +35,34 @@ where
     }
 
     #[inline]
-    fn name(&self) -> std::borrow::Cow<'static, str> {
-        any::type_name::<F>().into()
+    fn name(&self) -> Cow<'static, str> {
+        Self::fn_name().into()
     }
 }
 
-impl<F> IntoSystem<()> for F
+impl<In, Fn> System for FnSystem<(In,), Fn>
 where
-    F: FnMut() + 'static,
+    In: SystemParam + 'static,
+    Fn: FnMut(In::Item<'_>) + 'static,
 {
-    type System = FnSystem<(), F>;
+    fn run(&mut self, context: &mut Context) {
+        let Self { f, .. } = self;
+
+        let param = In::get_param(context);
+        f(param)
+    }
+
+    #[inline]
+    fn name(&self) -> Cow<'static, str> {
+        Self::fn_name().into()
+    }
+}
+
+impl<Fn> IntoSystem<()> for Fn
+where
+    Fn: FnMut() + 'static,
+{
+    type System = FnSystem<(), Fn>;
 
     #[inline]
     fn into_system(self) -> Self::System {
@@ -40,6 +70,64 @@ where
             f: self,
             phantom: PhantomData,
         }
+    }
+}
+
+impl<In, Fn> IntoSystem<In> for Fn
+where
+    In: SystemParam + 'static,
+    Fn: FnMut(In) + FnMut(In::Item<'_>) + 'static,
+{
+    type System = FnSystem<(In,), Fn>;
+
+    #[inline]
+    fn into_system(self) -> Self::System {
+        FnSystem {
+            f: self,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl SystemParam for &Context {
+    type Item<'context> = &'context Context;
+
+    #[inline]
+    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context> {
+        &*context
+    }
+}
+
+impl SystemParam for &mut Context {
+    type Item<'context> = &'context mut Context;
+
+    #[inline]
+    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context> {
+        context
+    }
+}
+
+impl<B> SystemParam for Bundles<'_, '_, B>
+where
+    B: Bundle,
+{
+    type Item<'context> = Bundles<'context, 'context, B>;
+
+    #[inline]
+    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context> {
+        context.bundles::<B>().unwrap() // TODO: error handling
+    }
+}
+
+impl<B> SystemParam for BundlesMut<'_, '_, B>
+where
+    B: Bundle,
+{
+    type Item<'context> = BundlesMut<'context, 'context, B>;
+
+    #[inline]
+    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context> {
+        context.bundles_mut::<B>().unwrap() // TODO: error handling
     }
 }
 

@@ -2,6 +2,7 @@ use std::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
+    iter::FusedIterator,
     num::Wrapping,
     ops::{Index, IndexMut},
 };
@@ -10,7 +11,12 @@ pub use error::TryReserveError;
 
 pub type TrySpawnError<Meta> = error::TryModifyError<Entity, Meta>;
 
-use gpecs_sparse::{arena::EpochSparseArena, error};
+use gpecs_sparse::{
+    arena::EpochSparseArena,
+    error,
+    iter::{Iter as SparseIter, IterMut as SparseIterMut},
+    soa::identity::IdentitySlice,
+};
 
 use crate::{soa::identity::Identity, world::registry::WorldId};
 
@@ -190,6 +196,22 @@ impl<Meta> EntityRegistry<Meta> {
         let Self { inner } = self;
         inner.clear()
     }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<Meta> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        Iter { inner }
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<Meta> {
+        let Self { inner } = self;
+
+        let inner = inner.iter_mut();
+        IterMut { inner }
+    }
 }
 
 impl<Meta> Debug for EntityRegistry<Meta>
@@ -296,6 +318,7 @@ impl<Meta> AsMut<Self> for EntityRegistry<Meta> {
 impl<Meta> Index<Entity> for EntityRegistry<Meta> {
     type Output = Meta;
 
+    #[inline]
     fn index(&self, index: Entity) -> &Self::Output {
         let Self { inner } = self;
         let Identity(meta) = inner.index(index);
@@ -304,9 +327,297 @@ impl<Meta> Index<Entity> for EntityRegistry<Meta> {
 }
 
 impl<Meta> IndexMut<Entity> for EntityRegistry<Meta> {
+    #[inline]
     fn index_mut(&mut self, index: Entity) -> &mut Self::Output {
         let Self { inner } = self;
         let Identity(meta) = inner.index_mut(index);
         meta
     }
 }
+
+impl<'a, Meta> IntoIterator for &'a EntityRegistry<Meta> {
+    type Item = (Entity, &'a Meta);
+    type IntoIter = Iter<'a, Meta>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, Meta> IntoIterator for &'a mut EntityRegistry<Meta> {
+    type Item = (Entity, &'a mut Meta);
+    type IntoIter = IterMut<'a, Meta>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+pub struct Iter<'a, Meta> {
+    inner: SparseIter<'a, Entity, Identity<Meta>>,
+}
+
+impl<'a, Meta> Iter<'a, Meta> {
+    #[inline]
+    pub fn entities(&self) -> &'a [Entity] {
+        let Self { inner } = self;
+        inner.as_keys_slice()
+    }
+
+    #[inline]
+    pub fn metas(&self) -> &'a [Meta] {
+        let Self { inner } = self;
+        inner.as_values_slice().as_inner()
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> (&'a [Entity], &'a [Meta]) {
+        let Self { inner } = self;
+
+        let (entities, metas) = inner.as_slices();
+        let metas = metas.as_inner();
+        (entities, metas)
+    }
+}
+
+impl<Meta> Debug for Iter<'_, Meta>
+where
+    Meta: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (entities, metas) = self.as_slices();
+        f.debug_struct("Iter")
+            .field("entities", &entities)
+            .field("metas", &metas)
+            .finish()
+    }
+}
+
+impl<Meta> Clone for Iter<'_, Meta> {
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self { inner } = self;
+
+        let inner = inner.clone();
+        Self { inner }
+    }
+}
+
+impl<Meta> AsRef<[Meta]> for Iter<'_, Meta> {
+    #[inline]
+    fn as_ref(&self) -> &[Meta] {
+        self.metas()
+    }
+}
+
+impl<'a, Meta> Iterator for Iter<'a, Meta> {
+    type Item = (Entity, &'a Meta);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next().map(|(&entity, Identity(meta))| (entity, meta))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { inner } = self;
+        inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        let Self { inner } = self;
+        inner.count()
+    }
+
+    #[inline]
+    fn last(self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.last().map(|(&entity, Identity(meta))| (entity, meta))
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth(n).map(|(&entity, Identity(meta))| (entity, meta))
+    }
+
+    #[inline]
+    fn for_each<F>(self, mut f: F)
+    where
+        F: FnMut(Self::Item),
+    {
+        let Self { inner } = self;
+        inner.for_each(|(&entity, Identity(meta))| f((entity, meta)))
+    }
+}
+
+impl<Meta> DoubleEndedIterator for Iter<'_, Meta> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner
+            .next_back()
+            .map(|(&entity, Identity(meta))| (entity, meta))
+    }
+
+    #[inline]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner
+            .nth_back(n)
+            .map(|(&entity, Identity(meta))| (entity, meta))
+    }
+}
+
+impl<Meta> ExactSizeIterator for Iter<'_, Meta> {
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+}
+
+impl<Meta> FusedIterator for Iter<'_, Meta> {}
+
+pub struct IterMut<'a, Meta> {
+    inner: SparseIterMut<'a, Entity, Identity<Meta>>,
+}
+
+impl<'a, Meta> IterMut<'a, Meta> {
+    #[inline]
+    pub fn into_entities(self) -> &'a [Entity] {
+        let Self { inner } = self;
+        inner.into_keys_slice()
+    }
+
+    #[inline]
+    pub fn entities(&self) -> &[Entity] {
+        let Self { inner } = self;
+        inner.as_keys_slice()
+    }
+
+    #[inline]
+    pub fn into_metas(self) -> &'a mut [Meta] {
+        let Self { inner } = self;
+        inner.into_values_slice().as_inner_mut()
+    }
+
+    #[inline]
+    pub fn metas(&self) -> &[Meta] {
+        let Self { inner } = self;
+        inner.as_values_slice().as_inner()
+    }
+
+    #[inline]
+    pub fn into_slices(self) -> (&'a [Entity], &'a mut [Meta]) {
+        let Self { inner } = self;
+
+        let (entities, metas) = inner.into_slices();
+        let metas = metas.as_inner_mut();
+        (entities, metas)
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> (&[Entity], &[Meta]) {
+        let Self { inner } = self;
+
+        let (entities, metas) = inner.as_slices();
+        let metas = metas.as_inner();
+        (entities, metas)
+    }
+}
+
+impl<Meta> Debug for IterMut<'_, Meta>
+where
+    Meta: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (entities, metas) = self.as_slices();
+        f.debug_struct("Iter")
+            .field("entities", &entities)
+            .field("metas", &metas)
+            .finish()
+    }
+}
+
+impl<Meta> AsRef<[Meta]> for IterMut<'_, Meta> {
+    #[inline]
+    fn as_ref(&self) -> &[Meta] {
+        self.metas()
+    }
+}
+
+impl<'a, Meta> Iterator for IterMut<'a, Meta> {
+    type Item = (Entity, &'a mut Meta);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next().map(|(&entity, Identity(meta))| (entity, meta))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { inner } = self;
+        inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        let Self { inner } = self;
+        inner.count()
+    }
+
+    #[inline]
+    fn last(self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.last().map(|(&entity, Identity(meta))| (entity, meta))
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth(n).map(|(&entity, Identity(meta))| (entity, meta))
+    }
+
+    #[inline]
+    fn for_each<F>(self, mut f: F)
+    where
+        F: FnMut(Self::Item),
+    {
+        let Self { inner } = self;
+        inner.for_each(|(&entity, Identity(meta))| f((entity, meta)))
+    }
+}
+
+impl<Meta> DoubleEndedIterator for IterMut<'_, Meta> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner
+            .next_back()
+            .map(|(&entity, Identity(meta))| (entity, meta))
+    }
+
+    #[inline]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner
+            .nth_back(n)
+            .map(|(&entity, Identity(meta))| (entity, meta))
+    }
+}
+
+impl<Meta> ExactSizeIterator for IterMut<'_, Meta> {
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+}
+
+impl<Meta> FusedIterator for IterMut<'_, Meta> {}

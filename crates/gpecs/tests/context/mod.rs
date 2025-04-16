@@ -145,3 +145,94 @@ fn one_entity() {
         .expect_err("entity should not exist");
     assert_eq!(error, EntityNotFoundError::new(entity).into());
 }
+
+#[test]
+fn many_entities() {
+    let mut context = Context::new();
+
+    for i in 0..12 {
+        let entity = context.spawn();
+        if i % 2 == 0 {
+            let x = i as f32;
+            let y = -(i as f32);
+            let z = 0.0;
+            context
+                .insert_bundle(entity, (Tag, Position { x, y, z }))
+                .expect("entity should exist & archetype of `Tag` and `Position` should be valid");
+        } else {
+            context
+                .insert_bundle(entity, (Mass { value: i }, Tag))
+                .expect("entity should exist & archetype of `Mass` and `Tag` should be valid");
+        }
+    }
+
+    let mut positions_count = 0;
+    let positions = context
+        .bundles_mut::<(Position,)>()
+        .expect("archetype of `Position` should exist");
+    for (entity, (position,)) in positions {
+        assert_eq!(entity.index() % 2, 0);
+        assert_eq!(position.x, entity.index() as f32);
+        assert_eq!(position.y, -(entity.index() as f32));
+        assert_eq!(position.z, 0.0);
+        positions_count += 1;
+    }
+    assert_eq!(positions_count, 6);
+
+    let mut masses_count = 0;
+    let masses = context
+        .bundles_mut::<(Mass,)>()
+        .expect("archetype of `Mass` should exist");
+    for (entity, (mass,)) in masses {
+        assert_eq!(entity.index() % 2, 1);
+        assert_eq!(mass.value, entity.index() as u16);
+        masses_count += 1;
+    }
+    assert_eq!(masses_count, 6);
+
+    let mut tags_count = 0;
+    let tags = context
+        .bundles_mut::<(Tag,)>()
+        .expect("archetype of `Tag` should exist");
+    for (_, (tag,)) in tags {
+        assert_eq!(tag, &Tag);
+        tags_count += 1;
+    }
+    assert_eq!(tags_count, 12);
+
+    let entities: Vec<_> = context
+        .entities()
+        .iter()
+        .map(|(entity, _)| entity)
+        .collect();
+    for entity in entities {
+        context
+            .remove_bundle::<(Tag,)>(entity)
+            .expect("entity should exist")
+    }
+
+    assert_eq!(
+        context
+            .bundles_mut::<(Position,)>()
+            .expect("archetype of `Position` should exist")
+            .into_iter()
+            .count(),
+        6,
+    );
+    assert_eq!(
+        context
+            .bundles_mut::<(Mass,)>()
+            .expect("archetype of `Mass` should exist")
+            .into_iter()
+            .count(),
+        6,
+    );
+    assert_eq!(
+        context
+            .bundles_mut::<(Tag,)>()
+            .expect("archetype of `Tag` should exist")
+            .into_iter()
+            .count(),
+        0,
+    );
+}

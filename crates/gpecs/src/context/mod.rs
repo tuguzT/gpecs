@@ -288,7 +288,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn bundles<B>(&self) -> Result<Bundles<'_, '_, B>, GetComponentsError>
+    pub fn bundles<B>(&self) -> Result<Bundles<B>, GetComponentsError>
     where
         B: Bundle,
     {
@@ -301,7 +301,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn bundles_mut<B>(&mut self) -> Result<BundlesMut<'_, '_, B>, GetComponentsError>
+    pub fn bundles_mut<B>(&mut self) -> Result<BundlesMut<B>, GetComponentsError>
     where
         B: Bundle,
     {

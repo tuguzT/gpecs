@@ -556,7 +556,7 @@ impl ArchetypeStorage {
             ref component_ids,
             erased_storage,
         } = self;
-        let Some(mut erased_fields) = erased_storage.remove(entity.into()) else {
+        let Some(mut erased_fields) = erased_storage.swap_remove(entity.into()) else {
             return false;
         };
 
@@ -842,7 +842,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
-        let value = ErasedStorage::remove(self, entity.into())?;
+        let value = ErasedStorage::swap_remove(self, entity.into())?;
 
         let component_ids = component_ids.keys().copied();
         let context = self.context();

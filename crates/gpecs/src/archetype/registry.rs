@@ -1495,7 +1495,9 @@ impl FusedIterator for CompatibleArchetypesMut<'_> {}
 #[inline]
 fn compatible_archetypes_predicate(info: &ArchetypeInfo, component_ids: &[ComponentId]) -> bool {
     let component_ids = component_ids.iter().copied();
-    info.storage().bundle_compatibility(component_ids).is_ok()
+    info.storage()
+        .components_compatibility(component_ids)
+        .is_ok()
 }
 
 pub struct Bundles<'a, 'c, B>

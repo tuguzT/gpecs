@@ -146,7 +146,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn bundle_compatibility_of<B>(
+    pub fn bundle_compatibility<B>(
         &self,
         components: &ComponentRegistry,
     ) -> Result<(), IncompatibleBundleError>
@@ -155,20 +155,23 @@ impl ArchetypeStorage {
     {
         let component_ids = B::get_components(components);
         let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
-        self.bundle_compatibility_inner(component_ids)
+        self.components_compatibility_inner(component_ids)
     }
 
     #[inline]
-    pub fn bundle_compatibility<I>(&self, component_ids: I) -> Result<(), IncompatibleBundleError>
+    pub fn components_compatibility<I>(
+        &self,
+        component_ids: I,
+    ) -> Result<(), IncompatibleBundleError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
         let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?;
-        self.bundle_compatibility_inner(component_ids)
+        self.components_compatibility_inner(component_ids)
     }
 
     #[inline]
-    pub fn bundle_compatibility_of_exact<B>(
+    pub fn bundle_compatibility_exact<B>(
         &self,
         components: &ComponentRegistry,
     ) -> Result<(), IncompatibleBundleExactError>
@@ -177,11 +180,11 @@ impl ArchetypeStorage {
     {
         let component_ids = B::get_components(components);
         let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
-        self.bundle_compatibility_exact_inner(component_ids)
+        self.components_compatibility_exact_inner(component_ids)
     }
 
     #[inline]
-    pub fn bundle_compatibility_exact<I>(
+    pub fn components_compatibility_exact<I>(
         &self,
         component_ids: I,
     ) -> Result<(), IncompatibleBundleExactError>
@@ -189,11 +192,11 @@ impl ArchetypeStorage {
         I: IntoIterator<Item = ComponentId>,
     {
         let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?;
-        self.bundle_compatibility_exact_inner(component_ids)
+        self.components_compatibility_exact_inner(component_ids)
     }
 
     #[inline]
-    fn bundle_compatibility_inner<I>(
+    fn components_compatibility_inner<I>(
         &self,
         bundle_component_ids: I,
     ) -> Result<(), IncompatibleBundleError>
@@ -213,7 +216,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    fn bundle_compatibility_exact_inner<I>(
+    fn components_compatibility_exact_inner<I>(
         &self,
         bundle_component_ids: I,
     ) -> Result<(), IncompatibleBundleExactError>
@@ -226,7 +229,7 @@ impl ArchetypeStorage {
         let mut bundle_component_ids = bundle_component_ids
             .into_iter()
             .inspect(|_| bundle_component_ids_count += 1);
-        self.bundle_compatibility_inner(bundle_component_ids.by_ref())?;
+        self.components_compatibility_inner(bundle_component_ids.by_ref())?;
 
         bundle_component_ids.for_each(drop);
         if bundle_component_ids_count != component_ids.len() {
@@ -367,7 +370,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of::<B>(components)?;
+        self.bundle_compatibility::<B>(components)?;
 
         let Self {
             component_ids,
@@ -396,7 +399,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of::<B>(components)?;
+        self.bundle_compatibility::<B>(components)?;
 
         let Self {
             ref component_ids,
@@ -426,7 +429,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of::<B>(components)?;
+        self.bundle_compatibility::<B>(components)?;
 
         let Self {
             ref component_ids,
@@ -457,7 +460,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of::<B>(components)?;
+        self.bundle_compatibility::<B>(components)?;
 
         let Self {
             ref component_ids,
@@ -490,7 +493,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        if let Err(reason) = self.bundle_compatibility_of_exact::<B>(components) {
+        if let Err(reason) = self.bundle_compatibility_exact::<B>(components) {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
@@ -527,7 +530,7 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.bundle_compatibility_of_exact::<B>(components)?;
+        self.bundle_compatibility_exact::<B>(components)?;
 
         let Self {
             ref component_ids,

@@ -1,17 +1,21 @@
 use std::{
     any,
     borrow::Cow,
+    convert::Infallible,
     fmt::{self, Debug},
     marker::PhantomData,
 };
 
 use crate::{
-    archetype::registry::{Bundles, BundlesMut},
+    archetype::{
+        error::GetComponentsError,
+        registry::{Bundles, BundlesMut},
+    },
     bundle::Bundle,
     context::Context,
 };
 
-use super::{IntoSystem, System, SystemParam};
+use super::{IntoSystem, System, SystemParam, SystemParamResult};
 
 pub struct FnSystem<In, Fn> {
     f: Fn,
@@ -48,7 +52,10 @@ where
     fn run(&mut self, context: &mut Context) {
         let Self { f, .. } = self;
 
-        let param = In::get_param(context);
+        let Ok(param) = In::get_param(context) else {
+            let name = self.name();
+            panic!(r#"failed to retrieve system "{name}" parameter"#)
+        };
         f(param)
     }
 
@@ -91,19 +98,21 @@ where
 
 impl SystemParam for &Context {
     type Item<'context> = &'context Context;
+    type Error<'context> = Infallible;
 
     #[inline]
-    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context> {
-        &*context
+    fn get_param(context: &mut Context) -> SystemParamResult<Self> {
+        Ok(&*context)
     }
 }
 
 impl SystemParam for &mut Context {
     type Item<'context> = &'context mut Context;
+    type Error<'context> = Infallible;
 
     #[inline]
-    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context> {
-        context
+    fn get_param(context: &mut Context) -> SystemParamResult<Self> {
+        Ok(context)
     }
 }
 
@@ -112,10 +121,11 @@ where
     B: Bundle,
 {
     type Item<'context> = Bundles<'context, 'context, B>;
+    type Error<'context> = GetComponentsError;
 
     #[inline]
-    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context> {
-        context.bundles::<B>().unwrap() // TODO: error handling
+    fn get_param(context: &mut Context) -> SystemParamResult<Self> {
+        context.bundles::<B>()
     }
 }
 
@@ -124,10 +134,11 @@ where
     B: Bundle,
 {
     type Item<'context> = BundlesMut<'context, 'context, B>;
+    type Error<'context> = GetComponentsError;
 
     #[inline]
-    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context> {
-        context.bundles_mut::<B>().unwrap() // TODO: error handling
+    fn get_param(context: &mut Context) -> SystemParamResult<Self> {
+        context.bundles_mut::<B>()
     }
 }
 

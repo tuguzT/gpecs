@@ -21,8 +21,12 @@ pub trait IntoSystem<In>: Sized {
     fn into_system(self) -> Self::System;
 }
 
+pub type SystemParamResult<'context, T> =
+    Result<<T as SystemParam>::Item<'context>, <T as SystemParam>::Error<'context>>;
+
 pub trait SystemParam: Sized {
     type Item<'context>: SystemParam;
+    type Error<'context>;
 
-    fn get_param<'context>(context: &'context mut Context) -> Self::Item<'context>;
+    fn get_param(context: &mut Context) -> SystemParamResult<Self>;
 }

@@ -6,6 +6,4 @@ fn execute_simple() {
     let mut executor = GpuExecutor::new(&mut context);
 
     executor.execute();
-
-    let _context = pollster::block_on(executor.into_context());
 }

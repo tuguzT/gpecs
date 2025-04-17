@@ -1,8 +1,12 @@
-use crate::context::Context;
+use crate::{archetype::error::DuplicateComponentError, context::Context};
 
-use self::component::{
-    registry::{GpuComponentId, GpuComponentRegistry},
-    GpuComponent,
+use self::{
+    archetype::registry::{GpuArchetypeId, GpuArchetypeRegistry},
+    bundle::GpuBundle,
+    component::{
+        registry::{GpuComponentId, GpuComponentRegistry},
+        GpuComponent,
+    },
 };
 
 use super::Executor;
@@ -15,7 +19,8 @@ pub mod component;
 pub struct GpuExecutor<'context> {
     context: &'context mut Context,
     components: GpuComponentRegistry,
-    // then add some struct with data on GPU
+    archetypes: GpuArchetypeRegistry,
+    // TODO: add some struct with GPU shaders and their schedule
 }
 
 impl<'context> GpuExecutor<'context> {
@@ -24,6 +29,7 @@ impl<'context> GpuExecutor<'context> {
         Self {
             context,
             components: GpuComponentRegistry::new(),
+            archetypes: GpuArchetypeRegistry::new(),
         }
     }
 
@@ -34,17 +40,13 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    pub async fn context_mut(&mut self) -> &mut Context {
-        self.sync().await;
-
+    pub fn context_mut(&mut self) -> &mut Context {
         let Self { context, .. } = self;
         context
     }
 
     #[inline]
-    pub async fn into_context(mut self) -> &'context mut Context {
-        self.sync().await;
-
+    pub fn into_context(self) -> &'context mut Context {
         let Self { context, .. } = self;
         context
     }
@@ -64,8 +66,36 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    pub async fn sync(&mut self) {
-        eprintln!("map buffers from GPU to the CPU")
+    pub fn register_archetype<B>(&mut self) -> Result<GpuArchetypeId, DuplicateComponentError>
+    where
+        B: GpuBundle,
+    {
+        let Self {
+            context,
+            components: gpu_components,
+            archetypes: gpu_archetypes,
+            ..
+        } = self;
+        #[allow(unsafe_code)]
+        let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
+
+        gpu_archetypes.register_archetype::<B>(archetypes, components, gpu_components)
+    }
+
+    #[inline]
+    pub fn map_async<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut Context),
+    {
+        eprintln!("map buffers from GPU to the CPU");
+
+        let Self { context, .. } = self;
+        f(context);
+    }
+
+    #[inline]
+    pub fn unmap(&mut self) {
+        eprintln!("unmap buffers from CPU to the GPU");
     }
 }
 

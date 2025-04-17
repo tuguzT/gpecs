@@ -46,6 +46,7 @@ impl From<GpuArchetypeId> for ArchetypeId {
 }
 
 #[derive(Debug)]
+// TODO: store GPU buffer here
 struct GpuBuffer;
 
 #[derive(Debug, Default)]

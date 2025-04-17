@@ -15,12 +15,24 @@ use super::Component;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
-pub struct ComponentId(usize);
+pub struct ComponentId(u32);
 
 impl ComponentId {
     #[inline]
-    pub const fn index(&self) -> usize {
+    pub fn index(&self) -> usize {
         let Self(id) = *self;
+        id.try_into().expect("ComponentId overflow")
+    }
+
+    #[inline]
+    fn from_index(index: usize) -> Self {
+        let id = index.try_into().expect("ComponentId overflow");
+        Self(id)
+    }
+
+    #[inline]
+    pub const fn into_inner(self) -> u32 {
+        let Self(id) = self;
         id
     }
 }
@@ -177,9 +189,12 @@ impl ComponentRegistry {
         components: &mut Vec<ComponentInfo>,
         descriptor: ComponentDescriptor,
     ) -> ComponentId {
-        let id = ComponentId(components.len());
+        let index = components.len();
+        let id = ComponentId::from_index(index);
+
         let info = ComponentInfo { id, descriptor };
         components.push(info);
+
         id
     }
 
@@ -221,13 +236,14 @@ impl ComponentRegistry {
     #[inline]
     pub fn component_ids(&self) -> ComponentIds {
         let len = self.len();
+        let len = ComponentId::from_index(len).into_inner();
         ComponentIds { inner: 0..len }
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ComponentIds {
-    inner: Range<usize>,
+    inner: Range<u32>,
 }
 
 impl ComponentIds {

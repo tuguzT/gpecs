@@ -41,12 +41,24 @@ use super::{
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
-pub struct ArchetypeId(usize);
+pub struct ArchetypeId(u32);
 
 impl ArchetypeId {
     #[inline]
-    pub const fn index(&self) -> usize {
+    pub fn index(&self) -> usize {
         let Self(id) = *self;
+        id.try_into().expect("ArchetypeId overflow")
+    }
+
+    #[inline]
+    fn from_index(index: usize) -> Self {
+        let id = index.try_into().expect("ArchetypeId overflow");
+        Self(id)
+    }
+
+    #[inline]
+    pub const fn into_inner(self) -> u32 {
+        let Self(id) = self;
         id
     }
 }
@@ -281,7 +293,8 @@ impl ArchetypeRegistry {
         key: ArchetypeKey,
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
-        let id = ArchetypeId(archetypes.len());
+        let index = archetypes.len();
+        let id = ArchetypeId::from_index(index);
 
         let info = ArchetypeInfo { id, storage };
         if let Some(_) = archetypes.insert(key, info) {
@@ -368,12 +381,13 @@ impl ArchetypeRegistry {
     #[inline]
     fn find_archetype(archetypes: &Archetypes, key: &ArchetypeKey) -> Option<ArchetypeId> {
         let (index, _, _) = archetypes.get_full(key)?;
-        Some(ArchetypeId(index))
+        Some(ArchetypeId::from_index(index))
     }
 
     #[inline]
     pub fn archetype_ids(&self) -> ArchetypeIds {
         let len = self.len();
+        let len = ArchetypeId::from_index(len).into_inner();
         ArchetypeIds { inner: 0..len }
     }
 
@@ -989,7 +1003,7 @@ impl ArchetypeRegistry {
         archetypes
             .values()
             .position(|info| info.storage().contains(entity))
-            .map(ArchetypeId)
+            .map(ArchetypeId::from_index)
     }
 
     #[inline]
@@ -1073,7 +1087,7 @@ impl ArchetypeRegistry {
         graph
             .edges_directed(archetype_id.index().into(), Direction::Incoming)
             .find(|edge| *edge.weight() == component_id)
-            .map(|edge| ArchetypeId(edge.source().index()))
+            .map(|edge| ArchetypeId::from_index(edge.source().index()))
     }
 
     #[inline]
@@ -1085,7 +1099,7 @@ impl ArchetypeRegistry {
         graph
             .edges_directed(archetype_id.index().into(), Direction::Outgoing)
             .find(|edge| *edge.weight() == component_id)
-            .map(|edge| ArchetypeId(edge.target().index()))
+            .map(|edge| ArchetypeId::from_index(edge.target().index()))
     }
 }
 
@@ -1099,7 +1113,7 @@ impl Debug for ArchetypeRegistry {
             DotConfig::RankDir(RankDir::LR),
         ];
         let node_attrs = |_, (index, _): (NodeIndex<_>, _)| {
-            let archetype_id = ArchetypeId(index.index());
+            let archetype_id = ArchetypeId::from_index(index.index());
             let Some((_, info)) = archetypes.get_index(index.index()) else {
                 unreachable!("archetype {archetype_id:?} should exist")
             };
@@ -1121,7 +1135,7 @@ impl Debug for ArchetypeRegistry {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ArchetypeIds {
-    inner: Range<usize>,
+    inner: Range<u32>,
 }
 
 impl ArchetypeIds {

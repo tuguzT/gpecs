@@ -14,7 +14,7 @@ gpecs_soa = { path = "../crates/gpecs_soa", default-features = false }
 gpecs_spirv_analysis = { path = "../crates/gpecs_spirv_analysis" }
 spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "175c175c" }
 spirv-builder = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "175c175c", default-features = false }
-rspirv = { git = "https://github.com/gfx-rs/rspirv", rev = "267882d4" }
+rspirv = { version = "0.12" }
 unroll = { version = "0.1.5" }
 static_assertions = { version = "1.1.0" }
 

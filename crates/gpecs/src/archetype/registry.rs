@@ -142,7 +142,7 @@ impl ArchetypeInfo {
 
 type ArchetypeKey = BTreeSet<ComponentId>;
 type Archetypes = IndexMap<ArchetypeKey, ArchetypeInfo>;
-type Graph = DiGraph<(), ComponentId, usize>;
+type Graph = DiGraph<(), ComponentId, u32>;
 
 #[derive(Default)]
 pub struct ArchetypeRegistry {
@@ -228,8 +228,8 @@ impl ArchetypeRegistry {
         };
 
         for (archetype_from, component_id) in before {
-            let archetype_from = archetype_from.index().into();
-            let archetype_to = archetype_to.index().into();
+            let archetype_from = archetype_from.into_inner().into();
+            let archetype_to = archetype_to.into_inner().into();
             let _ = graph.update_edge(archetype_from, archetype_to, component_id);
         }
         archetype_to
@@ -1085,7 +1085,7 @@ impl ArchetypeRegistry {
         component_id: ComponentId,
     ) -> Option<ArchetypeId> {
         graph
-            .edges_directed(archetype_id.index().into(), Direction::Incoming)
+            .edges_directed(archetype_id.into_inner().into(), Direction::Incoming)
             .find(|edge| *edge.weight() == component_id)
             .map(|edge| ArchetypeId::from_index(edge.source().index()))
     }
@@ -1097,7 +1097,7 @@ impl ArchetypeRegistry {
         component_id: ComponentId,
     ) -> Option<ArchetypeId> {
         graph
-            .edges_directed(archetype_id.index().into(), Direction::Outgoing)
+            .edges_directed(archetype_id.into_inner().into(), Direction::Outgoing)
             .find(|edge| *edge.weight() == component_id)
             .map(|edge| ArchetypeId::from_index(edge.target().index()))
     }

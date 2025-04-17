@@ -49,16 +49,18 @@ impl From<GpuArchetypeId> for ArchetypeId {
 // TODO: store GPU buffer here
 struct GpuBuffer;
 
+type GpuArchetypes = EpochSparseSet<u32, Identity<GpuBuffer>>;
+
 #[derive(Debug, Default)]
 pub struct GpuArchetypeRegistry {
-    archetypes: EpochSparseSet<u32, Identity<GpuBuffer>>,
+    gpu_archetypes: GpuArchetypes,
 }
 
 impl GpuArchetypeRegistry {
     #[inline]
     pub fn new() -> Self {
         Self {
-            archetypes: EpochSparseSet::new(),
+            gpu_archetypes: GpuArchetypes::new(),
         }
     }
 
@@ -73,16 +75,11 @@ impl GpuArchetypeRegistry {
         B: GpuBundle,
     {
         let _components = B::register_gpu_components(components, gpu_components);
-        let id = archetypes.register_archetype::<B>(components)?;
-        let id = GpuArchetypeId(id);
+        let archetype_id = archetypes.register_archetype::<B>(components)?;
 
-        let Self { archetypes } = self;
-        archetypes
-            .entry(id.into_inner())
-            .or_insert_with(|| GpuBuffer.into());
-        // TODO: create GPU buffers for all the children of this archetype
-
-        Ok(id)
+        let Self { gpu_archetypes, .. } = self;
+        let archetype_id = Self::register(gpu_archetypes, archetypes, archetype_id);
+        Ok(archetype_id)
     }
 
     #[inline]
@@ -96,34 +93,49 @@ impl GpuArchetypeRegistry {
         I: IntoIterator<Item = GpuComponentId>,
     {
         let component_ids = component_ids.into_iter().map(ComponentId::from);
-        let id = archetypes.register_archetype_from(components, component_ids)?;
-        let id = GpuArchetypeId(id);
+        let archetype_id = archetypes.register_archetype_from(components, component_ids)?;
 
-        let Self { archetypes } = self;
+        let Self { gpu_archetypes, .. } = self;
+        let archetype_id = Self::register(gpu_archetypes, archetypes, archetype_id);
+        Ok(archetype_id)
+    }
+
+    #[inline]
+    fn register(
+        gpu_archetypes: &mut GpuArchetypes,
+        archetypes: &ArchetypeRegistry,
+        archetype_id: ArchetypeId,
+    ) -> GpuArchetypeId {
+        let gpu_archetype_id = GpuArchetypeId(archetype_id);
+
         archetypes
-            .entry(id.into_inner())
-            .or_insert_with(|| GpuBuffer.into());
-        // TODO: create GPU buffers for all the children of this archetype
+            .archetypes_before_inclusive(archetype_id)
+            .for_each(|info| {
+                let archetype_id = info.id();
+                gpu_archetypes
+                    .entry(archetype_id.into_inner())
+                    .or_insert_with(|| GpuBuffer.into());
+            });
 
-        Ok(id)
+        gpu_archetype_id
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { archetypes } = self;
-        archetypes.len()
+        let Self { gpu_archetypes } = self;
+        gpu_archetypes.len()
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        let Self { archetypes } = self;
-        archetypes.is_empty()
+        let Self { gpu_archetypes } = self;
+        gpu_archetypes.is_empty()
     }
 
     #[inline]
     pub fn contains(&self, id: ArchetypeId) -> bool {
-        let Self { archetypes } = self;
-        archetypes.contains_key(id.into_inner())
+        let Self { gpu_archetypes } = self;
+        gpu_archetypes.contains_key(id.into_inner())
     }
 
     #[inline]
@@ -133,13 +145,13 @@ impl GpuArchetypeRegistry {
 
     #[inline]
     pub fn archetype_ids(&self) -> GpuArchetypeIds {
-        let Self { archetypes } = self;
+        let Self { gpu_archetypes } = self;
 
         // SAFETY: `GpuArchetypeId` is a #[repr(transparent)] struct around `ArchetypeId`,
         // which is #[repr(transparent)] around `u32`.
         #[allow(unsafe_code)]
         let archetype_ids = unsafe {
-            let slice = archetypes.as_keys_slice();
+            let slice = gpu_archetypes.as_keys_slice();
             &*(ptr::from_ref(slice) as *const [GpuArchetypeId])
         };
         let inner = archetype_ids.iter();

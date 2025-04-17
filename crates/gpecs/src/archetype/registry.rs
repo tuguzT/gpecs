@@ -14,7 +14,7 @@ use itertools::Itertools;
 use petgraph::{
     dot::{Config as DotConfig, Dot, RankDir},
     graph::{DiGraph, EdgeReference, NodeIndex},
-    visit::{Bfs, EdgeRef, Reversed, Walker},
+    visit::{Bfs, EdgeRef, Reversed, Visitable, Walker, WalkerIter},
     Direction,
 };
 
@@ -392,49 +392,27 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn archetypes_before(&self, id: ArchetypeId) -> impl Iterator<Item = &ArchetypeInfo> + '_ {
-        let Self {
-            archetypes,
-            ref graph,
-        } = self;
-
-        Bfs::new(graph, id.into_inner().into())
-            .iter(Reversed(graph))
-            .filter_map(move |index| {
-                let index = index.index();
-                let archetype_id = ArchetypeId::from_index(index);
-                if archetype_id == id {
-                    return None;
-                }
-
-                let Some(info) = Self::get_info(archetypes, archetype_id) else {
-                    unreachable!("archetype {archetype_id:?} should exist")
-                };
-                Some(info)
-            })
+    pub fn archetypes_before(&self, id: ArchetypeId) -> ArchetypesBefore {
+        let Self { archetypes, graph } = self;
+        ArchetypesBefore::new(archetypes, graph, id, true)
     }
 
     #[inline]
-    pub fn archetypes_after(&self, id: ArchetypeId) -> impl Iterator<Item = &ArchetypeInfo> + '_ {
-        let Self {
-            archetypes,
-            ref graph,
-        } = self;
+    pub fn archetypes_before_inclusive(&self, id: ArchetypeId) -> ArchetypesBefore {
+        let Self { archetypes, graph } = self;
+        ArchetypesBefore::new(archetypes, graph, id, false)
+    }
 
-        Bfs::new(graph, id.into_inner().into())
-            .iter(graph)
-            .filter_map(move |index| {
-                let index = index.index();
-                let archetype_id = ArchetypeId::from_index(index);
-                if archetype_id == id {
-                    return None;
-                }
+    #[inline]
+    pub fn archetypes_after(&self, id: ArchetypeId) -> ArchetypesAfter {
+        let Self { archetypes, graph } = self;
+        ArchetypesAfter::new(archetypes, graph, id, true)
+    }
 
-                let Some(info) = Self::get_info(archetypes, archetype_id) else {
-                    unreachable!("archetype {archetype_id:?} should exist")
-                };
-                Some(info)
-            })
+    #[inline]
+    pub fn archetypes_after_inclusive(&self, id: ArchetypeId) -> ArchetypesAfter {
+        let Self { archetypes, graph } = self;
+        ArchetypesAfter::new(archetypes, graph, id, false)
     }
 
     #[inline]
@@ -1153,30 +1131,39 @@ impl Debug for ArchetypeRegistry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { archetypes, graph } = self;
 
-        let config = [
-            DotConfig::NodeNoLabel,
-            DotConfig::EdgeNoLabel,
-            DotConfig::RankDir(RankDir::LR),
-        ];
-        let node_attrs = |_, (index, _): (NodeIndex<_>, _)| {
-            let archetype_id = ArchetypeId::from_index(index.index());
-            let Some((_, info)) = archetypes.get_index(index.index()) else {
-                unreachable!("archetype {archetype_id:?} should exist")
-            };
-            let component_ids = info.storage().component_ids();
-            format!(r#"shape=box label="{archetype_id:?}\n{component_ids:?}" "#)
-        };
-        let edge_attrs = |_, edge: EdgeReference<'_, _, _>| {
-            let component_id = edge.weight();
-            format!(r#"label="{component_id:?}" "#)
-        };
-        let graph = &Dot::with_attr_getters(graph, &config, &edge_attrs, &node_attrs);
-
-        f.debug_struct("ArchetypeRegistry")
-            .field("archetypes", archetypes)
-            .field("graph", graph)
-            .finish()
+        graph_dot_scoped(archetypes, graph, |graph| {
+            f.debug_struct("ArchetypeRegistry")
+                .field("archetypes", archetypes)
+                .field("graph", graph)
+                .finish()
+        })
     }
+}
+
+#[inline]
+fn graph_dot_scoped<F, O>(archetypes: &Archetypes, graph: &Graph, f: F) -> O
+where
+    F: FnOnce(&Dot<&Graph>) -> O,
+{
+    let config = [
+        DotConfig::NodeNoLabel,
+        DotConfig::EdgeNoLabel,
+        DotConfig::RankDir(RankDir::LR),
+    ];
+    let node_attrs = |_, (index, _): (NodeIndex<_>, _)| {
+        let archetype_id = ArchetypeId::from_index(index.index());
+        let Some((_, info)) = archetypes.get_index(index.index()) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+        let component_ids = info.storage().component_ids();
+        format!(r#"shape=box label="{archetype_id:?}\n{component_ids:?}" "#)
+    };
+    let edge_attrs = |_, edge: EdgeReference<'_, _, _>| {
+        let component_id = edge.weight();
+        format!(r#"label="{component_id:?}" "#)
+    };
+    let dot = Dot::with_attr_getters(graph, &config, &edge_attrs, &node_attrs);
+    f(&dot)
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -1283,6 +1270,195 @@ impl ExactSizeIterator for ArchetypeIds {
 }
 
 impl FusedIterator for ArchetypeIds {}
+
+#[derive(Clone)]
+pub struct ArchetypesBefore<'a> {
+    archetypes: &'a Archetypes,
+    walker: WalkerIter<Bfs<NodeIndex<u32>, <Graph as Visitable>::Map>, Reversed<&'a Graph>>,
+    archetype_id: ArchetypeId,
+    exclusive: bool,
+}
+
+impl<'a> ArchetypesBefore<'a> {
+    #[inline]
+    fn new(
+        archetypes: &'a Archetypes,
+        graph: &'a Graph,
+        archetype_id: ArchetypeId,
+        exclusive: bool,
+    ) -> Self {
+        let start = archetype_id.into_inner().into();
+        let graph = Reversed(graph);
+        let walker = Bfs::new(graph, start).iter(graph);
+        Self {
+            archetypes,
+            walker,
+            archetype_id,
+            exclusive,
+        }
+    }
+
+    #[inline]
+    pub fn is_inclusive(&self) -> bool {
+        let Self { exclusive, .. } = self;
+        !exclusive
+    }
+}
+
+impl Debug for ArchetypesBefore<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            archetypes,
+            walker,
+            archetype_id,
+            exclusive,
+        } = self;
+
+        let graph = walker.context().0;
+        let inclusive = &!exclusive;
+        graph_dot_scoped(archetypes, graph, |graph| {
+            f.debug_struct("ArchetypesBefore")
+                .field("archetypes", archetypes)
+                .field("graph", graph)
+                .field("archetype_id", archetype_id)
+                .field("inclusive", inclusive)
+                .finish()
+        })
+    }
+}
+
+impl<'a> Iterator for ArchetypesBefore<'a> {
+    type Item = &'a ArchetypeInfo;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref mut walker,
+            archetypes,
+            archetype_id,
+            exclusive,
+        } = *self;
+
+        let index = if exclusive {
+            walker.find(|index| index.index() != archetype_id.index())
+        } else {
+            walker.next()
+        }?;
+
+        let archetype_id = ArchetypeId::from_index(index.index());
+        let Some(info) = ArchetypeRegistry::get_info(archetypes, archetype_id) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+        Some(info)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self {
+            archetypes,
+            exclusive,
+            ..
+        } = *self;
+
+        let skip_count = exclusive as usize;
+        let upper = archetypes.len().saturating_sub(skip_count);
+        (0, Some(upper))
+    }
+}
+
+#[derive(Clone)]
+pub struct ArchetypesAfter<'a> {
+    archetypes: &'a Archetypes,
+    walker: WalkerIter<Bfs<NodeIndex<u32>, <Graph as Visitable>::Map>, &'a Graph>,
+    archetype_id: ArchetypeId,
+    exclusive: bool,
+}
+
+impl<'a> ArchetypesAfter<'a> {
+    #[inline]
+    fn new(
+        archetypes: &'a Archetypes,
+        graph: &'a Graph,
+        archetype_id: ArchetypeId,
+        exclusive: bool,
+    ) -> Self {
+        let start = archetype_id.into_inner().into();
+        let walker = Bfs::new(graph, start).iter(graph);
+        Self {
+            archetypes,
+            walker,
+            archetype_id,
+            exclusive,
+        }
+    }
+
+    #[inline]
+    pub fn is_inclusive(&self) -> bool {
+        let Self { exclusive, .. } = self;
+        !exclusive
+    }
+}
+
+impl Debug for ArchetypesAfter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            archetypes,
+            walker,
+            archetype_id,
+            exclusive,
+        } = self;
+
+        let graph = walker.context();
+        let inclusive = &!exclusive;
+        graph_dot_scoped(archetypes, graph, |graph| {
+            f.debug_struct("ArchetypesBefore")
+                .field("archetypes", archetypes)
+                .field("graph", graph)
+                .field("archetype_id", archetype_id)
+                .field("inclusive", inclusive)
+                .finish()
+        })
+    }
+}
+
+impl<'a> Iterator for ArchetypesAfter<'a> {
+    type Item = &'a ArchetypeInfo;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref mut walker,
+            archetypes,
+            archetype_id,
+            exclusive,
+        } = *self;
+
+        let index = if exclusive {
+            walker.find(|index| index.index() != archetype_id.index())
+        } else {
+            walker.next()
+        }?;
+
+        let archetype_id = ArchetypeId::from_index(index.index());
+        let Some(info) = ArchetypeRegistry::get_info(archetypes, archetype_id) else {
+            unreachable!("archetype {archetype_id:?} should exist")
+        };
+        Some(info)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self {
+            archetypes,
+            exclusive,
+            ..
+        } = *self;
+
+        let skip_count = exclusive as usize;
+        let upper = archetypes.len().saturating_sub(skip_count);
+        (0, Some(upper))
+    }
+}
 
 #[derive(Clone)]
 pub struct CompatibleArchetypes<'a> {

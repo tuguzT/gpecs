@@ -192,9 +192,9 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_component_info(&self, id: ComponentId) -> Option<&ComponentInfo> {
+    pub fn get_component_info(&self, component_id: ComponentId) -> Option<&ComponentInfo> {
         let Self { components, .. } = self;
-        components.get_component_info(id)
+        components.get_component_info(component_id)
     }
 
     #[inline]

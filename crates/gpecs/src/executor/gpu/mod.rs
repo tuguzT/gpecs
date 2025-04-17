@@ -7,6 +7,7 @@ use self::component::{
 
 use super::Executor;
 
+pub mod archetype;
 pub mod bundle;
 pub mod component;
 

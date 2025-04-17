@@ -3,11 +3,10 @@ use std::{
     borrow::Cow,
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::transmute,
     ptr,
 };
 
-use gpecs_sparse::{iter::Keys, set::EpochSparseSet};
+use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
     component::registry::{ComponentDescriptor, ComponentId, ComponentRegistry},
@@ -25,14 +24,6 @@ impl GpuComponentId {
     pub fn index(&self) -> usize {
         let Self(id) = *self;
         id.index()
-    }
-
-    #[inline]
-    #[allow(unsafe_code)]
-    fn from_inner(id: u32) -> Self {
-        // SAFETY: `GpuComponentId` is a #[repr(transparent)] struct around `ComponentId`,
-        // which is #[repr(transparent)] around `u32`.
-        unsafe { transmute(id) }
     }
 
     #[inline]
@@ -181,23 +172,29 @@ impl GpuComponentRegistry {
     #[inline]
     pub fn component_ids(&self) -> GpuComponentIds {
         let Self { components } = self;
-        let inner = components.keys();
+
+        // SAFETY: `GpuComponentId` is a #[repr(transparent)] struct around `ComponentId`,
+        // which is #[repr(transparent)] around `u32`.
+        #[allow(unsafe_code)]
+        let component_ids = unsafe {
+            let slice = components.as_keys_slice();
+            &*(ptr::from_ref(slice) as *const [GpuComponentId])
+        };
+        let inner = component_ids.iter();
         GpuComponentIds { inner }
     }
 }
 
 #[derive(Clone)]
 pub struct GpuComponentIds<'a> {
-    inner: Keys<'a, u32, ()>,
+    inner: std::slice::Iter<'a, GpuComponentId>,
 }
 
 impl Debug for GpuComponentIds<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner } = self;
 
-        let slice = inner.as_slice();
-        #[allow(unsafe_code)]
-        let component_ids = unsafe { &*(ptr::from_ref(slice) as *const [GpuComponentId]) };
+        let component_ids = inner.as_slice();
         f.debug_struct("GpuComponentIds")
             .field("component_ids", &component_ids)
             .finish()
@@ -210,7 +207,7 @@ impl Iterator for GpuComponentIds<'_> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().copied().map(GpuComponentId::from_inner)
+        inner.next().copied()
     }
 
     #[inline]
@@ -228,13 +225,13 @@ impl Iterator for GpuComponentIds<'_> {
     #[inline]
     fn last(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.last().copied().map(GpuComponentId::from_inner)
+        inner.last().copied()
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).copied().map(GpuComponentId::from_inner)
+        inner.nth(n).copied()
     }
 
     #[inline]
@@ -243,7 +240,7 @@ impl Iterator for GpuComponentIds<'_> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.copied().map(GpuComponentId::from_inner).for_each(f)
+        inner.copied().for_each(f)
     }
 
     #[inline]
@@ -252,7 +249,7 @@ impl Iterator for GpuComponentIds<'_> {
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.copied().map(GpuComponentId::from_inner).fold(init, f)
+        inner.copied().fold(init, f)
     }
 
     #[inline]
@@ -261,7 +258,7 @@ impl Iterator for GpuComponentIds<'_> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.copied().map(GpuComponentId::from_inner).all(f)
+        inner.copied().all(f)
     }
 
     #[inline]
@@ -270,7 +267,7 @@ impl Iterator for GpuComponentIds<'_> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.copied().map(GpuComponentId::from_inner).any(f)
+        inner.copied().any(f)
     }
 
     #[inline]
@@ -279,10 +276,7 @@ impl Iterator for GpuComponentIds<'_> {
         P: FnMut(&Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner
-            .copied()
-            .map(GpuComponentId::from_inner)
-            .find(predicate)
+        inner.copied().find(predicate)
     }
 
     #[inline]
@@ -291,7 +285,7 @@ impl Iterator for GpuComponentIds<'_> {
         F: FnMut(Self::Item) -> Option<B>,
     {
         let Self { inner } = self;
-        inner.copied().map(GpuComponentId::from_inner).find_map(f)
+        inner.copied().find_map(f)
     }
 
     #[inline]
@@ -300,10 +294,7 @@ impl Iterator for GpuComponentIds<'_> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner
-            .copied()
-            .map(GpuComponentId::from_inner)
-            .position(predicate)
+        inner.copied().position(predicate)
     }
 
     #[inline]
@@ -312,10 +303,7 @@ impl Iterator for GpuComponentIds<'_> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner
-            .copied()
-            .map(GpuComponentId::from_inner)
-            .rposition(predicate)
+        inner.copied().rposition(predicate)
     }
 }
 
@@ -323,13 +311,13 @@ impl DoubleEndedIterator for GpuComponentIds<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().copied().map(GpuComponentId::from_inner)
+        inner.next_back().copied()
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).copied().map(GpuComponentId::from_inner)
+        inner.nth_back(n).copied()
     }
 }
 

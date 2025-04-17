@@ -168,7 +168,7 @@ fn many_entities() {
         .expect("archetype of `Mass` should exist");
     for (entity, (mass,)) in masses {
         assert_eq!(entity.index() % 2, 1);
-        assert_eq!(mass.value, entity.index() as u16);
+        assert_eq!(mass.value, entity.index());
         masses_count += 1;
     }
     assert_eq!(masses_count, 6);

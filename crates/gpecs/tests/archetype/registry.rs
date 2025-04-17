@@ -216,7 +216,7 @@ fn exchange_components() {
         z: -3.0,
     };
     let mut mass = Mass {
-        value: u16::MAX - 1024,
+        value: u32::MAX - 1024,
     };
     archetypes
         .insert_bundle::<(Mass, Position)>(&mut components, entity, (mass, position))
@@ -315,7 +315,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Position` and `Mass` component");
     assert_eq!(
         error,
-        MissingComponentError::new(components.register_component::<Mass>()).into(),
+        MissingComponentError::new(components.register_component::<Position>()).into(),
     );
 }
 

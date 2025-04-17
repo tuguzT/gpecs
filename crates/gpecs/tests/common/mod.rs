@@ -9,7 +9,7 @@ pub struct Position {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Mass {
-    pub value: u16,
+    pub value: u32,
 }
 
 #[derive(Debug, PartialEq, Clone)]

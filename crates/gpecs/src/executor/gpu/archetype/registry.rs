@@ -45,11 +45,32 @@ impl From<GpuArchetypeId> for ArchetypeId {
     }
 }
 
-#[derive(Debug)]
 // TODO: store GPU buffer here
-struct GpuBuffer;
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct GpuBuffer;
 
-type GpuArchetypes = EpochSparseSet<u32, Identity<GpuBuffer>>;
+#[derive(Debug)]
+pub struct GpuArchetypeInfo {
+    id: GpuArchetypeId,
+    buffer: GpuBuffer,
+}
+
+impl GpuArchetypeInfo {
+    #[inline]
+    pub fn id(&self) -> GpuArchetypeId {
+        let Self { id, .. } = *self;
+        id
+    }
+
+    #[inline]
+    pub fn buffer(&self) -> &GpuBuffer {
+        let Self { buffer, .. } = self;
+        buffer
+    }
+}
+
+type GpuArchetypes = EpochSparseSet<u32, Identity<GpuArchetypeInfo>>;
 
 #[derive(Debug, Default)]
 pub struct GpuArchetypeRegistry {
@@ -112,9 +133,14 @@ impl GpuArchetypeRegistry {
             .archetypes_before_inclusive(archetype_id)
             .for_each(|info| {
                 let archetype_id = info.id();
-                gpu_archetypes
+                let info = gpu_archetypes
                     .entry(archetype_id.into_inner())
-                    .or_insert_with(|| GpuBuffer.into());
+                    .or_insert_with(|| {
+                        let id = GpuArchetypeId(archetype_id);
+                        let buffer = GpuBuffer;
+                        GpuArchetypeInfo { id, buffer }.into()
+                    });
+                let _ = &mut info.buffer;
             });
 
         gpu_archetype_id
@@ -130,6 +156,14 @@ impl GpuArchetypeRegistry {
     pub fn is_empty(&self) -> bool {
         let Self { gpu_archetypes } = self;
         gpu_archetypes.is_empty()
+    }
+
+    #[inline]
+    pub fn get_archetype_info(&self, archetype_id: GpuArchetypeId) -> Option<&GpuArchetypeInfo> {
+        let Self { gpu_archetypes } = self;
+        gpu_archetypes
+            .get(archetype_id.into_inner())
+            .map(Identity::as_inner)
     }
 
     #[inline]

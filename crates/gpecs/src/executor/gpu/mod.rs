@@ -1,16 +1,13 @@
 use std::any::TypeId;
 
 use crate::{
-    archetype::{
-        error::{DuplicateComponentError, GetComponentsError},
-        registry::ArchetypeInfo,
-    },
+    archetype::error::{DuplicateComponentError, GetComponentsError},
     component::registry::ComponentInfo,
     context::Context,
 };
 
 use self::{
-    archetype::registry::{GpuArchetypeId, GpuArchetypeRegistry},
+    archetype::registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
     bundle::GpuBundle,
     component::{
         registry::{GpuComponentId, GpuComponentRegistry},
@@ -143,9 +140,9 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    pub fn get_archetype_info(&self, archetype_id: GpuArchetypeId) -> Option<&ArchetypeInfo> {
-        let Self { context, .. } = self;
-        context.get_archetype_info(archetype_id.into())
+    pub fn get_archetype_info(&self, archetype_id: GpuArchetypeId) -> Option<&GpuArchetypeInfo> {
+        let Self { archetypes, .. } = self;
+        archetypes.get_archetype_info(archetype_id)
     }
 
     #[inline]

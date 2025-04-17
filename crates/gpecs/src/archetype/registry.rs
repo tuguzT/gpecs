@@ -14,7 +14,7 @@ use itertools::Itertools;
 use petgraph::{
     dot::{Config as DotConfig, Dot, RankDir},
     graph::{DiGraph, EdgeReference, NodeIndex},
-    visit::EdgeRef,
+    visit::{Bfs, EdgeRef, Reversed, Walker},
     Direction,
 };
 
@@ -389,6 +389,52 @@ impl ArchetypeRegistry {
         let len = self.len();
         let len = ArchetypeId::from_index(len).into_inner();
         ArchetypeIds { inner: 0..len }
+    }
+
+    #[inline]
+    pub fn archetypes_before(&self, id: ArchetypeId) -> impl Iterator<Item = &ArchetypeInfo> + '_ {
+        let Self {
+            archetypes,
+            ref graph,
+        } = self;
+
+        Bfs::new(graph, id.into_inner().into())
+            .iter(Reversed(graph))
+            .filter_map(move |index| {
+                let index = index.index();
+                let archetype_id = ArchetypeId::from_index(index);
+                if archetype_id == id {
+                    return None;
+                }
+
+                let Some(info) = Self::get_info(archetypes, archetype_id) else {
+                    unreachable!("archetype {archetype_id:?} should exist")
+                };
+                Some(info)
+            })
+    }
+
+    #[inline]
+    pub fn archetypes_after(&self, id: ArchetypeId) -> impl Iterator<Item = &ArchetypeInfo> + '_ {
+        let Self {
+            archetypes,
+            ref graph,
+        } = self;
+
+        Bfs::new(graph, id.into_inner().into())
+            .iter(graph)
+            .filter_map(move |index| {
+                let index = index.index();
+                let archetype_id = ArchetypeId::from_index(index);
+                if archetype_id == id {
+                    return None;
+                }
+
+                let Some(info) = Self::get_info(archetypes, archetype_id) else {
+                    unreachable!("archetype {archetype_id:?} should exist")
+                };
+                Some(info)
+            })
     }
 
     #[inline]

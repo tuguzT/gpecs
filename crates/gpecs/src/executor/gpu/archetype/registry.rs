@@ -19,6 +19,8 @@ use crate::{
     soa::identity::Identity,
 };
 
+use super::storage::GpuArchetypeStorage;
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct GpuArchetypeId(ArchetypeId);
@@ -45,15 +47,10 @@ impl From<GpuArchetypeId> for ArchetypeId {
     }
 }
 
-// TODO: store GPU buffer here
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct GpuBuffer;
-
 #[derive(Debug)]
 pub struct GpuArchetypeInfo {
     id: GpuArchetypeId,
-    buffer: GpuBuffer,
+    storage: GpuArchetypeStorage,
 }
 
 impl GpuArchetypeInfo {
@@ -64,9 +61,15 @@ impl GpuArchetypeInfo {
     }
 
     #[inline]
-    pub fn buffer(&self) -> &GpuBuffer {
-        let Self { buffer, .. } = self;
-        buffer
+    pub fn storage(&self) -> &GpuArchetypeStorage {
+        let Self { storage, .. } = self;
+        storage
+    }
+
+    #[inline]
+    pub fn storage_mut(&mut self) -> &mut GpuArchetypeStorage {
+        let Self { storage, .. } = self;
+        storage
     }
 }
 
@@ -133,14 +136,13 @@ impl GpuArchetypeRegistry {
             .archetypes_before_inclusive(archetype_id)
             .for_each(|info| {
                 let archetype_id = info.id();
-                let info = gpu_archetypes
+                gpu_archetypes
                     .entry(archetype_id.into_inner())
                     .or_insert_with(|| {
                         let id = GpuArchetypeId(archetype_id);
-                        let buffer = GpuBuffer;
-                        GpuArchetypeInfo { id, buffer }.into()
+                        let storage = GpuArchetypeStorage::new(info.storage());
+                        GpuArchetypeInfo { id, storage }.into()
                     });
-                let _ = &mut info.buffer;
             });
 
         gpu_archetype_id

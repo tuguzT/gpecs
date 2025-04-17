@@ -1,17 +1,29 @@
 use crate::context::Context;
 
+use self::component::{
+    registry::{GpuComponentId, GpuComponentRegistry},
+    GpuComponent,
+};
+
 use super::Executor;
+
+pub mod bundle;
+pub mod component;
 
 #[derive(Debug)]
 pub struct GpuExecutor<'context> {
     context: &'context mut Context,
+    components: GpuComponentRegistry,
     // then add some struct with data on GPU
 }
 
 impl<'context> GpuExecutor<'context> {
     #[inline]
     pub fn new(context: &'context mut Context) -> Self {
-        Self { context }
+        Self {
+            context,
+            components: GpuComponentRegistry::new(),
+        }
     }
 
     #[inline]
@@ -34,6 +46,20 @@ impl<'context> GpuExecutor<'context> {
 
         let Self { context, .. } = self;
         context
+    }
+
+    #[inline]
+    pub fn register_component<C>(&mut self) -> GpuComponentId
+    where
+        C: GpuComponent,
+    {
+        let Self {
+            context,
+            components,
+            ..
+        } = self;
+
+        components.register_component::<C>(context.components_mut())
     }
 
     #[inline]

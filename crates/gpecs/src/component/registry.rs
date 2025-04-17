@@ -49,13 +49,14 @@ pub struct ComponentDescriptor {
 
 impl ComponentDescriptor {
     #[inline]
-    pub fn new<N>(name: N, desc: FieldDescriptor, drop_fn: Option<DropFn>) -> Self
+    pub fn new<N, I>(name: N, type_id: I, desc: FieldDescriptor, drop_fn: Option<DropFn>) -> Self
     where
         N: Into<Cow<'static, str>>,
+        I: Into<Option<TypeId>>,
     {
         Self {
             name: name.into(),
-            type_id: None,
+            type_id: type_id.into(),
             desc,
             drop_fn,
         }
@@ -82,8 +83,8 @@ impl ComponentDescriptor {
 
     #[inline]
     pub fn type_id(&self) -> Option<TypeId> {
-        let Self { type_id, .. } = self;
-        type_id.clone()
+        let Self { type_id, .. } = *self;
+        type_id
     }
 
     #[inline]

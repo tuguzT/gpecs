@@ -18,14 +18,18 @@ where
 {
     type MaybeComponentIds = [Option<ComponentId>; 1];
 
+    #[inline]
     fn get_components(components: &ComponentRegistry) -> Self::MaybeComponentIds {
-        [components.component_id::<T>()]
+        let component_id = components.component_id::<T>();
+        [component_id]
     }
 
     type ComponentIds = [ComponentId; 1];
 
+    #[inline]
     fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds {
-        [components.register_component::<T>()]
+        let component_id = components.register_component::<T>();
+        [component_id]
     }
 }
 

@@ -4,6 +4,10 @@ pub use crate::{
     component::{registry::ComponentId, Component},
     context::Context,
     entity::Entity,
-    executor::{cpu::CpuExecutor, gpu::GpuExecutor, Executor},
+    executor::{
+        cpu::CpuExecutor,
+        gpu::{bundle::GpuBundle, component::GpuComponent, GpuExecutor},
+        Executor,
+    },
     world::registry::WorldId,
 };

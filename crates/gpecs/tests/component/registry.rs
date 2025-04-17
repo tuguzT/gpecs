@@ -59,7 +59,7 @@ fn register_with_descriptor() {
     components.register_component::<Position>();
     assert_eq!(components.len(), 1);
 
-    let descriptor = ComponentDescriptor::new("Mass", FieldDescriptor::of::<f32>(), None);
+    let descriptor = ComponentDescriptor::new("Mass", None, FieldDescriptor::of::<f32>(), None);
     let id = components.register_component_with(descriptor);
     assert_eq!(components.len(), 2);
     assert_eq!(id.index(), 1);

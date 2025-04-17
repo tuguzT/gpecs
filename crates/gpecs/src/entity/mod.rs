@@ -10,6 +10,7 @@ use crate::world::registry::WorldId;
 pub mod registry;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[repr(C)]
 pub struct Entity {
     index: u32,
     epoch: u16,

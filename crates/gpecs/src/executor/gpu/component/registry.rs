@@ -3,7 +3,7 @@ use std::{
     borrow::Cow,
     fmt::{self, Debug},
     iter::FusedIterator,
-    ptr,
+    ptr, slice,
 };
 
 use gpecs_sparse::set::EpochSparseSet;
@@ -187,7 +187,7 @@ impl GpuComponentRegistry {
 
 #[derive(Clone)]
 pub struct GpuComponentIds<'a> {
-    inner: std::slice::Iter<'a, GpuComponentId>,
+    inner: slice::Iter<'a, GpuComponentId>,
 }
 
 impl Debug for GpuComponentIds<'_> {

@@ -5,6 +5,7 @@ use std::{
 };
 
 use gpecs_sparse::set::EpochSparseSet;
+use wgpu::Device;
 
 use crate::{
     archetype::{
@@ -21,7 +22,7 @@ use crate::{
 
 use super::storage::GpuArchetypeStorage;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct GpuArchetypeId(ArchetypeId);
 
@@ -44,6 +45,13 @@ impl From<GpuArchetypeId> for ArchetypeId {
     fn from(value: GpuArchetypeId) -> Self {
         let GpuArchetypeId(id) = value;
         id
+    }
+}
+
+impl Debug for GpuArchetypeId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = &self.into_inner();
+        f.debug_tuple("GpuArchetypeId").field(value).finish()
     }
 }
 
@@ -94,6 +102,7 @@ impl GpuArchetypeRegistry {
         archetypes: &mut ArchetypeRegistry,
         components: &mut ComponentRegistry,
         gpu_components: &mut GpuComponentRegistry,
+        gpu_device: &Device,
     ) -> Result<GpuArchetypeId, DuplicateComponentError>
     where
         B: GpuBundle,
@@ -102,7 +111,7 @@ impl GpuArchetypeRegistry {
         let archetype_id = archetypes.register_archetype::<B>(components)?;
 
         let Self { gpu_archetypes, .. } = self;
-        let archetype_id = Self::register(gpu_archetypes, archetypes, archetype_id);
+        let archetype_id = Self::register(gpu_archetypes, archetypes, gpu_device, archetype_id);
         Ok(archetype_id)
     }
 
@@ -111,6 +120,7 @@ impl GpuArchetypeRegistry {
         &mut self,
         archetypes: &mut ArchetypeRegistry,
         components: &ComponentRegistry,
+        gpu_device: &Device,
         component_ids: I,
     ) -> Result<GpuArchetypeId, DuplicateComponentError>
     where
@@ -120,7 +130,7 @@ impl GpuArchetypeRegistry {
         let archetype_id = archetypes.register_archetype_from(components, component_ids)?;
 
         let Self { gpu_archetypes, .. } = self;
-        let archetype_id = Self::register(gpu_archetypes, archetypes, archetype_id);
+        let archetype_id = Self::register(gpu_archetypes, archetypes, gpu_device, archetype_id);
         Ok(archetype_id)
     }
 
@@ -128,6 +138,7 @@ impl GpuArchetypeRegistry {
     fn register(
         gpu_archetypes: &mut GpuArchetypes,
         archetypes: &ArchetypeRegistry,
+        gpu_device: &Device,
         archetype_id: ArchetypeId,
     ) -> GpuArchetypeId {
         let gpu_archetype_id = GpuArchetypeId(archetype_id);
@@ -140,7 +151,7 @@ impl GpuArchetypeRegistry {
                     .entry(archetype_id.into_inner())
                     .or_insert_with(|| {
                         let id = GpuArchetypeId(archetype_id);
-                        let storage = GpuArchetypeStorage::new(info.storage());
+                        let storage = GpuArchetypeStorage::new(gpu_device, info);
                         GpuArchetypeInfo { id, storage }.into()
                     });
             });

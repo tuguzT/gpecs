@@ -1,5 +1,7 @@
 use std::any::TypeId;
 
+use wgpu::Device;
+
 use crate::{
     archetype::error::{DuplicateComponentError, GetComponentsError},
     component::registry::ComponentInfo,
@@ -26,14 +28,16 @@ pub struct GpuExecutor<'context> {
     context: &'context mut Context,
     components: GpuComponentRegistry,
     archetypes: GpuArchetypeRegistry,
+    device: Device,
     // TODO: add some struct with GPU shaders and their schedule
 }
 
 impl<'context> GpuExecutor<'context> {
     #[inline]
-    pub fn new(context: &'context mut Context) -> Self {
+    pub fn new(context: &'context mut Context, device: Device) -> Self {
         Self {
             context,
+            device,
             components: GpuComponentRegistry::new(),
             archetypes: GpuArchetypeRegistry::new(),
         }
@@ -129,6 +133,7 @@ impl<'context> GpuExecutor<'context> {
     {
         let Self {
             context,
+            device,
             components: gpu_components,
             archetypes: gpu_archetypes,
             ..
@@ -136,7 +141,7 @@ impl<'context> GpuExecutor<'context> {
         #[allow(unsafe_code)]
         let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
 
-        gpu_archetypes.register_archetype::<B>(archetypes, components, gpu_components)
+        gpu_archetypes.register_archetype::<B>(archetypes, components, gpu_components, device)
     }
 
     #[inline]

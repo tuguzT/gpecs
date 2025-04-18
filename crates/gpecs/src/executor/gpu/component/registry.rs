@@ -15,7 +15,7 @@ use crate::{
 
 use super::GpuComponent;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct GpuComponentId(ComponentId);
 
@@ -38,6 +38,13 @@ impl From<GpuComponentId> for ComponentId {
     fn from(value: GpuComponentId) -> Self {
         let GpuComponentId(id) = value;
         id
+    }
+}
+
+impl Debug for GpuComponentId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = &self.into_inner();
+        f.debug_tuple("GpuComponentId").field(value).finish()
     }
 }
 

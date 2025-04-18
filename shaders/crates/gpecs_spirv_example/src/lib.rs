@@ -18,10 +18,14 @@ sa::const_assert_eq!(ITER_COUNT, 8);
 pub fn compute_shader(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] data: &mut TypedBuffer<[u32]>,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] data_zst: &mut TypedBuffer<[()]>,
 ) {
     let data: <(_,) as Soa>::SlicesMut<'_> = (data,);
     for index in 0..8 {
         let item = unsafe { data.0.index_unchecked_mut(index) };
         *item = id.x;
+
+        let zst = unsafe { data_zst.index_unchecked_mut(index) };
+        *zst = ();
     }
 }

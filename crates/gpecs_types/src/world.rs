@@ -34,18 +34,18 @@ impl WorldId {
     #[inline]
     #[allow(unsafe_code)]
     pub unsafe fn try_from_u32(id: u32) -> Result<Self, WorldIdFromU32Error> {
-        let id = if id > (u16::MAX as u32) {
-            return Err(WorldIdFromU32Error);
+        const MAX: u32 = u16::MAX as u32;
+
+        if id > MAX {
+            Err(WorldIdFromU32Error)
         } else {
-            id as u16
-        };
-        Ok(Self(id as u32))
+            Ok(Self(id))
+        }
     }
 
     #[inline]
     #[allow(unsafe_code)]
     pub const unsafe fn from_u32(id: u32) -> Self {
-        let id = id & 65535; // u16::MAX
         Self(id)
     }
 }

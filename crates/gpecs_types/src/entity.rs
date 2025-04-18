@@ -15,9 +15,12 @@ pub struct Entity {
 }
 
 impl Entity {
+    const BITS: u32 = u16::BITS;
+    const LO_BITS_MASK: u32 = u16::MAX as u32;
+
     #[inline]
     pub const fn new(index: u32, epoch: EntityEpoch, world: WorldId) -> Self {
-        let epoch_world = (epoch.into_u32() << u16::BITS) | world.into_u32();
+        let epoch_world = (epoch.into_u32() << Self::BITS) | world.into_u32();
         Self { index, epoch_world }
     }
 
@@ -31,7 +34,7 @@ impl Entity {
     #[allow(unsafe_code)]
     pub const fn epoch(&self) -> EntityEpoch {
         let Self { epoch_world, .. } = *self;
-        let epoch = epoch_world >> u16::BITS;
+        let epoch = epoch_world >> Self::BITS;
         unsafe { EntityEpoch::from_u32(epoch) }
     }
 
@@ -39,7 +42,7 @@ impl Entity {
     #[allow(unsafe_code)]
     pub const fn world(&self) -> WorldId {
         let Self { epoch_world, .. } = *self;
-        let world = epoch_world & 65535; // u16::MAX
+        let world = epoch_world & Self::LO_BITS_MASK;
         unsafe { WorldId::from_u32(world) }
     }
 }
@@ -112,19 +115,19 @@ impl EntityEpoch {
     }
 
     #[inline]
-    pub fn try_from_u32(epoch: u32) -> Result<Self, EpochFromU32Error> {
-        let id = if epoch > (u16::MAX as u32) {
-            return Err(EpochFromU32Error);
+    pub const fn try_from_u32(epoch: u32) -> Result<Self, EpochFromU32Error> {
+        const MAX: u32 = u16::MAX as u32;
+
+        if epoch > MAX {
+            Err(EpochFromU32Error)
         } else {
-            epoch as u16
-        };
-        Ok(Self(id as u32))
+            Ok(Self(epoch))
+        }
     }
 
     #[inline]
     #[allow(unsafe_code)]
     pub const unsafe fn from_u32(epoch: u32) -> Self {
-        let epoch = epoch & 65535; // u16::MAX
         Self(epoch)
     }
 }

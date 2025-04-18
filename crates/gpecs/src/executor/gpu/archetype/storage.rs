@@ -11,7 +11,7 @@ use crate::{
     prelude::ComponentId,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct BufferBindingDescriptor {
     offset: BufferAddress,
     size: BufferSize,
@@ -19,15 +19,15 @@ struct BufferBindingDescriptor {
 
 #[derive(Debug, Clone)]
 pub struct BufferBindings<'a> {
-    pub entities: BufferBinding<'a>,
-    pub components: Vec<(ComponentId, BufferBinding<'a>)>,
+    pub entities: Option<BufferBinding<'a>>,
+    pub components: IndexMap<ComponentId, Option<BufferBinding<'a>>>,
 }
 
 #[derive(Debug)]
 pub struct GpuArchetypeStorage {
     buffer: Buffer,
-    entities_binding: BufferBindingDescriptor,
-    component_bindings: IndexMap<ComponentId, BufferBindingDescriptor>,
+    entities_binding: Option<BufferBindingDescriptor>,
+    component_bindings: IndexMap<ComponentId, Option<BufferBindingDescriptor>>,
 }
 
 impl GpuArchetypeStorage {
@@ -38,13 +38,11 @@ impl GpuArchetypeStorage {
         let mut component_bindings = IndexMap::with_capacity(erased_components.len());
 
         let entities_byte_count = entities.len() * size_of::<Entity>();
-        let entities_binding = BufferBindingDescriptor {
-            offset: 0,
-            size: u64::try_from(entities_byte_count)
-                .unwrap()
-                .try_into()
-                .unwrap(),
-        };
+        let entities_binding = u64::try_from(entities_byte_count)
+            .unwrap()
+            .try_into()
+            .ok()
+            .map(|size| BufferBindingDescriptor { offset: 0, size });
 
         let min_offset_alignment = gpu_device
             .limits()
@@ -69,14 +67,12 @@ impl GpuArchetypeStorage {
                 let dst = contents.as_mut_ptr().add(contents_offset);
                 ptr::copy_nonoverlapping(src, dst, components_byte_count);
 
-                let subslice_info = BufferBindingDescriptor {
-                    offset,
-                    size: u64::try_from(components_byte_count)
-                        .unwrap()
-                        .try_into()
-                        .unwrap(),
-                };
-                component_bindings.insert(component_id, subslice_info);
+                let components_binding = u64::try_from(components_byte_count)
+                    .unwrap()
+                    .try_into()
+                    .ok()
+                    .map(|size| BufferBindingDescriptor { offset, size });
+                component_bindings.insert(component_id, components_binding);
             }
         }
 
@@ -111,25 +107,17 @@ impl GpuArchetypeStorage {
             component_bindings,
         } = self;
 
-        let entities = BufferBinding {
+        let map_binding = |binding: BufferBindingDescriptor| BufferBinding {
             buffer,
-            offset: entities_binding.offset,
-            size: Some(entities_binding.size),
+            offset: binding.offset,
+            size: Some(binding.size),
         };
-        let components = component_bindings
-            .iter()
-            .map(|(&component_id, desc)| {
-                let binding = BufferBinding {
-                    buffer,
-                    offset: desc.offset,
-                    size: Some(desc.size),
-                };
-                (component_id, binding)
-            })
-            .collect();
         BufferBindings {
-            entities,
-            components,
+            entities: entities_binding.map(map_binding),
+            components: component_bindings
+                .iter()
+                .map(|(&component_id, binding)| (component_id, binding.map(map_binding)))
+                .collect(),
         }
     }
 }

@@ -83,20 +83,14 @@ fn main() {
                 .expect("entity should exist & archetype of just `Mass` should be valid");
         }
     }
-    let position_id = context
-        .component_id::<Position>()
-        .expect("`Position` should be registered");
-    let mass_id = context
-        .component_id::<Mass>()
-        .expect("`Mass` should be registered");
+    let position_id = context.register_component::<Position>();
+    let mass_id = context.register_component::<Mass>();
     let position_archetype_id = context
-        .archetype_id::<Identity<Position>>()
-        .expect("`Position` archetype should be registered")
-        .expect("archetype id should be present");
+        .register_archetype::<Identity<Position>>()
+        .expect("`Position` archetype should contain unique component ids");
     let mass_archetype_id = context
-        .archetype_id::<Identity<Mass>>()
-        .expect("`Mass` archetype should be registered")
-        .expect("archetype id should be present");
+        .register_archetype::<Identity<Mass>>()
+        .expect("`Mass` archetype should contain unique component ids");
 
     let mut executor = GpuExecutor::new(&mut context, device.clone());
 

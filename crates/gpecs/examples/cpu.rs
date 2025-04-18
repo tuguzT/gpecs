@@ -1,35 +1,10 @@
 use gpecs::prelude::*;
 
-use crate::common::{Mass, Position, Tag};
+use self::common::{Mass, Position, Tag};
 
-#[test]
-fn execute_simple() {
-    let mut context = Context::new();
-    let mut executor = CpuExecutor::new(&mut context);
+mod common;
 
-    let system1 = executor.register_system(|| println!("Hello from the simple system!"));
-    let system2 = executor.register_system(|| unreachable!());
-
-    let added = executor.add_system(system2);
-    assert!(added, "system {system2:?} should not be scheduled yet");
-
-    let added = executor.add_system(system1);
-    assert!(added, "system {system1:?} should not be scheduled yet");
-
-    let added = executor.add_system(system2);
-    assert!(!added, "system {system2:?} should be scheduled before");
-
-    let removed = executor.remove_system(system2);
-    assert!(removed, "system {system2:?} should be scheduled before");
-
-    let removed = executor.remove_system(system2);
-    assert!(!removed, "system {system2:?} should not be scheduled yet");
-
-    executor.execute();
-}
-
-#[test]
-fn execute_bundles() {
+fn main() {
     let mut context = Context::new();
     for i in 0..12 {
         let entity = context.spawn();

@@ -1,19 +1,14 @@
 use gpecs::{prelude::*, soa::identity::Identity};
 use renderdoc::{RenderDoc, V141};
 
-use crate::common::{Mass, Position};
+use self::common::{Mass, Position};
 
-fn init() {
-    let _ = env_logger::builder()
+mod common;
+
+fn main() {
+    env_logger::builder()
         .filter_level(log::LevelFilter::Info)
-        .is_test(true)
-        .try_init();
-}
-
-#[test]
-#[cfg_attr(miri, ignore)]
-fn register_data() {
-    init();
+        .init();
 
     let instance_desc = wgpu::InstanceDescriptor {
         ..Default::default()

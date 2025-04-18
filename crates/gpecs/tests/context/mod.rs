@@ -21,7 +21,7 @@ fn one_entity() {
 
     let entity = context.spawn();
     assert_eq!(entity.index(), 0);
-    assert_eq!(entity.epoch(), 0);
+    assert_eq!(entity.epoch().into_u16(), 0);
     assert_eq!(entity.world(), WorldId::default());
     assert!(context.contains(entity));
 

@@ -3,7 +3,6 @@ use std::{
     fmt::{self, Debug},
     hash::{self, Hash},
     iter::FusedIterator,
-    num::Wrapping,
     ops::{Index, IndexMut},
 };
 
@@ -20,7 +19,7 @@ use gpecs_sparse::{
 
 use crate::{soa::identity::Identity, world::registry::WorldId};
 
-use super::Entity;
+use super::{Entity, EntityEpoch};
 
 pub struct EntityRegistry<Meta = ()> {
     inner: EpochSparseArena<Entity, Identity<Meta>>,
@@ -146,9 +145,9 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn get_epoch(&self, sparse_index: u32) -> Option<u16> {
+    pub fn get_epoch(&self, sparse_index: u32) -> Option<EntityEpoch> {
         let Self { inner } = self;
-        inner.get_epoch(sparse_index).map(|Wrapping(epoch)| epoch)
+        inner.get_epoch(sparse_index)
     }
 
     #[inline]

@@ -1,6 +1,11 @@
+use core::{
+    error::Error,
+    fmt::{self, Display},
+};
+
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
-pub struct WorldId(u16);
+pub struct WorldId(u32);
 
 impl WorldId {
     #[inline]
@@ -11,12 +16,36 @@ impl WorldId {
     #[inline]
     pub const fn into_u16(self) -> u16 {
         let Self(id) = self;
+        id as u16
+    }
+
+    #[inline]
+    pub const fn into_u32(self) -> u32 {
+        let Self(id) = self;
         id
     }
 
     #[inline]
     #[allow(unsafe_code)]
     pub const unsafe fn from_u16(id: u16) -> Self {
+        Self(id as u32)
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn try_from_u32(id: u32) -> Result<Self, WorldIdFromU32Error> {
+        let id = if id > (u16::MAX as u32) {
+            return Err(WorldIdFromU32Error);
+        } else {
+            id as u16
+        };
+        Ok(Self(id as u32))
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub const unsafe fn from_u32(id: u32) -> Self {
+        let id = id & 65535; // u16::MAX
         Self(id)
     }
 }
@@ -27,3 +56,22 @@ impl From<WorldId> for u16 {
         value.into_u16()
     }
 }
+
+impl From<WorldId> for u32 {
+    #[inline]
+    fn from(value: WorldId) -> Self {
+        value.into_u32()
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WorldIdFromU32Error;
+
+impl Display for WorldIdFromU32Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "failed to convert `u32` into `WorldId`")
+    }
+}
+
+impl Error for WorldIdFromU32Error {}

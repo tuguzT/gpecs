@@ -1,4 +1,10 @@
-use std::{mem::transmute, os::raw::c_void, ptr::null};
+use std::{
+    fs,
+    mem::transmute,
+    os::raw::c_void,
+    path::{self, Path},
+    ptr::null,
+};
 
 use gpecs::{prelude::*, soa::identity::Identity};
 use renderdoc::{RenderDoc, V141};
@@ -24,7 +30,8 @@ fn main() {
     };
     let adapter = pollster::block_on(instance.request_adapter(&adapter_options))
         .expect("failed to create WGPU adapter");
-    println!("Running on {:#?}", adapter.get_info());
+    log::info!("Running on:\n{:#?}", adapter.get_info());
+    log::info!("Adapter features:\n{:#?}", adapter.features());
 
     let downlevel_capabilities = adapter.get_downlevel_capabilities();
     if !downlevel_capabilities
@@ -37,12 +44,12 @@ fn main() {
     let device_desc = wgpu::DeviceDescriptor {
         label: Some("`gpecs` integration test device"),
         required_features: wgpu::Features::empty(),
-        required_limits: wgpu::Limits::downlevel_defaults(),
+        required_limits: adapter.limits(),
         memory_hints: wgpu::MemoryHints::Performance,
     };
     let (device, _queue) = pollster::block_on(adapter.request_device(&device_desc, None))
         .expect("failed to create device & queue");
-    println!("Limits of the current device are {:#?}", device.limits());
+    log::info!("Limits of the current device:\n{:#?}", device.limits());
 
     let device_raw = unsafe {
         device.as_hal::<wgpu::hal::api::Vulkan, _, _>(|device| {
@@ -122,13 +129,28 @@ fn main() {
         .get_archetype_info(mass_gpu_archetype_id)
         .expect("archetype info should be present");
     let buffer_bindings = unsafe { mass_gpu_archetype_info.storage().buffer_bindings() };
-    println!("{mass_gpu_archetype_id:?} buffer bindings are {buffer_bindings:#?}");
+    log::info!("{mass_gpu_archetype_id:?} buffer bindings:\n{buffer_bindings:#?}");
 
     let position_gpu_archetype_info = executor
         .get_archetype_info(position_gpu_archetype_id)
         .expect("archetype info should be present");
     let buffer_bindings = unsafe { position_gpu_archetype_info.storage().buffer_bindings() };
-    println!("{position_gpu_archetype_id:?} buffer bindings are {buffer_bindings:#?}");
+    log::info!("{position_gpu_archetype_id:?} buffer bindings:\n{buffer_bindings:#?}");
+
+    const ABS_PATH: &str = env!("CARGO_MANIFEST_DIR");
+    const REL_PATH: &str = "../../shaders/target/spirv-builder/spirv-unknown-spv1.3/release/deps/gpecs_spirv_example.spv";
+
+    let path = path::absolute(Path::new(ABS_PATH).join(REL_PATH)).expect("path should be valid");
+    log::info!("Loading shader from {path:?}");
+
+    let data = fs::read(path).expect("SPIR-V shader file should exist");
+    let shader_desc = wgpu::ShaderModuleDescriptor {
+        label: Some("`gpecs` example shader"),
+        source: wgpu::util::make_spirv(&data),
+    };
+    let shader_module = device.create_shader_module(shader_desc);
+    let shader_compilation_info = pollster::block_on(shader_module.get_compilation_info());
+    log::info!("Shader compilation info:\n{shader_compilation_info:#?}");
 
     executor.execute();
 

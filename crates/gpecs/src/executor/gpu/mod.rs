@@ -62,12 +62,6 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    pub fn context_mut(&mut self) -> &mut Context {
-        let Self { context, .. } = self;
-        context
-    }
-
-    #[inline]
     pub fn components_mut(&mut self) -> &mut GpuComponentRegistry {
         let Self { components, .. } = self;
         components

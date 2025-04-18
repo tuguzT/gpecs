@@ -613,6 +613,35 @@ impl ArchetypeStorage {
 
         ErasedStorageExt::remove(erased_storage, components, component_ids, entity)
     }
+
+    #[inline]
+    #[track_caller]
+    pub(crate) fn erased_components(
+        &self,
+        components: &ComponentRegistry,
+    ) -> (&[Entity], ErasedComponents<ErasedFieldSlice>) {
+        let Self {
+            component_ids,
+            erased_storage,
+        } = self;
+
+        ErasedStorageExt::components(erased_storage, components, component_ids)
+    }
+
+    #[inline]
+    #[track_caller]
+    #[allow(dead_code)]
+    pub(crate) fn erased_components_mut(
+        &mut self,
+        components: &ComponentRegistry,
+    ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut>) {
+        let Self {
+            component_ids,
+            erased_storage,
+        } = self;
+
+        ErasedStorageExt::components_mut(erased_storage, components, component_ids)
+    }
 }
 
 impl Debug for ArchetypeStorage {

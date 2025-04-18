@@ -1,3 +1,5 @@
+use std::{mem::transmute, os::raw::c_void, ptr::null};
+
 use gpecs::{prelude::*, soa::identity::Identity};
 use renderdoc::{RenderDoc, V141};
 
@@ -11,6 +13,7 @@ fn main() {
         .init();
 
     let instance_desc = wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::VULKAN,
         ..Default::default()
     };
     let instance = wgpu::Instance::new(&instance_desc);
@@ -41,12 +44,21 @@ fn main() {
         .expect("failed to create device & queue");
     println!("Limits of the current device are {:#?}", device.limits());
 
+    let device_raw = unsafe {
+        device.as_hal::<wgpu::hal::api::Vulkan, _, _>(|device| {
+            device
+                .map(|device| transmute(device.raw_device().handle()))
+                .unwrap_or(null::<c_void>())
+        })
+    };
+    let window_raw = null::<c_void>();
+
     let mut renderdoc = RenderDoc::<V141>::new();
     match renderdoc.as_mut() {
         Ok(renderdoc) => {
             log::info!("RenderDoc version: {:?}", renderdoc.get_api_version());
             log::info!("Starting RenderDoc capture...");
-            renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
+            renderdoc.start_frame_capture(device_raw, window_raw);
         }
         Err(error) => {
             log::warn!("{error}");
@@ -54,20 +66,51 @@ fn main() {
     }
 
     let mut context = Context::new();
+    for i in 0..12 {
+        let entity = context.spawn();
+        if i % 2 == 0 {
+            let x = i as f32;
+            let y = -(i as f32);
+            let z = 0.0;
+            let position = Position { x, y, z };
+            context
+                .insert_bundle(entity, (position,))
+                .expect("entity should exist & archetype of just `Position` should be valid");
+        } else {
+            let mass = Mass { value: i };
+            context
+                .insert_bundle(entity, (mass,))
+                .expect("entity should exist & archetype of just `Mass` should be valid");
+        }
+    }
+    let position_id = context
+        .component_id::<Position>()
+        .expect("`Position` should be registered");
+    let mass_id = context
+        .component_id::<Mass>()
+        .expect("`Mass` should be registered");
+    let mass_tag_archetype_id = context
+        .archetype_id::<Identity<Mass>>()
+        .expect("`Mass` archetype should be registered")
+        .expect("archetype id should be present");
+
     let mut executor = GpuExecutor::new(&mut context, device.clone());
 
     let component_id = executor.register_component::<Position>();
-    assert_eq!(component_id.into_inner(), 0);
+    assert_eq!(component_id.into_inner(), position_id.into_inner());
 
     let archetype_id = executor
         .register_archetype::<Identity<Mass>>()
         .expect("archetype of just `Mass` should contain unique component ids");
-    assert_eq!(archetype_id.into_inner(), 0);
+    assert_eq!(
+        archetype_id.into_inner(),
+        mass_tag_archetype_id.into_inner(),
+    );
 
     let component_id = executor
         .component_id::<Mass>()
         .expect("`Mass` component should be registered after registering archetype");
-    assert_eq!(component_id.into_inner(), 1);
+    assert_eq!(component_id.into_inner(), mass_id.into_inner());
 
     let archetype_info = executor
         .get_archetype_info(archetype_id)
@@ -83,6 +126,6 @@ fn main() {
 
     if let Ok(renderdoc) = renderdoc.as_mut() {
         log::info!("Ending RenderDoc capture...");
-        renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
+        renderdoc.end_frame_capture(device_raw, window_raw);
     }
 }

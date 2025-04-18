@@ -21,15 +21,15 @@ pub struct GpuComponentId(ComponentId);
 
 impl GpuComponentId {
     #[inline]
-    pub fn index(&self) -> usize {
-        let Self(id) = *self;
-        id.index()
-    }
-
-    #[inline]
     pub const fn into_inner(self) -> u32 {
         let Self(id) = self;
         id.into_inner()
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub const unsafe fn from_inner(id: ComponentId) -> Self {
+        Self(id)
     }
 }
 

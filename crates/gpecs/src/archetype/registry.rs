@@ -8,6 +8,8 @@ use std::{
     slice,
 };
 
+pub use gpecs_types::archetype::ArchetypeId;
+
 use gpecs_soa_erased::field::ErasedField;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
@@ -38,30 +40,6 @@ use super::{
     },
     utils::{try_collect_component_ids, try_collect_maybe_component_ids},
 };
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-#[repr(transparent)]
-pub struct ArchetypeId(u32);
-
-impl ArchetypeId {
-    #[inline]
-    pub fn index(&self) -> usize {
-        let Self(id) = *self;
-        id.try_into().expect("ArchetypeId overflow")
-    }
-
-    #[inline]
-    fn from_index(index: usize) -> Self {
-        let id = index.try_into().expect("ArchetypeId overflow");
-        Self(id)
-    }
-
-    #[inline]
-    pub const fn into_inner(self) -> u32 {
-        let Self(id) = self;
-        id
-    }
-}
 
 /// Archetype [identifier](ArchetypeId) of some [entity](Entity).
 ///
@@ -294,14 +272,13 @@ impl ArchetypeRegistry {
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
         let index = archetypes.len();
-        let id = ArchetypeId::from_index(index);
+        let id = archetype_id_from_usize(index);
 
         let info = ArchetypeInfo { id, storage };
         if let Some(_) = archetypes.insert(key, info) {
             unreachable!("duplicate archetype registration")
         }
 
-        let index = id.index();
         let node_index = graph.add_node(()).index();
         if index != node_index {
             unreachable!("archetype index {index} must be equal to node index {node_index}")
@@ -330,7 +307,7 @@ impl ArchetypeRegistry {
 
     #[inline]
     fn get_info(archetypes: &Archetypes, id: ArchetypeId) -> Option<&ArchetypeInfo> {
-        let index = id.index();
+        let index = archetype_id_into_usize(id);
         archetypes.get_index(index).map(|(_, info)| info)
     }
 
@@ -343,7 +320,7 @@ impl ArchetypeRegistry {
 
     #[inline]
     fn get_info_mut(archetypes: &mut Archetypes, id: ArchetypeId) -> Option<&mut ArchetypeInfo> {
-        let index = id.index();
+        let index = archetype_id_into_usize(id);
         archetypes.get_index_mut(index).map(|(_, info)| info)
     }
 
@@ -381,13 +358,13 @@ impl ArchetypeRegistry {
     #[inline]
     fn find_archetype(archetypes: &Archetypes, key: &ArchetypeKey) -> Option<ArchetypeId> {
         let (index, _, _) = archetypes.get_full(key)?;
-        Some(ArchetypeId::from_index(index))
+        Some(archetype_id_from_usize(index))
     }
 
     #[inline]
     pub fn archetype_ids(&self) -> ArchetypeIds {
         let len = self.len();
-        let len = ArchetypeId::from_index(len).into_inner();
+        let len = archetype_id_from_usize(len).into_inner();
         ArchetypeIds { inner: 0..len }
     }
 
@@ -971,7 +948,8 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let Some((key, _)) = archetypes.get_index(archetype_id.index()) else {
+        let index = archetype_id_into_usize(archetype_id);
+        let Some((key, _)) = archetypes.get_index(index) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
         for &component_id in component_ids {
@@ -995,7 +973,8 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let Some((key, _)) = archetypes.get_index(archetype_id.index()) else {
+        let index = archetype_id_into_usize(archetype_id);
+        let Some((key, _)) = archetypes.get_index(index) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
         for &component_id in component_ids {
@@ -1027,7 +1006,7 @@ impl ArchetypeRegistry {
         archetypes
             .values()
             .position(|info| info.storage().contains(entity))
-            .map(ArchetypeId::from_index)
+            .map(archetype_id_from_usize)
     }
 
     #[inline]
@@ -1111,7 +1090,7 @@ impl ArchetypeRegistry {
         graph
             .edges_directed(archetype_id.into_inner().into(), Direction::Incoming)
             .find(|edge| *edge.weight() == component_id)
-            .map(|edge| ArchetypeId::from_index(edge.source().index()))
+            .map(|edge| archetype_id_from_usize(edge.source().index()))
     }
 
     #[inline]
@@ -1123,7 +1102,7 @@ impl ArchetypeRegistry {
         graph
             .edges_directed(archetype_id.into_inner().into(), Direction::Outgoing)
             .find(|edge| *edge.weight() == component_id)
-            .map(|edge| ArchetypeId::from_index(edge.target().index()))
+            .map(|edge| archetype_id_from_usize(edge.target().index()))
     }
 }
 
@@ -1151,7 +1130,7 @@ where
         DotConfig::RankDir(RankDir::LR),
     ];
     let node_attrs = |_, (index, _): (NodeIndex<_>, _)| {
-        let archetype_id = ArchetypeId::from_index(index.index());
+        let archetype_id = archetype_id_from_usize(index.index());
         let Some((_, info)) = archetypes.get_index(index.index()) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
@@ -1190,7 +1169,7 @@ impl Debug for ArchetypeIds {
         let Self { inner } = self;
 
         let Range { start, end } = *inner;
-        let inner = ArchetypeId(start)..ArchetypeId(end);
+        let inner = archetype_id_trusted(start)..archetype_id_trusted(end);
         write!(f, "{inner:?}")
     }
 }
@@ -1201,7 +1180,7 @@ impl Iterator for ArchetypeIds {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(ArchetypeId)
+        inner.next().map(archetype_id_trusted)
     }
 
     #[inline]
@@ -1219,25 +1198,25 @@ impl Iterator for ArchetypeIds {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(ArchetypeId)
+        inner.nth(n).map(archetype_id_trusted)
     }
 
     #[inline]
     fn last(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.last().map(ArchetypeId)
+        inner.last().map(archetype_id_trusted)
     }
 
     #[inline]
     fn min(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.min().map(ArchetypeId)
+        inner.min().map(archetype_id_trusted)
     }
 
     #[inline]
     fn max(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.max().map(ArchetypeId)
+        inner.max().map(archetype_id_trusted)
     }
 
     #[inline]
@@ -1251,13 +1230,13 @@ impl DoubleEndedIterator for ArchetypeIds {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(ArchetypeId)
+        inner.next_back().map(archetype_id_trusted)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(ArchetypeId)
+        inner.nth_back(n).map(archetype_id_trusted)
     }
 }
 
@@ -1340,12 +1319,12 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
         } = *self;
 
         let index = if exclusive {
-            walker.find(|index| index.index() != archetype_id.index())
+            walker.find(|index| index.index() != archetype_id_into_usize(archetype_id))
         } else {
             walker.next()
         }?;
 
-        let archetype_id = ArchetypeId::from_index(index.index());
+        let archetype_id = archetype_id_from_usize(index.index());
         let Some(info) = ArchetypeRegistry::get_info(archetypes, archetype_id) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
@@ -1434,12 +1413,12 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
         } = *self;
 
         let index = if exclusive {
-            walker.find(|index| index.index() != archetype_id.index())
+            walker.find(|index| index.index() != archetype_id_into_usize(archetype_id))
         } else {
             walker.next()
         }?;
 
-        let archetype_id = ArchetypeId::from_index(index.index());
+        let archetype_id = archetype_id_from_usize(index.index());
         let Some(info) = ArchetypeRegistry::get_info(archetypes, archetype_id) else {
             unreachable!("archetype {archetype_id:?} should exist")
         };
@@ -2209,4 +2188,22 @@ fn and_then_or_clear<T, U>(opt: &mut Option<T>, f: impl FnOnce(&mut T) -> Option
         *opt = None;
     }
     x
+}
+
+#[inline]
+fn archetype_id_from_usize(index: usize) -> ArchetypeId {
+    let id = index.try_into().expect("`ArchetypeId` overflow");
+    archetype_id_trusted(id)
+}
+
+#[inline]
+fn archetype_id_into_usize(id: ArchetypeId) -> usize {
+    let id = id.into_inner();
+    id.try_into().expect("`ArchetypeId` overflow")
+}
+
+#[inline]
+#[allow(unsafe_code)]
+fn archetype_id_trusted(id: u32) -> ArchetypeId {
+    unsafe { ArchetypeId::from_inner(id) }
 }

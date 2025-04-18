@@ -5,29 +5,7 @@ use std::{
     ops::Range,
 };
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-#[repr(transparent)]
-pub struct WorldId(u16);
-
-impl WorldId {
-    #[inline]
-    pub const fn new() -> Self {
-        Self(0)
-    }
-
-    #[inline]
-    pub const fn index(&self) -> u16 {
-        let Self(id) = *self;
-        id
-    }
-}
-
-impl From<WorldId> for u16 {
-    #[inline]
-    fn from(value: WorldId) -> Self {
-        value.index()
-    }
-}
+pub use gpecs_types::world::WorldId;
 
 #[derive(Debug, Clone)]
 pub struct WorldRegistry {
@@ -51,7 +29,7 @@ impl WorldRegistry {
         let id = *next_id;
         *next_id = next_id.wrapping_add(1);
         *len = len.saturating_add(1);
-        WorldId(id)
+        world_id_trusted(id)
     }
 
     #[inline]
@@ -102,7 +80,7 @@ impl Debug for WorldIds {
         let Self { inner } = self;
 
         let Range { start, end } = *inner;
-        let inner = WorldId(start)..WorldId(end);
+        let inner = world_id_trusted(start)..world_id_trusted(end);
         write!(f, "{inner:?}")
     }
 }
@@ -113,7 +91,7 @@ impl Iterator for WorldIds {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(WorldId)
+        inner.next().map(world_id_trusted)
     }
 
     #[inline]
@@ -131,25 +109,25 @@ impl Iterator for WorldIds {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(WorldId)
+        inner.nth(n).map(world_id_trusted)
     }
 
     #[inline]
     fn last(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.last().map(WorldId)
+        inner.last().map(world_id_trusted)
     }
 
     #[inline]
     fn min(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.min().map(WorldId)
+        inner.min().map(world_id_trusted)
     }
 
     #[inline]
     fn max(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.max().map(WorldId)
+        inner.max().map(world_id_trusted)
     }
 
     #[inline]
@@ -163,13 +141,13 @@ impl DoubleEndedIterator for WorldIds {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(WorldId)
+        inner.next_back().map(world_id_trusted)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(WorldId)
+        inner.nth_back(n).map(world_id_trusted)
     }
 }
 
@@ -182,3 +160,9 @@ impl ExactSizeIterator for WorldIds {
 }
 
 impl FusedIterator for WorldIds {}
+
+#[inline]
+#[allow(unsafe_code)]
+const fn world_id_trusted(id: u16) -> WorldId {
+    unsafe { WorldId::from_inner(id) }
+}

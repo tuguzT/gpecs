@@ -1,0 +1,11 @@
+[package]
+name = "gpecs_types"
+description = "Types for ECS on GPU (probably)"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpecs_sparse = { workspace = true }

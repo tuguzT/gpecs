@@ -9,33 +9,11 @@ use std::{
     ptr,
 };
 
+pub use gpecs_types::component::ComponentId;
+
 use crate::soa::traits::FieldDescriptor;
 
 use super::Component;
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-#[repr(transparent)]
-pub struct ComponentId(u32);
-
-impl ComponentId {
-    #[inline]
-    pub fn index(&self) -> usize {
-        let Self(id) = *self;
-        id.try_into().expect("ComponentId overflow")
-    }
-
-    #[inline]
-    fn from_index(index: usize) -> Self {
-        let id = index.try_into().expect("ComponentId overflow");
-        Self(id)
-    }
-
-    #[inline]
-    pub const fn into_inner(self) -> u32 {
-        let Self(id) = self;
-        id
-    }
-}
 
 pub type DropFn = unsafe fn(to_drop: *mut u8);
 
@@ -191,7 +169,7 @@ impl ComponentRegistry {
         descriptor: ComponentDescriptor,
     ) -> ComponentId {
         let index = components.len();
-        let id = ComponentId::from_index(index);
+        let id = component_id_from_usize(index);
 
         let info = ComponentInfo { id, descriptor };
         components.push(info);
@@ -215,7 +193,7 @@ impl ComponentRegistry {
     pub fn get_component_info(&self, id: ComponentId) -> Option<&ComponentInfo> {
         let Self { components, .. } = self;
 
-        let index = id.index();
+        let index = component_id_into_usize(id);
         components.get(index)
     }
 
@@ -237,7 +215,7 @@ impl ComponentRegistry {
     #[inline]
     pub fn component_ids(&self) -> ComponentIds {
         let len = self.len();
-        let len = ComponentId::from_index(len).into_inner();
+        let len = component_id_from_usize(len).into_inner();
         ComponentIds { inner: 0..len }
     }
 }
@@ -266,7 +244,7 @@ impl Debug for ComponentIds {
         let Self { inner } = self;
 
         let Range { start, end } = *inner;
-        let inner = ComponentId(start)..ComponentId(end);
+        let inner = component_id_trusted(start)..component_id_trusted(end);
         write!(f, "{inner:?}")
     }
 }
@@ -277,7 +255,7 @@ impl Iterator for ComponentIds {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(ComponentId)
+        inner.next().map(component_id_trusted)
     }
 
     #[inline]
@@ -295,25 +273,25 @@ impl Iterator for ComponentIds {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(ComponentId)
+        inner.nth(n).map(component_id_trusted)
     }
 
     #[inline]
     fn last(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.last().map(ComponentId)
+        inner.last().map(component_id_trusted)
     }
 
     #[inline]
     fn min(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.min().map(ComponentId)
+        inner.min().map(component_id_trusted)
     }
 
     #[inline]
     fn max(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.max().map(ComponentId)
+        inner.max().map(component_id_trusted)
     }
 
     #[inline]
@@ -327,13 +305,13 @@ impl DoubleEndedIterator for ComponentIds {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(ComponentId)
+        inner.next_back().map(component_id_trusted)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(ComponentId)
+        inner.nth_back(n).map(component_id_trusted)
     }
 }
 
@@ -346,3 +324,21 @@ impl ExactSizeIterator for ComponentIds {
 }
 
 impl FusedIterator for ComponentIds {}
+
+#[inline]
+fn component_id_from_usize(index: usize) -> ComponentId {
+    let id = index.try_into().expect("`ComponentId` overflow");
+    component_id_trusted(id)
+}
+
+#[inline]
+fn component_id_into_usize(id: ComponentId) -> usize {
+    let id = id.into_inner();
+    id.try_into().expect("`ComponentId` overflow")
+}
+
+#[inline]
+#[allow(unsafe_code)]
+fn component_id_trusted(id: u32) -> ComponentId {
+    unsafe { ComponentId::from_inner(id) }
+}

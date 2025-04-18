@@ -12,6 +12,7 @@ crate-type = ["dylib", "lib"]
 
 [dependencies]
 gpecs_soa = { workspace = true }
+gpecs_types = { workspace = true }
 spirv-std = { workspace = true }
 unroll = { workspace = true }
 static_assertions = { workspace = true }

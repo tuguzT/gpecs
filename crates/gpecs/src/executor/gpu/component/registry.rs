@@ -21,15 +21,29 @@ pub struct GpuComponentId(ComponentId);
 
 impl GpuComponentId {
     #[inline]
-    pub const fn into_inner(self) -> u32 {
+    pub const fn into_u32(self) -> u32 {
         let Self(id) = self;
-        id.into_inner()
+        id.into_u32()
     }
 
     #[inline]
     #[allow(unsafe_code)]
-    pub const unsafe fn from_inner(id: ComponentId) -> Self {
+    pub const unsafe fn from_id(id: ComponentId) -> Self {
         Self(id)
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub const unsafe fn from_u32(id: u32) -> Self {
+        let id = unsafe { ComponentId::from_u32(id) };
+        Self(id)
+    }
+}
+
+impl From<GpuComponentId> for u32 {
+    #[inline]
+    fn from(value: GpuComponentId) -> Self {
+        value.into_u32()
     }
 }
 
@@ -43,7 +57,7 @@ impl From<GpuComponentId> for ComponentId {
 
 impl Debug for GpuComponentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = &self.into_inner();
+        let value = &self.into_u32();
         f.debug_tuple("GpuComponentId").field(value).finish()
     }
 }
@@ -133,7 +147,7 @@ impl GpuComponentRegistry {
         let id = GpuComponentId(id);
 
         let Self { components } = self;
-        components.insert(id.into_inner(), ());
+        components.insert(id.into_u32(), ());
 
         id
     }
@@ -148,7 +162,7 @@ impl GpuComponentRegistry {
         let id = GpuComponentId(id);
 
         let Self { components } = self;
-        components.insert(id.into_inner(), ());
+        components.insert(id.into_u32(), ());
 
         id
     }
@@ -168,7 +182,7 @@ impl GpuComponentRegistry {
     #[inline]
     pub fn contains(&self, id: ComponentId) -> bool {
         let Self { components } = self;
-        components.contains_key(id.into_inner())
+        components.contains_key(id.into_u32())
     }
 
     #[inline]

@@ -206,8 +206,8 @@ impl ArchetypeRegistry {
         };
 
         for (archetype_from, component_id) in before {
-            let archetype_from = archetype_from.into_inner().into();
-            let archetype_to = archetype_to.into_inner().into();
+            let archetype_from = archetype_from.into_u32().into();
+            let archetype_to = archetype_to.into_u32().into();
             let _ = graph.update_edge(archetype_from, archetype_to, component_id);
         }
         archetype_to
@@ -364,7 +364,7 @@ impl ArchetypeRegistry {
     #[inline]
     pub fn archetype_ids(&self) -> ArchetypeIds {
         let len = self.len();
-        let len = archetype_id_from_usize(len).into_inner();
+        let len = archetype_id_from_usize(len).into_u32();
         ArchetypeIds { inner: 0..len }
     }
 
@@ -1088,7 +1088,7 @@ impl ArchetypeRegistry {
         component_id: ComponentId,
     ) -> Option<ArchetypeId> {
         graph
-            .edges_directed(archetype_id.into_inner().into(), Direction::Incoming)
+            .edges_directed(archetype_id.into_u32().into(), Direction::Incoming)
             .find(|edge| *edge.weight() == component_id)
             .map(|edge| archetype_id_from_usize(edge.source().index()))
     }
@@ -1100,7 +1100,7 @@ impl ArchetypeRegistry {
         component_id: ComponentId,
     ) -> Option<ArchetypeId> {
         graph
-            .edges_directed(archetype_id.into_inner().into(), Direction::Outgoing)
+            .edges_directed(archetype_id.into_u32().into(), Direction::Outgoing)
             .find(|edge| *edge.weight() == component_id)
             .map(|edge| archetype_id_from_usize(edge.target().index()))
     }
@@ -1266,7 +1266,7 @@ impl<'a> ArchetypesBefore<'a> {
         archetype_id: ArchetypeId,
         exclusive: bool,
     ) -> Self {
-        let start = archetype_id.into_inner().into();
+        let start = archetype_id.into_u32().into();
         let graph = Reversed(graph);
         let walker = Bfs::new(graph, start).iter(graph);
         Self {
@@ -1361,7 +1361,7 @@ impl<'a> ArchetypesAfter<'a> {
         archetype_id: ArchetypeId,
         exclusive: bool,
     ) -> Self {
-        let start = archetype_id.into_inner().into();
+        let start = archetype_id.into_u32().into();
         let walker = Bfs::new(graph, start).iter(graph);
         Self {
             archetypes,
@@ -2198,12 +2198,12 @@ fn archetype_id_from_usize(index: usize) -> ArchetypeId {
 
 #[inline]
 fn archetype_id_into_usize(id: ArchetypeId) -> usize {
-    let id = id.into_inner();
+    let id = id.into_u32();
     id.try_into().expect("`ArchetypeId` overflow")
 }
 
 #[inline]
 #[allow(unsafe_code)]
 fn archetype_id_trusted(id: u32) -> ArchetypeId {
-    unsafe { ArchetypeId::from_inner(id) }
+    unsafe { ArchetypeId::from_u32(id) }
 }

@@ -24,7 +24,7 @@ fn register_type() {
 
     let id = components.register_component::<Position>();
     assert_eq!(components.len(), 1);
-    assert_eq!(id.into_inner(), 0);
+    assert_eq!(id.into_u32(), 0);
     assert_eq!(components.component_id::<Position>(), Some(id));
     assert!(components.component_ids().eq([id]));
 
@@ -40,7 +40,7 @@ fn register_type() {
 
     let id = components.register_component::<Mass>();
     assert_eq!(components.len(), 2);
-    assert_eq!(id.into_inner(), 1);
+    assert_eq!(id.into_u32(), 1);
     assert_eq!(components.component_id::<Mass>(), Some(id));
     assert!(components.component_ids().any(|item| item == id));
 
@@ -62,7 +62,7 @@ fn register_with_descriptor() {
     let descriptor = ComponentDescriptor::new("Mass", None, FieldDescriptor::of::<f32>(), None);
     let id = components.register_component_with(descriptor);
     assert_eq!(components.len(), 2);
-    assert_eq!(id.into_inner(), 1);
+    assert_eq!(id.into_u32(), 1);
     assert!(components.component_ids().any(|item| item == id));
 
     let info = components

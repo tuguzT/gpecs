@@ -28,15 +28,29 @@ pub struct GpuArchetypeId(ArchetypeId);
 
 impl GpuArchetypeId {
     #[inline]
-    pub const fn into_inner(self) -> u32 {
+    pub const fn into_u32(self) -> u32 {
         let Self(id) = self;
-        id.into_inner()
+        id.into_u32()
     }
 
     #[inline]
     #[allow(unsafe_code)]
-    pub const unsafe fn from_inner(id: ArchetypeId) -> Self {
+    pub const unsafe fn from_id(id: ArchetypeId) -> Self {
         Self(id)
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub const unsafe fn from_u32(id: u32) -> Self {
+        let id = unsafe { ArchetypeId::from_u32(id) };
+        Self(id)
+    }
+}
+
+impl From<GpuArchetypeId> for u32 {
+    #[inline]
+    fn from(value: GpuArchetypeId) -> Self {
+        value.into_u32()
     }
 }
 
@@ -50,7 +64,7 @@ impl From<GpuArchetypeId> for ArchetypeId {
 
 impl Debug for GpuArchetypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = &self.into_inner();
+        let value = &self.into_u32();
         f.debug_tuple("GpuArchetypeId").field(value).finish()
     }
 }
@@ -161,7 +175,7 @@ impl GpuArchetypeRegistry {
             .for_each(|info| {
                 let archetype_id = info.id();
                 gpu_archetypes
-                    .entry(archetype_id.into_inner())
+                    .entry(archetype_id.into_u32())
                     .or_insert_with(|| {
                         let id = GpuArchetypeId(archetype_id);
                         let storage = GpuArchetypeStorage::new(components, gpu_device, info);
@@ -188,14 +202,14 @@ impl GpuArchetypeRegistry {
     pub fn get_archetype_info(&self, archetype_id: GpuArchetypeId) -> Option<&GpuArchetypeInfo> {
         let Self { gpu_archetypes } = self;
         gpu_archetypes
-            .get(archetype_id.into_inner())
+            .get(archetype_id.into_u32())
             .map(Identity::as_inner)
     }
 
     #[inline]
     pub fn contains(&self, id: ArchetypeId) -> bool {
         let Self { gpu_archetypes } = self;
-        gpu_archetypes.contains_key(id.into_inner())
+        gpu_archetypes.contains_key(id.into_u32())
     }
 
     #[inline]

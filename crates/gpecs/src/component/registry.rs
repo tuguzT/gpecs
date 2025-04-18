@@ -215,7 +215,7 @@ impl ComponentRegistry {
     #[inline]
     pub fn component_ids(&self) -> ComponentIds {
         let len = self.len();
-        let len = component_id_from_usize(len).into_inner();
+        let len = component_id_from_usize(len).into_u32();
         ComponentIds { inner: 0..len }
     }
 }
@@ -333,12 +333,12 @@ fn component_id_from_usize(index: usize) -> ComponentId {
 
 #[inline]
 fn component_id_into_usize(id: ComponentId) -> usize {
-    let id = id.into_inner();
+    let id = id.into_u32();
     id.try_into().expect("`ComponentId` overflow")
 }
 
 #[inline]
 #[allow(unsafe_code)]
 fn component_id_trusted(id: u32) -> ComponentId {
-    unsafe { ComponentId::from_inner(id) }
+    unsafe { ComponentId::from_u32(id) }
 }

@@ -32,32 +32,14 @@ impl Entity {
     }
 
     #[inline]
-    pub const fn index_mut(&mut self) -> &mut u32 {
-        let Self { index, .. } = self;
-        index
-    }
-
-    #[inline]
     pub const fn epoch(&self) -> u16 {
         let Self { epoch, .. } = *self;
         epoch
     }
 
     #[inline]
-    pub const fn epoch_mut(&mut self) -> &mut u16 {
-        let Self { epoch, .. } = self;
-        epoch
-    }
-
-    #[inline]
     pub const fn world(&self) -> WorldId {
         let Self { world, .. } = *self;
-        world
-    }
-
-    #[inline]
-    pub const fn world_mut(&mut self) -> &mut WorldId {
-        let Self { world, .. } = self;
         world
     }
 }
@@ -87,7 +69,7 @@ impl Display for Entity {
             epoch,
             world,
         } = self;
-        let world = world.into_inner();
+        let world = world.into_u16();
         write!(f, "entity{{i{index}e{epoch}w{world}}}")
     }
 }

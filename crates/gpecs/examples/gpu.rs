@@ -95,28 +95,28 @@ fn main() {
     let mut executor = GpuExecutor::new(&mut context, device.clone());
 
     let position_gpu_id = executor.register_component::<Position>();
-    assert_eq!(position_gpu_id.into_inner(), position_id.into_inner());
+    assert_eq!(position_gpu_id.into_u32(), position_id.into_u32());
 
     let mass_gpu_archetype_id = executor
         .register_archetype::<Identity<Mass>>()
         .expect("archetype of just `Mass` should contain unique component ids");
     assert_eq!(
-        mass_gpu_archetype_id.into_inner(),
-        mass_archetype_id.into_inner(),
+        mass_gpu_archetype_id.into_u32(),
+        mass_archetype_id.into_u32(),
     );
 
     let position_gpu_archetype_id = executor
         .register_archetype::<Identity<Position>>()
         .expect("archetype of just `Position` should contain unique component ids");
     assert_eq!(
-        position_gpu_archetype_id.into_inner(),
-        position_archetype_id.into_inner(),
+        position_gpu_archetype_id.into_u32(),
+        position_archetype_id.into_u32(),
     );
 
     let mass_gpu_id = executor
         .component_id::<Mass>()
         .expect("`Mass` component should be registered after registering archetype");
-    assert_eq!(mass_gpu_id.into_inner(), mass_id.into_inner());
+    assert_eq!(mass_gpu_id.into_u32(), mass_id.into_u32());
 
     let mass_gpu_archetype_info = executor
         .get_archetype_info(mass_gpu_archetype_id)

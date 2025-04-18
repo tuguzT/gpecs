@@ -89,38 +89,52 @@ fn main() {
     let mass_id = context
         .component_id::<Mass>()
         .expect("`Mass` should be registered");
-    let mass_tag_archetype_id = context
+    let position_archetype_id = context
+        .archetype_id::<Identity<Position>>()
+        .expect("`Position` archetype should be registered")
+        .expect("archetype id should be present");
+    let mass_archetype_id = context
         .archetype_id::<Identity<Mass>>()
         .expect("`Mass` archetype should be registered")
         .expect("archetype id should be present");
 
     let mut executor = GpuExecutor::new(&mut context, device.clone());
 
-    let component_id = executor.register_component::<Position>();
-    assert_eq!(component_id.into_inner(), position_id.into_inner());
+    let position_gpu_id = executor.register_component::<Position>();
+    assert_eq!(position_gpu_id.into_inner(), position_id.into_inner());
 
-    let archetype_id = executor
+    let mass_gpu_archetype_id = executor
         .register_archetype::<Identity<Mass>>()
         .expect("archetype of just `Mass` should contain unique component ids");
     assert_eq!(
-        archetype_id.into_inner(),
-        mass_tag_archetype_id.into_inner(),
+        mass_gpu_archetype_id.into_inner(),
+        mass_archetype_id.into_inner(),
     );
 
-    let component_id = executor
+    let position_gpu_archetype_id = executor
+        .register_archetype::<Identity<Position>>()
+        .expect("archetype of just `Position` should contain unique component ids");
+    assert_eq!(
+        position_gpu_archetype_id.into_inner(),
+        position_archetype_id.into_inner(),
+    );
+
+    let mass_gpu_id = executor
         .component_id::<Mass>()
         .expect("`Mass` component should be registered after registering archetype");
-    assert_eq!(component_id.into_inner(), mass_id.into_inner());
+    assert_eq!(mass_gpu_id.into_inner(), mass_id.into_inner());
 
-    let archetype_info = executor
-        .get_archetype_info(archetype_id)
+    let mass_gpu_archetype_info = executor
+        .get_archetype_info(mass_gpu_archetype_id)
         .expect("archetype info should be present");
-    let buffer = unsafe { archetype_info.storage().buffer() };
-    println!(
-        "{archetype_id:?} buffer size is {}, its usage is {:?}",
-        buffer.size(),
-        buffer.usage(),
-    );
+    let buffer_bindings = unsafe { mass_gpu_archetype_info.storage().buffer_bindings() };
+    println!("{mass_gpu_archetype_id:?} buffer bindings are {buffer_bindings:#?}");
+
+    let position_gpu_archetype_info = executor
+        .get_archetype_info(position_gpu_archetype_id)
+        .expect("archetype info should be present");
+    let buffer_bindings = unsafe { position_gpu_archetype_info.storage().buffer_bindings() };
+    println!("{position_gpu_archetype_id:?} buffer bindings are {buffer_bindings:#?}");
 
     executor.execute();
 

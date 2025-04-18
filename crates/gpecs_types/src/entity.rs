@@ -17,6 +17,7 @@ pub struct Entity {
 impl Entity {
     const BITS: u32 = u16::BITS;
     const LO_BITS_MASK: u32 = u16::MAX as u32;
+    const HI_BITS_MASK: u32 = !Self::LO_BITS_MASK;
 
     #[inline]
     pub const fn new(index: u32, epoch: EntityEpoch, world: WorldId) -> Self {
@@ -31,6 +32,11 @@ impl Entity {
     }
 
     #[inline]
+    pub const fn set_index(&mut self, index: u32) {
+        self.index = index;
+    }
+
+    #[inline]
     #[allow(unsafe_code)]
     pub const fn epoch(&self) -> EntityEpoch {
         let Self { epoch_world, .. } = *self;
@@ -39,11 +45,22 @@ impl Entity {
     }
 
     #[inline]
+    pub const fn set_epoch(&mut self, epoch: EntityEpoch) {
+        let world = self.world().into_u32();
+        self.epoch_world = (epoch.into_u32() << Self::BITS) | world;
+    }
+
+    #[inline]
     #[allow(unsafe_code)]
     pub const fn world(&self) -> WorldId {
         let Self { epoch_world, .. } = *self;
         let world = epoch_world & Self::LO_BITS_MASK;
         unsafe { WorldId::from_u32(world) }
+    }
+
+    #[inline]
+    pub const fn set_world(&mut self, world: WorldId) {
+        self.epoch_world = (self.epoch_world & Self::HI_BITS_MASK) | world.into_u32();
     }
 }
 

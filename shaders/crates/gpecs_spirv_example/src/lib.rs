@@ -24,7 +24,7 @@ pub fn compute_shader(
     let data: <(_,) as Soa>::SlicesMut<'_> = (data,);
     for index in 0..8 {
         let item = unsafe { data.0.index_unchecked_mut(index) };
-        *item = Entity::new(index as u32 + id.x, item.epoch(), item.world());
+        item.set_index(index as u32 + id.x);
 
         let zst = unsafe { data_zst.index_unchecked_mut(index) };
         *zst = ();

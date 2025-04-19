@@ -244,8 +244,8 @@ impl Debug for ComponentIds {
         let Self { inner } = self;
 
         let Range { start, end } = *inner;
-        let inner = component_id_trusted(start)..component_id_trusted(end);
-        write!(f, "{inner:?}")
+        let ids = component_id_trusted(start)..component_id_trusted(end);
+        f.debug_struct("ComponentIds").field("ids", &ids).finish()
     }
 }
 

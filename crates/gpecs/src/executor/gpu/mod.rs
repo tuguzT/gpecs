@@ -1,6 +1,6 @@
 use std::any::TypeId;
 
-use wgpu::Device;
+use wgpu::{Device, ShaderModule};
 
 use crate::{
     archetype::error::{DuplicateComponentError, GetComponentsError},
@@ -15,6 +15,7 @@ use self::{
         registry::{GpuComponentId, GpuComponentRegistry},
         GpuComponent,
     },
+    system::registry::{GpuSystemId, GpuSystemInfo, GpuSystemRegistry},
 };
 
 use super::Executor;
@@ -22,14 +23,16 @@ use super::Executor;
 pub mod archetype;
 pub mod bundle;
 pub mod component;
+pub mod system;
 
 #[derive(Debug)]
 pub struct GpuExecutor<'context> {
     context: &'context mut Context,
     components: GpuComponentRegistry,
     archetypes: GpuArchetypeRegistry,
+    systems: GpuSystemRegistry,
     device: Device,
-    // TODO: add some struct with GPU shaders and their schedule
+    // TODO: add some struct with GPU systems' schedule
 }
 
 impl<'context> GpuExecutor<'context> {
@@ -40,6 +43,7 @@ impl<'context> GpuExecutor<'context> {
             device,
             components: GpuComponentRegistry::new(),
             archetypes: GpuArchetypeRegistry::new(),
+            systems: GpuSystemRegistry::new(),
         }
     }
 
@@ -59,6 +63,12 @@ impl<'context> GpuExecutor<'context> {
     pub fn archetypes(&self) -> &GpuArchetypeRegistry {
         let Self { archetypes, .. } = self;
         archetypes
+    }
+
+    #[inline]
+    pub fn systems(&self) -> &GpuSystemRegistry {
+        let Self { systems, .. } = self;
+        systems
     }
 
     #[inline]
@@ -127,7 +137,7 @@ impl<'context> GpuExecutor<'context> {
     {
         let Self {
             context,
-            device,
+            ref device,
             components: gpu_components,
             archetypes: gpu_archetypes,
             ..
@@ -135,13 +145,48 @@ impl<'context> GpuExecutor<'context> {
         #[allow(unsafe_code)]
         let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
 
-        gpu_archetypes.register_archetype::<B>(archetypes, components, gpu_components, device)
+        gpu_archetypes.register_archetype::<B>(components, archetypes, gpu_components, device)
     }
 
     #[inline]
     pub fn get_archetype_info(&self, archetype_id: GpuArchetypeId) -> Option<&GpuArchetypeInfo> {
         let Self { archetypes, .. } = self;
         archetypes.get_archetype_info(archetype_id)
+    }
+
+    #[inline]
+    pub fn register_system<I>(
+        &mut self,
+        shader_module: ShaderModule,
+        entry_point: Option<&str>,
+        bind_entities: bool,
+        component_ids: I,
+    ) -> Result<GpuSystemId, DuplicateComponentError>
+    where
+        I: IntoIterator<Item = GpuComponentId>,
+    {
+        let Self {
+            ref context,
+            ref device,
+            systems,
+            ..
+        } = self;
+        let components = context.components();
+
+        systems.register_system(
+            components,
+            device,
+            shader_module,
+            entry_point,
+            bind_entities,
+            component_ids,
+        )
+    }
+
+    #[inline]
+    pub fn get_system_info(&self, system_id: GpuSystemId) -> Option<&GpuSystemInfo> {
+        let Self { systems, .. } = self;
+        systems.get_system_info(system_id)
     }
 
     #[inline]

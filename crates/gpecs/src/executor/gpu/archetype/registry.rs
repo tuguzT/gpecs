@@ -113,8 +113,8 @@ impl GpuArchetypeRegistry {
     #[inline]
     pub fn register_archetype<B>(
         &mut self,
-        archetypes: &mut ArchetypeRegistry,
         components: &mut ComponentRegistry,
+        archetypes: &mut ArchetypeRegistry,
         gpu_components: &mut GpuComponentRegistry,
         gpu_device: &Device,
     ) -> Result<GpuArchetypeId, DuplicateComponentError>
@@ -138,8 +138,8 @@ impl GpuArchetypeRegistry {
     #[inline]
     pub fn register_archetype_from<I>(
         &mut self,
-        archetypes: &mut ArchetypeRegistry,
         components: &ComponentRegistry,
+        archetypes: &mut ArchetypeRegistry,
         gpu_device: &Device,
         component_ids: I,
     ) -> Result<GpuArchetypeId, DuplicateComponentError>
@@ -242,9 +242,9 @@ impl Debug for GpuArchetypeIds<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner } = self;
 
-        let archetype_ids = inner.as_slice();
+        let ids = inner.as_slice();
         f.debug_struct("GpuArchetypeIds")
-            .field("archetype_ids", &archetype_ids)
+            .field("ids", &ids)
             .finish()
     }
 }

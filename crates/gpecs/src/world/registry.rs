@@ -80,8 +80,8 @@ impl Debug for WorldIds {
         let Self { inner } = self;
 
         let Range { start, end } = *inner;
-        let inner = world_id_trusted(start)..world_id_trusted(end);
-        write!(f, "{inner:?}")
+        let ids = world_id_trusted(start)..world_id_trusted(end);
+        f.debug_struct("WorldIds").field("ids", &ids).finish()
     }
 }
 

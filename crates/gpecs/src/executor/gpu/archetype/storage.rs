@@ -11,13 +11,15 @@ use crate::{
     prelude::ComponentId,
 };
 
+use super::registry::GpuArchetypeId;
+
 #[derive(Debug, Clone, Copy)]
 struct BufferBindingDescriptor {
     offset: BufferAddress,
     size: BufferSize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BufferBindings<'a> {
     pub entities: Option<BufferBinding<'a>>,
     pub components: IndexMap<ComponentId, Option<BufferBinding<'a>>>,
@@ -25,7 +27,8 @@ pub struct BufferBindings<'a> {
 
 #[derive(Debug)]
 pub struct GpuArchetypeStorage {
-    buffer: Buffer,
+    storage_buffer: Buffer,
+    _download_buffer: Option<Buffer>,
     entities_binding: Option<BufferBindingDescriptor>,
     component_bindings: IndexMap<ComponentId, Option<BufferBindingDescriptor>>,
 }
@@ -33,7 +36,11 @@ pub struct GpuArchetypeStorage {
 impl GpuArchetypeStorage {
     #[inline]
     #[allow(unsafe_code)]
-    pub fn new(components: &ComponentRegistry, gpu_device: &Device, info: &ArchetypeInfo) -> Self {
+    pub(super) fn new(
+        components: &ComponentRegistry,
+        gpu_device: &Device,
+        info: &ArchetypeInfo,
+    ) -> Self {
         let (entities, erased_components) = info.storage().erased_components(components);
         let mut component_bindings = IndexMap::with_capacity(erased_components.len());
 
@@ -76,16 +83,18 @@ impl GpuArchetypeStorage {
             }
         }
 
-        let buffer_label = format!("`gpecs` {:?} storage buffer", info.id());
-        let buffer_desc = BufferInitDescriptor {
-            label: Some(&buffer_label),
+        let archetype_id = unsafe { GpuArchetypeId::from_id(info.id()) };
+        let storage_buffer_label = format!("`gpecs` {archetype_id:?} storage buffer");
+        let storage_buffer_desc = BufferInitDescriptor {
+            label: Some(&storage_buffer_label),
             contents: &contents,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
         };
-        let buffer = gpu_device.create_buffer_init(&buffer_desc);
+        let storage_buffer = gpu_device.create_buffer_init(&storage_buffer_desc);
 
         Self {
-            buffer,
+            storage_buffer,
+            _download_buffer: None,
             entities_binding,
             component_bindings,
         }
@@ -93,22 +102,23 @@ impl GpuArchetypeStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub unsafe fn buffer(&self) -> &Buffer {
-        let Self { buffer, .. } = self;
-        buffer
+    pub unsafe fn storage_buffer(&self) -> &Buffer {
+        let Self { storage_buffer, .. } = self;
+        storage_buffer
     }
 
     #[inline]
     #[allow(unsafe_code)]
-    pub unsafe fn buffer_bindings(&self) -> BufferBindings {
+    pub unsafe fn storage_buffer_bindings(&self) -> BufferBindings {
         let Self {
-            buffer,
+            storage_buffer,
             entities_binding,
             component_bindings,
+            ..
         } = self;
 
         let map_binding = |binding: BufferBindingDescriptor| BufferBinding {
-            buffer,
+            buffer: storage_buffer,
             offset: binding.offset,
             size: Some(binding.size),
         };

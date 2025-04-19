@@ -215,9 +215,9 @@ impl Debug for GpuComponentIds<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner } = self;
 
-        let component_ids = inner.as_slice();
+        let ids = inner.as_slice();
         f.debug_struct("GpuComponentIds")
-            .field("component_ids", &component_ids)
+            .field("ids", &ids)
             .finish()
     }
 }

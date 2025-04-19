@@ -8,13 +8,26 @@ use super::{IntoSystem, System};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
-pub struct SystemId(usize);
+pub struct SystemId(u32);
 
 impl SystemId {
     #[inline]
-    pub const fn index(&self) -> usize {
+    pub const fn into_u32(&self) -> u32 {
         let Self(id) = *self;
         id
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub const unsafe fn from_u32(id: u32) -> Self {
+        Self(id)
+    }
+}
+
+impl From<SystemId> for u32 {
+    #[inline]
+    fn from(id: SystemId) -> Self {
+        id.into_u32()
     }
 }
 
@@ -64,7 +77,8 @@ impl SystemRegistry {
     {
         let Self { systems } = self;
 
-        let id = SystemId(systems.len());
+        let index = systems.len();
+        let id = system_id_from_usize(index);
 
         let system = Box::new(system.into_system());
         let info = SystemInfo { id, system };
@@ -88,25 +102,26 @@ impl SystemRegistry {
     #[inline]
     pub fn get_system_info(&self, id: SystemId) -> Option<&SystemInfo> {
         let Self { systems } = self;
-        systems.get(id.index())
+        systems.get(system_id_into_usize(id))
     }
 
     #[inline]
     pub fn get_system_info_mut(&mut self, id: SystemId) -> Option<&mut SystemInfo> {
         let Self { systems } = self;
-        systems.get_mut(id.index())
+        systems.get_mut(system_id_into_usize(id))
     }
 
     #[inline]
     pub fn system_ids(&self) -> SystemIds {
-        let len = self.len();
+        let index = self.len();
+        let len = system_id_from_usize(index).into_u32();
         SystemIds { inner: 0..len }
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SystemIds {
-    inner: Range<usize>,
+    inner: Range<u32>,
 }
 
 impl SystemIds {
@@ -128,8 +143,8 @@ impl Debug for SystemIds {
         let Self { inner } = self;
 
         let Range { start, end } = *inner;
-        let inner = SystemId(start)..SystemId(end);
-        write!(f, "{inner:?}")
+        let ids = system_id_trusted(start)..system_id_trusted(end);
+        f.debug_struct("SystemIds").field("ids", &ids).finish()
     }
 }
 
@@ -139,7 +154,7 @@ impl Iterator for SystemIds {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(SystemId)
+        inner.next().map(system_id_trusted)
     }
 
     #[inline]
@@ -157,25 +172,25 @@ impl Iterator for SystemIds {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(SystemId)
+        inner.nth(n).map(system_id_trusted)
     }
 
     #[inline]
     fn last(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.last().map(SystemId)
+        inner.last().map(system_id_trusted)
     }
 
     #[inline]
     fn min(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.min().map(SystemId)
+        inner.min().map(system_id_trusted)
     }
 
     #[inline]
     fn max(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.max().map(SystemId)
+        inner.max().map(system_id_trusted)
     }
 
     #[inline]
@@ -189,13 +204,13 @@ impl DoubleEndedIterator for SystemIds {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(SystemId)
+        inner.next_back().map(system_id_trusted)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(SystemId)
+        inner.nth_back(n).map(system_id_trusted)
     }
 }
 
@@ -208,3 +223,21 @@ impl ExactSizeIterator for SystemIds {
 }
 
 impl FusedIterator for SystemIds {}
+
+#[inline]
+fn system_id_from_usize(index: usize) -> SystemId {
+    let id = index.try_into().expect("`SystemId` overflow");
+    system_id_trusted(id)
+}
+
+#[inline]
+fn system_id_into_usize(id: SystemId) -> usize {
+    let id = id.into_u32();
+    id.try_into().expect("`SystemId` overflow")
+}
+
+#[inline]
+#[allow(unsafe_code)]
+fn system_id_trusted(id: u32) -> SystemId {
+    unsafe { SystemId::from_u32(id) }
+}

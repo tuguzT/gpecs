@@ -23,7 +23,10 @@ use petgraph::{
 use crate::{
     archetype::{erased::drop_erased_in_place, storage::ArchetypeStorage},
     bundle::Bundle,
-    component::registry::{ComponentId, ComponentRegistry},
+    component::{
+        registry::{ComponentId, ComponentRegistry},
+        utils::{try_collect_component_ids, try_collect_maybe_component_ids},
+    },
     entity::Entity,
     soa::{
         slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
@@ -38,7 +41,6 @@ use super::{
         IncompatibleBundleError, InsertBundleError, InsertBundleExactError, MissingComponentError,
         RemoveBundleExactError,
     },
-    utils::{try_collect_component_ids, try_collect_maybe_component_ids},
 };
 
 /// Archetype [identifier](ArchetypeId) of some [entity](Entity).
@@ -1169,8 +1171,8 @@ impl Debug for ArchetypeIds {
         let Self { inner } = self;
 
         let Range { start, end } = *inner;
-        let inner = archetype_id_trusted(start)..archetype_id_trusted(end);
-        write!(f, "{inner:?}")
+        let ids = archetype_id_trusted(start)..archetype_id_trusted(end);
+        f.debug_struct("ArchetypeIds").field("ids", &ids).finish()
     }
 }
 

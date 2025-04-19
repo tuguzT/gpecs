@@ -21,7 +21,10 @@ use indexmap::{map::Keys, IndexMap, IndexSet};
 use crate::{
     archetype::erased::drop_erased_in_place,
     bundle::Bundle,
-    component::registry::{ComponentId, ComponentRegistry, DropFn},
+    component::{
+        registry::{ComponentId, ComponentRegistry, DropFn},
+        utils::{try_collect_component_ids, try_collect_maybe_component_ids},
+    },
     entity::Entity,
     soa::traits::{DefaultContext, FieldDescriptor, Soa},
 };
@@ -36,7 +39,6 @@ use super::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
         IncompatibleBundleValueError, MissingComponentError, TooFewComponentsError,
     },
-    utils::{try_collect_component_ids, try_collect_maybe_component_ids},
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]

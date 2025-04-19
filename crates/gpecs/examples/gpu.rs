@@ -115,6 +115,30 @@ fn main() {
         position_archetype_id.into_u32(),
     );
 
+    const PATH: &str = env!("gpecs_shader_example.spv");
+    log::info!("Loading shader from {PATH}");
+
+    let data = fs::read(PATH).expect("SPIR-V shader file should exist");
+    let shader_desc = wgpu::ShaderModuleDescriptor {
+        label: Some("`gpecs` example shader"),
+        source: wgpu::util::make_spirv(&data),
+    };
+    let shader_module = device.create_shader_module(shader_desc);
+    let shader_compilation_info = pollster::block_on(shader_module.get_compilation_info());
+    log::info!("Shader compilation info:\n{shader_compilation_info:#?}");
+
+    let positions_gpu_system_id = executor
+        .register_system(
+            shader_module,
+            Some("copy_entity_indices"),
+            true,
+            [position_gpu_id],
+        )
+        .expect("GPU system by shader module should be registered");
+    let positions_gpu_system_info = executor
+        .get_system_info(positions_gpu_system_id)
+        .expect("just registered GPU system should be present");
+
     let mass_gpu_id = executor
         .component_id::<Mass>()
         .expect("`Mass` component should be registered after registering archetype");
@@ -123,8 +147,9 @@ fn main() {
     let mass_gpu_archetype_info = executor
         .get_archetype_info(mass_gpu_archetype_id)
         .expect("archetype info should be present");
-    let buffer_bindings = unsafe { mass_gpu_archetype_info.storage().buffer_bindings() };
-    log::info!("{mass_gpu_archetype_id:?} buffer bindings:\n{buffer_bindings:#?}");
+    let storage_buffer_bindings =
+        unsafe { mass_gpu_archetype_info.storage().storage_buffer_bindings() };
+    log::info!("{mass_gpu_archetype_id:?} buffer bindings:\n{storage_buffer_bindings:#?}");
 
     let position_archetype_info = executor
         .context()
@@ -137,76 +162,30 @@ fn main() {
     let position_gpu_archetype_info = executor
         .get_archetype_info(position_gpu_archetype_id)
         .expect("archetype info should be present");
-    let buffer_bindings = unsafe { position_gpu_archetype_info.storage().buffer_bindings() };
-    log::info!("{position_gpu_archetype_id:?} buffer bindings:\n{buffer_bindings:#?}");
+    let storage_buffer_bindings = unsafe {
+        position_gpu_archetype_info
+            .storage()
+            .storage_buffer_bindings()
+    };
+    log::info!("{position_gpu_archetype_id:?} buffer bindings:\n{storage_buffer_bindings:#?}");
 
-    let entities_binding = buffer_bindings.entities;
-    let positions_binding = buffer_bindings
+    let entities_binding = storage_buffer_bindings.entities;
+    let positions_binding = storage_buffer_bindings
         .components
         .get(&position_id)
         .cloned()
         .flatten();
     if let Some((entities_binding, positions_binding)) = entities_binding.zip(positions_binding) {
-        const PATH: &str = env!("gpecs_shader_example.spv");
-        log::info!("Loading shader from {PATH}");
-
-        let data = fs::read(PATH).expect("SPIR-V shader file should exist");
-        let shader_desc = wgpu::ShaderModuleDescriptor {
-            label: Some("`gpecs` example shader"),
-            source: wgpu::util::make_spirv(&data),
-        };
-        let shader_module = device.create_shader_module(shader_desc);
-        let shader_compilation_info = pollster::block_on(shader_module.get_compilation_info());
-        log::info!("Shader compilation info:\n{shader_compilation_info:#?}");
-
         let download_buffer_desc = wgpu::BufferDescriptor {
             label: Some("`gpecs` example download buffer"),
-            size: (position_entities.len() * size_of::<Position>())
-                .try_into()
-                .expect("buffer size should fit into `u64`"),
+            size: positions_binding
+                .size
+                .expect("component binding never uses the whole buffer")
+                .get(),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         };
         let download_buffer = device.create_buffer(&download_buffer_desc);
-
-        let entities_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Storage { read_only: false },
-                min_binding_size: Some(
-                    u64::try_from(size_of::<Entity>())
-                        .unwrap()
-                        .try_into()
-                        .unwrap(),
-                ),
-                has_dynamic_offset: false,
-            },
-            count: None,
-        };
-        let positions_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Storage { read_only: false },
-                min_binding_size: Some(
-                    u64::try_from(size_of::<Position>())
-                        .unwrap()
-                        .try_into()
-                        .unwrap(),
-                ),
-                has_dynamic_offset: false,
-            },
-            count: None,
-        };
-        let bind_group_layout_desc = wgpu::BindGroupLayoutDescriptor {
-            label: Some("`gpecs` example bind group layout"),
-            entries: &[
-                entities_bind_group_layout_entry,
-                positions_bind_group_layout_entry,
-            ],
-        };
-        let bind_group_layout = device.create_bind_group_layout(&bind_group_layout_desc);
 
         let entities_bind_group_entry = wgpu::BindGroupEntry {
             binding: 0,
@@ -218,26 +197,10 @@ fn main() {
         };
         let bind_group_desc = wgpu::BindGroupDescriptor {
             label: Some("`gpecs` example bind group"),
-            layout: &bind_group_layout,
+            layout: positions_gpu_system_info.shader().bind_group_layout(),
             entries: &[entities_bind_group_entry, positions_bind_group_entry],
         };
         let bind_group = device.create_bind_group(&bind_group_desc);
-
-        let pipeline_layout_desc = wgpu::PipelineLayoutDescriptor {
-            label: Some("`gpecs` example compute pipeline layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        };
-        let pipeline_layout = device.create_pipeline_layout(&pipeline_layout_desc);
-
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("`gpecs` example compute pipeline"),
-            layout: Some(&pipeline_layout),
-            module: &shader_module,
-            entry_point: Some("copy_entity_indices"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            cache: None,
-        });
 
         let command_encoder_desc = wgpu::CommandEncoderDescriptor {
             label: Some("`gpecs` example command encoder"),
@@ -251,7 +214,7 @@ fn main() {
             };
             let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
 
-            compute_pass.set_pipeline(&pipeline);
+            compute_pass.set_pipeline(positions_gpu_system_info.shader().compute_pipeline());
             compute_pass.set_bind_group(0, &bind_group, &[]);
 
             let workgroup_count = position_entities

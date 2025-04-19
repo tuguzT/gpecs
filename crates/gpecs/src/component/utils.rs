@@ -1,6 +1,7 @@
-use crate::component::registry::ComponentId;
-
-use super::error::{ComponentNotRegisteredError, DuplicateComponentError, GetComponentsError};
+use crate::{
+    archetype::error::{ComponentNotRegisteredError, DuplicateComponentError, GetComponentsError},
+    component::registry::ComponentId,
+};
 
 #[inline]
 pub fn try_collect_component_ids<S, I, F>(

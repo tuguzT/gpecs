@@ -220,9 +220,11 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
         let Self {
             ref context,
+            ref device,
             ref archetypes,
             systems,
             schedule,
@@ -233,7 +235,7 @@ impl<'context> GpuExecutor<'context> {
             label: Some("`gpecs` executor compute pass"),
             timestamp_writes: None,
         };
-        let _compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
+        let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
 
         for system_id in schedule.iter() {
             let Some(system_info) = systems.get_system_info(system_id) else {
@@ -253,9 +255,74 @@ impl<'context> GpuExecutor<'context> {
                 let Some(archetype_id) = archetypes.map_archetype_id(archetype_info.id()) else {
                     continue;
                 };
+                let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
+                    unreachable!("archetype {archetype_id:?} should exist");
+                };
 
-                // TODO: execute system on archetype
-                println!("Executing system {system_id:?} on archetype {archetype_id:?}...");
+                let mut storage_buffer_bindings =
+                    unsafe { archetype_info.storage().storage_buffer_bindings() };
+                let mut bind_group_entries = Vec::new();
+
+                if let Some(entities_bind_group_layout_entry) =
+                    system_info.shader().entities_bind_group_layout_entry()
+                {
+                    let Some(entities_buffer_binding) = storage_buffer_bindings.entities else {
+                        continue;
+                    };
+                    let entities_bind_group_entry = wgpu::BindGroupEntry {
+                        binding: entities_bind_group_layout_entry.binding,
+                        resource: wgpu::BindingResource::Buffer(entities_buffer_binding),
+                    };
+                    bind_group_entries.push(entities_bind_group_entry);
+                }
+                let components_bind_group_layout_entries =
+                    system_info.shader().components_bind_group_layout_entries();
+                for (component_id, component_bind_group_layout_entry) in
+                    components_bind_group_layout_entries
+                {
+                    let Some(component_bind_group_layout_entry) = component_bind_group_layout_entry
+                    else {
+                        continue;
+                    };
+                    let Some(component_buffer_binding) = storage_buffer_bindings
+                        .components
+                        .swap_remove(&component_id.into_id())
+                    else {
+                        unreachable!("archetype {archetype_id:?} should have {component_id:?}");
+                    };
+                    let Some(component_buffer_binding) = component_buffer_binding else {
+                        break;
+                    };
+
+                    let component_bind_group_entry = wgpu::BindGroupEntry {
+                        binding: component_bind_group_layout_entry.binding,
+                        resource: wgpu::BindingResource::Buffer(component_buffer_binding),
+                    };
+                    bind_group_entries.push(component_bind_group_entry);
+                }
+                if bind_group_entries.is_empty() {
+                    continue;
+                }
+
+                let bind_group_label =
+                    format!("`gpecs` {system_id:?} bind group for {archetype_id:?}");
+                let bind_group_desc = wgpu::BindGroupDescriptor {
+                    label: Some(&bind_group_label),
+                    layout: system_info.shader().bind_group_layout(),
+                    entries: &bind_group_entries,
+                };
+                let bind_group = device.create_bind_group(&bind_group_desc);
+
+                compute_pass.set_pipeline(system_info.shader().compute_pipeline());
+                compute_pass.set_bind_group(0, &bind_group, &[]);
+
+                let workgroup_count = archetype_info
+                    .storage()
+                    .len()
+                    .div_ceil(64) // TODO: use workgroup size from shader
+                    .try_into()
+                    .expect("workgroup count should fit into `u32`");
+                compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
             }
         }
     }

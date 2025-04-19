@@ -166,7 +166,8 @@ impl SystemShader {
         &self,
     ) -> impl DoubleEndedIterator<Item = (GpuComponentId, Option<&BindGroupLayoutEntry>)>
            + ExactSizeIterator
-           + FusedIterator {
+           + FusedIterator
+           + Clone {
         let Self {
             components_bind_group_layout_entries,
             ..

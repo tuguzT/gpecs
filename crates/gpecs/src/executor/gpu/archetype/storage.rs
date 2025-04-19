@@ -27,6 +27,7 @@ pub struct BufferBindings<'a> {
 
 #[derive(Debug)]
 pub struct GpuArchetypeStorage {
+    len: usize,
     storage_buffer: Buffer,
     _download_buffer: Option<Buffer>,
     entities_binding: Option<BufferBindingDescriptor>,
@@ -93,11 +94,23 @@ impl GpuArchetypeStorage {
         let storage_buffer = gpu_device.create_buffer_init(&storage_buffer_desc);
 
         Self {
+            len: entities.len(),
             storage_buffer,
             _download_buffer: None,
             entities_binding,
             component_bindings,
         }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { len, .. } = *self;
+        len
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     #[inline]

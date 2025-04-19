@@ -1,9 +1,8 @@
-use indexmap::IndexSet;
-
 use crate::context::Context;
 
 use self::system::{
     registry::{SystemId, SystemRegistry},
+    schedule::SystemSchedule,
     IntoSystem,
 };
 
@@ -15,7 +14,7 @@ pub mod system;
 pub struct CpuExecutor<'context> {
     context: &'context mut Context,
     systems: SystemRegistry,
-    schedule: IndexSet<SystemId>,
+    schedule: SystemSchedule,
 }
 
 impl<'context> CpuExecutor<'context> {
@@ -24,7 +23,7 @@ impl<'context> CpuExecutor<'context> {
         Self {
             context,
             systems: SystemRegistry::new(),
-            schedule: IndexSet::new(),
+            schedule: SystemSchedule::new(),
         }
     }
 
@@ -58,13 +57,13 @@ impl<'context> CpuExecutor<'context> {
     #[inline]
     pub fn add_system(&mut self, system: SystemId) -> bool {
         let Self { schedule, .. } = self;
-        schedule.insert(system)
+        schedule.add_system(system)
     }
 
     #[inline]
     pub fn remove_system(&mut self, system: SystemId) -> bool {
         let Self { schedule, .. } = self;
-        schedule.shift_remove(&system)
+        schedule.remove_system(system)
     }
 }
 
@@ -77,7 +76,7 @@ impl Executor for CpuExecutor<'_> {
             ref schedule,
         } = self;
 
-        schedule.iter().for_each(|&system_id| {
+        schedule.iter().for_each(|system_id| {
             let Some(info) = systems.get_system_info_mut(system_id) else {
                 unreachable!("system {system_id:?} should be present");
             };

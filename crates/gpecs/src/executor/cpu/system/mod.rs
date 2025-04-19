@@ -3,6 +3,7 @@ use std::{any, borrow::Cow};
 use crate::context::Context;
 
 pub mod registry;
+pub mod schedule;
 
 mod impls;
 

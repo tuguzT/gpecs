@@ -9,11 +9,14 @@ fn main() {
     for i in 0..12 {
         let entity = context.spawn();
         if i % 2 == 0 {
-            let x = i as f32;
-            let y = -(i as f32);
-            let z = 0.0;
+            let position = Position {
+                x: i as f32,
+                y: -(i as f32),
+                z: 0.0,
+                _padding: 0.0,
+            };
             context
-                .insert_bundle(entity, (Tag, Position { x, y, z }))
+                .insert_bundle(entity, (Tag, position))
                 .expect("entity should exist & archetype of `Tag` and `Position` should be valid");
         } else {
             context

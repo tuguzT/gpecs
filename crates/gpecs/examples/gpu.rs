@@ -1,4 +1,4 @@
-use std::{fs, mem::transmute, os::raw::c_void, path, ptr::null};
+use std::{fs, mem::transmute, os::raw::c_void, path, ptr::null, slice};
 
 use gpecs::{prelude::*, soa::prelude::*};
 use renderdoc::{RenderDoc, V141};
@@ -70,10 +70,12 @@ fn main() {
     for i in 0..12 {
         let entity = context.spawn();
         if i % 2 == 0 {
-            let x = i as f32;
-            let y = -(i as f32);
-            let z = 0.0;
-            let position = Position { x, y, z };
+            let position = Position {
+                x: i as f32,
+                y: -(i as f32),
+                z: 0.0,
+                _padding: 0.0,
+            };
             context
                 .insert_bundle(entity, (position,))
                 .expect("entity should exist & archetype of just `Position` should be valid");
@@ -139,7 +141,13 @@ fn main() {
     let buffer_bindings = unsafe { position_gpu_archetype_info.storage().buffer_bindings() };
     log::info!("{position_gpu_archetype_id:?} buffer bindings:\n{buffer_bindings:#?}");
 
-    if let Some(entities_binding) = buffer_bindings.entities {
+    let entities_binding = buffer_bindings.entities;
+    let positions_binding = buffer_bindings
+        .components
+        .get(&position_id)
+        .cloned()
+        .flatten();
+    if let Some((entities_binding, positions_binding)) = entities_binding.zip(positions_binding) {
         let path = path::absolute(env!("gpecs_shader_example.spv")).expect("path should be valid");
         log::info!("Loading shader from {path:?}");
 
@@ -152,19 +160,11 @@ fn main() {
         let shader_compilation_info = pollster::block_on(shader_module.get_compilation_info());
         log::info!("Shader compilation info:\n{shader_compilation_info:#?}");
 
-        let indices_buffer_desc = wgpu::BufferDescriptor {
-            label: Some("`gpecs` example indices buffer"),
-            size: (position_entities.len() * size_of::<u32>())
-                .try_into()
-                .expect("buffer size should fit into `u64`"),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        };
-        let indices_buffer = device.create_buffer(&indices_buffer_desc);
-
         let download_buffer_desc = wgpu::BufferDescriptor {
             label: Some("`gpecs` example download buffer"),
-            size: indices_buffer.size(),
+            size: (position_entities.len() * size_of::<Position>())
+                .try_into()
+                .expect("buffer size should fit into `u64`"),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         };
@@ -174,7 +174,7 @@ fn main() {
             binding: 0,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                ty: wgpu::BufferBindingType::Storage { read_only: false },
                 min_binding_size: Some(
                     u64::try_from(size_of::<Entity>())
                         .unwrap()
@@ -185,13 +185,16 @@ fn main() {
             },
             count: None,
         };
-        let indices_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
+        let positions_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
             binding: 1,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Storage { read_only: false },
                 min_binding_size: Some(
-                    u64::try_from(size_of::<u32>()).unwrap().try_into().unwrap(),
+                    u64::try_from(size_of::<Position>())
+                        .unwrap()
+                        .try_into()
+                        .unwrap(),
                 ),
                 has_dynamic_offset: false,
             },
@@ -201,7 +204,7 @@ fn main() {
             label: Some("`gpecs` example bind group layout"),
             entries: &[
                 entities_bind_group_layout_entry,
-                indices_bind_group_layout_entry,
+                positions_bind_group_layout_entry,
             ],
         };
         let bind_group_layout = device.create_bind_group_layout(&bind_group_layout_desc);
@@ -210,14 +213,14 @@ fn main() {
             binding: 0,
             resource: wgpu::BindingResource::Buffer(entities_binding),
         };
-        let indices_bind_group_entry = wgpu::BindGroupEntry {
+        let positions_bind_group_entry = wgpu::BindGroupEntry {
             binding: 1,
-            resource: indices_buffer.as_entire_binding(),
+            resource: wgpu::BindingResource::Buffer(positions_binding.clone()),
         };
         let bind_group_desc = wgpu::BindGroupDescriptor {
             label: Some("`gpecs` example bind group"),
             layout: &bind_group_layout,
-            entries: &[entities_bind_group_entry, indices_bind_group_entry],
+            entries: &[entities_bind_group_entry, positions_bind_group_entry],
         };
         let bind_group = device.create_bind_group(&bind_group_desc);
 
@@ -261,27 +264,37 @@ fn main() {
         }
 
         command_encoder.copy_buffer_to_buffer(
-            &indices_buffer,
-            0,
+            positions_binding.buffer,
+            positions_binding.offset,
             &download_buffer,
             0,
-            indices_buffer.size(),
+            positions_binding.size.unwrap().get(),
         );
 
         let command_buffer = command_encoder.finish();
         queue.submit([command_buffer]);
 
-        let indices_slice = download_buffer.slice(..);
-        indices_slice.map_async(wgpu::MapMode::Read, |_| {});
+        let download_slice = download_buffer.slice(..);
+        download_slice.map_async(wgpu::MapMode::Read, |_| {});
 
         device.poll(wgpu::Maintain::Wait).panic_on_timeout();
-        let indices = indices_slice.get_mapped_range();
-        let indices: &[u32] = bytemuck::cast_slice(&indices);
-        log::info!("Resulting indices:\n{indices:#?}");
+        let positions = &download_slice.get_mapped_range()[..];
+        let positions: &[Position] = unsafe {
+            slice::from_raw_parts(
+                positions.as_ptr() as *const Position,
+                position_entities.len(),
+            )
+        };
+        log::info!("Compute output:\n{positions:#?}");
 
         itertools::assert_equal(
-            position_entities.iter().map(|entity| entity.index()),
-            indices.iter().copied(),
+            position_entities.iter().map(|entity| Position {
+                x: entity.index() as f32,
+                y: (entity.index() as f32) / 2.0,
+                z: -(entity.index() as f32) / 2.0,
+                _padding: 0.0,
+            }),
+            positions.iter().copied(),
         );
     }
 

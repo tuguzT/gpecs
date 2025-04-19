@@ -4,24 +4,33 @@
 
 use gpecs_soa::prelude::*;
 use gpecs_types::entity::Entity;
-use spirv_std::{glam::UVec3, spirv};
-use static_assertions as sa;
+use spirv_std::{
+    glam::{UVec3, Vec3},
+    spirv,
+};
 use unroll::unroll_for_loops;
 
-const WORKGROUP_SIZE: usize = 256;
-
-#[allow(unused)] // unroll does not support const variables, so integer literal is used instead
-const ITER_COUNT: usize = WORKGROUP_SIZE / 32;
-sa::const_assert_eq!(ITER_COUNT, 8);
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub struct Position {
+    data: Vec3,
+}
 
 #[spirv(compute(threads(64)))]
 #[unroll_for_loops]
 pub fn copy_entity_indices(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &[Entity],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] indices: &mut [u32],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &mut [Entity],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] positions: &mut [Position],
 ) {
     let (entities,): <(_,) as Soa>::Slices<'_> = (entities,);
+
     let index = id.x as usize;
-    indices[index] = entities[index].index();
+    let entity = entities[index];
+    let position = &mut positions[index];
+
+    position.data = Vec3 {
+        x: entity.index() as f32,
+        y: (entity.index() as f32) / 2.0,
+        z: -(entity.index() as f32) / 2.0,
+    };
 }

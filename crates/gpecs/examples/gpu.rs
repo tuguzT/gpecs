@@ -1,4 +1,4 @@
-use std::{fs, mem::transmute, os::raw::c_void, path, ptr::null, slice};
+use std::{fs, mem::transmute, os::raw::c_void, ptr::null, slice};
 
 use gpecs::{prelude::*, soa::prelude::*};
 use renderdoc::{RenderDoc, V141};
@@ -147,10 +147,10 @@ fn main() {
         .cloned()
         .flatten();
     if let Some((entities_binding, positions_binding)) = entities_binding.zip(positions_binding) {
-        let path = path::absolute(env!("gpecs_shader_example.spv")).expect("path should be valid");
-        log::info!("Loading shader from {path:?}");
+        const PATH: &str = env!("gpecs_shader_example.spv");
+        log::info!("Loading shader from {PATH}");
 
-        let data = fs::read(path).expect("SPIR-V shader file should exist");
+        let data = fs::read(PATH).expect("SPIR-V shader file should exist");
         let shader_desc = wgpu::ShaderModuleDescriptor {
             label: Some("`gpecs` example shader"),
             source: wgpu::util::make_spirv(&data),

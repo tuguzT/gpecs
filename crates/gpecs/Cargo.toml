@@ -22,3 +22,6 @@ bytemuck = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 renderdoc = { workspace = true }
+
+[build-dependencies]
+const_format = { workspace = true }

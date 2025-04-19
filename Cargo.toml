@@ -37,6 +37,7 @@ rspirv = { version = "0.12" }
 criterion = { version = "0.5", features = ["html_reports"] }
 pollster = { version = "0.4" }
 bytemuck = { version = "1.22" }
+const_format = { version = "0.2" }
 env_logger = { version = "0.11" }
 log = { version = "0.4" }
 unroll = { version = "0.1" }

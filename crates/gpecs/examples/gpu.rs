@@ -176,17 +176,6 @@ fn main() {
         .cloned()
         .flatten();
     if let Some((entities_binding, positions_binding)) = entities_binding.zip(positions_binding) {
-        let download_buffer_desc = wgpu::BufferDescriptor {
-            label: Some("`gpecs` example download buffer"),
-            size: positions_binding
-                .size
-                .expect("component binding never uses the whole buffer")
-                .get(),
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        };
-        let download_buffer = device.create_buffer(&download_buffer_desc);
-
         let entities_bind_group_entry = wgpu::BindGroupEntry {
             binding: 0,
             resource: wgpu::BindingResource::Buffer(entities_binding),
@@ -225,6 +214,17 @@ fn main() {
             compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
         }
 
+        let download_buffer_desc = wgpu::BufferDescriptor {
+            label: Some("`gpecs` example download buffer"),
+            size: positions_binding
+                .size
+                .expect("component binding never uses the whole buffer")
+                .get(),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        };
+        let download_buffer = device.create_buffer(&download_buffer_desc);
+
         command_encoder.copy_buffer_to_buffer(
             positions_binding.buffer,
             positions_binding.offset,
@@ -238,12 +238,11 @@ fn main() {
 
         let download_slice = download_buffer.slice(..);
         download_slice.map_async(wgpu::MapMode::Read, |_| {});
-
         device.poll(wgpu::Maintain::Wait).panic_on_timeout();
-        let positions = &download_slice.get_mapped_range()[..];
+
         let positions: &[Position] = unsafe {
             slice::from_raw_parts(
-                positions.as_ptr() as *const Position,
+                download_slice.get_mapped_range().as_ptr().cast(),
                 position_entities.len(),
             )
         };

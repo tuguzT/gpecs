@@ -13,14 +13,14 @@ fn main() {
                 x: i as f32,
                 y: -(i as f32),
                 z: 0.0,
-                _padding: 0.0,
             };
             context
                 .insert_bundle(entity, (Tag, position))
                 .expect("entity should exist & archetype of `Tag` and `Position` should be valid");
         } else {
+            let mass = Mass { value: i };
             context
-                .insert_bundle(entity, (Mass { value: i }, Tag))
+                .insert_bundle(entity, (mass, Tag))
                 .expect("entity should exist & archetype of `Mass` and `Tag` should be valid");
         }
     }

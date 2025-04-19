@@ -11,6 +11,7 @@ use spirv_std::{
 use unroll::unroll_for_loops;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[repr(C, align(16))]
 pub struct Position {
     data: Vec3,
 }

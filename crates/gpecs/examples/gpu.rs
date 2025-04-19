@@ -74,7 +74,6 @@ fn main() {
                 x: i as f32,
                 y: -(i as f32),
                 z: 0.0,
-                _padding: 0.0,
             };
             context
                 .insert_bundle(entity, (position,))
@@ -292,7 +291,6 @@ fn main() {
                 x: entity.index() as f32,
                 y: (entity.index() as f32) / 2.0,
                 z: -(entity.index() as f32) / 2.0,
-                _padding: 0.0,
             }),
             positions.iter().copied(),
         );

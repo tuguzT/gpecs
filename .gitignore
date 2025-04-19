@@ -22,3 +22,7 @@ Cargo.lock
 
 # VS Code
 .vscode/
+
+# `rust-gpu` build artifacts
+manifest.json
+*.spv

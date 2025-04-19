@@ -1,10 +1,4 @@
-use std::{
-    fs,
-    mem::transmute,
-    os::raw::c_void,
-    path::{self, Path},
-    ptr::null,
-};
+use std::{fs, mem::transmute, os::raw::c_void, path, ptr::null};
 
 use gpecs::{prelude::*, soa::prelude::*};
 use renderdoc::{RenderDoc, V141};
@@ -146,11 +140,7 @@ fn main() {
     log::info!("{position_gpu_archetype_id:?} buffer bindings:\n{buffer_bindings:#?}");
 
     if let Some(entities_binding) = buffer_bindings.entities {
-        const ABS_PATH: &str = env!("CARGO_MANIFEST_DIR");
-        const REL_PATH: &str = "../../shaders/target/spirv-builder/spirv-unknown-spv1.3/release/deps/gpecs_spirv_example.spv";
-
-        let path =
-            path::absolute(Path::new(ABS_PATH).join(REL_PATH)).expect("path should be valid");
+        let path = path::absolute(env!("gpecs_shader_example.spv")).expect("path should be valid");
         log::info!("Loading shader from {path:?}");
 
         let data = fs::read(path).expect("SPIR-V shader file should exist");

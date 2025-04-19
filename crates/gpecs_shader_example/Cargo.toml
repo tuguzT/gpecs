@@ -1,5 +1,5 @@
 [package]
-name = "gpecs_spirv_example"
+name = "gpecs_shader_example"
 description = "Example SPIR-V shader for (probably) ECS on GPU"
 version.workspace = true
 license.workspace = true
@@ -18,5 +18,22 @@ spirv-std = { workspace = true }
 unroll = { workspace = true }
 static_assertions = { workspace = true }
 
+[features]
+nightly = []
+
 [lints]
 workspace = true
+
+[package.metadata.rust-gpu.install]
+spirv_builder_source = "https://github.com/Rust-GPU/rust-gpu"
+spirv_builder_version = "175c175c"
+rust_toolchain = "nightly-2024-11-22"
+auto-install-rust-toolchain = true
+force-spirv-cli-rebuild = true
+force-overwrite-lockfiles-v4-to-v3 = false
+
+[package.metadata.rust-gpu.build]
+no_default_features = true
+features = ["nightly"]
+shader-target = "spirv-unknown-spv1.3"
+spirv-metadata = "Full"

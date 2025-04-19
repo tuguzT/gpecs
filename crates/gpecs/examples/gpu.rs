@@ -161,7 +161,7 @@ fn main() {
             shader_module,
             Some("copy_entity_indices"),
             true,
-            [position_gpu_id, tag_gpu_id],
+            [position_gpu_id],
         )
         .expect("GPU system by shader module should be registered");
     executor.add_system(positions_gpu_system_id);

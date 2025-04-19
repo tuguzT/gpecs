@@ -1,7 +1,7 @@
 use std::any::TypeId;
 
 use system::schedule::GpuSystemSchedule;
-use wgpu::{CommandEncoder, Device, ShaderModule};
+use wgpu::{CommandEncoder, ComputePassDescriptor, Device, ShaderModule};
 
 use crate::{
     archetype::error::{DuplicateComponentError, GetComponentsError},
@@ -222,21 +222,41 @@ impl<'context> GpuExecutor<'context> {
     #[inline]
     pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
         let Self {
-            context: _,
-            device: _,
-            components: _,
-            archetypes: _,
+            ref context,
+            ref archetypes,
             systems,
             schedule,
+            ..
         } = self;
 
-        let _ = command_encoder;
+        let compute_pass_desc = ComputePassDescriptor {
+            label: Some("`gpecs` executor compute pass"),
+            timestamp_writes: None,
+        };
+        let _compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
+
         for system_id in schedule.iter() {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("system {system_id:?} should exist");
             };
-            // TODO: collect all compatible archetypes
-            println!("Executing system {:?}...", system_info.id());
+
+            let component_ids = system_info
+                .shader()
+                .components_bind_group_layout_entries()
+                .map(|(component_id, _)| component_id.into());
+            let Ok(compatible_archetypes) =
+                context.archetypes().compatible_archetypes(component_ids)
+            else {
+                unreachable!("system {system_id:?} should have compatible archetypes");
+            };
+            for archetype_info in compatible_archetypes {
+                let Some(archetype_id) = archetypes.map_archetype_id(archetype_info.id()) else {
+                    continue;
+                };
+
+                // TODO: execute system on archetype
+                println!("Executing system {system_id:?} on archetype {archetype_id:?}...");
+            }
         }
     }
 

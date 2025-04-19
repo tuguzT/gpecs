@@ -164,6 +164,8 @@ fn main() {
             [position_gpu_id, tag_gpu_id],
         )
         .expect("GPU system by shader module should be registered");
+    executor.add_system(positions_gpu_system_id);
+
     let positions_gpu_system_info = executor
         .get_system_info(positions_gpu_system_id)
         .expect("just registered GPU system should be present");
@@ -369,6 +371,8 @@ fn main() {
         );
     }
 
+    executor.execute(&mut command_encoder);
+
     let command_buffer = command_encoder.finish();
     queue.submit([command_buffer]);
 
@@ -384,6 +388,13 @@ fn main() {
     device.poll(wgpu::Maintain::Wait).panic_on_timeout();
 
     if let Some(position_tag_download_buffer) = position_tag_download_buffer {
+        let position_tag_archetype_info = executor
+            .context()
+            .archetypes()
+            .get_archetype_info(position_tag_archetype_id)
+            .expect("archetype info should be present");
+        let position_tag_entities = position_tag_archetype_info.storage().entities();
+
         let position_tag_positions: &[Position] = unsafe {
             slice::from_raw_parts(
                 position_tag_download_buffer
@@ -406,6 +417,13 @@ fn main() {
         );
     }
     if let Some(position_mass_download_buffer) = position_mass_download_buffer {
+        let position_mass_archetype_info = executor
+            .context()
+            .archetypes()
+            .get_archetype_info(position_mass_archetype_id)
+            .expect("archetype info should be present");
+        let position_mass_entities = position_mass_archetype_info.storage().entities();
+
         let position_mass_positions: &[Position] = unsafe {
             slice::from_raw_parts(
                 position_mass_download_buffer
@@ -427,8 +445,6 @@ fn main() {
             position_mass_positions.iter().copied(),
         );
     }
-
-    executor.execute();
 
     if let Ok(renderdoc) = renderdoc.as_mut() {
         log::info!("Ending RenderDoc capture...");

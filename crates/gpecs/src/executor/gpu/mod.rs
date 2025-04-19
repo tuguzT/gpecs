@@ -1,6 +1,7 @@
 use std::any::TypeId;
 
-use wgpu::{Device, ShaderModule};
+use system::schedule::GpuSystemSchedule;
+use wgpu::{CommandEncoder, Device, ShaderModule};
 
 use crate::{
     archetype::error::{DuplicateComponentError, GetComponentsError},
@@ -26,11 +27,11 @@ pub mod system;
 #[derive(Debug)]
 pub struct GpuExecutor<'context> {
     context: &'context mut Context,
+    device: Device,
     components: GpuComponentRegistry,
     archetypes: GpuArchetypeRegistry,
     systems: GpuSystemRegistry,
-    device: Device,
-    // TODO: add some struct with GPU systems' schedule
+    schedule: GpuSystemSchedule,
 }
 
 impl<'context> GpuExecutor<'context> {
@@ -42,6 +43,7 @@ impl<'context> GpuExecutor<'context> {
             components: GpuComponentRegistry::new(),
             archetypes: GpuArchetypeRegistry::new(),
             systems: GpuSystemRegistry::new(),
+            schedule: GpuSystemSchedule::new(),
         }
     }
 
@@ -153,6 +155,24 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
+    pub fn archetype_id<B>(&self) -> Result<Option<GpuArchetypeId>, GetComponentsError>
+    where
+        B: GpuBundle,
+    {
+        let Self {
+            context,
+            archetypes,
+            ..
+        } = self;
+
+        let Some(archetype_id) = context.archetype_id::<B>()? else {
+            return Ok(None);
+        };
+        let archetype_id = archetypes.map_archetype_id(archetype_id);
+        Ok(archetype_id)
+    }
+
+    #[inline]
     pub fn register_system<I>(
         &mut self,
         shader_module: ShaderModule,
@@ -188,26 +208,36 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    pub fn archetype_id<B>(&self) -> Result<Option<GpuArchetypeId>, GetComponentsError>
-    where
-        B: GpuBundle,
-    {
-        let Self {
-            context,
-            archetypes,
-            ..
-        } = self;
-
-        let Some(archetype_id) = context.archetype_id::<B>()? else {
-            return Ok(None);
-        };
-        let archetype_id = archetypes.map_archetype_id(archetype_id);
-        Ok(archetype_id)
+    pub fn add_system(&mut self, system_id: GpuSystemId) -> bool {
+        let Self { schedule, .. } = self;
+        schedule.add_system(system_id)
     }
 
     #[inline]
-    pub fn execute(&mut self) {
-        println!("Hello from the GPU executor!")
+    pub fn remove_system(&mut self, system_id: GpuSystemId) -> bool {
+        let Self { schedule, .. } = self;
+        schedule.remove_system(system_id)
+    }
+
+    #[inline]
+    pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
+        let Self {
+            context: _,
+            device: _,
+            components: _,
+            archetypes: _,
+            systems,
+            schedule,
+        } = self;
+
+        let _ = command_encoder;
+        for system_id in schedule.iter() {
+            let Some(system_info) = systems.get_system_info(system_id) else {
+                unreachable!("system {system_id:?} should exist");
+            };
+            // TODO: collect all compatible archetypes
+            println!("Executing system {:?}...", system_info.id());
+        }
     }
 
     // TODO: methods to copy data from CPU to GPU and vice versa

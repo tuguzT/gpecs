@@ -6,7 +6,7 @@ use std::{
     ptr::null,
 };
 
-use gpecs::{prelude::*, soa::identity::Identity};
+use gpecs::{prelude::*, soa::prelude::*};
 use renderdoc::{RenderDoc, V141};
 
 use self::common::{Mass, Position};
@@ -47,7 +47,7 @@ fn main() {
         required_limits: adapter.limits(),
         memory_hints: wgpu::MemoryHints::Performance,
     };
-    let (device, _queue) = pollster::block_on(adapter.request_device(&device_desc, None))
+    let (device, queue) = pollster::block_on(adapter.request_device(&device_desc, None))
         .expect("failed to create device & queue");
     log::info!("Limits of the current device:\n{:#?}", device.limits());
 
@@ -131,26 +131,169 @@ fn main() {
     let buffer_bindings = unsafe { mass_gpu_archetype_info.storage().buffer_bindings() };
     log::info!("{mass_gpu_archetype_id:?} buffer bindings:\n{buffer_bindings:#?}");
 
+    let position_archetype_info = executor
+        .context()
+        .archetypes()
+        .get_archetype_info(position_archetype_id)
+        .expect("archetype info should be present");
+    let position_entities = position_archetype_info.storage().entities();
+    log::info!("{position_archetype_id:?} has entities:\n{position_entities:#?}");
+
     let position_gpu_archetype_info = executor
         .get_archetype_info(position_gpu_archetype_id)
         .expect("archetype info should be present");
     let buffer_bindings = unsafe { position_gpu_archetype_info.storage().buffer_bindings() };
     log::info!("{position_gpu_archetype_id:?} buffer bindings:\n{buffer_bindings:#?}");
 
-    const ABS_PATH: &str = env!("CARGO_MANIFEST_DIR");
-    const REL_PATH: &str = "../../shaders/target/spirv-builder/spirv-unknown-spv1.3/release/deps/gpecs_spirv_example.spv";
+    if let Some(entities_binding) = buffer_bindings.entities {
+        const ABS_PATH: &str = env!("CARGO_MANIFEST_DIR");
+        const REL_PATH: &str = "../../shaders/target/spirv-builder/spirv-unknown-spv1.3/release/deps/gpecs_spirv_example.spv";
 
-    let path = path::absolute(Path::new(ABS_PATH).join(REL_PATH)).expect("path should be valid");
-    log::info!("Loading shader from {path:?}");
+        let path =
+            path::absolute(Path::new(ABS_PATH).join(REL_PATH)).expect("path should be valid");
+        log::info!("Loading shader from {path:?}");
 
-    let data = fs::read(path).expect("SPIR-V shader file should exist");
-    let shader_desc = wgpu::ShaderModuleDescriptor {
-        label: Some("`gpecs` example shader"),
-        source: wgpu::util::make_spirv(&data),
-    };
-    let shader_module = device.create_shader_module(shader_desc);
-    let shader_compilation_info = pollster::block_on(shader_module.get_compilation_info());
-    log::info!("Shader compilation info:\n{shader_compilation_info:#?}");
+        let data = fs::read(path).expect("SPIR-V shader file should exist");
+        let shader_desc = wgpu::ShaderModuleDescriptor {
+            label: Some("`gpecs` example shader"),
+            source: wgpu::util::make_spirv(&data),
+        };
+        let shader_module = device.create_shader_module(shader_desc);
+        let shader_compilation_info = pollster::block_on(shader_module.get_compilation_info());
+        log::info!("Shader compilation info:\n{shader_compilation_info:#?}");
+
+        let indices_buffer_desc = wgpu::BufferDescriptor {
+            label: Some("`gpecs` example indices buffer"),
+            size: (position_entities.len() * size_of::<u32>())
+                .try_into()
+                .expect("buffer size should fit into `u64`"),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        };
+        let indices_buffer = device.create_buffer(&indices_buffer_desc);
+
+        let download_buffer_desc = wgpu::BufferDescriptor {
+            label: Some("`gpecs` example download buffer"),
+            size: indices_buffer.size(),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        };
+        let download_buffer = device.create_buffer(&download_buffer_desc);
+
+        let entities_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                min_binding_size: Some(
+                    u64::try_from(size_of::<Entity>())
+                        .unwrap()
+                        .try_into()
+                        .unwrap(),
+                ),
+                has_dynamic_offset: false,
+            },
+            count: None,
+        };
+        let indices_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
+            binding: 1,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: false },
+                min_binding_size: Some(
+                    u64::try_from(size_of::<u32>()).unwrap().try_into().unwrap(),
+                ),
+                has_dynamic_offset: false,
+            },
+            count: None,
+        };
+        let bind_group_layout_desc = wgpu::BindGroupLayoutDescriptor {
+            label: Some("`gpecs` example bind group layout"),
+            entries: &[
+                entities_bind_group_layout_entry,
+                indices_bind_group_layout_entry,
+            ],
+        };
+        let bind_group_layout = device.create_bind_group_layout(&bind_group_layout_desc);
+
+        let entities_bind_group_entry = wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::Buffer(entities_binding),
+        };
+        let indices_bind_group_entry = wgpu::BindGroupEntry {
+            binding: 1,
+            resource: indices_buffer.as_entire_binding(),
+        };
+        let bind_group_desc = wgpu::BindGroupDescriptor {
+            label: Some("`gpecs` example bind group"),
+            layout: &bind_group_layout,
+            entries: &[entities_bind_group_entry, indices_bind_group_entry],
+        };
+        let bind_group = device.create_bind_group(&bind_group_desc);
+
+        let pipeline_layout_desc = wgpu::PipelineLayoutDescriptor {
+            label: Some("`gpecs` example compute pipeline layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        };
+        let pipeline_layout = device.create_pipeline_layout(&pipeline_layout_desc);
+
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("`gpecs` example compute pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &shader_module,
+            entry_point: Some("copy_entity_indices"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
+        });
+
+        let command_encoder_desc = wgpu::CommandEncoderDescriptor {
+            label: Some("`gpecs` example command encoder"),
+        };
+        let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
+
+        {
+            let compute_pass_desc = wgpu::ComputePassDescriptor {
+                label: Some("`gpecs` example compute pass"),
+                timestamp_writes: None,
+            };
+            let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
+
+            compute_pass.set_pipeline(&pipeline);
+            compute_pass.set_bind_group(0, &bind_group, &[]);
+
+            let workgroup_count = position_entities
+                .len()
+                .div_ceil(64)
+                .try_into()
+                .expect("workgroup count should fit into `u32`");
+            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+        }
+
+        command_encoder.copy_buffer_to_buffer(
+            &indices_buffer,
+            0,
+            &download_buffer,
+            0,
+            indices_buffer.size(),
+        );
+
+        let command_buffer = command_encoder.finish();
+        queue.submit([command_buffer]);
+
+        let indices_slice = download_buffer.slice(..);
+        indices_slice.map_async(wgpu::MapMode::Read, |_| {});
+
+        device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        let indices = indices_slice.get_mapped_range();
+        let indices: &[u32] = bytemuck::cast_slice(&indices);
+        log::info!("Resulting indices:\n{indices:#?}");
+
+        itertools::assert_equal(
+            position_entities.iter().map(|entity| entity.index()),
+            indices.iter().copied(),
+        );
+    }
 
     executor.execute();
 

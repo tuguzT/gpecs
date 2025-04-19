@@ -2,7 +2,7 @@
 
 use core::{mem::forget, ops::Not};
 
-use gpecs_sparse::{prelude::*, soa::identity::Identity};
+use gpecs_sparse::prelude::*;
 
 type Key = EpochKey;
 

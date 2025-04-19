@@ -4,7 +4,7 @@
 
 use gpecs_soa::prelude::*;
 use gpecs_types::entity::Entity;
-use spirv_std::{arch::IndexUnchecked, glam::UVec3, spirv, TypedBuffer};
+use spirv_std::{glam::UVec3, spirv, TypedBuffer};
 use static_assertions as sa;
 use unroll::unroll_for_loops;
 
@@ -16,17 +16,12 @@ sa::const_assert_eq!(ITER_COUNT, 8);
 
 #[spirv(compute(threads(64)))]
 #[unroll_for_loops]
-pub fn compute_shader(
+pub fn copy_entity_indices(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] data: &mut TypedBuffer<[Entity]>,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] data_zst: &mut TypedBuffer<[()]>,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &TypedBuffer<[Entity]>,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] indices: &mut TypedBuffer<[u32]>,
 ) {
-    let data: <(_,) as Soa>::SlicesMut<'_> = (data,);
-    for index in 0..8 {
-        let item = unsafe { data.0.index_unchecked_mut(index) };
-        item.set_index(index as u32 + id.x);
-
-        let zst = unsafe { data_zst.index_unchecked_mut(index) };
-        *zst = ();
-    }
+    let (entities,): <(_,) as Soa>::Slices<'_> = (entities,);
+    let index = id.x as usize;
+    indices[index] = entities[index].index();
 }

@@ -1,9 +1,9 @@
 use std::{fs, mem::transmute, os::raw::c_void, ptr::null, slice};
 
-use gpecs::{prelude::*, soa::prelude::*};
+use gpecs::prelude::*;
 use renderdoc::{RenderDoc, V141};
 
-use self::common::{Mass, Position};
+use self::common::{Mass, Position, Tag};
 
 mod common;
 
@@ -76,43 +76,47 @@ fn main() {
                 z: 0.0,
             };
             context
-                .insert_bundle(entity, (position,))
-                .expect("entity should exist & archetype of just `Position` should be valid");
+                .insert_bundle(entity, (Tag, position))
+                .expect("entity should exist & archetype of `Tag` and `Position` should be valid");
         } else {
             let mass = Mass { value: i };
             context
-                .insert_bundle(entity, (mass,))
-                .expect("entity should exist & archetype of just `Mass` should be valid");
+                .insert_bundle(entity, (mass, Tag))
+                .expect("entity should exist & archetype of `Mass` and `Tag` should be valid");
         }
     }
     let position_id = context.register_component::<Position>();
+    let tag_id = context.register_component::<Tag>();
     let mass_id = context.register_component::<Mass>();
-    let position_archetype_id = context
-        .register_archetype::<Identity<Position>>()
-        .expect("`Position` archetype should contain unique component ids");
+    let position_tag_archetype_id = context
+        .register_archetype::<(Position, Tag)>()
+        .expect("archetype of `Position` and `Tag` should contain unique component ids");
     let mass_archetype_id = context
-        .register_archetype::<Identity<Mass>>()
-        .expect("`Mass` archetype should contain unique component ids");
+        .register_archetype::<(Mass,)>()
+        .expect("archetype of just `Mass` should contain unique component ids");
 
     let mut executor = GpuExecutor::new(&mut context, device.clone());
 
     let position_gpu_id = executor.register_component::<Position>();
     assert_eq!(position_gpu_id.into_u32(), position_id.into_u32());
 
+    let tag_gpu_id = executor.register_component::<Tag>();
+    assert_eq!(tag_gpu_id.into_u32(), tag_id.into_u32());
+
     let mass_gpu_archetype_id = executor
-        .register_archetype::<Identity<Mass>>()
+        .register_archetype::<(Mass,)>()
         .expect("archetype of just `Mass` should contain unique component ids");
     assert_eq!(
         mass_gpu_archetype_id.into_u32(),
         mass_archetype_id.into_u32(),
     );
 
-    let position_gpu_archetype_id = executor
-        .register_archetype::<Identity<Position>>()
+    let position_tag_gpu_archetype_id = executor
+        .register_archetype::<(Position, Tag)>()
         .expect("archetype of just `Position` should contain unique component ids");
     assert_eq!(
-        position_gpu_archetype_id.into_u32(),
-        position_archetype_id.into_u32(),
+        position_tag_gpu_archetype_id.into_u32(),
+        position_tag_archetype_id.into_u32(),
     );
 
     const PATH: &str = env!("gpecs_shader_example.spv");
@@ -132,7 +136,7 @@ fn main() {
             shader_module,
             Some("copy_entity_indices"),
             true,
-            [position_gpu_id],
+            [position_gpu_id, tag_gpu_id],
         )
         .expect("GPU system by shader module should be registered");
     let positions_gpu_system_info = executor
@@ -151,23 +155,23 @@ fn main() {
         unsafe { mass_gpu_archetype_info.storage().storage_buffer_bindings() };
     log::info!("{mass_gpu_archetype_id:?} buffer bindings:\n{storage_buffer_bindings:#?}");
 
-    let position_archetype_info = executor
+    let position_tag_archetype_info = executor
         .context()
         .archetypes()
-        .get_archetype_info(position_archetype_id)
+        .get_archetype_info(position_tag_archetype_id)
         .expect("archetype info should be present");
-    let position_entities = position_archetype_info.storage().entities();
-    log::info!("{position_archetype_id:?} has entities:\n{position_entities:#?}");
+    let position_tag_entities = position_tag_archetype_info.storage().entities();
+    log::info!("{position_tag_archetype_id:?} has entities:\n{position_tag_entities:#?}");
 
-    let position_gpu_archetype_info = executor
-        .get_archetype_info(position_gpu_archetype_id)
+    let position_tag_gpu_archetype_info = executor
+        .get_archetype_info(position_tag_gpu_archetype_id)
         .expect("archetype info should be present");
     let storage_buffer_bindings = unsafe {
-        position_gpu_archetype_info
+        position_tag_gpu_archetype_info
             .storage()
             .storage_buffer_bindings()
     };
-    log::info!("{position_gpu_archetype_id:?} buffer bindings:\n{storage_buffer_bindings:#?}");
+    log::info!("{position_tag_gpu_archetype_id:?} buffer bindings:\n{storage_buffer_bindings:#?}");
 
     let entities_binding = storage_buffer_bindings.entities;
     let positions_binding = storage_buffer_bindings
@@ -175,6 +179,13 @@ fn main() {
         .get(&position_id)
         .cloned()
         .flatten();
+    let tags_binding = storage_buffer_bindings
+        .components
+        .get(&tag_id)
+        .cloned()
+        .flatten();
+    assert!(tags_binding.is_none());
+
     if let Some((entities_binding, positions_binding)) = entities_binding.zip(positions_binding) {
         let entities_bind_group_entry = wgpu::BindGroupEntry {
             binding: 0,
@@ -206,7 +217,7 @@ fn main() {
             compute_pass.set_pipeline(positions_gpu_system_info.shader().compute_pipeline());
             compute_pass.set_bind_group(0, &bind_group, &[]);
 
-            let workgroup_count = position_entities
+            let workgroup_count = position_tag_entities
                 .len()
                 .div_ceil(64)
                 .try_into()
@@ -243,13 +254,13 @@ fn main() {
         let positions: &[Position] = unsafe {
             slice::from_raw_parts(
                 download_slice.get_mapped_range().as_ptr().cast(),
-                position_entities.len(),
+                position_tag_entities.len(),
             )
         };
         log::info!("Compute output:\n{positions:#?}");
 
         itertools::assert_equal(
-            position_entities.iter().map(|entity| Position {
+            position_tag_entities.iter().map(|entity| Position {
                 x: entity.index() as f32,
                 y: (entity.index() as f32) / 2.0,
                 z: -(entity.index() as f32) / 2.0,

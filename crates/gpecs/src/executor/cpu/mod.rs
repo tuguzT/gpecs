@@ -6,8 +6,6 @@ use self::system::{
     IntoSystem,
 };
 
-use super::Executor;
-
 pub mod system;
 
 #[derive(Debug)]
@@ -65,11 +63,9 @@ impl<'context> CpuExecutor<'context> {
         let Self { schedule, .. } = self;
         schedule.remove_system(system)
     }
-}
 
-impl Executor for CpuExecutor<'_> {
     #[inline]
-    fn execute(&mut self) {
+    pub fn execute(&mut self) {
         let Self {
             context,
             systems,

@@ -18,8 +18,6 @@ use self::{
     system::registry::{GpuSystemId, GpuSystemInfo, GpuSystemRegistry},
 };
 
-use super::Executor;
-
 pub mod archetype;
 pub mod bundle;
 pub mod component;
@@ -207,13 +205,11 @@ impl<'context> GpuExecutor<'context> {
         Ok(archetype_id)
     }
 
-    // TODO: methods to copy data from CPU to GPU and vice versa
-    //       and decide what to do with mutable access to the context
-}
-
-impl Executor for GpuExecutor<'_> {
     #[inline]
-    fn execute(&mut self) {
+    pub fn execute(&mut self) {
         println!("Hello from the GPU executor!")
     }
+
+    // TODO: methods to copy data from CPU to GPU and vice versa
+    //       and decide what to do with mutable access to the context
 }

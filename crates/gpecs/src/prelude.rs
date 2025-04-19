@@ -5,9 +5,17 @@ pub use crate::{
     context::Context,
     entity::Entity,
     executor::{
-        cpu::CpuExecutor,
-        gpu::{bundle::GpuBundle, component::GpuComponent, GpuExecutor},
-        Executor,
+        cpu::{
+            system::{registry::SystemId, System},
+            CpuExecutor,
+        },
+        gpu::{
+            archetype::registry::GpuArchetypeId,
+            bundle::GpuBundle,
+            component::{registry::GpuComponentId, GpuComponent},
+            system::registry::GpuSystemId,
+            GpuExecutor,
+        },
     },
     world::registry::WorldId,
 };

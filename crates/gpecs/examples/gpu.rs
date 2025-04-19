@@ -67,22 +67,36 @@ fn main() {
     }
 
     let mut context = Context::new();
-    for i in 0..12 {
+    for i in 0..24 {
         let entity = context.spawn();
-        if i % 2 == 0 {
-            let position = Position {
-                x: i as f32,
-                y: -(i as f32),
-                z: 0.0,
-            };
-            context
-                .insert_bundle(entity, (Tag, position))
-                .expect("entity should exist & archetype of `Tag` and `Position` should be valid");
-        } else {
-            let mass = Mass { value: i };
-            context
-                .insert_bundle(entity, (mass, Tag))
-                .expect("entity should exist & archetype of `Mass` and `Tag` should be valid");
+        match i % 3 {
+            0 => {
+                let position = Position {
+                    x: i as f32,
+                    y: -(i as f32),
+                    z: 0.0,
+                };
+                context
+                    .insert_bundle::<(Tag, Position)>(entity, (Tag, position))
+                    .expect("entity should exist & archetype should be valid");
+            }
+            1 => {
+                let mass = Mass { value: i };
+                context
+                    .insert_bundle::<(Mass, Tag)>(entity, (mass, Tag))
+                    .expect("entity should exist & archetype should be valid");
+            }
+            _ => {
+                let position = Position {
+                    x: i as f32,
+                    y: -(i as f32),
+                    z: 0.0,
+                };
+                let mass = Mass { value: i };
+                context
+                    .insert_bundle::<(Position, Mass)>(entity, (position, mass))
+                    .expect("entity should exist & archetype should be valid");
+            }
         }
     }
     let position_id = context.register_component::<Position>();
@@ -94,6 +108,9 @@ fn main() {
     let mass_archetype_id = context
         .register_archetype::<(Mass,)>()
         .expect("archetype of just `Mass` should contain unique component ids");
+    let position_mass_archetype_id = context
+        .register_archetype::<(Position, Mass)>()
+        .expect("archetype of `Position` and `Mass` should contain unique component ids");
 
     let mut executor = GpuExecutor::new(&mut context, device.clone());
 
@@ -102,6 +119,14 @@ fn main() {
 
     let tag_gpu_id = executor.register_component::<Tag>();
     assert_eq!(tag_gpu_id.into_u32(), tag_id.into_u32());
+
+    let position_mass_gpu_archetype_id = executor
+        .register_archetype::<(Position, Mass)>()
+        .expect("archetype of `Position` and `Mass` should contain unique component ids");
+    assert_eq!(
+        position_mass_gpu_archetype_id.into_u32(),
+        position_mass_archetype_id.into_u32(),
+    );
 
     let mass_gpu_archetype_id = executor
         .register_archetype::<(Mass,)>()

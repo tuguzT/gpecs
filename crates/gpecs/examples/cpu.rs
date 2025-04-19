@@ -6,22 +6,36 @@ mod common;
 
 fn main() {
     let mut context = Context::new();
-    for i in 0..12 {
+    for i in 0..24 {
         let entity = context.spawn();
-        if i % 2 == 0 {
-            let position = Position {
-                x: i as f32,
-                y: -(i as f32),
-                z: 0.0,
-            };
-            context
-                .insert_bundle(entity, (Tag, position))
-                .expect("entity should exist & archetype of `Tag` and `Position` should be valid");
-        } else {
-            let mass = Mass { value: i };
-            context
-                .insert_bundle(entity, (mass, Tag))
-                .expect("entity should exist & archetype of `Mass` and `Tag` should be valid");
+        match i % 3 {
+            0 => {
+                let position = Position {
+                    x: i as f32,
+                    y: -(i as f32),
+                    z: 0.0,
+                };
+                context
+                    .insert_bundle::<(Tag, Position)>(entity, (Tag, position))
+                    .expect("entity should exist & archetype should be valid");
+            }
+            1 => {
+                let mass = Mass { value: i };
+                context
+                    .insert_bundle::<(Mass, Tag)>(entity, (mass, Tag))
+                    .expect("entity should exist & archetype should be valid");
+            }
+            _ => {
+                let position = Position {
+                    x: i as f32,
+                    y: -(i as f32),
+                    z: 0.0,
+                };
+                let mass = Mass { value: i };
+                context
+                    .insert_bundle::<(Position, Mass)>(entity, (position, mass))
+                    .expect("entity should exist & archetype should be valid");
+            }
         }
     }
 
@@ -32,13 +46,13 @@ fn main() {
 
         let mut positions_count = 0;
         for (entity, (position,)) in positions {
-            assert_eq!(entity.index() % 2, 0);
+            assert!(matches!(entity.index() % 3, 0 | 2));
             assert_eq!(position.x, entity.index() as f32);
             assert_eq!(position.y, -(entity.index() as f32));
             assert_eq!(position.z, 0.0);
             positions_count += 1;
         }
-        assert_eq!(positions_count, 6);
+        assert_eq!(positions_count, 16);
     });
     let mass_system = executor.register_system(|context: &mut Context| {
         println!("Hello from the system working with masses!");
@@ -48,11 +62,11 @@ fn main() {
             .bundles_mut::<(Mass,)>()
             .expect("archetype of `Mass` should exist");
         for (entity, (mass,)) in masses {
-            assert_eq!(entity.index() % 2, 1);
+            assert!(matches!(entity.index() % 3, 1 | 2));
             assert_eq!(mass.value, entity.index());
             masses_count += 1;
         }
-        assert_eq!(masses_count, 6);
+        assert_eq!(masses_count, 16);
     });
     let tag_system = executor.register_system(|tags: Bundles<(Tag,)>| {
         println!("Hello from the system working with tags!");
@@ -62,7 +76,7 @@ fn main() {
             assert_eq!(tag, &Tag);
             tags_count += 1;
         }
-        assert_eq!(tags_count, 12);
+        assert_eq!(tags_count, 16);
     });
 
     executor.add_system(position_system);

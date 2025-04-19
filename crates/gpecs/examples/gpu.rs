@@ -176,9 +176,27 @@ fn main() {
     let mass_gpu_archetype_info = executor
         .get_archetype_info(mass_gpu_archetype_id)
         .expect("archetype info should be present");
-    let storage_buffer_bindings =
+    let mass_storage_buffer_bindings =
         unsafe { mass_gpu_archetype_info.storage().storage_buffer_bindings() };
-    log::info!("{mass_gpu_archetype_id:?} buffer bindings:\n{storage_buffer_bindings:#?}");
+    log::info!("{mass_gpu_archetype_id:?} buffer bindings:\n{mass_storage_buffer_bindings:#?}");
+
+    let position_mass_archetype_info = executor
+        .context()
+        .archetypes()
+        .get_archetype_info(position_mass_archetype_id)
+        .expect("archetype info should be present");
+    let position_mass_entities = position_mass_archetype_info.storage().entities();
+    log::info!("{position_mass_archetype_id:?} has entities:\n{position_mass_entities:#?}");
+
+    let position_mass_gpu_archetype_info = executor
+        .get_archetype_info(position_mass_gpu_archetype_id)
+        .expect("archetype info should be present");
+    let position_mass_storage_buffer_bindings = unsafe {
+        position_mass_gpu_archetype_info
+            .storage()
+            .storage_buffer_bindings()
+    };
+    log::info!("{position_mass_gpu_archetype_id:?} buffer bindings:\n{position_mass_storage_buffer_bindings:#?}");
 
     let position_tag_archetype_info = executor
         .context()
@@ -191,98 +209,191 @@ fn main() {
     let position_tag_gpu_archetype_info = executor
         .get_archetype_info(position_tag_gpu_archetype_id)
         .expect("archetype info should be present");
-    let storage_buffer_bindings = unsafe {
+    let position_tag_storage_buffer_bindings = unsafe {
         position_tag_gpu_archetype_info
             .storage()
             .storage_buffer_bindings()
     };
-    log::info!("{position_tag_gpu_archetype_id:?} buffer bindings:\n{storage_buffer_bindings:#?}");
+    log::info!("{position_tag_gpu_archetype_id:?} buffer bindings:\n{position_tag_storage_buffer_bindings:#?}");
 
-    let entities_binding = storage_buffer_bindings.entities;
-    let positions_binding = storage_buffer_bindings
+    let position_tag_entities_binding = position_tag_storage_buffer_bindings.entities;
+    let position_tag_positions_binding = position_tag_storage_buffer_bindings
         .components
         .get(&position_id)
         .cloned()
         .flatten();
-    let tags_binding = storage_buffer_bindings
+    let position_tag_tags_binding = position_tag_storage_buffer_bindings
         .components
         .get(&tag_id)
         .cloned()
         .flatten();
-    assert!(tags_binding.is_none());
+    assert!(position_tag_tags_binding.is_none());
 
-    if let Some((entities_binding, positions_binding)) = entities_binding.zip(positions_binding) {
+    let command_encoder_desc = wgpu::CommandEncoderDescriptor {
+        label: Some("`gpecs` example command encoder"),
+    };
+    let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
+
+    let compute_pass_desc = wgpu::ComputePassDescriptor {
+        label: Some("`gpecs` example compute pass"),
+        timestamp_writes: None,
+    };
+    let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
+
+    let mut position_tag_download_buffer = None;
+    if let Some((position_tag_entities_binding, position_tag_positions_binding)) =
+        position_tag_entities_binding.zip(position_tag_positions_binding.clone())
+    {
         let entities_bind_group_entry = wgpu::BindGroupEntry {
             binding: 0,
-            resource: wgpu::BindingResource::Buffer(entities_binding),
+            resource: wgpu::BindingResource::Buffer(position_tag_entities_binding),
         };
         let positions_bind_group_entry = wgpu::BindGroupEntry {
             binding: 1,
-            resource: wgpu::BindingResource::Buffer(positions_binding.clone()),
+            resource: wgpu::BindingResource::Buffer(position_tag_positions_binding.clone()),
         };
         let bind_group_desc = wgpu::BindGroupDescriptor {
-            label: Some("`gpecs` example bind group"),
+            label: Some("`gpecs` example (`Position`, `Tag`) bind group"),
             layout: positions_gpu_system_info.shader().bind_group_layout(),
             entries: &[entities_bind_group_entry, positions_bind_group_entry],
         };
         let bind_group = device.create_bind_group(&bind_group_desc);
 
-        let command_encoder_desc = wgpu::CommandEncoderDescriptor {
-            label: Some("`gpecs` example command encoder"),
-        };
-        let mut command_encoder = device.create_command_encoder(&command_encoder_desc);
+        compute_pass.set_pipeline(positions_gpu_system_info.shader().compute_pipeline());
+        compute_pass.set_bind_group(0, &bind_group, &[]);
 
-        {
-            let compute_pass_desc = wgpu::ComputePassDescriptor {
-                label: Some("`gpecs` example compute pass"),
-                timestamp_writes: None,
-            };
-            let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
+        let workgroup_count = position_tag_entities
+            .len()
+            .div_ceil(64)
+            .try_into()
+            .expect("workgroup count should fit into `u32`");
+        compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
 
-            compute_pass.set_pipeline(positions_gpu_system_info.shader().compute_pipeline());
-            compute_pass.set_bind_group(0, &bind_group, &[]);
-
-            let workgroup_count = position_tag_entities
-                .len()
-                .div_ceil(64)
-                .try_into()
-                .expect("workgroup count should fit into `u32`");
-            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
-        }
-
-        let download_buffer_desc = wgpu::BufferDescriptor {
-            label: Some("`gpecs` example download buffer"),
-            size: positions_binding
+        let position_tag_download_buffer_desc = wgpu::BufferDescriptor {
+            label: Some("`gpecs` example (`Position`, `Tag`) download buffer"),
+            size: position_tag_positions_binding
                 .size
                 .expect("component binding never uses the whole buffer")
                 .get(),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         };
-        let download_buffer = device.create_buffer(&download_buffer_desc);
+        position_tag_download_buffer = device
+            .create_buffer(&position_tag_download_buffer_desc)
+            .into();
+    }
 
+    let position_mass_entities_binding = position_mass_storage_buffer_bindings.entities;
+    let position_mass_positions_binding = position_mass_storage_buffer_bindings
+        .components
+        .get(&position_id)
+        .cloned()
+        .flatten();
+    let position_mass_masses_binding = position_mass_storage_buffer_bindings
+        .components
+        .get(&mass_id)
+        .cloned()
+        .flatten();
+    assert!(position_mass_masses_binding.is_some());
+
+    let mut position_mass_download_buffer = None;
+    if let Some((position_mass_entities_binding, position_mass_positions_binding)) =
+        position_mass_entities_binding.zip(position_mass_positions_binding.clone())
+    {
+        let entities_bind_group_entry = wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::Buffer(position_mass_entities_binding),
+        };
+        let positions_bind_group_entry = wgpu::BindGroupEntry {
+            binding: 1,
+            resource: wgpu::BindingResource::Buffer(position_mass_positions_binding.clone()),
+        };
+        let bind_group_desc = wgpu::BindGroupDescriptor {
+            label: Some("`gpecs` example (`Position`, `Mass`) bind group"),
+            layout: positions_gpu_system_info.shader().bind_group_layout(),
+            entries: &[entities_bind_group_entry, positions_bind_group_entry],
+        };
+        let bind_group = device.create_bind_group(&bind_group_desc);
+
+        compute_pass.set_pipeline(positions_gpu_system_info.shader().compute_pipeline());
+        compute_pass.set_bind_group(0, &bind_group, &[]);
+
+        let workgroup_count = position_mass_entities
+            .len()
+            .div_ceil(64)
+            .try_into()
+            .expect("workgroup count should fit into `u32`");
+        compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+
+        let position_mass_download_buffer_desc = wgpu::BufferDescriptor {
+            label: Some("`gpecs` example (`Position`, `Mass`) download buffer"),
+            size: position_mass_positions_binding
+                .size
+                .expect("component binding never uses the whole buffer")
+                .get(),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        };
+        position_mass_download_buffer = device
+            .create_buffer(&position_mass_download_buffer_desc)
+            .into();
+    }
+
+    drop(compute_pass);
+
+    if let Some((position_tag_download_buffer, position_tag_positions_binding)) =
+        position_tag_download_buffer
+            .clone()
+            .zip(position_tag_positions_binding)
+    {
         command_encoder.copy_buffer_to_buffer(
-            positions_binding.buffer,
-            positions_binding.offset,
-            &download_buffer,
+            position_tag_positions_binding.buffer,
+            position_tag_positions_binding.offset,
+            &position_tag_download_buffer,
             0,
-            positions_binding.size.unwrap().get(),
+            position_tag_positions_binding.size.unwrap().get(),
         );
+    }
+    if let Some((position_mass_download_buffer, position_mass_positions_binding)) =
+        position_mass_download_buffer
+            .clone()
+            .zip(position_mass_positions_binding)
+    {
+        command_encoder.copy_buffer_to_buffer(
+            position_mass_positions_binding.buffer,
+            position_mass_positions_binding.offset,
+            &position_mass_download_buffer,
+            0,
+            position_mass_positions_binding.size.unwrap().get(),
+        );
+    }
 
-        let command_buffer = command_encoder.finish();
-        queue.submit([command_buffer]);
+    let command_buffer = command_encoder.finish();
+    queue.submit([command_buffer]);
 
-        let download_slice = download_buffer.slice(..);
-        download_slice.map_async(wgpu::MapMode::Read, |_| {});
-        device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+    if let Some(position_tag_download_buffer) = position_tag_download_buffer.clone() {
+        let position_tag_download_slice = position_tag_download_buffer.slice(..);
+        position_tag_download_slice.map_async(wgpu::MapMode::Read, |_| {});
+    }
+    if let Some(position_mass_download_buffer) = position_mass_download_buffer.clone() {
+        let position_mass_download_slice = position_mass_download_buffer.slice(..);
+        position_mass_download_slice.map_async(wgpu::MapMode::Read, |_| {});
+    }
 
-        let positions: &[Position] = unsafe {
+    device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+
+    if let Some(position_tag_download_buffer) = position_tag_download_buffer {
+        let position_tag_positions: &[Position] = unsafe {
             slice::from_raw_parts(
-                download_slice.get_mapped_range().as_ptr().cast(),
+                position_tag_download_buffer
+                    .slice(..)
+                    .get_mapped_range()
+                    .as_ptr()
+                    .cast(),
                 position_tag_entities.len(),
             )
         };
-        log::info!("Compute output:\n{positions:#?}");
+        log::info!("Compute output:\n{position_tag_positions:#?}");
 
         itertools::assert_equal(
             position_tag_entities.iter().map(|entity| Position {
@@ -290,7 +401,29 @@ fn main() {
                 y: (entity.index() as f32) / 2.0,
                 z: -(entity.index() as f32) / 2.0,
             }),
-            positions.iter().copied(),
+            position_tag_positions.iter().copied(),
+        );
+    }
+    if let Some(position_mass_download_buffer) = position_mass_download_buffer {
+        let position_mass_positions: &[Position] = unsafe {
+            slice::from_raw_parts(
+                position_mass_download_buffer
+                    .slice(..)
+                    .get_mapped_range()
+                    .as_ptr()
+                    .cast(),
+                position_mass_entities.len(),
+            )
+        };
+        log::info!("Compute output:\n{position_mass_positions:#?}");
+
+        itertools::assert_equal(
+            position_mass_entities.iter().map(|entity| Position {
+                x: entity.index() as f32,
+                y: (entity.index() as f32) / 2.0,
+                z: -(entity.index() as f32) / 2.0,
+            }),
+            position_mass_positions.iter().copied(),
         );
     }
 

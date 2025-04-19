@@ -1,6 +1,6 @@
-use std::num::NonZeroU64;
+use std::{iter::FusedIterator, num::NonZeroU64};
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferBindingType, ComputePipeline, ComputePipelineDescriptor, Device,
@@ -19,8 +19,8 @@ use super::registry::GpuSystemId;
 
 #[derive(Debug)]
 pub struct SystemShader {
-    _bind_entities: bool,
-    _component_ids: IndexSet<GpuComponentId>,
+    entities_bind_group_layout_entry: Option<BindGroupLayoutEntry>,
+    components_bind_group_layout_entries: IndexMap<GpuComponentId, Option<BindGroupLayoutEntry>>,
     shader_module: ShaderModule,
     bind_group_layout: BindGroupLayout,
     pipeline_layout: PipelineLayout,
@@ -51,8 +51,10 @@ impl SystemShader {
 
         let max_bind_group_layout_entries = component_ids.len() + (bind_entities as usize);
         let mut bind_group_layout_entries = Vec::with_capacity(max_bind_group_layout_entries);
+
+        let mut entities_bind_group_layout_entry = None;
         if bind_entities {
-            let entities_bind_group_layout_entry = BindGroupLayoutEntry {
+            entities_bind_group_layout_entry = BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStages::COMPUTE,
                 ty: BindingType::Buffer {
@@ -66,9 +68,13 @@ impl SystemShader {
                     has_dynamic_offset: false,
                 },
                 count: None,
-            };
-            bind_group_layout_entries.push(entities_bind_group_layout_entry);
+            }
+            .into();
+            bind_group_layout_entries.push(entities_bind_group_layout_entry.unwrap());
         }
+
+        let mut components_bind_group_layout_entries =
+            IndexMap::with_capacity(max_bind_group_layout_entries);
         for (index, &component_id) in component_ids.iter().enumerate() {
             let Some(info) = components.get_component_info(component_id.into()) else {
                 unreachable!("component {component_id:?} should exist");
@@ -80,6 +86,7 @@ impl SystemShader {
                 .try_into()
                 .expect("size of component should fit in `u64`");
             let Some(min_binding_size) = NonZeroU64::new(size_of_component) else {
+                components_bind_group_layout_entries.insert(component_id, None);
                 continue;
             };
 
@@ -95,6 +102,10 @@ impl SystemShader {
                 },
                 count: None,
             };
+            components_bind_group_layout_entries.insert(
+                component_id,
+                Some(component_bind_group_layout_entry.clone()),
+            );
             bind_group_layout_entries.push(component_bind_group_layout_entry);
         }
 
@@ -125,8 +136,8 @@ impl SystemShader {
         let compute_pipeline = gpu_device.create_compute_pipeline(&compute_pipeline_desc);
 
         Ok(Self {
-            _bind_entities: bind_entities,
-            _component_ids: component_ids,
+            entities_bind_group_layout_entry,
+            components_bind_group_layout_entries,
             shader_module,
             bind_group_layout,
             pipeline_layout,
@@ -138,6 +149,31 @@ impl SystemShader {
     pub fn shader_module(&self) -> &ShaderModule {
         let Self { shader_module, .. } = self;
         shader_module
+    }
+
+    #[inline]
+    pub fn entities_bind_group_layout_entry(&self) -> Option<&BindGroupLayoutEntry> {
+        let Self {
+            entities_bind_group_layout_entry,
+            ..
+        } = self;
+        entities_bind_group_layout_entry.as_ref()
+    }
+
+    #[inline]
+    // TODO: add specific iterator type
+    pub fn components_bind_group_layout_entries(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (GpuComponentId, Option<&BindGroupLayoutEntry>)>
+           + ExactSizeIterator
+           + FusedIterator {
+        let Self {
+            components_bind_group_layout_entries,
+            ..
+        } = self;
+        components_bind_group_layout_entries
+            .iter()
+            .map(|(&id, entry)| (id, entry.as_ref()))
     }
 
     #[inline]

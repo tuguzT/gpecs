@@ -167,6 +167,7 @@ fn main() {
     let positions_gpu_system_info = executor
         .get_system_info(positions_gpu_system_id)
         .expect("just registered GPU system should be present");
+    log::info!("GPU system {positions_gpu_system_id:?} info:\n{positions_gpu_system_info:#?}");
 
     let mass_gpu_id = executor
         .component_id::<Mass>()

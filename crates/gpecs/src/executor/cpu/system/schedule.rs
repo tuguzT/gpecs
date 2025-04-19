@@ -30,6 +30,7 @@ impl SystemSchedule {
     }
 
     #[inline]
+    // TODO: add specific iterator type
     pub fn iter(
         &self,
     ) -> impl DoubleEndedIterator<Item = SystemId> + ExactSizeIterator + FusedIterator + '_ {

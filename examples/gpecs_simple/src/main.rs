@@ -5,10 +5,19 @@ use gpecs::prelude::*;
 use gpecs_simple_types::*;
 use renderdoc::{RenderDoc, V141};
 
+const ENTITY_COUNT: u32 = if cfg!(debug_assertions) {
+    2_400
+} else {
+    2_400_000
+};
+
 fn main() {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .init();
+    let filter_level = if cfg!(debug_assertions) {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
+    env_logger::builder().filter_level(filter_level).init();
 
     let mut context = Context::new();
     setup_context(&mut context);
@@ -118,7 +127,7 @@ fn main() {
                 position_tag_entities.len(),
             )
         };
-        log::info!("Positions of {position_tag_gpu_archetype_id:?}:\n{position_tag_positions:#?}");
+        log::debug!("Positions of {position_tag_gpu_archetype_id:?}:\n{position_tag_positions:#?}");
 
         itertools::assert_equal(
             position_tag_entities.iter().map(|entity| Position {
@@ -137,7 +146,7 @@ fn main() {
 
 fn setup_context(context: &mut Context) {
     log::info!("Filling context with data to process...");
-    for i in 0..24 {
+    for i in 0..ENTITY_COUNT {
         let entity = context.spawn();
 
         let position = Position {
@@ -178,10 +187,10 @@ fn check_positions(positions: BundlesMut<(Position,)>) {
         assert_eq!(position.data.y, -(entity.index() as f32));
         assert_eq!(position.data.z, 0.0);
 
-        log::info!("{entity} has position of {}", position.data);
+        log::debug!("{entity} has position of {}", position.data);
         positions_count += 1;
     }
-    assert_eq!(positions_count, 16);
+    assert_eq!(positions_count, ENTITY_COUNT / 3 * 2);
 }
 
 fn check_masses(context: &mut Context) {
@@ -195,10 +204,10 @@ fn check_masses(context: &mut Context) {
         assert!(matches!(entity.index() % 3, 1 | 2));
         assert_eq!(mass.value, entity.index());
 
-        log::info!("{entity} has mass of {}", mass.value);
+        log::debug!("{entity} has mass of {}", mass.value);
         masses_count += 1;
     }
-    assert_eq!(masses_count, 16);
+    assert_eq!(masses_count, ENTITY_COUNT / 3 * 2);
 }
 
 fn check_tags(tags: Bundles<(Tag,)>) {
@@ -206,12 +215,13 @@ fn check_tags(tags: Bundles<(Tag,)>) {
 
     let mut tags_count = 0;
     for (entity, (tag,)) in tags {
+        assert!(matches!(entity.index() % 3, 0 | 1));
         assert_eq!(tag, &Tag);
 
-        log::info!("{entity} has {tag:?}");
+        log::debug!("{entity} has {tag:?}");
         tags_count += 1;
     }
-    assert_eq!(tags_count, 16);
+    assert_eq!(tags_count, ENTITY_COUNT / 3 * 2);
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
@@ -288,7 +298,7 @@ fn init_wgpu_position_tag_download_buffer(
             .storage()
             .storage_buffer_bindings()
     };
-    log::info!("{position_tag_gpu_archetype_id:?} buffer bindings:\n{position_tag_storage_buffer_bindings:#?}");
+    log::debug!("{position_tag_gpu_archetype_id:?} buffer bindings:\n{position_tag_storage_buffer_bindings:#?}");
 
     let position_tag_positions_binding = position_tag_storage_buffer_bindings
         .components
@@ -335,7 +345,6 @@ fn wgpu_copy_into_position_tag_download_buffer(
             .storage()
             .storage_buffer_bindings()
     };
-    log::info!("{position_tag_gpu_archetype_id:?} buffer bindings:\n{position_tag_storage_buffer_bindings:#?}");
 
     let position_tag_positions_binding = position_tag_storage_buffer_bindings
         .components

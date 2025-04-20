@@ -1,9 +1,10 @@
 use std::any::TypeId;
 
+use indexmap::IndexMap;
 use system::schedule::GpuSystemSchedule;
 use wgpu::{
-    BindGroupDescriptor, BindGroupEntry, BindingResource, CommandEncoder, ComputePassDescriptor,
-    Device, ShaderModule,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, CommandEncoder,
+    ComputePassDescriptor, Device, ShaderModule,
 };
 
 use crate::{
@@ -27,6 +28,8 @@ pub mod bundle;
 pub mod component;
 pub mod system;
 
+type ScheduleCache = IndexMap<GpuSystemId, IndexMap<GpuArchetypeId, BindGroup>>;
+
 #[derive(Debug)]
 pub struct GpuExecutor<'context> {
     context: &'context mut Context,
@@ -35,6 +38,7 @@ pub struct GpuExecutor<'context> {
     archetypes: GpuArchetypeRegistry,
     systems: GpuSystemRegistry,
     schedule: GpuSystemSchedule,
+    schedule_cache: Option<ScheduleCache>,
 }
 
 impl<'context> GpuExecutor<'context> {
@@ -47,6 +51,7 @@ impl<'context> GpuExecutor<'context> {
             archetypes: GpuArchetypeRegistry::new(),
             systems: GpuSystemRegistry::new(),
             schedule: GpuSystemSchedule::new(),
+            schedule_cache: None,
         }
     }
 
@@ -239,8 +244,13 @@ impl<'context> GpuExecutor<'context> {
             ref archetypes,
             systems,
             schedule,
+            schedule_cache,
             ..
         } = self;
+
+        let cache_schedule =
+            || Self::cache_schedule(context, device, archetypes, systems, schedule);
+        let schedule_cache = schedule_cache.get_or_insert_with(cache_schedule);
 
         let compute_pass_desc = ComputePassDescriptor {
             label: Some("`gpecs` executor compute pass"),
@@ -248,6 +258,34 @@ impl<'context> GpuExecutor<'context> {
         };
         let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
 
+        for (&system_id, archetypes_bind_groups) in schedule_cache.iter() {
+            let Some(system_info) = systems.get_system_info(system_id) else {
+                unreachable!("system {system_id:?} should exist");
+            };
+            let shader = system_info.shader();
+            for (&archetype_id, bind_group) in archetypes_bind_groups.iter() {
+                let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
+                    unreachable!("archetype {archetype_id:?} should exist");
+                };
+                compute_pass.set_pipeline(shader.compute_pipeline());
+                compute_pass.set_bind_group(0, bind_group, &[]);
+                let storage_len = u32::try_from(archetype_info.storage().len())
+                    .expect("storage length should fit into `u32`");
+                let workgroup_count = storage_len.div_ceil(shader.workgroup_count().unwrap_or(64));
+                compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+            }
+        }
+    }
+
+    #[inline]
+    fn cache_schedule(
+        context: &Context,
+        device: &Device,
+        archetypes: &GpuArchetypeRegistry,
+        systems: &GpuSystemRegistry,
+        schedule: &GpuSystemSchedule,
+    ) -> ScheduleCache {
+        let mut schedule_cache = ScheduleCache::default();
         for system_id in schedule.iter() {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("system {system_id:?} should exist");
@@ -270,6 +308,7 @@ impl<'context> GpuExecutor<'context> {
                     unreachable!("archetype {archetype_id:?} should exist");
                 };
 
+                #[allow(unsafe_code)]
                 let mut storage_buffer_bindings =
                     unsafe { archetype_info.storage().storage_buffer_bindings() };
                 let mut bind_group_entries = Vec::new();
@@ -324,15 +363,13 @@ impl<'context> GpuExecutor<'context> {
                 };
                 let bind_group = device.create_bind_group(&bind_group_desc);
 
-                compute_pass.set_pipeline(shader.compute_pipeline());
-                compute_pass.set_bind_group(0, &bind_group, &[]);
-
-                let storage_len = u32::try_from(archetype_info.storage().len())
-                    .expect("storage length should fit into `u32`");
-                let workgroup_count = storage_len.div_ceil(shader.workgroup_count().unwrap_or(64));
-                compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+                let system_archetypes = schedule_cache.entry(system_id).or_default();
+                if let Some(_) = system_archetypes.insert(archetype_id, bind_group) {
+                    unreachable!("archetype {archetype_id:?} cannot have multiple bind groups for system {system_id:?}");
+                };
             }
         }
+        schedule_cache
     }
 
     // TODO: methods to copy data from CPU to GPU and vice versa

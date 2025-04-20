@@ -1,5 +1,3 @@
-use crate::component::Component;
+pub use gpecs_types::component::GpuComponent;
 
 pub mod registry;
-
-pub trait GpuComponent: Component + Copy {}

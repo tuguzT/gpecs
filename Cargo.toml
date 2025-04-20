@@ -10,10 +10,10 @@ members = [
     "crates/gpecs_sparse",
     "crates/gpecs_spirv_analysis",
     "crates/gpecs_task_graph",
-    # Benchmarks
-    "crates/gpecs_soa_bench",
     # Shaders
     "crates/gpecs_shader_example",
+    # Standalone benchmarks
+    "benches/gpecs_soa_bench",
 ]
 
 [workspace.package]

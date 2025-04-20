@@ -164,22 +164,20 @@ impl Context {
 
     #[inline]
     pub fn despawn(&mut self, entity: Entity) -> bool {
-        let Self {
-            entities,
-            archetypes,
-            ..
-        } = self;
-
-        let Some(archetype_id) = entities.despawn(entity) else {
-            return false;
-        };
-        archetypes.destroy_in_place(entity, archetype_id.into())
+        let Self { entities, .. } = self;
+        entities.despawn(entity).is_some()
     }
 
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { entities, .. } = self;
         entities.contains(entity)
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        let Self { entities, .. } = self;
+        entities.clear();
     }
 
     #[inline]

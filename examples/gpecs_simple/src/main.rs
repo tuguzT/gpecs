@@ -8,7 +8,7 @@ use renderdoc::{RenderDoc, V141};
 const ENTITY_COUNT: u32 = if cfg!(debug_assertions) {
     2_400
 } else {
-    2_400_000
+    1_200_000
 };
 
 fn main() {
@@ -23,8 +23,8 @@ fn main() {
     setup_context(&mut context);
 
     let mut executor = CpuExecutor::new(&mut context);
-    let check_positions_system = executor.register_system(check_positions);
-    let check_masses_system = executor.register_system(check_masses);
+    let check_positions_system = executor.register_system(update_positions);
+    let check_masses_system = executor.register_system(update_masses);
     let check_tags_system = executor.register_system(check_tags);
 
     // Setup order of systems' execution
@@ -41,6 +41,9 @@ fn main() {
 
     let mut renderdoc = init_renderdoc();
     renderdoc_start_frame_capture(renderdoc.as_mut(), &device);
+
+    context.clear();
+    setup_context(&mut context);
 
     let mut executor = GpuExecutor::new(&mut context, device.clone());
 
@@ -177,7 +180,7 @@ fn setup_context(context: &mut Context) {
     }
 }
 
-fn check_positions(positions: BundlesMut<(Position,)>) {
+fn update_positions(positions: BundlesMut<(Position,)>) {
     log::info!("Hello from the CPU system working with positions!");
 
     let mut positions_count = 0;
@@ -188,12 +191,19 @@ fn check_positions(positions: BundlesMut<(Position,)>) {
         assert_eq!(position.data.z, 0.0);
 
         log::debug!("{entity} has position of {}", position.data);
+        position.data = Vec3 {
+            x: entity.index() as f32,
+            y: (entity.index() as f32) / 2.0,
+            z: -(entity.index() as f32) / 2.0,
+        };
+        log::debug!("{entity} position have been updated to {}", position.data);
+
         positions_count += 1;
     }
     assert_eq!(positions_count, ENTITY_COUNT / 3 * 2);
 }
 
-fn check_masses(context: &mut Context) {
+fn update_masses(context: &mut Context) {
     log::info!("Hello from the CPU system working with masses!");
 
     let mut masses_count = 0;
@@ -205,6 +215,9 @@ fn check_masses(context: &mut Context) {
         assert_eq!(mass.value, entity.index());
 
         log::debug!("{entity} has mass of {}", mass.value);
+        mass.value += entity.index();
+        log::debug!("{entity} mass have been updated to {}", mass.value);
+
         masses_count += 1;
     }
     assert_eq!(masses_count, ENTITY_COUNT / 3 * 2);

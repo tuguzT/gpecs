@@ -914,7 +914,6 @@ impl ArchetypeRegistry {
         let fields = info.storage.insert_erased(components, entity, fields);
         if let Some(fields) = fields {
             unsafe { Self::drop_erased_in_place(components, fields) }
-            unreachable!("duplicated entity {entity:?}")
         }
     }
 

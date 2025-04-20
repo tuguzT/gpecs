@@ -2,24 +2,13 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 
-use gpecs_soa::prelude::*;
-use gpecs_types::entity::Entity;
+use gpecs_simple_types::*;
+use gpecs_types::{entity::Entity, soa::prelude::*};
 use spirv_std::{
     glam::{UVec3, Vec3},
     spirv,
 };
 use unroll::unroll_for_loops;
-
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-#[repr(C, align(16))]
-pub struct Position {
-    data: Vec3,
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct Mass {
-    value: u32,
-}
 
 #[spirv(compute(threads(64)))]
 #[unroll_for_loops]

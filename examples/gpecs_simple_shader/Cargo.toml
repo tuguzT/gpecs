@@ -6,14 +6,14 @@ license.workspace = true
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish = false
 
 [lib]
 crate-type = ["dylib", "lib"]
 
 [dependencies]
-gpecs_soa = { workspace = true }
-gpecs_sparse = { workspace = true }
 gpecs_types = { workspace = true }
+gpecs_simple_types = { workspace = true }
 spirv-std = { workspace = true }
 unroll = { workspace = true }
 static_assertions = { workspace = true }

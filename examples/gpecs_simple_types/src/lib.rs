@@ -1,5 +1,7 @@
-use glam::Vec3;
-use gpecs::prelude::*;
+#![no_std]
+
+use gpecs_types::component::{Component, GpuComponent};
+use spirv_std::glam::Vec3;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(align(16))]
@@ -23,10 +25,3 @@ pub struct Tag;
 
 impl Component for Tag {}
 impl GpuComponent for Tag {}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Name {
-    pub value: String,
-}
-
-impl Component for Name {}

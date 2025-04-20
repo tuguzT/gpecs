@@ -1,0 +1,13 @@
+[package]
+name = "gpecs_simple_types"
+description = "Common types for simple example of ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpecs_types = { workspace = true }
+spirv-std = { workspace = true }

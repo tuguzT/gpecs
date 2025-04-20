@@ -14,6 +14,7 @@ members = [
     "benches/gpecs_soa_bench",
     # Standalone examples
     "examples/gpecs_simple",
+    "examples/gpecs_simple_types",
     "examples/gpecs_simple_shader",
 ]
 
@@ -30,6 +31,7 @@ gpecs_soa = { path = "crates/gpecs_soa", default-features = false }
 gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
 gpecs_soa_erased = { path = "crates/gpecs_soa_erased" }
 gpecs_types = { path = "crates/gpecs_types" }
+gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "175c175c" }
 indexmap = { version = "2.9" }
 petgraph = { version = "0.8" }

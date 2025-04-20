@@ -2,11 +2,8 @@ use std::{ffi::c_void, fs, mem::transmute, ptr::null, slice};
 
 use glam::Vec3;
 use gpecs::prelude::*;
+use gpecs_simple_types::*;
 use renderdoc::{RenderDoc, V141};
-
-use self::components::*;
-
-mod components;
 
 fn main() {
     env_logger::builder()

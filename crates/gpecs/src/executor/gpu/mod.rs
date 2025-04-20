@@ -1,7 +1,10 @@
 use std::any::TypeId;
 
 use system::schedule::GpuSystemSchedule;
-use wgpu::{CommandEncoder, ComputePassDescriptor, Device, ShaderModule};
+use wgpu::{
+    BindGroupDescriptor, BindGroupEntry, BindingResource, CommandEncoder, ComputePassDescriptor,
+    Device, ShaderModule,
+};
 
 use crate::{
     archetype::error::{DuplicateComponentError, GetComponentsError},
@@ -269,9 +272,9 @@ impl<'context> GpuExecutor<'context> {
                     let Some(entities_buffer_binding) = storage_buffer_bindings.entities else {
                         continue;
                     };
-                    let entities_bind_group_entry = wgpu::BindGroupEntry {
+                    let entities_bind_group_entry = BindGroupEntry {
                         binding: entities_bind_group_layout_entry.binding,
-                        resource: wgpu::BindingResource::Buffer(entities_buffer_binding),
+                        resource: BindingResource::Buffer(entities_buffer_binding),
                     };
                     bind_group_entries.push(entities_bind_group_entry);
                 }
@@ -294,9 +297,9 @@ impl<'context> GpuExecutor<'context> {
                         break;
                     };
 
-                    let component_bind_group_entry = wgpu::BindGroupEntry {
+                    let component_bind_group_entry = BindGroupEntry {
                         binding: component_bind_group_layout_entry.binding,
-                        resource: wgpu::BindingResource::Buffer(component_buffer_binding),
+                        resource: BindingResource::Buffer(component_buffer_binding),
                     };
                     bind_group_entries.push(component_bind_group_entry);
                 }
@@ -306,7 +309,7 @@ impl<'context> GpuExecutor<'context> {
 
                 let bind_group_label =
                     format!("`gpecs` {system_id:?} bind group for {archetype_id:?}");
-                let bind_group_desc = wgpu::BindGroupDescriptor {
+                let bind_group_desc = BindGroupDescriptor {
                     label: Some(&bind_group_label),
                     layout: system_info.shader().bind_group_layout(),
                     entries: &bind_group_entries,

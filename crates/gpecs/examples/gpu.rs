@@ -238,8 +238,10 @@ fn main() {
 
     let mut position_tag_download_buffer = None;
     if let Some(position_tag_positions_binding) = position_tag_positions_binding.clone() {
+        let position_tag_download_buffer_label =
+            format!("`gpecs` {position_tag_gpu_archetype_id:?} download buffer");
         let position_tag_download_buffer_desc = wgpu::BufferDescriptor {
-            label: Some("`gpecs` example (`Position`, `Tag`) download buffer"),
+            label: Some(&position_tag_download_buffer_label),
             size: position_tag_positions_binding
                 .size
                 .expect("component binding never uses the whole buffer")
@@ -266,8 +268,10 @@ fn main() {
 
     let mut position_mass_download_buffer = None;
     if let Some(position_mass_positions_binding) = position_mass_positions_binding.clone() {
+        let position_mass_download_buffer_label =
+            format!("`gpecs` {position_mass_gpu_archetype_id:?} download buffer");
         let position_mass_download_buffer_desc = wgpu::BufferDescriptor {
-            label: Some("`gpecs` example (`Position`, `Mass`) download buffer"),
+            label: Some(&position_mass_download_buffer_label),
             size: position_mass_positions_binding
                 .size
                 .expect("component binding never uses the whole buffer")
@@ -280,6 +284,21 @@ fn main() {
             .into();
     }
 
+    executor.execute(&mut command_encoder);
+
+    let position_tag_gpu_archetype_info = executor
+        .get_archetype_info(position_tag_gpu_archetype_id)
+        .expect("archetype info should be present");
+    let position_tag_storage_buffer_bindings = unsafe {
+        position_tag_gpu_archetype_info
+            .storage()
+            .storage_buffer_bindings()
+    };
+    let position_tag_positions_binding = position_tag_storage_buffer_bindings
+        .components
+        .get(&position_id)
+        .cloned()
+        .flatten();
     if let Some((position_tag_download_buffer, position_tag_positions_binding)) =
         position_tag_download_buffer
             .clone()
@@ -293,6 +312,20 @@ fn main() {
             position_tag_positions_binding.size.unwrap().get(),
         );
     }
+
+    let position_mass_gpu_archetype_info = executor
+        .get_archetype_info(position_mass_gpu_archetype_id)
+        .expect("archetype info should be present");
+    let position_mass_storage_buffer_bindings = unsafe {
+        position_mass_gpu_archetype_info
+            .storage()
+            .storage_buffer_bindings()
+    };
+    let position_mass_positions_binding = position_mass_storage_buffer_bindings
+        .components
+        .get(&position_id)
+        .cloned()
+        .flatten();
     if let Some((position_mass_download_buffer, position_mass_positions_binding)) =
         position_mass_download_buffer
             .clone()
@@ -307,23 +340,23 @@ fn main() {
         );
     }
 
-    executor.execute(&mut command_encoder);
-
     let command_buffer = command_encoder.finish();
     queue.submit([command_buffer]);
 
-    if let Some(position_tag_download_buffer) = position_tag_download_buffer.clone() {
-        let position_tag_download_slice = position_tag_download_buffer.slice(..);
-        position_tag_download_slice.map_async(wgpu::MapMode::Read, |_| {});
-    }
-    if let Some(position_mass_download_buffer) = position_mass_download_buffer.clone() {
-        let position_mass_download_slice = position_mass_download_buffer.slice(..);
-        position_mass_download_slice.map_async(wgpu::MapMode::Read, |_| {});
-    }
+    let position_tag_download_slice = position_tag_download_buffer.as_ref().map(|buffer| {
+        let slice = buffer.slice(..);
+        slice.map_async(wgpu::MapMode::Read, |_| {});
+        slice
+    });
+    let position_mass_download_slice = position_mass_download_buffer.as_ref().map(|buffer| {
+        let slice = buffer.slice(..);
+        slice.map_async(wgpu::MapMode::Read, |_| {});
+        slice
+    });
 
     device.poll(wgpu::Maintain::Wait).panic_on_timeout();
 
-    if let Some(position_tag_download_buffer) = position_tag_download_buffer {
+    if let Some(position_tag_download_slice) = position_tag_download_slice {
         let position_tag_archetype_info = executor
             .context()
             .archetypes()
@@ -331,17 +364,13 @@ fn main() {
             .expect("archetype info should be present");
         let position_tag_entities = position_tag_archetype_info.storage().entities();
 
+        let mapped_range = position_tag_download_slice.get_mapped_range();
         let position_tag_positions: &[Position] = unsafe {
-            slice::from_raw_parts(
-                position_tag_download_buffer
-                    .slice(..)
-                    .get_mapped_range()
-                    .as_ptr()
-                    .cast(),
-                position_tag_entities.len(),
-            )
+            slice::from_raw_parts(mapped_range.as_ptr().cast(), position_tag_entities.len())
         };
-        log::info!("Compute output:\n{position_tag_positions:#?}");
+        log::info!(
+            "Positions of {position_tag_archetype_id:?} are now:\n{position_tag_positions:#?}",
+        );
 
         // TODO: fails for some reason
         // itertools::assert_equal(
@@ -353,7 +382,7 @@ fn main() {
         //     position_tag_positions.iter().copied(),
         // );
     }
-    if let Some(position_mass_download_buffer) = position_mass_download_buffer {
+    if let Some(position_mass_download_slice) = position_mass_download_slice {
         let position_mass_archetype_info = executor
             .context()
             .archetypes()
@@ -361,17 +390,13 @@ fn main() {
             .expect("archetype info should be present");
         let position_mass_entities = position_mass_archetype_info.storage().entities();
 
+        let mapped_range = position_mass_download_slice.get_mapped_range();
         let position_mass_positions: &[Position] = unsafe {
-            slice::from_raw_parts(
-                position_mass_download_buffer
-                    .slice(..)
-                    .get_mapped_range()
-                    .as_ptr()
-                    .cast(),
-                position_mass_entities.len(),
-            )
+            slice::from_raw_parts(mapped_range.as_ptr().cast(), position_mass_entities.len())
         };
-        log::info!("Compute output:\n{position_mass_positions:#?}");
+        log::info!(
+            "Positions of {position_mass_archetype_id:?} are now:\n{position_mass_positions:#?}",
+        );
 
         // TODO: fails for some reason
         // itertools::assert_equal(

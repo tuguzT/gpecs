@@ -1,5 +1,6 @@
 use std::{fs, mem::transmute, os::raw::c_void, ptr::null, slice};
 
+use glam::Vec3;
 use gpecs::prelude::*;
 use renderdoc::{RenderDoc, V141};
 
@@ -69,30 +70,27 @@ fn main() {
     let mut context = Context::new();
     for i in 0..24 {
         let entity = context.spawn();
+
+        let position = Position {
+            data: Vec3 {
+                x: i as f32,
+                y: -(i as f32),
+                z: 0.0,
+            },
+        };
+        let mass = Mass { value: i };
         match i % 3 {
             0 => {
-                let position = Position {
-                    x: i as f32,
-                    y: -(i as f32),
-                    z: 0.0,
-                };
                 context
                     .insert_bundle::<(Tag, Position)>(entity, (Tag, position))
                     .expect("entity should exist & archetype should be valid");
             }
             1 => {
-                let mass = Mass { value: i };
                 context
                     .insert_bundle::<(Mass, Tag)>(entity, (mass, Tag))
                     .expect("entity should exist & archetype should be valid");
             }
             _ => {
-                let position = Position {
-                    x: i as f32,
-                    y: -(i as f32),
-                    z: 0.0,
-                };
-                let mass = Mass { value: i };
                 context
                     .insert_bundle::<(Position, Mass)>(entity, (position, mass))
                     .expect("entity should exist & archetype should be valid");
@@ -374,9 +372,11 @@ fn main() {
 
         itertools::assert_equal(
             position_tag_entities.iter().map(|entity| Position {
-                x: entity.index() as f32,
-                y: (entity.index() as f32) / 2.0,
-                z: -(entity.index() as f32) / 2.0,
+                data: Vec3 {
+                    x: entity.index() as f32,
+                    y: (entity.index() as f32) / 2.0,
+                    z: -(entity.index() as f32) / 2.0,
+                },
             }),
             position_tag_positions.iter().copied(),
         );
@@ -399,9 +399,11 @@ fn main() {
 
         itertools::assert_equal(
             position_mass_entities.iter().map(|entity| Position {
-                x: entity.index() as f32,
-                y: (entity.index() as f32) / 2.0,
-                z: -(entity.index() as f32) / 2.0,
+                data: Vec3 {
+                    x: entity.index() as f32,
+                    y: (entity.index() as f32) / 2.0,
+                    z: -(entity.index() as f32) / 2.0,
+                },
             }),
             position_mass_positions.iter().copied(),
         );

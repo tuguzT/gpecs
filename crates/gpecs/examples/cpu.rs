@@ -1,3 +1,4 @@
+use glam::Vec3;
 use gpecs::prelude::*;
 
 use self::common::{Mass, Position, Tag};
@@ -8,30 +9,27 @@ fn main() {
     let mut context = Context::new();
     for i in 0..24 {
         let entity = context.spawn();
+
+        let position = Position {
+            data: Vec3 {
+                x: i as f32,
+                y: -(i as f32),
+                z: 0.0,
+            },
+        };
+        let mass = Mass { value: i };
         match i % 3 {
             0 => {
-                let position = Position {
-                    x: i as f32,
-                    y: -(i as f32),
-                    z: 0.0,
-                };
                 context
                     .insert_bundle::<(Tag, Position)>(entity, (Tag, position))
                     .expect("entity should exist & archetype should be valid");
             }
             1 => {
-                let mass = Mass { value: i };
                 context
                     .insert_bundle::<(Mass, Tag)>(entity, (mass, Tag))
                     .expect("entity should exist & archetype should be valid");
             }
             _ => {
-                let position = Position {
-                    x: i as f32,
-                    y: -(i as f32),
-                    z: 0.0,
-                };
-                let mass = Mass { value: i };
                 context
                     .insert_bundle::<(Position, Mass)>(entity, (position, mass))
                     .expect("entity should exist & archetype should be valid");
@@ -47,9 +45,9 @@ fn main() {
         let mut positions_count = 0;
         for (entity, (position,)) in positions {
             assert!(matches!(entity.index() % 3, 0 | 2));
-            assert_eq!(position.x, entity.index() as f32);
-            assert_eq!(position.y, -(entity.index() as f32));
-            assert_eq!(position.z, 0.0);
+            assert_eq!(position.data.x, entity.index() as f32);
+            assert_eq!(position.data.y, -(entity.index() as f32));
+            assert_eq!(position.data.z, 0.0);
             positions_count += 1;
         }
         assert_eq!(positions_count, 16);

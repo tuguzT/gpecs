@@ -414,16 +414,16 @@ fn main() {
             "Positions of {position_mass_archetype_id:?} are now:\n{position_mass_positions:#?}",
         );
 
-        // itertools::assert_equal(
-        //     position_mass_entities.iter().map(|entity| Position {
-        //         data: Vec3 {
-        //             x: entity.index() as f32,
-        //             y: (entity.index() as f32) / 2.0,
-        //             z: -(entity.index() as f32) / 2.0,
-        //         },
-        //     }),
-        //     position_mass_positions.iter().copied(),
-        // );
+        itertools::assert_equal(
+            position_mass_entities.iter().map(|entity| Position {
+                data: Vec3 {
+                    x: entity.index() as f32,
+                    y: (entity.index() as f32) / 2.0,
+                    z: -(entity.index() as f32) / 2.0,
+                },
+            }),
+            position_mass_positions.iter().copied(),
+        );
     }
 
     if let Ok(renderdoc) = renderdoc.as_mut() {

@@ -1,3 +1,6 @@
+#![warn(clippy::all)]
+// TODO `#![warn(missing_docs)]` after implementation & tests
+#![forbid(unsafe_code)]
 #![no_std]
 
 use gpecs_types::component::{Component, GpuComponent};

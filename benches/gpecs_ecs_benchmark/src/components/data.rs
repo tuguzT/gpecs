@@ -9,7 +9,7 @@ pub const DEFAULT_SEED: u32 = 340383;
 pub struct Data {
     pub thingy: i32,
     pub dingy: f32,
-    pub mingy: bool,
+    pub mingy: u32,
     pub seed: u32,
     pub rng: RandomXoshiro128,
     pub numgy: u32,

@@ -519,6 +519,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpecs_ecs_benchmark_shader"
+version = "0.0.0"
+dependencies = [
+ "gpecs_ecs_benchmark",
+ "gpecs_types",
+ "spirv-std",
+ "static_assertions",
+ "unroll",
+]
+
+[[package]]
 name = "gpecs_simple"
 version = "0.0.0"
 dependencies = [

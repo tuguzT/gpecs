@@ -372,15 +372,14 @@ fn main() {
             "Positions of {position_tag_archetype_id:?} are now:\n{position_tag_positions:#?}",
         );
 
-        // TODO: fails for some reason
-        // itertools::assert_equal(
-        //     position_tag_entities.iter().map(|entity| Position {
-        //         x: entity.index() as f32,
-        //         y: (entity.index() as f32) / 2.0,
-        //         z: -(entity.index() as f32) / 2.0,
-        //     }),
-        //     position_tag_positions.iter().copied(),
-        // );
+        itertools::assert_equal(
+            position_tag_entities.iter().map(|entity| Position {
+                x: entity.index() as f32,
+                y: (entity.index() as f32) / 2.0,
+                z: -(entity.index() as f32) / 2.0,
+            }),
+            position_tag_positions.iter().copied(),
+        );
     }
     if let Some(position_mass_download_slice) = position_mass_download_slice {
         let position_mass_archetype_info = executor
@@ -398,15 +397,14 @@ fn main() {
             "Positions of {position_mass_archetype_id:?} are now:\n{position_mass_positions:#?}",
         );
 
-        // TODO: fails for some reason
-        // itertools::assert_equal(
-        //     position_mass_entities.iter().map(|entity| Position {
-        //         x: entity.index() as f32,
-        //         y: (entity.index() as f32) / 2.0,
-        //         z: -(entity.index() as f32) / 2.0,
-        //     }),
-        //     position_mass_positions.iter().copied(),
-        // );
+        itertools::assert_equal(
+            position_mass_entities.iter().map(|entity| Position {
+                x: entity.index() as f32,
+                y: (entity.index() as f32) / 2.0,
+                z: -(entity.index() as f32) / 2.0,
+            }),
+            position_mass_positions.iter().copied(),
+        );
     }
 
     if let Ok(renderdoc) = renderdoc.as_mut() {

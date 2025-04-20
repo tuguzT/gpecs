@@ -15,14 +15,3 @@ indexmap = { workspace = true }
 petgraph = { workspace = true }
 itertools = { workspace = true }
 wgpu = { workspace = true }
-
-[dev-dependencies]
-pollster = { workspace = true }
-bytemuck = { workspace = true }
-env_logger = { workspace = true }
-glam = { workspace = true }
-log = { workspace = true }
-renderdoc = { workspace = true }
-
-[build-dependencies]
-const_format = { workspace = true }

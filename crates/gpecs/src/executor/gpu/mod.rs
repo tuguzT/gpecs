@@ -57,6 +57,12 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
+    pub fn device(&self) -> &Device {
+        let Self { device, .. } = self;
+        device
+    }
+
+    #[inline]
     pub fn components(&self) -> &GpuComponentRegistry {
         let Self { components, .. } = self;
         components

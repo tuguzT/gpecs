@@ -1,6 +1,6 @@
 [package]
-name = "gpecs_shader_example"
-description = "Example SPIR-V shader for (probably) ECS on GPU"
+name = "gpecs_simple_shader"
+description = "SPIR-V shader for simple example of (probably) ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true

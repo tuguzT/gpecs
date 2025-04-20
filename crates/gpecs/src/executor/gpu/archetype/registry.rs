@@ -28,6 +28,12 @@ pub struct GpuArchetypeId(ArchetypeId);
 
 impl GpuArchetypeId {
     #[inline]
+    pub const fn into_id(self) -> ArchetypeId {
+        let Self(id) = self;
+        id
+    }
+
+    #[inline]
     pub const fn into_u32(self) -> u32 {
         let Self(id) = self;
         id.into_u32()

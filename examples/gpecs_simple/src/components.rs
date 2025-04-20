@@ -2,7 +2,7 @@ use glam::Vec3;
 use gpecs::prelude::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-#[repr(C, align(16))]
+#[repr(align(16))]
 pub struct Position {
     pub data: Vec3,
 }

@@ -10,10 +10,11 @@ members = [
     "crates/gpecs_sparse",
     "crates/gpecs_spirv_analysis",
     "crates/gpecs_task_graph",
-    # Shaders
-    "crates/gpecs_shader_example",
     # Standalone benchmarks
     "benches/gpecs_soa_bench",
+    # Standalone examples
+    "examples/gpecs_simple",
+    "examples/gpecs_simple_shader",
 ]
 
 [workspace.package]
@@ -24,6 +25,7 @@ edition = "2021"
 rust-version = "1.84.0"
 
 [workspace.dependencies]
+gpecs = { path = "crates/gpecs" }
 gpecs_soa = { path = "crates/gpecs_soa", default-features = false }
 gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
 gpecs_soa_erased = { path = "crates/gpecs_soa_erased" }

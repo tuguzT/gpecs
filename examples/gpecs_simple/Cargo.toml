@@ -1,0 +1,22 @@
+[package]
+name = "gpecs_simple"
+description = "Simple example of ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gpecs = { workspace = true }
+itertools = { workspace = true }
+glam = { workspace = true }
+pollster = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+wgpu = { workspace = true }
+renderdoc = { workspace = true }
+
+[build-dependencies]
+const_format = { workspace = true }

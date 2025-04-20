@@ -52,3 +52,7 @@ renderdoc = { version = "0.12" }
 [workspace.lints.rust.unexpected_cfgs]
 level = "warn"
 check-cfg = ['cfg(target_arch, values("spirv"))']
+
+[profile.release]
+codegen-units = 1
+lto = "fat"

@@ -1,10 +1,11 @@
-use std::any::TypeId;
+use std::{any::TypeId, num::NonZeroU32};
 
 use indexmap::IndexMap;
 use system::schedule::GpuSystemSchedule;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, CommandEncoder,
-    ComputePassDescriptor, Device, ShaderModule,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Buffer, BufferDescriptor,
+    BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features, QuerySet,
+    QuerySetDescriptor, QueryType, ShaderModule,
 };
 
 use crate::{
@@ -31,6 +32,35 @@ pub mod system;
 type ScheduleCache = IndexMap<GpuSystemId, IndexMap<GpuArchetypeId, BindGroup>>;
 
 #[derive(Debug)]
+pub struct TimestampQueryResources {
+    query_set: QuerySet,
+    count: NonZeroU32,
+    resolve_buffer: Buffer,
+}
+
+impl TimestampQueryResources {
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn query_set(&self) -> &QuerySet {
+        let Self { query_set, .. } = self;
+        query_set
+    }
+
+    #[inline]
+    pub fn count(&self) -> NonZeroU32 {
+        let Self { count, .. } = self;
+        *count
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn resolve_buffer(&self) -> &Buffer {
+        let Self { resolve_buffer, .. } = self;
+        resolve_buffer
+    }
+}
+
+#[derive(Debug)]
 pub struct GpuExecutor<'context> {
     context: &'context mut Context,
     device: Device,
@@ -39,6 +69,7 @@ pub struct GpuExecutor<'context> {
     systems: GpuSystemRegistry,
     schedule: GpuSystemSchedule,
     schedule_cache: Option<ScheduleCache>,
+    timestamp_query_resources: Option<TimestampQueryResources>,
 }
 
 impl<'context> GpuExecutor<'context> {
@@ -52,6 +83,7 @@ impl<'context> GpuExecutor<'context> {
             systems: GpuSystemRegistry::new(),
             schedule: GpuSystemSchedule::new(),
             schedule_cache: None,
+            timestamp_query_resources: None,
         }
     }
 
@@ -83,6 +115,15 @@ impl<'context> GpuExecutor<'context> {
     pub fn systems(&self) -> &GpuSystemRegistry {
         let Self { systems, .. } = self;
         systems
+    }
+
+    #[inline]
+    pub fn timestamp_query_resources(&self) -> Option<&TimestampQueryResources> {
+        let Self {
+            timestamp_query_resources,
+            ..
+        } = self;
+        timestamp_query_resources.as_ref()
     }
 
     #[inline]
@@ -236,7 +277,6 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
         let Self {
             ref context,
@@ -245,6 +285,7 @@ impl<'context> GpuExecutor<'context> {
             systems,
             schedule,
             schedule_cache,
+            timestamp_query_resources,
             ..
         } = self;
 
@@ -252,12 +293,21 @@ impl<'context> GpuExecutor<'context> {
             || Self::cache_schedule(context, device, archetypes, systems, schedule);
         let schedule_cache = schedule_cache.get_or_insert_with(cache_schedule);
 
+        let can_write_timestamps = device
+            .features()
+            .contains(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
+        if can_write_timestamps && timestamp_query_resources.is_none() {
+            *timestamp_query_resources =
+                Self::create_timestamp_query_resources(device, schedule_cache);
+        }
+
         let compute_pass_desc = ComputePassDescriptor {
             label: Some("`gpecs` executor compute pass"),
             timestamp_writes: None,
         };
         let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
 
+        let mut query_index = 0;
         for (&system_id, archetypes_bind_groups) in schedule_cache.iter() {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("system {system_id:?} should exist");
@@ -269,12 +319,76 @@ impl<'context> GpuExecutor<'context> {
                 };
                 compute_pass.set_pipeline(shader.compute_pipeline());
                 compute_pass.set_bind_group(0, bind_group, &[]);
+
                 let storage_len = u32::try_from(archetype_info.storage().len())
                     .expect("storage length should fit into `u32`");
                 let workgroup_count = storage_len.div_ceil(shader.workgroup_count().unwrap_or(64));
+
+                if let Some(timestamp_query_resources) = timestamp_query_resources.as_ref() {
+                    let TimestampQueryResources { query_set, .. } = timestamp_query_resources;
+                    compute_pass.write_timestamp(query_set, query_index);
+                    query_index += 1;
+                }
                 compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+                if let Some(timestamp_query_resources) = timestamp_query_resources.as_ref() {
+                    let TimestampQueryResources { query_set, .. } = timestamp_query_resources;
+                    compute_pass.write_timestamp(query_set, query_index);
+                }
             }
+            query_index += 1;
         }
+        drop(compute_pass);
+
+        if let Some(timestamp_query_resources) = timestamp_query_resources.as_ref() {
+            let TimestampQueryResources {
+                query_set,
+                count,
+                resolve_buffer,
+            } = timestamp_query_resources;
+            command_encoder.resolve_query_set(query_set, 0..count.get(), resolve_buffer, 0);
+        }
+    }
+
+    #[inline]
+    fn create_timestamp_query_resources(
+        device: &Device,
+        schedule_cache: &ScheduleCache,
+    ) -> Option<TimestampQueryResources> {
+        let count = schedule_cache
+            .iter()
+            .map(|(_, archetypes_bind_groups)| {
+                let count = u32::try_from(archetypes_bind_groups.len())
+                    .expect("archetype count should fit into `u32`");
+                match count {
+                    0 => 0,
+                    count => count + 1,
+                }
+            })
+            .sum();
+        let count = NonZeroU32::new(count)?;
+
+        let query_set_desc = QuerySetDescriptor {
+            label: Some("`gpecs` executor query set"),
+            ty: QueryType::Timestamp,
+            count: count.get(),
+        };
+        let query_set = device.create_query_set(&query_set_desc);
+
+        let resolve_buffer_size = u64::from(count.get())
+            * u64::try_from(size_of::<u64>()).expect("size of `u64` should fit into `u64`");
+        let resolve_buffer_desc = BufferDescriptor {
+            label: Some("`gpecs` executor query set resolve buffer"),
+            size: resolve_buffer_size,
+            usage: BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        };
+        let resolve_buffer = device.create_buffer(&resolve_buffer_desc);
+
+        Some(TimestampQueryResources {
+            query_set,
+            count,
+            resolve_buffer,
+        })
     }
 
     #[inline]

@@ -1,8 +1,9 @@
-use std::{ffi::c_void, fs, mem::transmute, ptr::null, slice};
+use std::{ffi::c_void, fs, mem::transmute, ptr::null, slice, time::Duration};
 
 use glam::Vec3;
 use gpecs::prelude::*;
 use gpecs_simple_types::*;
+use itertools::Itertools;
 use renderdoc::{RenderDoc, V141};
 
 const ENTITY_COUNT: u32 = if cfg!(debug_assertions) {
@@ -104,12 +105,25 @@ fn main() {
         tag_gpu_id,
     );
 
+    // Create download buffer for results of timestamp queries
+    let timestamp_query_download_buffer = init_wgpu_timestamp_query_download_buffer(&executor);
+
+    // Push commands to copy data into the timestamp query download buffer
+    wgpu_copy_into_timestamp_query_download_buffer(
+        &executor,
+        timestamp_query_download_buffer.as_ref(),
+        &mut command_encoder,
+    );
+
     let command_buffer = command_encoder.finish();
     queue.submit([command_buffer]);
 
     // Map download buffer to CPU memory
-    let position_tag_download_slice =
-        wgpu_map_position_tag_download_buffer(position_tag_download_buffer.as_ref());
+    let position_tag_download_slice = wgpu_map_whole_buffer(position_tag_download_buffer.as_ref());
+
+    // Map timestamp query download buffer to CPU memory
+    let timestamp_query_download_slice =
+        wgpu_map_whole_buffer(timestamp_query_download_buffer.as_ref());
 
     device.poll(wgpu::Maintain::Wait).panic_on_timeout();
 
@@ -142,6 +156,36 @@ fn main() {
             }),
             position_tag_positions.iter().copied(),
         );
+    }
+
+    // Check data inside of the timestamp query download buffer
+    if let Some((timestamp_query_download_slice, timestamp_query_resources)) =
+        timestamp_query_download_slice.zip(executor.timestamp_query_resources())
+    {
+        let timestamp_query_download_slice_mapped_range =
+            timestamp_query_download_slice.get_mapped_range();
+        let timestamp_query_raw_results: &[u64] = unsafe {
+            slice::from_raw_parts(
+                timestamp_query_download_slice_mapped_range.as_ptr().cast(),
+                timestamp_query_resources
+                    .count()
+                    .get()
+                    .try_into()
+                    .expect("count of queries should fit into `usize`"),
+            )
+        };
+        log::info!("Timestamp query raw results:\n{timestamp_query_raw_results:#?}");
+
+        let timestamp_period_nanos = queue.get_timestamp_period();
+        for (index, (&first, &second)) in timestamp_query_raw_results
+            .iter()
+            .tuple_windows()
+            .enumerate()
+        {
+            let nanos = (second - first) as f32 * timestamp_period_nanos;
+            let duration = Duration::from_nanos(nanos as u64);
+            log::info!("Timestamp query {index} duration: {duration:?}");
+        }
     }
 
     renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
@@ -261,9 +305,15 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
         panic!("adapter does not support compute shaders, which are required");
     }
 
+    let features = adapter.features();
+    if !features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES) {
+        panic!("adapter does not support timestamp queries inside passes, which are required");
+    }
+
     let device_desc = wgpu::DeviceDescriptor {
         label: Some("`gpecs` integration test device"),
-        required_features: wgpu::Features::empty(),
+        required_features: wgpu::Features::TIMESTAMP_QUERY
+            | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
         required_limits: adapter.limits(),
         memory_hints: wgpu::MemoryHints::Performance,
     };
@@ -342,6 +392,20 @@ fn init_wgpu_position_tag_download_buffer(
         .into()
 }
 
+fn init_wgpu_timestamp_query_download_buffer(executor: &GpuExecutor) -> Option<wgpu::Buffer> {
+    let timestamp_query_resources = executor.timestamp_query_resources()?;
+    let timestamp_query_download_buffer_desc = wgpu::BufferDescriptor {
+        label: Some("`gpecs` timestamp query download buffer"),
+        size: unsafe { timestamp_query_resources.resolve_buffer() }.size(),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    };
+    executor
+        .device()
+        .create_buffer(&timestamp_query_download_buffer_desc)
+        .into()
+}
+
 fn wgpu_copy_into_position_tag_download_buffer(
     executor: &GpuExecutor,
     position_tag_download_buffer: Option<&wgpu::Buffer>,
@@ -384,12 +448,31 @@ fn wgpu_copy_into_position_tag_download_buffer(
     }
 }
 
-fn wgpu_map_position_tag_download_buffer(
-    position_tag_download_buffer: Option<&wgpu::Buffer>,
-) -> Option<wgpu::BufferSlice<'_>> {
-    let position_tag_download_slice = position_tag_download_buffer?.slice(..);
-    position_tag_download_slice.map_async(wgpu::MapMode::Read, |_| {});
-    position_tag_download_slice.into()
+fn wgpu_copy_into_timestamp_query_download_buffer(
+    executor: &GpuExecutor,
+    timestamp_query_download_buffer: Option<&wgpu::Buffer>,
+    command_encoder: &mut wgpu::CommandEncoder,
+) {
+    let Some((timestamp_query_resources, timestamp_query_download_buffer)) = executor
+        .timestamp_query_resources()
+        .zip(timestamp_query_download_buffer)
+    else {
+        return;
+    };
+
+    command_encoder.copy_buffer_to_buffer(
+        unsafe { timestamp_query_resources.resolve_buffer() },
+        0,
+        timestamp_query_download_buffer,
+        0,
+        timestamp_query_download_buffer.size(),
+    );
+}
+
+fn wgpu_map_whole_buffer(buffer: Option<&wgpu::Buffer>) -> Option<wgpu::BufferSlice<'_>> {
+    let slice = buffer?.slice(..);
+    slice.map_async(wgpu::MapMode::Read, |_| {});
+    slice.into()
 }
 
 fn init_renderdoc() -> Option<RenderDoc<V141>> {

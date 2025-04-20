@@ -12,6 +12,7 @@ members = [
     "crates/gpecs_task_graph",
     # Standalone benchmarks
     "benches/gpecs_soa_bench",
+    "benches/gpecs_ecs_benchmark",
     # Standalone examples
     "examples/gpecs_simple",
     "examples/gpecs_simple_types",

@@ -512,6 +512,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpecs_ecs_benchmark"
+version = "0.0.0"
+dependencies = [
+ "gpecs_types",
+]
+
+[[package]]
 name = "gpecs_simple"
 version = "0.0.0"
 dependencies = [

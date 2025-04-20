@@ -1,0 +1,51 @@
+use core::ops::Range;
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct TimeDelta(pub f32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RandomXoshiro128 {
+    state: [u32; 4],
+}
+
+impl RandomXoshiro128 {
+    pub fn new(seed: u32) -> Self {
+        let state = [seed + 3, seed + 5, seed + 7, seed + 11];
+        Self { state }
+    }
+
+    pub fn from_state(state: [u32; 4]) -> Self {
+        Self { state }
+    }
+
+    pub fn next(&mut self) -> u32 {
+        let Self { state } = self;
+
+        let result = Self::rotl(state[1] * 5, 7) * 9;
+
+        let t = state[1] << 9;
+        state[2] ^= state[0];
+        state[3] ^= state[1];
+        state[1] ^= state[2];
+        state[0] ^= state[3];
+        state[2] ^= t;
+        state[3] = Self::rotl(state[3], 11);
+
+        result
+    }
+
+    pub fn range(&mut self, range: Range<u32>) -> u32 {
+        let Range {
+            start: low,
+            end: high,
+        } = range;
+
+        let r = high - low + 1;
+        (self.next() % r) + low
+    }
+
+    fn rotl(x: u32, k: u32) -> u32 {
+        (x << k) | (x >> (32 - k))
+    }
+}

@@ -157,6 +157,7 @@ fn main() {
     let positions_gpu_system_id = executor
         .register_system(
             shader_module,
+            Some(64),
             Some("copy_entity_indices"),
             true,
             [position_gpu_id],

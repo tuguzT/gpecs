@@ -22,6 +22,7 @@ pub struct SystemShader {
     entities_bind_group_layout_entry: Option<BindGroupLayoutEntry>,
     components_bind_group_layout_entries: IndexMap<GpuComponentId, Option<BindGroupLayoutEntry>>,
     shader_module: ShaderModule,
+    workgroup_count: Option<u32>,
     bind_group_layout: BindGroupLayout,
     pipeline_layout: PipelineLayout,
     compute_pipeline: ComputePipeline,
@@ -34,6 +35,7 @@ impl SystemShader {
         components: &ComponentRegistry,
         gpu_device: &Device,
         shader_module: ShaderModule,
+        workgroup_count: Option<u32>,
         entry_point: Option<&str>,
         system_id: GpuSystemId,
         bind_entities: bool,
@@ -138,6 +140,7 @@ impl SystemShader {
         Ok(Self {
             entities_bind_group_layout_entry,
             components_bind_group_layout_entries,
+            workgroup_count,
             shader_module,
             bind_group_layout,
             pipeline_layout,
@@ -149,6 +152,14 @@ impl SystemShader {
     pub fn shader_module(&self) -> &ShaderModule {
         let Self { shader_module, .. } = self;
         shader_module
+    }
+
+    #[inline]
+    pub fn workgroup_count(&self) -> Option<u32> {
+        let Self {
+            workgroup_count, ..
+        } = *self;
+        workgroup_count
     }
 
     #[inline]

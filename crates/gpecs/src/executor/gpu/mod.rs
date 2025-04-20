@@ -179,6 +179,7 @@ impl<'context> GpuExecutor<'context> {
     pub fn register_system<I>(
         &mut self,
         shader_module: ShaderModule,
+        workgroup_count: Option<u32>,
         entry_point: Option<&str>,
         bind_entities: bool,
         component_ids: I,
@@ -198,6 +199,7 @@ impl<'context> GpuExecutor<'context> {
             components,
             device,
             shader_module,
+            workgroup_count,
             entry_point,
             bind_entities,
             component_ids,
@@ -245,8 +247,8 @@ impl<'context> GpuExecutor<'context> {
                 unreachable!("system {system_id:?} should exist");
             };
 
-            let component_ids = system_info
-                .shader()
+            let shader = system_info.shader();
+            let component_ids = shader
                 .components_bind_group_layout_entries()
                 .map(|(component_id, _)| component_id.into());
             let Ok(compatible_archetypes) =
@@ -267,7 +269,7 @@ impl<'context> GpuExecutor<'context> {
                 let mut bind_group_entries = Vec::new();
 
                 if let Some(entities_bind_group_layout_entry) =
-                    system_info.shader().entities_bind_group_layout_entry()
+                    shader.entities_bind_group_layout_entry()
                 {
                     let Some(entities_buffer_binding) = storage_buffer_bindings.entities else {
                         continue;
@@ -279,7 +281,7 @@ impl<'context> GpuExecutor<'context> {
                     bind_group_entries.push(entities_bind_group_entry);
                 }
                 let components_bind_group_layout_entries =
-                    system_info.shader().components_bind_group_layout_entries();
+                    shader.components_bind_group_layout_entries();
                 for (component_id, component_bind_group_layout_entry) in
                     components_bind_group_layout_entries
                 {
@@ -311,25 +313,22 @@ impl<'context> GpuExecutor<'context> {
                     format!("`gpecs` {system_id:?} bind group for {archetype_id:?}");
                 let bind_group_desc = BindGroupDescriptor {
                     label: Some(&bind_group_label),
-                    layout: system_info.shader().bind_group_layout(),
+                    layout: shader.bind_group_layout(),
                     entries: &bind_group_entries,
                 };
                 let bind_group = device.create_bind_group(&bind_group_desc);
 
-                compute_pass.set_pipeline(system_info.shader().compute_pipeline());
+                compute_pass.set_pipeline(shader.compute_pipeline());
                 compute_pass.set_bind_group(0, &bind_group, &[]);
 
-                let workgroup_count = archetype_info
-                    .storage()
-                    .len()
-                    .div_ceil(64) // TODO: use workgroup size from shader
-                    .try_into()
-                    .expect("workgroup count should fit into `u32`");
+                let storage_len = u32::try_from(archetype_info.storage().len())
+                    .expect("storage length should fit into `u32`");
+                let workgroup_count = storage_len.div_ceil(shader.workgroup_count().unwrap_or(64));
                 compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
             }
         }
     }
 
     // TODO: methods to copy data from CPU to GPU and vice versa
-    //       and decide what to do with mutable access to the context
+    //       do not grant mutable access to the context
 }

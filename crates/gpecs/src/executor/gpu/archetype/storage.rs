@@ -62,7 +62,8 @@ impl GpuArchetypeStorage {
             let dst = contents.as_mut_ptr();
             ptr::copy_nonoverlapping(src, dst, entities_byte_count);
 
-            let mut offset = BufferAddress::try_from(entities_byte_count).unwrap();
+            let mut offset = BufferAddress::try_from(entities_byte_count)
+                .expect("entities byte count should fit into `BufferAddress`");
             for (&component_id, slice) in erased_components.iter() {
                 offset = offset.div_ceil(min_offset_alignment) * min_offset_alignment;
 
@@ -81,6 +82,9 @@ impl GpuArchetypeStorage {
                     .ok()
                     .map(|size| BufferBindingDescriptor { offset, size });
                 component_bindings.insert(component_id, components_binding);
+
+                offset += BufferAddress::try_from(components_byte_count)
+                    .expect("components byte count should fit into `BufferAddress`");
             }
         }
 

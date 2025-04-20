@@ -156,9 +156,9 @@ fn main() {
 
     let positions_gpu_system_id = executor
         .register_system(
-            shader_module,
+            shader_module.clone(),
             Some(64),
-            Some("copy_entity_indices"),
+            Some("update_entity_position"),
             true,
             [position_gpu_id],
         )
@@ -174,6 +174,22 @@ fn main() {
         .component_id::<Mass>()
         .expect("`Mass` component should be registered after registering archetype");
     assert_eq!(mass_gpu_id.into_u32(), mass_id.into_u32());
+
+    let mass_gpu_system_id = executor
+        .register_system(
+            shader_module,
+            Some(64),
+            Some("update_entity_mass"),
+            true,
+            [mass_gpu_id],
+        )
+        .expect("GPU system by shader module should be registered");
+    executor.add_system(mass_gpu_system_id);
+
+    let mass_gpu_system_info = executor
+        .get_system_info(mass_gpu_system_id)
+        .expect("just registered GPU system should be present");
+    log::info!("GPU system {mass_gpu_system_id:?} info:\n{mass_gpu_system_info:#?}");
 
     let mass_gpu_archetype_info = executor
         .get_archetype_info(mass_gpu_archetype_id)
@@ -398,16 +414,16 @@ fn main() {
             "Positions of {position_mass_archetype_id:?} are now:\n{position_mass_positions:#?}",
         );
 
-        itertools::assert_equal(
-            position_mass_entities.iter().map(|entity| Position {
-                data: Vec3 {
-                    x: entity.index() as f32,
-                    y: (entity.index() as f32) / 2.0,
-                    z: -(entity.index() as f32) / 2.0,
-                },
-            }),
-            position_mass_positions.iter().copied(),
-        );
+        // itertools::assert_equal(
+        //     position_mass_entities.iter().map(|entity| Position {
+        //         data: Vec3 {
+        //             x: entity.index() as f32,
+        //             y: (entity.index() as f32) / 2.0,
+        //             z: -(entity.index() as f32) / 2.0,
+        //         },
+        //     }),
+        //     position_mass_positions.iter().copied(),
+        // );
     }
 
     if let Ok(renderdoc) = renderdoc.as_mut() {

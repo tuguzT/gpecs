@@ -86,7 +86,7 @@ impl GpuSystemRegistry {
         workgroup_count: Option<u32>,
         entry_point: Option<&str>,
         bind_entities: bool,
-        component_ids: I,
+        bind_components: I,
     ) -> Result<GpuSystemId, DuplicateComponentError>
     where
         I: IntoIterator<Item = GpuComponentId>,
@@ -104,7 +104,7 @@ impl GpuSystemRegistry {
             entry_point,
             id,
             bind_entities,
-            component_ids,
+            bind_components,
         )?;
         let info = GpuSystemInfo { id, shader };
         systems.push(info);

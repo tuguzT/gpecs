@@ -39,12 +39,12 @@ impl SystemShader {
         entry_point: Option<&str>,
         system_id: GpuSystemId,
         bind_entities: bool,
-        component_ids: I,
+        bind_components: I,
     ) -> Result<Self, DuplicateComponentError>
     where
         I: IntoIterator<Item = GpuComponentId>,
     {
-        let component_ids = component_ids.into_iter().map(Into::into);
+        let component_ids = bind_components.into_iter().map(Into::into);
         let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?;
         let component_ids: IndexSet<_> = component_ids
             .into_iter()

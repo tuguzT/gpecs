@@ -182,7 +182,7 @@ impl<'context> GpuExecutor<'context> {
         workgroup_count: Option<u32>,
         entry_point: Option<&str>,
         bind_entities: bool,
-        component_ids: I,
+        bind_components: I,
     ) -> Result<GpuSystemId, DuplicateComponentError>
     where
         I: IntoIterator<Item = GpuComponentId>,
@@ -202,7 +202,7 @@ impl<'context> GpuExecutor<'context> {
             workgroup_count,
             entry_point,
             bind_entities,
-            component_ids,
+            bind_components,
         )
     }
 

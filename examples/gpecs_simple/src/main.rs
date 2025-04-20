@@ -164,7 +164,7 @@ fn main() {
     {
         let timestamp_query_download_slice_mapped_range =
             timestamp_query_download_slice.get_mapped_range();
-        let timestamp_query_raw_results: &[u64] = unsafe {
+        let timestamp_query_raw: &[u64] = unsafe {
             slice::from_raw_parts(
                 timestamp_query_download_slice_mapped_range.as_ptr().cast(),
                 timestamp_query_resources
@@ -174,14 +174,9 @@ fn main() {
                     .expect("count of queries should fit into `usize`"),
             )
         };
-        log::info!("Timestamp query raw results:\n{timestamp_query_raw_results:#?}");
 
         let timestamp_period_nanos = queue.get_timestamp_period();
-        for (index, (&first, &second)) in timestamp_query_raw_results
-            .iter()
-            .tuple_windows()
-            .enumerate()
-        {
+        for (index, (&first, &second)) in timestamp_query_raw.iter().tuple_windows().enumerate() {
             let nanos = (second - first) as f32 * timestamp_period_nanos;
             let duration = Duration::from_nanos(nanos as u64);
             log::info!("Timestamp query {index} duration: {duration:?}");

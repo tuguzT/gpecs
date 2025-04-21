@@ -1,15 +1,18 @@
 #[derive(Debug)]
 #[repr(C, align(16))]
-pub struct Framebuffer<'a> {
+pub struct Framebuffer<B> {
     width: u32,
     height: u32,
-    buffer: &'a mut [u32],
+    buffer: B,
 }
 
-impl<'a> Framebuffer<'a> {
-    pub fn new(width: u32, height: u32, buffer: &'a mut [u32]) -> Self {
+impl<B> Framebuffer<B>
+where
+    B: AsRef<[u32]> + AsMut<[u32]>,
+{
+    pub fn new(width: u32, height: u32, buffer: B) -> Self {
         assert!(
-            buffer.len() <= (width * height) as usize,
+            buffer.as_ref().len() <= (width * height) as usize,
             "buffer is too small for the given width {width} and height {height}",
         );
         Self {
@@ -17,6 +20,21 @@ impl<'a> Framebuffer<'a> {
             height,
             buffer,
         }
+    }
+
+    pub fn width(&self) -> u32 {
+        let Self { width, .. } = *self;
+        width
+    }
+
+    pub fn height(&self) -> u32 {
+        let Self { height, .. } = *self;
+        height
+    }
+
+    pub fn buffer(&self) -> &[u32] {
+        let Self { buffer, .. } = self;
+        buffer.as_ref()
     }
 
     pub fn draw(&mut self, x: i32, y: i32, char: u32) {
@@ -28,7 +46,7 @@ impl<'a> Framebuffer<'a> {
 
         if y >= 0 && y < height as i32 {
             if x >= 0 && x < width as i32 {
-                buffer[(x + y * width as i32) as usize] = char;
+                buffer.as_mut()[(x + y * width as i32) as usize] = char;
             }
         }
     }

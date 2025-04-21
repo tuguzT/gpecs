@@ -53,8 +53,7 @@ where
         let Self { f, .. } = self;
 
         let Ok(param) = In::get_param(context) else {
-            let name = self.name();
-            panic!(r#"failed to retrieve system "{name}" parameter"#)
+            return;
         };
         f(param)
     }

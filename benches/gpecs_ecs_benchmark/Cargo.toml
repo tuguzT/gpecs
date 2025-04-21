@@ -9,6 +9,11 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_types = { workspace = true }
+itertools = { workspace = true }
+
+[dev-dependencies]
+gpecs = { workspace = true }
+rand = { workspace = true }
 
 [[bench]]
 name = "gpecs"

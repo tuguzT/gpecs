@@ -3,6 +3,9 @@ use crate::{
     framebuffer::Framebuffer,
 };
 
-pub fn render_sprite(position: &Position, sprite: &Sprite, framebuffer: &mut Framebuffer) {
+pub fn render_sprite<B>(position: &Position, sprite: &Sprite, framebuffer: &mut Framebuffer<B>)
+where
+    B: AsRef<[u32]> + AsMut<[u32]>,
+{
     framebuffer.draw(position.x as i32, position.y as i32, sprite.character);
 }

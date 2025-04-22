@@ -1,5 +1,12 @@
 use gpecs_types::component::{Component, GpuComponent};
 
+pub const PLAYER_SPRITE: u32 = '@' as u32;
+pub const MONSTER_SPRITE: u32 = 'k' as u32;
+pub const NPC_SPRITE: u32 = 'h' as u32;
+pub const GRAVE_SPRITE: u32 = '|' as u32;
+pub const SPAWN_SPRITE: u32 = '_' as u32;
+pub const NONE_SPRITE: u32 = ' ' as u32;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct Sprite {
@@ -9,7 +16,7 @@ pub struct Sprite {
 impl Default for Sprite {
     fn default() -> Self {
         Self {
-            character: ' ' as u32,
+            character: NONE_SPRITE,
         }
     }
 }

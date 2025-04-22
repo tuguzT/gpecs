@@ -5,7 +5,9 @@ pub use self::{
     health::{Health, StatusEffect},
     player::{Player, PlayerType},
     position::Position,
-    sprite::Sprite,
+    sprite::{
+        Sprite, GRAVE_SPRITE, MONSTER_SPRITE, NONE_SPRITE, NPC_SPRITE, PLAYER_SPRITE, SPAWN_SPRITE,
+    },
     velocity::Velocity,
 };
 

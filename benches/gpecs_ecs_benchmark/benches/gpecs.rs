@@ -2,11 +2,14 @@ use std::{cell::RefCell, fs::File, io::Write, rc::Rc};
 
 use gpecs::prelude::*;
 use gpecs_ecs_benchmark::{
-    components::{Damage, Data, Health, Player, PlayerType, Position, Sprite, Velocity},
+    components::{
+        Damage, Data, Health, Player, PlayerType, Position, Sprite, Velocity, NONE_SPRITE,
+        SPAWN_SPRITE,
+    },
     framebuffer::Framebuffer,
     systems::{
         render_sprite, update_components, update_damage, update_data, update_health,
-        update_position, update_sprite, NONE_SPRITE, SPAWN_SPRITE,
+        update_position, update_sprite,
     },
     utils::{RandomXoshiro128, TimeDelta},
 };

@@ -47,7 +47,7 @@ fn register_systems<B>(
     time_delta: Rc<RefCell<TimeDelta>>,
     framebuffer: Rc<RefCell<Framebuffer<B>>>,
 ) where
-    B: AsRef<[u32]> + AsMut<[u32]> + 'static,
+    B: AsMut<[u32]> + 'static,
 {
     let time_delta_clone = Rc::clone(&time_delta);
     let system = executor.register_system(move |bundles: BundlesMut<(Position, Velocity)>| {
@@ -162,7 +162,7 @@ fn create_player(context: &mut Context, rng: &mut impl rand::Rng, player_type: O
 
 fn save_framebuffer_to_file<B>(framebuffer: &Framebuffer<B>)
 where
-    B: AsRef<[u32]> + AsMut<[u32]>,
+    B: AsRef<[u32]>,
 {
     let mut framebuffer_file =
         File::create("framebuffer.txt").expect("failed to create framebuffer file");

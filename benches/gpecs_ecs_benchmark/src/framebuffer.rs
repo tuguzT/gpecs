@@ -6,9 +6,21 @@ pub struct Framebuffer<B> {
     buffer: B,
 }
 
+impl<B> Framebuffer<B> {
+    pub fn width(&self) -> u32 {
+        let Self { width, .. } = *self;
+        width
+    }
+
+    pub fn height(&self) -> u32 {
+        let Self { height, .. } = *self;
+        height
+    }
+}
+
 impl<B> Framebuffer<B>
 where
-    B: AsRef<[u32]> + AsMut<[u32]>,
+    B: AsRef<[u32]>,
 {
     pub fn new(width: u32, height: u32, buffer: B) -> Self {
         assert!(
@@ -22,21 +34,16 @@ where
         }
     }
 
-    pub fn width(&self) -> u32 {
-        let Self { width, .. } = *self;
-        width
-    }
-
-    pub fn height(&self) -> u32 {
-        let Self { height, .. } = *self;
-        height
-    }
-
     pub fn buffer(&self) -> &[u32] {
         let Self { buffer, .. } = self;
         buffer.as_ref()
     }
+}
 
+impl<B> Framebuffer<B>
+where
+    B: AsMut<[u32]>,
+{
     pub fn draw(&mut self, x: i32, y: i32, char: u32) {
         let Self {
             width,

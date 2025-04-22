@@ -7,7 +7,7 @@ use std::{
     path::Path,
     ptr::null,
     rc::Rc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use gpecs::{context::error::IncompatibleBundleError, prelude::*};
@@ -23,6 +23,7 @@ use gpecs_ecs_benchmark::{
     },
     utils::{RandomXoshiro128, TimeDelta},
 };
+use itertools::Itertools;
 use renderdoc::{RenderDoc, V141};
 use wgpu::util::DeviceExt;
 
@@ -150,6 +151,8 @@ fn run_gpu(context: &mut Context) {
     };
     let framebuffer_download_buffer = device.create_buffer(&framebuffer_download_buffer_desc);
 
+    let mut timestamp_query_download_buffer = None;
+
     log::info!(">> Registering GPU systems...");
     register_gpu_systems(
         &mut executor,
@@ -166,6 +169,16 @@ fn run_gpu(context: &mut Context) {
         let mut command_encoder = init_wgpu_command_encoder(&device);
         executor.execute(&mut command_encoder);
 
+        if timestamp_query_download_buffer.is_none() {
+            timestamp_query_download_buffer = init_wgpu_timestamp_query_download_buffer(&executor);
+        }
+
+        wgpu_copy_into_timestamp_query_download_buffer(
+            &executor,
+            timestamp_query_download_buffer.as_ref(),
+            &mut command_encoder,
+        );
+
         command_encoder.copy_buffer_to_buffer(
             &framebuffer_data_storage_buffer,
             0,
@@ -177,14 +190,55 @@ fn run_gpu(context: &mut Context) {
         let command_buffer = command_encoder.finish();
         queue.submit([command_buffer]);
 
+        let timestamp_query_download_slice =
+            wgpu_map_whole_buffer(timestamp_query_download_buffer.as_ref());
+
         let framebuffer_data = framebuffer_download_buffer.slice(..);
         framebuffer_data.map_async(wgpu::MapMode::Read, |_| {});
 
         device.poll(wgpu::Maintain::Wait).panic_on_timeout();
 
         let elapsed = timestamp.elapsed();
-        log::info!(">>! Execution of GPU systems {i} took {elapsed:?}");
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
+
+        if let Some(timestamp_query_download_slice) = timestamp_query_download_slice {
+            let timestamp_query_view = timestamp_query_download_slice.get_mapped_range();
+            let timestamp_query_raw: &[u64] = bytemuck::cast_slice(&*timestamp_query_view);
+            let timestamp_period_nanos = queue.get_timestamp_period();
+            let mut timestamp_query_result =
+                timestamp_query_raw
+                    .iter()
+                    .tuple_windows()
+                    .map(|(first, second)| {
+                        let nanos = (second - first) as f32 * timestamp_period_nanos;
+                        Duration::from_nanos(nanos as u64)
+                    });
+
+            let update_position: Duration = timestamp_query_result.by_ref().take(3).sum();
+            log::info!(">>> `update_position` system took {update_position:?}");
+
+            let update_data: Duration = timestamp_query_result.by_ref().skip(1).take(3).sum();
+            log::info!(">>> `update_data` system took {update_data:?}");
+
+            let update_components: Duration = timestamp_query_result.by_ref().skip(1).take(2).sum();
+            log::info!(">>> `update_components` system took {update_components:?}");
+
+            let update_health: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
+            log::info!(">>> `update_health` system took {update_health:?}");
+
+            let update_damage: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
+            log::info!(">>> `update_damage` system took {update_damage:?}");
+
+            let update_sprite: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
+            log::info!(">>> `update_sprite` system took {update_sprite:?}");
+
+            let render_sprite: Duration = timestamp_query_result.skip(1).sum();
+            log::info!(">>> `render_sprite` system took {render_sprite:?}");
+        }
+        if let Some(timestamp_query_download_buffer) = timestamp_query_download_buffer.as_ref() {
+            timestamp_query_download_buffer.unmap();
+        }
+        log::info!(">>! Execution of GPU systems {i} took {elapsed:?}");
 
         time_delta = TimeDelta(elapsed.as_secs_f32());
         let time_delta_slice = [time_delta.0];
@@ -723,6 +777,47 @@ fn init_wgpu_shader(device: &wgpu::Device) -> wgpu::ShaderModule {
     log::debug!("Shader compilation info:\n{shader_compilation_info:#?}");
 
     shader_module
+}
+
+fn init_wgpu_timestamp_query_download_buffer(executor: &GpuExecutor) -> Option<wgpu::Buffer> {
+    let timestamp_query_resources = executor.timestamp_query_resources()?;
+    let timestamp_query_download_buffer_desc = wgpu::BufferDescriptor {
+        label: Some("`gpecs` timestamp query download buffer"),
+        size: unsafe { timestamp_query_resources.resolve_buffer() }.size(),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    };
+    executor
+        .device()
+        .create_buffer(&timestamp_query_download_buffer_desc)
+        .into()
+}
+
+fn wgpu_copy_into_timestamp_query_download_buffer(
+    executor: &GpuExecutor,
+    timestamp_query_download_buffer: Option<&wgpu::Buffer>,
+    command_encoder: &mut wgpu::CommandEncoder,
+) {
+    let Some((timestamp_query_resources, timestamp_query_download_buffer)) = executor
+        .timestamp_query_resources()
+        .zip(timestamp_query_download_buffer)
+    else {
+        return;
+    };
+
+    command_encoder.copy_buffer_to_buffer(
+        unsafe { timestamp_query_resources.resolve_buffer() },
+        0,
+        timestamp_query_download_buffer,
+        0,
+        timestamp_query_download_buffer.size(),
+    );
+}
+
+fn wgpu_map_whole_buffer(buffer: Option<&wgpu::Buffer>) -> Option<wgpu::BufferSlice<'_>> {
+    let slice = buffer?.slice(..);
+    slice.map_async(wgpu::MapMode::Read, |_| {});
+    slice.into()
 }
 
 fn init_wgpu_command_encoder(device: &wgpu::Device) -> wgpu::CommandEncoder {

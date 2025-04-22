@@ -520,6 +520,7 @@ dependencies = [
  "env_logger",
  "gpecs",
  "gpecs_types",
+ "itertools 0.14.0",
  "log",
  "pollster",
  "renderdoc",

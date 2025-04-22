@@ -18,6 +18,16 @@ impl<B> Framebuffer<B> {
         let Self { desc, .. } = *self;
         desc
     }
+
+    pub fn buffer(&self) -> &B {
+        let Self { buffer, .. } = self;
+        buffer
+    }
+
+    pub fn buffer_mut(&mut self) -> &mut B {
+        let Self { buffer, .. } = self;
+        buffer
+    }
 }
 
 impl<B> Framebuffer<B>
@@ -31,11 +41,6 @@ where
         );
         let desc = FramebufferDesc { width, height };
         Self { desc, buffer }
-    }
-
-    pub fn buffer(&self) -> &[u32] {
-        let Self { buffer, .. } = self;
-        buffer.as_ref()
     }
 }
 

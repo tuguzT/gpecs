@@ -58,7 +58,7 @@ fn run_cpu(context: &mut Context) {
     log::info!(">> Preparing entities with mixed components...");
     prepare_entities_with_mixed_components(context, &mut rng, &entities);
 
-    let time_delta = TimeDelta(1.0);
+    let time_delta = TimeDelta::default();
     let framebuffer = Framebuffer::new(
         FRAMEBUFFER_WIDTH as u32,
         FRAMEBUFFER_HEIGHT as u32,
@@ -82,7 +82,7 @@ fn run_cpu(context: &mut Context) {
         log::info!(">>! Execution of CPU systems {i} took {elapsed:?}");
 
         let time_delta = &mut *time_delta.borrow_mut();
-        *time_delta = TimeDelta(1.0);
+        *time_delta = TimeDelta(elapsed.as_secs_f32());
 
         log::info!(">>> Saving framebuffer state {i} to file...");
         let framebuffer = &*framebuffer.borrow();
@@ -102,8 +102,8 @@ fn run_gpu(context: &mut Context) {
     log::info!(">> Preparing entities with mixed components...");
     prepare_entities_with_mixed_components(context, &mut rng, &entities);
 
-    let time_delta = TimeDelta(1.0);
-    let framebuffer = Framebuffer::new(
+    let mut time_delta = TimeDelta::default();
+    let mut framebuffer = Framebuffer::new(
         FRAMEBUFFER_WIDTH as u32,
         FRAMEBUFFER_HEIGHT as u32,
         vec![NONE_SPRITE; FRAMEBUFFER_SIZE],
@@ -122,7 +122,7 @@ fn run_gpu(context: &mut Context) {
     let time_delta_uniform_buffer_desc = wgpu::util::BufferInitDescriptor {
         label: Some("`gpecs` `ecs_benchmark` time delta uniform buffer"),
         contents: bytemuck::cast_slice(&time_delta_slice),
-        usage: wgpu::BufferUsages::UNIFORM,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     };
     let time_delta_uniform_buffer = device.create_buffer_init(&time_delta_uniform_buffer_desc);
 
@@ -143,6 +143,14 @@ fn run_gpu(context: &mut Context) {
     let framebuffer_desc_uniform_buffer =
         device.create_buffer_init(&framebuffer_desc_uniform_buffer_desc);
 
+    let framebuffer_download_buffer_desc = wgpu::BufferDescriptor {
+        label: Some("`gpecs` `ecs_benchmark` framebuffer download buffer"),
+        size: framebuffer_data_storage_buffer.size(),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    };
+    let framebuffer_download_buffer = device.create_buffer(&framebuffer_download_buffer_desc);
+
     log::info!(">> Registering GPU systems...");
     register_gpu_systems(
         &mut executor,
@@ -159,8 +167,19 @@ fn run_gpu(context: &mut Context) {
         let mut command_encoder = init_wgpu_command_encoder(&device);
         executor.execute(&mut command_encoder);
 
+        command_encoder.copy_buffer_to_buffer(
+            &framebuffer_data_storage_buffer,
+            0,
+            &framebuffer_download_buffer,
+            0,
+            framebuffer_data_storage_buffer.size(),
+        );
+
         let command_buffer = command_encoder.finish();
         queue.submit([command_buffer]);
+
+        let framebuffer_data = framebuffer_download_buffer.slice(..);
+        framebuffer_data.map_async(wgpu::MapMode::Read, |_| {});
 
         device.poll(wgpu::Maintain::Wait).panic_on_timeout();
 
@@ -168,10 +187,21 @@ fn run_gpu(context: &mut Context) {
         log::info!(">>! Execution of GPU systems {i} took {elapsed:?}");
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
 
-        // TODO: update time delta GPU buffer
-        // *time_delta = TimeDelta(1.0);
+        time_delta = TimeDelta(elapsed.as_secs_f32());
+        let time_delta_slice = [time_delta.0];
+        queue.write_buffer(
+            &time_delta_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&time_delta_slice),
+        );
 
-        // TODO: download framebuffer data to CPU to print out
+        let framebuffer_view = framebuffer_data.get_mapped_range();
+        let framebuffer_data = bytemuck::cast_slice(&*framebuffer_view);
+        framebuffer.buffer_mut().copy_from_slice(framebuffer_data);
+
+        drop(framebuffer_view);
+        framebuffer_download_buffer.unmap();
+
         log::info!(">>> Saving framebuffer state {i} to file...");
         save_framebuffer_to_file(&framebuffer, GPU_PATH, i);
     }
@@ -759,7 +789,11 @@ where
     fs::create_dir_all(prefix).expect("failed to create parent directory");
 
     let mut framebuffer_file = File::create(path).expect("failed to create framebuffer file");
-    for chunk in framebuffer.buffer().chunks_exact(FRAMEBUFFER_WIDTH) {
+    for chunk in framebuffer
+        .buffer()
+        .as_ref()
+        .chunks_exact(FRAMEBUFFER_WIDTH)
+    {
         for &char in chunk {
             let char = u8::try_from(char).expect("failed to convert character to `u8`");
             assert!(char.is_ascii(), "character should be ASCII");

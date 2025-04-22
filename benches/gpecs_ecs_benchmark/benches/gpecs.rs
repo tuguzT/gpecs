@@ -215,25 +215,25 @@ fn run_gpu(context: &mut Context) {
                     });
 
             let update_position: Duration = timestamp_query_result.by_ref().take(3).sum();
-            log::info!(">>> `update_position` system took {update_position:?}");
+            log::info!(">>>> `update_position` system took {update_position:?}");
 
             let update_data: Duration = timestamp_query_result.by_ref().skip(1).take(3).sum();
-            log::info!(">>> `update_data` system took {update_data:?}");
+            log::info!(">>>> `update_data` system took {update_data:?}");
 
             let update_components: Duration = timestamp_query_result.by_ref().skip(1).take(2).sum();
-            log::info!(">>> `update_components` system took {update_components:?}");
+            log::info!(">>>> `update_components` system took {update_components:?}");
 
             let update_health: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
-            log::info!(">>> `update_health` system took {update_health:?}");
+            log::info!(">>>> `update_health` system took {update_health:?}");
 
             let update_damage: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
-            log::info!(">>> `update_damage` system took {update_damage:?}");
+            log::info!(">>>> `update_damage` system took {update_damage:?}");
 
             let update_sprite: Duration = timestamp_query_result.by_ref().skip(1).take(4).sum();
-            log::info!(">>> `update_sprite` system took {update_sprite:?}");
+            log::info!(">>>> `update_sprite` system took {update_sprite:?}");
 
             let render_sprite: Duration = timestamp_query_result.skip(1).sum();
-            log::info!(">>> `render_sprite` system took {render_sprite:?}");
+            log::info!(">>>> `render_sprite` system took {render_sprite:?}");
         }
         if let Some(timestamp_query_download_buffer) = timestamp_query_download_buffer.as_ref() {
             timestamp_query_download_buffer.unmap();

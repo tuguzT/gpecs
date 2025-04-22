@@ -14,6 +14,12 @@ gpecs_types = { workspace = true }
 gpecs = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
+wgpu = { workspace = true }
+pollster = { workspace = true }
+renderdoc = { workspace = true }
+
+[build-dependencies]
+const_format = { workspace = true }
 
 [[bench]]
 name = "gpecs"

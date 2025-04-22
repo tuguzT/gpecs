@@ -515,10 +515,14 @@ dependencies = [
 name = "gpecs_ecs_benchmark"
 version = "0.0.0"
 dependencies = [
+ "const_format",
  "env_logger",
  "gpecs",
  "gpecs_types",
  "log",
+ "pollster",
+ "renderdoc",
+ "wgpu",
 ]
 
 [[package]]

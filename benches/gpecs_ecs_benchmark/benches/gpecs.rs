@@ -1,8 +1,11 @@
 use std::{
     cell::RefCell,
+    ffi::c_void,
     fs::{self, File},
     io::Write,
+    mem::transmute,
     path::Path,
+    ptr::null,
     rc::Rc,
     time::Instant,
 };
@@ -20,13 +23,14 @@ use gpecs_ecs_benchmark::{
     },
     utils::{RandomXoshiro128, TimeDelta},
 };
+use renderdoc::{RenderDoc, V141};
 
 const ENTITY_COUNT: usize = 1_000_000;
 const EXEC_COUNT: usize = 10;
 const RNG_SEED: u32 = 0xDEADBEEF;
 
 const CPU_PATH: &str = "cpu";
-// const GPU_PATH: &str = "gpu";
+const GPU_PATH: &str = "gpu";
 
 const FRAMEBUFFER_WIDTH: usize = 320;
 const FRAMEBUFFER_HEIGHT: usize = 240;
@@ -40,14 +44,17 @@ fn main() {
 
     let mut context = Context::new();
     run_cpu(&mut context);
+    run_gpu(&mut context);
 }
 
 fn run_cpu(context: &mut Context) {
+    log::info!("> Running on CPU...");
+
     let mut rng = RandomXoshiro128::new(RNG_SEED);
-    log::info!("Creating {ENTITY_COUNT} entities with mixed components...");
+    log::info!(">> Creating {ENTITY_COUNT} entities with mixed components...");
     let entities = create_entities_with_mixed_components(context, ENTITY_COUNT);
 
-    log::info!("Preparing entities with mixed components...");
+    log::info!(">> Preparing entities with mixed components...");
     prepare_entities_with_mixed_components(context, &mut rng, &entities);
 
     let time_delta = TimeDelta(0.0);
@@ -62,20 +69,77 @@ fn run_cpu(context: &mut Context) {
     let time_delta = Rc::new(RefCell::new(time_delta));
     let framebuffer = Rc::new(RefCell::new(framebuffer));
 
-    log::info!("Registering CPU systems...");
+    log::info!(">> Registering CPU systems...");
     register_cpu_systems(&mut executor, time_delta, framebuffer.clone());
 
-    log::info!("Running CPU systems...");
+    log::info!(">> Running CPU systems...");
     for i in 0..EXEC_COUNT {
         let timestamp = Instant::now();
         executor.execute();
 
         let elapsed = timestamp.elapsed();
-        log::info!("Execution of CPU systems {i} took {elapsed:?}");
+        log::info!(">>! Execution of CPU systems {i} took {elapsed:?}");
 
-        log::info!("Saving framebuffer state {i} to file...");
+        log::info!(">>> Saving framebuffer state {i} to file...");
         let framebuffer = &*framebuffer.borrow();
         save_framebuffer_to_file(framebuffer, CPU_PATH, i);
+    }
+
+    context.clear();
+}
+
+fn run_gpu(context: &mut Context) {
+    log::info!("> Running on GPU...");
+
+    let mut rng = RandomXoshiro128::new(RNG_SEED);
+    log::info!(">> Creating {ENTITY_COUNT} entities with mixed components...");
+    let entities = create_entities_with_mixed_components(context, ENTITY_COUNT);
+
+    log::info!(">> Preparing entities with mixed components...");
+    prepare_entities_with_mixed_components(context, &mut rng, &entities);
+
+    let time_delta = TimeDelta(0.0);
+    let framebuffer = Framebuffer::new(
+        FRAMEBUFFER_WIDTH as u32,
+        FRAMEBUFFER_HEIGHT as u32,
+        vec![NONE_SPRITE; FRAMEBUFFER_SIZE],
+    );
+
+    log::info!(">> Initializing GPU resources...");
+    let (device, queue) = init_wgpu();
+    let mut renderdoc = init_renderdoc();
+
+    let mut executor = GpuExecutor::new(context, device.clone());
+    executor
+        .register_archetype::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
+        .expect("all the components should be unique");
+
+    let time_delta = Rc::new(RefCell::new(time_delta));
+    let framebuffer = Rc::new(RefCell::new(framebuffer));
+
+    log::info!(">> Registering GPU systems...");
+    register_gpu_systems(&mut executor, time_delta, framebuffer.clone());
+
+    log::info!(">> Running GPU systems...");
+    for i in 0..EXEC_COUNT {
+        renderdoc_start_frame_capture(renderdoc.as_mut(), &device);
+        let timestamp = Instant::now();
+
+        let mut command_encoder = init_wgpu_command_encoder(&device);
+        executor.execute(&mut command_encoder);
+
+        let command_buffer = command_encoder.finish();
+        queue.submit([command_buffer]);
+
+        device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+
+        let elapsed = timestamp.elapsed();
+        log::info!(">>! Execution of GPU systems {i} took {elapsed:?}");
+        renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
+
+        log::info!(">>> Saving framebuffer state {i} to file...");
+        let framebuffer = &*framebuffer.borrow();
+        save_framebuffer_to_file(framebuffer, GPU_PATH, i);
     }
 
     context.clear();
@@ -276,7 +340,8 @@ fn register_cpu_systems<B>(
         for (_, (position, velocity)) in bundles {
             update_position(position, velocity, time_delta);
         }
-        log::info!("- `update_position` system took {:?}", timestamp.elapsed());
+        let elapsed = timestamp.elapsed();
+        log::info!(">>>> `update_position` system took {elapsed:?}",);
     });
     executor.add_system(system);
 
@@ -286,7 +351,8 @@ fn register_cpu_systems<B>(
         for (_, (data,)) in bundles {
             update_data(data, time_delta);
         }
-        log::info!("- `update_data` system took {:?}", timestamp.elapsed());
+        let elapsed = timestamp.elapsed();
+        log::info!(">>>> `update_data` system took {elapsed:?}");
     });
     executor.add_system(system);
 
@@ -295,10 +361,8 @@ fn register_cpu_systems<B>(
         for (_, (position, velocity, data)) in bundles {
             update_components(position, velocity, data);
         }
-        log::info!(
-            "- `update_components` system took {:?}",
-            timestamp.elapsed()
-        );
+        let elapsed = timestamp.elapsed();
+        log::info!(">>>> `update_components` system took {elapsed:?}");
     });
     executor.add_system(system);
 
@@ -307,7 +371,8 @@ fn register_cpu_systems<B>(
         for (_, (health,)) in bundles {
             update_health(health);
         }
-        log::info!("- `update_health` system took {:?}", timestamp.elapsed());
+        let elapsed = timestamp.elapsed();
+        log::info!(">>>> `update_health` system took {elapsed:?}");
     });
     executor.add_system(system);
 
@@ -316,7 +381,8 @@ fn register_cpu_systems<B>(
         for (_, (health, damage)) in bundles {
             update_damage(health, damage);
         }
-        log::info!("- `update_damage` system took {:?}", timestamp.elapsed());
+        let elapsed = timestamp.elapsed();
+        log::info!(">>>> `update_damage` system took {elapsed:?}");
     });
     executor.add_system(system);
 
@@ -325,7 +391,8 @@ fn register_cpu_systems<B>(
         for (_, (sprite, player, health)) in bundles {
             update_sprite(sprite, player, health);
         }
-        log::info!("- `update_sprite` system took {:?}", timestamp.elapsed());
+        let elapsed = timestamp.elapsed();
+        log::info!(">>>> `update_sprite` system took {elapsed:?}");
     });
     executor.add_system(system);
 
@@ -335,9 +402,191 @@ fn register_cpu_systems<B>(
         for (_, (position, sprite)) in bundles {
             render_sprite(position, sprite, framebuffer);
         }
-        log::info!("- `render_sprite` system took {:?}", timestamp.elapsed());
+        let elapsed = timestamp.elapsed();
+        log::info!(">>>> `render_sprite` system took {elapsed:?}");
     });
     executor.add_system(system);
+}
+
+fn register_gpu_systems<B>(
+    executor: &mut GpuExecutor,
+    time_delta: Rc<RefCell<TimeDelta>>,
+    framebuffer: Rc<RefCell<Framebuffer<B>>>,
+) where
+    B: AsMut<[u32]> + 'static,
+{
+    let shader_module = init_wgpu_shader(executor.device());
+
+    let _ = time_delta;
+    let _ = framebuffer;
+
+    let position_id = executor.register_component::<Position>();
+    let velocity_id = executor.register_component::<Velocity>();
+    let data_id = executor.register_component::<Data>();
+    let health_id = executor.register_component::<Health>();
+    let damage_id = executor.register_component::<Damage>();
+    let sprite_id = executor.register_component::<Sprite>();
+    let player_id = executor.register_component::<Player>();
+
+    // TODO: add support for uniforms to execute `update_position`
+    // TODO: add support for uniforms to execute `update_data`
+
+    let system = executor
+        .register_system(
+            shader_module.clone(),
+            Some(64),
+            Some("update_components"),
+            false,
+            [position_id, velocity_id, data_id],
+        )
+        .expect("archetype components should be unique");
+    executor.add_system(system);
+
+    let system = executor
+        .register_system(
+            shader_module.clone(),
+            Some(64),
+            Some("update_health"),
+            false,
+            [health_id],
+        )
+        .expect("archetype components should be unique");
+    executor.add_system(system);
+
+    let system = executor
+        .register_system(
+            shader_module.clone(),
+            Some(64),
+            Some("update_damage"),
+            false,
+            [health_id, damage_id],
+        )
+        .expect("archetype components should be unique");
+    executor.add_system(system);
+
+    let system = executor
+        .register_system(
+            shader_module.clone(),
+            Some(64),
+            Some("update_sprite"),
+            false,
+            [sprite_id, player_id, health_id],
+        )
+        .expect("archetype components should be unique");
+    executor.add_system(system);
+
+    // TODO: add support for uniforms to execute `render_sprite`
+}
+
+fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
+    let instance_desc = wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::VULKAN,
+        ..Default::default()
+    };
+    let instance = wgpu::Instance::new(&instance_desc);
+
+    let adapter_options = wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        ..Default::default()
+    };
+    let adapter = pollster::block_on(instance.request_adapter(&adapter_options))
+        .expect("failed to create adapter");
+    log::debug!("Running on:\n{:#?}", adapter.get_info());
+    log::debug!("Adapter features:\n{:#?}", adapter.features());
+
+    let downlevel_capabilities = adapter.get_downlevel_capabilities();
+    if !downlevel_capabilities
+        .flags
+        .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS)
+    {
+        panic!("adapter does not support compute shaders, which are required");
+    }
+
+    let features = adapter.features();
+    if !features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES) {
+        panic!("adapter does not support timestamp queries inside passes, which are required");
+    }
+
+    let device_desc = wgpu::DeviceDescriptor {
+        label: Some("`gpecs` `ecs_benchmark` device"),
+        required_features: wgpu::Features::TIMESTAMP_QUERY
+            | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
+        required_limits: adapter.limits(),
+        memory_hints: wgpu::MemoryHints::Performance,
+    };
+    let (device, queue) = pollster::block_on(adapter.request_device(&device_desc, None))
+        .expect("failed to create device & queue");
+    log::debug!("Limits of the current device:\n{:#?}", device.limits());
+
+    (device, queue)
+}
+
+fn init_wgpu_shader(device: &wgpu::Device) -> wgpu::ShaderModule {
+    const PATH: &str = env!("gpecs_ecs_benchmark_shader.spv");
+    log::debug!("Loading shader from {PATH}");
+
+    let data = fs::read(PATH).expect("SPIR-V shader file should exist");
+    let shader_desc = wgpu::ShaderModuleDescriptor {
+        label: Some("`gpecs` `ecs_benchmark` shader"),
+        source: wgpu::util::make_spirv(&data),
+    };
+    let shader_module = device.create_shader_module(shader_desc);
+    let shader_compilation_info = pollster::block_on(shader_module.get_compilation_info());
+    log::debug!("Shader compilation info:\n{shader_compilation_info:#?}");
+
+    shader_module
+}
+
+fn init_wgpu_command_encoder(device: &wgpu::Device) -> wgpu::CommandEncoder {
+    let command_encoder_desc = wgpu::CommandEncoderDescriptor {
+        label: Some("`gpecs` `ecs_benchmark` command encoder"),
+    };
+    device.create_command_encoder(&command_encoder_desc)
+}
+
+fn init_renderdoc() -> Option<RenderDoc<V141>> {
+    match RenderDoc::<V141>::new() {
+        Ok(renderdoc) => {
+            log::info!("RenderDoc version: {:?}", renderdoc.get_api_version());
+            Some(renderdoc)
+        }
+        Err(error) => {
+            log::warn!("{error}");
+            None
+        }
+    }
+}
+
+fn wgpu_raw_device_window(device: &wgpu::Device) -> (*const c_void, *const c_void) {
+    let device_raw = unsafe {
+        device.as_hal::<wgpu::hal::api::Vulkan, _, _>(|device| {
+            device
+                .map(|device| transmute(device.raw_device().handle()))
+                .unwrap_or(null::<c_void>())
+        })
+    };
+    let window_raw = null::<c_void>();
+    (device_raw, window_raw)
+}
+
+fn renderdoc_start_frame_capture(renderdoc: Option<&mut RenderDoc<V141>>, device: &wgpu::Device) {
+    let Some(renderdoc) = renderdoc else {
+        return;
+    };
+
+    log::info!("Starting RenderDoc capture...");
+    let (device_raw, window_raw) = wgpu_raw_device_window(device);
+    renderdoc.start_frame_capture(device_raw, window_raw);
+}
+
+fn renderdoc_end_frame_capture(renderdoc: Option<&mut RenderDoc<V141>>, device: &wgpu::Device) {
+    let Some(renderdoc) = renderdoc else {
+        return;
+    };
+
+    log::info!("Ending RenderDoc capture...");
+    let (device_raw, window_raw) = wgpu_raw_device_window(device);
+    renderdoc.end_frame_capture(device_raw, window_raw);
 }
 
 fn save_framebuffer_to_file<B>(framebuffer: &Framebuffer<B>, path: &str, index: usize)

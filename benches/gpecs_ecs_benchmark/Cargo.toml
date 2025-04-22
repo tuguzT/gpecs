@@ -14,7 +14,6 @@ gpecs_types = { workspace = true }
 gpecs = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
-rand = { workspace = true }
 
 [[bench]]
 name = "gpecs"

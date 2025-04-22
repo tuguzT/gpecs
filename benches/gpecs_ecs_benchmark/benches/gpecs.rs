@@ -1,4 +1,11 @@
-use std::{cell::RefCell, fs::File, io::Write, rc::Rc, time::Instant};
+use std::{
+    cell::RefCell,
+    fs::{self, File},
+    io::Write,
+    path::Path,
+    rc::Rc,
+    time::Instant,
+};
 
 use gpecs::{context::error::IncompatibleBundleError, prelude::*};
 use gpecs_ecs_benchmark::{
@@ -14,7 +21,13 @@ use gpecs_ecs_benchmark::{
     utils::{RandomXoshiro128, TimeDelta},
 };
 
-const ENTITY_COUNT: usize = 2_000_000;
+const ENTITY_COUNT: usize = 1_000_000;
+const EXEC_COUNT: usize = 10;
+const RNG_SEED: u32 = 0xDEADBEEF;
+
+const CPU_PATH: &str = "cpu";
+// const GPU_PATH: &str = "gpu";
+
 const FRAMEBUFFER_WIDTH: usize = 320;
 const FRAMEBUFFER_HEIGHT: usize = 240;
 const FRAMEBUFFER_SIZE: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT;
@@ -25,14 +38,17 @@ fn main() {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let mut rng = rand::rng();
     let mut context = Context::new();
+    run_cpu(&mut context);
+}
 
+fn run_cpu(context: &mut Context) {
+    let mut rng = RandomXoshiro128::new(RNG_SEED);
     log::info!("Creating {ENTITY_COUNT} entities with mixed components...");
-    let entities = create_entities_with_mixed_components(&mut context, ENTITY_COUNT);
+    let entities = create_entities_with_mixed_components(context, ENTITY_COUNT);
 
     log::info!("Preparing entities with mixed components...");
-    prepare_entities_with_mixed_components(&mut context, &mut rng, &entities);
+    prepare_entities_with_mixed_components(context, &mut rng, &entities);
 
     let time_delta = TimeDelta(0.0);
     let framebuffer = Framebuffer::new(
@@ -41,7 +57,7 @@ fn main() {
         vec![NONE_SPRITE; FRAMEBUFFER_SIZE],
     );
 
-    let mut executor = CpuExecutor::new(&mut context);
+    let mut executor = CpuExecutor::new(context);
 
     let time_delta = Rc::new(RefCell::new(time_delta));
     let framebuffer = Rc::new(RefCell::new(framebuffer));
@@ -50,12 +66,19 @@ fn main() {
     register_cpu_systems(&mut executor, time_delta, framebuffer.clone());
 
     log::info!("Running CPU systems...");
-    let timestamp = Instant::now();
-    executor.execute();
-    log::info!("Execution of CPU systems took {:?}", timestamp.elapsed());
+    for i in 0..EXEC_COUNT {
+        let timestamp = Instant::now();
+        executor.execute();
 
-    log::info!("Saving framebuffer to file...");
-    save_framebuffer_to_file(&*framebuffer.borrow());
+        let elapsed = timestamp.elapsed();
+        log::info!("Execution of CPU systems {i} took {elapsed:?}");
+
+        log::info!("Saving framebuffer state {i} to file...");
+        let framebuffer = &*framebuffer.borrow();
+        save_framebuffer_to_file(framebuffer, CPU_PATH, i);
+    }
+
+    context.clear();
 }
 
 fn create_entities_with_mixed_components(context: &mut Context, count: usize) -> Vec<Entity> {
@@ -93,7 +116,7 @@ fn create_entities_with_mixed_components(context: &mut Context, count: usize) ->
 
 fn prepare_entities_with_mixed_components(
     context: &mut Context,
-    rng: &mut impl rand::Rng,
+    rng: &mut RandomXoshiro128,
     entities: &[Entity],
 ) {
     let mut j = 0;
@@ -173,7 +196,7 @@ fn add_components(context: &mut Context, entity: Entity) {
     match context.get_bundle::<(Position,)>(entity) {
         Err(IncompatibleBundleError::MissingComponent(_)) => context
             .insert_bundle_exact(entity, (Position::default(),))
-            .expect(""),
+            .expect("entity should be present & should not have `Position` component"),
         Err(error) => unreachable!("unexpected error occurred: {error}"),
         Ok(_) => {}
     }
@@ -182,14 +205,14 @@ fn add_components(context: &mut Context, entity: Entity) {
 fn init_components(
     context: &mut Context,
     entity: Entity,
-    rng: &mut impl rand::Rng,
+    rng: &mut RandomXoshiro128,
     player_type: Option<PlayerType>,
 ) {
     let (position, player, health, damage, sprite) = context
         .get_bundle_mut::<(Position, Player, Health, Damage, Sprite)>(entity)
         .expect("entity should be present & have all these components");
 
-    let mut rng = RandomXoshiro128::new(rng.next_u32());
+    let mut rng = RandomXoshiro128::new(rng.next());
     let r#type = player_type.unwrap_or_else(|| {
         let rate = rng.range(1..100);
         match rate {
@@ -253,7 +276,7 @@ fn register_cpu_systems<B>(
         for (_, (position, velocity)) in bundles {
             update_position(position, velocity, time_delta);
         }
-        log::info!("`update_position` system took {:?}", timestamp.elapsed());
+        log::info!("- `update_position` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
@@ -263,7 +286,7 @@ fn register_cpu_systems<B>(
         for (_, (data,)) in bundles {
             update_data(data, time_delta);
         }
-        log::info!("`update_data` system took {:?}", timestamp.elapsed());
+        log::info!("- `update_data` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
@@ -272,7 +295,10 @@ fn register_cpu_systems<B>(
         for (_, (position, velocity, data)) in bundles {
             update_components(position, velocity, data);
         }
-        log::info!("`update_components` system took {:?}", timestamp.elapsed());
+        log::info!(
+            "- `update_components` system took {:?}",
+            timestamp.elapsed()
+        );
     });
     executor.add_system(system);
 
@@ -281,7 +307,7 @@ fn register_cpu_systems<B>(
         for (_, (health,)) in bundles {
             update_health(health);
         }
-        log::info!("`update_health` system took {:?}", timestamp.elapsed());
+        log::info!("- `update_health` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
@@ -290,7 +316,7 @@ fn register_cpu_systems<B>(
         for (_, (health, damage)) in bundles {
             update_damage(health, damage);
         }
-        log::info!("`update_damage` system took {:?}", timestamp.elapsed());
+        log::info!("- `update_damage` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
@@ -299,7 +325,7 @@ fn register_cpu_systems<B>(
         for (_, (sprite, player, health)) in bundles {
             update_sprite(sprite, player, health);
         }
-        log::info!("`update_sprite` system took {:?}", timestamp.elapsed());
+        log::info!("- `update_sprite` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
@@ -309,17 +335,22 @@ fn register_cpu_systems<B>(
         for (_, (position, sprite)) in bundles {
             render_sprite(position, sprite, framebuffer);
         }
-        log::info!("`render_sprite` system took {:?}", timestamp.elapsed());
+        log::info!("- `render_sprite` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 }
 
-fn save_framebuffer_to_file<B>(framebuffer: &Framebuffer<B>)
+fn save_framebuffer_to_file<B>(framebuffer: &Framebuffer<B>, path: &str, index: usize)
 where
     B: AsRef<[u32]>,
 {
-    let mut framebuffer_file =
-        File::create("framebuffer.txt").expect("failed to create framebuffer file");
+    let path = format!("./dump/{path}/{index}.txt");
+    let path = Path::new(&path);
+
+    let prefix = path.parent().expect("failed to get parent directory");
+    fs::create_dir_all(prefix).expect("failed to create parent directory");
+
+    let mut framebuffer_file = File::create(path).expect("failed to create framebuffer file");
     for chunk in framebuffer.buffer().chunks_exact(FRAMEBUFFER_WIDTH) {
         for &char in chunk {
             let char = u8::try_from(char).expect("failed to convert character to `u8`");

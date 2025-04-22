@@ -57,7 +57,7 @@ fn run_cpu(context: &mut Context) {
     log::info!(">> Preparing entities with mixed components...");
     prepare_entities_with_mixed_components(context, &mut rng, &entities);
 
-    let time_delta = TimeDelta(0.0);
+    let time_delta = TimeDelta(1.0);
     let framebuffer = Framebuffer::new(
         FRAMEBUFFER_WIDTH as u32,
         FRAMEBUFFER_HEIGHT as u32,
@@ -70,7 +70,7 @@ fn run_cpu(context: &mut Context) {
     let framebuffer = Rc::new(RefCell::new(framebuffer));
 
     log::info!(">> Registering CPU systems...");
-    register_cpu_systems(&mut executor, time_delta, framebuffer.clone());
+    register_cpu_systems(&mut executor, time_delta.clone(), framebuffer.clone());
 
     log::info!(">> Running CPU systems...");
     for i in 0..EXEC_COUNT {
@@ -79,6 +79,9 @@ fn run_cpu(context: &mut Context) {
 
         let elapsed = timestamp.elapsed();
         log::info!(">>! Execution of CPU systems {i} took {elapsed:?}");
+
+        let time_delta = &mut *time_delta.borrow_mut();
+        *time_delta = TimeDelta(1.0);
 
         log::info!(">>> Saving framebuffer state {i} to file...");
         let framebuffer = &*framebuffer.borrow();
@@ -98,7 +101,7 @@ fn run_gpu(context: &mut Context) {
     log::info!(">> Preparing entities with mixed components...");
     prepare_entities_with_mixed_components(context, &mut rng, &entities);
 
-    let time_delta = TimeDelta(0.0);
+    let time_delta = TimeDelta(1.0);
     let framebuffer = Framebuffer::new(
         FRAMEBUFFER_WIDTH as u32,
         FRAMEBUFFER_HEIGHT as u32,
@@ -118,7 +121,7 @@ fn run_gpu(context: &mut Context) {
     let framebuffer = Rc::new(RefCell::new(framebuffer));
 
     log::info!(">> Registering GPU systems...");
-    register_gpu_systems(&mut executor, time_delta, framebuffer.clone());
+    register_gpu_systems(&mut executor, time_delta.clone(), framebuffer.clone());
 
     log::info!(">> Running GPU systems...");
     for i in 0..EXEC_COUNT {
@@ -136,6 +139,9 @@ fn run_gpu(context: &mut Context) {
         let elapsed = timestamp.elapsed();
         log::info!(">>! Execution of GPU systems {i} took {elapsed:?}");
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
+
+        let time_delta = &mut *time_delta.borrow_mut();
+        *time_delta = TimeDelta(1.0);
 
         log::info!(">>> Saving framebuffer state {i} to file...");
         let framebuffer = &*framebuffer.borrow();

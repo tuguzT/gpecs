@@ -75,6 +75,7 @@ fn main() {
             Some("update_entity_position"),
             true,
             [position_gpu_id],
+            [],
         )
         .expect("GPU system by shader module should be registered");
 
@@ -86,6 +87,7 @@ fn main() {
             Some("update_entity_mass"),
             true,
             [mass_gpu_id],
+            [],
         )
         .expect("GPU system by shader module should be registered");
 

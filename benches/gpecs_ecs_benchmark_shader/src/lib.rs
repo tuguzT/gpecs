@@ -5,7 +5,7 @@
 
 use gpecs_ecs_benchmark::{
     components::{Damage, Data, Health, Player, Position, Sprite, Velocity},
-    framebuffer::Framebuffer,
+    framebuffer::{Framebuffer, FramebufferDesc},
     systems,
     utils::TimeDelta,
 };
@@ -69,12 +69,6 @@ pub fn update_position(
     let position = &mut position[index];
     let velocity = &velocity[index];
     systems::update_position(position, velocity, *dt);
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FramebufferDesc {
-    pub width: u32,
-    pub height: u32,
 }
 
 #[spirv(compute(threads(64)))]

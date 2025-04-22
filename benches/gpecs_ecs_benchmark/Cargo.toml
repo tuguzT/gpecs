@@ -9,6 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_types = { workspace = true }
+bytemuck = { workspace = true }
 
 [dev-dependencies]
 gpecs = { workspace = true }

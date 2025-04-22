@@ -4,7 +4,7 @@ use std::{
     ops::Range,
 };
 
-use wgpu::{Device, ShaderModule};
+use wgpu::{BindGroupLayoutEntry, Device, ShaderModule};
 
 use crate::{
     archetype::error::DuplicateComponentError, component::registry::ComponentRegistry,
@@ -78,7 +78,7 @@ impl GpuSystemRegistry {
     }
 
     #[inline]
-    pub fn register_system<I>(
+    pub fn register_system<I, B>(
         &mut self,
         components: &ComponentRegistry,
         gpu_device: &Device,
@@ -87,9 +87,11 @@ impl GpuSystemRegistry {
         entry_point: Option<&str>,
         bind_entities: bool,
         bind_components: I,
+        additional_bindings: B,
     ) -> Result<GpuSystemId, DuplicateComponentError>
     where
         I: IntoIterator<Item = GpuComponentId>,
+        B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
         let Self { systems } = self;
 
@@ -105,6 +107,7 @@ impl GpuSystemRegistry {
             id,
             bind_entities,
             bind_components,
+            additional_bindings,
         )?;
         let info = GpuSystemInfo { id, shader };
         systems.push(info);

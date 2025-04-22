@@ -3,9 +3,9 @@ use std::{any::TypeId, num::NonZeroU32};
 use indexmap::IndexMap;
 use system::schedule::GpuSystemSchedule;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Buffer, BufferDescriptor,
-    BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features, QuerySet,
-    QuerySetDescriptor, QueryType, ShaderModule,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, BindingResource, Buffer,
+    BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features,
+    QuerySet, QuerySetDescriptor, QueryType, ShaderModule,
 };
 
 use crate::{
@@ -228,16 +228,18 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    pub fn register_system<I>(
+    pub fn register_system<I, B>(
         &mut self,
         shader_module: ShaderModule,
         workgroup_count: Option<u32>,
         entry_point: Option<&str>,
         bind_entities: bool,
         bind_components: I,
+        additional_bindings: B,
     ) -> Result<GpuSystemId, DuplicateComponentError>
     where
         I: IntoIterator<Item = GpuComponentId>,
+        B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
         let Self {
             ref context,
@@ -255,6 +257,7 @@ impl<'context> GpuExecutor<'context> {
             entry_point,
             bind_entities,
             bind_components,
+            additional_bindings,
         )
     }
 
@@ -277,6 +280,33 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
+    pub fn set_additional_bindings<'a, I, B>(&mut self, additional_bindings: I)
+    where
+        I: IntoIterator<Item = (GpuSystemId, B)>,
+        B: IntoIterator<Item = BindGroupEntry<'a>>,
+    {
+        let Self {
+            ref context,
+            ref device,
+            ref archetypes,
+            ref systems,
+            ref schedule,
+            schedule_cache,
+            ..
+        } = self;
+
+        let new_cache = Self::cache_schedule(
+            context,
+            device,
+            archetypes,
+            systems,
+            schedule,
+            additional_bindings,
+        );
+        schedule_cache.replace(new_cache);
+    }
+
+    #[inline]
     pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
         let Self {
             ref context,
@@ -289,8 +319,9 @@ impl<'context> GpuExecutor<'context> {
             ..
         } = self;
 
-        let cache_schedule =
-            || Self::cache_schedule(context, device, archetypes, systems, schedule);
+        let cache_schedule = || {
+            Self::cache_schedule::<_, [_; 0]>(context, device, archetypes, systems, schedule, [])
+        };
         let schedule_cache = schedule_cache.get_or_insert_with(cache_schedule);
 
         let can_write_timestamps = device
@@ -392,13 +423,24 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    fn cache_schedule(
+    fn cache_schedule<'a, I, B>(
         context: &Context,
         device: &Device,
         archetypes: &GpuArchetypeRegistry,
         systems: &GpuSystemRegistry,
         schedule: &GpuSystemSchedule,
-    ) -> ScheduleCache {
+        additional_bindings: I,
+    ) -> ScheduleCache
+    where
+        I: IntoIterator<Item = (GpuSystemId, B)>,
+        B: IntoIterator<Item = BindGroupEntry<'a>>,
+    {
+        let mut additional_bindings_cache = IndexMap::<GpuSystemId, Vec<BindGroupEntry>>::new();
+        for (system_id, additional_bindings) in additional_bindings {
+            let cached_entries = additional_bindings_cache.entry(system_id).or_default();
+            cached_entries.extend(additional_bindings);
+        }
+
         let mut schedule_cache = ScheduleCache::default();
         for system_id in schedule.iter() {
             let Some(system_info) = systems.get_system_info(system_id) else {
@@ -467,6 +509,12 @@ impl<'context> GpuExecutor<'context> {
                 if bind_group_entries.is_empty() {
                     continue;
                 }
+
+                let default_additional_bindings = Vec::new();
+                let additional_bindings = additional_bindings_cache
+                    .get(&system_id)
+                    .unwrap_or(&default_additional_bindings);
+                bind_group_entries.extend(additional_bindings.iter().cloned());
 
                 let bind_group_label =
                     format!("`gpecs` {system_id:?} bind group for {archetype_id:?}");

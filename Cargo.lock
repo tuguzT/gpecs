@@ -515,6 +515,7 @@ dependencies = [
 name = "gpecs_ecs_benchmark"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "const_format",
  "env_logger",
  "gpecs",

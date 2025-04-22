@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fs::File, io::Write, rc::Rc};
+use std::{cell::RefCell, fs::File, io::Write, rc::Rc, time::Instant};
 
 use gpecs::{context::error::IncompatibleBundleError, prelude::*};
 use gpecs_ecs_benchmark::{
@@ -14,17 +14,24 @@ use gpecs_ecs_benchmark::{
     utils::{RandomXoshiro128, TimeDelta},
 };
 
-const ENTITY_COUNT: usize = 1000;
+const ENTITY_COUNT: usize = 2_000_000;
 const FRAMEBUFFER_WIDTH: usize = 320;
 const FRAMEBUFFER_HEIGHT: usize = 240;
 const FRAMEBUFFER_SIZE: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT;
 const SPAWN_AREA_MARGIN: u32 = 100;
 
 fn main() {
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
     let mut rng = rand::rng();
     let mut context = Context::new();
 
+    log::info!("Creating {ENTITY_COUNT} entities with mixed components...");
     let entities = create_entities_with_mixed_components(&mut context, ENTITY_COUNT);
+
+    log::info!("Preparing entities with mixed components...");
     prepare_entities_with_mixed_components(&mut context, &mut rng, &entities);
 
     let time_delta = TimeDelta(0.0);
@@ -38,10 +45,16 @@ fn main() {
 
     let time_delta = Rc::new(RefCell::new(time_delta));
     let framebuffer = Rc::new(RefCell::new(framebuffer));
+
+    log::info!("Registering CPU systems...");
     register_cpu_systems(&mut executor, time_delta, framebuffer.clone());
 
+    log::info!("Running CPU systems...");
+    let timestamp = Instant::now();
     executor.execute();
+    log::info!("Execution of CPU systems took {:?}", timestamp.elapsed());
 
+    log::info!("Saving framebuffer to file...");
     save_framebuffer_to_file(&*framebuffer.borrow());
 }
 
@@ -235,51 +248,68 @@ fn register_cpu_systems<B>(
 {
     let time_delta_clone = Rc::clone(&time_delta);
     let system = executor.register_system(move |bundles: BundlesMut<(Position, Velocity)>| {
+        let time_delta = *time_delta_clone.borrow();
+        let timestamp = Instant::now();
         for (_, (position, velocity)) in bundles {
-            update_position(position, velocity, *time_delta_clone.borrow());
+            update_position(position, velocity, time_delta);
         }
+        log::info!("`update_position` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
     let system = executor.register_system(move |bundles: BundlesMut<(Data,)>| {
+        let time_delta = *time_delta.borrow();
+        let timestamp = Instant::now();
         for (_, (data,)) in bundles {
-            update_data(data, *time_delta.borrow());
+            update_data(data, time_delta);
         }
+        log::info!("`update_data` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
     let system = executor.register_system(|bundles: BundlesMut<(Position, Velocity, Data)>| {
+        let timestamp = Instant::now();
         for (_, (position, velocity, data)) in bundles {
             update_components(position, velocity, data);
         }
+        log::info!("`update_components` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
     let system = executor.register_system(|bundles: BundlesMut<(Health,)>| {
+        let timestamp = Instant::now();
         for (_, (health,)) in bundles {
             update_health(health);
         }
+        log::info!("`update_health` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
     let system = executor.register_system(|bundles: BundlesMut<(Health, Damage)>| {
+        let timestamp = Instant::now();
         for (_, (health, damage)) in bundles {
             update_damage(health, damage);
         }
+        log::info!("`update_damage` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
     let system = executor.register_system(|bundles: BundlesMut<(Sprite, Player, Health)>| {
+        let timestamp = Instant::now();
         for (_, (sprite, player, health)) in bundles {
             update_sprite(sprite, player, health);
         }
+        log::info!("`update_sprite` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 
     let system = executor.register_system(move |bundles: BundlesMut<(Position, Sprite)>| {
+        let framebuffer = &mut *framebuffer.borrow_mut();
+        let timestamp = Instant::now();
         for (_, (position, sprite)) in bundles {
-            render_sprite(position, sprite, &mut *framebuffer.borrow_mut());
+            render_sprite(position, sprite, framebuffer);
         }
+        log::info!("`render_sprite` system took {:?}", timestamp.elapsed());
     });
     executor.add_system(system);
 }

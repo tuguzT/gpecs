@@ -527,9 +527,10 @@ dependencies = [
 name = "gpecs_ecs_benchmark"
 version = "0.0.0"
 dependencies = [
+ "env_logger",
  "gpecs",
  "gpecs_types",
- "itertools 0.14.0",
+ "log",
  "rand",
 ]
 

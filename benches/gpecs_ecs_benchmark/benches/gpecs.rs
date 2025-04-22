@@ -13,8 +13,8 @@ use std::{
 use gpecs::{context::error::IncompatibleBundleError, prelude::*};
 use gpecs_ecs_benchmark::{
     components::{
-        Damage, Data, Health, Player, PlayerType, Position, Sprite, Velocity, NONE_SPRITE,
-        SPAWN_SPRITE,
+        Damage, Data, Health, Player, PlayerType, Position, Sprite, Velocity, DEFAULT_SEED,
+        NONE_SPRITE, SPAWN_SPRITE,
     },
     framebuffer::{Framebuffer, FramebufferDesc},
     systems::{
@@ -28,7 +28,6 @@ use wgpu::util::DeviceExt;
 
 const ENTITY_COUNT: usize = 1_000_000;
 const EXEC_COUNT: usize = 10;
-const RNG_SEED: u32 = 0xDEADBEEF;
 
 const CPU_PATH: &str = "cpu";
 const GPU_PATH: &str = "gpu";
@@ -51,7 +50,7 @@ fn main() {
 fn run_cpu(context: &mut Context) {
     log::info!("> Running on CPU...");
 
-    let mut rng = RandomXoshiro128::new(RNG_SEED);
+    let mut rng = RandomXoshiro128::new(DEFAULT_SEED);
     log::info!(">> Creating {ENTITY_COUNT} entities with mixed components...");
     let entities = create_entities_with_mixed_components(context, ENTITY_COUNT);
 
@@ -95,7 +94,7 @@ fn run_cpu(context: &mut Context) {
 fn run_gpu(context: &mut Context) {
     log::info!("> Running on GPU...");
 
-    let mut rng = RandomXoshiro128::new(RNG_SEED);
+    let mut rng = RandomXoshiro128::new(DEFAULT_SEED);
     log::info!(">> Creating {ENTITY_COUNT} entities with mixed components...");
     let entities = create_entities_with_mixed_components(context, ENTITY_COUNT);
 

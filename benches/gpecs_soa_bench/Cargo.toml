@@ -8,7 +8,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-gpecs_soa = { workspace = true }
+gpecs_soa = { workspace = true, features = ["alloc"] }
 gpecs_soa_erased = { workspace = true }
 
 [dev-dependencies]

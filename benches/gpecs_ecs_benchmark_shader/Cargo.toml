@@ -26,7 +26,7 @@ workspace = true
 
 [package.metadata.rust-gpu.install]
 spirv_builder_source = "https://github.com/Rust-GPU/rust-gpu"
-spirv_builder_version = "175c175c"
+spirv_builder_version = "1e4e468"
 rust_toolchain = "nightly-2024-11-22"
 auto-install-rust-toolchain = false
 force-spirv-cli-rebuild = false

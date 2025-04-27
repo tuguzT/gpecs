@@ -49,7 +49,7 @@ log = { version = "0.4" }
 glam = { version = "0.30" }
 unroll = { version = "0.1" }
 static_assertions = { version = "1.1" }
-wgpu = { version = "24.0.3", features = ["spirv"] }
+wgpu = { version = "25" }
 renderdoc = { version = "0.12" }
 
 [workspace.lints.rust.unexpected_cfgs]

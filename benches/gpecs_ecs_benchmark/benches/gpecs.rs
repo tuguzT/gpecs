@@ -196,7 +196,9 @@ fn run_gpu(context: &mut Context) {
         let framebuffer_data = framebuffer_download_buffer.slice(..);
         framebuffer_data.map_async(wgpu::MapMode::Read, |_| {});
 
-        device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        device
+            .poll(wgpu::PollType::Wait)
+            .expect("device should poll");
 
         let elapsed = timestamp.elapsed();
         renderdoc_end_frame_capture(renderdoc.as_mut(), &device);
@@ -755,8 +757,9 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
             | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
         required_limits: adapter.limits(),
         memory_hints: wgpu::MemoryHints::Performance,
+        trace: wgpu::Trace::Off,
     };
-    let (device, queue) = pollster::block_on(adapter.request_device(&device_desc, None))
+    let (device, queue) = pollster::block_on(adapter.request_device(&device_desc))
         .expect("failed to create device & queue");
     log::debug!("Limits of the current device:\n{:#?}", device.limits());
 

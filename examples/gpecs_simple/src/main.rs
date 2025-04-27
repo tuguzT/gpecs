@@ -147,7 +147,9 @@ fn main() {
         let timestamp_query_download_slice =
             wgpu_map_whole_buffer(timestamp_query_download_buffer.as_ref());
 
-        device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        device
+            .poll(wgpu::PollType::Wait)
+            .expect("device should poll");
 
         let duration = start.elapsed();
         log::info!("GPU system execution {i} overall took {duration:?}");
@@ -356,8 +358,9 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
             | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
         required_limits: adapter.limits(),
         memory_hints: wgpu::MemoryHints::Performance,
+        trace: wgpu::Trace::Off,
     };
-    let (device, queue) = pollster::block_on(adapter.request_device(&device_desc, None))
+    let (device, queue) = pollster::block_on(adapter.request_device(&device_desc))
         .expect("failed to create device & queue");
     log::info!("Limits of the current device:\n{:#?}", device.limits());
 

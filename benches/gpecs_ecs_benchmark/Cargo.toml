@@ -15,7 +15,7 @@ bytemuck = { workspace = true }
 gpecs = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
-wgpu = { workspace = true }
+wgpu = { workspace = true, features = ["spirv"] }
 pollster = { workspace = true }
 renderdoc = { workspace = true }
 itertools = { workspace = true }

@@ -57,6 +57,7 @@ level = "warn"
 check-cfg = ['cfg(target_arch, values("spirv"))']
 
 [profile.release]
+debug = true
 codegen-units = 1
 lto = "fat"
 

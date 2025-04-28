@@ -1,8 +1,6 @@
 use std::{array, hint::black_box, iter::Zip, slice};
 
 use gpecs_soa::{prelude::*, slice as soa_slice};
-
-#[cfg(feature = "erased")]
 use gpecs_soa_erased::erased::ErasedSoa;
 
 use crate::{push::Push, with_capacity::WithCapacity, Big, Large, Small, Tiny};
@@ -23,7 +21,6 @@ pub trait Work: WithCapacity + Push {
     fn soa_slf_prepare_iter(data: SoaSlices<Self>) -> Self::SoaSlfIter<'_>;
     fn soa_slf_work(iter: Self::SoaSlfIter<'_>);
 
-    #[cfg(feature = "erased")]
     fn soa_ser_prepare_vec(count: usize) -> SoaVec<ErasedSoa> {
         let mut vec = Self::soa_ser_with_capacity(count);
         for index in 0..count {
@@ -34,11 +31,8 @@ pub trait Work: WithCapacity + Push {
         black_box(vec)
     }
 
-    #[cfg(feature = "erased")]
     type SoaSerIter<'a>: Iterator + Clone;
-    #[cfg(feature = "erased")]
     fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa>) -> Self::SoaSerIter<'_>;
-    #[cfg(feature = "erased")]
     fn soa_ser_work(iter: Self::SoaSerIter<'_>);
 
     fn soa_std_prepare_vec(count: usize) -> Self::Vecs {
@@ -88,15 +82,12 @@ impl Work for Tiny {
         black_box(result);
     }
 
-    #[cfg(feature = "erased")]
     type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa>;
 
-    #[cfg(feature = "erased")]
     fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa>) -> Self::SoaSerIter<'_> {
         data.into_iter()
     }
 
-    #[cfg(feature = "erased")]
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
         let mut result = 0;
         for refs in iter {
@@ -156,15 +147,12 @@ impl Work for Small {
         black_box(result);
     }
 
-    #[cfg(feature = "erased")]
     type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa>;
 
-    #[cfg(feature = "erased")]
     fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa>) -> Self::SoaSerIter<'_> {
         data.into_iter()
     }
 
-    #[cfg(feature = "erased")]
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
         let mut result = 0.0;
         for refs in iter {
@@ -231,15 +219,12 @@ impl Work for Big {
         black_box(result);
     }
 
-    #[cfg(feature = "erased")]
     type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa>;
 
-    #[cfg(feature = "erased")]
     fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa>) -> Self::SoaSerIter<'_> {
         data.into_iter()
     }
 
-    #[cfg(feature = "erased")]
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
         let mut result = 0;
         for (index, refs) in iter.enumerate() {
@@ -322,15 +307,12 @@ impl Work for Large {
         black_box(result);
     }
 
-    #[cfg(feature = "erased")]
     type SoaSerIter<'a> = soa_slice::Iter<'a, ErasedSoa>;
 
-    #[cfg(feature = "erased")]
     fn soa_ser_prepare_iter(data: SoaSlices<ErasedSoa>) -> Self::SoaSerIter<'_> {
         data.into_iter()
     }
 
-    #[cfg(feature = "erased")]
     fn soa_ser_work(iter: Self::SoaSerIter<'_>) {
         let mut result = 0;
         for refs in iter {

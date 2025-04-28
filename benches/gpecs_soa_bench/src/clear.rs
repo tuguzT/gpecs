@@ -1,6 +1,4 @@
 use gpecs_soa::{prelude::*, traits::SoaVecs};
-
-#[cfg(feature = "erased")]
 use gpecs_soa_erased::erased::ErasedSoa;
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero};
@@ -10,7 +8,6 @@ pub trait Clear: SoaVecs {
         vec.clear();
     }
 
-    #[cfg(feature = "erased")]
     fn soa_ser_clear(vec: &mut SoaVec<ErasedSoa>) {
         vec.clear();
     }

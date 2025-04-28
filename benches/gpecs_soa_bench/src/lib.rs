@@ -5,6 +5,7 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 
 pub mod clear;
+pub mod names;
 pub mod push;
 pub mod with_capacity;
 pub mod work;

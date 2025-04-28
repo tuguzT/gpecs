@@ -1,9 +1,9 @@
 use std::any::type_name;
 
-use criterion::{criterion_group, BenchmarkId, Criterion};
-use gpecs_soa_bench::{with_capacity::WithCapacity, Big, Large, Medium, Small, Tiny, Zero};
-
-use super::names::*;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use gpecs_soa_bench::{
+    names::*, with_capacity::WithCapacity, Big, Large, Medium, Small, Tiny, Zero,
+};
 
 fn with_capacity<T>(c: &mut Criterion)
 where
@@ -19,16 +19,19 @@ where
             &capacity,
             |b, &capacity| b.iter(|| T::soa_slf_with_capacity(capacity)),
         );
+
         group.bench_with_input(
             BenchmarkId::new(SOA_SER_FUNCTION_NAME, capacity),
             &capacity,
             |b, &capacity| b.iter(|| T::soa_ser_with_capacity(capacity)),
         );
+
         group.bench_with_input(
             BenchmarkId::new(SOA_STD_FUNCTION_NAME, capacity),
             &capacity,
             |b, &capacity| b.iter(|| T::soa_std_with_capacity(capacity)),
         );
+
         group.bench_with_input(
             BenchmarkId::new(AOS_STD_FUNCTION_NAME, capacity),
             &capacity,
@@ -46,3 +49,5 @@ criterion_group!(
     with_capacity::<Big>,
     with_capacity::<Large>,
 );
+
+criterion_main!(benches);

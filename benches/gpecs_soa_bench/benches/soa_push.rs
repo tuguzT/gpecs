@@ -1,12 +1,11 @@
 use std::{any::type_name, hint::black_box};
 
-use criterion::{criterion_group, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use gpecs_soa_bench::{
-    clear::Clear, push::Push, with_capacity::WithCapacity, Big, Large, Medium, Small, Tiny, Zero,
+    clear::Clear, names::*, push::Push, with_capacity::WithCapacity, Big, Large, Medium, Small,
+    Tiny, Zero,
 };
 use gpecs_soa_erased::erased::ErasedSoa;
-
-use super::names::*;
 
 fn push<T>(c: &mut Criterion)
 where
@@ -29,6 +28,7 @@ where
                 });
             },
         );
+
         group.bench_with_input(
             BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
             &count,
@@ -44,6 +44,7 @@ where
                 });
             },
         );
+
         group.bench_with_input(
             BenchmarkId::new(SOA_STD_FUNCTION_NAME, count),
             &count,
@@ -57,6 +58,7 @@ where
                 });
             },
         );
+
         group.bench_with_input(
             BenchmarkId::new(AOS_STD_FUNCTION_NAME, count),
             &count,
@@ -90,6 +92,7 @@ where
                 T::soa_slf_clear(&mut vec);
             },
         );
+
         let context = Default::default();
         let mut vec = T::soa_ser_with_capacity(count);
         group.bench_with_input(
@@ -106,6 +109,7 @@ where
                 T::soa_ser_clear(&mut vec);
             },
         );
+
         let mut vec = T::soa_std_with_capacity(count);
         group.bench_with_input(
             BenchmarkId::new(SOA_STD_FUNCTION_NAME, count),
@@ -120,6 +124,7 @@ where
                 T::soa_std_clear(&mut vec);
             },
         );
+
         let mut vec = T::aos_std_with_capacity(count);
         group.bench_with_input(
             BenchmarkId::new(AOS_STD_FUNCTION_NAME, count),
@@ -146,3 +151,5 @@ criterion_group!(
     push::<Big>,
     push::<Large>,
 );
+
+criterion_main!(benches);

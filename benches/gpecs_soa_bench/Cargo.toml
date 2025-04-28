@@ -15,5 +15,13 @@ gpecs_soa_erased = { workspace = true }
 criterion = { workspace = true }
 
 [[bench]]
-name = "soa"
+name = "soa_push"
+harness = false
+
+[[bench]]
+name = "soa_with_capacity"
+harness = false
+
+[[bench]]
+name = "soa_work"
 harness = false

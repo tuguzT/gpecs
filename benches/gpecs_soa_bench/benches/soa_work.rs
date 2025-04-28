@@ -1,9 +1,7 @@
 use std::any::type_name;
 
-use criterion::{criterion_group, BenchmarkId, Criterion};
-use gpecs_soa_bench::{work::Work, Big, Large, Small, Tiny};
-
-use super::names::*;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use gpecs_soa_bench::{names::*, work::Work, Big, Large, Small, Tiny};
 
 fn work<T>(c: &mut Criterion)
 where
@@ -55,3 +53,5 @@ criterion_group!(
     work::<Big>,
     work::<Large>,
 );
+
+criterion_main!(benches);

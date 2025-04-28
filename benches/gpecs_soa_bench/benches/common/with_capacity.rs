@@ -19,6 +19,7 @@ where
             &capacity,
             |b, &capacity| b.iter(|| T::soa_slf_with_capacity(capacity)),
         );
+        #[cfg(feature = "erased")]
         group.bench_with_input(
             BenchmarkId::new(SOA_SER_FUNCTION_NAME, capacity),
             &capacity,

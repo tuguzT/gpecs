@@ -9,10 +9,13 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_soa = { workspace = true, features = ["alloc"] }
-gpecs_soa_erased = { workspace = true }
+gpecs_soa_erased = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+
+[features]
+erased = ["dep:gpecs_soa_erased"]
 
 [[bench]]
 name = "soa"

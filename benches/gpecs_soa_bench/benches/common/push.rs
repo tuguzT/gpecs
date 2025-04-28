@@ -4,6 +4,8 @@ use criterion::{criterion_group, BenchmarkId, Criterion};
 use gpecs_soa_bench::{
     clear::Clear, push::Push, with_capacity::WithCapacity, Big, Large, Medium, Small, Tiny, Zero,
 };
+
+#[cfg(feature = "erased")]
 use gpecs_soa_erased::erased::ErasedSoa;
 
 use super::names::*;
@@ -29,6 +31,7 @@ where
                 });
             },
         );
+        #[cfg(feature = "erased")]
         group.bench_with_input(
             BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
             &count,
@@ -90,22 +93,25 @@ where
                 T::soa_slf_clear(&mut vec);
             },
         );
-        let context = Default::default();
-        let mut vec = T::soa_ser_with_capacity(count);
-        group.bench_with_input(
-            BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
-            &count,
-            |b, &count| {
-                b.iter(|| {
-                    for _ in 0..count {
-                        let value = ErasedSoa::from::<T>(&context, Default::default());
-                        T::soa_ser_push(&mut vec, value);
-                    }
-                    black_box(&mut vec);
-                });
-                T::soa_ser_clear(&mut vec);
-            },
-        );
+        #[cfg(feature = "erased")]
+        {
+            let context = Default::default();
+            let mut vec = T::soa_ser_with_capacity(count);
+            group.bench_with_input(
+                BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
+                &count,
+                |b, &count| {
+                    b.iter(|| {
+                        for _ in 0..count {
+                            let value = ErasedSoa::from::<T>(&context, Default::default());
+                            T::soa_ser_push(&mut vec, value);
+                        }
+                        black_box(&mut vec);
+                    });
+                    T::soa_ser_clear(&mut vec);
+                },
+            );
+        }
         let mut vec = T::soa_std_with_capacity(count);
         group.bench_with_input(
             BenchmarkId::new(SOA_STD_FUNCTION_NAME, count),

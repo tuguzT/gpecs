@@ -21,13 +21,16 @@ where
             |b, _| b.iter(|| T::soa_slf_work(iter.clone())),
         );
 
-        let vec = T::soa_ser_prepare_vec(count);
-        let iter = T::soa_ser_prepare_iter(vec.slices());
-        group.bench_with_input(
-            BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
-            &count,
-            |b, _| b.iter(|| T::soa_ser_work(iter.clone())),
-        );
+        #[cfg(feature = "erased")]
+        {
+            let vec = T::soa_ser_prepare_vec(count);
+            let iter = T::soa_ser_prepare_iter(vec.slices());
+            group.bench_with_input(
+                BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
+                &count,
+                |b, _| b.iter(|| T::soa_ser_work(iter.clone())),
+            );
+        }
 
         let vec = T::soa_std_prepare_vec(count);
         let iter = T::soa_std_prepare_iter(&vec);

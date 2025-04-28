@@ -59,3 +59,6 @@ check-cfg = ['cfg(target_arch, values("spirv"))']
 [profile.release]
 codegen-units = 1
 lto = "fat"
+
+[profile.bench]
+debug = true

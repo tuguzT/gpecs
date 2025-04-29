@@ -1,9 +1,11 @@
 use std::any::type_name;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use gpecs_soa::Soa;
 use gpecs_soa_bench::{
     names::*, with_capacity::WithCapacity, Big, Large, Medium, Small, Tiny, Zero,
 };
+use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaContext};
 
 fn with_capacity<T>(c: &mut Criterion)
 where
@@ -15,33 +17,52 @@ where
 
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
-        group.bench_with_input(
-            BenchmarkId::new(SOA_SER_FUNCTION_NAME, capacity),
-            &capacity,
-            |b, &capacity| b.iter(|| T::soa_ser_with_capacity(capacity)),
-        );
+        let context = ErasedSoaContext::of::<T>(&Default::default());
+        let (buffer_layout, _) = ErasedSoa::buffer_layout(&context, capacity).unwrap();
+        let bytes = buffer_layout.size();
+        group
+            .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
+            .bench_with_input(
+                BenchmarkId::new(SOA_SER_FUNCTION_NAME, capacity),
+                &capacity,
+                |b, &capacity| b.iter(|| T::soa_ser_with_capacity(capacity)),
+            );
     }
     group.finish();
 
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
-        group.bench_with_input(
-            BenchmarkId::new(SOA_SLF_FUNCTION_NAME, capacity),
-            &capacity,
-            |b, &capacity| b.iter(|| T::soa_slf_with_capacity(capacity)),
-        );
+        let context = Default::default();
+        let (buffer_layout, _) = T::buffer_layout(&context, capacity).unwrap();
+        let bytes = buffer_layout.size();
+        group
+            .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
+            .bench_with_input(
+                BenchmarkId::new(SOA_SLF_FUNCTION_NAME, capacity),
+                &capacity,
+                |b, &capacity| b.iter(|| T::soa_slf_with_capacity(capacity)),
+            );
 
-        group.bench_with_input(
-            BenchmarkId::new(SOA_STD_FUNCTION_NAME, capacity),
-            &capacity,
-            |b, &capacity| b.iter(|| T::soa_std_with_capacity(capacity)),
-        );
+        let bytes = T::field_descriptors(&context)
+            .into_iter()
+            .map(|desc| capacity * desc.as_ref().layout().size())
+            .sum::<usize>();
+        group
+            .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
+            .bench_with_input(
+                BenchmarkId::new(SOA_STD_FUNCTION_NAME, capacity),
+                &capacity,
+                |b, &capacity| b.iter(|| T::soa_std_with_capacity(capacity)),
+            );
 
-        group.bench_with_input(
-            BenchmarkId::new(AOS_STD_FUNCTION_NAME, capacity),
-            &capacity,
-            |b, &capacity| b.iter(|| T::aos_std_with_capacity(capacity)),
-        );
+        let bytes = capacity * size_of::<T>();
+        group
+            .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
+            .bench_with_input(
+                BenchmarkId::new(AOS_STD_FUNCTION_NAME, capacity),
+                &capacity,
+                |b, &capacity| b.iter(|| T::aos_std_with_capacity(capacity)),
+            );
     }
     group.finish();
 }

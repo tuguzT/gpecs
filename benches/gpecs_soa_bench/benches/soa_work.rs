@@ -8,8 +8,21 @@ where
     T: Work,
 {
     const COUNT_RANGE: [usize; 5] = [10, 100, 1_000, 10_000, 100_000];
+    let group_name = format!("Work for `{}`", type_name::<T>());
 
-    let mut group = c.benchmark_group(format!("Work for `{}`", type_name::<T>()));
+    let mut group = c.benchmark_group(&group_name);
+    for count in COUNT_RANGE {
+        let vec = T::soa_ser_prepare_vec(count);
+        let iter = T::soa_ser_prepare_iter(vec.slices());
+        group.bench_with_input(
+            BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
+            &count,
+            |b, _| b.iter(|| T::soa_ser_work(iter.clone())),
+        );
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group(&group_name);
     for count in COUNT_RANGE {
         let vec = T::soa_slf_prepare_vec(count);
         let iter = T::soa_slf_prepare_iter(vec.slices());
@@ -17,14 +30,6 @@ where
             BenchmarkId::new(SOA_SLF_FUNCTION_NAME, count),
             &count,
             |b, _| b.iter(|| T::soa_slf_work(iter.clone())),
-        );
-
-        let vec = T::soa_ser_prepare_vec(count);
-        let iter = T::soa_ser_prepare_iter(vec.slices());
-        group.bench_with_input(
-            BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
-            &count,
-            |b, _| b.iter(|| T::soa_ser_work(iter.clone())),
         );
 
         let vec = T::soa_std_prepare_vec(count);
@@ -43,10 +48,11 @@ where
             |b, _| b.iter(|| T::aos_std_work(iter.clone())),
         );
     }
+    group.finish();
 }
 
 criterion_group!(
-    benches,
+    work_benches,
     work::<Tiny>,
     work::<Small>,
     // work::<Medium>,
@@ -54,4 +60,4 @@ criterion_group!(
     work::<Large>,
 );
 
-criterion_main!(benches);
+criterion_main!(work_benches);

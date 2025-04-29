@@ -11,19 +11,24 @@ where
 {
     const KB: usize = 1024;
     const CAPACITY_RANGE: [usize; 8] = [0, 1, 10, 100, KB, KB * 2, KB * 4, KB * 8];
+    let group_name = format!("With capacity for `{}`", type_name::<T>());
 
-    let mut group = c.benchmark_group(format!("With capacity for `{}`", type_name::<T>()));
+    let mut group = c.benchmark_group(&group_name);
+    for capacity in CAPACITY_RANGE {
+        group.bench_with_input(
+            BenchmarkId::new(SOA_SER_FUNCTION_NAME, capacity),
+            &capacity,
+            |b, &capacity| b.iter(|| T::soa_ser_with_capacity(capacity)),
+        );
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
         group.bench_with_input(
             BenchmarkId::new(SOA_SLF_FUNCTION_NAME, capacity),
             &capacity,
             |b, &capacity| b.iter(|| T::soa_slf_with_capacity(capacity)),
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new(SOA_SER_FUNCTION_NAME, capacity),
-            &capacity,
-            |b, &capacity| b.iter(|| T::soa_ser_with_capacity(capacity)),
         );
 
         group.bench_with_input(
@@ -38,10 +43,11 @@ where
             |b, &capacity| b.iter(|| T::aos_std_with_capacity(capacity)),
         );
     }
+    group.finish();
 }
 
 criterion_group!(
-    benches,
+    with_capacity_benches,
     with_capacity::<Zero>,
     with_capacity::<Tiny>,
     with_capacity::<Small>,
@@ -50,4 +56,4 @@ criterion_group!(
     with_capacity::<Large>,
 );
 
-criterion_main!(benches);
+criterion_main!(with_capacity_benches);

@@ -499,6 +499,7 @@ pub unsafe trait Soa: Sized {
 
 /// Default implementation of [`buffer_layout()`](Soa::buffer_layout) method of [`Soa`] trait
 /// for collections implementing [`FromIterator`] trait.
+#[inline]
 pub fn buffer_layout<B, I>(field_layouts: I, capacity: usize) -> Result<(Layout, B), LayoutError>
 where
     I: IntoIterator<Item: Borrow<Layout>>,
@@ -519,6 +520,7 @@ where
 }
 
 /// Use this until [`Layout::repeat()`] is stabilized
+#[inline]
 fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
     const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
         Ok(_) => unreachable!(),

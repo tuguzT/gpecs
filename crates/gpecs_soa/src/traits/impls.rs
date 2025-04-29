@@ -409,9 +409,7 @@ unsafe impl SoaVecs for () {
 
     #[inline]
     unsafe fn vecs_set_len(_: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-        unsafe {
-            vecs.set_len(len);
-        }
+        unsafe { vecs.set_len(len) }
     }
 }
 

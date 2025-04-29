@@ -26,3 +26,5 @@ target/
 # `rust-gpu` build artifacts
 manifest.json
 *.spv
+
+flamegraph.svg

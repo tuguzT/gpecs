@@ -25,7 +25,7 @@ impl ErasedSoaNonNullPtrs {
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, ptrs: T::NonNullPtrs) -> Self
+    pub fn from<'context, T>(context: &'context T::Context, ptrs: T::NonNullPtrs<'context>) -> Self
     where
         T: Soa,
     {
@@ -49,7 +49,7 @@ impl ErasedSoaNonNullPtrs {
     pub unsafe fn into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::NonNullPtrs, IntoValueError<Self>>
+    ) -> Result<T::NonNullPtrs<'_>, IntoValueError<Self>>
     where
         T: Soa,
     {

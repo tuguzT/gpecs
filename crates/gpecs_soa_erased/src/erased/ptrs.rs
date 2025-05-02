@@ -25,7 +25,7 @@ impl ErasedSoaPtrs {
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, ptrs: T::Ptrs) -> Self
+    pub fn from<'context, T>(context: &'context T::Context, ptrs: T::Ptrs<'context>) -> Self
     where
         T: Soa,
     {
@@ -44,7 +44,7 @@ impl ErasedSoaPtrs {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Ptrs, IntoValueError<Self>>
+    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Ptrs<'_>, IntoValueError<Self>>
     where
         T: Soa,
     {

@@ -74,7 +74,7 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> T::Slices<'_> {
+    pub fn as_slices(&self) -> T::Slices<'_, '_> {
         self.iter.as_slices()
     }
 }
@@ -97,7 +97,7 @@ where
 
 impl<T, U> AsRef<[U]> for Drain<'_, T>
 where
-    for<'a> T: Soa<Slices<'a> = &'a [U]> + 'a,
+    for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
         self.as_slices()
@@ -107,7 +107,7 @@ where
 impl<T> Debug for Drain<'_, T>
 where
     T: Soa,
-    for<'any> T::Slices<'any>: Debug,
+    for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
@@ -187,7 +187,7 @@ where
                     let tail = self.0.tail_start;
                     if tail != start {
                         let src = source_vec.as_ptrs();
-                        let dst = source_vec.as_mut_ptrs();
+                        let dst = source_vec.buffer.ptrs();
                         let context = source_vec.context();
 
                         let src = T::ptrs_add(context, src, tail);
@@ -200,8 +200,6 @@ where
         }
 
         let drop_len = self.iter.len();
-        let slices = self.iter.as_slices();
-
         let mut vec = self.vec;
 
         if is_zst::<T>() {
@@ -218,7 +216,7 @@ where
         }
 
         // ensure elements are moved back into their appropriate places, even when drop_in_place panics
-        let _guard = DropGuard(self);
+        let guard = DropGuard(self);
 
         if drop_len == 0 {
             return;
@@ -232,6 +230,7 @@ where
             // it also gets touched by vec::Splice which may turn it into a dangling pointer
             // which would make it and the vec pointer point to different allocations which would
             // lead to invalid pointer arithmetic below.
+            let slices = guard.0.iter.as_slices();
             let drop_ptrs = T::slice_refs_as_ptrs(context, slices);
 
             // drop_ptrs comes from an Iter which only gives us slices but for drop_in_place

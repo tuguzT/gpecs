@@ -60,11 +60,11 @@ pub fn get_pair<T>(iter: impl IntoIterator<Item = T>, a: usize, b: usize) -> Opt
     Some(pair)
 }
 
-pub fn sparse_get<'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefs<'a, K, V>>,
+pub fn sparse_get<'context, 'a, K, V>(
+    dense: impl IntoIterator<Item = KeyValueRefs<'context, 'a, K, V>>,
     sparse: &[SparseItem<K>],
     key: K,
-) -> Option<V::Refs<'a>>
+) -> Option<V::Refs<'context, 'a>>
 where
     K: Key + 'a,
     V: Soa,
@@ -94,11 +94,11 @@ where
 
 #[inline]
 #[track_caller]
-pub fn sparse_index<'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefs<'a, K, V>>,
+pub fn sparse_index<'context, 'a, K, V>(
+    dense: impl IntoIterator<Item = KeyValueRefs<'context, 'a, K, V>>,
     sparse: &[SparseItem<K>],
     key: K,
-) -> V::Refs<'a>
+) -> V::Refs<'context, 'a>
 where
     K: Key + Debug + 'a,
     V: Soa,
@@ -109,11 +109,11 @@ where
     }
 }
 
-pub fn sparse_get_mut<'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefsMut<'a, K, V>>,
+pub fn sparse_get_mut<'context, 'a, K, V>(
+    dense: impl IntoIterator<Item = KeyValueRefsMut<'context, 'a, K, V>>,
     sparse: &[SparseItem<K>],
     key: K,
-) -> Option<V::RefsMut<'a>>
+) -> Option<V::RefsMut<'context, 'a>>
 where
     K: Key + 'a,
     V: Soa,
@@ -133,11 +133,11 @@ where
 
 #[inline]
 #[track_caller]
-pub fn sparse_index_mut<'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefsMut<'a, K, V>>,
+pub fn sparse_index_mut<'context, 'a, K, V>(
+    dense: impl IntoIterator<Item = KeyValueRefsMut<'context, 'a, K, V>>,
     sparse: &[SparseItem<K>],
     key: K,
-) -> V::RefsMut<'a>
+) -> V::RefsMut<'context, 'a>
 where
     K: Key + Debug + 'a,
     V: Soa,
@@ -148,11 +148,11 @@ where
     }
 }
 
-pub fn sparse_get_with_key<'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefs<'a, K, V>>,
+pub fn sparse_get_with_key<'context, 'a, K, V>(
+    dense: impl IntoIterator<Item = KeyValueRefs<'context, 'a, K, V>>,
     sparse: &[SparseItem<K>],
     sparse_index: K::SparseIndex,
-) -> Option<(K, V::Refs<'a>)>
+) -> Option<(K, V::Refs<'context, 'a>)>
 where
     K: Key + 'a,
     V: Soa,
@@ -167,11 +167,11 @@ where
     Some((dense_key, value))
 }
 
-pub fn sparse_get_mut_with_key<'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefsMut<'a, K, V>>,
+pub fn sparse_get_mut_with_key<'context, 'a, K, V>(
+    dense: impl IntoIterator<Item = KeyValueRefsMut<'context, 'a, K, V>>,
     sparse: &[SparseItem<K>],
     sparse_index: K::SparseIndex,
-) -> Option<(K, V::RefsMut<'a>)>
+) -> Option<(K, V::RefsMut<'context, 'a>)>
 where
     K: Key + 'a,
     V: Soa,

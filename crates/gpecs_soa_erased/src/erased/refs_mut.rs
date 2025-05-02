@@ -25,7 +25,7 @@ impl<'a> ErasedSoaRefsMut<'a> {
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, refs: T::RefsMut<'a>) -> Self
+    pub fn from<'context, T>(context: &'context T::Context, refs: T::RefsMut<'context, 'a>) -> Self
     where
         T: Soa,
     {
@@ -48,7 +48,7 @@ impl<'a> ErasedSoaRefsMut<'a> {
     pub unsafe fn into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::RefsMut<'a>, IntoValueError<Self>>
+    ) -> Result<T::RefsMut<'_, 'a>, IntoValueError<Self>>
     where
         T: Soa,
     {

@@ -252,7 +252,7 @@ where
     }
 
     #[inline]
-    pub fn ptrs(&self) -> T::MutPtrs {
+    pub fn ptrs(&self) -> T::MutPtrs<'_> {
         let ptr = self.ptr();
         let context = self.context();
         let capacity = self.capacity();
@@ -261,7 +261,7 @@ where
 
     #[inline]
     #[allow(dead_code)]
-    pub fn non_nulls(&self) -> T::NonNullPtrs {
+    pub fn non_nulls(&self) -> T::NonNullPtrs<'_> {
         let ptrs = self.ptrs();
         let context = self.context();
         unsafe { T::ptrs_to_nonnull(context, ptrs) }

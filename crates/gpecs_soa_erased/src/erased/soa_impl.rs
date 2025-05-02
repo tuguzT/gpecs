@@ -16,7 +16,10 @@ use crate::{
         field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
         ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldVec,
     },
-    soa::traits::{buffer_layout, FieldDescriptor, Soa},
+    soa::{
+        traits::{buffer_layout, Soa},
+        FieldDescriptor,
+    },
 };
 
 use super::{
@@ -29,13 +32,13 @@ unsafe impl Soa for ErasedSoa {
     type Context = ErasedSoaContext;
     type Fields = ErasedSoaFields;
 
-    type FieldDescriptors<'a> = &'a [FieldDescriptor];
+    type FieldDescriptors<'context> = &'context [FieldDescriptor];
 
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_> {
         context.field_descriptors()
     }
 
-    type FieldOffsets<'a> = Box<[usize]>;
+    type FieldOffsets<'context> = Box<[usize]>;
 
     fn buffer_layout(
         context: &Self::Context,
@@ -48,14 +51,18 @@ unsafe impl Soa for ErasedSoa {
         buffer_layout(field_layouts, capacity)
     }
 
-    type Ptrs = ErasedSoaPtrs;
-    type MutPtrs = ErasedSoaMutPtrs;
+    type Ptrs<'context> = ErasedSoaPtrs;
+    type MutPtrs<'context> = ErasedSoaMutPtrs;
 
-    type ErasedPtrs = iter::Map<vec::IntoIter<ErasedFieldPtr>, fn(ErasedFieldPtr) -> *const u8>;
-    type ErasedMutPtrs =
+    type ErasedPtrs<'context> =
+        iter::Map<vec::IntoIter<ErasedFieldPtr>, fn(ErasedFieldPtr) -> *const u8>;
+    type ErasedMutPtrs<'context> =
         iter::Map<vec::IntoIter<ErasedFieldMutPtr>, fn(ErasedFieldMutPtr) -> *mut u8>;
 
-    fn ptrs_erase(context: &Self::Context, ptrs: Self::Ptrs) -> Self::ErasedPtrs {
+    fn ptrs_erase<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::Ptrs<'context>,
+    ) -> Self::ErasedPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -65,7 +72,10 @@ unsafe impl Soa for ErasedSoa {
             .map(ErasedFieldPtr::into_ptr)
     }
 
-    fn ptrs_erase_mut(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::ErasedMutPtrs {
+    fn ptrs_erase_mut<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::MutPtrs<'context>,
+    ) -> Self::ErasedMutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -78,7 +88,7 @@ unsafe impl Soa for ErasedSoa {
     fn ptrs_restore(
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *const u8>,
-    ) -> Self::Ptrs {
+    ) -> Self::Ptrs<'_> {
         let descriptors = context.field_descriptors();
 
         let ptrs: Box<[_]> = descriptors
@@ -97,7 +107,7 @@ unsafe impl Soa for ErasedSoa {
     fn ptrs_restore_mut(
         context: &Self::Context,
         ptrs: impl IntoIterator<Item = *mut u8>,
-    ) -> Self::MutPtrs {
+    ) -> Self::MutPtrs<'_> {
         let descriptors = context.field_descriptors();
 
         let ptrs: Box<[_]> = descriptors
@@ -113,7 +123,7 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs {
+    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_> {
         let ptrs = context
             .field_descriptors()
             .iter()
@@ -122,7 +132,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    fn ptrs_cast_const(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::Ptrs {
+    fn ptrs_cast_const<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::MutPtrs<'context>,
+    ) -> Self::Ptrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -137,7 +150,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn ptrs_cast_mut(context: &Self::Context, ptrs: Self::Ptrs) -> Self::MutPtrs {
+    fn ptrs_cast_mut<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::Ptrs<'context>,
+    ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -152,7 +168,11 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    unsafe fn ptrs_add(context: &Self::Context, ptrs: Self::Ptrs, offset: usize) -> Self::Ptrs {
+    unsafe fn ptrs_add<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::Ptrs<'context>,
+        offset: usize,
+    ) -> Self::Ptrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -167,11 +187,11 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    unsafe fn ptrs_add_mut(
-        context: &Self::Context,
-        ptrs: Self::MutPtrs,
+    unsafe fn ptrs_add_mut<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::MutPtrs<'context>,
         offset: usize,
-    ) -> Self::MutPtrs {
+    ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -188,8 +208,8 @@ unsafe impl Soa for ErasedSoa {
 
     unsafe fn ptrs_offset_from(
         context: &Self::Context,
-        ptrs: Self::Ptrs,
-        origin: Self::Ptrs,
+        ptrs: Self::Ptrs<'_>,
+        origin: Self::Ptrs<'_>,
     ) -> isize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
@@ -214,8 +234,8 @@ unsafe impl Soa for ErasedSoa {
 
     unsafe fn ptrs_offset_from_mut(
         context: &Self::Context,
-        ptrs: Self::MutPtrs,
-        origin: Self::Ptrs,
+        ptrs: Self::MutPtrs<'_>,
+        origin: Self::Ptrs<'_>,
     ) -> isize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
@@ -238,7 +258,7 @@ unsafe impl Soa for ErasedSoa {
         offset
     }
 
-    unsafe fn ptrs_swap(context: &Self::Context, a: Self::MutPtrs, b: Self::MutPtrs) {
+    unsafe fn ptrs_swap(context: &Self::Context, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), a.field_ptrs().len());
         assert_eq!(a.field_ptrs().len(), b.field_ptrs().len());
@@ -266,7 +286,12 @@ unsafe impl Soa for ErasedSoa {
             })
     }
 
-    unsafe fn ptrs_copy(context: &Self::Context, src: Self::Ptrs, dst: Self::MutPtrs, len: usize) {
+    unsafe fn ptrs_copy(
+        context: &Self::Context,
+        src: Self::Ptrs<'_>,
+        dst: Self::MutPtrs<'_>,
+        len: usize,
+    ) {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), src.field_ptrs().len());
         assert_eq!(src.field_ptrs().len(), dst.field_ptrs().len());
@@ -296,8 +321,8 @@ unsafe impl Soa for ErasedSoa {
 
     unsafe fn ptrs_copy_rev(
         context: &Self::Context,
-        src: Self::Ptrs,
-        dst: Self::MutPtrs,
+        src: Self::Ptrs<'_>,
+        dst: Self::MutPtrs<'_>,
         len: usize,
     ) {
         let descriptors = context.field_descriptors();
@@ -330,8 +355,8 @@ unsafe impl Soa for ErasedSoa {
 
     unsafe fn ptrs_copy_nonoverlapping(
         context: &Self::Context,
-        src: Self::Ptrs,
-        dst: Self::MutPtrs,
+        src: Self::Ptrs<'_>,
+        dst: Self::MutPtrs<'_>,
         len: usize,
     ) {
         let descriptors = context.field_descriptors();
@@ -351,7 +376,7 @@ unsafe impl Soa for ErasedSoa {
             .for_each(|((_, src), dst)| unsafe { dst.copy_from_nonoverlapping(src, len) })
     }
 
-    unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs) -> Self {
+    unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), src.field_ptrs().len());
 
@@ -366,7 +391,7 @@ unsafe impl Soa for ErasedSoa {
         unsafe { Self::new_unchecked(fields) }
     }
 
-    unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs, value: Self) {
+    unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), dst.field_ptrs().len());
         assert_eq!(descriptors.len(), value.field_descriptors().len());
@@ -387,13 +412,16 @@ unsafe impl Soa for ErasedSoa {
             })
     }
 
-    unsafe fn ptrs_drop_in_place(_: &Self::Context, _: Self::MutPtrs) {
+    unsafe fn ptrs_drop_in_place(_: &Self::Context, _: Self::MutPtrs<'_>) {
         // do nothing; it's safe to not drop anything
     }
 
-    type NonNullPtrs = ErasedSoaNonNullPtrs;
+    type NonNullPtrs<'context> = ErasedSoaNonNullPtrs;
 
-    unsafe fn ptrs_to_nonnull(context: &Self::Context, ptrs: Self::MutPtrs) -> Self::NonNullPtrs {
+    unsafe fn ptrs_to_nonnull<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::MutPtrs<'context>,
+    ) -> Self::NonNullPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -412,7 +440,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaNonNullPtrs::new(ptrs)
     }
 
-    fn nonnull_to_ptrs(context: &Self::Context, ptrs: Self::NonNullPtrs) -> Self::MutPtrs {
+    fn nonnull_to_ptrs<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::NonNullPtrs<'context>,
+    ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -431,17 +462,20 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    type Refs<'a>
+    type Refs<'context, 'a>
         = ErasedSoaRefs<'a>
     where
         Self: 'a;
 
-    type RefsMut<'a>
+    type RefsMut<'context, 'a>
         = ErasedSoaRefsMut<'a>
     where
         Self: 'a;
 
-    unsafe fn ptrs_to_refs<'a>(context: &Self::Context, ptrs: Self::Ptrs) -> Self::Refs<'a> {
+    unsafe fn ptrs_to_refs<'context, 'a>(
+        context: &'context Self::Context,
+        ptrs: Self::Ptrs<'context>,
+    ) -> Self::Refs<'context, 'a> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -456,10 +490,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaRefs::new(refs)
     }
 
-    unsafe fn ptrs_to_refs_mut<'a>(
-        context: &Self::Context,
-        ptrs: Self::MutPtrs,
-    ) -> Self::RefsMut<'a> {
+    unsafe fn ptrs_to_refs_mut<'context, 'a>(
+        context: &'context Self::Context,
+        ptrs: Self::MutPtrs<'context>,
+    ) -> Self::RefsMut<'context, 'a> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -474,7 +508,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaRefsMut::new(refs)
     }
 
-    fn refs_as_ptrs(context: &Self::Context, refs: Self::Refs<'_>) -> Self::Ptrs {
+    fn refs_as_ptrs<'context>(
+        context: &'context Self::Context,
+        refs: Self::Refs<'context, '_>,
+    ) -> Self::Ptrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), refs.field_refs().len());
 
@@ -489,7 +526,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn mut_refs_as_ptrs(context: &Self::Context, refs: Self::RefsMut<'_>) -> Self::MutPtrs {
+    fn mut_refs_as_ptrs<'context>(
+        context: &'context Self::Context,
+        refs: Self::RefsMut<'context, '_>,
+    ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), refs.field_refs().len());
 
@@ -504,7 +544,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    fn mut_refs_as_refs<'a>(context: &Self::Context, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
+    fn mut_refs_as_refs<'context, 'a>(
+        context: &'context Self::Context,
+        refs: Self::RefsMut<'context, 'a>,
+    ) -> Self::Refs<'context, 'a> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), refs.field_refs().len());
 
@@ -519,14 +562,14 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaRefs::new(refs)
     }
 
-    type SlicePtrs = ErasedSoaSlicePtrs;
-    type SliceMutPtrs = ErasedSoaSliceMutPtrs;
+    type SlicePtrs<'context> = ErasedSoaSlicePtrs;
+    type SliceMutPtrs<'context> = ErasedSoaSliceMutPtrs;
 
-    fn slices_from_raw_parts(
-        context: &Self::Context,
-        ptrs: Self::Ptrs,
+    fn slices_from_raw_parts<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::Ptrs<'context>,
         len: usize,
-    ) -> Self::SlicePtrs {
+    ) -> Self::SlicePtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -541,11 +584,11 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
 
-    fn slices_from_raw_parts_mut(
-        context: &Self::Context,
-        ptrs: Self::MutPtrs,
+    fn slices_from_raw_parts_mut<'context>(
+        context: &'context Self::Context,
+        ptrs: Self::MutPtrs<'context>,
         len: usize,
-    ) -> Self::SliceMutPtrs {
+    ) -> Self::SliceMutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
@@ -560,10 +603,10 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
 
-    fn slice_ptrs_cast_const(
-        context: &Self::Context,
-        slices: Self::SliceMutPtrs,
-    ) -> Self::SlicePtrs {
+    fn slice_ptrs_cast_const<'context>(
+        context: &'context Self::Context,
+        slices: Self::SliceMutPtrs<'context>,
+    ) -> Self::SlicePtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -579,7 +622,10 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
 
-    fn slice_ptrs_cast_mut(context: &Self::Context, slices: Self::SlicePtrs) -> Self::SliceMutPtrs {
+    fn slice_ptrs_cast_mut<'context>(
+        context: &'context Self::Context,
+        slices: Self::SlicePtrs<'context>,
+    ) -> Self::SliceMutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -595,21 +641,24 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
 
-    fn slice_ptrs_len(context: &Self::Context, slices: &Self::SlicePtrs) -> usize {
+    fn slice_ptrs_len(context: &Self::Context, slices: &Self::SlicePtrs<'_>) -> usize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         slices.len()
     }
 
-    fn slice_ptrs_len_mut(context: &Self::Context, slices: &Self::SliceMutPtrs) -> usize {
+    fn slice_ptrs_len_mut(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         slices.len()
     }
 
-    fn slice_ptrs_as_ptrs(context: &Self::Context, slices: Self::SlicePtrs) -> Self::Ptrs {
+    fn slice_ptrs_as_ptrs<'context>(
+        context: &'context Self::Context,
+        slices: Self::SlicePtrs<'context>,
+    ) -> Self::Ptrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -624,10 +673,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn mut_slice_ptrs_as_ptrs(
-        context: &Self::Context,
-        slices: Self::SliceMutPtrs,
-    ) -> Self::MutPtrs {
+    fn mut_slice_ptrs_as_ptrs<'context>(
+        context: &'context Self::Context,
+        slices: Self::SliceMutPtrs<'context>,
+    ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -642,20 +691,20 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    type Slices<'a>
+    type Slices<'context, 'a>
         = ErasedSoaSlices<'a>
     where
         Self: 'a;
 
-    type SlicesMut<'a>
+    type SlicesMut<'context, 'a>
         = ErasedSoaSlicesMut<'a>
     where
         Self: 'a;
 
-    unsafe fn slice_ptrs_to_slices<'a>(
-        context: &Self::Context,
-        slices: Self::SlicePtrs,
-    ) -> Self::Slices<'a> {
+    unsafe fn slice_ptrs_to_slices<'context, 'a>(
+        context: &'context Self::Context,
+        slices: Self::SlicePtrs<'context>,
+    ) -> Self::Slices<'context, 'a> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -671,10 +720,10 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
     }
 
-    unsafe fn slice_ptrs_to_slices_mut<'a>(
-        context: &Self::Context,
-        slices: Self::SliceMutPtrs,
-    ) -> Self::SlicesMut<'a> {
+    unsafe fn slice_ptrs_to_slices_mut<'context, 'a>(
+        context: &'context Self::Context,
+        slices: Self::SliceMutPtrs<'context>,
+    ) -> Self::SlicesMut<'context, 'a> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -690,24 +739,24 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlicesMut::new_unchecked(len, slices) }
     }
 
-    fn slices_len(context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
+    fn slices_len(context: &Self::Context, slices: &Self::Slices<'_, '_>) -> usize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         slices.len()
     }
 
-    fn slices_len_mut(context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize {
+    fn slices_len_mut(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         slices.len()
     }
 
-    fn slice_refs_as_slice_ptrs(
-        context: &Self::Context,
-        slices: Self::Slices<'_>,
-    ) -> Self::SlicePtrs {
+    fn slice_refs_as_slice_ptrs<'context>(
+        context: &'context Self::Context,
+        slices: Self::Slices<'context, '_>,
+    ) -> Self::SlicePtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -723,10 +772,10 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
 
-    fn mut_slice_refs_as_slice_ptrs(
-        context: &Self::Context,
-        slices: Self::SlicesMut<'_>,
-    ) -> Self::SliceMutPtrs {
+    fn mut_slice_refs_as_slice_ptrs<'context>(
+        context: &'context Self::Context,
+        slices: Self::SlicesMut<'context, '_>,
+    ) -> Self::SliceMutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -742,10 +791,10 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
 
-    fn mut_slices_as_slices<'a>(
-        context: &Self::Context,
-        slices: Self::SlicesMut<'a>,
-    ) -> Self::Slices<'a> {
+    fn mut_slices_as_slices<'context, 'a>(
+        context: &'context Self::Context,
+        slices: Self::SlicesMut<'context, 'a>,
+    ) -> Self::Slices<'context, 'a> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -761,7 +810,10 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
     }
 
-    fn slice_refs_as_ptrs(context: &Self::Context, slices: Self::Slices<'_>) -> Self::Ptrs {
+    fn slice_refs_as_ptrs<'context>(
+        context: &'context Self::Context,
+        slices: Self::Slices<'context, '_>,
+    ) -> Self::Ptrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -776,10 +828,10 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn mut_slice_refs_as_ptrs(
-        context: &Self::Context,
-        slices: Self::SlicesMut<'_>,
-    ) -> Self::MutPtrs {
+    fn mut_slice_refs_as_ptrs<'context>(
+        context: &'context Self::Context,
+        slices: Self::SlicesMut<'context, '_>,
+    ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -794,7 +846,7 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    unsafe fn slices_drop_in_place(_: &Self::Context, _: Self::SliceMutPtrs) {
+    unsafe fn slices_drop_in_place(_: &Self::Context, _: Self::SliceMutPtrs<'_>) {
         // do nothing; it's safe to not drop anything
     }
 }
@@ -817,7 +869,10 @@ unsafe impl SoaVecs for ErasedSoa {
         ErasedSoaVecs { len: 0, vecs }
     }
 
-    fn vecs_as_ptrs(context: &Self::Context, vecs: &Self::Vecs) -> Self::Ptrs {
+    fn vecs_as_ptrs<'context>(
+        context: &'context Self::Context,
+        vecs: &Self::Vecs,
+    ) -> Self::Ptrs<'context> {
         let descriptors = context.field_descriptors();
         let ErasedSoaVecs { vecs, .. } = vecs;
         assert_eq!(descriptors.len(), vecs.len());
@@ -839,7 +894,10 @@ unsafe impl SoaVecs for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn mut_vecs_as_ptrs(context: &Self::Context, vecs: &mut Self::Vecs) -> Self::MutPtrs {
+    fn mut_vecs_as_ptrs<'context>(
+        context: &'context Self::Context,
+        vecs: &mut Self::Vecs,
+    ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         let ErasedSoaVecs { vecs, .. } = vecs;
         assert_eq!(descriptors.len(), vecs.len());

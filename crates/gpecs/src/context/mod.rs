@@ -243,7 +243,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_bundle<B>(&self, entity: Entity) -> Result<B::Refs<'_>, IncompatibleBundleError>
+    pub fn get_bundle<B>(&self, entity: Entity) -> Result<B::Refs<'_, '_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -266,7 +266,7 @@ impl Context {
     pub fn get_bundle_mut<B>(
         &mut self,
         entity: Entity,
-    ) -> Result<B::RefsMut<'_>, IncompatibleBundleError>
+    ) -> Result<B::RefsMut<'_, '_>, IncompatibleBundleError>
     where
         B: Bundle,
     {

@@ -1,4 +1,4 @@
-use crate::{aligned_bytes::AlignedBytes, soa::traits::FieldDescriptor};
+use crate::{aligned_bytes::AlignedBytes, soa::FieldDescriptor};
 
 // TODO: implement some API (in the future)
 pub struct ErasedFieldVec {

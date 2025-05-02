@@ -26,7 +26,10 @@ use crate::{
         utils::{try_collect_component_ids, try_collect_maybe_component_ids},
     },
     entity::Entity,
-    soa::traits::{DefaultContext, FieldDescriptor, Soa},
+    soa::{
+        traits::{DefaultContext, Soa},
+        FieldDescriptor,
+    },
 };
 
 use super::{
@@ -75,8 +78,8 @@ impl From<NoEpochEntity> for Entity {
     }
 }
 
-pub type Bundles<'a, B> = (&'a [Entity], <B as Soa>::Slices<'a>);
-pub type BundlesMut<'a, B> = (&'a [Entity], <B as Soa>::SlicesMut<'a>);
+pub type Bundles<'a, B> = (&'a [Entity], <B as Soa>::Slices<'a, 'a>);
+pub type BundlesMut<'a, B> = (&'a [Entity], <B as Soa>::SlicesMut<'a, 'a>);
 
 type ErasedStorage = EpochSparseSet<NoEpochEntity, ErasedSoa>;
 type ComponentIdMap = IndexMap<ComponentId, Option<DropFn>>;
@@ -385,9 +388,9 @@ impl ArchetypeStorage {
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let components = unsafe {
+            const CONTEXT: DefaultContext = ();
             let len = entities.len();
-            let context = DefaultContext::default();
-            from_erased_slices::<B>(components, &context, bundle_component_ids, len, fields)
+            from_erased_slices::<B>(components, &CONTEXT, bundle_component_ids, len, fields)
         };
         Ok((entities, components))
     }
@@ -414,9 +417,9 @@ impl ArchetypeStorage {
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let components = unsafe {
+            const CONTEXT: DefaultContext = ();
             let len = entities.len();
-            let context = DefaultContext::default();
-            from_erased_slices_mut::<B>(components, &context, bundle_component_ids, len, fields)
+            from_erased_slices_mut::<B>(components, &CONTEXT, bundle_component_ids, len, fields)
         };
         Ok((entities, components))
     }
@@ -427,7 +430,7 @@ impl ArchetypeStorage {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<B::Refs<'_>>, IncompatibleBundleError>
+    ) -> Result<Option<B::Refs<'_, '_>>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -446,8 +449,8 @@ impl ArchetypeStorage {
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let refs = unsafe {
-            let context = DefaultContext::default();
-            from_erased_refs::<B>(components, &context, bundle_component_ids, fields)
+            const CONTEXT: DefaultContext = ();
+            from_erased_refs::<B>(components, &CONTEXT, bundle_component_ids, fields)
         };
         Ok(Some(refs))
     }
@@ -458,7 +461,7 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<B::RefsMut<'_>>, IncompatibleBundleError>
+    ) -> Result<Option<B::RefsMut<'_, '_>>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -478,8 +481,8 @@ impl ArchetypeStorage {
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let refs = unsafe {
-            let context = DefaultContext::default();
-            from_erased_refs_mut::<B>(components, &context, bundle_component_ids, fields)
+            const CONTEXT: DefaultContext = ();
+            from_erased_refs_mut::<B>(components, &CONTEXT, bundle_component_ids, fields)
         };
         Ok(Some(refs))
     }

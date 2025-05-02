@@ -243,7 +243,7 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> V::Slices<'a> {
+    pub fn as_slice(&self) -> V::Slices<'_, 'a> {
         let Self { inner } = self;
 
         let KeyValueSlices { values, .. } = inner.as_slices();
@@ -254,7 +254,7 @@ where
 impl<K, V> Debug for Values<'_, K, V>
 where
     V: Soa,
-    for<'a> V::Slices<'a>: Debug,
+    for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
@@ -276,7 +276,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for Values<'_, K, V>
 where
-    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -288,7 +288,7 @@ impl<'a, K, V> Iterator for Values<'a, K, V>
 where
     V: Soa,
 {
-    type Item = V::Refs<'a>;
+    type Item = V::Refs<'a, 'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -457,7 +457,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice(self) -> V::SlicesMut<'a> {
+    pub fn into_slice(self) -> V::SlicesMut<'a, 'a> {
         let Self { inner } = self;
 
         let KeyValueSlicesMut { values, .. } = inner.into_slices();
@@ -465,7 +465,7 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> V::Slices<'_> {
+    pub fn as_slice(&self) -> V::Slices<'_, '_> {
         let Self { inner } = self;
 
         let KeyValueSlices { values, .. } = inner.as_slices();
@@ -476,7 +476,7 @@ where
 impl<K, V> Debug for ValuesMut<'_, K, V>
 where
     V: Soa,
-    for<'a> V::Slices<'a>: Debug,
+    for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slice();
@@ -486,7 +486,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for ValuesMut<'_, K, V>
 where
-    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -498,7 +498,7 @@ impl<'a, K, V> Iterator for ValuesMut<'a, K, V>
 where
     V: Soa,
 {
-    type Item = V::RefsMut<'a>;
+    type Item = V::RefsMut<'a, 'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -674,7 +674,7 @@ where
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> V::Slices<'a> {
+    pub fn as_values_slice(&self) -> V::Slices<'_, 'a> {
         let Self { inner } = self;
 
         let KeyValueSlices { values, .. } = inner.as_slices();
@@ -682,7 +682,7 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&'a [K], V::Slices<'a>) {
+    pub fn as_slices(&self) -> (&'a [K], V::Slices<'_, 'a>) {
         let Self { inner } = self;
 
         let KeyValueSlices { keys, values } = inner.as_slices();
@@ -694,7 +694,7 @@ impl<K, V> Debug for Iter<'_, K, V>
 where
     K: Debug,
     V: Soa,
-    for<'a> V::Slices<'a>: Debug,
+    for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = self.as_slices();
@@ -720,7 +720,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for Iter<'_, K, V>
 where
-    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -732,7 +732,7 @@ impl<'a, K, V> Iterator for Iter<'a, K, V>
 where
     V: Soa,
 {
-    type Item = (&'a K, V::Refs<'a>);
+    type Item = (&'a K, V::Refs<'a, 'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -848,7 +848,7 @@ where
     }
 
     #[inline]
-    pub fn into_values_slice(self) -> V::SlicesMut<'a> {
+    pub fn into_values_slice(self) -> V::SlicesMut<'a, 'a> {
         let Self { inner } = self;
 
         let KeyValueSlicesMut { values, .. } = inner.into_slices();
@@ -856,7 +856,7 @@ where
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> V::Slices<'_> {
+    pub fn as_values_slice(&self) -> V::Slices<'_, '_> {
         let Self { inner } = self;
 
         let KeyValueSlices { values, .. } = inner.as_slices();
@@ -864,7 +864,7 @@ where
     }
 
     #[inline]
-    pub fn into_slices(self) -> (&'a [K], V::SlicesMut<'a>) {
+    pub fn into_slices(self) -> (&'a [K], V::SlicesMut<'a, 'a>) {
         let Self { inner } = self;
 
         let KeyValueSlicesMut { keys, values } = inner.into_slices();
@@ -872,7 +872,7 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[K], V::Slices<'_>) {
+    pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
         let Self { inner } = self;
 
         let KeyValueSlices { keys, values } = inner.as_slices();
@@ -884,7 +884,7 @@ impl<K, V> Debug for IterMut<'_, K, V>
 where
     K: Debug,
     V: Soa,
-    for<'a> V::Slices<'a>: Debug,
+    for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = self.as_slices();
@@ -897,7 +897,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for IterMut<'_, K, V>
 where
-    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -909,7 +909,7 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V>
 where
     V: Soa,
 {
-    type Item = (&'a K, V::RefsMut<'a>);
+    type Item = (&'a K, V::RefsMut<'a, 'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

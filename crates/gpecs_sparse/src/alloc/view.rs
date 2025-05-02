@@ -12,7 +12,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'any> V::Refs<'any>: Ord,
+        for<'c, 'any> V::Refs<'c, 'any>: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
@@ -30,7 +30,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, mut f: F)
     where
-        F: FnMut((K, V::Refs<'_>), (K, V::Refs<'_>)) -> cmp::Ordering,
+        F: FnMut((K, V::Refs<'_, '_>), (K, V::Refs<'_, '_>)) -> cmp::Ordering,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by(|&lhs_key, &rhs_key| {
@@ -52,7 +52,7 @@ where
     #[inline]
     pub fn sort_by_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, V::Refs<'_>)) -> T,
+        F: FnMut((K, V::Refs<'_, '_>)) -> T,
         T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
@@ -68,7 +68,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, V::Refs<'_>)) -> T,
+        F: FnMut((K, V::Refs<'_, '_>)) -> T,
         T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {

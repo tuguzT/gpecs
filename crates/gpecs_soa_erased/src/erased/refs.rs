@@ -25,7 +25,7 @@ impl<'a> ErasedSoaRefs<'a> {
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, refs: T::Refs<'a>) -> Self
+    pub fn from<'context, T>(context: &'context T::Context, refs: T::Refs<'context, 'a>) -> Self
     where
         T: Soa,
     {
@@ -45,7 +45,10 @@ impl<'a> ErasedSoaRefs<'a> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Refs<'a>, IntoValueError<Self>>
+    pub unsafe fn into<T>(
+        self,
+        context: &T::Context,
+    ) -> Result<T::Refs<'_, 'a>, IntoValueError<Self>>
     where
         T: Soa,
     {

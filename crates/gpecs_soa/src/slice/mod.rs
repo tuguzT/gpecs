@@ -17,7 +17,7 @@ mod slices;
 
 pub(crate) trait IndexHelper<'a, T>
 where
-    Self: SoaSliceIndex<T, Refs<'a> = &'a Self::Output>,
+    Self: SoaSliceIndex<T, Refs<'a, 'a> = &'a Self::Output>,
     T: Soa + 'a,
 {
     type Output: ?Sized + 'a;
@@ -27,14 +27,14 @@ impl<'a, T, I, U> IndexHelper<'a, T> for I
 where
     U: ?Sized + 'a,
     T: Soa + 'a,
-    I: SoaSliceIndex<T, Refs<'a> = &'a U>,
+    I: SoaSliceIndex<T, Refs<'a, 'a> = &'a U>,
 {
     type Output = U;
 }
 
 pub(crate) trait IndexHelperMut<'a, T>
 where
-    Self: IndexHelper<'a, T> + SoaSliceIndex<T, RefsMut<'a> = &'a mut Self::Output>,
+    Self: IndexHelper<'a, T> + SoaSliceIndex<T, RefsMut<'a, 'a> = &'a mut Self::Output>,
     T: Soa + 'a,
 {
 }
@@ -43,7 +43,7 @@ impl<'a, T, I, U> IndexHelperMut<'a, T> for I
 where
     U: ?Sized + 'a,
     T: Soa + 'a,
-    I: IndexHelper<'a, T, Output = U> + SoaSliceIndex<T, RefsMut<'a> = &'a mut U>,
+    I: IndexHelper<'a, T, Output = U> + SoaSliceIndex<T, RefsMut<'a, 'a> = &'a mut U>,
 {
 }
 

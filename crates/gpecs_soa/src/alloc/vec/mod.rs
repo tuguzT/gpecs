@@ -3,7 +3,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem::ManuallyDrop,
+    mem::{transmute, ManuallyDrop},
     ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
     ptr,
 };
@@ -36,7 +36,7 @@ pub struct SoaVec<T>
 where
     T: Soa,
 {
-    buffer: RawSoaVec<T>,
+    pub(super) buffer: RawSoaVec<T>,
     len: usize,
 }
 
@@ -147,7 +147,7 @@ where
             let ptrs = ptrs::<T>(context, ptr, old_capacity).unwrap_unchecked();
             T::ptrs_cast_const(context, ptrs)
         };
-        let new_ptrs = self.as_mut_ptrs();
+        let new_ptrs = self.buffer.ptrs();
         let context = self.context();
         unsafe {
             T::ptrs_copy_rev(context, old_ptrs, new_ptrs, self.len());
@@ -257,15 +257,13 @@ where
             return;
         }
 
-        let ptrs = self.as_mut_ptrs();
-        let context = self.context();
-
         let remaining_len = self.len - len;
         unsafe {
-            let ptrs = T::ptrs_add_mut(context, ptrs, len);
-            let slices = T::slices_from_raw_parts_mut(context, ptrs, remaining_len);
-
             self.set_len(len);
+
+            let context = self.context();
+            let ptrs = T::ptrs_add_mut(context, self.buffer.ptrs(), len);
+            let slices = T::slices_from_raw_parts_mut(context, ptrs, remaining_len);
             let context = self.context();
             T::slices_drop_in_place(context, slices);
         }
@@ -282,19 +280,19 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> T::Ptrs {
+    pub fn as_ptrs(&self) -> T::Ptrs<'_> {
         let ptrs = self.buffer.ptrs();
         let context = self.context();
         T::ptrs_cast_const(context, ptrs)
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> T::MutPtrs {
+    pub fn as_mut_ptrs(&mut self) -> T::MutPtrs<'_> {
         self.buffer.ptrs()
     }
 
     #[inline]
-    pub fn as_slices(&self) -> T::Slices<'_> {
+    pub fn as_slices(&self) -> T::Slices<'_, '_> {
         let ptrs = self.as_ptrs();
         let len = self.len();
         let context = self.context();
@@ -304,8 +302,8 @@ where
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_> {
-        let ptrs = self.as_mut_ptrs();
+    pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_, '_> {
+        let ptrs = self.buffer.ptrs();
         let len = self.len();
         let context = self.context();
 
@@ -362,7 +360,7 @@ where
         }
 
         unsafe {
-            let ptrs = self.as_mut_ptrs();
+            let ptrs = self.buffer.ptrs();
             let context = self.context();
             let value = {
                 let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
@@ -405,7 +403,7 @@ where
         }
 
         unsafe {
-            let ptrs = self.as_mut_ptrs();
+            let ptrs = self.buffer.ptrs();
             let context = self.context();
             let ptrs = T::ptrs_add_mut(context, ptrs, index);
 
@@ -434,7 +432,7 @@ where
         }
 
         unsafe {
-            let ptrs = self.as_mut_ptrs();
+            let ptrs = self.buffer.ptrs();
             let context = self.context();
             let ptrs = T::ptrs_add_mut(context, ptrs, index);
 
@@ -453,9 +451,9 @@ where
     }
 
     #[inline]
-    pub fn retain<F>(&mut self, mut f: F)
+    pub fn retain<'me, F>(&'me mut self, mut f: F)
     where
-        F: FnMut(T::Refs<'_>) -> bool,
+        F: FnMut(T::Refs<'me, '_>) -> bool,
     {
         let context = ptr::from_ref(self.context());
         self.retain_mut(|refs| {
@@ -464,9 +462,9 @@ where
         });
     }
 
-    pub fn retain_mut<F>(&mut self, mut f: F)
+    pub fn retain_mut<'me, F>(&'me mut self, mut f: F)
     where
-        F: FnMut(T::RefsMut<'_>) -> bool,
+        F: FnMut(T::RefsMut<'me, '_>) -> bool,
     {
         let original_len = self.len();
         // Avoid double drop if the drop guard is not executed,
@@ -502,7 +500,7 @@ where
                 if self.deleted_cnt > 0 {
                     // SAFETY: Trailing unchecked items must be valid since we never touch them.
                     unsafe {
-                        let ptrs = self.v.as_mut_ptrs();
+                        let ptrs = self.v.buffer.ptrs();
                         let context = self.v.context();
 
                         T::ptrs_copy(
@@ -531,21 +529,22 @@ where
             original_len,
         };
 
-        fn process_loop<F, T, const DELETED: bool>(
+        fn process_loop<'me, F, T, const DELETED: bool>(
             original_len: usize,
             f: &mut F,
             g: &mut BackshiftOnDrop<'_, T>,
         ) where
             T: Soa,
-            F: FnMut(T::RefsMut<'_>) -> bool,
+            F: FnMut(T::RefsMut<'me, '_>) -> bool,
         {
             while g.processed_len != original_len {
-                let ptrs = g.v.as_mut_ptrs();
+                let ptrs = g.v.buffer.ptrs();
                 let context = g.v.context();
                 // SAFETY: Unchecked element must be valid.
                 let cur = unsafe { T::ptrs_add_mut(context, ptrs, g.processed_len) };
-                let res = {
-                    let cur = unsafe { T::ptrs_to_refs_mut(context, cur.clone()) };
+                let res = unsafe {
+                    let cur = T::ptrs_to_refs_mut(context, cur.clone());
+                    let cur = transmute(cur);
                     !f(cur)
                 };
                 if res {
@@ -568,7 +567,7 @@ where
                     // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
                     // We use copy for move, and never touch this element again.
                     unsafe {
-                        let ptrs = g.v.as_mut_ptrs();
+                        let ptrs = g.v.buffer.ptrs();
                         let context = g.v.context();
                         T::ptrs_copy_nonoverlapping(
                             context,
@@ -605,7 +604,7 @@ where
         }
 
         unsafe {
-            let ptrs = self.as_mut_ptrs();
+            let ptrs = self.buffer.ptrs();
             let context = self.context();
             let ptrs = T::ptrs_add_mut(context, ptrs, len);
 
@@ -618,12 +617,11 @@ where
     pub fn extend_from_within<R>(&mut self, src: R)
     where
         R: RangeBounds<usize>,
-        for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T>,
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
     {
         let range = slice_range(src, ..self.len());
         self.reserve(range.len());
 
-        let ptrs = self.as_mut_ptrs();
         let mut set_len_on_drop = SetLenOnDrop {
             local_len: self.len(),
             vec: self,
@@ -632,9 +630,13 @@ where
         let context = set_len_on_drop.vec.context();
         for index in range {
             unsafe {
-                let refs =
-                    T::ptrs_to_refs(context, set_len_on_drop.vec.slices().get_unchecked(index));
-                let dst = T::ptrs_add_mut(context, ptrs.clone(), set_len_on_drop.local_len);
+                let slices = set_len_on_drop.vec.slices();
+                let refs = T::ptrs_to_refs(context, slices.get_unchecked(index));
+                let dst = T::ptrs_add_mut(
+                    context,
+                    set_len_on_drop.vec.buffer.ptrs(),
+                    set_len_on_drop.local_len,
+                );
                 refs.clone_into_ptrs(context, dst);
             }
             set_len_on_drop.local_len += 1;
@@ -670,14 +672,13 @@ where
 
     #[inline]
     pub fn clear(&mut self) {
-        let context = ptr::from_ref(self.context());
-        let slices = self.as_mut_slices();
-        let slices = T::mut_slice_refs_as_slice_ptrs(unsafe { &*context }, slices);
+        let len = self.len();
+        unsafe { self.set_len(0) }
 
-        unsafe {
-            self.set_len(0);
-            T::slices_drop_in_place(&*context, slices);
-        }
+        let context = self.context();
+        let ptrs = self.buffer.ptrs();
+        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        unsafe { T::slices_drop_in_place(&*context, slices) }
     }
 }
 
@@ -718,7 +719,7 @@ where
         }
 
         let src = T::vecs_as_ptrs(context, &vecs);
-        let dst = vec.as_mut_ptrs();
+        let dst = vec.buffer.ptrs();
         let context = vec.context();
         unsafe {
             T::ptrs_copy_nonoverlapping(context, src, dst, len);
@@ -762,11 +763,10 @@ where
     #[track_caller]
     pub fn extend_from_slice<'other>(&mut self, other: &'other SoaSlice<T>)
     where
-        T::Refs<'other>: SoaToOwned<'other, Owned = T>,
+        T::Refs<'other, 'other>: SoaToOwned<'other, 'other, Owned = T>,
     {
         self.reserve(other.len());
 
-        let ptrs = self.as_mut_ptrs();
         let mut set_len_on_drop = SetLenOnDrop {
             local_len: self.len(),
             vec: self,
@@ -775,7 +775,11 @@ where
         let context = set_len_on_drop.vec.context();
         for refs in other.iter() {
             unsafe {
-                let dst = T::ptrs_add_mut(context, ptrs.clone(), set_len_on_drop.local_len);
+                let dst = T::ptrs_add_mut(
+                    context,
+                    set_len_on_drop.vec.buffer.ptrs(),
+                    set_len_on_drop.local_len,
+                );
                 refs.clone_into_ptrs(context, dst);
             }
             set_len_on_drop.local_len += 1;
@@ -786,7 +790,7 @@ where
 impl<T> Debug for SoaVec<T>
 where
     T: Soa,
-    for<'any> T::Slices<'any>: Debug,
+    for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -869,14 +873,14 @@ where
 impl<T> Eq for SoaVec<T>
 where
     T: Soa,
-    for<'any> T::Slices<'any>: Eq,
+    for<'c, 'any> T::Slices<'c, 'any>: Eq,
 {
 }
 
 impl<T> Ord for SoaVec<T>
 where
     T: Soa,
-    for<'any> T::Slices<'any>: Ord,
+    for<'c, 'any> T::Slices<'c, 'any>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         Ord::cmp(&self.as_slices(), &other.as_slices())
@@ -886,7 +890,7 @@ where
 impl<T> Hash for SoaVec<T>
 where
     T: Soa,
-    for<'any> T::Slices<'any>: Hash,
+    for<'c, 'any> T::Slices<'c, 'any>: Hash,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -899,7 +903,7 @@ impl<T> Clone for SoaVec<T>
 where
     T: Soa,
     T::Context: Clone,
-    for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T> + 'any,
+    for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -986,7 +990,7 @@ where
                 self.reserve(lower.saturating_add(1));
             }
 
-            let ptrs = self.as_mut_ptrs();
+            let ptrs = self.buffer.ptrs();
             let context = self.context();
             unsafe {
                 let dst = T::ptrs_add_mut(context, ptrs, len);
@@ -1014,7 +1018,7 @@ impl<'me, T> From<&'me SoaSlice<T>> for SoaVec<T>
 where
     T: SoaTrustedFields,
     T::Context: Clone,
-    T::Refs<'me>: SoaToOwned<'me, Owned = T>,
+    T::Refs<'me, 'me>: SoaToOwned<'me, 'me, Owned = T>,
 {
     #[inline]
     fn from(value: &'me SoaSlice<T>) -> Self {
@@ -1026,7 +1030,7 @@ impl<'me, T> From<&'me mut SoaSlice<T>> for SoaVec<T>
 where
     T: SoaTrustedFields,
     T::Context: Clone,
-    T::Refs<'me>: SoaToOwned<'me, Owned = T>,
+    T::Refs<'me, 'me>: SoaToOwned<'me, 'me, Owned = T>,
 {
     #[inline]
     fn from(value: &'me mut SoaSlice<T>) -> Self {
@@ -1038,7 +1042,7 @@ impl<'a, T> IntoIterator for &'a SoaVec<T>
 where
     T: Soa,
 {
-    type Item = T::Refs<'a>;
+    type Item = T::Refs<'a, 'a>;
     type IntoIter = Iter<'a, T>;
 
     #[inline]
@@ -1051,7 +1055,7 @@ impl<'a, T> IntoIterator for &'a mut SoaVec<T>
 where
     T: Soa,
 {
-    type Item = T::RefsMut<'a>;
+    type Item = T::RefsMut<'a, 'a>;
     type IntoIter = IterMut<'a, T>;
 
     #[inline]
@@ -1097,7 +1101,7 @@ where
                 let mut vector = SoaVec::with_context_and_capacity(context, initial_capacity);
                 unsafe {
                     // SAFETY: We requested capacity at least 1
-                    let dst = vector.as_mut_ptrs();
+                    let dst = vector.buffer.ptrs();
                     let context = vector.context();
                     T::ptrs_write(context, dst, element);
                     vector.set_len(1);
@@ -1119,7 +1123,7 @@ where
             return;
         }
 
-        let ptrs = self.as_mut_ptrs();
+        let ptrs = self.buffer.ptrs();
         let len = self.len();
         let context = self.context();
 

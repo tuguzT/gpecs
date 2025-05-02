@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 
 use crate::{
     component::registry::{ComponentId, ComponentRegistry, DropFn},
-    soa::{traits::FieldDescriptor, Soa},
+    soa::{traits::Soa, FieldDescriptor},
 };
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
@@ -116,12 +116,12 @@ where
 
 #[inline]
 #[allow(unsafe_code)]
-pub unsafe fn from_erased_refs<'a, T>(
+pub unsafe fn from_erased_refs<'context, 'a, T>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedFieldRef<'a>>,
-) -> T::Refs<'a>
+) -> T::Refs<'context, 'a>
 where
     T: Soa,
 {
@@ -131,11 +131,11 @@ where
 }
 
 #[inline]
-pub fn into_erased_refs<'a, T>(
+pub fn into_erased_refs<'context, 'a, T>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    refs: T::Refs<'a>,
+    refs: T::Refs<'context, 'a>,
 ) -> ErasedComponents<ErasedFieldRef<'a>>
 where
     T: Soa,
@@ -148,12 +148,12 @@ where
 
 #[inline]
 #[allow(unsafe_code)]
-pub unsafe fn from_erased_refs_mut<'a, T>(
+pub unsafe fn from_erased_refs_mut<'context, 'a, T>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedFieldRefMut<'a>>,
-) -> T::RefsMut<'a>
+) -> T::RefsMut<'context, 'a>
 where
     T: Soa,
 {
@@ -163,11 +163,11 @@ where
 }
 
 #[inline]
-pub fn into_erased_refs_mut<'a, T>(
+pub fn into_erased_refs_mut<'context, 'a, T>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    refs: T::RefsMut<'a>,
+    refs: T::RefsMut<'context, 'a>,
 ) -> ErasedComponents<ErasedFieldRefMut<'a>>
 where
     T: Soa,
@@ -180,13 +180,13 @@ where
 
 #[inline]
 #[allow(unsafe_code)]
-pub unsafe fn from_erased_slices<'a, T>(
+pub unsafe fn from_erased_slices<'context, 'a, T>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
     fields: ErasedComponents<ErasedFieldSlice<'a>>,
-) -> T::Slices<'a>
+) -> T::Slices<'context, 'a>
 where
     T: Soa,
 {
@@ -196,11 +196,11 @@ where
 }
 
 #[inline]
-pub fn into_erased_slices<'a, T>(
+pub fn into_erased_slices<'context, 'a, T>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    slices: T::Slices<'a>,
+    slices: T::Slices<'context, 'a>,
 ) -> (usize, ErasedComponents<ErasedFieldSlice<'a>>)
 where
     T: Soa,
@@ -215,13 +215,13 @@ where
 
 #[inline]
 #[allow(unsafe_code)]
-pub unsafe fn from_erased_slices_mut<'a, T>(
+pub unsafe fn from_erased_slices_mut<'context, 'a, T>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
     fields: ErasedComponents<ErasedFieldSliceMut<'a>>,
-) -> T::SlicesMut<'a>
+) -> T::SlicesMut<'context, 'a>
 where
     T: Soa,
 {
@@ -232,11 +232,11 @@ where
 }
 
 #[inline]
-pub fn into_erased_slices_mut<'a, T>(
+pub fn into_erased_slices_mut<'context, 'a, T>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    slices: T::SlicesMut<'a>,
+    slices: T::SlicesMut<'context, 'a>,
 ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'a>>)
 where
     T: Soa,

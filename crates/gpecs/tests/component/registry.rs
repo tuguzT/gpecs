@@ -5,7 +5,7 @@ use std::{
 
 use gpecs::{
     component::registry::{ComponentDescriptor, ComponentRegistry},
-    soa::traits::FieldDescriptor,
+    soa::FieldDescriptor,
 };
 
 use crate::common::{Mass, Position};

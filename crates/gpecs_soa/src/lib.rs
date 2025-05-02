@@ -10,7 +10,7 @@ extern crate alloc as core_alloc;
 
 #[cfg(feature = "alloc")]
 pub use self::alloc::vec;
-pub use self::traits::Soa;
+pub use self::{desc::FieldDescriptor, traits::Soa};
 
 pub mod identity;
 pub mod mem;
@@ -21,3 +21,5 @@ pub mod traits;
 
 #[cfg(feature = "alloc")]
 mod alloc;
+mod desc;
+mod wrappers;

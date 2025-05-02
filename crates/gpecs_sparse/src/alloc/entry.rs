@@ -47,7 +47,7 @@ where
     }
 
     #[inline]
-    pub fn get(&self) -> V::Refs<'_> {
+    pub fn get(&self) -> V::Refs<'_, '_> {
         let Self {
             dense_index,
             container,
@@ -59,7 +59,7 @@ where
     }
 
     #[inline]
-    pub fn get_mut(&mut self) -> V::RefsMut<'_> {
+    pub fn get_mut(&mut self) -> V::RefsMut<'_, '_> {
         let Self {
             dense_index,
             container,
@@ -71,7 +71,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut(self) -> V::RefsMut<'a> {
+    pub fn into_mut(self) -> V::RefsMut<'a, 'a> {
         let Self {
             dense_index,
             container,
@@ -143,7 +143,7 @@ where
     K: Key + Debug,
     V: Soa,
     C: EpochSparseContainer<K, V> + ?Sized,
-    for<'a> V::Refs<'a>: Debug,
+    for<'c, 'any> V::Refs<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
@@ -195,7 +195,7 @@ where
     }
 
     #[inline]
-    pub fn insert(self, value: V) -> V::RefsMut<'a> {
+    pub fn insert(self, value: V) -> V::RefsMut<'a, 'a> {
         let Self { key, container, .. } = self;
 
         if let Err(_) = container.try_insert(key, value) {
@@ -369,7 +369,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get(&self) -> Option<V::Refs<'_>> {
+            pub fn get(&self) -> Option<V::Refs<'_, '_>> {
                 match self {
                     Self::Occupied(entry) => Some(entry.get()),
                     Self::Vacant(_) => None,
@@ -377,7 +377,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get_mut(&mut self) -> Option<V::RefsMut<'_>> {
+            pub fn get_mut(&mut self) -> Option<V::RefsMut<'_, '_>> {
                 match self {
                     Self::Occupied(entry) => Some(entry.get_mut()),
                     Self::Vacant(_) => None,
@@ -387,7 +387,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn and_modify<F>(self, f: F) -> Self
             where
-                F: FnOnce(V::RefsMut<'_>),
+                F: FnOnce(V::RefsMut<'_, '_>),
             {
                 match self {
                     Self::Occupied(mut entry) => {
@@ -399,7 +399,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_insert(self, default: V) -> V::RefsMut<'a> {
+            pub fn or_insert(self, default: V) -> V::RefsMut<'a, 'a> {
                 match self {
                     Self::Occupied(entry) => entry.into_mut(),
                     Self::Vacant(entry) => entry.insert(default),
@@ -407,7 +407,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_insert_with<F>(self, default: F) -> V::RefsMut<'a>
+            pub fn or_insert_with<F>(self, default: F) -> V::RefsMut<'a, 'a>
             where
                 F: FnOnce() -> V,
             {
@@ -418,7 +418,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_default(self) -> V::RefsMut<'a>
+            pub fn or_default(self) -> V::RefsMut<'a, 'a>
             where
                 V: Default,
             {
@@ -465,7 +465,7 @@ macro_rules! generate_entry_types {
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: $crate::soa::traits::Soa + core::fmt::Debug,
-            for<'a> V::Refs<'a>: Debug,
+            for<'c, 'any> V::Refs<'c, 'any>: Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
@@ -496,19 +496,19 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get(&self) -> V::Refs<'_> {
+            pub fn get(&self) -> V::Refs<'_, '_> {
                 let Self { inner } = self;
                 inner.get()
             }
 
             #[inline]
-            pub fn get_mut(&mut self) -> V::RefsMut<'_> {
+            pub fn get_mut(&mut self) -> V::RefsMut<'_, '_> {
                 let Self { inner } = self;
                 inner.get_mut()
             }
 
             #[inline]
-            pub fn into_mut(self) -> V::RefsMut<'a> {
+            pub fn into_mut(self) -> V::RefsMut<'a, 'a> {
                 let Self { inner } = self;
                 inner.into_mut()
             }
@@ -555,7 +555,7 @@ macro_rules! generate_entry_types {
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: $crate::soa::traits::Soa + core::fmt::Debug,
-            for<'a> V::Refs<'a>: core::fmt::Debug,
+            for<'c, 'any> V::Refs<'c, 'any>: core::fmt::Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;
@@ -596,7 +596,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn insert(self, value: V) -> V::RefsMut<'a> {
+            pub fn insert(self, value: V) -> V::RefsMut<'a, 'a> {
                 let Self { inner } = self;
                 inner.insert(value)
             }

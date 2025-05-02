@@ -27,4 +27,5 @@ target/
 manifest.json
 *.spv
 
+# cargo flamegraph artifacts
 flamegraph.svg

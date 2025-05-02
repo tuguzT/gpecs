@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use crate::soa::traits::{FieldDescriptor, Soa};
+use crate::soa::{traits::Soa, FieldDescriptor};
 
 #[derive(Debug, Clone)]
 pub struct ErasedSoaContext {

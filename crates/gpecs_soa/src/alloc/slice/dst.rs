@@ -23,7 +23,7 @@ where
     #[inline]
     pub fn to_vec<'me>(&'me self) -> SoaVec<T>
     where
-        T::Refs<'me>: SoaToOwned<'me, Owned = T>,
+        T::Refs<'me, 'me>: SoaToOwned<'me, 'me, Owned = T>,
         T::Context: Clone,
     {
         self.slices().to_vec()
@@ -32,7 +32,7 @@ where
     #[inline]
     pub fn sort_with_permutation(&mut self, permutation: &mut [usize])
     where
-        for<'any> T::Refs<'any>: Ord,
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         self.slices_mut().sort_with_permutation(permutation);
     }
@@ -40,7 +40,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'any> T::Refs<'any>: Ord,
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         self.slices_mut().sort();
     }
@@ -48,7 +48,7 @@ where
     #[inline]
     pub fn sort_with_permutation_by<F>(&mut self, permutation: &mut [usize], compare: F)
     where
-        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
+        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.slices_mut()
             .sort_with_permutation_by(permutation, compare);
@@ -57,7 +57,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
-        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
+        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.slices_mut().sort_by(compare);
     }
@@ -65,7 +65,7 @@ where
     #[inline]
     pub fn sort_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], f: F)
     where
-        F: FnMut(T::Refs<'_>) -> K,
+        F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
         self.slices_mut()
@@ -75,7 +75,7 @@ where
     #[inline]
     pub fn sort_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_>) -> K,
+        F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
         self.slices_mut().sort_by_key(f);
@@ -84,7 +84,7 @@ where
     #[inline]
     pub fn sort_with_permutation_by_cached_key<K, F>(&mut self, permutation: &mut [usize], f: F)
     where
-        F: FnMut(T::Refs<'_>) -> K,
+        F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
         self.slices_mut()
@@ -94,7 +94,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_>) -> K,
+        F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
         self.slices_mut().sort_by_cached_key(f);
@@ -103,7 +103,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'any> T::Refs<'any>: Ord,
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         self.slices_mut().sort_unstable();
     }
@@ -111,7 +111,7 @@ where
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
-        for<'any> F: FnMut(T::Refs<'any>, T::Refs<'any>) -> cmp::Ordering,
+        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.slices_mut().sort_unstable_by(compare);
     }
@@ -119,7 +119,7 @@ where
     #[inline]
     pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_>) -> K,
+        F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
         self.slices_mut().sort_unstable_by_key(f);
@@ -141,7 +141,7 @@ impl<T> ToOwned for SoaSlice<T>
 where
     T: SoaTrustedFields,
     T::Context: Clone,
-    for<'any> T::Refs<'any>: SoaToOwned<'any, Owned = T> + 'any,
+    for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {
     type Owned = SoaVec<T>;
 
@@ -164,7 +164,7 @@ impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
 where
     T: SoaTrustedFields,
 {
-    type Item = T::Refs<'a>;
+    type Item = T::Refs<'a, 'a>;
     type IntoIter = Iter<'a, T>;
 
     #[inline]
@@ -177,7 +177,7 @@ impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
 where
     T: SoaTrustedFields,
 {
-    type Item = T::RefsMut<'a>;
+    type Item = T::RefsMut<'a, 'a>;
     type IntoIter = IterMut<'a, T>;
 
     #[inline]

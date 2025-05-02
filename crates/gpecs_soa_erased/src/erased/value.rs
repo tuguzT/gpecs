@@ -9,7 +9,10 @@ use crate::{
     assert::{check_same_layout, check_same_len},
     error::LenMismatchError,
     field::{ErasedField, ErasedFieldRef, ErasedFieldRefMut},
-    soa::traits::{buffer_layout, FieldDescriptor, Soa},
+    soa::{
+        traits::{buffer_layout, Soa},
+        FieldDescriptor,
+    },
 };
 
 use super::{error::IntoValueError, ErasedSoaRefs, ErasedSoaRefsMut};

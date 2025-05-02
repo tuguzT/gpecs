@@ -11,7 +11,7 @@ macro_rules! __impl_slice_ord {
         impl<T, $($vars)*> PartialOrd<$rhs> for $lhs
         where
             T: SoaTrustedFields,
-            for<'any> T::Slices<'any>: PartialOrd,
+            for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
             $($ty: $bound)?
         {
             #[inline]
@@ -25,7 +25,7 @@ macro_rules! __impl_slice_ord {
 impl<T> PartialOrd<SoaVec<T>> for SoaVec<T>
 where
     T: Soa,
-    for<'any> T::Slices<'any>: PartialOrd,
+    for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
 {
     #[inline]
     fn partial_cmp(&self, other: &SoaVec<T>) -> Option<::core::cmp::Ordering> {

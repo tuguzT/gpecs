@@ -10,7 +10,7 @@ use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
     component::registry::{ComponentDescriptor, ComponentId, ComponentRegistry},
-    soa::traits::FieldDescriptor,
+    soa::FieldDescriptor,
 };
 
 use super::GpuComponent;
@@ -131,7 +131,7 @@ impl From<GpuComponentDescriptor> for ComponentDescriptor {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct GpuComponentRegistry {
     components: EpochSparseSet<u32, ()>,
 }

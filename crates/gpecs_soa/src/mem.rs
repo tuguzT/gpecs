@@ -1,7 +1,11 @@
 use crate::traits::Soa;
 
 /// Version of [`core::mem::replace()`] but for [SoA][`Soa`] references.
-pub fn replace<T>(context: &T::Context, dest: T::RefsMut<'_>, src: T) -> T
+pub fn replace<'context, T>(
+    context: &'context T::Context,
+    dest: T::RefsMut<'context, '_>,
+    src: T,
+) -> T
 where
     T: Soa,
 {
@@ -18,8 +22,11 @@ where
 }
 
 /// Version of [`core::mem::swap()`] but for [SoA][`Soa`] references.
-pub fn swap<T>(context: &T::Context, x: T::RefsMut<'_>, y: T::RefsMut<'_>)
-where
+pub fn swap<'context, T>(
+    context: &'context T::Context,
+    x: T::RefsMut<'context, '_>,
+    y: T::RefsMut<'context, '_>,
+) where
     T: Soa,
 {
     let x = T::mut_refs_as_ptrs(context, x);

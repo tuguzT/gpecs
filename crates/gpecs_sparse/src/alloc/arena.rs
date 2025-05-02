@@ -247,7 +247,7 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> V::Slices<'_> {
+    pub fn as_slices(&self) -> V::Slices<'_, '_> {
         let Self { dense, .. } = self;
 
         let KeyValueSlices { values, .. } = dense.as_slices();
@@ -255,7 +255,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> V::SlicesMut<'_> {
+    pub fn as_mut_slices(&mut self) -> V::SlicesMut<'_, '_> {
         let Self { dense, .. } = self;
 
         let KeyValueSlicesMut { values, .. } = dense.as_mut_slices();
@@ -281,7 +281,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> V::Ptrs {
+    pub fn as_ptrs(&self) -> V::Ptrs<'_> {
         let Self { dense, .. } = self;
 
         let KeyValuePtrs { value, .. } = dense.as_ptrs();
@@ -289,7 +289,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> V::MutPtrs {
+    pub fn as_mut_ptrs(&mut self) -> V::MutPtrs<'_> {
         let Self { dense, .. } = self;
 
         let KeyValueMutPtrs { value, .. } = dense.as_mut_ptrs();
@@ -388,7 +388,7 @@ where
         dense: SoaVec<KeyValuePair<K, V>>,
         mut sparse: Vec<SparseItem<K>>,
     ) -> Result<Self, FromPartsError<K>> {
-        let _view = EpochSparseView::new(dense.slices(), sparse.as_slice())?;
+        let _ = EpochSparseView::new(dense.slices(), sparse.as_slice())?;
 
         sparse.clear();
         let mut sparse_vacant_head = 0;
@@ -749,7 +749,7 @@ where
 
     pub fn retain<F>(&mut self, mut f: F)
     where
-        F: FnMut(K, V::RefsMut<'_>) -> bool,
+        F: FnMut(K, V::RefsMut<'_, '_>) -> bool,
     {
         let old_len = self.len();
         let Self {
@@ -786,7 +786,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'any> V::Refs<'any>: Ord,
+        for<'c, 'any> V::Refs<'c, 'any>: Ord,
     {
         let mut view_mut = self.as_mut_view();
         view_mut.sort()
@@ -801,7 +801,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, f: F)
     where
-        F: FnMut((K, V::Refs<'_>), (K, V::Refs<'_>)) -> cmp::Ordering,
+        F: FnMut((K, V::Refs<'_, '_>), (K, V::Refs<'_, '_>)) -> cmp::Ordering,
     {
         let mut view_mut = self.as_mut_view();
         view_mut.sort_by(f)
@@ -810,7 +810,7 @@ where
     #[inline]
     pub fn sort_by_key<T, F>(&mut self, f: F)
     where
-        F: FnMut((K, V::Refs<'_>)) -> T,
+        F: FnMut((K, V::Refs<'_, '_>)) -> T,
         T: Ord,
     {
         let mut view_mut = self.as_mut_view();
@@ -820,7 +820,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<T, F>(&mut self, f: F)
     where
-        F: FnMut((K, V::Refs<'_>)) -> T,
+        F: FnMut((K, V::Refs<'_, '_>)) -> T,
         T: Ord,
     {
         let mut view_mut = self.as_mut_view();
@@ -830,7 +830,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'any> V::Refs<'any>: Ord,
+        for<'c, 'any> V::Refs<'c, 'any>: Ord,
     {
         let mut view_mut = self.as_mut_view();
         view_mut.sort_unstable()
@@ -845,7 +845,7 @@ where
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, f: F)
     where
-        F: FnMut((K, V::Refs<'_>), (K, V::Refs<'_>)) -> cmp::Ordering,
+        F: FnMut((K, V::Refs<'_, '_>), (K, V::Refs<'_, '_>)) -> cmp::Ordering,
     {
         let mut view_mut = self.as_mut_view();
         view_mut.sort_unstable_by(f)
@@ -854,7 +854,7 @@ where
     #[inline]
     pub fn sort_unstable_by_key<T, F>(&mut self, f: F)
     where
-        F: FnMut((K, V::Refs<'_>)) -> T,
+        F: FnMut((K, V::Refs<'_, '_>)) -> T,
         T: Ord,
     {
         let mut view_mut = self.as_mut_view();
@@ -862,19 +862,19 @@ where
     }
 
     #[inline]
-    pub fn get(&self, key: K) -> Option<V::Refs<'_>> {
+    pub fn get(&self, key: K) -> Option<V::Refs<'_, '_>> {
         let view = self.as_view();
         view.into_get(key)
     }
 
     #[inline]
-    pub fn get_mut(&mut self, key: K) -> Option<V::RefsMut<'_>> {
+    pub fn get_mut(&mut self, key: K) -> Option<V::RefsMut<'_, '_>> {
         let view_mut = self.as_mut_view();
         view_mut.into_get_mut(key)
     }
 
     #[inline]
-    pub fn index(&self, key: K) -> V::Refs<'_>
+    pub fn index(&self, key: K) -> V::Refs<'_, '_>
     where
         K: Debug,
     {
@@ -883,7 +883,7 @@ where
     }
 
     #[inline]
-    pub fn index_mut(&mut self, key: K) -> V::RefsMut<'_>
+    pub fn index_mut(&mut self, key: K) -> V::RefsMut<'_, '_>
     where
         K: Debug,
     {
@@ -892,7 +892,7 @@ where
     }
 
     #[inline]
-    pub fn get_with_key(&self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'_>)> {
+    pub fn get_with_key(&self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'_, '_>)> {
         let view = self.as_view();
         view.into_get_with_key(sparse_index)
     }
@@ -901,7 +901,7 @@ where
     pub fn get_mut_with_key(
         &mut self,
         sparse_index: K::SparseIndex,
-    ) -> Option<(K, V::RefsMut<'_>)> {
+    ) -> Option<(K, V::RefsMut<'_, '_>)> {
         let view_mut = self.as_mut_view();
         view_mut.into_get_mut_with_key(sparse_index)
     }
@@ -1224,7 +1224,7 @@ where
 impl<T, K, V> Index<K> for EpochSparseArena<K, V>
 where
     K: Key + Debug,
-    for<'a> V: Soa<Refs<'a> = &'a T> + 'a,
+    for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T> + 'any,
 {
     type Output = T;
 
@@ -1237,7 +1237,7 @@ where
 impl<T, K, V> IndexMut<K> for EpochSparseArena<K, V>
 where
     K: Key + Debug,
-    for<'a> V: Soa<Refs<'a> = &'a T, RefsMut<'a> = &'a mut T> + 'a,
+    for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T, RefsMut<'c, 'any> = &'any mut T> + 'any,
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
@@ -1248,7 +1248,7 @@ where
 impl<T, K, V> AsRef<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
-    for<'a> V: Soa<Slices<'a> = &'a [T]> + 'a,
+    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -1259,7 +1259,7 @@ where
 impl<T, K, V> AsMut<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
-    for<'a> V: Soa<SlicesMut<'a> = &'a mut [T]> + 'a,
+    for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
@@ -1294,7 +1294,7 @@ where
     K: Key,
     V: Soa,
 {
-    type Item = (&'a K, V::Refs<'a>);
+    type Item = (&'a K, V::Refs<'a, 'a>);
 
     type IntoIter = Iter<'a, K, V>;
 
@@ -1309,7 +1309,7 @@ where
     K: Key,
     V: Soa,
 {
-    type Item = (&'a K, V::RefsMut<'a>);
+    type Item = (&'a K, V::RefsMut<'a, 'a>);
 
     type IntoIter = IterMut<'a, K, V>;
 

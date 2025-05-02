@@ -55,7 +55,7 @@ impl<'a> ErasedSoaSlices<'a> {
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, slices: T::Slices<'a>) -> Self
+    pub fn from<'context, T>(context: &'context T::Context, slices: T::Slices<'context, 'a>) -> Self
     where
         T: Soa,
     {
@@ -74,7 +74,10 @@ impl<'a> ErasedSoaSlices<'a> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Slices<'a>, IntoValueError<Self>>
+    pub unsafe fn into<T>(
+        self,
+        context: &T::Context,
+    ) -> Result<T::Slices<'_, 'a>, IntoValueError<Self>>
     where
         T: Soa,
     {

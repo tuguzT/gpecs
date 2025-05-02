@@ -1,6 +1,6 @@
 use core::{ptr, slice};
 
-use crate::soa::traits::FieldDescriptor;
+use crate::soa::FieldDescriptor;
 
 use super::{
     super::assert::{check_same_layout, check_same_len},

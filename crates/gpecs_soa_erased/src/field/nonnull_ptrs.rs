@@ -1,6 +1,6 @@
 use core::ptr::{self, NonNull};
 
-use crate::soa::traits::FieldDescriptor;
+use crate::soa::FieldDescriptor;
 
 use super::{
     super::assert::check_same_len,

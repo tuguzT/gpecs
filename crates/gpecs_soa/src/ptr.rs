@@ -423,7 +423,7 @@ pub(crate) unsafe fn ptrs<T>(
     context: &T::Context,
     ptr: *mut BufferData<T>,
     capacity: usize,
-) -> Result<T::MutPtrs, LayoutError>
+) -> Result<T::MutPtrs<'_>, LayoutError>
 where
     T: Soa,
 {

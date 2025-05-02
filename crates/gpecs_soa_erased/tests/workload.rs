@@ -2,7 +2,7 @@ use std::iter;
 
 use gpecs_soa_erased::{
     erased::{ErasedSoa, ErasedSoaContext},
-    soa::{vec::SoaVec, FieldDescriptor},
+    soa::{traits::FieldDescriptor, vec::SoaVec},
 };
 
 #[test]

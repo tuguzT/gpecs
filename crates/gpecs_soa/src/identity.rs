@@ -11,12 +11,9 @@ use core_alloc::vec::Vec;
 
 #[cfg(feature = "alloc")]
 use crate::traits::SoaVecs;
-use crate::{
-    desc::FieldDescriptor,
-    traits::{
-        impls::{collect_array, debug_assert_ptr_is_aligned},
-        DefaultContext, Soa, SoaToOwned, SoaTrustedFields,
-    },
+use crate::traits::{
+    impls::{collect_array, debug_assert_ptr_is_aligned},
+    DefaultContext, FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]

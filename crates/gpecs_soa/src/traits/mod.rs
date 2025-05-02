@@ -3,10 +3,12 @@ use core::{
     borrow::Borrow,
 };
 
-use crate::desc::FieldDescriptor;
+pub use self::desc::FieldDescriptor;
 
 #[doc(hidden)]
 pub mod impls;
+
+mod desc;
 
 pub type DefaultContext = ();
 

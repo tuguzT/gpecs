@@ -16,10 +16,7 @@ use crate::{
         field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
         ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldVec,
     },
-    soa::{
-        traits::{buffer_layout, Soa},
-        FieldDescriptor,
-    },
+    soa::traits::{buffer_layout, FieldDescriptor, Soa},
 };
 
 use super::{

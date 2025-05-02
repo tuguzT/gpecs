@@ -3,7 +3,7 @@ use std::{ptr, slice};
 use gpecs_soa_erased::{
     erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaSlices},
     field::{ErasedField, ErasedFieldRef, ErasedFieldSlice},
-    soa::FieldDescriptor,
+    soa::traits::FieldDescriptor,
 };
 
 #[test]

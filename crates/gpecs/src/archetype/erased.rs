@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 
 use crate::{
     component::registry::{ComponentId, ComponentRegistry, DropFn},
-    soa::{traits::Soa, FieldDescriptor},
+    soa::traits::{FieldDescriptor, Soa},
 };
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;

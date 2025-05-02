@@ -1,4 +1,4 @@
-use gpecs_soa_erased::{erased::ErasedSoaContext, soa::FieldDescriptor};
+use gpecs_soa_erased::{erased::ErasedSoaContext, soa::traits::FieldDescriptor};
 
 #[test]
 #[cfg_attr(miri, ignore)]

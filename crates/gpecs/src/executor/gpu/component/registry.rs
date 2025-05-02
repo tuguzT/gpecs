@@ -10,7 +10,7 @@ use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
     component::registry::{ComponentDescriptor, ComponentId, ComponentRegistry},
-    soa::FieldDescriptor,
+    soa::traits::FieldDescriptor,
 };
 
 use super::GpuComponent;

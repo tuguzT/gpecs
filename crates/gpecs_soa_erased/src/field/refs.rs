@@ -4,7 +4,7 @@ use core::{
     ptr, slice,
 };
 
-use crate::soa::FieldDescriptor;
+use crate::soa::traits::FieldDescriptor;
 
 use super::{
     super::assert::check_same_len,

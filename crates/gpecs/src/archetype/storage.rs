@@ -26,10 +26,7 @@ use crate::{
         utils::{try_collect_component_ids, try_collect_maybe_component_ids},
     },
     entity::Entity,
-    soa::{
-        traits::{DefaultContext, Soa},
-        FieldDescriptor,
-    },
+    soa::traits::{DefaultContext, FieldDescriptor, Soa},
 };
 
 use super::{

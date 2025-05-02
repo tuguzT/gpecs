@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     aligned_bytes::AlignedBytes, assert::check_same_len, error::LenMismatchError,
-    soa::FieldDescriptor,
+    soa::traits::FieldDescriptor,
 };
 
 use super::{

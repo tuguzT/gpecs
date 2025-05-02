@@ -14,10 +14,7 @@ use core_alloc::vec::Vec;
 
 #[cfg(feature = "alloc")]
 use crate::soa::traits::SoaVecs;
-use crate::soa::{
-    traits::{Soa, SoaToOwned, SoaTrustedFields},
-    FieldDescriptor,
-};
+use crate::soa::traits::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct KeyValuePair<K, V> {

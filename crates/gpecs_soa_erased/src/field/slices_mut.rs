@@ -6,7 +6,7 @@ use core::{
     slice,
 };
 
-use crate::soa::FieldDescriptor;
+use crate::soa::traits::FieldDescriptor;
 
 use super::{
     assert::{check_buffer_align, check_layout, check_slice_buffer_len},

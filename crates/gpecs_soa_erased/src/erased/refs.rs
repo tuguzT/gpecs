@@ -12,20 +12,25 @@ use super::error::IntoValueError;
 #[derive(Debug, Clone)]
 pub struct ErasedSoaRefs<'a> {
     refs: Box<[ErasedFieldRef<'a>]>,
+    capacity: usize,
 }
 
 impl<'a> ErasedSoaRefs<'a> {
     #[inline]
-    pub fn new<I>(refs: I) -> Self
+    pub fn new<I>(capacity: usize, refs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldRef<'a>>,
     {
         let refs = refs.into_iter().collect();
-        Self { refs }
+        Self { refs, capacity }
     }
 
     #[inline]
-    pub fn from<'context, T>(context: &'context T::Context, refs: T::Refs<'context, 'a>) -> Self
+    pub fn from<'context, T>(
+        context: &'context T::Context,
+        capacity: usize,
+        refs: T::Refs<'context, 'a>,
+    ) -> Self
     where
         T: Soa,
     {
@@ -40,7 +45,7 @@ impl<'a> ErasedSoaRefs<'a> {
                 let buffer = unsafe { slice::from_raw_parts(ptr, len) };
                 unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
             });
-        Self::new(refs)
+        Self::new(capacity, refs)
     }
 
     #[inline]
@@ -68,15 +73,21 @@ impl<'a> ErasedSoaRefs<'a> {
             return Err(IntoValueError::new(self, error));
         }
 
-        let Self { refs, .. } = self;
+        let Self { capacity, refs } = self;
         let ptrs = refs
             .into_vec()
             .into_iter()
             .map(|r#ref| r#ref.into_buffer().as_ptr());
 
-        let ptrs = T::ptrs_restore(context, ptrs);
+        let ptrs = T::ptrs_restore(context, capacity, ptrs);
         let refs = unsafe { T::ptrs_to_refs(context, ptrs) };
         Ok(refs)
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
     }
 
     #[inline]

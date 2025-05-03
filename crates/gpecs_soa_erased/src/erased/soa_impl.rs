@@ -84,6 +84,7 @@ unsafe impl Soa for ErasedSoa {
 
     fn ptrs_restore(
         context: &Self::Context,
+        capacity: usize,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs<'_> {
         let descriptors = context.field_descriptors();
@@ -98,11 +99,12 @@ unsafe impl Soa for ErasedSoa {
             .collect();
         assert_eq!(descriptors.len(), ptrs.len());
 
-        ErasedSoaPtrs::new(ptrs)
+        ErasedSoaPtrs::new(capacity, ptrs)
     }
 
     fn ptrs_restore_mut(
         context: &Self::Context,
+        capacity: usize,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs<'_> {
         let descriptors = context.field_descriptors();
@@ -117,16 +119,16 @@ unsafe impl Soa for ErasedSoa {
             .collect();
         assert_eq!(descriptors.len(), ptrs.len());
 
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
-    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling(context: &Self::Context, capacity: usize) -> Self::MutPtrs<'_> {
         let ptrs = context
             .field_descriptors()
             .iter()
             .copied()
             .map(ErasedFieldMutPtr::dangling);
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
     fn ptrs_cast_const<'context>(
@@ -136,6 +138,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -144,7 +147,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| ptr.cast_const());
-        ErasedSoaPtrs::new(ptrs)
+        ErasedSoaPtrs::new(capacity, ptrs)
     }
 
     fn ptrs_cast_mut<'context>(
@@ -154,6 +157,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -162,7 +166,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| ptr.cast_mut());
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
     unsafe fn ptrs_add<'context>(
@@ -173,6 +177,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -181,7 +186,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| unsafe { ptr.add(offset) });
-        ErasedSoaPtrs::new(ptrs)
+        ErasedSoaPtrs::new(capacity, ptrs)
     }
 
     unsafe fn ptrs_add_mut<'context>(
@@ -192,6 +197,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -200,7 +206,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| unsafe { ptr.add(offset) });
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
     unsafe fn ptrs_offset_from(
@@ -422,6 +428,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -434,7 +441,7 @@ unsafe impl Soa for ErasedSoa {
                 let buffer = unsafe { NonNull::new_unchecked(ptr.buffer()) };
                 ErasedFieldNonNullPtr::new(desc, buffer).expect("buffer should be aligned")
             });
-        ErasedSoaNonNullPtrs::new(ptrs)
+        ErasedSoaNonNullPtrs::new(capacity, ptrs)
     }
 
     fn nonnull_to_ptrs<'context>(
@@ -444,6 +451,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let ptrs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -456,7 +464,7 @@ unsafe impl Soa for ErasedSoa {
                 let buffer = ptr.buffer().as_ptr();
                 ErasedFieldMutPtr::new(desc, buffer).expect("buffer should be aligned")
             });
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
     type Refs<'context, 'a>
@@ -476,6 +484,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let refs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -484,7 +493,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| unsafe { ptr.deref() });
-        ErasedSoaRefs::new(refs)
+        ErasedSoaRefs::new(capacity, refs)
     }
 
     unsafe fn ptrs_to_refs_mut<'context, 'a>(
@@ -494,6 +503,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let refs = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -502,7 +512,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, ptr)| unsafe { ptr.deref_mut() });
-        ErasedSoaRefsMut::new(refs)
+        ErasedSoaRefsMut::new(capacity, refs)
     }
 
     fn refs_as_ptrs<'context>(
@@ -512,6 +522,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), refs.field_refs().len());
 
+        let capacity = refs.capacity();
         let ptrs = descriptors
             .iter()
             .zip(refs.into_field_refs())
@@ -520,7 +531,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, r#ref)| r#ref.as_field_ptr());
-        ErasedSoaPtrs::new(ptrs)
+        ErasedSoaPtrs::new(capacity, ptrs)
     }
 
     fn refs_mut_as_ptrs<'context>(
@@ -530,6 +541,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), refs.field_refs().len());
 
+        let capacity = refs.capacity();
         let ptrs = descriptors
             .iter()
             .zip(refs.into_field_refs())
@@ -538,7 +550,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, mut r#ref)| r#ref.as_field_mut_ptr());
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
     fn refs_mut_as_refs<'context, 'a>(
@@ -548,6 +560,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), refs.field_refs().len());
 
+        let capacity = refs.capacity();
         let refs = descriptors
             .iter()
             .zip(refs.into_field_refs())
@@ -556,7 +569,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, r#ref)| From::from(r#ref));
-        ErasedSoaRefs::new(refs)
+        ErasedSoaRefs::new(capacity, refs)
     }
 
     type SlicePtrs<'context> = ErasedSoaSlicePtrs;
@@ -570,6 +583,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let slices = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -578,7 +592,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, data)| field_slice_from_raw_parts(data, len));
-        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, capacity, slices) }
     }
 
     fn slices_from_raw_parts_mut<'context>(
@@ -589,6 +603,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), ptrs.field_ptrs().len());
 
+        let capacity = ptrs.capacity();
         let slices = descriptors
             .iter()
             .zip(ptrs.into_field_ptrs())
@@ -597,7 +612,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, data)| field_slice_from_raw_parts_mut(data, len));
-        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, capacity, slices) }
     }
 
     fn slice_ptrs_cast_const<'context>(
@@ -608,6 +623,7 @@ unsafe impl Soa for ErasedSoa {
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         let len = slices.len();
+        let capacity = slices.capacity();
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -616,7 +632,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.cast_const());
-        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, capacity, slices) }
     }
 
     fn slice_ptrs_cast_mut<'context>(
@@ -627,6 +643,7 @@ unsafe impl Soa for ErasedSoa {
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         let len = slices.len();
+        let capacity = slices.capacity();
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -635,7 +652,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.cast_mut());
-        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, capacity, slices) }
     }
 
     fn slice_ptrs_len(context: &Self::Context, slices: &Self::SlicePtrs<'_>) -> usize {
@@ -659,6 +676,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
+        let capacity = slices.capacity();
         let ptrs = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -667,7 +685,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.as_field_ptr());
-        ErasedSoaPtrs::new(ptrs)
+        ErasedSoaPtrs::new(capacity, ptrs)
     }
 
     fn slice_mut_ptrs_as_ptrs<'context>(
@@ -677,6 +695,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
+        let capacity = slices.capacity();
         let ptrs = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -685,7 +704,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.as_field_ptr());
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
     type Slices<'context, 'a>
@@ -706,6 +725,7 @@ unsafe impl Soa for ErasedSoa {
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         let len = slices.len();
+        let capacity = slices.capacity();
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -714,7 +734,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| unsafe { slice.deref() });
-        unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSlices::new_unchecked(len, capacity, slices) }
     }
 
     unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
@@ -725,6 +745,7 @@ unsafe impl Soa for ErasedSoa {
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         let len = slices.len();
+        let capacity = slices.capacity();
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -733,7 +754,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| unsafe { slice.deref_mut() });
-        unsafe { ErasedSoaSlicesMut::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSlicesMut::new_unchecked(len, capacity, slices) }
     }
 
     fn slices_len(context: &Self::Context, slices: &Self::Slices<'_, '_>) -> usize {
@@ -758,6 +779,7 @@ unsafe impl Soa for ErasedSoa {
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         let len = slices.len();
+        let capacity = slices.capacity();
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -766,7 +788,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.as_field_slice_ptr());
-        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSlicePtrs::new_unchecked(len, capacity, slices) }
     }
 
     fn slices_mut_as_slice_ptrs<'context>(
@@ -777,6 +799,7 @@ unsafe impl Soa for ErasedSoa {
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         let len = slices.len();
+        let capacity = slices.capacity();
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -785,7 +808,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, mut slice)| slice.as_field_slice_mut_ptr());
-        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, capacity, slices) }
     }
 
     fn slices_mut_as_slices<'context, 'a>(
@@ -796,6 +819,7 @@ unsafe impl Soa for ErasedSoa {
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         let len = slices.len();
+        let capacity = slices.capacity();
         let slices = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -804,7 +828,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| From::from(slice));
-        unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
+        unsafe { ErasedSoaSlices::new_unchecked(len, capacity, slices) }
     }
 
     fn slices_as_ptrs<'context>(
@@ -814,6 +838,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
+        let capacity = slices.capacity();
         let ptrs = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -822,7 +847,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, slice)| slice.as_field_ptr());
-        ErasedSoaPtrs::new(ptrs)
+        ErasedSoaPtrs::new(capacity, ptrs)
     }
 
     fn slices_mut_as_ptrs<'context>(
@@ -832,6 +857,7 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
+        let capacity = slices.capacity();
         let ptrs = descriptors
             .iter()
             .zip(slices.into_field_slices())
@@ -840,7 +866,7 @@ unsafe impl Soa for ErasedSoa {
                     .expect("layouts should match")
             })
             .map(|(_, mut slice)| slice.as_field_mut_ptr());
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
     unsafe fn slices_drop_in_place(_: &Self::Context, _: Self::SliceMutPtrs<'_>) {
@@ -863,7 +889,11 @@ unsafe impl SoaVecs for ErasedSoa {
                 ErasedFieldVec { buffer, desc }
             })
             .collect();
-        ErasedSoaVecs { len: 0, vecs }
+        ErasedSoaVecs {
+            len: 0,
+            capacity,
+            vecs,
+        }
     }
 
     fn vecs_as_ptrs<'context>(
@@ -871,6 +901,7 @@ unsafe impl SoaVecs for ErasedSoa {
         vecs: &Self::Vecs,
     ) -> Self::Ptrs<'context> {
         let descriptors = context.field_descriptors();
+        let capacity = Self::vecs_capacity(context, vecs);
         let ErasedSoaVecs { vecs, .. } = vecs;
         assert_eq!(descriptors.len(), vecs.len());
 
@@ -888,7 +919,7 @@ unsafe impl SoaVecs for ErasedSoa {
                 let buffer = ptr::slice_from_raw_parts(data, len);
                 ErasedFieldPtr::new(*desc, buffer).expect("buffer should be aligned")
             });
-        ErasedSoaPtrs::new(ptrs)
+        ErasedSoaPtrs::new(capacity, ptrs)
     }
 
     fn vecs_as_ptrs_mut<'context>(
@@ -896,6 +927,7 @@ unsafe impl SoaVecs for ErasedSoa {
         vecs: &mut Self::Vecs,
     ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
+        let capacity = Self::vecs_capacity(context, vecs);
         let ErasedSoaVecs { vecs, .. } = vecs;
         assert_eq!(descriptors.len(), vecs.len());
 
@@ -913,7 +945,7 @@ unsafe impl SoaVecs for ErasedSoa {
                 let buffer = ptr::slice_from_raw_parts_mut(data, len);
                 ErasedFieldMutPtr::new(*desc, buffer).expect("buffer should be aligned")
             });
-        ErasedSoaMutPtrs::new(ptrs)
+        ErasedSoaMutPtrs::new(capacity, ptrs)
     }
 
     fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
@@ -922,6 +954,16 @@ unsafe impl SoaVecs for ErasedSoa {
         assert_eq!(descriptors.len(), vecs.len());
 
         len
+    }
+
+    fn vecs_capacity(context: &Self::Context, vecs: &Self::Vecs) -> usize {
+        let descriptors = context.field_descriptors();
+        let ErasedSoaVecs {
+            ref vecs, capacity, ..
+        } = *vecs;
+        assert_eq!(descriptors.len(), vecs.len());
+
+        capacity
     }
 
     unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {

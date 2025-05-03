@@ -428,7 +428,7 @@ where
     T: Soa,
 {
     if is_zst::<T>() || capacity == 0 {
-        return Ok(T::ptrs_dangling(context));
+        return Ok(T::ptrs_dangling(context, capacity));
     }
 
     let (layout, offsets) = T::buffer_layout(context, capacity)?;
@@ -440,7 +440,7 @@ where
     let ptrs = offsets
         .into_iter()
         .map(|offset| unsafe { ptr.add(offset + offset_from_prefix) });
-    let ptrs = T::ptrs_restore_mut(context, ptrs);
+    let ptrs = T::ptrs_restore_mut(context, capacity, ptrs);
     Ok(ptrs)
 }
 

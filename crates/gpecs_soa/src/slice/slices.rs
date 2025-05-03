@@ -282,7 +282,7 @@ where
     T: Soa,
 {
     fn from(context: &'c T::Context) -> Self {
-        let ptrs = T::ptrs_dangling(context);
+        let ptrs = T::ptrs_dangling(context, 0);
         let ptrs = T::ptrs_cast_const(context, ptrs);
         unsafe { Self::from_parts(context, ptrs, 0) }
     }
@@ -1094,7 +1094,7 @@ where
     T: Soa,
 {
     fn from(context: &'c T::Context) -> Self {
-        let ptrs = T::ptrs_dangling(context);
+        let ptrs = T::ptrs_dangling(context, 0);
         unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }

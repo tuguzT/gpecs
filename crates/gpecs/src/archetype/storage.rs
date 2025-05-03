@@ -379,15 +379,16 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
+        let capacity = erased_storage.capacity();
         let (entities, fields) =
             ErasedStorageExt::components(erased_storage, components, component_ids);
-        let bundle_component_ids = B::get_components(components)
+        let component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let components = unsafe {
             const CONTEXT: DefaultContext = ();
             let len = entities.len();
-            from_erased_slices::<B>(components, &CONTEXT, bundle_component_ids, len, fields)
+            from_erased_slices::<B>(components, &CONTEXT, component_ids, len, capacity, fields)
         };
         Ok((entities, components))
     }
@@ -408,15 +409,16 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
+        let capacity = erased_storage.capacity();
         let (entities, fields) =
             ErasedStorageExt::components_mut(erased_storage, components, component_ids);
-        let bundle_component_ids = B::get_components(components)
+        let component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let components = unsafe {
             const CONTEXT: DefaultContext = ();
             let len = entities.len();
-            from_erased_slices_mut::<B>(components, &CONTEXT, bundle_component_ids, len, fields)
+            from_erased_slices_mut::<B>(components, &CONTEXT, component_ids, len, capacity, fields)
         };
         Ok((entities, components))
     }
@@ -438,16 +440,17 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
+        let capacity = erased_storage.capacity();
         let Some(fields) = ErasedStorageExt::get(erased_storage, components, component_ids, entity)
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::get_components(components)
+        let component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let refs = unsafe {
             const CONTEXT: DefaultContext = ();
-            from_erased_refs::<B>(components, &CONTEXT, bundle_component_ids, fields)
+            from_erased_refs::<B>(components, &CONTEXT, component_ids, capacity, fields)
         };
         Ok(Some(refs))
     }
@@ -469,17 +472,18 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
+        let capacity = erased_storage.capacity();
         let Some(fields) =
             ErasedStorageExt::get_mut(erased_storage, components, component_ids, entity)
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::get_components(components)
+        let component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let refs = unsafe {
             const CONTEXT: DefaultContext = ();
-            from_erased_refs_mut::<B>(components, &CONTEXT, bundle_component_ids, fields)
+            from_erased_refs_mut::<B>(components, &CONTEXT, component_ids, capacity, fields)
         };
         Ok(Some(refs))
     }
@@ -815,13 +819,14 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_>>) {
+        let capacity = self.capacity();
         let (dense, _) = ErasedStorage::as_view(self).into_parts();
         let (context, KeyValueSlices { keys, values }) = dense.into_slices_with_context();
 
         let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
         let (len, fields) =
-            into_erased_slices::<ErasedSoa>(components, context, component_ids, values);
+            into_erased_slices::<ErasedSoa>(components, context, component_ids, capacity, values);
         if entities.len() != len {
             unreachable!("count of entities should match count of components")
         }
@@ -835,13 +840,19 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_>>) {
+        let capacity = self.capacity();
         let (dense, _) = ErasedStorage::as_mut_view(self).into_parts();
         let (context, KeyValueSlicesMut { keys, values }) = dense.into_slices_with_context();
 
         let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
-        let (len, fields) =
-            into_erased_slices_mut::<ErasedSoa>(components, context, component_ids, values);
+        let (len, fields) = into_erased_slices_mut::<ErasedSoa>(
+            components,
+            context,
+            component_ids,
+            capacity,
+            values,
+        );
         if entities.len() != len {
             unreachable!("count of entities should match count of components")
         }
@@ -891,11 +902,13 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
+        let capacity = self.capacity();
         let view = ErasedStorage::as_view(self);
         let (context, refs) = view.into_get_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
-        let refs = into_erased_refs::<ErasedSoa>(components, context, component_ids, refs?);
+        let refs =
+            into_erased_refs::<ErasedSoa>(components, context, component_ids, capacity, refs?);
         Some(refs)
     }
 
@@ -906,11 +919,13 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {
+        let capacity = self.capacity();
         let view = ErasedStorage::as_mut_view(self);
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
-        let refs = into_erased_refs_mut::<ErasedSoa>(components, context, component_ids, refs?);
+        let refs =
+            into_erased_refs_mut::<ErasedSoa>(components, context, component_ids, capacity, refs?);
         Some(refs)
     }
 }

@@ -12,20 +12,25 @@ use super::error::IntoValueError;
 #[derive(Debug, Clone)]
 pub struct ErasedSoaNonNullPtrs {
     ptrs: Box<[ErasedFieldNonNullPtr]>,
+    capacity: usize,
 }
 
 impl ErasedSoaNonNullPtrs {
     #[inline]
-    pub fn new<I>(ptrs: I) -> Self
+    pub fn new<I>(capacity: usize, ptrs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldNonNullPtr>,
     {
         let ptrs = ptrs.into_iter().collect();
-        Self { ptrs }
+        Self { ptrs, capacity }
     }
 
     #[inline]
-    pub fn from<'context, T>(context: &'context T::Context, ptrs: T::NonNullPtrs<'context>) -> Self
+    pub fn from<'context, T>(
+        context: &'context T::Context,
+        capacity: usize,
+        ptrs: T::NonNullPtrs<'context>,
+    ) -> Self
     where
         T: Soa,
     {
@@ -41,7 +46,7 @@ impl ErasedSoaNonNullPtrs {
                 let buffer = unsafe { NonNull::new_unchecked(ptr) };
                 unsafe { ErasedFieldNonNullPtr::new_unchecked(desc, buffer) }
             });
-        Self::new(ptrs)
+        Self::new(capacity, ptrs)
     }
 
     #[inline]
@@ -69,15 +74,21 @@ impl ErasedSoaNonNullPtrs {
             return Err(IntoValueError::new(self, error));
         }
 
-        let Self { ptrs, .. } = self;
+        let Self { capacity, ptrs } = self;
         let ptrs = ptrs
             .into_vec()
             .into_iter()
             .map(|slice| slice.as_ptr().as_ptr());
 
-        let ptrs = T::ptrs_restore_mut(context, ptrs);
+        let ptrs = T::ptrs_restore_mut(context, capacity, ptrs);
         let ptrs = unsafe { T::ptrs_to_nonnull(context, ptrs) };
         Ok(ptrs)
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
     }
 
     #[inline]

@@ -38,7 +38,7 @@ gpecs_ecs_benchmark = { path = "benches/gpecs_ecs_benchmark" }
 spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "1e4e468" }
 indexmap = { version = "2.9" }
 petgraph = { version = "0.8" }
-itertools = { version = "0.14" }
+itertools = { version = "0.14", default-features = false }
 rspirv = { version = "0.12" }
 criterion = { git = "https://github.com/bheisler/criterion.rs", rev = "260e2f1", features = ["html_reports"] }
 pollster = { version = "0.4" }

@@ -13,5 +13,5 @@ gpecs_soa_erased = { workspace = true }
 gpecs_types = { workspace = true }
 indexmap = { workspace = true }
 petgraph = { workspace = true }
-itertools = { workspace = true }
+itertools = { workspace = true, features = ["use_alloc"] }
 wgpu = { workspace = true }

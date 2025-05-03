@@ -334,9 +334,9 @@ impl<Meta> IndexMut<Entity> for EntityRegistry<Meta> {
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a EntityRegistry<Meta> {
-    type Item = (Entity, &'a Meta);
-    type IntoIter = Iter<'a, Meta>;
+impl<'r, Meta> IntoIterator for &'r EntityRegistry<Meta> {
+    type Item = (Entity, &'r Meta);
+    type IntoIter = Iter<'r, 'r, Meta>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -344,9 +344,9 @@ impl<'a, Meta> IntoIterator for &'a EntityRegistry<Meta> {
     }
 }
 
-impl<'a, Meta> IntoIterator for &'a mut EntityRegistry<Meta> {
-    type Item = (Entity, &'a mut Meta);
-    type IntoIter = IterMut<'a, Meta>;
+impl<'r, Meta> IntoIterator for &'r mut EntityRegistry<Meta> {
+    type Item = (Entity, &'r mut Meta);
+    type IntoIter = IterMut<'r, 'r, Meta>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -354,11 +354,11 @@ impl<'a, Meta> IntoIterator for &'a mut EntityRegistry<Meta> {
     }
 }
 
-pub struct Iter<'a, Meta> {
-    inner: SparseIter<'a, Entity, Identity<Meta>>,
+pub struct Iter<'c, 'a, Meta> {
+    inner: SparseIter<'c, 'a, Entity, Identity<Meta>>,
 }
 
-impl<'a, Meta> Iter<'a, Meta> {
+impl<'c, 'a, Meta> Iter<'c, 'a, Meta> {
     #[inline]
     pub fn entities(&self) -> &'a [Entity] {
         let Self { inner } = self;
@@ -381,7 +381,7 @@ impl<'a, Meta> Iter<'a, Meta> {
     }
 }
 
-impl<Meta> Debug for Iter<'_, Meta>
+impl<Meta> Debug for Iter<'_, '_, Meta>
 where
     Meta: Debug,
 {
@@ -394,7 +394,7 @@ where
     }
 }
 
-impl<Meta> Clone for Iter<'_, Meta> {
+impl<Meta> Clone for Iter<'_, '_, Meta> {
     #[inline]
     fn clone(&self) -> Self {
         let Self { inner } = self;
@@ -404,14 +404,14 @@ impl<Meta> Clone for Iter<'_, Meta> {
     }
 }
 
-impl<Meta> AsRef<[Meta]> for Iter<'_, Meta> {
+impl<Meta> AsRef<[Meta]> for Iter<'_, '_, Meta> {
     #[inline]
     fn as_ref(&self) -> &[Meta] {
         self.metas()
     }
 }
 
-impl<'a, Meta> Iterator for Iter<'a, Meta> {
+impl<'a, Meta> Iterator for Iter<'_, 'a, Meta> {
     type Item = (Entity, &'a Meta);
 
     #[inline]
@@ -454,7 +454,7 @@ impl<'a, Meta> Iterator for Iter<'a, Meta> {
     }
 }
 
-impl<Meta> DoubleEndedIterator for Iter<'_, Meta> {
+impl<Meta> DoubleEndedIterator for Iter<'_, '_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
@@ -472,7 +472,7 @@ impl<Meta> DoubleEndedIterator for Iter<'_, Meta> {
     }
 }
 
-impl<Meta> ExactSizeIterator for Iter<'_, Meta> {
+impl<Meta> ExactSizeIterator for Iter<'_, '_, Meta> {
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -480,13 +480,13 @@ impl<Meta> ExactSizeIterator for Iter<'_, Meta> {
     }
 }
 
-impl<Meta> FusedIterator for Iter<'_, Meta> {}
+impl<Meta> FusedIterator for Iter<'_, '_, Meta> {}
 
-pub struct IterMut<'a, Meta> {
-    inner: SparseIterMut<'a, Entity, Identity<Meta>>,
+pub struct IterMut<'c, 'a, Meta> {
+    inner: SparseIterMut<'c, 'a, Entity, Identity<Meta>>,
 }
 
-impl<'a, Meta> IterMut<'a, Meta> {
+impl<'c, 'a, Meta> IterMut<'c, 'a, Meta> {
     #[inline]
     pub fn into_entities(self) -> &'a [Entity] {
         let Self { inner } = self;
@@ -530,7 +530,7 @@ impl<'a, Meta> IterMut<'a, Meta> {
     }
 }
 
-impl<Meta> Debug for IterMut<'_, Meta>
+impl<Meta> Debug for IterMut<'_, '_, Meta>
 where
     Meta: Debug,
 {
@@ -543,14 +543,14 @@ where
     }
 }
 
-impl<Meta> AsRef<[Meta]> for IterMut<'_, Meta> {
+impl<Meta> AsRef<[Meta]> for IterMut<'_, '_, Meta> {
     #[inline]
     fn as_ref(&self) -> &[Meta] {
         self.metas()
     }
 }
 
-impl<'a, Meta> Iterator for IterMut<'a, Meta> {
+impl<'a, Meta> Iterator for IterMut<'_, 'a, Meta> {
     type Item = (Entity, &'a mut Meta);
 
     #[inline]
@@ -593,7 +593,7 @@ impl<'a, Meta> Iterator for IterMut<'a, Meta> {
     }
 }
 
-impl<Meta> DoubleEndedIterator for IterMut<'_, Meta> {
+impl<Meta> DoubleEndedIterator for IterMut<'_, '_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
@@ -611,7 +611,7 @@ impl<Meta> DoubleEndedIterator for IterMut<'_, Meta> {
     }
 }
 
-impl<Meta> ExactSizeIterator for IterMut<'_, Meta> {
+impl<Meta> ExactSizeIterator for IterMut<'_, '_, Meta> {
     #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -619,4 +619,4 @@ impl<Meta> ExactSizeIterator for IterMut<'_, Meta> {
     }
 }
 
-impl<Meta> FusedIterator for IterMut<'_, Meta> {}
+impl<Meta> FusedIterator for IterMut<'_, '_, Meta> {}

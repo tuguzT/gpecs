@@ -336,6 +336,8 @@ pub unsafe trait Soa: Sized {
     /// Non-empty collection of properly typed references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
+    ///
+    /// This type should be covariant over `'context` lifetime.
     type Refs<'context, 'a>
     where
         Self: 'a;
@@ -343,6 +345,8 @@ pub unsafe trait Soa: Sized {
     /// Non-empty collection of properly typed mutable references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
+    ///
+    /// This type should be covariant over `'context` lifetime.
     type RefsMut<'context, 'a>
     where
         Self: 'a;
@@ -465,6 +469,8 @@ pub unsafe trait Soa: Sized {
     /// Non-empty collection of properly typed slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
+    ///
+    /// This type should be covariant over `'context` lifetime.
     type Slices<'context, 'a>
     where
         Self: 'a;
@@ -472,6 +478,8 @@ pub unsafe trait Soa: Sized {
     /// Non-empty collection of properly typed mutable slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
+    ///
+    /// This type should be covariant over `'context` lifetime.
     type SlicesMut<'context, 'a>
     where
         Self: 'a;

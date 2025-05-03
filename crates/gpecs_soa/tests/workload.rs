@@ -16,8 +16,8 @@ struct ZST3 {
 
 #[test]
 fn slices_empty() {
-    type Slices<'a> = SoaSlices<'a, (u8, u64, u16, ())>;
-    type SlicesMut<'a> = SoaSlicesMut<'a, (u8, u64, u16, ())>;
+    type Slices<'c, 'a> = SoaSlices<'c, 'a, (u8, u64, u16, ())>;
+    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (u8, u64, u16, ())>;
 
     let context = ();
 
@@ -99,8 +99,8 @@ fn vec_new() {
 
 #[test]
 fn slices_empty_zst() {
-    type Slices<'a> = SoaSlices<'a, (ZST1, ZST2, ZST3)>;
-    type SlicesMut<'a> = SoaSlicesMut<'a, (ZST1, ZST2, ZST3)>;
+    type Slices<'c, 'a> = SoaSlices<'c, 'a, (ZST1, ZST2, ZST3)>;
+    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (ZST1, ZST2, ZST3)>;
 
     let context = ();
 
@@ -299,8 +299,8 @@ fn vec_with_capacity_zst() {
 
 #[test]
 fn slices_one_item() {
-    type Slices<'a> = SoaSlices<'a, (u8, u64, u16, ())>;
-    type SlicesMut<'a> = SoaSlicesMut<'a, (u8, u64, u16, ())>;
+    type Slices<'c, 'a> = SoaSlices<'c, 'a, (u8, u64, u16, ())>;
+    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (u8, u64, u16, ())>;
 
     let context = ();
     let mut u8s = [1];
@@ -556,8 +556,8 @@ fn vec_one_item() {
 
 #[test]
 fn slices_one_item_zst() {
-    type Slices<'a> = SoaSlices<'a, (ZST1, ZST2, ZST3)>;
-    type SlicesMut<'a> = SoaSlicesMut<'a, (ZST1, ZST2, ZST3)>;
+    type Slices<'c, 'a> = SoaSlices<'c, 'a, (ZST1, ZST2, ZST3)>;
+    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (ZST1, ZST2, ZST3)>;
 
     let context = ();
     let mut zst1s = [ZST1];
@@ -790,8 +790,8 @@ fn vec_one_item_zst() {
 
 #[test]
 fn slices_three_items() {
-    type Slices<'a> = SoaSlices<'a, (u8, String, u64, ())>;
-    type SlicesMut<'a> = SoaSlicesMut<'a, (u8, String, u64, ())>;
+    type Slices<'c, 'a> = SoaSlices<'c, 'a, (u8, String, u64, ())>;
+    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (u8, String, u64, ())>;
 
     let context = ();
     let mut u8s = [1, 2, 3];
@@ -1324,8 +1324,8 @@ fn vec_three_items() {
 
 #[test]
 fn slices_three_items_zst() {
-    type Slices<'a> = SoaSlices<'a, (ZST1, ZST2, ZST3)>;
-    type SlicesMut<'a> = SoaSlicesMut<'a, (ZST1, ZST2, ZST3)>;
+    type Slices<'c, 'a> = SoaSlices<'c, 'a, (ZST1, ZST2, ZST3)>;
+    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (ZST1, ZST2, ZST3)>;
 
     let context = ();
     let mut zst1s = [ZST1; 3];

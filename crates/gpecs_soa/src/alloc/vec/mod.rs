@@ -312,14 +312,14 @@ where
     }
 
     #[inline]
-    pub fn slices(&self) -> SoaSlices<'_, T> {
+    pub fn slices(&self) -> SoaSlices<T> {
         let context = self.context();
         let slices = self.as_slices();
         SoaSlices::new(context, slices)
     }
 
     #[inline]
-    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, T> {
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<T> {
         let context = unsafe { &*self.as_ptr().ptr_to_context() };
         let slices = self.as_mut_slices();
         SoaSlicesMut::new(context, slices)
@@ -948,7 +948,7 @@ impl<T, U, I> Index<I> for SoaVec<T>
 where
     T: Soa,
     U: ?Sized,
-    for<'a> I: IndexHelper<'a, T, Output = U>,
+    for<'c, 'any> I: IndexHelper<'c, 'any, T, Output = U>,
 {
     type Output = U;
 
@@ -961,7 +961,7 @@ impl<T, U, I> IndexMut<I> for SoaVec<T>
 where
     T: Soa,
     U: ?Sized,
-    for<'a> I: IndexHelperMut<'a, T, Output = U>,
+    for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.slices_mut().into_index_mut(index)
@@ -1038,12 +1038,12 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a SoaVec<T>
+impl<'r, T> IntoIterator for &'r SoaVec<T>
 where
     T: Soa,
 {
-    type Item = T::Refs<'a, 'a>;
-    type IntoIter = Iter<'a, T>;
+    type Item = T::Refs<'r, 'r>;
+    type IntoIter = Iter<'r, 'r, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1051,12 +1051,12 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut SoaVec<T>
+impl<'r, T> IntoIterator for &'r mut SoaVec<T>
 where
     T: Soa,
 {
-    type Item = T::RefsMut<'a, 'a>;
-    type IntoIter = IterMut<'a, T>;
+    type Item = T::RefsMut<'r, 'r>;
+    type IntoIter = IterMut<'r, 'r, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

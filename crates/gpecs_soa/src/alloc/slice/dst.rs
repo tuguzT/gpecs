@@ -160,12 +160,12 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
+impl<'r, T> IntoIterator for &'r Box<SoaSlice<T>>
 where
     T: SoaTrustedFields,
 {
-    type Item = T::Refs<'a, 'a>;
-    type IntoIter = Iter<'a, T>;
+    type Item = T::Refs<'r, 'r>;
+    type IntoIter = Iter<'r, 'r, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -173,12 +173,12 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
+impl<'r, T> IntoIterator for &'r mut Box<SoaSlice<T>>
 where
     T: SoaTrustedFields,
 {
-    type Item = T::RefsMut<'a, 'a>;
-    type IntoIter = IterMut<'a, T>;
+    type Item = T::RefsMut<'r, 'r>;
+    type IntoIter = IterMut<'r, 'r, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

@@ -36,18 +36,18 @@ use crate::{
     },
 };
 
-pub type SparseView<'a, T> = EpochSparseView<'a, usize, T>;
+pub type SparseView<'c, 'a, T> = EpochSparseView<'c, 'a, usize, T>;
 
-pub struct EpochSparseView<'a, K, V>
+pub struct EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
-    dense: SoaSlices<'a, KeyValuePair<K, V>>,
+    dense: SoaSlices<'c, 'a, KeyValuePair<K, V>>,
     sparse: &'a [SparseItem<K>],
 }
 
-impl<'a, K, V> EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
@@ -55,7 +55,7 @@ where
     #[inline]
     #[track_caller]
     pub fn new(
-        dense: SoaSlices<'a, KeyValuePair<K, V>>,
+        dense: SoaSlices<'c, 'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
     ) -> Result<Self, FromPartsError<K>> {
         let dense_reborrow = SoaSlices::new(dense.context(), dense.as_slices());
@@ -68,7 +68,7 @@ where
     #[track_caller]
     #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(
-        dense: SoaSlices<'a, KeyValuePair<K, V>>,
+        dense: SoaSlices<'c, 'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
     ) -> Self {
         if cfg!(debug_assertions) {
@@ -119,13 +119,13 @@ where
     }
 
     #[inline]
-    pub fn into_slices(self) -> V::Slices<'a, 'a> {
+    pub fn into_slices(self) -> V::Slices<'c, 'a> {
         let (_, slices) = self.into_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn into_slices_with_context(self) -> (&'a V::Context, V::Slices<'a, 'a>) {
+    pub fn into_slices_with_context(self) -> (&'c V::Context, V::Slices<'c, 'a>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slices_with_context();
@@ -170,7 +170,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (SoaSlices<'a, KeyValuePair<K, V>>, &'a [SparseItem<K>]) {
+    pub fn into_parts(self) -> (SoaSlices<'c, 'a, KeyValuePair<K, V>>, &'a [SparseItem<K>]) {
         let Self { dense, sparse } = self;
         (dense, sparse)
     }
@@ -189,13 +189,13 @@ where
     }
 
     #[inline]
-    pub fn into_get(self, key: K) -> Option<V::Refs<'a, 'a>> {
+    pub fn into_get(self, key: K) -> Option<V::Refs<'c, 'a>> {
         let (_, refs) = self.into_get_with_context(key);
         refs
     }
 
     #[inline]
-    pub fn into_get_with_context(self, key: K) -> (&'a V::Context, Option<V::Refs<'a, 'a>>) {
+    pub fn into_get_with_context(self, key: K) -> (&'c V::Context, Option<V::Refs<'c, 'a>>) {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.into_iter_with_context();
         (context, sparse_get(dense, sparse, key))
@@ -208,7 +208,7 @@ where
     }
 
     #[inline]
-    pub fn into_get_with_key(self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'a, 'a>)> {
+    pub fn into_get_with_key(self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'c, 'a>)> {
         let Self { dense, sparse } = self;
         sparse_get_with_key(dense, sparse, sparse_index)
     }
@@ -230,21 +230,21 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) -> Keys<'_, K, V> {
+    pub fn keys(&self) -> Keys<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Keys::new(inner)
     }
 
     #[inline]
-    pub fn values(&self) -> Values<'_, K, V> {
+    pub fn values(&self) -> Values<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Values::new(inner)
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, K, V> {
+    pub fn iter(&self) -> Iter<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Iter::new(inner)
@@ -273,7 +273,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn into_index(self, key: K) -> V::Refs<'a, 'a>
+    pub fn into_index(self, key: K) -> V::Refs<'c, 'a>
     where
         K: Debug,
     {
@@ -283,7 +283,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn into_index_with_context(self, key: K) -> (&'a V::Context, V::Refs<'a, 'a>)
+    pub fn into_index_with_context(self, key: K) -> (&'c V::Context, V::Refs<'c, 'a>)
     where
         K: Debug,
     {
@@ -293,12 +293,12 @@ where
     }
 }
 
-impl<'a, K, V> Debug for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> Debug for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
     SparseItem<K>: Debug,
-    SoaSlices<'a, KeyValuePair<K, V>>: Debug,
+    SoaSlices<'c, 'a, KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { dense, sparse } = self;
@@ -309,12 +309,12 @@ where
     }
 }
 
-impl<'a, K, V> From<&'a V::Context> for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> From<&'c V::Context> for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
-    fn from(context: &'a V::Context) -> Self {
+    fn from(context: &'c V::Context) -> Self {
         Self {
             dense: context.into(),
             sparse: Default::default(),
@@ -322,7 +322,7 @@ where
     }
 }
 
-impl<K, V> Clone for EpochSparseView<'_, K, V>
+impl<K, V> Clone for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
     V: Soa,
@@ -335,19 +335,19 @@ where
     }
 }
 
-impl<'a, K, V> Copy for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> Copy for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlices<'a, KeyValuePair<K, V>>: Copy,
+    SoaSlices<'c, 'a, KeyValuePair<K, V>>: Copy,
 {
 }
 
-impl<'a, K, V> PartialEq for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> PartialEq for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlices<'a, KeyValuePair<K, V>>: PartialEq,
+    SoaSlices<'c, 'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { dense, sparse } = self;
@@ -355,19 +355,19 @@ where
     }
 }
 
-impl<'a, K, V> Eq for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> Eq for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlices<'a, KeyValuePair<K, V>>: Eq,
+    SoaSlices<'c, 'a, KeyValuePair<K, V>>: Eq,
 {
 }
 
-impl<'a, K, V> PartialOrd for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> PartialOrd for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlices<'a, KeyValuePair<K, V>>: PartialOrd,
+    SoaSlices<'c, 'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { dense, sparse } = self;
@@ -379,11 +379,11 @@ where
     }
 }
 
-impl<'a, K, V> Ord for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> Ord for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlices<'a, KeyValuePair<K, V>>: Ord,
+    SoaSlices<'c, 'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { dense, sparse } = self;
@@ -395,12 +395,12 @@ where
     }
 }
 
-impl<'a, K, V> Hash for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> Hash for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
     SparseItem<K>: Hash,
-    SoaSlices<'a, KeyValuePair<K, V>>: Hash,
+    SoaSlices<'c, 'a, KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { dense, sparse } = self;
@@ -409,7 +409,7 @@ where
     }
 }
 
-impl<T, K, V> Index<K> for EpochSparseView<'_, K, V>
+impl<T, K, V> Index<K> for EpochSparseView<'_, '_, K, V>
 where
     K: Key + Debug,
     for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T> + 'any,
@@ -422,7 +422,7 @@ where
     }
 }
 
-impl<T, K, V> AsRef<[T]> for EpochSparseView<'_, K, V>
+impl<T, K, V> AsRef<[T]> for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
@@ -433,25 +433,24 @@ where
     }
 }
 
-impl<'a, K, V> AsRef<EpochSparseView<'a, K, V>> for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> AsRef<EpochSparseView<'c, 'a, K, V>> for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
     #[inline]
-    fn as_ref(&self) -> &EpochSparseView<'a, K, V> {
+    fn as_ref(&self) -> &EpochSparseView<'c, 'a, K, V> {
         self
     }
 }
 
-impl<'a, K, V> IntoIterator for &'a EpochSparseView<'_, K, V>
+impl<'r, K, V> IntoIterator for &'r EpochSparseView<'_, '_, K, V>
 where
     K: Key,
     V: Soa,
 {
-    type Item = (&'a K, V::Refs<'a, 'a>);
-
-    type IntoIter = Iter<'a, K, V>;
+    type Item = (&'r K, V::Refs<'r, 'r>);
+    type IntoIter = Iter<'r, 'r, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -459,14 +458,13 @@ where
     }
 }
 
-impl<'a, K, V> IntoIterator for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> IntoIterator for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
-    type Item = (&'a K, V::Refs<'a, 'a>);
-
-    type IntoIter = Iter<'a, K, V>;
+    type Item = (&'a K, V::Refs<'c, 'a>);
+    type IntoIter = Iter<'c, 'a, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -476,18 +474,18 @@ where
     }
 }
 
-pub type SparseViewMut<'a, T> = EpochSparseViewMut<'a, usize, T>;
+pub type SparseViewMut<'c, 'a, T> = EpochSparseViewMut<'c, 'a, usize, T>;
 
-pub struct EpochSparseViewMut<'a, K, V>
+pub struct EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
-    dense: SoaSlicesMut<'a, KeyValuePair<K, V>>,
+    dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
     sparse: &'a mut [SparseItem<K>],
 }
 
-impl<'a, K, V> EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
@@ -495,7 +493,7 @@ where
     #[inline]
     #[track_caller]
     pub fn new(
-        dense: SoaSlicesMut<'a, KeyValuePair<K, V>>,
+        dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
         sparse: &'a mut [SparseItem<K>],
     ) -> Result<Self, FromPartsError<K>> {
         let dense_reborrow = SoaSlices::new(dense.context(), dense.as_slices());
@@ -508,7 +506,7 @@ where
     #[track_caller]
     #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(
-        dense: SoaSlicesMut<'a, KeyValuePair<K, V>>,
+        dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
         sparse: &'a mut [SparseItem<K>],
     ) -> Self {
         if cfg!(debug_assertions) {
@@ -574,13 +572,13 @@ where
     }
 
     #[inline]
-    pub fn into_slices(self) -> V::SlicesMut<'a, 'a> {
+    pub fn into_slices(self) -> V::SlicesMut<'c, 'a> {
         let (_, slices) = self.into_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn into_slices_with_context(self) -> (&'a V::Context, V::SlicesMut<'a, 'a>) {
+    pub fn into_slices_with_context(self) -> (&'c V::Context, V::SlicesMut<'c, 'a>) {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slices_with_context();
@@ -698,7 +696,7 @@ where
     pub fn into_parts(
         self,
     ) -> (
-        SoaSlicesMut<'a, KeyValuePair<K, V>>,
+        SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
         &'a mut [SparseItem<K>],
     ) {
         let Self { dense, sparse } = self;
@@ -805,7 +803,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'c, 'any> V::Refs<'c, 'any>: Ord,
+        for<'ca, 'any> V::Refs<'ca, 'any>: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
@@ -920,13 +918,13 @@ where
     }
 
     #[inline]
-    pub fn into_get(self, key: K) -> Option<V::Refs<'a, 'a>> {
+    pub fn into_get(self, key: K) -> Option<V::Refs<'c, 'a>> {
         let (_, refs) = self.into_get_with_context(key);
         refs
     }
 
     #[inline]
-    pub fn into_get_with_context(self, key: K) -> (&'a V::Context, Option<V::Refs<'a, 'a>>) {
+    pub fn into_get_with_context(self, key: K) -> (&'c V::Context, Option<V::Refs<'c, 'a>>) {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.into_iter_with_context();
         (context, sparse_get(dense, sparse, key))
@@ -946,13 +944,13 @@ where
     }
 
     #[inline]
-    pub fn into_get_mut(self, key: K) -> Option<V::RefsMut<'a, 'a>> {
+    pub fn into_get_mut(self, key: K) -> Option<V::RefsMut<'c, 'a>> {
         let (_, refs) = self.into_get_mut_with_context(key);
         refs
     }
 
     #[inline]
-    pub fn into_get_mut_with_context(self, key: K) -> (&'a V::Context, Option<V::RefsMut<'a, 'a>>) {
+    pub fn into_get_mut_with_context(self, key: K) -> (&'c V::Context, Option<V::RefsMut<'c, 'a>>) {
         let Self { dense, sparse } = self;
         let (context, dense) = dense.into_iter_mut_with_context();
         (context, sparse_get_mut(dense, sparse, key))
@@ -965,7 +963,7 @@ where
     }
 
     #[inline]
-    pub fn into_get_with_key(self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'a, 'a>)> {
+    pub fn into_get_with_key(self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'c, 'a>)> {
         let Self { dense, sparse } = self;
         let (_, dense) = dense.into_iter_with_context();
         sparse_get_with_key(dense, sparse, sparse_index)
@@ -984,7 +982,7 @@ where
     pub fn into_get_mut_with_key(
         self,
         sparse_index: K::SparseIndex,
-    ) -> Option<(K, V::RefsMut<'a, 'a>)> {
+    ) -> Option<(K, V::RefsMut<'c, 'a>)> {
         let Self { dense, sparse } = self;
         sparse_get_mut_with_key(dense, sparse, sparse_index)
     }
@@ -1006,42 +1004,42 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) -> Keys<'_, K, V> {
+    pub fn keys(&self) -> Keys<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Keys::new(inner)
     }
 
     #[inline]
-    pub fn values(&self) -> Values<'_, K, V> {
+    pub fn values(&self) -> Values<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Values::new(inner)
     }
 
     #[inline]
-    pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+    pub fn values_mut(&mut self) -> ValuesMut<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter_mut();
         ValuesMut::new(inner)
     }
 
     #[inline]
-    pub fn into_values_mut(self) -> ValuesMut<'a, K, V> {
+    pub fn into_values_mut(self) -> ValuesMut<'c, 'a, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.into_iter();
         ValuesMut::new(inner)
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, K, V> {
+    pub fn iter(&self) -> Iter<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Iter::new(inner)
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+    pub fn iter_mut(&mut self) -> IterMut<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter_mut();
         IterMut::new(inner)
@@ -1070,7 +1068,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn into_index(self, key: K) -> V::Refs<'a, 'a>
+    pub fn into_index(self, key: K) -> V::Refs<'c, 'a>
     where
         K: Debug,
     {
@@ -1080,7 +1078,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn into_index_with_context(self, key: K) -> (&'a V::Context, V::Refs<'a, 'a>)
+    pub fn into_index_with_context(self, key: K) -> (&'c V::Context, V::Refs<'c, 'a>)
     where
         K: Debug,
     {
@@ -1111,7 +1109,7 @@ where
     }
 
     #[inline]
-    pub fn into_index_mut(self, key: K) -> V::RefsMut<'a, 'a>
+    pub fn into_index_mut(self, key: K) -> V::RefsMut<'c, 'a>
     where
         K: Debug,
     {
@@ -1121,7 +1119,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn into_index_mut_with_context(self, key: K) -> (&'a V::Context, V::RefsMut<'a, 'a>)
+    pub fn into_index_mut_with_context(self, key: K) -> (&'c V::Context, V::RefsMut<'c, 'a>)
     where
         K: Debug,
     {
@@ -1131,12 +1129,12 @@ where
     }
 }
 
-impl<'a, K, V> Debug for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> Debug for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
     SparseItem<K>: Debug,
-    SoaSlicesMut<'a, KeyValuePair<K, V>>: Debug,
+    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { dense, sparse } = self;
@@ -1147,12 +1145,12 @@ where
     }
 }
 
-impl<'a, K, V> From<&'a V::Context> for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> From<&'c V::Context> for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
-    fn from(context: &'a V::Context) -> Self {
+    fn from(context: &'c V::Context) -> Self {
         Self {
             dense: context.into(),
             sparse: Default::default(),
@@ -1160,11 +1158,11 @@ where
     }
 }
 
-impl<'a, K, V> PartialEq for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> PartialEq for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlicesMut<'a, KeyValuePair<K, V>>: PartialEq,
+    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { dense, sparse } = self;
@@ -1172,19 +1170,19 @@ where
     }
 }
 
-impl<'a, K, V> Eq for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> Eq for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlicesMut<'a, KeyValuePair<K, V>>: Eq,
+    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Eq,
 {
 }
 
-impl<'a, K, V> PartialOrd for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> PartialOrd for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlicesMut<'a, KeyValuePair<K, V>>: PartialOrd,
+    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { dense, sparse } = self;
@@ -1196,11 +1194,11 @@ where
     }
 }
 
-impl<'a, K, V> Ord for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> Ord for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
-    SoaSlicesMut<'a, KeyValuePair<K, V>>: Ord,
+    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { dense, sparse } = self;
@@ -1212,12 +1210,12 @@ where
     }
 }
 
-impl<'a, K, V> Hash for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> Hash for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
     SparseItem<K>: Hash,
-    SoaSlicesMut<'a, KeyValuePair<K, V>>: Hash,
+    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { dense, sparse } = self;
@@ -1226,7 +1224,7 @@ where
     }
 }
 
-impl<T, K, V> Index<K> for EpochSparseViewMut<'_, K, V>
+impl<T, K, V> Index<K> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key + Debug,
     for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T> + 'any,
@@ -1239,7 +1237,7 @@ where
     }
 }
 
-impl<T, K, V> IndexMut<K> for EpochSparseViewMut<'_, K, V>
+impl<T, K, V> IndexMut<K> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key + Debug,
     for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T, RefsMut<'c, 'any> = &'any mut T> + 'any,
@@ -1250,7 +1248,7 @@ where
     }
 }
 
-impl<T, K, V> AsRef<[T]> for EpochSparseViewMut<'_, K, V>
+impl<T, K, V> AsRef<[T]> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
@@ -1261,7 +1259,7 @@ where
     }
 }
 
-impl<T, K, V> AsMut<[T]> for EpochSparseViewMut<'_, K, V>
+impl<T, K, V> AsMut<[T]> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
@@ -1272,36 +1270,35 @@ where
     }
 }
 
-impl<'a, K, V> AsRef<EpochSparseViewMut<'a, K, V>> for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> AsRef<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
     #[inline]
-    fn as_ref(&self) -> &EpochSparseViewMut<'a, K, V> {
+    fn as_ref(&self) -> &EpochSparseViewMut<'c, 'a, K, V> {
         self
     }
 }
 
-impl<'a, K, V> AsMut<EpochSparseViewMut<'a, K, V>> for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> AsMut<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut EpochSparseViewMut<'a, K, V> {
+    fn as_mut(&mut self) -> &mut EpochSparseViewMut<'c, 'a, K, V> {
         self
     }
 }
 
-impl<'a, K, V> IntoIterator for &'a EpochSparseViewMut<'_, K, V>
+impl<'r, K, V> IntoIterator for &'r EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     V: Soa,
 {
-    type Item = (&'a K, V::Refs<'a, 'a>);
-
-    type IntoIter = Iter<'a, K, V>;
+    type Item = (&'r K, V::Refs<'r, 'r>);
+    type IntoIter = Iter<'r, 'r, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1309,14 +1306,13 @@ where
     }
 }
 
-impl<'a, K, V> IntoIterator for &'a mut EpochSparseViewMut<'_, K, V>
+impl<'r, K, V> IntoIterator for &'r mut EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     V: Soa,
 {
-    type Item = (&'a K, V::RefsMut<'a, 'a>);
-
-    type IntoIter = IterMut<'a, K, V>;
+    type Item = (&'r K, V::RefsMut<'r, 'r>);
+    type IntoIter = IterMut<'r, 'r, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1324,14 +1320,13 @@ where
     }
 }
 
-impl<'a, K, V> IntoIterator for EpochSparseViewMut<'a, K, V>
+impl<'c, 'a, K, V> IntoIterator for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
-    type Item = (&'a K, V::RefsMut<'a, 'a>);
-
-    type IntoIter = IterMut<'a, K, V>;
+    type Item = (&'a K, V::RefsMut<'c, 'a>);
+    type IntoIter = IterMut<'c, 'a, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1341,14 +1336,14 @@ where
     }
 }
 
-impl<'a, K, V> From<EpochSparseViewMut<'a, K, V>> for EpochSparseView<'a, K, V>
+impl<'c, 'a, K, V> From<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
     V: Soa,
 {
     #[inline]
     #[allow(unsafe_code)]
-    fn from(value: EpochSparseViewMut<'a, K, V>) -> Self {
+    fn from(value: EpochSparseViewMut<'c, 'a, K, V>) -> Self {
         let EpochSparseViewMut { dense, sparse } = value;
         unsafe { Self::new_unchecked(dense.into(), sparse) }
     }

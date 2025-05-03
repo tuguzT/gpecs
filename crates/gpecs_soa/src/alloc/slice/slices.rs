@@ -8,14 +8,14 @@ use crate::{
     vec::SoaVec,
 };
 
-impl<'a, T> SoaSlices<'a, T>
+impl<'c, 'a, T> SoaSlices<'c, 'a, T>
 where
     T: Soa,
 {
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
-        T::Refs<'a, 'a>: SoaToOwned<'a, 'a, Owned = T>,
+        T::Refs<'c, 'a>: SoaToOwned<'c, 'a, Owned = T>,
         T::Context: Clone,
     {
         let len = self.len();
@@ -47,14 +47,14 @@ where
     }
 }
 
-impl<'a, T> SoaSlicesMut<'a, T>
+impl<'c, 'a, T> SoaSlicesMut<'c, 'a, T>
 where
     T: Soa,
 {
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
-        T::Refs<'a, 'a>: SoaToOwned<'a, 'a, Owned = T>,
+        T::Refs<'c, 'a>: SoaToOwned<'c, 'a, Owned = T>,
         T::Context: Clone,
     {
         let len = self.len();
@@ -94,7 +94,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
         self.sort_with_permutation(&mut permutation)
@@ -103,7 +103,7 @@ where
     #[inline]
     pub fn sort_with_permutation(&mut self, permutation: &mut [usize])
     where
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
         self.sort_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b))
     }
@@ -111,7 +111,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
-        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
+        for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
         self.sort_with_permutation_by(&mut permutation, compare)
@@ -120,7 +120,7 @@ where
     #[inline]
     pub fn sort_with_permutation_by<F>(&mut self, permutation: &mut [usize], mut compare: F)
     where
-        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
+        for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
     {
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = unsafe { me.as_parts() };
@@ -197,7 +197,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
         self.sort_unstable_with_permutation(&mut permutation)
@@ -206,7 +206,7 @@ where
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
-        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
+        for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
         self.sort_unstable_with_permutation_by(&mut permutation, compare)

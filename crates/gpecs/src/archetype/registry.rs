@@ -1811,7 +1811,8 @@ where
     }
 }
 
-type BundlesIntoIterInner<'a, B> = iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIter<'a, B>>;
+type BundlesIntoIterInner<'a, B> =
+    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIter<'a, 'a, B>>;
 
 pub struct BundlesIntoIter<'a, 'c, B>
 where
@@ -2049,7 +2050,7 @@ where
 }
 
 type BundlesMutIntoIterInner<'a, B> =
-    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIterMut<'a, B>>;
+    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIterMut<'a, 'a, B>>;
 
 pub struct BundlesMutIntoIter<'a, 'c, B>
 where

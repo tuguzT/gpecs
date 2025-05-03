@@ -4,7 +4,7 @@ use crate::{
     assert::unwrap_dense_from_sparse_index, key::Key, soa::traits::Soa, view::EpochSparseViewMut,
 };
 
-impl<'a, K, V> EpochSparseViewMut<'a, K, V>
+impl<'a, K, V> EpochSparseViewMut<'_, 'a, K, V>
 where
     K: Key,
     V: Soa,
@@ -12,7 +12,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'c, 'any> V::Refs<'c, 'any>: Ord,
+        for<'ca, 'any> V::Refs<'ca, 'any>: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {

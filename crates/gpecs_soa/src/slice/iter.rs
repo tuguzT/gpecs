@@ -1,28 +1,30 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    marker::PhantomData,
 };
 
 use crate::{traits::Soa, wrappers::NonNullPtrs};
 
 use super::{SoaSlices, SoaSlicesMut};
 
-pub struct Iter<'a, T>
+pub struct Iter<'c, 'a, T>
 where
     T: Soa + 'a,
 {
-    context: &'a T::Context,
-    ptrs: NonNullPtrs<'a, T>,
+    context: &'c T::Context,
+    ptrs: NonNullPtrs<'c, T>,
     start: usize,
     end: usize,
+    phantom: PhantomData<&'a ()>,
 }
 
-impl<'a, T> Iter<'a, T>
+impl<'c, 'a, T> Iter<'c, 'a, T>
 where
     T: Soa,
 {
     #[inline]
-    pub(crate) fn new(slices: SoaSlices<'a, T>) -> Self {
+    pub(crate) fn new(slices: SoaSlices<'c, 'a, T>) -> Self {
         let (context, ptrs, len) = slices.into_parts();
         let ptrs = unsafe { T::ptrs_to_nonnull(context, T::ptrs_cast_mut(context, ptrs)) };
         Self {
@@ -30,6 +32,7 @@ where
             ptrs: NonNullPtrs::new(ptrs),
             start: 0,
             end: len,
+            phantom: PhantomData,
         }
     }
 
@@ -44,11 +47,11 @@ where
     }
 
     #[inline]
-    pub fn context(&self) -> &T::Context {
+    pub fn context(&self) -> &'c T::Context {
         self.context
     }
 
-    fn ptrs(&self) -> T::Ptrs<'_> {
+    fn ptrs(&self) -> T::Ptrs<'c> {
         let context = self.context();
         let ptrs = self.ptrs.as_inner().clone();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
@@ -56,7 +59,7 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> T::Slices<'_, 'a> {
+    pub fn as_slices(&self) -> T::Slices<'c, 'a> {
         let context = self.context();
         let ptrs = self.ptrs();
         let len = self.len();
@@ -94,7 +97,7 @@ where
     }
 }
 
-unsafe impl<T> Send for Iter<'_, T>
+unsafe impl<T> Send for Iter<'_, '_, T>
 where
     T: Soa,
     T::Fields: Send,
@@ -102,7 +105,7 @@ where
 {
 }
 
-unsafe impl<T> Sync for Iter<'_, T>
+unsafe impl<T> Sync for Iter<'_, '_, T>
 where
     T: Soa,
     T::Fields: Sync,
@@ -110,7 +113,7 @@ where
 {
 }
 
-impl<T, U> AsRef<[U]> for Iter<'_, T>
+impl<T, U> AsRef<[U]> for Iter<'_, '_, T>
 where
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
@@ -119,7 +122,7 @@ where
     }
 }
 
-impl<T> Debug for Iter<'_, T>
+impl<T> Debug for Iter<'_, '_, T>
 where
     T: Soa,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
@@ -131,27 +134,35 @@ where
     }
 }
 
-impl<T> Clone for Iter<'_, T>
+impl<T> Clone for Iter<'_, '_, T>
 where
     T: Soa,
 {
     #[inline]
     fn clone(&self) -> Self {
+        let Self {
+            context,
+            ref ptrs,
+            start,
+            end,
+            phantom,
+        } = *self;
         Self {
-            context: self.context,
-            ptrs: self.ptrs.clone(),
-            start: self.start,
-            end: self.end,
+            context,
+            ptrs: ptrs.clone(),
+            start,
+            end,
+            phantom,
         }
     }
 }
 
 #[allow(clippy::while_let_on_iterator)]
-impl<'a, T> Iterator for Iter<'a, T>
+impl<'c, 'a, T> Iterator for Iter<'c, 'a, T>
 where
     T: Soa,
 {
-    type Item = T::Refs<'a, 'a>;
+    type Item = T::Refs<'c, 'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -354,7 +365,7 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for Iter<'_, T>
+impl<T> DoubleEndedIterator for Iter<'_, '_, T>
 where
     T: Soa,
 {
@@ -391,7 +402,7 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for Iter<'_, T>
+impl<T> ExactSizeIterator for Iter<'_, '_, T>
 where
     T: Soa,
 {
@@ -401,24 +412,25 @@ where
     }
 }
 
-impl<T> FusedIterator for Iter<'_, T> where T: Soa {}
+impl<T> FusedIterator for Iter<'_, '_, T> where T: Soa {}
 
-pub struct IterMut<'a, T>
+pub struct IterMut<'c, 'a, T>
 where
     T: Soa + 'a,
 {
-    context: &'a T::Context,
-    ptrs: NonNullPtrs<'a, T>,
+    context: &'c T::Context,
+    ptrs: NonNullPtrs<'c, T>,
     start: usize,
     end: usize,
+    phantom: PhantomData<&'a ()>,
 }
 
-impl<'a, T> IterMut<'a, T>
+impl<'c, 'a, T> IterMut<'c, 'a, T>
 where
     T: Soa,
 {
     #[inline]
-    pub(super) fn new(slices: SoaSlicesMut<'a, T>) -> Self {
+    pub(super) fn new(slices: SoaSlicesMut<'c, 'a, T>) -> Self {
         let (context, ptrs, len) = slices.into_parts();
         let ptrs = unsafe { T::ptrs_to_nonnull(context, ptrs) };
         Self {
@@ -426,6 +438,7 @@ where
             ptrs: NonNullPtrs::new(ptrs),
             start: 0,
             end: len,
+            phantom: PhantomData,
         }
     }
 
@@ -451,7 +464,7 @@ where
     }
 
     #[inline]
-    pub fn into_slices(self) -> T::SlicesMut<'a, 'a> {
+    pub fn into_slices(self) -> T::SlicesMut<'c, 'a> {
         let len = self.len();
         let context = self.context;
         let ptrs = self.ptrs.into_inner();
@@ -503,7 +516,7 @@ where
     }
 }
 
-unsafe impl<T> Send for IterMut<'_, T>
+unsafe impl<T> Send for IterMut<'_, '_, T>
 where
     T: Soa,
     T::Fields: Send,
@@ -511,7 +524,7 @@ where
 {
 }
 
-unsafe impl<T> Sync for IterMut<'_, T>
+unsafe impl<T> Sync for IterMut<'_, '_, T>
 where
     T: Soa,
     T::Fields: Sync,
@@ -519,7 +532,7 @@ where
 {
 }
 
-impl<T, U> AsRef<[U]> for IterMut<'_, T>
+impl<T, U> AsRef<[U]> for IterMut<'_, '_, T>
 where
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
@@ -528,7 +541,7 @@ where
     }
 }
 
-impl<T> Debug for IterMut<'_, T>
+impl<T> Debug for IterMut<'_, '_, T>
 where
     T: Soa,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
@@ -541,11 +554,11 @@ where
 }
 
 #[allow(clippy::while_let_on_iterator)]
-impl<'a, T> Iterator for IterMut<'a, T>
+impl<'c, 'a, T> Iterator for IterMut<'c, 'a, T>
 where
     T: Soa,
 {
-    type Item = T::RefsMut<'a, 'a>;
+    type Item = T::RefsMut<'c, 'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -744,7 +757,7 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for IterMut<'_, T>
+impl<T> DoubleEndedIterator for IterMut<'_, '_, T>
 where
     T: Soa,
 {
@@ -780,7 +793,7 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for IterMut<'_, T>
+impl<T> ExactSizeIterator for IterMut<'_, '_, T>
 where
     T: Soa,
 {
@@ -790,4 +803,4 @@ where
     }
 }
 
-impl<T> FusedIterator for IterMut<'_, T> where T: Soa {}
+impl<T> FusedIterator for IterMut<'_, '_, T> where T: Soa {}

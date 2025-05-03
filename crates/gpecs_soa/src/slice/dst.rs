@@ -99,14 +99,14 @@ where
     }
 
     #[inline]
-    pub fn slices(&self) -> SoaSlices<'_, T> {
+    pub fn slices(&self) -> SoaSlices<T> {
         let context = self.context();
         let slices = self.as_slices();
         SoaSlices::new(context, slices)
     }
 
     #[inline]
-    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, T> {
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<T> {
         let len = self.len();
         let context = unsafe { ptr::from_ref(self).context() };
         let ptrs = self.as_mut_ptrs();
@@ -115,22 +115,22 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub fn iter(&self) -> Iter<T> {
         self.slices().into_iter()
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, T>) {
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<T>) {
         self.slices().into_iter_with_context()
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+    pub fn iter_mut(&mut self) -> IterMut<T> {
         self.slices_mut().into_iter()
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, T>) {
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<T>) {
         self.slices_mut().into_iter_mut_with_context()
     }
 
@@ -413,7 +413,7 @@ impl<T, U, I> Index<I> for SoaSlice<T>
 where
     T: SoaTrustedFields,
     U: ?Sized,
-    for<'any> I: IndexHelper<'any, T, Output = U>,
+    for<'c, 'any> I: IndexHelper<'c, 'any, T, Output = U>,
 {
     type Output = U;
 
@@ -426,19 +426,19 @@ impl<T, U, I> IndexMut<I> for SoaSlice<T>
 where
     T: SoaTrustedFields,
     U: ?Sized,
-    for<'any> I: IndexHelperMut<'any, T, Output = U>,
+    for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         SoaSlice::index_mut(self, index)
     }
 }
 
-impl<'a, T> IntoIterator for &'a SoaSlice<T>
+impl<'r, T> IntoIterator for &'r SoaSlice<T>
 where
     T: SoaTrustedFields,
 {
-    type Item = T::Refs<'a, 'a>;
-    type IntoIter = Iter<'a, T>;
+    type Item = T::Refs<'r, 'r>;
+    type IntoIter = Iter<'r, 'r, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -446,12 +446,12 @@ where
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut SoaSlice<T>
+impl<'r, T> IntoIterator for &'r mut SoaSlice<T>
 where
     T: SoaTrustedFields,
 {
-    type Item = T::RefsMut<'a, 'a>;
-    type IntoIter = IterMut<'a, T>;
+    type Item = T::RefsMut<'r, 'r>;
+    type IntoIter = IterMut<'r, 'r, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

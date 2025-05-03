@@ -21,7 +21,7 @@ where
     /// Length of tail
     tail_len: usize,
     /// Current remaining range to remove
-    iter: Iter<'a, T>,
+    iter: Iter<'a, 'a, T>,
     vec: NonNull<SoaVec<T>>,
 }
 

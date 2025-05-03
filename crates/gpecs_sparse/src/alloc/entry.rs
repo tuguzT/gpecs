@@ -261,9 +261,9 @@ where
     K: Key,
     V: Soa,
 {
-    fn slices(&self) -> SoaSlices<'_, V>;
+    fn slices(&self) -> SoaSlices<V>;
 
-    fn slices_mut(&mut self) -> SoaSlicesMut<'_, V>;
+    fn slices_mut(&mut self) -> SoaSlicesMut<V>;
 
     fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>>;
 
@@ -278,12 +278,12 @@ where
     V: Soa,
 {
     #[inline]
-    fn slices(&self) -> SoaSlices<'_, V> {
+    fn slices(&self) -> SoaSlices<V> {
         EpochSparseSet::slices(self)
     }
 
     #[inline]
-    fn slices_mut(&mut self) -> SoaSlicesMut<'_, V> {
+    fn slices_mut(&mut self) -> SoaSlicesMut<V> {
         EpochSparseSet::slices_mut(self)
     }
 
@@ -309,12 +309,12 @@ where
     V: Soa,
 {
     #[inline]
-    fn slices(&self) -> SoaSlices<'_, V> {
+    fn slices(&self) -> SoaSlices<V> {
         EpochSparseArena::slices(self)
     }
 
     #[inline]
-    fn slices_mut(&mut self) -> SoaSlicesMut<'_, V> {
+    fn slices_mut(&mut self) -> SoaSlicesMut<V> {
         EpochSparseArena::slices_mut(self)
     }
 

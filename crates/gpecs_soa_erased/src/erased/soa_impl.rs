@@ -523,7 +523,7 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn mut_refs_as_ptrs<'context>(
+    fn refs_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, '_>,
     ) -> Self::MutPtrs<'context> {
@@ -541,7 +541,7 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaMutPtrs::new(ptrs)
     }
 
-    fn mut_refs_as_refs<'context, 'a>(
+    fn refs_mut_as_refs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
     ) -> Self::Refs<'context, 'a> {
@@ -645,7 +645,7 @@ unsafe impl Soa for ErasedSoa {
         slices.len()
     }
 
-    fn slice_ptrs_len_mut(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
+    fn slice_mut_ptrs_len(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
@@ -670,7 +670,7 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn mut_slice_ptrs_as_ptrs<'context>(
+    fn slice_mut_ptrs_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::MutPtrs<'context> {
@@ -717,7 +717,7 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
     }
 
-    unsafe fn slice_ptrs_to_slices_mut<'context, 'a>(
+    unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::SlicesMut<'context, 'a> {
@@ -743,14 +743,14 @@ unsafe impl Soa for ErasedSoa {
         slices.len()
     }
 
-    fn slices_len_mut(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize {
+    fn slices_mut_len(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize {
         let descriptors = context.field_descriptors();
         assert_eq!(descriptors.len(), slices.field_slices().len());
 
         slices.len()
     }
 
-    fn slice_refs_as_slice_ptrs<'context>(
+    fn slices_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::SlicePtrs<'context> {
@@ -769,7 +769,7 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlicePtrs::new_unchecked(len, slices) }
     }
 
-    fn mut_slice_refs_as_slice_ptrs<'context>(
+    fn slices_mut_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::SliceMutPtrs<'context> {
@@ -788,7 +788,7 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSliceMutPtrs::new_unchecked(len, slices) }
     }
 
-    fn mut_slices_as_slices<'context, 'a>(
+    fn slices_mut_as_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a> {
@@ -807,7 +807,7 @@ unsafe impl Soa for ErasedSoa {
         unsafe { ErasedSoaSlices::new_unchecked(len, slices) }
     }
 
-    fn slice_refs_as_ptrs<'context>(
+    fn slices_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::Ptrs<'context> {
@@ -825,7 +825,7 @@ unsafe impl Soa for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn mut_slice_refs_as_ptrs<'context>(
+    fn slices_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::MutPtrs<'context> {
@@ -891,7 +891,7 @@ unsafe impl SoaVecs for ErasedSoa {
         ErasedSoaPtrs::new(ptrs)
     }
 
-    fn mut_vecs_as_ptrs<'context>(
+    fn vecs_as_ptrs_mut<'context>(
         context: &'context Self::Context,
         vecs: &mut Self::Vecs,
     ) -> Self::MutPtrs<'context> {

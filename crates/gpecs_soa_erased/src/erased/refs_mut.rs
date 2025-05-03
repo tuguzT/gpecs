@@ -29,7 +29,7 @@ impl<'a> ErasedSoaRefsMut<'a> {
     where
         T: Soa,
     {
-        let ptrs = T::mut_refs_as_ptrs(context, refs);
+        let ptrs = T::refs_mut_as_ptrs(context, refs);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
         let refs = T::field_descriptors(context)
             .into_iter()

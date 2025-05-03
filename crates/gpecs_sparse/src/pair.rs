@@ -418,26 +418,26 @@ where
     }
 
     #[inline]
-    fn mut_refs_as_ptrs<'context>(
+    fn refs_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, '_>,
     ) -> Self::MutPtrs<'context> {
         let KeyValueRefsMut { key, value } = refs;
         KeyValueMutPtrs {
             key: ptr::from_mut(key),
-            value: V::mut_refs_as_ptrs(context, value),
+            value: V::refs_mut_as_ptrs(context, value),
         }
     }
 
     #[inline]
-    fn mut_refs_as_refs<'context, 'a>(
+    fn refs_mut_as_refs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
     ) -> Self::Refs<'context, 'a> {
         let KeyValueRefsMut { key, value } = refs;
         KeyValueRefs {
             key: &*key,
-            value: V::mut_refs_as_refs(context, value),
+            value: V::refs_mut_as_refs(context, value),
         }
     }
 
@@ -506,11 +506,11 @@ where
     }
 
     #[inline]
-    fn slice_ptrs_len_mut(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
+    fn slice_mut_ptrs_len(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
         let KeyValueSliceMutPtrs { keys, values } = slices;
 
         let keys_len = keys.len();
-        let values_len = V::slice_ptrs_len_mut(context, values);
+        let values_len = V::slice_mut_ptrs_len(context, values);
         assert_eq!(keys_len, values_len);
         keys_len
     }
@@ -528,14 +528,14 @@ where
     }
 
     #[inline]
-    fn mut_slice_ptrs_as_ptrs<'context>(
+    fn slice_mut_ptrs_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::MutPtrs<'context> {
         let KeyValueSliceMutPtrs { keys, values } = slices;
         KeyValueMutPtrs {
             key: keys.cast(), // should be `keys.as_mut_ptr()` but it's unstable
-            value: V::mut_slice_ptrs_as_ptrs(context, values),
+            value: V::slice_mut_ptrs_as_ptrs(context, values),
         }
     }
 
@@ -564,16 +564,16 @@ where
     }
 
     #[inline]
-    unsafe fn slice_ptrs_to_slices_mut<'context, 'a>(
+    unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::SlicesMut<'context, 'a> {
-        let len = Self::slice_ptrs_len_mut(context, &slices);
+        let len = Self::slice_mut_ptrs_len(context, &slices);
         let KeyValueSliceMutPtrs { keys, values } = slices;
 
         KeyValueSlicesMut {
             keys: unsafe { slice::from_raw_parts_mut(keys.cast(), len) },
-            values: unsafe { V::slice_ptrs_to_slices_mut(context, values) },
+            values: unsafe { V::slice_mut_ptrs_to_slices(context, values) },
         }
     }
 
@@ -590,72 +590,72 @@ where
 
     #[inline]
     #[track_caller]
-    fn slices_len_mut(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize {
+    fn slices_mut_len(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize {
         let KeyValueSlicesMut { keys, values } = slices;
 
         let keys_len = keys.len();
-        let values_len = V::slices_len_mut(context, values);
+        let values_len = V::slices_mut_len(context, values);
         assert_eq!(keys_len, values_len);
         keys_len
     }
 
     #[inline]
-    fn slice_refs_as_slice_ptrs<'context>(
+    fn slices_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::SlicePtrs<'context> {
         let KeyValueSlices { keys, values } = slices;
         KeyValueSlicePtrs {
             keys: ptr::from_ref(keys),
-            values: V::slice_refs_as_slice_ptrs(context, values),
+            values: V::slices_as_slice_ptrs(context, values),
         }
     }
 
     #[inline]
-    fn mut_slice_refs_as_slice_ptrs<'context>(
+    fn slices_mut_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::SliceMutPtrs<'context> {
         let KeyValueSlicesMut { keys, values } = slices;
         KeyValueSliceMutPtrs {
             keys: ptr::from_mut(keys),
-            values: V::mut_slice_refs_as_slice_ptrs(context, values),
+            values: V::slices_mut_as_slice_ptrs(context, values),
         }
     }
 
     #[inline]
-    fn mut_slices_as_slices<'context, 'a>(
+    fn slices_mut_as_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a> {
         let KeyValueSlicesMut { keys, values } = slices;
         KeyValueSlices {
             keys: &*keys,
-            values: V::mut_slices_as_slices(context, values),
+            values: V::slices_mut_as_slices(context, values),
         }
     }
 
     #[inline]
-    fn slice_refs_as_ptrs<'context>(
+    fn slices_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::Ptrs<'context> {
         let KeyValueSlices { keys, values } = slices;
         KeyValuePtrs {
             key: keys.as_ptr(),
-            value: V::slice_refs_as_ptrs(context, values),
+            value: V::slices_as_ptrs(context, values),
         }
     }
 
     #[inline]
-    fn mut_slice_refs_as_ptrs<'context>(
+    fn slices_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::MutPtrs<'context> {
         let KeyValueSlicesMut { keys, values } = slices;
         KeyValueMutPtrs {
             key: keys.as_mut_ptr(),
-            value: V::mut_slice_refs_as_ptrs(context, values),
+            value: V::slices_mut_as_ptrs(context, values),
         }
     }
 
@@ -702,14 +702,14 @@ where
     }
 
     #[inline]
-    fn mut_vecs_as_ptrs<'context>(
+    fn vecs_as_ptrs_mut<'context>(
         context: &'context Self::Context,
         vecs: &mut Self::Vecs,
     ) -> Self::MutPtrs<'context> {
         let KeyValueVecs { keys, values } = vecs;
         KeyValueMutPtrs {
             key: keys.as_mut_ptr(),
-            value: V::mut_vecs_as_ptrs(context, values),
+            value: V::vecs_as_ptrs_mut(context, values),
         }
     }
 

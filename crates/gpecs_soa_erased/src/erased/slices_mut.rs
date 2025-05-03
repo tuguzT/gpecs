@@ -62,8 +62,8 @@ impl<'a> ErasedSoaSlicesMut<'a> {
     where
         T: Soa,
     {
-        let len = T::slices_len_mut(context, &slices);
-        let ptrs = T::mut_slice_refs_as_ptrs(context, slices);
+        let len = T::slices_mut_len(context, &slices);
+        let ptrs = T::slices_mut_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase_mut(context, ptrs);
         let slices = T::field_descriptors(context)
             .into_iter()
@@ -108,7 +108,7 @@ impl<'a> ErasedSoaSlicesMut<'a> {
 
         let ptrs = T::ptrs_restore_mut(context, ptrs);
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-        let slices = unsafe { T::slice_ptrs_to_slices_mut(context, slices) };
+        let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         Ok(slices)
     }
 

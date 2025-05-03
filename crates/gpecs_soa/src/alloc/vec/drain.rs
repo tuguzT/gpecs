@@ -231,7 +231,7 @@ where
             // which would make it and the vec pointer point to different allocations which would
             // lead to invalid pointer arithmetic below.
             let slices = guard.0.iter.as_slices();
-            let drop_ptrs = T::slice_refs_as_ptrs(context, slices);
+            let drop_ptrs = T::slices_as_ptrs(context, slices);
 
             // drop_ptrs comes from an Iter which only gives us slices but for drop_in_place
             // a pointer with mutable provenance is necessary. Therefore we must reconstruct

@@ -95,7 +95,7 @@ where
         let ptrs = self.as_mut_ptrs();
 
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-        unsafe { T::slice_ptrs_to_slices_mut(context, slices) }
+        unsafe { T::slice_mut_ptrs_to_slices(context, slices) }
     }
 
     #[inline]
@@ -403,7 +403,7 @@ where
         let slices = self.as_mut_slices();
         unsafe {
             let context = &*context;
-            let slices = T::mut_slice_refs_as_slice_ptrs(context, slices);
+            let slices = T::slices_mut_as_slice_ptrs(context, slices);
             T::slices_drop_in_place(&*context, slices);
         }
     }

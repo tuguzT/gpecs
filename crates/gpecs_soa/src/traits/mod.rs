@@ -380,14 +380,14 @@ pub unsafe trait Soa: Sized {
 
     /// Converts properly typed mutable references to each field of [`Fields`](Soa::Fields)
     /// to their mutable pointers by taking the pointer of each one of them.
-    fn mut_refs_as_ptrs<'context>(
+    fn refs_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, '_>,
     ) -> Self::MutPtrs<'context>;
 
     /// Converts properly typed mutable references to each field of [`Fields`](Soa::Fields)
     /// to their references by explicitly converting each one of them via `&*` operator combination.
-    fn mut_refs_as_refs<'context, 'a>(
+    fn refs_mut_as_refs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
     ) -> Self::Refs<'context, 'a>;
@@ -450,7 +450,7 @@ pub unsafe trait Soa: Sized {
     ///
     /// Note that resulting lengths should be the same for all the mutable slice pointers,
     /// or else this method could panic.
-    fn slice_ptrs_len_mut(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize;
+    fn slice_mut_ptrs_len(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize;
 
     /// Returns properly typed pointers to the slice's buffer
     /// of each slice pointer of [`Fields`](Soa::Fields).
@@ -461,7 +461,7 @@ pub unsafe trait Soa: Sized {
 
     /// Returns properly typed mutable pointers to the slice's buffer
     /// of each mutable slice pointer of [`Fields`](Soa::Fields).
-    fn mut_slice_ptrs_as_ptrs<'context>(
+    fn slice_mut_ptrs_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::MutPtrs<'context>;
@@ -499,7 +499,7 @@ pub unsafe trait Soa: Sized {
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn slice_ptrs_to_slices_mut<'context, 'a>(
+    unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::SlicesMut<'context, 'a>;
@@ -516,39 +516,39 @@ pub unsafe trait Soa: Sized {
     ///
     /// Note that resulting lengths should be the same for all the mutable slices,
     /// or else this method could panic.
-    fn slices_len_mut(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize;
+    fn slices_mut_len(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize;
 
     /// Converts properly typed slices to each field of [`Fields`](Soa::Fields)
     /// to their slice pointers by taking the pointer of each one of them.
-    fn slice_refs_as_slice_ptrs<'context>(
+    fn slices_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::SlicePtrs<'context>;
 
     /// Converts properly typed mutable slices to each field of [`Fields`](Soa::Fields)
     /// to their mutable slice pointers by taking the pointer of each one of them.
-    fn mut_slice_refs_as_slice_ptrs<'context>(
+    fn slices_mut_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::SliceMutPtrs<'context>;
 
     /// Converts properly typed mutable slices to each field of [`Fields`](Soa::Fields)
     /// to their slices by explicitly converting each one of them via `&*` operator combination.
-    fn mut_slices_as_slices<'context, 'a>(
+    fn slices_mut_as_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a>;
 
     /// Returns properly typed pointers to the slice's buffer
     /// of each slice of [`Fields`](Soa::Fields).
-    fn slice_refs_as_ptrs<'context>(
+    fn slices_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::Ptrs<'context>;
 
     /// Returns properly typed mutable pointers to the slice's buffer
     /// of each mutable slice of [`Fields`](Soa::Fields).
-    fn mut_slice_refs_as_ptrs<'context>(
+    fn slices_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::MutPtrs<'context>;
@@ -564,8 +564,8 @@ pub unsafe trait Soa: Sized {
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) {
-        let len = Self::slice_ptrs_len_mut(context, &slices);
-        let ptrs = Self::mut_slice_ptrs_as_ptrs(context, slices);
+        let len = Self::slice_mut_ptrs_len(context, &slices);
+        let ptrs = Self::slice_mut_ptrs_as_ptrs(context, slices);
         for index in 0..len {
             unsafe {
                 let ptrs = Self::ptrs_add_mut(context, ptrs.clone(), index);
@@ -655,7 +655,7 @@ pub trait SoaToOwned<'context, 'a> {
         context: &'c <Self::Owned as Soa>::Context,
         target: <Self::Owned as Soa>::RefsMut<'c, '_>,
     ) {
-        let target = <Self::Owned as Soa>::mut_refs_as_ptrs(context, target);
+        let target = <Self::Owned as Soa>::refs_mut_as_ptrs(context, target);
         unsafe {
             self.clone_into_ptrs(context, target);
         }
@@ -687,7 +687,7 @@ pub unsafe trait SoaVecs: Soa {
 
     /// Returns properly typed mutable pointers to the vectors' buffers of each field of [`Fields`](Soa::Fields),
     /// or a dangling pointers valid for zero sized reads if these vectors didn’t allocate.
-    fn mut_vecs_as_ptrs<'context>(
+    fn vecs_as_ptrs_mut<'context>(
         context: &'context Self::Context,
         vecs: &mut Self::Vecs,
     ) -> Self::MutPtrs<'context>;

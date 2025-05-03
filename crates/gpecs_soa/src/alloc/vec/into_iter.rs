@@ -87,7 +87,7 @@ where
         unsafe {
             let ptrs = T::ptrs_add_mut(context, ptrs, self.start);
             let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-            T::slice_ptrs_to_slices_mut(context, slices)
+            T::slice_mut_ptrs_to_slices(context, slices)
         }
     }
 
@@ -205,7 +205,7 @@ where
 
         let context = ptr::from_ref(guard.0.context());
         let slices = guard.0.as_mut_slices();
-        let slices = T::mut_slice_refs_as_slice_ptrs(unsafe { &*context }, slices);
+        let slices = T::slices_mut_as_slice_ptrs(unsafe { &*context }, slices);
         unsafe { T::slices_drop_in_place(&*context, slices) }
         // now `guard` will be dropped and do the rest
     }

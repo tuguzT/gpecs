@@ -308,7 +308,7 @@ where
         let context = self.context();
 
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-        unsafe { T::slice_ptrs_to_slices_mut(context, slices) }
+        unsafe { T::slice_mut_ptrs_to_slices(context, slices) }
     }
 
     #[inline]
@@ -457,7 +457,7 @@ where
     {
         let context = ptr::from_ref(self.context());
         self.retain_mut(|refs| {
-            let refs = T::mut_refs_as_refs(unsafe { &*context }, refs);
+            let refs = T::refs_mut_as_refs(unsafe { &*context }, refs);
             f(refs)
         });
     }
@@ -697,7 +697,7 @@ where
 
         let context = self.context();
         let src = self.as_ptrs();
-        let dst = T::mut_vecs_as_ptrs(context, &mut vecs);
+        let dst = T::vecs_as_ptrs_mut(context, &mut vecs);
         unsafe {
             T::ptrs_copy_nonoverlapping(context, src, dst, len);
             T::vecs_set_len(context, &mut vecs, len);

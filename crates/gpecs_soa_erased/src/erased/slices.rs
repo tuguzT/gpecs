@@ -60,7 +60,7 @@ impl<'a> ErasedSoaSlices<'a> {
         T: Soa,
     {
         let len = T::slices_len(context, &slices);
-        let ptrs = T::slice_refs_as_ptrs(context, slices);
+        let ptrs = T::slices_as_ptrs(context, slices);
         let ptrs = T::ptrs_erase(context, ptrs);
         let slices = T::field_descriptors(context)
             .into_iter()

@@ -12,14 +12,13 @@ use super::{error::IntoValueError, ErasedSoaMutPtrs, ErasedSoaPtrs, ErasedSoaSli
 
 #[derive(Debug, Clone)]
 pub struct ErasedSoaSliceMutPtrs {
-    slices: Box<[ErasedFieldSliceMutPtr]>,
     len: usize,
-    capacity: usize,
+    slices: Box<[ErasedFieldSliceMutPtr]>,
 }
 
 impl ErasedSoaSliceMutPtrs {
     #[inline]
-    pub fn new<I>(len: usize, capacity: usize, slices: I) -> Result<Self, LenMismatchError>
+    pub fn new<I>(len: usize, slices: I) -> Result<Self, LenMismatchError>
     where
         I: IntoIterator<Item = ErasedFieldSliceMutPtr>,
     {
@@ -30,39 +29,34 @@ impl ErasedSoaSliceMutPtrs {
                 Ok(slice)
             })
             .collect::<Result<Box<[_]>, _>>()?;
-        let me = unsafe { Self::actual_new(len, capacity, slices) };
+        let me = unsafe { Self::actual_new(len, slices) };
         Ok(me)
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn new_unchecked<I>(len: usize, capacity: usize, slices: I) -> Self
+    pub unsafe fn new_unchecked<I>(len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldSliceMutPtr>,
     {
         if cfg!(debug_assertions) {
-            return Self::new(len, capacity, slices).expect("incorrect inputs");
+            return Self::new(len, slices).expect("incorrect inputs");
         }
-        unsafe { Self::actual_new(len, capacity, slices) }
+        unsafe { Self::actual_new(len, slices) }
     }
 
     #[inline]
-    unsafe fn actual_new<I>(len: usize, capacity: usize, slices: I) -> Self
+    unsafe fn actual_new<I>(len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldSliceMutPtr>,
     {
         let slices = slices.into_iter().collect();
-        Self {
-            slices,
-            len,
-            capacity,
-        }
+        Self { len, slices }
     }
 
     #[inline]
     pub fn from<'context, T>(
         context: &'context T::Context,
-        capacity: usize,
         slices: T::SliceMutPtrs<'context>,
     ) -> Self
     where
@@ -79,7 +73,7 @@ impl ErasedSoaSliceMutPtrs {
                 let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size() * len);
                 unsafe { ErasedFieldSliceMutPtr::new_unchecked(desc, buffer, len) }
             });
-        unsafe { Self::new_unchecked(len, capacity, slices) }
+        unsafe { Self::new_unchecked(len, slices) }
     }
 
     #[inline]
@@ -106,33 +100,22 @@ impl ErasedSoaSliceMutPtrs {
             return Err(IntoValueError::new(self, error));
         }
 
-        let Self {
-            slices,
-            len,
-            capacity,
-        } = self;
+        let Self { slices, len, .. } = self;
         let ptrs = slices.into_vec().into_iter().map(|slice| slice.as_ptr());
 
-        let ptrs = T::ptrs_restore_mut(context, capacity, ptrs);
+        let ptrs = T::ptrs_restore_mut(context, ptrs);
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
         Ok(slices)
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { len, .. } = *self;
-        len
+        self.len
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        let Self { capacity, .. } = *self;
-        capacity
     }
 
     #[inline]
@@ -149,26 +132,16 @@ impl ErasedSoaSliceMutPtrs {
 
     #[inline]
     pub fn iter(&self) -> ErasedSoaSlicePtrsIter {
-        let Self {
-            ref slices,
-            capacity,
-            ..
-        } = *self;
-
+        let Self { slices, .. } = self;
         let slices = slices.iter().map(IntoIterator::into_iter);
-        ErasedSoaSlicePtrsIter::new(capacity, slices)
+        ErasedSoaSlicePtrsIter::new(slices)
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> ErasedSoaSliceMutPtrsIter {
-        let Self {
-            ref mut slices,
-            capacity,
-            ..
-        } = *self;
-
+        let Self { slices, .. } = self;
         let slices = slices.iter_mut().map(IntoIterator::into_iter);
-        ErasedSoaSliceMutPtrsIter::new(capacity, slices)
+        ErasedSoaSliceMutPtrsIter::new(slices)
     }
 }
 
@@ -198,24 +171,20 @@ impl IntoIterator for ErasedSoaSliceMutPtrs {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self {
-            slices, capacity, ..
-        } = self;
-
+        let Self { slices, .. } = self;
         let slices = slices.into_vec().into_iter().map(IntoIterator::into_iter);
-        ErasedSoaSliceMutPtrsIter::new(capacity, slices)
+        ErasedSoaSliceMutPtrsIter::new(slices)
     }
 }
 
 pub struct ErasedSoaSliceMutPtrsIter {
     slices: Box<[ErasedFieldSliceMutPtrIter]>,
-    capacity: usize,
 }
 
 impl ErasedSoaSliceMutPtrsIter {
     #[inline]
     #[track_caller]
-    fn new<I>(capacity: usize, slices: I) -> Self
+    fn new<I>(slices: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldSliceMutPtrIter>,
     {
@@ -230,7 +199,7 @@ impl ErasedSoaSliceMutPtrsIter {
                 check_same_len(iter.len(), len).expect("input slices should have the same length")
             })
             .collect();
-        Self { slices, capacity }
+        Self { slices }
     }
 
     #[inline]
@@ -253,13 +222,9 @@ impl Iterator for ErasedSoaSliceMutPtrsIter {
         if ErasedSoaSliceMutPtrsIter::is_empty(self) {
             return None;
         }
-        let Self {
-            ref mut slices,
-            capacity,
-        } = *self;
 
-        let ptrs = slices.iter_mut().flat_map(Iterator::next);
-        Some(ErasedSoaMutPtrs::new(capacity, ptrs))
+        let ptrs = self.slices.iter_mut().flat_map(Iterator::next);
+        Some(ErasedSoaMutPtrs::new(ptrs))
     }
 
     #[inline]
@@ -275,13 +240,12 @@ impl DoubleEndedIterator for ErasedSoaSliceMutPtrsIter {
         if ErasedSoaSliceMutPtrsIter::is_empty(self) {
             return None;
         }
-        let Self {
-            ref mut slices,
-            capacity,
-        } = *self;
 
-        let ptrs = slices.iter_mut().flat_map(DoubleEndedIterator::next_back);
-        Some(ErasedSoaMutPtrs::new(capacity, ptrs))
+        let ptrs = self
+            .slices
+            .iter_mut()
+            .flat_map(DoubleEndedIterator::next_back);
+        Some(ErasedSoaMutPtrs::new(ptrs))
     }
 }
 

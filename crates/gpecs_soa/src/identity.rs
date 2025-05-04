@@ -279,7 +279,6 @@ unsafe impl<T> Soa for Identity<T> {
     #[track_caller]
     fn ptrs_restore(
         _context: &Self::Context,
-        _capacity: usize,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs<'_> {
         let ptrs: [_; 1] = collect_array(ptrs);
@@ -292,7 +291,6 @@ unsafe impl<T> Soa for Identity<T> {
     #[track_caller]
     fn ptrs_restore_mut(
         _context: &Self::Context,
-        _capacity: usize,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs<'_> {
         let ptrs: [_; 1] = collect_array(ptrs);
@@ -302,7 +300,7 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn ptrs_dangling(_context: &Self::Context, _capacity: usize) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
     }
 
@@ -679,11 +677,6 @@ unsafe impl<T> SoaVecs for Identity<T> {
     #[inline]
     fn vecs_len(_context: &Self::Context, vecs: &Self::Vecs) -> usize {
         vecs.len()
-    }
-
-    #[inline]
-    fn vecs_capacity(_context: &Self::Context, vecs: &Self::Vecs) -> usize {
-        vecs.capacity()
     }
 
     #[inline]

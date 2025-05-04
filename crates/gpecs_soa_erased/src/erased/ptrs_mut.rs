@@ -12,25 +12,20 @@ use super::error::IntoValueError;
 #[derive(Debug, Clone)]
 pub struct ErasedSoaMutPtrs {
     ptrs: Box<[ErasedFieldMutPtr]>,
-    capacity: usize,
 }
 
 impl ErasedSoaMutPtrs {
     #[inline]
-    pub fn new<I>(capacity: usize, ptrs: I) -> Self
+    pub fn new<I>(ptrs: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldMutPtr>,
     {
         let ptrs = ptrs.into_iter().collect();
-        Self { ptrs, capacity }
+        Self { ptrs }
     }
 
     #[inline]
-    pub fn from<'context, T>(
-        context: &'context T::Context,
-        capacity: usize,
-        ptrs: T::MutPtrs<'context>,
-    ) -> Self
+    pub fn from<'context, T>(context: &'context T::Context, ptrs: T::MutPtrs<'context>) -> Self
     where
         T: Soa,
     {
@@ -44,7 +39,7 @@ impl ErasedSoaMutPtrs {
                 let buffer = ptr::slice_from_raw_parts_mut(ptr, len);
                 unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
             });
-        Self::new(capacity, ptrs)
+        Self::new(ptrs)
     }
 
     #[inline]
@@ -72,17 +67,11 @@ impl ErasedSoaMutPtrs {
             return Err(IntoValueError::new(self, error));
         }
 
-        let Self { capacity, ptrs } = self;
+        let Self { ptrs, .. } = self;
         let ptrs = ptrs.into_vec().into_iter().map(|slice| slice.as_ptr());
 
-        let ptrs = T::ptrs_restore_mut(context, capacity, ptrs);
+        let ptrs = T::ptrs_restore_mut(context, ptrs);
         Ok(ptrs)
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        let Self { capacity, .. } = *self;
-        capacity
     }
 
     #[inline]

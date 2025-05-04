@@ -100,7 +100,6 @@ unsafe impl Soa for () {
     #[inline]
     fn ptrs_restore(
         _context: &Self::Context,
-        _capacity: usize,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs<'_> {
         let ptrs: [*const u8; 1] = collect_array(ptrs);
@@ -111,7 +110,6 @@ unsafe impl Soa for () {
     #[inline]
     fn ptrs_restore_mut(
         _context: &Self::Context,
-        _capacity: usize,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs<'_> {
         let ptrs: [*mut u8; 1] = collect_array(ptrs);
@@ -119,7 +117,7 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn ptrs_dangling(_context: &Self::Context, _capacity: usize) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
     }
 
@@ -499,11 +497,6 @@ unsafe impl SoaVecs for () {
     }
 
     #[inline]
-    fn vecs_capacity(_context: &Self::Context, vecs: &Self::Vecs) -> usize {
-        vecs.capacity()
-    }
-
-    #[inline]
     unsafe fn vecs_set_len(_context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
         unsafe { vecs.set_len(len) }
     }
@@ -631,11 +624,7 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_restore(
-                _context: &Self::Context,
-                _capacity: usize,
-                ptrs: impl IntoIterator<Item = *const u8>,
-            ) -> Self::Ptrs<'_> {
+            fn ptrs_restore(_context: &Self::Context, ptrs: impl IntoIterator<Item = *const u8>) -> Self::Ptrs<'_> {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let ptrs: [*const u8; count_idents!($($types,)*)] = collect_array(ptrs);
@@ -651,11 +640,7 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_restore_mut(
-                _context: &Self::Context,
-                _capacity: usize,
-                ptrs: impl IntoIterator<Item = *mut u8>,
-            ) -> Self::MutPtrs<'_> {
+            fn ptrs_restore_mut(_context: &Self::Context, ptrs: impl IntoIterator<Item = *mut u8>) -> Self::MutPtrs<'_> {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let ptrs: [*mut u8; count_idents!($($types,)*)] = collect_array(ptrs);
@@ -671,7 +656,7 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_dangling(_context: &Self::Context, _capacity: usize) -> Self::MutPtrs<'_> {
+            fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
                 let ptrs = ($(ptr::dangling_mut::<$types>(),)*);
                 ptrs
             }
@@ -1117,13 +1102,6 @@ macro_rules! soa_tuple_impl {
                 let lens = [$(vecs.$indices.len(),)*];
                 assert!(lens.iter().all(|len| lens[0].eq(len)));
                 lens[0]
-            }
-
-            #[inline]
-            fn vecs_capacity(_context: &Self::Context, vecs: &Self::Vecs) -> usize {
-                let capacities = [$(vecs.$indices.capacity(),)*];
-                assert!(capacities.iter().all(|capacity| capacities[0].eq(capacity)));
-                capacities[0]
             }
 
             #[inline]

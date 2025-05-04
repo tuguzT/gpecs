@@ -133,7 +133,6 @@ pub unsafe trait Soa: Sized {
     /// Process of 'restoring' just means converting pointers of bytes to properly typed pointers.
     fn ptrs_restore(
         context: &Self::Context,
-        capacity: usize,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs<'_>;
 
@@ -142,12 +141,11 @@ pub unsafe trait Soa: Sized {
     /// Process of 'restoring' just means converting pointers of bytes to properly typed pointers.
     fn ptrs_restore_mut(
         context: &Self::Context,
-        capacity: usize,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs<'_>;
 
     /// Returns dangling pointers to each field of [`Fields`](Soa::Fields).
-    fn ptrs_dangling(context: &Self::Context, capacity: usize) -> Self::MutPtrs<'_>;
+    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_>;
 
     /// Converts pointers to the mutable ones of each field of [`Fields`](Soa::Fields).
     fn ptrs_cast_const<'context>(
@@ -700,13 +698,6 @@ pub unsafe trait SoaVecs: Soa {
     /// Note that resulting lengths should be the same for all the vectors,
     /// or else this method could panic.
     fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize;
-
-    /// Returns the number of elements in each vector of [`Fields`](Soa::Fields),
-    /// also referred to as their 'length'.
-    ///
-    /// Note that resulting lengths should be the same for all the vectors,
-    /// or else this method could panic.
-    fn vecs_capacity(context: &Self::Context, vecs: &Self::Vecs) -> usize;
 
     /// Forces the length of the vectors of [`Fields`](Soa::Fields) to `new_len`.
     ///

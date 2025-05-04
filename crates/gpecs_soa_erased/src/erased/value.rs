@@ -97,7 +97,7 @@ impl ErasedSoa {
             let dst = {
                 let buffer = buffer.as_mut_ptr().cast::<u8>();
                 let ptrs = offsets.into_iter().map(|offset| buffer.add(offset));
-                T::ptrs_restore_mut(context, 1, ptrs)
+                T::ptrs_restore_mut(context, ptrs)
             };
             T::ptrs_write(context, dst, value);
         }
@@ -144,7 +144,7 @@ impl ErasedSoa {
             let src = {
                 let buffer = buffer.as_ptr().cast::<u8>();
                 let ptrs = offsets.into_iter().map(|offset| buffer.add(offset));
-                T::ptrs_restore(context, 1, ptrs)
+                T::ptrs_restore(context, ptrs)
             };
             T::ptrs_read(context, src)
         };
@@ -203,7 +203,7 @@ impl ErasedSoa {
             let r#ref = unsafe { slice::from_raw_parts(data, len) };
             unsafe { ErasedFieldRef::new_unchecked(desc.clone(), r#ref) }
         });
-        ErasedSoaRefs::new(1, refs)
+        ErasedSoaRefs::new(refs)
     }
 
     #[inline]
@@ -226,7 +226,7 @@ impl ErasedSoa {
             let r#ref = unsafe { slice::from_raw_parts_mut(data, len) };
             unsafe { ErasedFieldRefMut::new_unchecked(desc.clone(), r#ref) }
         });
-        ErasedSoaRefsMut::new(1, refs)
+        ErasedSoaRefsMut::new(refs)
     }
 }
 

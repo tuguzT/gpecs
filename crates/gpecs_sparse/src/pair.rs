@@ -100,7 +100,6 @@ where
     #[track_caller]
     fn ptrs_restore(
         context: &Self::Context,
-        capacity: usize,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs<'_> {
         let mut ptrs = ptrs.into_iter();
@@ -110,7 +109,7 @@ where
 
         KeyValuePtrs {
             key: key.cast(),
-            value: V::ptrs_restore(context, capacity, ptrs),
+            value: V::ptrs_restore(context, ptrs),
         }
     }
 
@@ -118,7 +117,6 @@ where
     #[track_caller]
     fn ptrs_restore_mut(
         context: &Self::Context,
-        capacity: usize,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs<'_> {
         let mut ptrs = ptrs.into_iter();
@@ -128,15 +126,15 @@ where
 
         KeyValueMutPtrs {
             key: key.cast(),
-            value: V::ptrs_restore_mut(context, capacity, ptrs),
+            value: V::ptrs_restore_mut(context, ptrs),
         }
     }
 
     #[inline]
-    fn ptrs_dangling(context: &Self::Context, capacity: usize) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_> {
         KeyValueMutPtrs {
             key: ptr::dangling_mut(),
-            value: V::ptrs_dangling(context, capacity),
+            value: V::ptrs_dangling(context),
         }
     }
 
@@ -724,17 +722,6 @@ where
         let values_len = V::vecs_len(context, values);
         assert_eq!(keys_len, values_len);
         keys_len
-    }
-
-    #[inline]
-    #[track_caller]
-    fn vecs_capacity(context: &Self::Context, vecs: &Self::Vecs) -> usize {
-        let KeyValueVecs { keys, values } = vecs;
-
-        let keys_capacity = keys.capacity();
-        let values_capacity = V::vecs_capacity(context, values);
-        assert_eq!(keys_capacity, values_capacity);
-        keys_capacity
     }
 
     #[inline]

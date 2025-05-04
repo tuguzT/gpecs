@@ -120,14 +120,13 @@ pub unsafe fn from_erased_refs<'context, 'a, T>(
     components: &ComponentRegistry,
     context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    capacity: usize,
     fields: ErasedComponents<ErasedFieldRef<'a>>,
 ) -> T::Refs<'context, 'a>
 where
     T: Soa,
 {
     let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    let erased_refs = ErasedSoaRefs::new(capacity, refs);
+    let erased_refs = ErasedSoaRefs::new(refs);
     unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
 }
 
@@ -136,13 +135,12 @@ pub fn into_erased_refs<'context, 'a, T>(
     components: &ComponentRegistry,
     context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    capacity: usize,
     refs: T::Refs<'context, 'a>,
 ) -> ErasedComponents<ErasedFieldRef<'a>>
 where
     T: Soa,
 {
-    let erased_refs = ErasedSoaRefs::from::<T>(context, capacity, refs).into_field_refs();
+    let erased_refs = ErasedSoaRefs::from::<T>(context, refs).into_field_refs();
     validate_components::<T, _>(components, context, component_ids)
         .zip(erased_refs)
         .collect()
@@ -154,14 +152,13 @@ pub unsafe fn from_erased_refs_mut<'context, 'a, T>(
     components: &ComponentRegistry,
     context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    capacity: usize,
     fields: ErasedComponents<ErasedFieldRefMut<'a>>,
 ) -> T::RefsMut<'context, 'a>
 where
     T: Soa,
 {
     let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    let erased_refs = ErasedSoaRefsMut::new(capacity, refs);
+    let erased_refs = ErasedSoaRefsMut::new(refs);
     unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
 }
 
@@ -170,13 +167,12 @@ pub fn into_erased_refs_mut<'context, 'a, T>(
     components: &ComponentRegistry,
     context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    capacity: usize,
     refs: T::RefsMut<'context, 'a>,
 ) -> ErasedComponents<ErasedFieldRefMut<'a>>
 where
     T: Soa,
 {
-    let erased_refs = ErasedSoaRefsMut::from::<T>(context, capacity, refs).into_field_refs();
+    let erased_refs = ErasedSoaRefsMut::from::<T>(context, refs).into_field_refs();
     validate_components::<T, _>(components, context, component_ids)
         .zip(erased_refs)
         .collect()
@@ -189,15 +185,13 @@ pub unsafe fn from_erased_slices<'context, 'a, T>(
     context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
-    capacity: usize,
     fields: ErasedComponents<ErasedFieldSlice<'a>>,
 ) -> T::Slices<'context, 'a>
 where
     T: Soa,
 {
     let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    let erased_slices =
-        ErasedSoaSlices::new(len, capacity, slices).expect("all the fields should be valid");
+    let erased_slices = ErasedSoaSlices::new(len, slices).expect("all the fields should be valid");
     unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
 }
 
@@ -206,13 +200,12 @@ pub fn into_erased_slices<'context, 'a, T>(
     components: &ComponentRegistry,
     context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    capacity: usize,
     slices: T::Slices<'context, 'a>,
 ) -> (usize, ErasedComponents<ErasedFieldSlice<'a>>)
 where
     T: Soa,
 {
-    let erased_slices = ErasedSoaSlices::from::<T>(context, capacity, slices);
+    let erased_slices = ErasedSoaSlices::from::<T>(context, slices);
     let len = erased_slices.len();
     let fields = validate_components::<T, _>(components, context, component_ids)
         .zip(erased_slices.into_field_slices())
@@ -227,7 +220,6 @@ pub unsafe fn from_erased_slices_mut<'context, 'a, T>(
     context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
-    capacity: usize,
     fields: ErasedComponents<ErasedFieldSliceMut<'a>>,
 ) -> T::SlicesMut<'context, 'a>
 where
@@ -235,7 +227,7 @@ where
 {
     let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
     let erased_slices =
-        ErasedSoaSlicesMut::new(len, capacity, slices).expect("all the fields should be valid");
+        ErasedSoaSlicesMut::new(len, slices).expect("all the fields should be valid");
     unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
 }
 
@@ -244,13 +236,12 @@ pub fn into_erased_slices_mut<'context, 'a, T>(
     components: &ComponentRegistry,
     context: &'context T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    capacity: usize,
     slices: T::SlicesMut<'context, 'a>,
 ) -> (usize, ErasedComponents<ErasedFieldSliceMut<'a>>)
 where
     T: Soa,
 {
-    let erased_slices = ErasedSoaSlicesMut::from::<T>(context, capacity, slices);
+    let erased_slices = ErasedSoaSlicesMut::from::<T>(context, slices);
     let len = erased_slices.len();
     let fields = validate_components::<T, _>(components, context, component_ids)
         .zip(erased_slices.into_field_slices())

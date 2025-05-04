@@ -12,14 +12,13 @@ use super::{error::IntoValueError, ErasedSoaRefs};
 
 #[derive(Debug, Clone)]
 pub struct ErasedSoaSlices<'a> {
-    slices: Box<[ErasedFieldSlice<'a>]>,
     len: usize,
-    capacity: usize,
+    slices: Box<[ErasedFieldSlice<'a>]>,
 }
 
 impl<'a> ErasedSoaSlices<'a> {
     #[inline]
-    pub fn new<I>(len: usize, capacity: usize, slices: I) -> Result<Self, LenMismatchError>
+    pub fn new<I>(len: usize, slices: I) -> Result<Self, LenMismatchError>
     where
         I: IntoIterator<Item = ErasedFieldSlice<'a>>,
     {
@@ -30,41 +29,33 @@ impl<'a> ErasedSoaSlices<'a> {
                 Ok(slice)
             })
             .collect::<Result<Box<[_]>, _>>()?;
-        let me = unsafe { Self::actual_new(len, capacity, slices) };
+        let me = unsafe { Self::actual_new(len, slices) };
         Ok(me)
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn new_unchecked<I>(len: usize, capacity: usize, slices: I) -> Self
+    pub unsafe fn new_unchecked<I>(len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldSlice<'a>>,
     {
         if cfg!(debug_assertions) {
-            return Self::new(len, capacity, slices).expect("incorrect inputs");
+            return Self::new(len, slices).expect("incorrect inputs");
         }
-        unsafe { Self::actual_new(len, capacity, slices) }
+        unsafe { Self::actual_new(len, slices) }
     }
 
     #[inline]
-    unsafe fn actual_new<I>(len: usize, capacity: usize, slices: I) -> Self
+    unsafe fn actual_new<I>(len: usize, slices: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldSlice<'a>>,
     {
         let slices = slices.into_iter().collect();
-        Self {
-            slices,
-            len,
-            capacity,
-        }
+        Self { len, slices }
     }
 
     #[inline]
-    pub fn from<'context, T>(
-        context: &'context T::Context,
-        capacity: usize,
-        slices: T::Slices<'context, 'a>,
-    ) -> Self
+    pub fn from<'context, T>(context: &'context T::Context, slices: T::Slices<'context, 'a>) -> Self
     where
         T: Soa,
     {
@@ -79,7 +70,7 @@ impl<'a> ErasedSoaSlices<'a> {
                 let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
                 unsafe { ErasedFieldSlice::new_unchecked(desc, buffer, len) }
             });
-        unsafe { Self::new_unchecked(len, capacity, slices) }
+        unsafe { Self::new_unchecked(len, slices) }
     }
 
     #[inline]
@@ -106,17 +97,13 @@ impl<'a> ErasedSoaSlices<'a> {
             return Err(IntoValueError::new(self, error));
         }
 
-        let Self {
-            slices,
-            len,
-            capacity,
-        } = self;
+        let Self { slices, len, .. } = self;
         let ptrs = slices
             .into_vec()
             .into_iter()
             .map(|slice| slice.into_buffer().as_ptr());
 
-        let ptrs = T::ptrs_restore(context, capacity, ptrs);
+        let ptrs = T::ptrs_restore(context, ptrs);
         let slices = T::slices_from_raw_parts(context, ptrs, len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         Ok(slices)
@@ -124,19 +111,12 @@ impl<'a> ErasedSoaSlices<'a> {
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { len, .. } = *self;
-        len
+        self.len
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        let Self { capacity, .. } = *self;
-        capacity
     }
 
     #[inline]
@@ -153,14 +133,9 @@ impl<'a> ErasedSoaSlices<'a> {
 
     #[inline]
     pub fn iter(&self) -> ErasedSoaSlicesIter<'_> {
-        let Self {
-            ref slices,
-            capacity,
-            ..
-        } = *self;
-
+        let Self { slices, .. } = self;
         let slices = slices.iter().map(IntoIterator::into_iter);
-        ErasedSoaSlicesIter::new(capacity, slices)
+        ErasedSoaSlicesIter::new(slices)
     }
 }
 
@@ -180,23 +155,19 @@ impl<'a> IntoIterator for ErasedSoaSlices<'a> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self {
-            slices, capacity, ..
-        } = self;
-
+        let Self { slices, .. } = self;
         let slices = slices.into_vec().into_iter().map(IntoIterator::into_iter);
-        ErasedSoaSlicesIter::new(capacity, slices)
+        ErasedSoaSlicesIter::new(slices)
     }
 }
 
 pub struct ErasedSoaSlicesIter<'a> {
     slices: Box<[ErasedFieldSliceIter<'a>]>,
-    capacity: usize,
 }
 
 impl<'a> ErasedSoaSlicesIter<'a> {
     #[inline]
-    pub(super) fn new<I>(capacity: usize, slices: I) -> Self
+    pub(super) fn new<I>(slices: I) -> Self
     where
         I: IntoIterator<Item = ErasedFieldSliceIter<'a>>,
     {
@@ -211,7 +182,7 @@ impl<'a> ErasedSoaSlicesIter<'a> {
                 check_same_len(iter.len(), len).expect("input slices should have the same length")
             })
             .collect();
-        Self { slices, capacity }
+        Self { slices }
     }
 
     #[inline]
@@ -234,13 +205,9 @@ impl<'a> Iterator for ErasedSoaSlicesIter<'a> {
         if ErasedSoaSlicesIter::is_empty(self) {
             return None;
         }
-        let Self {
-            ref mut slices,
-            capacity,
-        } = *self;
 
-        let refs = slices.iter_mut().flat_map(Iterator::next);
-        Some(ErasedSoaRefs::new(capacity, refs))
+        let refs = self.slices.iter_mut().flat_map(Iterator::next);
+        Some(ErasedSoaRefs::new(refs))
     }
 
     #[inline]
@@ -256,13 +223,12 @@ impl DoubleEndedIterator for ErasedSoaSlicesIter<'_> {
         if ErasedSoaSlicesIter::is_empty(self) {
             return None;
         }
-        let Self {
-            ref mut slices,
-            capacity,
-        } = *self;
 
-        let refs = slices.iter_mut().flat_map(DoubleEndedIterator::next_back);
-        Some(ErasedSoaRefs::new(capacity, refs))
+        let refs = self
+            .slices
+            .iter_mut()
+            .flat_map(DoubleEndedIterator::next_back);
+        Some(ErasedSoaRefs::new(refs))
     }
 }
 

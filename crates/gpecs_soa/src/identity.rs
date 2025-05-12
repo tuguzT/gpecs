@@ -233,16 +233,11 @@ unsafe impl<T> Soa for Identity<T> {
         [FieldDescriptor::of::<T>()]
     }
 
-    type FieldOffsets<'context> = [usize; 1];
+    type BufferRegions<'context> = [Result<Layout, LayoutError>; 1];
 
     #[inline]
-    fn buffer_layout(
-        _context: &Self::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
-        let offsets = [0];
-        let layout = Layout::array::<T>(capacity)?;
-        Ok((layout, offsets))
+    fn buffer_regions(_context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_> {
+        [Layout::array::<T>(capacity)]
     }
 
     #[inline]

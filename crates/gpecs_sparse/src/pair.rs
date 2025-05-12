@@ -60,14 +60,14 @@ where
         KeyValueFieldDescriptors::new(context)
     }
 
-    type FieldOffsets<'context> = KeyValueFieldOffsets<'context, K, V>;
+    type BufferRegions<'context> = iter::Chain<
+        iter::Once<Result<Layout, LayoutError>>,
+        <V::BufferRegions<'context> as IntoIterator>::IntoIter,
+    >;
 
     #[inline]
-    fn buffer_layout(
-        context: &Self::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
-        KeyValueFieldOffsets::new(context, capacity)
+    fn buffer_regions(context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_> {
+        iter::once(Layout::array::<K>(capacity)).chain(V::buffer_regions(context, capacity))
     }
 
     type Ptrs<'context> = KeyValuePtrs<'context, K, V>;
@@ -817,168 +817,6 @@ where
             |desc| *desc.as_ref();
         let value = value.into_iter().map(f);
         iter::once(key).chain(value)
-    }
-}
-
-pub struct KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-{
-    offset_from_keys: usize,
-    keys: PhantomData<fn() -> K>,
-    values: V::FieldOffsets<'context>,
-}
-
-impl<'context, K, V> KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-{
-    pub fn new(
-        context: &'context V::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self), LayoutError> {
-        let (mut layout, offsets) = V::buffer_layout(context, capacity)?;
-
-        let keys = Layout::array::<K>(capacity)?;
-        let offset_from_keys;
-        (layout, offset_from_keys) = keys.extend(layout)?;
-
-        let this = Self {
-            offset_from_keys,
-            keys: PhantomData,
-            values: offsets,
-        };
-        Ok((layout, this))
-    }
-}
-
-impl<'context, K, V> Debug for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-    V::FieldOffsets<'context>: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("KeyValueFieldOffsets")
-            .field("offset_from_keys", &self.offset_from_keys)
-            .field("values", &self.values)
-            .finish()
-    }
-}
-
-impl<'context, K, V> PartialEq for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-    V::FieldOffsets<'context>: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.offset_from_keys == other.offset_from_keys
-            && self.keys == other.keys
-            && self.values == other.values
-    }
-}
-
-impl<'context, K, V> Eq for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-    V::FieldOffsets<'context>: Eq,
-{
-}
-
-impl<'context, K, V> PartialOrd for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-    V::FieldOffsets<'context>: PartialOrd,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.offset_from_keys.partial_cmp(&other.offset_from_keys) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.keys.partial_cmp(&other.keys) {
-            Some(cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.values.partial_cmp(&other.values)
-    }
-}
-
-impl<'context, K, V> Ord for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-    V::FieldOffsets<'context>: Ord,
-{
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.offset_from_keys.cmp(&other.offset_from_keys) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        match self.keys.cmp(&other.keys) {
-            cmp::Ordering::Equal => {}
-            ord => return ord,
-        }
-        self.values.cmp(&other.values)
-    }
-}
-
-impl<'context, K, V> Hash for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-    V::FieldOffsets<'context>: Hash,
-{
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.offset_from_keys.hash(state);
-        self.keys.hash(state);
-        self.values.hash(state);
-    }
-}
-
-impl<'context, K, V> Clone for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-    V::FieldOffsets<'context>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            offset_from_keys: self.offset_from_keys.clone(),
-            keys: self.keys.clone(),
-            values: self.values.clone(),
-        }
-    }
-}
-
-impl<'context, K, V> Copy for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-    V::FieldOffsets<'context>: Copy,
-{
-}
-
-impl<'context, K, V> IntoIterator for KeyValueFieldOffsets<'context, K, V>
-where
-    V: Soa,
-{
-    type Item = usize;
-
-    type IntoIter = iter::Chain<
-        iter::Once<usize>,
-        iter::Scan<
-            <<V as Soa>::FieldOffsets<'context> as IntoIterator>::IntoIter,
-            usize,
-            fn(&mut usize, usize) -> Option<usize>,
-        >,
-    >;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let Self {
-            offset_from_keys,
-            values,
-            ..
-        } = self;
-
-        let key_offset = 0;
-        let f: fn(&mut _, _) -> _ = |&mut offset_from_keys, offset| Some(offset + offset_from_keys);
-        let value_offsets = values.into_iter().scan(offset_from_keys, f);
-        iter::once(key_offset).chain(value_offsets)
     }
 }
 

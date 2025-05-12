@@ -4,7 +4,7 @@ use alloc::{
 };
 use core::{
     alloc::{Layout, LayoutError},
-    iter,
+    iter::{self, FusedIterator},
     ptr::{self, NonNull},
 };
 use gpecs_soa::traits::SoaVecs;
@@ -16,7 +16,7 @@ use crate::{
         field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
         ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldVec,
     },
-    soa::traits::{buffer_layout, FieldDescriptor, Soa},
+    soa::traits::{FieldDescriptor, Soa},
 };
 
 use super::{
@@ -31,21 +31,20 @@ unsafe impl Soa for ErasedSoa {
 
     type FieldDescriptors<'context> = &'context [FieldDescriptor];
 
+    #[inline]
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_> {
         context.field_descriptors()
     }
 
-    type FieldOffsets<'context> = Box<[usize]>;
+    type BufferRegions<'context> = BufferRegions<'context>;
 
-    fn buffer_layout(
-        context: &Self::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
-        let field_layouts = context
-            .field_descriptors()
-            .iter()
-            .map(FieldDescriptor::layout);
-        buffer_layout(field_layouts, capacity)
+    #[inline]
+    fn buffer_regions(context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_> {
+        let descriptors = context.field_descriptors();
+        BufferRegions {
+            descriptors: descriptors.iter(),
+            capacity,
+        }
     }
 
     type Ptrs<'context> = ErasedSoaPtrs;
@@ -846,6 +845,73 @@ unsafe impl Soa for ErasedSoa {
     unsafe fn slices_drop_in_place(_: &Self::Context, _: Self::SliceMutPtrs<'_>) {
         // do nothing; it's safe to not drop anything
     }
+}
+
+pub struct BufferRegions<'context> {
+    descriptors: core::slice::Iter<'context, FieldDescriptor>,
+    capacity: usize,
+}
+
+impl Iterator for BufferRegions<'_> {
+    type Item = Result<Layout, LayoutError>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref mut descriptors,
+            capacity,
+        } = *self;
+
+        let desc = descriptors.next()?;
+        let item = repeat_layout(desc.layout(), capacity);
+        Some(item)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { descriptors, .. } = self;
+        descriptors.size_hint()
+    }
+}
+
+impl DoubleEndedIterator for BufferRegions<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref mut descriptors,
+            capacity,
+        } = *self;
+
+        let desc = descriptors.next_back()?;
+        let item = repeat_layout(desc.layout(), capacity);
+        Some(item)
+    }
+}
+
+impl ExactSizeIterator for BufferRegions<'_> {
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { descriptors, .. } = self;
+        descriptors.len()
+    }
+}
+
+impl FusedIterator for BufferRegions<'_> {}
+
+/// Use this until [`Layout::repeat()`] is stabilized
+#[inline]
+fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
+    const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
+        Ok(_) => unreachable!(),
+        Err(err) => err,
+    };
+
+    let layout = layout.pad_to_align();
+    let size = match layout.size().checked_mul(n) {
+        Some(v) => v,
+        None => return Err(ERR),
+    };
+    Layout::from_size_align(size, layout.align())
 }
 
 unsafe impl SoaVecs for ErasedSoa {

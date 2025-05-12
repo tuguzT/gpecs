@@ -59,14 +59,11 @@ unsafe impl Soa for () {
         [FieldDescriptor::of::<Self>()]
     }
 
-    type FieldOffsets<'context> = [usize; 1];
+    type BufferRegions<'context> = [Result<Layout, LayoutError>; 1];
 
     #[inline]
-    fn buffer_layout(
-        _context: &Self::Context,
-        _capacity: usize,
-    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
-        Ok((Layout::new::<Self>(), [0]))
+    fn buffer_regions(_context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_> {
+        [Layout::array::<Self>(capacity)]
     }
 
     #[inline]
@@ -102,7 +99,7 @@ unsafe impl Soa for () {
         _context: &Self::Context,
         ptrs: impl IntoIterator<Item = *const u8>,
     ) -> Self::Ptrs<'_> {
-        let ptrs: [*const u8; 1] = collect_array(ptrs);
+        let ptrs = collect_array::<_, 1>(ptrs);
         ptrs[0].cast()
     }
 
@@ -112,7 +109,7 @@ unsafe impl Soa for () {
         _context: &Self::Context,
         ptrs: impl IntoIterator<Item = *mut u8>,
     ) -> Self::MutPtrs<'_> {
-        let ptrs: [*mut u8; 1] = collect_array(ptrs);
+        let ptrs = collect_array::<_, 1>(ptrs);
         ptrs[0].cast()
     }
 
@@ -576,21 +573,18 @@ macro_rules! soa_tuple_impl {
                 SoaTupleImplHelper::<($($types,)*)>::FIELD_DESCRIPTORS
             }
 
-            type FieldOffsets<'context> = [usize; count_idents!($($types,)*)];
+            type BufferRegions<'context> = [Result<Layout, LayoutError>; count_idents!($($types,)*)];
 
             #[inline]
-            fn buffer_layout(
+            fn buffer_regions(
                 _context: &Self::Context,
                 capacity: usize,
-            ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError> {
-                let layouts = [$(Layout::array::<$types>(capacity)?,)*];
+            ) -> Self::BufferRegions<'_> {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let mut layout = Layout::new::<()>();
-                let mut offsets = [0; count_idents!($($types,)*)];
-                $((layout, offsets[$indices]) = layout.extend(layouts[permutation[$indices]])?;)*
-
-                Ok((layout, offsets))
+                let regions = [$(Layout::array::<$types>(capacity),)*];
+                let regions = [$(regions[permutation[$indices]].clone(),)*];
+                regions
             }
 
             type Ptrs<'context> = ($(*const $types,)*);
@@ -627,7 +621,7 @@ macro_rules! soa_tuple_impl {
             fn ptrs_restore(_context: &Self::Context, ptrs: impl IntoIterator<Item = *const u8>) -> Self::Ptrs<'_> {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let ptrs: [*const u8; count_idents!($($types,)*)] = collect_array(ptrs);
+                let ptrs = collect_array::<_, { count_idents!($($types,)*) }>(ptrs);
                 let ptrs = {
                     let mut result = [ptr::null(); count_idents!($($types,)*)];
                     $(result[permutation[$indices]] = ptrs[$indices];)*
@@ -643,7 +637,7 @@ macro_rules! soa_tuple_impl {
             fn ptrs_restore_mut(_context: &Self::Context, ptrs: impl IntoIterator<Item = *mut u8>) -> Self::MutPtrs<'_> {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
-                let ptrs: [*mut u8; count_idents!($($types,)*)] = collect_array(ptrs);
+                let ptrs = collect_array::<_, { count_idents!($($types,)*) }>(ptrs);
                 let ptrs = {
                     let mut result = [ptr::null_mut(); count_idents!($($types,)*)];
                     $(result[permutation[$indices]] = ptrs[$indices];)*

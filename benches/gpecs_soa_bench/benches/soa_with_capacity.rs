@@ -1,7 +1,7 @@
 use std::any::type_name;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use gpecs_soa::Soa;
+use gpecs_soa::traits::{buffer_layout, Soa};
 use gpecs_soa_bench::{
     names::*, with_capacity::WithCapacity, Big, Large, Medium, Small, Tiny, Zero,
 };
@@ -18,7 +18,7 @@ where
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
         let context = ErasedSoaContext::of::<T>(&Default::default());
-        let (buffer_layout, _) = ErasedSoa::buffer_layout(&context, capacity).unwrap();
+        let buffer_layout = buffer_layout(ErasedSoa::buffer_regions(&context, capacity)).unwrap();
         let bytes = buffer_layout.size();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
@@ -33,7 +33,7 @@ where
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
         let context = Default::default();
-        let (buffer_layout, _) = T::buffer_layout(&context, capacity).unwrap();
+        let buffer_layout = buffer_layout(T::buffer_regions(&context, capacity)).unwrap();
         let bytes = buffer_layout.size();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))

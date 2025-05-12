@@ -1,6 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
-    borrow::Borrow,
+    iter::FusedIterator,
 };
 
 pub use self::desc::FieldDescriptor;
@@ -39,24 +39,15 @@ pub unsafe trait Soa: Sized {
     /// Returns [field descriptors](Soa::FieldDescriptors) for each field of [`Fields`](Soa::Fields).
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_>;
 
-    /// Non-empty collection of offsets (in bytes) for each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of layouts needed to store `capacity` number of fields inside of a buffer
+    /// for each field of [`Fields`](Soa::Fields).
     ///
-    /// Each of these offsets **MUST** correspond to the offset of the field in the buffer
+    /// Each of these layouts **MUST** correspond to the layout of the field in the buffer
     /// in the order defined by [`FieldDescriptors`](Soa::FieldDescriptors).
-    ///
-    /// These offsets should not include offset to the [`Context`](Soa::Context),
-    /// as it is handled by the crate itself.
-    type FieldOffsets<'context>: IntoIterator<Item = usize>;
+    type BufferRegions<'context>: IntoIterator<Item = Result<Layout, LayoutError>>;
 
-    /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
-    /// Also returns non-empty collection of offsets for each field of [`Fields`](Soa::Fields) (in bytes).
-    ///
-    /// This layout should not include [`Context`](Soa::Context),
-    /// as it is handled by the crate itself.
-    fn buffer_layout(
-        context: &Self::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self::FieldOffsets<'_>), LayoutError>;
+    /// Returns [buffer regions](Soa::BufferRegions) for each field of [`Fields`](Soa::Fields).
+    fn buffer_regions(context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_>;
 
     /// Retrieves maximum number of fields that can be stored inside of a buffer with given layout.
     fn capacity_from(context: &Self::Context, buffer_layout: Layout) -> usize {
@@ -69,7 +60,8 @@ pub unsafe trait Soa: Sized {
 
         let mut capacity = max_capacity;
         while {
-            let (layout, _) = Self::buffer_layout(context, capacity)
+            let regions = Self::buffer_regions(context, capacity);
+            let layout = self::buffer_layout(regions)
                 .expect("new buffer layout should be smaller than the input one");
             layout.size() > buffer_size
         } {
@@ -575,42 +567,80 @@ pub unsafe trait Soa: Sized {
     }
 }
 
-/// Default implementation of [`buffer_layout()`](Soa::buffer_layout) method of [`Soa`] trait
-/// for collections implementing [`FromIterator`] trait.
+/// Calculates layout needed to store provided regions in a single buffer.
 #[inline]
-pub fn buffer_layout<B, I>(field_layouts: I, capacity: usize) -> Result<(Layout, B), LayoutError>
+pub fn buffer_layout<I>(regions: I) -> Result<Layout, LayoutError>
 where
-    I: IntoIterator<Item: Borrow<Layout>>,
-    B: FromIterator<usize>,
+    I: IntoIterator<Item = Result<Layout, LayoutError>>,
 {
-    let mut layout = Layout::new::<()>();
-    let offsets = field_layouts
-        .into_iter()
-        .map(|item| {
-            let repeated = repeat_layout(item.borrow(), capacity)?;
-            let offset;
-            (layout, offset) = layout.extend(repeated)?;
-            Ok(offset)
-        })
-        .collect::<Result<_, _>>()?;
-
-    Ok((layout, offsets))
+    let mut offsets = buffer_offsets(regions);
+    offsets.by_ref().try_for_each(|offset| offset.map(drop))?;
+    Ok(offsets.layout())
 }
 
-/// Use this until [`Layout::repeat()`] is stabilized
-#[inline]
-fn repeat_layout(layout: &Layout, n: usize) -> Result<Layout, LayoutError> {
-    const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
-        Ok(_) => unreachable!(),
-        Err(err) => err,
-    };
+pub struct BufferOffsets<I> {
+    layout: Layout,
+    regions: I,
+}
 
-    let layout = layout.pad_to_align();
-    let size = match layout.size().checked_mul(n) {
-        Some(v) => v,
-        None => return Err(ERR),
-    };
-    Layout::from_size_align(size, layout.align())
+impl<I> BufferOffsets<I> {
+    #[inline]
+    pub fn layout(&self) -> Layout {
+        let Self { layout, .. } = *self;
+        layout
+    }
+}
+
+impl<I> Iterator for BufferOffsets<I>
+where
+    I: Iterator<Item = Result<Layout, LayoutError>>,
+{
+    type Item = Result<usize, LayoutError>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { layout, regions } = self;
+
+        let offset = regions.next()?.and_then(|region| {
+            let offset;
+            (*layout, offset) = layout.extend(region)?;
+            Ok(offset)
+        });
+        Some(offset)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { regions, .. } = self;
+        regions.size_hint()
+    }
+}
+
+impl<I> ExactSizeIterator for BufferOffsets<I>
+where
+    I: Iterator<Item = Result<Layout, LayoutError>> + ExactSizeIterator,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { regions, .. } = self;
+        regions.len()
+    }
+}
+
+impl<I> FusedIterator for BufferOffsets<I> where
+    I: Iterator<Item = Result<Layout, LayoutError>> + FusedIterator
+{
+}
+
+#[inline]
+pub fn buffer_offsets<I>(regions: I) -> BufferOffsets<I::IntoIter>
+where
+    I: IntoIterator<Item = Result<Layout, LayoutError>>,
+{
+    BufferOffsets {
+        layout: Layout::new::<()>(),
+        regions: regions.into_iter(),
+    }
 }
 
 /// A generalization of [`Clone`] to borrowed data

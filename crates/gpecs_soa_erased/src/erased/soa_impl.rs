@@ -7,7 +7,6 @@ use core::{
     iter::{self, FusedIterator},
     ptr::{self, NonNull},
 };
-use gpecs_soa::traits::SoaVecs;
 
 use crate::{
     aligned_bytes::AlignedBytes,
@@ -16,7 +15,7 @@ use crate::{
         field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
         ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldVec,
     },
-    soa::traits::{FieldDescriptor, Soa},
+    soa::traits::{buffer_layout, buffer_offsets, BufferOffsets, FieldDescriptor, Soa, SoaVecs},
 };
 
 use super::{
@@ -45,6 +44,17 @@ unsafe impl Soa for ErasedSoa {
             descriptors: descriptors.iter(),
             capacity,
         }
+    }
+
+    type BufferOffsets<'context> = UnwrapBufferOffsets<'context>;
+
+    #[inline]
+    fn buffer_layout_with_offsets(
+        context: &Self::Context,
+        capacity: usize,
+    ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
+        let descriptors = context.field_descriptors();
+        buffer_layout_with_offsets(descriptors, capacity)
     }
 
     type Ptrs<'context> = ErasedSoaPtrs;
@@ -847,6 +857,7 @@ unsafe impl Soa for ErasedSoa {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BufferRegions<'context> {
     descriptors: core::slice::Iter<'context, FieldDescriptor>,
     capacity: usize,
@@ -912,6 +923,23 @@ fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
         None => return Err(ERR),
     };
     Layout::from_size_align(size, layout.align())
+}
+
+type UnwrapBufferOffsets<'context> =
+    iter::Map<BufferOffsets<BufferRegions<'context>>, fn(Result<usize, LayoutError>) -> usize>;
+
+#[inline]
+pub fn buffer_layout_with_offsets(
+    descriptors: &[FieldDescriptor],
+    capacity: usize,
+) -> Result<(Layout, UnwrapBufferOffsets), LayoutError> {
+    let regions = BufferRegions {
+        descriptors: descriptors.iter(),
+        capacity,
+    };
+    let layout = buffer_layout(regions.clone())?;
+    let offsets = buffer_offsets(regions).map(Result::unwrap as fn(_) -> _);
+    Ok((layout, offsets))
 }
 
 unsafe impl SoaVecs for ErasedSoa {

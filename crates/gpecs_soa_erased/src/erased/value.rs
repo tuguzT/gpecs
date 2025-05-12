@@ -3,17 +3,18 @@ use core::{
     fmt::{self, Debug},
     ptr, slice,
 };
-use gpecs_soa::traits::buffer_offsets;
 
 use crate::{
     aligned_bytes::AlignedBytes,
     assert::{check_same_layout, check_same_len},
     error::LenMismatchError,
     field::{ErasedField, ErasedFieldRef, ErasedFieldRefMut},
-    soa::traits::{buffer_layout, FieldDescriptor, Soa},
+    soa::traits::{FieldDescriptor, Soa},
 };
 
-use super::{error::IntoValueError, ErasedSoaRefs, ErasedSoaRefsMut};
+use super::{
+    error::IntoValueError, soa_impl::buffer_layout_with_offsets, ErasedSoaRefs, ErasedSoaRefsMut,
+};
 
 pub struct ErasedSoa {
     buffer: AlignedBytes,
@@ -59,13 +60,11 @@ impl ErasedSoa {
     {
         let (descriptors, fields): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
         let descriptors = descriptors.into_boxed_slice();
-        let regions = descriptors.iter().map(FieldDescriptor::layout).map(Ok);
 
-        let layout = buffer_layout(regions.clone())
+        let (layout, offsets) = buffer_layout_with_offsets(&descriptors, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
         let mut buffer = AlignedBytes::new(layout);
 
-        let offsets = buffer_offsets(regions).map(Result::unwrap);
         for ((desc, src), offset) in descriptors.iter().zip(fields).zip(offsets) {
             let src = src.as_ref().as_ptr();
             let dst = unsafe { buffer.as_mut_ptr().cast::<u8>().add(offset) };
@@ -88,13 +87,11 @@ impl ErasedSoa {
             .into_iter()
             .map(|desc| desc.as_ref().clone())
             .collect();
-        let regions = descriptors.iter().map(FieldDescriptor::layout).map(Ok);
 
-        let layout = buffer_layout(regions.clone())
+        let (layout, offsets) = buffer_layout_with_offsets(&descriptors, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
         let mut buffer = AlignedBytes::new(layout);
 
-        let offsets = buffer_offsets(regions).map(Result::unwrap);
         unsafe {
             let buffer = buffer.as_mut_ptr().cast::<u8>();
             let ptrs = offsets.into_iter().map(|offset| buffer.add(offset));
@@ -132,16 +129,14 @@ impl ErasedSoa {
         if let Err(error) = result {
             return Err(IntoValueError::new(self, error));
         }
-        let regions = descriptors.iter().map(FieldDescriptor::layout).map(Ok);
 
-        let layout = buffer_layout(regions.clone())
+        let (layout, offsets) = buffer_layout_with_offsets(&descriptors, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
         let buffer_len = layout.size();
         if let Err(error) = check_same_len(buffer_len, buffer.layout().size()) {
             return Err(IntoValueError::new(self, error.into()));
         }
 
-        let offsets = buffer_offsets(regions).map(Result::unwrap);
         let value = unsafe {
             let buffer = buffer.as_ptr().cast::<u8>();
             let ptrs = offsets.into_iter().map(|offset| buffer.add(offset));
@@ -159,14 +154,11 @@ impl ErasedSoa {
             ..
         } = self;
 
-        let regions = descriptors.iter().map(FieldDescriptor::layout).map(Ok);
-
-        let layout = buffer_layout(regions.clone())
+        let (layout, offsets) = buffer_layout_with_offsets(&descriptors, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
         let buffer_len = layout.size();
         check_same_len(buffer_len, buffer.layout().size()).expect("buffer length should match");
 
-        let offsets = buffer_offsets(regions).map(Result::unwrap);
         descriptors
             .iter()
             .zip(offsets)
@@ -192,14 +184,11 @@ impl ErasedSoa {
             ..
         } = self;
 
-        let regions = descriptors.iter().map(FieldDescriptor::layout).map(Ok);
-
-        let layout = buffer_layout(regions.clone())
+        let (layout, offsets) = buffer_layout_with_offsets(&descriptors, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
         let buffer_len = layout.size();
         check_same_len(buffer_len, buffer.layout().size()).expect("buffer length should match");
 
-        let offsets = buffer_offsets(regions).map(Result::unwrap);
         let refs = descriptors.iter().zip(offsets).map(|(desc, offset)| {
             let data = unsafe { buffer.as_ptr().cast::<u8>().add(offset) };
             let len = desc.layout().size();
@@ -217,14 +206,11 @@ impl ErasedSoa {
             ..
         } = self;
 
-        let regions = descriptors.iter().map(FieldDescriptor::layout).map(Ok);
-
-        let layout = buffer_layout(regions.clone())
+        let (layout, offsets) = buffer_layout_with_offsets(&descriptors, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
         let buffer_len = layout.size();
         check_same_len(buffer_len, buffer.layout().size()).expect("buffer length should match");
 
-        let offsets = buffer_offsets(regions).map(Result::unwrap);
         let refs = descriptors.iter().zip(offsets).map(|(desc, offset)| {
             let data = unsafe { buffer.as_mut_ptr().cast::<u8>().add(offset) };
             let len = desc.layout().size();

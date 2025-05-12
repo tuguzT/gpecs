@@ -66,6 +66,18 @@ unsafe impl Soa for () {
         [Layout::array::<Self>(capacity)]
     }
 
+    type BufferOffsets<'context> = [usize; 1];
+
+    #[inline]
+    fn buffer_layout_with_offsets(
+        _context: &Self::Context,
+        capacity: usize,
+    ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
+        let layout = Layout::array::<Self>(capacity)?;
+        let offsets = [0];
+        Ok((layout, offsets))
+    }
+
     #[inline]
     fn capacity_from(_context: &Self::Context, _buffer_layout: Layout) -> usize {
         usize::MAX
@@ -585,6 +597,24 @@ macro_rules! soa_tuple_impl {
                 let regions = [$(Layout::array::<$types>(capacity),)*];
                 let regions = [$(regions[permutation[$indices]].clone(),)*];
                 regions
+            }
+
+            type BufferOffsets<'context> = [usize; count_idents!($($types,)*)];
+
+            #[inline]
+            fn buffer_layout_with_offsets(
+                _context: &Self::Context,
+                capacity: usize,
+            ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+
+                let mut layout = Layout::new::<()>();
+                let mut offsets = [0; count_idents!($($types,)*)];
+
+                let regions = [$(Layout::array::<$types>(capacity)?,)*];
+                $((layout, offsets[$indices]) = layout.extend(regions[permutation[$indices]])?;)*
+
+                Ok((layout, offsets))
             }
 
             type Ptrs<'context> = ($(*const $types,)*);

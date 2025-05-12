@@ -70,6 +70,16 @@ where
         iter::once(Layout::array::<K>(capacity)).chain(V::buffer_regions(context, capacity))
     }
 
+    type BufferOffsets<'context> = KeyValueBufferOffsets<'context, K, V>;
+
+    #[inline]
+    fn buffer_layout_with_offsets(
+        context: &Self::Context,
+        capacity: usize,
+    ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
+        KeyValueBufferOffsets::new(context, capacity)
+    }
+
     type Ptrs<'context> = KeyValuePtrs<'context, K, V>;
     type MutPtrs<'context> = KeyValueMutPtrs<'context, K, V>;
 
@@ -817,6 +827,206 @@ where
             |desc| *desc.as_ref();
         let value = value.into_iter().map(f);
         iter::once(key).chain(value)
+    }
+}
+
+pub struct KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+{
+    offset_from_keys: usize,
+    keys: PhantomData<fn() -> K>,
+    values: V::BufferOffsets<'context>,
+}
+
+impl<'context, K, V> KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+{
+    #[inline]
+    pub fn new(
+        context: &'context V::Context,
+        capacity: usize,
+    ) -> Result<(Layout, Self), LayoutError> {
+        let (mut layout, offsets) = V::buffer_layout_with_offsets(context, capacity)?;
+
+        let keys = Layout::array::<K>(capacity)?;
+        let offset_from_keys;
+        (layout, offset_from_keys) = keys.extend(layout)?;
+
+        let offsets = Self {
+            offset_from_keys,
+            keys: PhantomData,
+            values: offsets,
+        };
+        Ok((layout, offsets))
+    }
+}
+
+impl<'context, K, V> Debug for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+    V::BufferOffsets<'context>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            offset_from_keys,
+            values,
+            ..
+        } = self;
+
+        f.debug_struct("KeyValueFieldOffsets")
+            .field("offset_from_keys", offset_from_keys)
+            .field("values", values)
+            .finish()
+    }
+}
+
+impl<'context, K, V> PartialEq for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+    V::BufferOffsets<'context>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            offset_from_keys,
+            keys,
+            values,
+        } = self;
+
+        *offset_from_keys == other.offset_from_keys
+            && *keys == other.keys
+            && *values == other.values
+    }
+}
+
+impl<'context, K, V> Eq for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+    V::BufferOffsets<'context>: Eq,
+{
+}
+
+impl<'context, K, V> PartialOrd for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+    V::BufferOffsets<'context>: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        let Self {
+            offset_from_keys,
+            keys,
+            values,
+        } = self;
+
+        match offset_from_keys.partial_cmp(&other.offset_from_keys) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match keys.partial_cmp(&other.keys) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        values.partial_cmp(&other.values)
+    }
+}
+
+impl<'context, K, V> Ord for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+    V::BufferOffsets<'context>: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let Self {
+            offset_from_keys,
+            keys,
+            values,
+        } = self;
+
+        match offset_from_keys.cmp(&other.offset_from_keys) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        match keys.cmp(&other.keys) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        values.cmp(&other.values)
+    }
+}
+
+impl<'context, K, V> Hash for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+    V::BufferOffsets<'context>: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        let Self {
+            offset_from_keys,
+            keys,
+            values,
+        } = self;
+
+        offset_from_keys.hash(state);
+        keys.hash(state);
+        values.hash(state);
+    }
+}
+
+impl<'context, K, V> Clone for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+    V::BufferOffsets<'context>: Clone,
+{
+    fn clone(&self) -> Self {
+        let Self {
+            offset_from_keys,
+            keys,
+            ref values,
+        } = *self;
+
+        Self {
+            offset_from_keys,
+            keys,
+            values: values.clone(),
+        }
+    }
+}
+
+impl<'context, K, V> Copy for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+    V::BufferOffsets<'context>: Copy,
+{
+}
+
+impl<'context, K, V> IntoIterator for KeyValueBufferOffsets<'context, K, V>
+where
+    V: Soa,
+{
+    type Item = usize;
+
+    type IntoIter = iter::Chain<
+        iter::Once<usize>,
+        iter::Scan<
+            <<V as Soa>::BufferOffsets<'context> as IntoIterator>::IntoIter,
+            usize,
+            fn(&mut usize, usize) -> Option<usize>,
+        >,
+    >;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Self {
+            offset_from_keys,
+            values,
+            ..
+        } = self;
+
+        let key_offset = 0;
+        let f: fn(&mut _, _) -> _ = |&mut offset_from_keys, offset| Some(offset + offset_from_keys);
+        let value_offsets = values.into_iter().scan(offset_from_keys, f);
+        iter::once(key_offset).chain(value_offsets)
     }
 }
 

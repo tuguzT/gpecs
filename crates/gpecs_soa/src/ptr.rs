@@ -430,14 +430,14 @@ where
         return Ok(T::ptrs_dangling(context));
     }
 
-    let layout = traits::buffer_layout(T::buffer_regions(context, capacity))?;
+    let (layout, offsets) = T::buffer_layout_with_offsets(context, capacity)?;
     let prefix_layout = Layout::new::<BufferPrefix<T>>();
     let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
 
     let ptr = ptr.cast::<u8>();
-    let ptrs = traits::buffer_offsets(T::buffer_regions(context, capacity))
+    let ptrs = offsets
         .into_iter()
-        .map(|offset| unsafe { ptr.add(offset.unwrap() + offset_from_prefix) });
+        .map(|offset| unsafe { ptr.add(offset + offset_from_prefix) });
     let ptrs = T::ptrs_restore_mut(context, ptrs);
     Ok(ptrs)
 }

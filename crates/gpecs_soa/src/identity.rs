@@ -240,6 +240,18 @@ unsafe impl<T> Soa for Identity<T> {
         [Layout::array::<T>(capacity)]
     }
 
+    type BufferOffsets<'context> = [usize; 1];
+
+    #[inline]
+    fn buffer_layout_with_offsets(
+        _context: &Self::Context,
+        capacity: usize,
+    ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
+        let layout = Layout::array::<T>(capacity)?;
+        let offsets = [0];
+        Ok((layout, offsets))
+    }
+
     #[inline]
     fn capacity_from(_context: &Self::Context, buffer_layout: Layout) -> usize {
         buffer_layout

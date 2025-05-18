@@ -25,14 +25,14 @@ nightly = []
 workspace = true
 
 [package.metadata.rust-gpu.install]
-spirv_builder_source = "https://github.com/Rust-GPU/rust-gpu"
-spirv_builder_version = "6d7c1cd"
-auto-install-rust-toolchain = false
+spirv-builder-source = "https://github.com/Rust-GPU/rust-gpu"
+spirv-builder-version = "6d7c1cd"
 rebuild-codegen = false
+auto-install-rust-toolchain = false
 force-overwrite-lockfiles-v4-to-v3 = false
 
 [package.metadata.rust-gpu.build]
-default_features = true
+default-features = false
 features = ["nightly"]
 target = "spirv-unknown-spv1.5"
 spirv-metadata = "Full"

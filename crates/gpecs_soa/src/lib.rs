@@ -10,7 +10,6 @@ extern crate alloc as core_alloc;
 
 #[cfg(feature = "alloc")]
 pub use self::alloc::vec;
-pub use self::traits::Soa;
 
 pub mod identity;
 pub mod mem;

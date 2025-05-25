@@ -240,16 +240,9 @@ unsafe impl<T> Soa for Identity<T> {
         [Layout::array::<T>(capacity)]
     }
 
-    type BufferOffsets<'context> = [usize; 1];
-
     #[inline]
-    fn buffer_layout_with_offsets(
-        _context: &Self::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
-        let layout = Layout::array::<T>(capacity)?;
-        let offsets = [0];
-        Ok((layout, offsets))
+    fn buffer_layout(_context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
+        Layout::array::<T>(capacity)
     }
 
     #[inline]
@@ -309,6 +302,17 @@ unsafe impl<T> Soa for Identity<T> {
     #[inline]
     fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer<'context>(
+        _context: &'context Self::Context,
+        buffer: *mut u8,
+        _capacity: usize,
+    ) -> Self::MutPtrs<'context> {
+        let ptrs = buffer.cast();
+        debug_assert_ptr_is_aligned(ptrs);
+        ptrs
     }
 
     #[inline]

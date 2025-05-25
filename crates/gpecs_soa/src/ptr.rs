@@ -6,7 +6,7 @@ use core::{
 
 use crate::{
     slice::SoaSlice,
-    traits::{self, Soa, SoaTrustedFields},
+    traits::{Soa, SoaTrustedFields},
 };
 
 #[allow(clippy::missing_safety_doc)]
@@ -350,7 +350,7 @@ where
         return Ok(Layout::new::<BufferPrefix<T>>());
     }
 
-    let layout = traits::buffer_layout(T::buffer_regions(context, capacity))?;
+    let layout = T::buffer_layout(context, capacity)?;
     let prefix_layout = Layout::new::<BufferPrefix<T>>();
     let (layout, _) = prefix_layout.extend(layout)?;
 
@@ -430,15 +430,12 @@ where
         return Ok(T::ptrs_dangling(context));
     }
 
-    let (layout, offsets) = T::buffer_layout_with_offsets(context, capacity)?;
+    let layout = T::buffer_layout(context, capacity)?;
     let prefix_layout = Layout::new::<BufferPrefix<T>>();
     let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
 
-    let ptr = ptr.cast::<u8>();
-    let ptrs = offsets
-        .into_iter()
-        .map(|offset| unsafe { ptr.add(offset + offset_from_prefix) });
-    let ptrs = T::ptrs_restore_mut(context, ptrs);
+    let buffer = unsafe { ptr.cast::<u8>().add(offset_from_prefix) };
+    let ptrs = unsafe { T::ptrs_from_buffer(context, buffer, capacity) };
     Ok(ptrs)
 }
 

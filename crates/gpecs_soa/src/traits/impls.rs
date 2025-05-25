@@ -66,16 +66,9 @@ unsafe impl Soa for () {
         [Layout::array::<Self>(capacity)]
     }
 
-    type BufferOffsets<'context> = [usize; 1];
-
     #[inline]
-    fn buffer_layout_with_offsets(
-        _context: &Self::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
-        let layout = Layout::array::<Self>(capacity)?;
-        let offsets = [0];
-        Ok((layout, offsets))
+    fn buffer_layout(_context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
+        Layout::array::<Self>(capacity)
     }
 
     #[inline]
@@ -128,6 +121,15 @@ unsafe impl Soa for () {
     #[inline]
     fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer<'context>(
+        _context: &'context Self::Context,
+        buffer: *mut u8,
+        _capacity: usize,
+    ) -> Self::MutPtrs<'context> {
+        buffer.cast()
     }
 
     #[inline]
@@ -599,22 +601,15 @@ macro_rules! soa_tuple_impl {
                 regions
             }
 
-            type BufferOffsets<'context> = [usize; count_idents!($($types,)*)];
-
             #[inline]
-            fn buffer_layout_with_offsets(
-                _context: &Self::Context,
-                capacity: usize,
-            ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
+            fn buffer_layout(_context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();
-                let mut offsets = [0; count_idents!($($types,)*)];
-
                 let regions = [$(Layout::array::<$types>(capacity)?,)*];
-                $((layout, offsets[$indices]) = layout.extend(regions[permutation[$indices]])?;)*
+                $((layout, _) = layout.extend(regions[permutation[$indices]])?;)*
 
-                Ok((layout, offsets))
+                Ok(layout)
             }
 
             type Ptrs<'context> = ($(*const $types,)*);
@@ -682,6 +677,33 @@ macro_rules! soa_tuple_impl {
             #[inline]
             fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
                 let ptrs = ($(ptr::dangling_mut::<$types>(),)*);
+                ptrs
+            }
+
+            #[inline]
+            unsafe fn ptrs_from_buffer<'context>(
+                _context: &'context Self::Context,
+                buffer: *mut u8,
+                capacity: usize,
+            ) -> Self::MutPtrs<'context> {
+                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+
+                let mut layout = Layout::new::<()>();
+                let mut offsets = [0; count_idents!($($types,)*)];
+
+                let regions = unsafe { [$(Layout::array::<$types>(capacity).unwrap_unchecked(),)*] };
+                $((layout, offsets[$indices]) = unsafe { layout.extend(regions[permutation[$indices]]).unwrap_unchecked() };)*
+                let _ = layout;
+
+                let ptrs = unsafe { [$(buffer.add(offsets[$indices]),)*] };
+                let ptrs = {
+                    let mut result = [ptr::null_mut(); count_idents!($($types,)*)];
+                    $(result[permutation[$indices]] = ptrs[$indices];)*
+                    result
+                };
+
+                let ptrs: Self::MutPtrs<'_> = ($(ptrs[$indices].cast(),)*);
+                $(debug_assert_ptr_is_aligned(ptrs.$indices);)*
                 ptrs
             }
 

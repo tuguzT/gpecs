@@ -84,3 +84,19 @@ where
     offsets.by_ref().try_for_each(|offset| offset.map(drop))?;
     Ok(offsets.layout())
 }
+
+/// Copy of [`Layout::repeat()`] functionality which could be used on stable channel.
+#[inline]
+pub fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
+    const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
+        Ok(_) => unreachable!(),
+        Err(err) => err,
+    };
+
+    let layout = layout.pad_to_align();
+    let size = match layout.size().checked_mul(n) {
+        Some(v) => v,
+        None => return Err(ERR),
+    };
+    Layout::from_size_align(size, layout.align())
+}

@@ -15,7 +15,7 @@ use crate::{
         field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
         ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldVec,
     },
-    soa::traits::{buffer_layout, buffer_offsets, BufferOffsets, FieldDescriptor, Soa, SoaVecs},
+    soa::traits::{buffer_offsets, repeat_layout, FieldDescriptor, Soa, SoaVecs},
 };
 
 use super::{
@@ -44,17 +44,6 @@ unsafe impl Soa for ErasedSoa {
             descriptors: descriptors.iter(),
             capacity,
         }
-    }
-
-    type BufferOffsets<'context> = UnwrapBufferOffsets<'context>;
-
-    #[inline]
-    fn buffer_layout_with_offsets(
-        context: &Self::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError> {
-        let descriptors = context.field_descriptors();
-        buffer_layout_with_offsets(descriptors, capacity)
     }
 
     type Ptrs<'context> = ErasedSoaPtrs;
@@ -135,6 +124,27 @@ unsafe impl Soa for ErasedSoa {
             .iter()
             .copied()
             .map(ErasedFieldMutPtr::dangling);
+        ErasedSoaMutPtrs::new(ptrs)
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer<'context>(
+        context: &'context Self::Context,
+        buffer: *mut u8,
+        capacity: usize,
+    ) -> Self::MutPtrs<'context> {
+        let descriptors = context.field_descriptors();
+        let regions = BufferRegions {
+            descriptors: descriptors.iter(),
+            capacity,
+        };
+        let ptrs = buffer_offsets(regions)
+            .zip(descriptors)
+            .map(|(offset, &desc)| unsafe {
+                let data = buffer.add(offset.unwrap_unchecked());
+                let buffer = ptr::slice_from_raw_parts_mut(data, desc.layout().size());
+                ErasedFieldMutPtr::new_unchecked(desc, buffer)
+            });
         ErasedSoaMutPtrs::new(ptrs)
     }
 
@@ -908,39 +918,6 @@ impl ExactSizeIterator for BufferRegions<'_> {
 }
 
 impl FusedIterator for BufferRegions<'_> {}
-
-/// Use this until [`Layout::repeat()`] is stabilized
-#[inline]
-fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
-    const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
-        Ok(_) => unreachable!(),
-        Err(err) => err,
-    };
-
-    let layout = layout.pad_to_align();
-    let size = match layout.size().checked_mul(n) {
-        Some(v) => v,
-        None => return Err(ERR),
-    };
-    Layout::from_size_align(size, layout.align())
-}
-
-type UnwrapBufferOffsets<'context> =
-    iter::Map<BufferOffsets<BufferRegions<'context>>, fn(Result<usize, LayoutError>) -> usize>;
-
-#[inline]
-pub fn buffer_layout_with_offsets(
-    descriptors: &[FieldDescriptor],
-    capacity: usize,
-) -> Result<(Layout, UnwrapBufferOffsets), LayoutError> {
-    let regions = BufferRegions {
-        descriptors: descriptors.iter(),
-        capacity,
-    };
-    let layout = buffer_layout(regions.clone())?;
-    let offsets = buffer_offsets(regions).map(Result::unwrap as fn(_) -> _);
-    Ok((layout, offsets))
-}
 
 unsafe impl SoaVecs for ErasedSoa {
     type Vecs = ErasedSoaVecs;

@@ -2,7 +2,7 @@ use core::alloc::{Layout, LayoutError};
 
 pub use self::{
     desc::FieldDescriptor,
-    utils::{buffer_layout, buffer_offsets, BufferOffsets},
+    utils::{buffer_layout, buffer_offsets, repeat_layout, BufferOffsets},
 };
 
 #[doc(hidden)]
@@ -18,6 +18,8 @@ pub type DefaultContext = ();
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays (or SoA) pattern.
 #[allow(clippy::missing_safety_doc)]
+// TODO: remove unnecessary / excessive stuff (such as buffer regions, byte offsets, erase / restore API)
+//       we can (potentially) achieve the same without that mess mentioned above
 pub unsafe trait Soa: Sized {
     /// Type of context used to perform all operations of this trait.
     ///
@@ -52,24 +54,10 @@ pub unsafe trait Soa: Sized {
     /// Returns [buffer regions](Soa::BufferRegions) for each field of [`Fields`](Soa::Fields).
     fn buffer_regions(context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_>;
 
-    /// Non-empty collection of offsets (in bytes) for each field of [`Fields`](Soa::Fields).
-    ///
-    /// Each of these offsets **MUST** correspond to the offset of the field in the buffer
-    /// in the order defined by [`FieldDescriptors`](Soa::FieldDescriptors).
-    ///
-    /// These offsets should not include offset to the [`Context`](Soa::Context),
-    /// as it is handled by the crate itself.
-    type BufferOffsets<'context>: IntoIterator<Item = usize>;
-
-    /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
-    /// Also returns non-empty collection of offsets for each field of [`Fields`](Soa::Fields) (in bytes).
-    ///
-    /// This layout should not include [`Context`](Soa::Context),
-    /// as it is handled by the crate itself.
-    fn buffer_layout_with_offsets(
-        context: &Self::Context,
-        capacity: usize,
-    ) -> Result<(Layout, Self::BufferOffsets<'_>), LayoutError>;
+    fn buffer_layout(context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
+        let regions = Self::buffer_regions(context, capacity);
+        self::buffer_layout(regions)
+    }
 
     /// Retrieves maximum number of fields that can be stored inside of a buffer with given layout.
     fn capacity_from(context: &Self::Context, buffer_layout: Layout) -> usize {
@@ -82,8 +70,7 @@ pub unsafe trait Soa: Sized {
 
         let mut capacity = max_capacity;
         while {
-            let regions = Self::buffer_regions(context, capacity);
-            let layout = self::buffer_layout(regions)
+            let layout = Self::buffer_layout(context, capacity)
                 .expect("new buffer layout should be smaller than the input one");
             layout.size() > buffer_size
         } {
@@ -160,6 +147,12 @@ pub unsafe trait Soa: Sized {
 
     /// Returns dangling pointers to each field of [`Fields`](Soa::Fields).
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_>;
+
+    unsafe fn ptrs_from_buffer<'context>(
+        context: &'context Self::Context,
+        buffer: *mut u8,
+        capacity: usize,
+    ) -> Self::MutPtrs<'context>;
 
     /// Converts pointers to the mutable ones of each field of [`Fields`](Soa::Fields).
     fn ptrs_cast_const<'context>(

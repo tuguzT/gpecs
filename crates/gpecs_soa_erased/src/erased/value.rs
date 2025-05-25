@@ -88,15 +88,12 @@ impl ErasedSoa {
             .map(|desc| desc.as_ref().clone())
             .collect();
 
-        let (layout, offsets) = T::buffer_layout_with_offsets(context, 1)
+        let layout = T::buffer_layout(context, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
         let mut buffer = AlignedBytes::new(layout);
 
         unsafe {
-            let ptrs = offsets
-                .into_iter()
-                .map(|offset| buffer.as_mut_ptr().add(offset));
-            let dst = T::ptrs_restore_mut(context, ptrs);
+            let dst = T::ptrs_from_buffer(context, buffer.as_mut_ptr(), 1);
             T::ptrs_write(context, dst, value);
         }
 
@@ -131,18 +128,16 @@ impl ErasedSoa {
             return Err(IntoValueError::new(self, error));
         }
 
-        let (layout, offsets) = T::buffer_layout_with_offsets(context, 1)
+        let layout = T::buffer_layout(context, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
         if let Err(error) = check_same_len(layout.size(), buffer.layout().size()) {
             return Err(IntoValueError::new(self, error.into()));
         }
 
+        let Self { mut buffer, .. } = self;
         let value = unsafe {
-            let ptrs = offsets
-                .into_iter()
-                .map(|offset| buffer.as_ptr().add(offset));
-            let src = T::ptrs_restore(context, ptrs);
-            T::ptrs_read(context, src)
+            let src = T::ptrs_from_buffer(context, buffer.as_mut_ptr(), 1);
+            T::ptrs_read(context, T::ptrs_cast_const(context, src))
         };
         Ok(value)
     }

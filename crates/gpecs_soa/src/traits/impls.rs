@@ -692,17 +692,10 @@ macro_rules! soa_tuple_impl {
                 let mut offsets = [0; count_idents!($($types,)*)];
 
                 let regions = unsafe { [$(Layout::array::<$types>(capacity).unwrap_unchecked(),)*] };
-                $((layout, offsets[$indices]) = unsafe { layout.extend(regions[permutation[$indices]]).unwrap_unchecked() };)*
+                $((layout, offsets[permutation[$indices]]) = unsafe { layout.extend(regions[permutation[$indices]]).unwrap_unchecked() };)*
                 let _ = layout;
 
-                let ptrs = unsafe { [$(buffer.add(offsets[$indices]),)*] };
-                let ptrs = {
-                    let mut result = [ptr::null_mut(); count_idents!($($types,)*)];
-                    $(result[permutation[$indices]] = ptrs[$indices];)*
-                    result
-                };
-
-                let ptrs: Self::MutPtrs<'_> = ($(ptrs[$indices].cast(),)*);
+                let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
                 $(debug_assert_ptr_is_aligned(ptrs.$indices);)*
                 ptrs
             }

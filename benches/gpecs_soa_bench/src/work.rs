@@ -1,7 +1,7 @@
 use std::{array, hint::black_box, iter::Zip, slice};
 
 use gpecs_soa::{prelude::*, slice as soa_slice};
-use gpecs_soa_erased::erased::ErasedSoa;
+use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaVec};
 
 use crate::{push::Push, with_capacity::WithCapacity, Big, Large, Small, Tiny};
 
@@ -23,7 +23,7 @@ pub trait Work: WithCapacity + Push {
     fn soa_slf_prepare_iter<'c, 'a>(data: SoaSlices<'c, 'a, Self>) -> Self::SoaSlfIter<'c, 'a>;
     fn soa_slf_work(iter: Self::SoaSlfIter<'_, '_>) -> Self::Output;
 
-    fn soa_ser_prepare_vec(count: usize) -> SoaVec<ErasedSoa> {
+    fn soa_ser_prepare_vec(count: usize) -> ErasedSoaVec {
         let mut vec = Self::soa_ser_with_capacity(count);
         for index in 0..count {
             let value = black_box(Self::work_item(index));

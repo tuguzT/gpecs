@@ -1,14 +1,14 @@
 use std::iter;
 
 use gpecs_soa_erased::{
-    erased::{ErasedSoa, ErasedSoaContext},
-    soa::{traits::FieldDescriptor, vec::SoaVec},
+    erased::{ErasedSoa, ErasedSoaContext, ErasedSoaVec},
+    soa::traits::FieldDescriptor,
 };
 
 #[test]
 fn new_erased() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<ErasedSoa>;
+    type Vec = ErasedSoaVec;
 
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
@@ -69,7 +69,7 @@ fn new_erased() {
 #[test]
 fn with_capacity_erased() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<ErasedSoa>;
+    type Vec = ErasedSoaVec;
 
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
@@ -131,7 +131,7 @@ fn with_capacity_erased() {
 #[test]
 fn one_item_erased() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<ErasedSoa>;
+    type Vec = ErasedSoaVec;
 
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
@@ -256,7 +256,7 @@ fn one_item_erased() {
 #[test]
 fn three_items_erased() {
     type Soa = (u8, String, u64, ());
-    type Vec = SoaVec<ErasedSoa>;
+    type Vec = ErasedSoaVec;
 
     let context = ();
     let erased_context = ErasedSoaContext::of::<Soa>(&context);

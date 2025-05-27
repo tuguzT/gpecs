@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
 use gpecs_soa::{prelude::*, traits::SoaVecs};
-use gpecs_soa_erased::erased::ErasedSoa;
+use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaVec};
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero};
 
@@ -11,7 +11,7 @@ pub trait Push: SoaVecs {
         vec.push(value);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<ErasedSoa>, value: ErasedSoa) {
+    fn soa_ser_push(vec: &mut ErasedSoaVec, value: ErasedSoa) {
         let value = black_box(value);
         vec.push(value);
     }

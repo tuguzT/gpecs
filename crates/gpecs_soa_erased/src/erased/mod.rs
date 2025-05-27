@@ -10,7 +10,7 @@ pub use self::{
     slice_ptrs_mut::{ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter},
     slices::{ErasedSoaSlices, ErasedSoaSlicesIter},
     slices_mut::{ErasedSoaSlicesIterMut, ErasedSoaSlicesMut},
-    value::ErasedSoa,
+    value::{ErasedSoa, ErasedSoaVec},
     vecs::ErasedSoaVecs,
 };
 

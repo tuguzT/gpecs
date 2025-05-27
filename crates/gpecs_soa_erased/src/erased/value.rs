@@ -9,10 +9,15 @@ use crate::{
     assert::{check_same_layout, check_same_len},
     error::LenMismatchError,
     field::{ErasedField, ErasedFieldRef, ErasedFieldRefMut},
-    soa::traits::{buffer_layout, buffer_offsets, FieldDescriptor, Soa},
+    soa::{
+        traits::{buffer_layout, buffer_offsets, FieldDescriptor, Soa},
+        vec::SoaVec,
+    },
 };
 
 use super::{error::IntoValueError, ErasedSoaRefs, ErasedSoaRefsMut};
+
+pub type ErasedSoaVec = SoaVec<ErasedSoa>;
 
 pub struct ErasedSoa {
     buffer: AlignedBytes,

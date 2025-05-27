@@ -60,16 +60,6 @@ where
         KeyValueFieldDescriptors::new(context)
     }
 
-    type BufferRegions<'context> = iter::Chain<
-        iter::Once<Result<Layout, LayoutError>>,
-        <V::BufferRegions<'context> as IntoIterator>::IntoIter,
-    >;
-
-    #[inline]
-    fn buffer_regions(context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_> {
-        iter::once(Layout::array::<K>(capacity)).chain(V::buffer_regions(context, capacity))
-    }
-
     #[inline]
     fn buffer_layout(context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
         let keys = Layout::array::<K>(capacity)?;

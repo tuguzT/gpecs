@@ -3,34 +3,49 @@ use core::{
     iter::FusedIterator,
 };
 
-/// Iterator of offsets for each provided region in a single buffer.
+use super::FieldDescriptor;
+
+/// Iterator of offsets for each provided field in a single buffer of provided capacity.
 ///
 /// Resulting layout could be retrieved using [`layout()`](BufferOffsets::layout()) method.
 pub struct BufferOffsets<I> {
+    fields: I,
     layout: Layout,
-    regions: I,
+    capacity: usize,
 }
 
 impl<I> BufferOffsets<I> {
-    /// Layout of a buffer needed to store all regions processed by iterator.
+    /// Layout of a buffer needed to store all fields processed by self.
     #[inline]
     pub fn layout(&self) -> Layout {
         let Self { layout, .. } = *self;
         layout
     }
+
+    /// Capacity of a buffer needed to store all fields processed by self.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
+    }
 }
 
 impl<I> Iterator for BufferOffsets<I>
 where
-    I: Iterator<Item = Result<Layout, LayoutError>>,
+    I: Iterator<Item: AsRef<FieldDescriptor>>,
 {
     type Item = Result<usize, LayoutError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { layout, regions } = self;
+        let Self {
+            ref mut fields,
+            ref mut layout,
+            capacity,
+        } = *self;
 
-        let region = regions.next()?;
+        let field_layout = fields.next()?.as_ref().layout();
+        let region = repeat_layout(field_layout, capacity);
         let offset = region.and_then(|region| {
             let offset;
             (*layout, offset) = layout.extend(region)?;
@@ -41,46 +56,47 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { regions, .. } = self;
-        regions.size_hint()
+        let Self { fields, .. } = self;
+        fields.size_hint()
     }
 }
 
 impl<I> ExactSizeIterator for BufferOffsets<I>
 where
-    I: Iterator<Item = Result<Layout, LayoutError>> + ExactSizeIterator,
+    I: Iterator<Item: AsRef<FieldDescriptor>> + ExactSizeIterator,
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { regions, .. } = self;
-        regions.len()
+        let Self { fields, .. } = self;
+        fields.len()
     }
 }
 
 impl<I> FusedIterator for BufferOffsets<I> where
-    I: Iterator<Item = Result<Layout, LayoutError>> + FusedIterator
+    I: Iterator<Item: AsRef<FieldDescriptor>> + FusedIterator
 {
 }
 
 /// Calculates offsets for each provided region in a single buffer.
 #[inline]
-pub fn buffer_offsets<I>(regions: I) -> BufferOffsets<I::IntoIter>
+pub fn buffer_offsets<I>(fields: I, capacity: usize) -> BufferOffsets<I::IntoIter>
 where
-    I: IntoIterator<Item = Result<Layout, LayoutError>>,
+    I: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
     BufferOffsets {
         layout: Layout::new::<()>(),
-        regions: regions.into_iter(),
+        fields: fields.into_iter(),
+        capacity,
     }
 }
 
 /// Calculates layout needed to store provided regions in a single buffer.
 #[inline]
-pub fn buffer_layout<I>(regions: I) -> Result<Layout, LayoutError>
+pub fn buffer_layout<I>(fields: I, capacity: usize) -> Result<Layout, LayoutError>
 where
-    I: IntoIterator<Item = Result<Layout, LayoutError>>,
+    I: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
-    let mut offsets = buffer_offsets(regions);
+    let mut offsets = buffer_offsets(fields, capacity);
     offsets.by_ref().try_for_each(|offset| offset.map(drop))?;
     Ok(offsets.layout())
 }

@@ -35,17 +35,6 @@ unsafe impl Soa for ErasedSoa {
         context.field_descriptors()
     }
 
-    type BufferRegions<'context> = BufferRegions<'context>;
-
-    #[inline]
-    fn buffer_regions(context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_> {
-        let descriptors = context.field_descriptors();
-        BufferRegions {
-            descriptors: descriptors.iter(),
-            capacity,
-        }
-    }
-
     type Ptrs<'context> = ErasedSoaPtrs;
     type MutPtrs<'context> = ErasedSoaMutPtrs;
 
@@ -134,17 +123,14 @@ unsafe impl Soa for ErasedSoa {
         capacity: usize,
     ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
-        let regions = BufferRegions {
-            descriptors: descriptors.iter(),
-            capacity,
-        };
-        let ptrs = buffer_offsets(regions)
-            .zip(descriptors)
-            .map(|(offset, &desc)| unsafe {
-                let data = buffer.add(offset.unwrap_unchecked());
-                let buffer = ptr::slice_from_raw_parts_mut(data, desc.layout().size());
-                ErasedFieldMutPtr::new_unchecked(desc, buffer)
-            });
+        let ptrs =
+            buffer_offsets(descriptors, capacity)
+                .zip(descriptors)
+                .map(|(offset, &desc)| unsafe {
+                    let data = buffer.add(offset.unwrap_unchecked());
+                    let buffer = ptr::slice_from_raw_parts_mut(data, desc.layout().size());
+                    ErasedFieldMutPtr::new_unchecked(desc, buffer)
+                });
         ErasedSoaMutPtrs::new(ptrs)
     }
 

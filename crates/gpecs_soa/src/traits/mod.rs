@@ -18,7 +18,7 @@ pub type DefaultContext = ();
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays (or SoA) pattern.
 #[allow(clippy::missing_safety_doc)]
-// TODO: remove unnecessary / excessive stuff (such as buffer regions, byte offsets, erase / restore API)
+// TODO: remove unnecessary / excessive stuff (such as erase / restore API)
 //       we can (potentially) achieve the same without that mess mentioned above
 pub unsafe trait Soa: Sized {
     /// Type of context used to perform all operations of this trait.
@@ -44,19 +44,9 @@ pub unsafe trait Soa: Sized {
     /// Returns [field descriptors](Soa::FieldDescriptors) for each field of [`Fields`](Soa::Fields).
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_>;
 
-    /// Non-empty collection of layouts needed to store `capacity` number of fields inside of a buffer
-    /// for each field of [`Fields`](Soa::Fields).
-    ///
-    /// Each of these layouts **MUST** correspond to the layout of the field in the buffer
-    /// in the order defined by [`FieldDescriptors`](Soa::FieldDescriptors).
-    type BufferRegions<'context>: IntoIterator<Item = Result<Layout, LayoutError>>;
-
-    /// Returns [buffer regions](Soa::BufferRegions) for each field of [`Fields`](Soa::Fields).
-    fn buffer_regions(context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_>;
-
     fn buffer_layout(context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
-        let regions = Self::buffer_regions(context, capacity);
-        self::buffer_layout(regions)
+        let fields = Self::field_descriptors(context);
+        self::buffer_layout(fields, capacity)
     }
 
     /// Retrieves maximum number of fields that can be stored inside of a buffer with given layout.

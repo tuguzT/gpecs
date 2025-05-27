@@ -18,7 +18,8 @@ where
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
         let context = ErasedSoaContext::of::<T>(&Default::default());
-        let buffer_layout = buffer_layout(ErasedSoa::buffer_regions(&context, capacity)).unwrap();
+        let fields = <ErasedSoa as Soa>::field_descriptors(&context);
+        let buffer_layout = buffer_layout(fields, capacity).unwrap();
         let bytes = buffer_layout.size();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
@@ -33,7 +34,7 @@ where
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
         let context = Default::default();
-        let buffer_layout = buffer_layout(T::buffer_regions(&context, capacity)).unwrap();
+        let buffer_layout = buffer_layout(T::field_descriptors(&context), capacity).unwrap();
         let bytes = buffer_layout.size();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))

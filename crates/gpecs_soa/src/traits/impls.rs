@@ -59,13 +59,6 @@ unsafe impl Soa for () {
         [FieldDescriptor::of::<Self>()]
     }
 
-    type BufferRegions<'context> = [Result<Layout, LayoutError>; 1];
-
-    #[inline]
-    fn buffer_regions(_context: &Self::Context, capacity: usize) -> Self::BufferRegions<'_> {
-        [Layout::array::<Self>(capacity)]
-    }
-
     #[inline]
     fn buffer_layout(_context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
         Layout::array::<Self>(capacity)
@@ -585,20 +578,6 @@ macro_rules! soa_tuple_impl {
             #[inline]
             fn field_descriptors(_context: &Self::Context) -> Self::FieldDescriptors<'_> {
                 SoaTupleImplHelper::<($($types,)*)>::FIELD_DESCRIPTORS
-            }
-
-            type BufferRegions<'context> = [Result<Layout, LayoutError>; count_idents!($($types,)*)];
-
-            #[inline]
-            fn buffer_regions(
-                _context: &Self::Context,
-                capacity: usize,
-            ) -> Self::BufferRegions<'_> {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
-
-                let regions = [$(Layout::array::<$types>(capacity),)*];
-                let regions = [$(regions[permutation[$indices]].clone(),)*];
-                regions
             }
 
             #[inline]

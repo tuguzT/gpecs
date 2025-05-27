@@ -36,7 +36,7 @@ pub unsafe trait Soa: Sized {
     /// This is true for such implementations which store all the fields of self.
     type Fields;
 
-    /// Non-empty collection of [descriptors](FieldDescriptor) for each field.
+    /// Non-empty collection of [descriptors](FieldDescriptor) for each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
     type FieldDescriptors<'context>: IntoIterator<Item: AsRef<FieldDescriptor>>;
@@ -44,6 +44,10 @@ pub unsafe trait Soa: Sized {
     /// Returns [field descriptors](Soa::FieldDescriptors) for each field of [`Fields`](Soa::Fields).
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_>;
 
+    /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
+    ///
+    /// This layout should not include [`Context`](Soa::Context),
+    /// as it is handled by the crate itself.
     fn buffer_layout(context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
         let fields = Self::field_descriptors(context);
         self::buffer_layout(fields, capacity)
@@ -138,6 +142,16 @@ pub unsafe trait Soa: Sized {
     /// Returns dangling pointers to each field of [`Fields`](Soa::Fields).
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_>;
 
+    /// Creates properly typed pointers to each field of [`Fields`](Soa::Fields)
+    /// from a given buffer with given capacity.
+    ///
+    /// Implementations of this method should not account for a [`Context`](Soa::Context),
+    /// as it is handled by the crate itself.
+    ///
+    /// # Safety
+    ///
+    /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
+    /// must be the same as the one returned by [`buffer_layout()`](Soa::buffer_layout) method.
     unsafe fn ptrs_from_buffer<'context>(
         context: &'context Self::Context,
         buffer: *mut u8,

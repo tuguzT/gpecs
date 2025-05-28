@@ -11,7 +11,6 @@ pub use self::{
     slices::{ErasedFieldSlice, ErasedFieldSliceIter},
     slices_mut::{ErasedFieldSliceIterMut, ErasedFieldSliceMut},
     value::ErasedField,
-    vecs::ErasedFieldVec,
 };
 
 pub mod error;
@@ -27,4 +26,3 @@ mod slice_ptrs_mut;
 mod slices;
 mod slices_mut;
 mod value;
-mod vecs;

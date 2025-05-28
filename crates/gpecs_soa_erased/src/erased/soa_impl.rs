@@ -9,19 +9,18 @@ use core::{
 };
 
 use crate::{
-    aligned_bytes::AlignedBytes,
     assert::check_same_layout,
     field::{
         field_slice_from_raw_parts, field_slice_from_raw_parts_mut, ErasedFieldMutPtr,
-        ErasedFieldNonNullPtr, ErasedFieldPtr, ErasedFieldVec,
+        ErasedFieldNonNullPtr, ErasedFieldPtr,
     },
-    soa::traits::{buffer_offsets, repeat_layout, FieldDescriptor, Soa, SoaVecs},
+    soa::traits::{buffer_offsets, repeat_layout, FieldDescriptor, Soa},
 };
 
 use super::{
     ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs,
     ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs,
-    ErasedSoaSlices, ErasedSoaSlicesMut, ErasedSoaVecs,
+    ErasedSoaSlices, ErasedSoaSlicesMut,
 };
 
 unsafe impl Soa for ErasedSoa {
@@ -904,103 +903,3 @@ impl ExactSizeIterator for BufferRegions<'_> {
 }
 
 impl FusedIterator for BufferRegions<'_> {}
-
-unsafe impl SoaVecs for ErasedSoa {
-    type Vecs = ErasedSoaVecs;
-
-    fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs {
-        let vecs = context
-            .field_descriptors()
-            .iter()
-            .map(|&desc| {
-                let size = capacity * desc.layout().size();
-                let layout = Layout::from_size_align(size, desc.layout().align())
-                    .expect("layout should be valid");
-                let buffer = AlignedBytes::new(layout);
-                ErasedFieldVec { buffer, desc }
-            })
-            .collect();
-        ErasedSoaVecs { len: 0, vecs }
-    }
-
-    fn vecs_as_ptrs<'context>(
-        context: &'context Self::Context,
-        vecs: &Self::Vecs,
-    ) -> Self::Ptrs<'context> {
-        let descriptors = context.field_descriptors();
-        let ErasedSoaVecs { vecs, .. } = vecs;
-        assert_eq!(descriptors.len(), vecs.len());
-
-        let ptrs = descriptors
-            .iter()
-            .zip(vecs)
-            .inspect(|(desc, vec)| {
-                check_same_layout(vec.desc.layout(), desc.layout()).expect("layouts should match")
-            })
-            .map(|(_, vec)| {
-                let ErasedFieldVec { buffer, desc, .. } = vec;
-
-                let data = buffer.as_ptr().cast();
-                let len = desc.layout().size();
-                let buffer = ptr::slice_from_raw_parts(data, len);
-                ErasedFieldPtr::new(*desc, buffer).expect("buffer should be aligned")
-            });
-        ErasedSoaPtrs::new(ptrs)
-    }
-
-    fn vecs_as_ptrs_mut<'context>(
-        context: &'context Self::Context,
-        vecs: &mut Self::Vecs,
-    ) -> Self::MutPtrs<'context> {
-        let descriptors = context.field_descriptors();
-        let ErasedSoaVecs { vecs, .. } = vecs;
-        assert_eq!(descriptors.len(), vecs.len());
-
-        let ptrs = descriptors
-            .iter()
-            .zip(vecs)
-            .inspect(|(desc, vec)| {
-                check_same_layout(vec.desc.layout(), desc.layout()).expect("layouts should match")
-            })
-            .map(|(_, vec)| {
-                let ErasedFieldVec { buffer, desc, .. } = vec;
-
-                let data = buffer.as_mut_ptr().cast();
-                let len = desc.layout().size();
-                let buffer = ptr::slice_from_raw_parts_mut(data, len);
-                ErasedFieldMutPtr::new(*desc, buffer).expect("buffer should be aligned")
-            });
-        ErasedSoaMutPtrs::new(ptrs)
-    }
-
-    fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize {
-        let descriptors = context.field_descriptors();
-        let ErasedSoaVecs { ref vecs, len, .. } = *vecs;
-        assert_eq!(descriptors.len(), vecs.len());
-
-        len
-    }
-
-    unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize) {
-        let descriptors = context.field_descriptors();
-        let ErasedSoaVecs {
-            vecs,
-            len: vecs_len,
-            ..
-        } = vecs;
-        assert_eq!(descriptors.len(), vecs.len());
-
-        descriptors
-            .iter()
-            .zip(vecs)
-            .inspect(|(desc, vec)| {
-                check_same_layout(vec.desc.layout(), desc.layout()).expect("layouts should match")
-            })
-            .for_each(|(_, _vec)| {
-                // let ErasedFieldVec { buffer, desc } = vec;
-                // let len = len * desc.layout().size();
-                // unsafe { buffer.set_len(len) }
-            });
-        *vecs_len = len;
-    }
-}

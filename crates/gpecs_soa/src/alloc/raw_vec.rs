@@ -276,18 +276,6 @@ where
     }
 
     #[inline]
-    pub fn drop_buffer(self) -> T::Context {
-        let me = ManuallyDrop::new(self);
-        let context = unsafe { ptr::read(me.ptr().cast_const().ptr_to_context()) };
-        if let Some((ptr, layout)) = me.current_memory(&context) {
-            unsafe {
-                dealloc(ptr.as_ptr(), layout);
-            }
-        }
-        context
-    }
-
-    #[inline]
     fn current_memory(&self, context: &T::Context) -> Option<(NonNull<u8>, Layout)> {
         if !should_allocate::<T>(self.capacity) {
             return None;

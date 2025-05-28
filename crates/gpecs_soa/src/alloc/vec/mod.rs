@@ -20,7 +20,7 @@ use crate::{
         from_raw_parts, from_raw_parts_mut, slice_range, IndexHelper, IndexHelperMut, Iter,
         IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
     },
-    traits::{Soa, SoaToOwned, SoaTrustedFields, SoaVecs},
+    traits::{Soa, SoaToOwned, SoaTrustedFields},
 };
 
 use super::{raw_vec::RawSoaVec, set_len_on_drop::SetLenOnDrop};
@@ -679,53 +679,6 @@ where
         let ptrs = self.buffer.ptrs();
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
         unsafe { T::slices_drop_in_place(&*context, slices) }
-    }
-}
-
-impl<T> SoaVec<T>
-where
-    T: SoaVecs,
-{
-    pub fn into_vecs(mut self) -> (T::Context, T::Vecs) {
-        let len = self.len();
-        let context = self.context();
-        let mut vecs = T::vecs_with_capacity(context, len);
-
-        unsafe {
-            self.set_len(0);
-        }
-
-        let context = self.context();
-        let src = self.as_ptrs();
-        let dst = T::vecs_as_ptrs_mut(context, &mut vecs);
-        unsafe {
-            T::ptrs_copy_nonoverlapping(context, src, dst, len);
-            T::vecs_set_len(context, &mut vecs, len);
-        }
-
-        let me = ManuallyDrop::new(self);
-        let buffer = unsafe { ptr::read(&me.buffer) };
-        let context = buffer.drop_buffer();
-        (context, vecs)
-    }
-
-    pub fn from_vecs(context: T::Context, mut vecs: T::Vecs) -> Self {
-        let len = T::vecs_len(&context, &vecs);
-        let mut vec = Self::with_context_and_capacity(context, len);
-
-        let context = vec.context();
-        unsafe {
-            T::vecs_set_len(context, &mut vecs, 0);
-        }
-
-        let src = T::vecs_as_ptrs(context, &vecs);
-        let dst = vec.buffer.ptrs();
-        let context = vec.context();
-        unsafe {
-            T::ptrs_copy_nonoverlapping(context, src, dst, len);
-            vec.set_len(len);
-        }
-        vec
     }
 }
 

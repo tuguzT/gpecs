@@ -11,7 +11,6 @@ pub use self::{
     slices::{ErasedSoaSlices, ErasedSoaSlicesIter},
     slices_mut::{ErasedSoaSlicesIterMut, ErasedSoaSlicesMut},
     value::{ErasedSoa, ErasedSoaVec},
-    vecs::ErasedSoaVecs,
 };
 
 pub mod error;
@@ -29,4 +28,3 @@ mod slices;
 mod slices_mut;
 mod soa_impl;
 mod value;
-mod vecs;

@@ -1,9 +1,9 @@
 use std::hint::black_box;
 
-use gpecs_soa::{prelude::*, traits::SoaVecs};
+use gpecs_soa::prelude::*;
 use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaVec};
 
-use crate::{Big, Large, Medium, Small, Tiny, Zero};
+use crate::{soa_vecs::SoaVecs, Big, Large, Medium, Small, Tiny, Zero};
 
 pub trait Push: SoaVecs {
     fn soa_slf_push(vec: &mut SoaVec<Self>, value: Self) {

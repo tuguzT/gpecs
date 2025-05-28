@@ -635,53 +635,6 @@ pub trait SoaToOwned<'context, 'a> {
     }
 }
 
-/// Extension trait which allows to convert SoA vector of [`Fields`](Soa::Fields)
-/// into vectors of each field of [`Fields`](Soa::Fields).
-pub unsafe trait SoaVecs: Soa {
-    /// Non-empty collection of properly typed vectors of each field of [`Fields`](Soa::Fields).
-    ///
-    /// Order of such vectors **may not** resemble their order inside of a buffer in memory.
-    ///
-    /// Most of the time type of these vectors is [`Vec`].
-    ///
-    /// [`Vec`]: https://doc.rust-lang.org/stable/alloc/vec/struct.Vec.html
-    type Vecs;
-
-    /// Constructs new, empty vectors for each field of [`Fields`](Soa::Fields)
-    /// with at least the specified capacity.
-    fn vecs_with_capacity(context: &Self::Context, capacity: usize) -> Self::Vecs;
-
-    /// Returns properly typed pointers to the vectors' buffers of each field of [`Fields`](Soa::Fields),
-    /// or a dangling pointers valid for zero sized reads if these vectors didn’t allocate.
-    fn vecs_as_ptrs<'context>(
-        context: &'context Self::Context,
-        vecs: &Self::Vecs,
-    ) -> Self::Ptrs<'context>;
-
-    /// Returns properly typed mutable pointers to the vectors' buffers of each field of [`Fields`](Soa::Fields),
-    /// or a dangling pointers valid for zero sized reads if these vectors didn’t allocate.
-    fn vecs_as_ptrs_mut<'context>(
-        context: &'context Self::Context,
-        vecs: &mut Self::Vecs,
-    ) -> Self::MutPtrs<'context>;
-
-    /// Returns the number of elements in each vector of [`Fields`](Soa::Fields),
-    /// also referred to as their 'length'.
-    ///
-    /// Note that resulting lengths should be the same for all the vectors,
-    /// or else this method could panic.
-    fn vecs_len(context: &Self::Context, vecs: &Self::Vecs) -> usize;
-
-    /// Forces the length of the vectors of [`Fields`](Soa::Fields) to `new_len`.
-    ///
-    /// All the safety requirements resulting from applying
-    /// [`Vec::set_len()`] method to each vector
-    /// should be satisfied to be safe to call this method.
-    ///
-    /// [`Vec::set_len()`]: https://doc.rust-lang.org/stable/alloc/vec/struct.Vec.html#method.set_len
-    unsafe fn vecs_set_len(context: &Self::Context, vecs: &mut Self::Vecs, len: usize);
-}
-
 /// Marker trait which places additional safety requirements
 /// on the [`Fields`](Soa::Fields) associated type of [`Soa`] trait implementations.
 ///

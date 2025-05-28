@@ -7,6 +7,7 @@
 pub mod clear;
 pub mod names;
 pub mod push;
+pub mod soa_vecs;
 pub mod with_capacity;
 pub mod work;
 

@@ -1,7 +1,7 @@
-use gpecs_soa::{prelude::*, traits::SoaVecs};
+use gpecs_soa::prelude::*;
 use gpecs_soa_erased::erased::ErasedSoaVec;
 
-use crate::{Big, Large, Medium, Small, Tiny, Zero};
+use crate::{soa_vecs::SoaVecs, Big, Large, Medium, Small, Tiny, Zero};
 
 pub trait Clear: SoaVecs {
     fn soa_slf_clear(vec: &mut SoaVec<Self>) {

@@ -46,12 +46,6 @@ fn new_erased() {
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
-    let (erased_context, vecs) = vec.into_vecs();
-    // assert_eq!(vecs, (vec![], vec![], vec![]));
-
-    let vec = Vec::from_vecs(erased_context, vecs);
-    assert!(vec.is_empty());
-
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
@@ -108,12 +102,6 @@ fn with_capacity_erased() {
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
-    let (erased_context, vecs) = vec.into_vecs();
-    // assert_eq!(vecs, (vec![], vec![], vec![]));
-
-    let vec = Vec::from_vecs(erased_context, vecs);
-    assert!(vec.is_empty());
-
     let vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
@@ -163,7 +151,7 @@ fn one_item_erased() {
         Some((&u8, &u64, &u16, &())),
     );
 
-    let vec = {
+    let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
@@ -198,22 +186,6 @@ fn one_item_erased() {
 
     assert_eq!(
         unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
-        (
-            [u8].as_slice(),
-            [u64].as_slice(),
-            [u16].as_slice(),
-            [()].as_slice(),
-        ),
-    );
-
-    let (erased_context, vecs) = vec.into_vecs();
-    // assert_eq!(vecs, ..);
-
-    let mut vec = Vec::from_vecs(erased_context, vecs);
-    assert_eq!(vec.len(), 1);
-    assert!(vec.capacity() >= 1);
-    assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -344,7 +316,7 @@ fn three_items_erased() {
         ),
     );
 
-    let vec = {
+    let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
@@ -379,22 +351,6 @@ fn three_items_erased() {
             .get(2)
             .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
         Some((&1, &"2".to_owned(), &3, &())),
-    );
-
-    let (erased_context, vecs) = vec.into_vecs();
-    // assert_eq!(vecs, ..);
-
-    let mut vec = Vec::from_vecs(erased_context, vecs);
-    assert_eq!(vec.len(), 3);
-    assert!(vec.capacity() >= 3);
-    assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
-        (
-            [4, 7, 1].as_slice(),
-            ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
-            [6, 9, 3].as_slice(),
-            [(), (), ()].as_slice(),
-        ),
     );
 
     for refs in &mut vec {

@@ -22,12 +22,12 @@ use crate::{
     key::{Epoch, Key},
     pair::{
         KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs, KeyValueSlices,
-        KeyValueSlicesMut, KeyValueVecs,
+        KeyValueSlicesMut,
     },
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
-        traits::{Soa, SoaVecs},
+        traits::Soa,
         vec::SoaVec,
     },
     view::{EpochSparseView, EpochSparseViewMut},
@@ -849,28 +849,6 @@ where
     pub fn iter_mut(&mut self) -> IterMut<K, V> {
         let view_mut = self.as_mut_view();
         view_mut.into_iter()
-    }
-}
-
-impl<K, V> EpochSparseSet<K, V>
-where
-    K: Key,
-    V: SoaVecs,
-{
-    #[inline]
-    pub fn into_vecs(self) -> (V::Context, V::Vecs) {
-        let Self { dense, .. } = self;
-
-        let (context, KeyValueVecs { values, .. }) = dense.into_vecs();
-        (context, values)
-    }
-
-    #[inline]
-    pub fn into_keys_vec(self) -> Vec<K> {
-        let Self { dense, .. } = self;
-
-        let (_, KeyValueVecs { keys, .. }) = dense.into_vecs();
-        keys
     }
 }
 

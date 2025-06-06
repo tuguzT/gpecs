@@ -42,7 +42,8 @@ where
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        if is_zst::<T>() {
+        let context = self.context();
+        if is_zst::<T>(context) {
             return usize::MAX;
         }
         unsafe { ptr::from_ref(self).capacity() }

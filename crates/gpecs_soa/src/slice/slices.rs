@@ -1050,7 +1050,8 @@ where
         }
 
         let len = self.len();
-        if is_zst::<T>() || len < 2 {
+        let context = self.context();
+        if is_zst::<T>(context) || len < 2 {
             return;
         }
         if permutation.len() < len {

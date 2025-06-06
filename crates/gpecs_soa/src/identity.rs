@@ -7,8 +7,8 @@ use core::{
 };
 
 use crate::traits::{
-    impls::{collect_array, debug_assert_ptr_is_aligned},
-    DefaultContext, FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields,
+    impls::debug_assert_ptr_is_aligned, DefaultContext, FieldDescriptor, Soa, SoaToOwned,
+    SoaTrustedFields,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
@@ -243,49 +243,6 @@ unsafe impl<T> Soa for Identity<T> {
 
     type Ptrs<'context> = *const Self;
     type MutPtrs<'context> = *mut Self;
-
-    type ErasedPtrs<'context> = [*const u8; 1];
-    type ErasedMutPtrs<'context> = [*mut u8; 1];
-
-    #[inline]
-    fn ptrs_erase<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
-    ) -> Self::ErasedPtrs<'context> {
-        [ptrs.cast()]
-    }
-
-    #[inline]
-    fn ptrs_erase_mut<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-    ) -> Self::ErasedMutPtrs<'context> {
-        [ptrs.cast()]
-    }
-
-    #[inline]
-    #[track_caller]
-    fn ptrs_restore(
-        _context: &Self::Context,
-        ptrs: impl IntoIterator<Item = *const u8>,
-    ) -> Self::Ptrs<'_> {
-        let ptrs: [_; 1] = collect_array(ptrs);
-        let ptr = ptrs[0].cast();
-        debug_assert_ptr_is_aligned(ptr);
-        ptr
-    }
-
-    #[inline]
-    #[track_caller]
-    fn ptrs_restore_mut(
-        _context: &Self::Context,
-        ptrs: impl IntoIterator<Item = *mut u8>,
-    ) -> Self::MutPtrs<'_> {
-        let ptrs: [_; 1] = collect_array(ptrs);
-        let ptr = ptrs[0].cast();
-        debug_assert_ptr_is_aligned(ptr);
-        ptr
-    }
 
     #[inline]
     fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {

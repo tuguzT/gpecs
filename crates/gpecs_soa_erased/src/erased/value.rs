@@ -7,15 +7,14 @@ use core::{
 use crate::{
     aligned_bytes::AlignedBytes,
     assert::{check_same_layout, check_same_len},
+    erased::{error::IntoValueError, ErasedSoaRefs, ErasedSoaRefsMut},
     error::LenMismatchError,
-    field::{ErasedField, ErasedFieldRef, ErasedFieldRefMut},
+    field::ErasedField,
     soa::{
         traits::{buffer_layout, buffer_offsets, FieldDescriptor, Soa},
         vec::SoaVec,
     },
 };
-
-use super::{error::IntoValueError, ErasedSoaRefs, ErasedSoaRefsMut};
 
 pub type ErasedSoaVec = SoaVec<ErasedSoa>;
 
@@ -115,7 +114,6 @@ impl ErasedSoa {
         let Self {
             buffer,
             descriptors,
-            ..
         } = &self;
         let result = T::field_descriptors(context)
             .into_iter()
@@ -151,7 +149,6 @@ impl ErasedSoa {
         let Self {
             buffer,
             ref descriptors,
-            ..
         } = self;
 
         let layout = buffer_layout(descriptors, 1)
@@ -177,54 +174,27 @@ impl ErasedSoa {
     }
 
     #[inline]
-    pub fn as_refs(&self) -> ErasedSoaRefs<'_> {
+    pub fn as_refs(&self) -> ErasedSoaRefs {
         let Self {
             buffer,
             descriptors,
-            ..
         } = self;
-
-        let layout = buffer_layout(descriptors, 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
-        check_same_len(layout.size(), buffer.layout().size()).expect("buffer length should match");
-
-        let offsets = buffer_offsets(descriptors, 1).map(Result::unwrap);
-        let refs = descriptors.iter().zip(offsets).map(|(desc, offset)| {
-            let data = unsafe { buffer.as_ptr().add(offset) };
-            let len = desc.layout().size();
-            let r#ref = unsafe { slice::from_raw_parts(data, len) };
-            unsafe { ErasedFieldRef::new_unchecked(desc.clone(), r#ref) }
-        });
-        ErasedSoaRefs::new(refs)
+        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer.as_ptr(), 1, 0) }
     }
 
     #[inline]
-    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_> {
+    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut {
         let Self {
             buffer,
             ref descriptors,
-            ..
         } = self;
-
-        let layout = buffer_layout(descriptors, 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
-        check_same_len(layout.size(), buffer.layout().size()).expect("buffer length should match");
-
-        let offsets = buffer_offsets(descriptors, 1).map(Result::unwrap);
-        let refs = descriptors.iter().zip(offsets).map(|(desc, offset)| {
-            let data = unsafe { buffer.as_mut_ptr().add(offset) };
-            let len = desc.layout().size();
-            let r#ref = unsafe { slice::from_raw_parts_mut(data, len) };
-            unsafe { ErasedFieldRefMut::new_unchecked(desc.clone(), r#ref) }
-        });
-        ErasedSoaRefsMut::new(refs)
+        unsafe { ErasedSoaRefsMut::new_unchecked(descriptors, buffer.as_mut_ptr(), 1, 0) }
     }
 }
 
 impl Debug for ErasedSoa {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let refs = self.as_refs();
-        let fields = &refs.field_refs();
+        let fields = &self.as_refs().into_iter();
         f.debug_struct("ErasedSoa").field("fields", fields).finish()
     }
 }

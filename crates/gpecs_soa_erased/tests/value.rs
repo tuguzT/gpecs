@@ -1,46 +1,21 @@
 use std::{ptr, slice};
 
 use gpecs_soa_erased::{
-    erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaSlices},
-    field::{ErasedField, ErasedFieldRef, ErasedFieldSlice},
+    erased::ErasedSoa,
+    field::{ErasedField, ErasedFieldRef},
     soa::traits::FieldDescriptor,
 };
 
 #[test]
-fn erased_value() {
+fn value() {
     let context = ();
-
-    let value = ();
-    let erased_value = ErasedSoa::from(&context, value);
-
-    let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(erased_value
-        .field_descriptors()
-        .iter()
-        .map(FieldDescriptor::layout)
-        .eq(descriptors.iter().map(FieldDescriptor::layout)));
-
-    let field_refs = [
-        ErasedFieldRef::new(FieldDescriptor::of::<()>(), [].as_slice()).expect("incorrect inputs"),
-    ];
-    assert!(erased_value
-        .as_refs()
-        .field_refs()
-        .into_iter()
-        .copied()
-        .map(ErasedFieldRef::into_buffer)
-        .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)));
-
-    let value =
-        unsafe { erased_value.into::<()>(&context) }.expect("all the fields should be valid");
-    assert_eq!(value, ());
 
     let i1 = 1;
     let i2 = 2;
     let i3 = 3;
     let str = "hello";
     let value = ((), str.to_owned(), i1, i2, i3);
-    let erased_value = ErasedSoa::from(&(), value);
+    let erased_value = ErasedSoa::from(&context, value);
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -56,9 +31,9 @@ fn erased_value() {
         .eq(descriptors.iter().map(FieldDescriptor::layout)));
 
     let erased_refs = erased_value.as_refs();
-    assert_eq!(erased_refs.field_refs().len(), 5);
+    assert_eq!(erased_refs.into_iter().len(), 5);
 
-    let field_ref = erased_refs.field_refs()[0];
+    let field_ref = erased_refs.into_iter().nth(0).unwrap();
     assert_eq!(
         unsafe { field_ref.into::<()>() }.expect("layouts should match"),
         &(),
@@ -68,7 +43,7 @@ fn erased_value() {
         ErasedFieldRef::from(&()).into_buffer(),
     );
 
-    let field_ref = erased_refs.field_refs()[1];
+    let field_ref = erased_refs.into_iter().nth(1).unwrap();
     assert_eq!(
         unsafe { field_ref.into::<u8>() }.expect("layouts should match"),
         &i3,
@@ -78,7 +53,7 @@ fn erased_value() {
         ErasedFieldRef::from(&i3).into_buffer(),
     );
 
-    let field_ref = erased_refs.field_refs()[2];
+    let field_ref = erased_refs.into_iter().nth(2).unwrap();
     assert_eq!(
         unsafe { field_ref.into::<u16>() }.expect("layouts should match"),
         &i2,
@@ -88,7 +63,7 @@ fn erased_value() {
         ErasedFieldRef::from(&i2).into_buffer(),
     );
 
-    let field_ref = erased_refs.field_refs()[3];
+    let field_ref = erased_refs.into_iter().nth(3).unwrap();
     assert_eq!(
         unsafe { field_ref.into::<u32>() }.expect("layouts should match"),
         &i1,
@@ -98,7 +73,7 @@ fn erased_value() {
         ErasedFieldRef::from(&i1).into_buffer(),
     );
 
-    let field_ref = erased_refs.field_refs()[4];
+    let field_ref = erased_refs.into_iter().nth(4).unwrap();
     assert_eq!(
         unsafe { field_ref.into::<String>() }.expect("layouts should match"),
         &str,
@@ -126,9 +101,9 @@ fn erased_value() {
         ErasedFieldRef::new(descriptors[2], i2_bytes).expect("incorrect inputs"),
         ErasedFieldRef::new(descriptors[3], i1_bytes).expect("incorrect inputs"),
     ];
-    assert!(erased_refs.field_refs()[..4]
+    assert!(erased_refs
         .into_iter()
-        .copied()
+        .take(4)
         .map(ErasedFieldRef::into_buffer)
         .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)));
 
@@ -143,251 +118,39 @@ fn erased_value() {
         .expect("all the fields should be valid");
     assert!(erased_value
         .as_refs()
-        .field_refs()
         .into_iter()
-        .copied()
         .map(ErasedFieldRef::into_buffer)
         .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)));
 
     let value = unsafe { erased_value.into::<((), u32, u16, u8)>(&context) }
         .expect("all the fields should be valid");
     assert_eq!(value, ((), i1, i2, i3));
+}
 
-    let refs = (&(), &str.to_owned(), &i1, &i2, &i3);
-    let erased_refs = ErasedSoaRefs::from::<((), String, u32, u16, u8)>(&context, refs);
-    assert_eq!(erased_refs.field_refs().len(), 5);
+#[test]
+fn value_zst() {
+    let context = ();
 
-    let field_ref = erased_refs.field_refs()[0];
-    assert_eq!(
-        unsafe { field_ref.into::<()>() }.expect("layouts should match"),
-        &(),
-    );
-    assert_eq!(
-        field_ref.into_buffer(),
-        ErasedFieldRef::from(&()).into_buffer(),
-    );
+    let value = ();
+    let erased_value = ErasedSoa::from(&context, value);
 
-    let field_ref = erased_refs.field_refs()[1];
-    assert_eq!(
-        unsafe { field_ref.into::<u8>() }.expect("layouts should match"),
-        &i3,
-    );
-    assert_eq!(
-        field_ref.into_buffer(),
-        ErasedFieldRef::from(&i3).into_buffer(),
-    );
+    let descriptors = [FieldDescriptor::of::<()>()];
+    assert!(erased_value
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
 
-    let field_ref = erased_refs.field_refs()[2];
-    assert_eq!(
-        unsafe { field_ref.into::<u16>() }.expect("layouts should match"),
-        &i2,
-    );
-    assert_eq!(
-        field_ref.into_buffer(),
-        ErasedFieldRef::from(&i2).into_buffer(),
-    );
-
-    let field_ref = erased_refs.field_refs()[3];
-    assert_eq!(
-        unsafe { field_ref.into::<u32>() }.expect("layouts should match"),
-        &i1,
-    );
-    assert_eq!(
-        field_ref.into_buffer(),
-        ErasedFieldRef::from(&i1).into_buffer(),
-    );
-
-    let field_ref = erased_refs.field_refs()[4];
-    assert_eq!(
-        unsafe { field_ref.into::<String>() }.expect("layouts should match"),
-        &str,
-    );
-
-    assert!(erased_refs.field_refs()[..4]
+    let field_refs = [
+        ErasedFieldRef::new(FieldDescriptor::of::<()>(), [].as_slice()).expect("incorrect inputs"),
+    ];
+    assert!(erased_value
+        .as_refs()
         .into_iter()
-        .copied()
         .map(ErasedFieldRef::into_buffer)
         .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)));
 
-    let refs = unsafe { erased_refs.into::<((), String, u32, u16, u8)>(&context) }
-        .expect("all the fields should be valid");
-    assert_eq!(refs, (&(), &str.to_owned(), &i1, &i2, &i3));
-
-    let units = [(), (), ()];
-    let i123 = [1, 2, 3];
-    let i456 = [4, 5, 6];
-    let i789 = [7, 8, 9];
-
-    let units_slices = units.as_slice();
-    let i123_slices = i123.as_slice();
-    let i456_slices = i456.as_slice();
-    let i789_slices = i789.as_slice();
-
-    let slices = (units_slices, i123_slices, i456_slices, i789_slices);
-    let erased_slices = ErasedSoaSlices::from::<((), u32, u16, u8)>(&(), slices);
-    assert_eq!(erased_slices.field_slices().len(), 4);
-
-    let field_slice = erased_slices.field_slices()[0];
-    assert_eq!(
-        unsafe { field_slice.into::<()>() }.expect("layouts should match"),
-        units_slices,
-    );
-    assert_eq!(
-        field_slice.into_buffer(),
-        ErasedFieldSlice::from([(); 3].as_slice()).into_buffer(),
-    );
-    for (idx, r#ref) in field_slice.iter().enumerate().rev() {
-        assert_eq!(
-            unsafe { r#ref.into::<()>() }.expect("layouts should match"),
-            &units[idx],
-        );
-        assert_eq!(
-            r#ref.into_buffer(),
-            ErasedFieldRef::from(&units[idx]).into_buffer(),
-        );
-    }
-
-    let field_slice = erased_slices.field_slices()[1];
-    assert_eq!(
-        unsafe { field_slice.into::<u8>() }.expect("layouts should match"),
-        i789_slices,
-    );
-    assert_eq!(
-        field_slice.into_buffer(),
-        ErasedFieldSlice::from(i789_slices).into_buffer(),
-    );
-    for (idx, r#ref) in field_slice.iter().enumerate().rev() {
-        assert_eq!(
-            unsafe { r#ref.into::<u8>() }.expect("layouts should match"),
-            &i789[idx],
-        );
-        assert_eq!(
-            r#ref.into_buffer(),
-            ErasedFieldRef::from(&i789[idx]).into_buffer(),
-        );
-    }
-    assert_eq!(
-        field_slice.iter().fold(0, |acc, item| {
-            let item = unsafe { item.into::<u8>() }.expect("layouts should match");
-            acc + item
-        }),
-        24,
-    );
-
-    let field_slice = erased_slices.field_slices()[2];
-    assert_eq!(
-        unsafe { field_slice.into::<u16>() }.expect("layouts should match"),
-        i456_slices,
-    );
-    assert_eq!(
-        field_slice.into_buffer(),
-        ErasedFieldSlice::from(i456_slices).into_buffer(),
-    );
-    for (idx, r#ref) in field_slice.iter().enumerate().rev() {
-        assert_eq!(
-            unsafe { r#ref.into::<u16>() }.expect("layouts should match"),
-            &i456[idx],
-        );
-        assert_eq!(
-            r#ref.into_buffer(),
-            ErasedFieldRef::from(&i456[idx]).into_buffer(),
-        );
-    }
-    assert_eq!(
-        field_slice.iter().fold(0, |acc, item| {
-            let item = unsafe { item.into::<u16>() }.expect("layouts should match");
-            acc + item
-        }),
-        15,
-    );
-
-    let field_slice = erased_slices.field_slices()[3];
-    assert_eq!(
-        unsafe { field_slice.into::<u32>() }.expect("layouts should match"),
-        i123_slices,
-    );
-    assert_eq!(
-        field_slice.into_buffer(),
-        ErasedFieldSlice::from(i123_slices).into_buffer(),
-    );
-    for (idx, r#ref) in field_slice.iter().enumerate().rev() {
-        assert_eq!(
-            unsafe { r#ref.into::<u32>() }.expect("layouts should match"),
-            &i123[idx],
-        );
-        assert_eq!(
-            r#ref.into_buffer(),
-            ErasedFieldRef::from(&i123[idx]).into_buffer(),
-        );
-    }
-    assert_eq!(
-        field_slice.iter().fold(0, |acc, item| {
-            let item = unsafe { item.into::<u32>() }.expect("layouts should match");
-            acc + item
-        }),
-        6,
-    );
-
-    let units_bytes = unsafe {
-        let data = ptr::from_ref(&units).cast();
-        let len = size_of_val(&units);
-        slice::from_raw_parts(data, len)
-    };
-    let i123_bytes = unsafe {
-        let data = ptr::from_ref(&i123).cast();
-        let len = size_of_val(&i123);
-        slice::from_raw_parts(data, len)
-    };
-    let i456_bytes = unsafe {
-        let data = ptr::from_ref(&i456).cast();
-        let len = size_of_val(&i456);
-        slice::from_raw_parts(data, len)
-    };
-    let i789_bytes = unsafe {
-        let data = ptr::from_ref(&i789).cast();
-        let len = size_of_val(&i789);
-        slice::from_raw_parts(data, len)
-    };
-    let field_slices = [
-        ErasedFieldSlice::new(descriptors[0], units_bytes, units.len()).expect("incorrect inputs"),
-        ErasedFieldSlice::new(descriptors[1], i789_bytes, i789.len()).expect("incorrect inputs"),
-        ErasedFieldSlice::new(descriptors[2], i456_bytes, i456.len()).expect("incorrect inputs"),
-        ErasedFieldSlice::new(descriptors[3], i123_bytes, i123.len()).expect("incorrect inputs"),
-    ];
-    assert!(erased_slices
-        .field_slices()
-        .into_iter()
-        .copied()
-        .map(ErasedFieldSlice::into_buffer)
-        .eq(field_slices.into_iter().map(ErasedFieldSlice::into_buffer)));
-
-    for (idx, refs) in erased_slices.iter().enumerate().rev() {
-        let static_refs = (&units[idx], &i123[idx], &i456[idx], &i789[idx]);
-
-        let target_refs = ErasedSoaRefs::from::<((), u32, u16, u8)>(&context, static_refs);
-        let target_fields = target_refs
-            .field_refs()
-            .into_iter()
-            .copied()
-            .map(ErasedFieldRef::into_buffer);
-        assert!(refs
-            .field_refs()
-            .into_iter()
-            .copied()
-            .map(ErasedFieldRef::into_buffer)
-            .eq(target_fields));
-
-        assert_eq!(
-            unsafe { refs.into::<((), u32, u16, u8)>(&context) }
-                .expect("all the fields should be valid"),
-            static_refs,
-        );
-    }
-
-    let slices = unsafe { erased_slices.into::<((), u32, u16, u8)>(&()) }
-        .expect("all the fields should be valid");
-    assert_eq!(
-        slices,
-        (units_slices, i123_slices, i456_slices, i789_slices),
-    );
+    let value =
+        unsafe { erased_value.into::<()>(&context) }.expect("all the fields should be valid");
+    assert_eq!(value, ());
 }

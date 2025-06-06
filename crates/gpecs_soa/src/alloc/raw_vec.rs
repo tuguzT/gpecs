@@ -131,7 +131,7 @@ where
         capacity: usize,
         init: AllocInit,
     ) -> Result<Self, TryReserveError> {
-        if !should_allocate::<T>(capacity) {
+        if !should_allocate::<T>(&context, capacity) {
             let this = Self {
                 ptr: NonNull::dangling(),
                 capacity: 0,
@@ -269,7 +269,8 @@ where
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        if is_zst::<T>() {
+        let context = self.context();
+        if is_zst::<T>(context) {
             return usize::MAX;
         }
         self.capacity
@@ -277,7 +278,7 @@ where
 
     #[inline]
     fn current_memory(&self, context: &T::Context) -> Option<(NonNull<u8>, Layout)> {
-        if !should_allocate::<T>(self.capacity) {
+        if !should_allocate::<T>(context, self.capacity) {
             return None;
         }
 
@@ -367,13 +368,12 @@ where
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
         debug_assert!(additional > 0);
 
-        if is_zst::<T>() {
+        let context = self.context();
+        if is_zst::<T>(context) {
             return Err(CapacityOverflow.into());
         }
 
-        let context = self.context();
         let required_capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
-
         let capacity = cmp::max(self.capacity() * 2, required_capacity);
         let capacity = cmp::max(Self::min_non_zero_cap(context), capacity);
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
@@ -389,11 +389,11 @@ where
     }
 
     fn grow_exact(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {
-        if is_zst::<T>() {
+        let context = self.context();
+        if is_zst::<T>(context) {
             return Err(CapacityOverflow.into());
         }
 
-        let context = self.context();
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 

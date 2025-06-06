@@ -6,7 +6,7 @@ use gpecs_soa_erased::{
 };
 
 #[test]
-fn new_erased() {
+fn new() {
     type Soa = (u8, u64, u16, ());
     type Vec = ErasedSoaVec;
 
@@ -61,7 +61,57 @@ fn new_erased() {
 }
 
 #[test]
-fn with_capacity_erased() {
+fn new_zst() {
+    type Soa = ();
+    type Vec = ErasedSoaVec;
+
+    let context = ();
+    let erased_context = ErasedSoaContext::of::<Soa>(&context);
+
+    let descriptors = [FieldDescriptor::of::<()>()];
+    assert!(erased_context
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
+
+    let vec = Vec::with_context(erased_context);
+    assert!(vec.is_empty());
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    assert_eq!(
+        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        [].as_slice(),
+    );
+
+    let slices = vec.slices();
+    assert!(slices.is_empty());
+
+    assert_eq!(
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        [].as_slice(),
+    );
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let into_iter = vec.into_iter();
+    assert!(into_iter.is_empty());
+
+    assert_eq!(
+        unsafe { into_iter.as_slices().into::<Soa>(&context) }.unwrap(),
+        [].as_slice(),
+    );
+}
+
+#[test]
+fn with_capacity() {
     type Soa = (u8, u64, u16, ());
     type Vec = ErasedSoaVec;
 
@@ -117,7 +167,58 @@ fn with_capacity_erased() {
 }
 
 #[test]
-fn one_item_erased() {
+fn with_capacity_zst() {
+    type Soa = ();
+    type Vec = ErasedSoaVec;
+
+    let context = ();
+    let erased_context = ErasedSoaContext::of::<Soa>(&context);
+
+    let descriptors = [FieldDescriptor::of::<()>()];
+    assert!(erased_context
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
+
+    let vec = Vec::with_context_and_capacity(erased_context, 10);
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 10);
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    assert_eq!(
+        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        [].as_slice(),
+    );
+
+    let slices = vec.slices();
+    assert!(slices.is_empty());
+
+    assert_eq!(
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        [].as_slice(),
+    );
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let into_iter = vec.into_iter();
+    assert!(into_iter.is_empty());
+
+    assert_eq!(
+        unsafe { into_iter.as_slices().into::<Soa>(&context) }.unwrap(),
+        [].as_slice(),
+    );
+}
+
+#[test]
+fn one_item() {
     type Soa = (u8, u64, u16, ());
     type Vec = ErasedSoaVec;
 
@@ -226,7 +327,93 @@ fn one_item_erased() {
 }
 
 #[test]
-fn three_items_erased() {
+fn one_item_zst() {
+    type Soa = ();
+    type Vec = ErasedSoaVec;
+
+    let context = ();
+    let erased_context = ErasedSoaContext::of::<Soa>(&context);
+
+    let descriptors = [FieldDescriptor::of::<()>()];
+    assert!(erased_context
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
+
+    let mut vec = Vec::with_context(erased_context);
+
+    vec.push(ErasedSoa::from(&context, ()));
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 1);
+    assert_eq!(
+        vec.slices()
+            .into_get(0)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    assert_eq!(
+        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        [()].as_slice(),
+    );
+
+    let slices = vec.slices();
+    assert_eq!(slices.len(), 1);
+    assert_eq!(
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        [()].as_slice(),
+    );
+    assert_eq!(
+        vec.slices()
+            .into_get(0)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+
+    assert_eq!(
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        [()].as_slice(),
+    );
+
+    let mut iter = vec.slices().into_iter();
+    assert_eq!(iter.len(), 1);
+    assert_eq!(
+        iter.next_back()
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert!(iter.next().is_none());
+
+    let value = vec.pop().expect("vector should not be empty");
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 1);
+    assert!(vec.slices().into_get(0).is_none());
+
+    let value = unsafe { value.into::<Soa>(&context) }.unwrap();
+    assert_eq!(value, ());
+
+    assert_eq!(
+        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        [].as_slice(),
+    );
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let into_iter = vec.into_iter();
+    assert!(into_iter.is_empty());
+}
+
+#[test]
+fn three_items() {
     type Soa = (u8, String, u64, ());
     type Vec = ErasedSoaVec;
 
@@ -572,4 +759,297 @@ fn three_items_erased() {
 
     assert!(into_iter.next().is_none());
     assert!(into_iter.next_back().is_none());
+}
+
+#[test]
+fn three_items_zst() {
+    type Soa = ();
+    type Vec = ErasedSoaVec;
+
+    let context = ();
+    let erased_context = ErasedSoaContext::of::<Soa>(&context);
+
+    let descriptors = [FieldDescriptor::of::<()>()];
+    assert!(erased_context
+        .field_descriptors()
+        .iter()
+        .map(FieldDescriptor::layout)
+        .eq(descriptors.iter().map(FieldDescriptor::layout)));
+
+    let mut vec = Vec::with_context(erased_context);
+
+    let iter = iter::repeat_with(|| ErasedSoa::from::<Soa>(&context, ())).take(3);
+    vec.extend(iter);
+
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+
+    assert_eq!(
+        vec.slices()
+            .into_get(0)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(
+        vec.slices()
+            .into_get(1)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(
+        vec.slices()
+            .into_get(2)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+
+    assert_eq!(
+        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        [(); 3].as_slice(),
+    );
+
+    // use `drain` instead of `truncate` to drop all the contents,
+    // erased vec does not do it automatically
+    for erased in vec.drain(..) {
+        let () = unsafe { erased.into::<Soa>(&context) }.unwrap();
+    }
+
+    vec.insert(0, ErasedSoa::from::<Soa>(&context, ()));
+    vec.insert(0, ErasedSoa::from::<Soa>(&context, ()));
+    vec.insert(1, ErasedSoa::from::<Soa>(&context, ()));
+
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+
+    assert_eq!(
+        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        [(); 3].as_slice(),
+    );
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let slices = vec.slices();
+    assert_eq!(slices.len(), 3);
+
+    assert_eq!(
+        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        [(); 3].as_slice(),
+    );
+
+    assert_eq!(
+        slices
+            .get(0)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(
+        slices
+            .get(1)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(
+        slices
+            .get(2)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+
+    for refs in &mut vec {
+        let () = unsafe { refs.into::<Soa>(&context) }.unwrap();
+    }
+
+    let mut iter = vec.slices().into_iter();
+    assert_eq!(iter.len(), 3);
+
+    assert_eq!(
+        iter.next()
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(iter.len(), 2);
+
+    assert_eq!(
+        iter.next_back()
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(iter.len(), 1);
+
+    assert_eq!(
+        iter.next()
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(iter.len(), 0);
+
+    assert!(iter.next_back().is_none());
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    vec.push(ErasedSoa::from::<Soa>(&context, ()));
+    vec.push(ErasedSoa::from::<Soa>(&context, ()));
+    assert_eq!(vec.len(), 5);
+    assert!(vec.capacity() >= 5);
+
+    assert_eq!(
+        vec.slices()
+            .into_get(0)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(
+        vec.slices()
+            .into_get(1)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(
+        vec.slices()
+            .into_get(2)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(
+        vec.slices()
+            .into_get(3)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+    assert_eq!(
+        vec.slices()
+            .into_get(4)
+            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+        Some(&()),
+    );
+
+    {
+        let mut drain = vec.drain(2..4);
+        assert_eq!(drain.len(), 2);
+
+        let value = drain
+            .next_back()
+            .expect("drain iterator should not be empty");
+        let value = unsafe { value.into::<Soa>(&context) }.unwrap();
+        assert_eq!(value, ());
+        assert_eq!(drain.len(), 1);
+
+        let value = drain.next().expect("drain iterator should not be empty");
+        let value = unsafe { value.into::<Soa>(&context) }.unwrap();
+        assert_eq!(value, ());
+        assert_eq!(drain.len(), 0);
+
+        assert!(drain.next().is_none());
+        assert!(drain.next_back().is_none());
+    }
+
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 5);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let value = vec.swap_remove(1);
+    let value = unsafe { value.into::<Soa>(&context) }.unwrap();
+    assert_eq!(value, ());
+
+    assert_eq!(vec.len(), 2);
+    assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let value = vec.pop().expect("vector should not be empty");
+    let value = unsafe { value.into::<Soa>(&context) }.unwrap();
+    assert_eq!(value, ());
+
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let value = vec.remove(0);
+    let value = unsafe { value.into::<Soa>(&context) }.unwrap();
+    assert_eq!(value, ());
+
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 3);
+
+    let iter = iter::repeat_with(|| ErasedSoa::from::<Soa>(&context, ())).take(3);
+    vec.extend(iter);
+
+    vec.reserve(1);
+    assert!(vec.capacity() >= 4);
+    vec.reserve_exact(6);
+    assert!(vec.capacity() >= 9);
+
+    vec.shrink_to(6);
+    assert!(vec.capacity() >= 6);
+    vec.shrink_to(0);
+    assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    // use `drain` instead of `truncate` to drop needed contents,
+    // erased vec does not do it automatically
+    for erased in vec.drain(1..) {
+        let () = unsafe { erased.into::<Soa>(&context) }.unwrap();
+    }
+    assert_eq!(vec.len(), 1);
+    assert!(vec.capacity() >= 3);
+
+    // use `drain` instead of `clear` to drop all the contents,
+    // erased vec does not do it automatically
+    for erased in vec.drain(..) {
+        let () = unsafe { erased.into::<Soa>(&context) }.unwrap();
+    }
+    assert!(vec.is_empty());
+    assert!(vec.capacity() >= 3);
+
+    let mut vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    for _ in 0..3 {
+        vec.push(ErasedSoa::from::<Soa>(&context, ()));
+    }
+
+    assert_eq!(vec.len(), 3);
+    assert!(vec.capacity() >= 3);
+
+    assert_eq!(
+        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        [(); 3].as_slice(),
+    );
+
+    let vec = {
+        let (ptr, len, capacity) = vec.into_raw_parts();
+        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    };
+
+    let mut into_iter = vec.into_iter();
+    assert_eq!(into_iter.len(), 3);
+
+    let value = into_iter.next_back().expect("iterator should not be empty");
+    let value = unsafe { value.into::<Soa>(&context) }.unwrap();
+    assert_eq!(value, ());
+
+    assert_eq!(into_iter.len(), 2);
 }

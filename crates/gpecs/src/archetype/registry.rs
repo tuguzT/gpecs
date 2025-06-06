@@ -21,7 +21,7 @@ use petgraph::{
 };
 
 use crate::{
-    archetype::{erased::drop_erased_in_place, storage::ArchetypeStorage},
+    archetype::storage::ArchetypeStorage,
     bundle::Bundle,
     component::{
         registry::{ComponentId, ComponentRegistry},
@@ -35,7 +35,7 @@ use crate::{
 };
 
 use super::{
-    erased::{from_erased_fields, into_erased_fields, ErasedComponents},
+    erased::{drop_erased_in_place, from_erased_fields, into_erased_fields, ErasedComponents},
     error::{
         AlreadyHasComponentError, DuplicateComponentError, GetComponentsError,
         IncompatibleBundleError, InsertBundleError, InsertBundleExactError, MissingComponentError,

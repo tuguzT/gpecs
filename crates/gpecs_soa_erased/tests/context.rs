@@ -2,14 +2,14 @@ use gpecs_soa_erased::{erased::ErasedSoaContext, soa::traits::FieldDescriptor};
 
 #[test]
 #[cfg_attr(miri, ignore)]
-fn erased_context() {
+fn context() {
     let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
     let _context = ErasedSoaContext::new(descriptors);
 }
 
 #[test]
 #[cfg_attr(miri, ignore)]
-fn erased_context_of() {
+fn context_of() {
     let context = ErasedSoaContext::of::<()>(&());
     let descriptors = [FieldDescriptor::of::<()>()];
     assert!(context

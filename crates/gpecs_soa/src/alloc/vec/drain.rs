@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     ptr::is_zst,
-    slice::{slice_range, Iter, SoaSlices},
+    slice::{range, Iter, SoaSlices},
 };
 
 use super::{Soa, SoaVec};
@@ -46,7 +46,7 @@ where
         // the hole, and the vector length is restored to the new length.
         //
         let len = vec.len();
-        let range @ Range { start, end } = slice_range(range, ..len);
+        let range @ Range { start, end } = self::range(range, ..len);
 
         unsafe {
             let mut vec = NonNull::from(vec);
@@ -202,7 +202,8 @@ where
         let drop_len = self.iter.len();
         let mut vec = self.vec;
 
-        if is_zst::<T>() {
+        let context = unsafe { vec.as_ref() }.context();
+        if is_zst::<T>(context) {
             // ZSTs have no identity, so we don't need to move them around, we only need to drop the correct amount.
             // this can be achieved by manipulating the Vec length instead of moving values out from `iter`.
             unsafe {

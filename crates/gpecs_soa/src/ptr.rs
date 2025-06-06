@@ -44,7 +44,7 @@ fn len_for_inner<T>(context: &T::Context, len: usize, capacity: usize) -> usize
 where
     T: Soa,
 {
-    if !should_allocate::<T>(capacity) {
+    if !should_allocate::<T>(context, capacity) {
         return len;
     }
 
@@ -313,11 +313,15 @@ mod private_slice_ptr {
 
 #[inline]
 #[track_caller]
-pub(crate) fn is_zst<T>() -> bool
+pub(crate) fn is_zst<T>(context: &T::Context) -> bool
 where
     T: Soa,
 {
-    size_of::<T::Fields>() == 0
+    let packed_size = T::field_descriptors(context)
+        .into_iter()
+        .map(|desc| desc.as_ref().layout().size())
+        .sum::<usize>();
+    size_of::<T::Fields>() == 0 || packed_size == 0
 }
 
 #[inline]
@@ -330,11 +334,11 @@ where
 }
 
 #[inline]
-pub(crate) fn should_allocate<T>(capacity: usize) -> bool
+pub(crate) fn should_allocate<T>(context: &T::Context, capacity: usize) -> bool
 where
     T: Soa,
 {
-    let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>() || capacity == 0);
+    let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>(context) || capacity == 0);
     !should_not_allocate
 }
 
@@ -343,7 +347,7 @@ fn buffer_layout_not_padded<T>(context: &T::Context, capacity: usize) -> Result<
 where
     T: Soa,
 {
-    if is_zst::<T>() || capacity == 0 {
+    if is_zst::<T>(context) || capacity == 0 {
         if is_context_zst::<T>() {
             return Ok(Layout::new::<()>());
         }
@@ -362,7 +366,7 @@ pub(crate) fn buffer_layout<T>(context: &T::Context, capacity: usize) -> Result<
 where
     T: Soa,
 {
-    if is_zst::<T>() || capacity == 0 {
+    if is_zst::<T>(context) || capacity == 0 {
         if is_context_zst::<T>() {
             return Ok(Layout::new::<()>());
         }
@@ -388,7 +392,7 @@ where
     T: Soa,
 {
     let size_of_prefix = size_of::<BufferPrefix<T>>();
-    if is_zst::<T>() || buffer_layout.size() < size_of_prefix {
+    if is_zst::<T>(context) || buffer_layout.size() < size_of_prefix {
         return 0;
     }
 
@@ -404,7 +408,7 @@ where
     T: Soa,
 {
     let size_of_prefix = size_of::<BufferPrefix<T>>();
-    if is_zst::<T>() || buffer_layout.size() < size_of_prefix {
+    if is_zst::<T>(context) || buffer_layout.size() < size_of_prefix {
         return 0;
     }
 
@@ -426,7 +430,7 @@ pub(crate) unsafe fn ptrs<T>(
 where
     T: Soa,
 {
-    if is_zst::<T>() || capacity == 0 {
+    if is_zst::<T>(context) || capacity == 0 {
         return Ok(T::ptrs_dangling(context));
     }
 
@@ -465,7 +469,7 @@ mod tests {
 
         assert_eq!(
             to_capacity_in_bytes(0),
-            should_allocate::<(u8, u8, u8)>(0)
+            should_allocate::<(u8, u8, u8)>(&Default::default(), 0)
                 .then_some(prefix)
                 .unwrap_or_default(),
         );
@@ -531,7 +535,7 @@ mod tests {
 
         assert_eq!(
             to_capacity_in_bytes(0),
-            should_allocate::<(u16, u16, u16)>(0)
+            should_allocate::<(u16, u16, u16)>(&Default::default(), 0)
                 .then_some(prefix)
                 .unwrap_or_default(),
         );
@@ -593,7 +597,7 @@ mod tests {
 
         assert_eq!(
             to_capacity_in_bytes(0),
-            should_allocate::<(u32, u32, u32)>(0)
+            should_allocate::<(u32, u32, u32)>(&Default::default(), 0)
                 .then_some(prefix)
                 .unwrap_or_default(),
         );
@@ -654,7 +658,7 @@ mod tests {
 
         assert_eq!(
             to_capacity_in_bytes(0),
-            should_allocate::<(u64, u64, u64)>(0)
+            should_allocate::<(u64, u64, u64)>(&Default::default(), 0)
                 .then_some(prefix)
                 .unwrap_or_default(),
         );
@@ -718,7 +722,7 @@ mod tests {
 
         assert_eq!(
             to_capacity_in_bytes(0),
-            should_allocate::<(u8, u16, u32)>(0)
+            should_allocate::<(u8, u16, u32)>(&Default::default(), 0)
                 .then_some(prefix)
                 .unwrap_or_default(),
         );

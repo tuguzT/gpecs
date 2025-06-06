@@ -1,79 +1,109 @@
-use alloc::boxed::Box;
-use core::{iter::FusedIterator, slice};
+use core::{
+    fmt::{self, Debug},
+    iter::FusedIterator,
+    marker::PhantomData,
+    ops::{Range, RangeBounds},
+    ptr, slice,
+};
 
 use crate::{
     assert::{check_same_layout, check_same_len},
-    error::LenMismatchError,
-    field::{ErasedFieldSliceIterMut, ErasedFieldSliceMut},
-    soa::traits::Soa,
+    erased::{error::IntoValueError, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs},
+    field::{field_slice_from_raw_parts_mut, ErasedFieldMutPtr, ErasedFieldSliceMut},
+    soa::{
+        slice::range,
+        traits::{buffer_layout, FieldDescriptor, Soa},
+    },
 };
 
-use super::{error::IntoValueError, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlicesIter};
-
-#[derive(Debug)]
-pub struct ErasedSoaSlicesMut<'a> {
-    len: usize,
-    slices: Box<[ErasedFieldSliceMut<'a>]>,
+#[derive(Debug, Clone, Copy)]
+pub struct ErasedSoaSlicesMut<'context, 'a> {
+    descriptors: &'context [FieldDescriptor],
+    buffer: *mut u8,
+    capacity: usize,
+    start: usize,
+    end: usize,
+    phantom: PhantomData<&'a mut [u8]>,
 }
 
-impl<'a> ErasedSoaSlicesMut<'a> {
-    #[inline]
-    pub fn new<I>(len: usize, slices: I) -> Result<Self, LenMismatchError>
-    where
-        I: IntoIterator<Item = ErasedFieldSliceMut<'a>>,
-    {
-        let slices = slices
-            .into_iter()
-            .map(|slice| {
-                check_same_len(slice.len(), len)?;
-                Ok(slice)
-            })
-            .collect::<Result<Box<[_]>, _>>()?;
-        let me = unsafe { Self::actual_new(len, slices) };
-        Ok(me)
-    }
-
+impl<'context, 'a> ErasedSoaSlicesMut<'context, 'a> {
     #[inline]
     #[track_caller]
-    pub unsafe fn new_unchecked<I>(len: usize, slices: I) -> Self
-    where
-        I: IntoIterator<Item = ErasedFieldSliceMut<'a>>,
-    {
-        if cfg!(debug_assertions) {
-            return Self::new(len, slices).expect("incorrect inputs");
-        }
-        unsafe { Self::actual_new(len, slices) }
-    }
-
-    #[inline]
-    unsafe fn actual_new<I>(len: usize, slices: I) -> Self
-    where
-        I: IntoIterator<Item = ErasedFieldSliceMut<'a>>,
-    {
-        let slices = slices.into_iter().collect();
-        Self { len, slices }
-    }
-
-    #[inline]
-    pub fn from<'context, T>(
-        context: &'context T::Context,
-        slices: T::SlicesMut<'context, 'a>,
+    pub fn new<R>(
+        descriptors: &'context [FieldDescriptor],
+        buffer: &'a mut [u8],
+        capacity: usize,
+        range: R,
     ) -> Self
     where
-        T: Soa,
+        R: RangeBounds<usize>,
     {
-        let len = T::slices_mut_len(context, &slices);
-        let ptrs = T::slices_mut_as_ptrs(context, slices);
-        let ptrs = T::ptrs_erase_mut(context, ptrs);
-        let slices = T::field_descriptors(context)
-            .into_iter()
-            .zip(ptrs)
-            .map(|(desc, ptr)| {
-                let desc = desc.as_ref().clone();
-                let buffer = unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size() * len) };
-                unsafe { ErasedFieldSliceMut::new_unchecked(desc, buffer, len) }
-            });
-        unsafe { Self::new_unchecked(len, slices) }
+        let layout = buffer_layout(descriptors, capacity)
+            .expect("buffer layout size should not exceed `isize::MAX`");
+        assert!(
+            buffer.len() >= layout.size(),
+            "buffer length ({buffer_len}) should be equal to or larger than expected layout size ({layout_size})",
+            buffer_len = buffer.len(),
+            layout_size = layout.size(),
+        );
+
+        let buffer = buffer.as_mut_ptr();
+        unsafe { Self::new_unchecked(descriptors, buffer, capacity, range) }
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked<R>(
+        descriptors: &'context [FieldDescriptor],
+        buffer: *mut u8,
+        capacity: usize,
+        range: R,
+    ) -> Self
+    where
+        R: RangeBounds<usize>,
+    {
+        let Range { start, end } = self::range(range, ..capacity);
+        Self {
+            descriptors,
+            buffer,
+            capacity,
+            start,
+            end,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
+        let Self { descriptors, .. } = *self;
+        descriptors
+    }
+
+    #[inline]
+    pub fn buffer(&self) -> *mut u8 {
+        let Self { buffer, .. } = *self;
+        buffer
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
+    }
+
+    #[inline]
+    pub fn range(&self) -> Range<usize> {
+        let Self { start, end, .. } = *self;
+        start..end
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.range().len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     #[inline]
@@ -84,179 +114,191 @@ impl<'a> ErasedSoaSlicesMut<'a> {
     where
         T: Soa,
     {
-        let Self { slices, .. } = &self;
+        let Self {
+            descriptors,
+            buffer,
+            capacity,
+            start,
+            end,
+            ..
+        } = self;
+
         let result = T::field_descriptors(context)
             .into_iter()
-            .zip(slices)
+            .zip(self)
             .try_fold(0, |len, (desc, slice)| {
                 check_same_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
                 Ok(len + 1)
             })
             .and_then(|len| {
-                check_same_len(len, slices.len())?;
+                check_same_len(len, descriptors.len())?;
                 Ok(())
             });
         if let Err(error) = result {
             return Err(IntoValueError::new(self, error));
         }
 
-        let Self { slices, len, .. } = self;
-        let ptrs = slices
-            .into_vec()
-            .into_iter()
-            .map(|slice| slice.into_buffer().as_mut_ptr());
-
-        let ptrs = T::ptrs_restore_mut(context, ptrs);
-        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-        let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
-        Ok(slices)
+        unsafe {
+            let ptrs = T::ptrs_from_buffer(context, buffer, capacity);
+            let ptrs = T::ptrs_add_mut(context, ptrs, start);
+            let slices = T::slices_from_raw_parts_mut(context, ptrs, (start..end).len());
+            let slice = T::slice_mut_ptrs_to_slices(context, slices);
+            Ok(slice)
+        }
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        self.len
+    pub fn into_parts(self) -> (&'context [FieldDescriptor], *mut u8, usize, Range<usize>) {
+        let Self {
+            descriptors,
+            buffer,
+            capacity,
+            start,
+            end,
+            ..
+        } = self;
+        (descriptors, buffer, capacity, start..end)
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    pub fn as_ptrs(&self) -> ErasedSoaSlicePtrs<'context> {
+        let Self {
+            descriptors,
+            buffer,
+            capacity,
+            start,
+            end,
+            ..
+        } = *self;
+        unsafe { ErasedSoaSlicePtrs::new(descriptors, buffer, capacity, start..end) }
     }
 
     #[inline]
-    pub fn field_slices(&self) -> &[ErasedFieldSliceMut<'a>] {
-        let Self { slices, .. } = self;
-        slices.as_ref()
-    }
-
-    #[inline]
-    pub fn into_field_slices(self) -> Box<[ErasedFieldSliceMut<'a>]> {
-        let Self { slices, .. } = self;
-        slices
-    }
-
-    #[inline]
-    pub fn iter(&self) -> ErasedSoaSlicesIter<'_> {
-        let Self { slices, .. } = self;
-        let slices = slices.iter().map(IntoIterator::into_iter);
-        ErasedSoaSlicesIter::new(slices)
-    }
-
-    #[inline]
-    pub fn iter_mut(&mut self) -> ErasedSoaSlicesIterMut<'_> {
-        let Self { slices, .. } = self;
-        let slices = slices.iter_mut().map(IntoIterator::into_iter);
-        ErasedSoaSlicesIterMut::new(slices)
+    pub fn as_mut_ptrs(&mut self) -> ErasedSoaSliceMutPtrs<'context> {
+        let Self {
+            descriptors,
+            buffer,
+            capacity,
+            start,
+            end,
+            ..
+        } = *self;
+        unsafe { ErasedSoaSliceMutPtrs::new(descriptors, buffer, capacity, start..end) }
     }
 }
 
-impl<'a> IntoIterator for &'a ErasedSoaSlicesMut<'_> {
-    type Item = ErasedSoaRefs<'a>;
-    type IntoIter = ErasedSoaSlicesIter<'a>;
+impl<'context, 'a> IntoIterator for ErasedSoaSlicesMut<'context, 'a> {
+    type Item = ErasedFieldSliceMut<'a>;
+    type IntoIter = ErasedSoaSlicesMutIter<'context, 'a>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        let Self {
+            descriptors,
+            buffer,
+            capacity,
+            start,
+            end,
+            phantom,
+        } = self;
+
+        ErasedSoaSlicesMutIter {
+            descriptors: descriptors.iter(),
+            buffer,
+            capacity,
+            start,
+            end,
+            phantom,
+        }
     }
 }
 
-impl<'a> IntoIterator for &'a mut ErasedSoaSlicesMut<'_> {
-    type Item = ErasedSoaRefsMut<'a>;
-    type IntoIter = ErasedSoaSlicesIterMut<'a>;
+#[derive(Clone)]
+pub struct ErasedSoaSlicesMutIter<'context, 'a> {
+    descriptors: slice::Iter<'context, FieldDescriptor>,
+    buffer: *mut u8,
+    capacity: usize,
+    start: usize,
+    end: usize,
+    phantom: PhantomData<&'a mut [u8]>,
+}
+
+impl ErasedSoaSlicesMutIter<'_, '_> {
+    #[inline]
+    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
+        let Self { descriptors, .. } = self;
+        descriptors.as_slice()
+    }
 
     #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
+    pub fn buffer(&self) -> *mut u8 {
+        let Self { buffer, .. } = *self;
+        buffer
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
+    }
+
+    #[inline]
+    pub fn range(&self) -> Range<usize> {
+        let Self { start, end, .. } = *self;
+        start..end
     }
 }
 
-impl<'a> IntoIterator for ErasedSoaSlicesMut<'a> {
-    type Item = ErasedSoaRefsMut<'a>;
-    type IntoIter = ErasedSoaSlicesIterMut<'a>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        let Self { slices, .. } = self;
-        let slices = slices.into_vec().into_iter().map(IntoIterator::into_iter);
-        ErasedSoaSlicesIterMut::new(slices)
+impl Debug for ErasedSoaSlicesMutIter<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries = self.clone();
+        f.debug_list().entries(entries).finish()
     }
 }
 
-pub struct ErasedSoaSlicesIterMut<'a> {
-    slices: Box<[ErasedFieldSliceIterMut<'a>]>,
-}
-
-impl<'a> ErasedSoaSlicesIterMut<'a> {
-    #[inline]
-    fn new<I>(slices: I) -> Self
-    where
-        I: IntoIterator<Item = ErasedFieldSliceIterMut<'a>>,
-    {
-        let mut slices = slices.into_iter().peekable();
-        let len = slices
-            .peek()
-            .map(ExactSizeIterator::len)
-            .expect("input slices should contain at least one field");
-
-        let slices = slices
-            .inspect(|iter| {
-                check_same_len(iter.len(), len).expect("input slices should have the same length")
-            })
-            .collect();
-        Self { slices }
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        let Self { slices, .. } = self;
-        slices.iter().map(ExactSizeIterator::len).next().unwrap()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl<'a> Iterator for ErasedSoaSlicesIterMut<'a> {
-    type Item = ErasedSoaRefsMut<'a>;
+impl<'a> Iterator for ErasedSoaSlicesMutIter<'_, 'a> {
+    type Item = ErasedFieldSliceMut<'a>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if ErasedSoaSlicesIterMut::is_empty(self) {
-            return None;
-        }
+        let Self {
+            ref mut descriptors,
+            ref mut buffer,
+            capacity,
+            start,
+            end,
+            ..
+        } = *self;
 
-        let refs = self.slices.iter_mut().flat_map(Iterator::next);
-        Some(ErasedSoaRefsMut::new(refs))
+        let &desc = descriptors.next()?;
+        let ptr_buffer = ptr::slice_from_raw_parts_mut(*buffer, desc.layout().size());
+        let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, ptr_buffer) };
+
+        let item = unsafe {
+            let data = ptr.add(start);
+            field_slice_from_raw_parts_mut(data, (start..end).len()).deref_mut()
+        };
+        *buffer = unsafe { ptr.add(capacity) }.as_ptr();
+
+        if let [desc, ..] = descriptors.as_slice() {
+            *buffer = unsafe { buffer.add(buffer.align_offset(desc.layout().align())) };
+        }
+        Some(item)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.len();
-        (len, Some(len))
+        let Self { descriptors, .. } = self;
+        descriptors.size_hint()
     }
 }
 
-impl DoubleEndedIterator for ErasedSoaSlicesIterMut<'_> {
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        if ErasedSoaSlicesIterMut::is_empty(self) {
-            return None;
-        }
-
-        let refs = self
-            .slices
-            .iter_mut()
-            .flat_map(DoubleEndedIterator::next_back);
-        Some(ErasedSoaRefsMut::new(refs))
-    }
-}
-
-impl ExactSizeIterator for ErasedSoaSlicesIterMut<'_> {
+impl ExactSizeIterator for ErasedSoaSlicesMutIter<'_, '_> {
     #[inline]
     fn len(&self) -> usize {
-        ErasedSoaSlicesIterMut::len(self)
+        let Self { descriptors, .. } = self;
+        descriptors.len()
     }
 }
 
-impl FusedIterator for ErasedSoaSlicesIterMut<'_> {}
+impl FusedIterator for ErasedSoaSlicesMutIter<'_, '_> {}

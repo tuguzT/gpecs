@@ -19,7 +19,6 @@ use gpecs_sparse::{
 use indexmap::{map::Keys, IndexMap, IndexSet};
 
 use crate::{
-    archetype::erased::drop_erased_in_place,
     bundle::Bundle,
     component::{
         registry::{ComponentId, ComponentRegistry, DropFn},
@@ -31,9 +30,10 @@ use crate::{
 
 use super::{
     erased::{
-        from_erased_fields, from_erased_refs, from_erased_refs_mut, from_erased_slices,
-        from_erased_slices_mut, get_component_info_fail, into_erased_fields, into_erased_refs,
-        into_erased_refs_mut, into_erased_slices, into_erased_slices_mut, ErasedComponents,
+        drop_erased_in_place, from_erased_fields, from_erased_refs, from_erased_refs_mut,
+        from_erased_slices, from_erased_slices_mut, get_component_info_fail, into_erased_fields,
+        into_erased_refs, into_erased_refs_mut, into_erased_slices, into_erased_slices_mut,
+        ErasedComponents,
     },
     error::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
@@ -571,14 +571,11 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    fn destroy_refs_mut(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut<'_>) {
-        let fields = erased_refs_mut.into_field_refs();
+    fn destroy_refs_mut(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut) {
+        let fields = erased_refs_mut.into_iter();
         debug_assert_eq!(fields.len(), component_ids.len());
 
-        let fields = fields
-            .into_vec()
-            .into_iter()
-            .zip(component_ids.values().copied());
+        let fields = fields.zip(component_ids.values().copied());
         #[allow(unsafe_code)]
         unsafe {
             drop_erased_in_place(fields)

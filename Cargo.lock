@@ -587,6 +587,7 @@ name = "gpecs_soa_erased"
 version = "0.0.0"
 dependencies = [
  "gpecs_soa",
+ "itertools 0.14.0",
 ]
 
 [[package]]

@@ -17,8 +17,8 @@ use crate::{
         BufferDataPtrMut,
     },
     slice::{
-        from_raw_parts, from_raw_parts_mut, slice_range, IndexHelper, IndexHelperMut, Iter,
-        IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
+        from_raw_parts, from_raw_parts_mut, range, IndexHelper, IndexHelperMut, Iter, IterMut,
+        SoaSlice, SoaSlices, SoaSlicesMut,
     },
     traits::{Soa, SoaToOwned, SoaTrustedFields},
 };
@@ -336,7 +336,9 @@ where
 
     #[inline]
     fn set_len_in_buffer(&mut self, new_len: usize) {
-        if !should_allocate::<T>(self.capacity()) {
+        let context = self.context();
+        let capacity = self.capacity();
+        if !should_allocate::<T>(context, capacity) {
             return;
         }
 
@@ -619,7 +621,7 @@ where
         R: RangeBounds<usize>,
         for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
     {
-        let range = slice_range(src, ..self.len());
+        let range = range(src, ..self.len());
         self.reserve(range.len());
 
         let mut set_len_on_drop = SetLenOnDrop {

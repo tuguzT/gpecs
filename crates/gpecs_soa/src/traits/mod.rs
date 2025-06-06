@@ -18,8 +18,6 @@ pub type DefaultContext = ();
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays (or SoA) pattern.
 #[allow(clippy::missing_safety_doc)]
-// TODO: remove unnecessary / excessive stuff (such as erase / restore API)
-//       we can (potentially) achieve the same without that mess mentioned above
 pub unsafe trait Soa: Sized {
     /// Type of context used to perform all operations of this trait.
     ///
@@ -73,76 +71,28 @@ pub unsafe trait Soa: Sized {
         capacity
     }
 
-    /// Non-empty collection of properly typed pointers to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of pointers to each field of [`Fields`](Soa::Fields).
     ///
-    /// Unlike [`ErasedPtrs`](Soa::ErasedPtrs),
+    /// Unlike [field descriptors](Soa::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     ///
     /// This type should be covariant over given lifetime.
     type Ptrs<'context>: Clone;
 
-    /// Non-empty collection of properly typed mutable pointers to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of mutable pointers to each field of [`Fields`](Soa::Fields).
     ///
-    /// Unlike [`ErasedMutPtrs`](Soa::ErasedMutPtrs),
+    /// Unlike [field descriptors](Soa::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     ///
     /// This type should be covariant over given lifetime.
     type MutPtrs<'context>: Clone;
 
-    /// Non-empty collection of pointers to the bytes of each field of [`Fields`](Soa::Fields).
-    ///
-    /// Unlike [`Ptrs`](Soa::Ptrs),
-    /// order of such pointers **MUST** resemble their order inside of a buffer in memory.
-    ///
-    /// This type should be covariant over given lifetime.
-    type ErasedPtrs<'context>: IntoIterator<Item = *const u8>;
-
-    /// Non-empty collection of mutable pointers to the bytes of each field of [`Fields`](Soa::Fields).
-    ///
-    /// Unlike [`MutPtrs`](Soa::MutPtrs),
-    /// order of such pointers **MUST** resemble their order inside of a buffer in memory.
-    ///
-    /// This type should be covariant over given lifetime.
-    type ErasedMutPtrs<'context>: IntoIterator<Item = *mut u8>;
-
-    /// Erases pointers of each field of [`Fields`](Soa::Fields).
-    ///
-    /// Process of 'erasing' just means converting properly typed pointers to the pointers of bytes.
-    fn ptrs_erase<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
-    ) -> Self::ErasedPtrs<'context>;
-
-    /// Erases mutable pointers of each field of [`Fields`](Soa::Fields).
-    ///
-    /// Process of 'erasing' just means converting properly typed pointers to the pointers of bytes.
-    fn ptrs_erase_mut<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-    ) -> Self::ErasedMutPtrs<'context>;
-
-    /// Restores pointers to bytes of each field of [`Fields`](Soa::Fields).
-    ///
-    /// Process of 'restoring' just means converting pointers of bytes to properly typed pointers.
-    fn ptrs_restore(
-        context: &Self::Context,
-        ptrs: impl IntoIterator<Item = *const u8>,
-    ) -> Self::Ptrs<'_>;
-
-    /// Restores mutable pointers to bytes of each field of [`Fields`](Soa::Fields).
-    ///
-    /// Process of 'restoring' just means converting pointers of bytes to properly typed pointers.
-    fn ptrs_restore_mut(
-        context: &Self::Context,
-        ptrs: impl IntoIterator<Item = *mut u8>,
-    ) -> Self::MutPtrs<'_>;
-
     /// Returns dangling pointers to each field of [`Fields`](Soa::Fields).
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_>;
 
-    /// Creates properly typed pointers to each field of [`Fields`](Soa::Fields)
+    /// Creates pointers to each field of [`Fields`](Soa::Fields)
     /// from a given buffer with given capacity.
     ///
     /// Implementations of this method should not account for a [`Context`](Soa::Context),
@@ -170,7 +120,7 @@ pub unsafe trait Soa: Sized {
         ptrs: Self::Ptrs<'context>,
     ) -> Self::MutPtrs<'context>;
 
-    /// Adds an unsigned offset to each properly typed pointer.
+    /// Adds an unsigned offset to each pointer.
     ///
     /// All the safety requirements resulting from applying [`pointer::add()`] method to each pointer
     /// should be satisfied to be safe to call this method.
@@ -182,7 +132,7 @@ pub unsafe trait Soa: Sized {
         offset: usize,
     ) -> Self::Ptrs<'context>;
 
-    /// Adds an unsigned offset to each mutable properly typed pointer.
+    /// Adds an unsigned offset to each mutable pointer.
     ///
     /// All the safety requirements resulting from applying [`pointer::add()`] method to each pointer
     /// should be satisfied to be safe to call this method.
@@ -194,7 +144,7 @@ pub unsafe trait Soa: Sized {
         offset: usize,
     ) -> Self::MutPtrs<'context>;
 
-    /// Calculates the distance between two properly typed pointers
+    /// Calculates the distance between two pointers
     /// to each field of [`Fields`](Soa::Fields) within the same allocation.
     ///
     /// All the safety requirements resulting from applying [`pointer::offset_from()`] method to each pointer
@@ -210,7 +160,7 @@ pub unsafe trait Soa: Sized {
         origin: Self::Ptrs<'_>,
     ) -> isize;
 
-    /// Calculates the distance between two properly typed mutable pointers
+    /// Calculates the distance between two mutable pointers
     /// to each field of [`Fields`](Soa::Fields) within the same allocation.
     ///
     /// All the safety requirements resulting from applying [`pointer::offset_from()`] method to each pointer
@@ -320,7 +270,7 @@ pub unsafe trait Soa: Sized {
         drop(value);
     }
 
-    /// Non-empty collection of properly typed non-null pointers to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of non-null pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
@@ -328,7 +278,7 @@ pub unsafe trait Soa: Sized {
     /// This type should be covariant over given lifetime.
     type NonNullPtrs<'context>: Clone;
 
-    /// Creates properly typed non-null pointers to each field of [`Fields`](Soa::Fields).
+    /// Creates non-null pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// All the safety requirements resulting from applying
     /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
@@ -344,7 +294,7 @@ pub unsafe trait Soa: Sized {
         ptrs: Self::NonNullPtrs<'context>,
     ) -> Self::MutPtrs<'context>;
 
-    /// Non-empty collection of properly typed references to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
     ///
@@ -353,7 +303,7 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    /// Non-empty collection of properly typed mutable references to each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of mutable references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
     ///
@@ -362,7 +312,7 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    /// Converts properly typed pointers to each field of [`Fields`](Soa::Fields)
+    /// Converts pointers to each field of [`Fields`](Soa::Fields)
     /// to their references by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
@@ -372,7 +322,7 @@ pub unsafe trait Soa: Sized {
         ptrs: Self::Ptrs<'context>,
     ) -> Self::Refs<'context, 'a>;
 
-    /// Converts properly typed mutable pointers to each field of [`Fields`](Soa::Fields)
+    /// Converts mutable pointers to each field of [`Fields`](Soa::Fields)
     /// to their mutable references by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
@@ -382,21 +332,21 @@ pub unsafe trait Soa: Sized {
         ptrs: Self::MutPtrs<'context>,
     ) -> Self::RefsMut<'context, 'a>;
 
-    /// Converts properly typed references to each field of [`Fields`](Soa::Fields)
+    /// Converts references to each field of [`Fields`](Soa::Fields)
     /// to their pointers by taking the pointer of each one of them.
     fn refs_as_ptrs<'context>(
         context: &'context Self::Context,
         refs: Self::Refs<'context, '_>,
     ) -> Self::Ptrs<'context>;
 
-    /// Converts properly typed mutable references to each field of [`Fields`](Soa::Fields)
+    /// Converts mutable references to each field of [`Fields`](Soa::Fields)
     /// to their mutable pointers by taking the pointer of each one of them.
     fn refs_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, '_>,
     ) -> Self::MutPtrs<'context>;
 
-    /// Converts properly typed mutable references to each field of [`Fields`](Soa::Fields)
+    /// Converts mutable references to each field of [`Fields`](Soa::Fields)
     /// to their references by explicitly converting each one of them via `&*` operator combination.
     fn refs_mut_as_refs<'context, 'a>(
         context: &'context Self::Context,
@@ -463,21 +413,21 @@ pub unsafe trait Soa: Sized {
     /// or else this method could panic.
     fn slice_mut_ptrs_len(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize;
 
-    /// Returns properly typed pointers to the slice's buffer
+    /// Returns pointers to the slice's buffer
     /// of each slice pointer of [`Fields`](Soa::Fields).
     fn slice_ptrs_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicePtrs<'context>,
     ) -> Self::Ptrs<'context>;
 
-    /// Returns properly typed mutable pointers to the slice's buffer
+    /// Returns mutable pointers to the slice's buffer
     /// of each mutable slice pointer of [`Fields`](Soa::Fields).
     fn slice_mut_ptrs_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::MutPtrs<'context>;
 
-    /// Non-empty collection of properly typed slices of each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
     ///
@@ -486,7 +436,7 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    /// Non-empty collection of properly typed mutable slices of each field of [`Fields`](Soa::Fields).
+    /// Non-empty collection of mutable slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
     ///
@@ -495,7 +445,7 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    /// Converts properly typed slice pointers to each field of [`Fields`](Soa::Fields)
+    /// Converts slice pointers to each field of [`Fields`](Soa::Fields)
     /// to their slices by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each slice pointer
@@ -505,7 +455,7 @@ pub unsafe trait Soa: Sized {
         slices: Self::SlicePtrs<'context>,
     ) -> Self::Slices<'context, 'a>;
 
-    /// Converts properly typed mutable slice pointers to each field of [`Fields`](Soa::Fields)
+    /// Converts mutable slice pointers to each field of [`Fields`](Soa::Fields)
     /// to their mutable slices by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
@@ -529,35 +479,35 @@ pub unsafe trait Soa: Sized {
     /// or else this method could panic.
     fn slices_mut_len(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize;
 
-    /// Converts properly typed slices to each field of [`Fields`](Soa::Fields)
+    /// Converts slices to each field of [`Fields`](Soa::Fields)
     /// to their slice pointers by taking the pointer of each one of them.
     fn slices_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::SlicePtrs<'context>;
 
-    /// Converts properly typed mutable slices to each field of [`Fields`](Soa::Fields)
+    /// Converts mutable slices to each field of [`Fields`](Soa::Fields)
     /// to their mutable slice pointers by taking the pointer of each one of them.
     fn slices_mut_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::SliceMutPtrs<'context>;
 
-    /// Converts properly typed mutable slices to each field of [`Fields`](Soa::Fields)
+    /// Converts mutable slices to each field of [`Fields`](Soa::Fields)
     /// to their slices by explicitly converting each one of them via `&*` operator combination.
     fn slices_mut_as_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a>;
 
-    /// Returns properly typed pointers to the slice's buffer
+    /// Returns pointers to the slice's buffer
     /// of each slice of [`Fields`](Soa::Fields).
     fn slices_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::Ptrs<'context>;
 
-    /// Returns properly typed mutable pointers to the slice's buffer
+    /// Returns mutable pointers to the slice's buffer
     /// of each mutable slice of [`Fields`](Soa::Fields).
     fn slices_mut_as_ptrs<'context>(
         context: &'context Self::Context,

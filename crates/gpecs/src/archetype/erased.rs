@@ -1,5 +1,5 @@
 use gpecs_soa_erased::{
-    erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut},
+    // erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut},
     field::{
         ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
@@ -8,7 +8,10 @@ use indexmap::IndexMap;
 
 use crate::{
     component::registry::{ComponentId, ComponentRegistry, DropFn},
-    soa::traits::{FieldDescriptor, Soa},
+    soa::traits::{
+        // FieldDescriptor,
+        Soa,
+    },
 };
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
@@ -20,66 +23,66 @@ pub fn get_component_info_fail(component_id: &ComponentId) -> ! {
     panic!("info of component {component_id:?} should be present")
 }
 
-#[inline]
-#[track_caller]
-fn validate_component<D>(components: &ComponentRegistry, id: ComponentId, desc: D)
-where
-    D: AsRef<FieldDescriptor>,
-{
-    let info = components
-        .get_component_info(id)
-        .unwrap_or_else(|| get_component_info_fail(&id));
-    assert_eq!(info.descriptor().layout(), desc.as_ref().layout());
-}
+// #[inline]
+// #[track_caller]
+// fn validate_component<D>(components: &ComponentRegistry, id: ComponentId, desc: D)
+// where
+//     D: AsRef<FieldDescriptor>,
+// {
+//     let info = components
+//         .get_component_info(id)
+//         .unwrap_or_else(|| get_component_info_fail(&id));
+//     assert_eq!(info.descriptor().layout(), desc.as_ref().layout());
+// }
 
-#[inline]
-#[track_caller]
-fn validate_components<'components, 'context, T, I>(
-    components: &'components ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: I,
-) -> impl Iterator<Item = ComponentId> + use<'components, 'context, T, I>
-where
-    T: Soa,
-    I: IntoIterator<Item = ComponentId>,
-{
-    component_ids
-        .into_iter()
-        .zip(T::field_descriptors(context))
-        .inspect(|(id, desc)| validate_component(components, *id, desc))
-        .map(|(id, _)| id)
-}
+// #[inline]
+// #[track_caller]
+// fn validate_components<'components, 'context, T, I>(
+//     components: &'components ComponentRegistry,
+//     context: &'context T::Context,
+//     component_ids: I,
+// ) -> impl Iterator<Item = ComponentId> + use<'components, 'context, T, I>
+// where
+//     T: Soa,
+//     I: IntoIterator<Item = ComponentId>,
+// {
+//     component_ids
+//         .into_iter()
+//         .zip(T::field_descriptors(context))
+//         .inspect(|(id, desc)| validate_component(components, *id, desc))
+//         .map(|(id, _)| id)
+// }
 
-#[inline]
-#[track_caller]
-fn reorder_fields<'components, 'context, T, I, F>(
-    components: &'components ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: I,
-    mut fields: ErasedComponents<F>,
-) -> impl Iterator<Item = F> + use<'components, 'context, T, I, F>
-where
-    T: Soa,
-    I: IntoIterator<Item = ComponentId>,
-{
-    #[cold]
-    #[track_caller]
-    #[inline(never)]
-    fn remove_field_fail(component_id: &ComponentId) -> ! {
-        panic!("field of component {component_id:?} should be present")
-    }
+// #[inline]
+// #[track_caller]
+// fn reorder_fields<'components, 'context, T, I, F>(
+//     components: &'components ComponentRegistry,
+//     context: &'context T::Context,
+//     component_ids: I,
+//     mut fields: ErasedComponents<F>,
+// ) -> impl Iterator<Item = F> + use<'components, 'context, T, I, F>
+// where
+//     T: Soa,
+//     I: IntoIterator<Item = ComponentId>,
+// {
+//     #[cold]
+//     #[track_caller]
+//     #[inline(never)]
+//     fn remove_field_fail(component_id: &ComponentId) -> ! {
+//         panic!("field of component {component_id:?} should be present")
+//     }
 
-    let remove_field = move |(id, _)| {
-        fields
-            .swap_remove(&id)
-            .unwrap_or_else(|| remove_field_fail(&id))
-    };
-    component_ids
-        .into_iter()
-        .zip(T::field_descriptors(context))
-        .inspect(|(id, desc)| validate_component(components, *id, desc))
-        .map(remove_field)
-}
+//     let remove_field = move |(id, _)| {
+//         fields
+//             .swap_remove(&id)
+//             .unwrap_or_else(|| remove_field_fail(&id))
+//     };
+//     component_ids
+//         .into_iter()
+//         .zip(T::field_descriptors(context))
+//         .inspect(|(id, desc)| validate_component(components, *id, desc))
+//         .map(remove_field)
+// }
 
 #[inline]
 #[allow(unsafe_code)]
@@ -92,10 +95,16 @@ pub unsafe fn from_erased_fields<T>(
 where
     T: Soa,
 {
-    let fields = reorder_fields::<T, _, _>(components, context, component_ids, fields)
-        .map(ErasedField::into_parts);
-    let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
-    unsafe { erased_value.into::<T>(context) }.expect("all the fields should be valid")
+    // let fields = reorder_fields::<T, _, _>(components, context, component_ids, fields)
+    //     .map(ErasedField::into_parts);
+    // let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
+    // unsafe { erased_value.into::<T>(context) }.expect("all the fields should be valid")
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = fields;
+    todo!()
 }
 
 #[inline]
@@ -108,10 +117,16 @@ pub fn into_erased_fields<T>(
 where
     T: Soa,
 {
-    let erased_value = ErasedSoa::from(context, value).into_fields();
-    validate_components::<T, _>(components, context, component_ids)
-        .zip(erased_value)
-        .collect()
+    // let erased_value = ErasedSoa::from(context, value).into_fields();
+    // validate_components::<T, _>(components, context, component_ids)
+    //     .zip(erased_value)
+    //     .collect()
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = value;
+    todo!()
 }
 
 #[inline]
@@ -125,9 +140,15 @@ pub unsafe fn from_erased_refs<'context, 'a, T>(
 where
     T: Soa,
 {
-    let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    let erased_refs = ErasedSoaRefs::new(refs);
-    unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
+    // let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
+    // let erased_refs = ErasedSoaRefs::new(refs);
+    // unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = fields;
+    todo!()
 }
 
 #[inline]
@@ -140,10 +161,16 @@ pub fn into_erased_refs<'context, 'a, T>(
 where
     T: Soa,
 {
-    let erased_refs = ErasedSoaRefs::from::<T>(context, refs).into_field_refs();
-    validate_components::<T, _>(components, context, component_ids)
-        .zip(erased_refs)
-        .collect()
+    // let erased_refs = ErasedSoaRefs::from::<T>(context, refs).into_field_refs();
+    // validate_components::<T, _>(components, context, component_ids)
+    //     .zip(erased_refs)
+    //     .collect()
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = refs;
+    todo!()
 }
 
 #[inline]
@@ -157,9 +184,15 @@ pub unsafe fn from_erased_refs_mut<'context, 'a, T>(
 where
     T: Soa,
 {
-    let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    let erased_refs = ErasedSoaRefsMut::new(refs);
-    unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
+    // let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
+    // let erased_refs = ErasedSoaRefsMut::new(refs);
+    // unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = fields;
+    todo!()
 }
 
 #[inline]
@@ -172,10 +205,16 @@ pub fn into_erased_refs_mut<'context, 'a, T>(
 where
     T: Soa,
 {
-    let erased_refs = ErasedSoaRefsMut::from::<T>(context, refs).into_field_refs();
-    validate_components::<T, _>(components, context, component_ids)
-        .zip(erased_refs)
-        .collect()
+    // let erased_refs = ErasedSoaRefsMut::from::<T>(context, refs).into_field_refs();
+    // validate_components::<T, _>(components, context, component_ids)
+    //     .zip(erased_refs)
+    //     .collect()
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = refs;
+    todo!()
 }
 
 #[inline]
@@ -190,9 +229,16 @@ pub unsafe fn from_erased_slices<'context, 'a, T>(
 where
     T: Soa,
 {
-    let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    let erased_slices = ErasedSoaSlices::new(len, slices).expect("all the fields should be valid");
-    unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
+    // let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
+    // let erased_slices = ErasedSoaSlices::new(len, slices).expect("all the fields should be valid");
+    // unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = len;
+    let _ = fields;
+    todo!()
 }
 
 #[inline]
@@ -205,12 +251,18 @@ pub fn into_erased_slices<'context, 'a, T>(
 where
     T: Soa,
 {
-    let erased_slices = ErasedSoaSlices::from::<T>(context, slices);
-    let len = erased_slices.len();
-    let fields = validate_components::<T, _>(components, context, component_ids)
-        .zip(erased_slices.into_field_slices())
-        .collect();
-    (len, fields)
+    // let erased_slices = ErasedSoaSlices::from::<T>(context, slices);
+    // let len = erased_slices.len();
+    // let fields = validate_components::<T, _>(components, context, component_ids)
+    //     .zip(erased_slices.into_field_slices())
+    //     .collect();
+    // (len, fields)
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = slices;
+    todo!()
 }
 
 #[inline]
@@ -225,10 +277,17 @@ pub unsafe fn from_erased_slices_mut<'context, 'a, T>(
 where
     T: Soa,
 {
-    let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    let erased_slices =
-        ErasedSoaSlicesMut::new(len, slices).expect("all the fields should be valid");
-    unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
+    // let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
+    // let erased_slices =
+    //     ErasedSoaSlicesMut::new(len, slices).expect("all the fields should be valid");
+    // unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = len;
+    let _ = fields;
+    todo!()
 }
 
 #[inline]
@@ -241,12 +300,18 @@ pub fn into_erased_slices_mut<'context, 'a, T>(
 where
     T: Soa,
 {
-    let erased_slices = ErasedSoaSlicesMut::from::<T>(context, slices);
-    let len = erased_slices.len();
-    let fields = validate_components::<T, _>(components, context, component_ids)
-        .zip(erased_slices.into_field_slices())
-        .collect();
-    (len, fields)
+    // let erased_slices = ErasedSoaSlicesMut::from::<T>(context, slices);
+    // let len = erased_slices.len();
+    // let fields = validate_components::<T, _>(components, context, component_ids)
+    //     .zip(erased_slices.into_field_slices())
+    //     .collect();
+    // (len, fields)
+
+    let _ = components;
+    let _ = context;
+    let _ = component_ids;
+    let _ = slices;
+    todo!()
 }
 
 #[inline]
@@ -256,8 +321,11 @@ where
     I: IntoIterator<Item = (F, Option<DropFn>)>,
     F: AsMut<[u8]>,
 {
-    fields.into_iter().for_each(|(mut field, drop_fn)| {
-        let Some(drop_fn) = drop_fn else { return };
-        unsafe { drop_fn(field.as_mut().as_mut_ptr()) }
-    })
+    // fields.into_iter().for_each(|(mut field, drop_fn)| {
+    //     let Some(drop_fn) = drop_fn else { return };
+    //     unsafe { drop_fn(field.as_mut().as_mut_ptr()) }
+    // })
+
+    let _ = fields;
+    todo!()
 }

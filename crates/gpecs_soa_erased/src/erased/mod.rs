@@ -1,20 +1,23 @@
 pub use self::{
     context::ErasedSoaContext,
     fields::ErasedSoaFields,
-    nonnull_ptrs::ErasedSoaNonNullPtrs,
-    ptrs::ErasedSoaPtrs,
-    ptrs_mut::ErasedSoaMutPtrs,
-    refs::ErasedSoaRefs,
-    refs_mut::ErasedSoaRefsMut,
-    slice_ptrs::{ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter},
-    slice_ptrs_mut::{ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter},
+    nonnull_ptrs::{ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter},
+    ptrs::{ErasedSoaPtrs, ErasedSoaPtrsIter},
+    ptrs_mut::{ErasedSoaMutPtrs, ErasedSoaMutPtrsIter},
+    refs::{ErasedSoaRefs, ErasedSoaRefsIter},
+    refs_mut::{ErasedSoaRefsMut, ErasedSoaRefsMutIter},
+    slice_ptrs::{soa_slice_from_raw_parts, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter},
+    slice_ptrs_mut::{
+        soa_slice_from_raw_parts_mut, ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter,
+    },
     slices::{ErasedSoaSlices, ErasedSoaSlicesIter},
-    slices_mut::{ErasedSoaSlicesIterMut, ErasedSoaSlicesMut},
+    slices_mut::{ErasedSoaSlicesMut, ErasedSoaSlicesMutIter},
     value::{ErasedSoa, ErasedSoaVec},
 };
 
 pub mod error;
 
+mod assert;
 mod context;
 mod fields;
 mod nonnull_ptrs;

@@ -32,8 +32,7 @@ use super::{
     erased::{
         drop_erased_in_place, from_erased_fields, from_erased_refs, from_erased_refs_mut,
         from_erased_slices, from_erased_slices_mut, get_component_info_fail, into_erased_fields,
-        into_erased_refs, into_erased_refs_mut, into_erased_slices, into_erased_slices_mut,
-        ErasedComponents,
+        validate_components, ErasedComponents,
     },
     error::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
@@ -381,14 +380,7 @@ impl ArchetypeStorage {
 
         let (entities, fields) =
             ErasedStorageExt::components(erased_storage, components, component_ids);
-        let bundle_component_ids = B::get_components(components)
-            .into_iter()
-            .map(|component_id| component_id.expect("all of components should be registered"));
-        let components = unsafe {
-            const CONTEXT: DefaultContext = ();
-            let len = entities.len();
-            from_erased_slices::<B>(components, &CONTEXT, bundle_component_ids, len, fields)
-        };
+        let components = unsafe { from_erased_slices::<B>(components, entities.len(), fields) };
         Ok((entities, components))
     }
 
@@ -410,14 +402,7 @@ impl ArchetypeStorage {
 
         let (entities, fields) =
             ErasedStorageExt::components_mut(erased_storage, components, component_ids);
-        let bundle_component_ids = B::get_components(components)
-            .into_iter()
-            .map(|component_id| component_id.expect("all of components should be registered"));
-        let components = unsafe {
-            const CONTEXT: DefaultContext = ();
-            let len = entities.len();
-            from_erased_slices_mut::<B>(components, &CONTEXT, bundle_component_ids, len, fields)
-        };
+        let components = unsafe { from_erased_slices_mut::<B>(components, entities.len(), fields) };
         Ok((entities, components))
     }
 
@@ -442,13 +427,7 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::get_components(components)
-            .into_iter()
-            .map(|component_id| component_id.expect("all of components should be registered"));
-        let refs = unsafe {
-            const CONTEXT: DefaultContext = ();
-            from_erased_refs::<B>(components, &CONTEXT, bundle_component_ids, fields)
-        };
+        let refs = unsafe { from_erased_refs::<B>(components, fields) };
         Ok(Some(refs))
     }
 
@@ -474,13 +453,7 @@ impl ArchetypeStorage {
         else {
             return Ok(None);
         };
-        let bundle_component_ids = B::get_components(components)
-            .into_iter()
-            .map(|component_id| component_id.expect("all of components should be registered"));
-        let refs = unsafe {
-            const CONTEXT: DefaultContext = ();
-            from_erased_refs_mut::<B>(components, &CONTEXT, bundle_component_ids, fields)
-        };
+        let refs = unsafe { from_erased_refs_mut::<B>(components, fields) };
         Ok(Some(refs))
     }
 
@@ -817,9 +790,10 @@ impl ErasedStorageExt for ErasedStorage {
 
         let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
-        let (len, fields) =
-            into_erased_slices::<ErasedSoa>(components, context, component_ids, values);
-        if entities.len() != len {
+        let fields = validate_components::<ErasedSoa, _>(components, context, component_ids)
+            .zip(values)
+            .collect();
+        if entities.len() != values.len() {
             unreachable!("count of entities should match count of components")
         }
         (entities, fields)
@@ -837,9 +811,10 @@ impl ErasedStorageExt for ErasedStorage {
 
         let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
-        let (len, fields) =
-            into_erased_slices_mut::<ErasedSoa>(components, context, component_ids, values);
-        if entities.len() != len {
+        let fields = validate_components::<ErasedSoa, _>(components, context, component_ids)
+            .zip(values)
+            .collect();
+        if entities.len() != values.len() {
             unreachable!("count of entities should match count of components")
         }
         (entities, fields)
@@ -892,7 +867,9 @@ impl ErasedStorageExt for ErasedStorage {
         let (context, refs) = view.into_get_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
-        let refs = into_erased_refs::<ErasedSoa>(components, context, component_ids, refs?);
+        let refs = validate_components::<ErasedSoa, _>(components, context, component_ids)
+            .zip(refs?)
+            .collect();
         Some(refs)
     }
 
@@ -907,7 +884,9 @@ impl ErasedStorageExt for ErasedStorage {
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
-        let refs = into_erased_refs_mut::<ErasedSoa>(components, context, component_ids, refs?);
+        let refs = validate_components::<ErasedSoa, _>(components, context, component_ids)
+            .zip(refs?)
+            .collect();
         Some(refs)
     }
 }

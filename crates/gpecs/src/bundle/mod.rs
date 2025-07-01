@@ -1,3 +1,5 @@
+use gpecs_soa_erased::field::ErasedFieldMutPtr;
+
 use crate::{
     component::registry::{ComponentId, ComponentRegistry},
     soa::traits::{DefaultContext, Soa},
@@ -19,4 +21,11 @@ pub unsafe trait Bundle: Soa<Context = DefaultContext> + 'static {
     type ComponentIds: IntoIterator<Item = ComponentId>;
 
     fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds;
+
+    unsafe fn ptrs_from_iter<'context, I>(
+        components: &ComponentRegistry,
+        iter: I,
+    ) -> Self::MutPtrs<'context>
+    where
+        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>;
 }

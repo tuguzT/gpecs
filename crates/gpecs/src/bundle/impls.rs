@@ -1,3 +1,5 @@
+use gpecs_soa_erased::field::ErasedFieldMutPtr;
+
 use crate::{
     component::{
         registry::{ComponentId, ComponentRegistry},
@@ -31,6 +33,23 @@ where
         let component_id = components.register_component::<T>();
         [component_id]
     }
+
+    #[inline]
+    unsafe fn ptrs_from_iter<'context, I>(
+        components: &ComponentRegistry,
+        iter: I,
+    ) -> Self::MutPtrs<'context>
+    where
+        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
+    {
+        let component_id = unsafe { components.component_id::<T>().unwrap_unchecked() };
+        let (_, ptr) = unsafe {
+            iter.into_iter()
+                .find(|(id, _)| *id == component_id)
+                .unwrap_unchecked()
+        };
+        unsafe { ptr.into().unwrap_unchecked() }
+    }
 }
 
 macro_rules! bundle_tuple_impl {
@@ -60,6 +79,27 @@ macro_rules! bundle_tuple_impl {
                 let component_ids = [$(components.register_component::<$types>(),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
                 component_ids
+            }
+
+            #[inline]
+            unsafe fn ptrs_from_iter<'context, _I>(
+                components: &ComponentRegistry,
+                iter: _I,
+            ) -> Self::MutPtrs<'context>
+            where
+                _I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
+            {
+                let component_ids = [$(unsafe { components.component_id::<$types>().unwrap_unchecked() },)*];
+
+                let mut ptrs = ($(None::<*mut $types>,)*);
+                for (id, ptr) in iter {
+                    $(
+                        if id == component_ids[$indices] {
+                            ptrs.$indices = Some(unsafe { ptr.into().unwrap_unchecked() });
+                        }
+                    )*
+                }
+                ($(unsafe { ptrs.$indices.unwrap_unchecked() },)*)
             }
         }
     };

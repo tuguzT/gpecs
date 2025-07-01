@@ -1,5 +1,5 @@
 use gpecs_soa_erased::{
-    // erased::{ErasedSoa, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSlices, ErasedSoaSlicesMut},
+    erased::ErasedSoa,
     field::{
         ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
@@ -7,11 +7,9 @@ use gpecs_soa_erased::{
 use indexmap::IndexMap;
 
 use crate::{
+    bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry, DropFn},
-    soa::traits::{
-        // FieldDescriptor,
-        Soa,
-    },
+    soa::traits::{FieldDescriptor, Soa},
 };
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
@@ -23,66 +21,66 @@ pub fn get_component_info_fail(component_id: &ComponentId) -> ! {
     panic!("info of component {component_id:?} should be present")
 }
 
-// #[inline]
-// #[track_caller]
-// fn validate_component<D>(components: &ComponentRegistry, id: ComponentId, desc: D)
-// where
-//     D: AsRef<FieldDescriptor>,
-// {
-//     let info = components
-//         .get_component_info(id)
-//         .unwrap_or_else(|| get_component_info_fail(&id));
-//     assert_eq!(info.descriptor().layout(), desc.as_ref().layout());
-// }
+#[inline]
+#[track_caller]
+fn validate_component<D>(components: &ComponentRegistry, id: ComponentId, desc: D)
+where
+    D: AsRef<FieldDescriptor>,
+{
+    let info = components
+        .get_component_info(id)
+        .unwrap_or_else(|| get_component_info_fail(&id));
+    assert_eq!(info.descriptor().layout(), desc.as_ref().layout());
+}
 
-// #[inline]
-// #[track_caller]
-// fn validate_components<'components, 'context, T, I>(
-//     components: &'components ComponentRegistry,
-//     context: &'context T::Context,
-//     component_ids: I,
-// ) -> impl Iterator<Item = ComponentId> + use<'components, 'context, T, I>
-// where
-//     T: Soa,
-//     I: IntoIterator<Item = ComponentId>,
-// {
-//     component_ids
-//         .into_iter()
-//         .zip(T::field_descriptors(context))
-//         .inspect(|(id, desc)| validate_component(components, *id, desc))
-//         .map(|(id, _)| id)
-// }
+#[inline]
+#[track_caller]
+pub fn validate_components<'components, 'context, T, I>(
+    components: &'components ComponentRegistry,
+    context: &'context T::Context,
+    component_ids: I,
+) -> impl Iterator<Item = ComponentId> + use<'components, 'context, T, I>
+where
+    T: Soa,
+    I: IntoIterator<Item = ComponentId>,
+{
+    component_ids
+        .into_iter()
+        .zip(T::field_descriptors(context))
+        .inspect(|(id, desc)| validate_component(components, *id, desc))
+        .map(|(id, _)| id)
+}
 
-// #[inline]
-// #[track_caller]
-// fn reorder_fields<'components, 'context, T, I, F>(
-//     components: &'components ComponentRegistry,
-//     context: &'context T::Context,
-//     component_ids: I,
-//     mut fields: ErasedComponents<F>,
-// ) -> impl Iterator<Item = F> + use<'components, 'context, T, I, F>
-// where
-//     T: Soa,
-//     I: IntoIterator<Item = ComponentId>,
-// {
-//     #[cold]
-//     #[track_caller]
-//     #[inline(never)]
-//     fn remove_field_fail(component_id: &ComponentId) -> ! {
-//         panic!("field of component {component_id:?} should be present")
-//     }
+#[inline]
+#[track_caller]
+fn reorder_fields<'components, 'context, T, I, F>(
+    components: &'components ComponentRegistry,
+    context: &'context T::Context,
+    component_ids: I,
+    mut fields: ErasedComponents<F>,
+) -> impl Iterator<Item = F> + use<'components, 'context, T, I, F>
+where
+    T: Soa,
+    I: IntoIterator<Item = ComponentId>,
+{
+    #[cold]
+    #[track_caller]
+    #[inline(never)]
+    fn remove_field_fail(component_id: &ComponentId) -> ! {
+        panic!("field of component {component_id:?} should be present")
+    }
 
-//     let remove_field = move |(id, _)| {
-//         fields
-//             .swap_remove(&id)
-//             .unwrap_or_else(|| remove_field_fail(&id))
-//     };
-//     component_ids
-//         .into_iter()
-//         .zip(T::field_descriptors(context))
-//         .inspect(|(id, desc)| validate_component(components, *id, desc))
-//         .map(remove_field)
-// }
+    let remove_field = move |(id, _)| {
+        fields
+            .swap_remove(&id)
+            .unwrap_or_else(|| remove_field_fail(&id))
+    };
+    component_ids
+        .into_iter()
+        .zip(T::field_descriptors(context))
+        .inspect(|(id, desc)| validate_component(components, *id, desc))
+        .map(remove_field)
+}
 
 #[inline]
 #[allow(unsafe_code)]
@@ -95,16 +93,10 @@ pub unsafe fn from_erased_fields<T>(
 where
     T: Soa,
 {
-    // let fields = reorder_fields::<T, _, _>(components, context, component_ids, fields)
-    //     .map(ErasedField::into_parts);
-    // let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
-    // unsafe { erased_value.into::<T>(context) }.expect("all the fields should be valid")
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = fields;
-    todo!()
+    let fields = reorder_fields::<T, _, _>(components, context, component_ids, fields)
+        .map(ErasedField::into_parts);
+    let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
+    unsafe { erased_value.into::<T>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]
@@ -117,201 +109,80 @@ pub fn into_erased_fields<T>(
 where
     T: Soa,
 {
-    // let erased_value = ErasedSoa::from(context, value).into_fields();
-    // validate_components::<T, _>(components, context, component_ids)
-    //     .zip(erased_value)
-    //     .collect()
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = value;
-    todo!()
+    let erased_value = ErasedSoa::from(context, value).into_fields();
+    validate_components::<T, _>(components, context, component_ids)
+        .zip(erased_value)
+        .collect()
 }
 
 #[inline]
 #[allow(unsafe_code)]
-pub unsafe fn from_erased_refs<'context, 'a, T>(
+pub unsafe fn from_erased_refs<'context, 'a, B>(
     components: &ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedFieldRef<'a>>,
-) -> T::Refs<'context, 'a>
+) -> B::Refs<'context, 'a>
 where
-    T: Soa,
+    B: Bundle,
 {
-    // let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    // let erased_refs = ErasedSoaRefs::new(refs);
-    // unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = fields;
-    todo!()
-}
-
-#[inline]
-pub fn into_erased_refs<'context, 'a, T>(
-    components: &ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
-    refs: T::Refs<'context, 'a>,
-) -> ErasedComponents<ErasedFieldRef<'a>>
-where
-    T: Soa,
-{
-    // let erased_refs = ErasedSoaRefs::from::<T>(context, refs).into_field_refs();
-    // validate_components::<T, _>(components, context, component_ids)
-    //     .zip(erased_refs)
-    //     .collect()
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = refs;
-    todo!()
+    let iter = fields
+        .into_iter()
+        .map(|(component_id, r#ref)| (component_id, r#ref.as_field_ptr().cast_mut()));
+    let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
+    let ptrs = B::ptrs_cast_const(&(), ptrs);
+    unsafe { B::ptrs_to_refs(&(), ptrs) }
 }
 
 #[inline]
 #[allow(unsafe_code)]
-pub unsafe fn from_erased_refs_mut<'context, 'a, T>(
+pub unsafe fn from_erased_refs_mut<'context, 'a, B>(
     components: &ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<ErasedFieldRefMut<'a>>,
-) -> T::RefsMut<'context, 'a>
+) -> B::RefsMut<'context, 'a>
 where
-    T: Soa,
+    B: Bundle,
 {
-    // let refs = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    // let erased_refs = ErasedSoaRefsMut::new(refs);
-    // unsafe { erased_refs.into::<T>(context) }.expect("all the fields should be valid")
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = fields;
-    todo!()
-}
-
-#[inline]
-pub fn into_erased_refs_mut<'context, 'a, T>(
-    components: &ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
-    refs: T::RefsMut<'context, 'a>,
-) -> ErasedComponents<ErasedFieldRefMut<'a>>
-where
-    T: Soa,
-{
-    // let erased_refs = ErasedSoaRefsMut::from::<T>(context, refs).into_field_refs();
-    // validate_components::<T, _>(components, context, component_ids)
-    //     .zip(erased_refs)
-    //     .collect()
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = refs;
-    todo!()
+    let iter = fields
+        .into_iter()
+        .map(|(component_id, mut r#ref)| (component_id, r#ref.as_field_mut_ptr()));
+    let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
+    unsafe { B::ptrs_to_refs_mut(&(), ptrs) }
 }
 
 #[inline]
 #[allow(unsafe_code)]
-pub unsafe fn from_erased_slices<'context, 'a, T>(
+pub unsafe fn from_erased_slices<'context, 'a, B>(
     components: &ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
     fields: ErasedComponents<ErasedFieldSlice<'a>>,
-) -> T::Slices<'context, 'a>
+) -> B::Slices<'context, 'a>
 where
-    T: Soa,
+    B: Bundle,
 {
-    // let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    // let erased_slices = ErasedSoaSlices::new(len, slices).expect("all the fields should be valid");
-    // unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = len;
-    let _ = fields;
-    todo!()
-}
-
-#[inline]
-pub fn into_erased_slices<'context, 'a, T>(
-    components: &ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
-    slices: T::Slices<'context, 'a>,
-) -> (usize, ErasedComponents<ErasedFieldSlice<'a>>)
-where
-    T: Soa,
-{
-    // let erased_slices = ErasedSoaSlices::from::<T>(context, slices);
-    // let len = erased_slices.len();
-    // let fields = validate_components::<T, _>(components, context, component_ids)
-    //     .zip(erased_slices.into_field_slices())
-    //     .collect();
-    // (len, fields)
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = slices;
-    todo!()
+    let iter = fields
+        .into_iter()
+        .map(|(component_id, slice)| (component_id, slice.as_field_ptr().cast_mut()));
+    let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
+    let ptrs = B::ptrs_cast_const(&(), ptrs);
+    let slices = B::slices_from_raw_parts(&(), ptrs, len);
+    unsafe { B::slice_ptrs_to_slices(&(), slices) }
 }
 
 #[inline]
 #[allow(unsafe_code)]
-pub unsafe fn from_erased_slices_mut<'context, 'a, T>(
+pub unsafe fn from_erased_slices_mut<'context, 'a, B>(
     components: &ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
     len: usize,
     fields: ErasedComponents<ErasedFieldSliceMut<'a>>,
-) -> T::SlicesMut<'context, 'a>
+) -> B::SlicesMut<'context, 'a>
 where
-    T: Soa,
+    B: Bundle,
 {
-    // let slices = reorder_fields::<T, _, _>(components, context, component_ids, fields);
-    // let erased_slices =
-    //     ErasedSoaSlicesMut::new(len, slices).expect("all the fields should be valid");
-    // unsafe { erased_slices.into::<T>(context) }.expect("all the fields should be valid")
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = len;
-    let _ = fields;
-    todo!()
-}
-
-#[inline]
-pub fn into_erased_slices_mut<'context, 'a, T>(
-    components: &ComponentRegistry,
-    context: &'context T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
-    slices: T::SlicesMut<'context, 'a>,
-) -> (usize, ErasedComponents<ErasedFieldSliceMut<'a>>)
-where
-    T: Soa,
-{
-    // let erased_slices = ErasedSoaSlicesMut::from::<T>(context, slices);
-    // let len = erased_slices.len();
-    // let fields = validate_components::<T, _>(components, context, component_ids)
-    //     .zip(erased_slices.into_field_slices())
-    //     .collect();
-    // (len, fields)
-
-    let _ = components;
-    let _ = context;
-    let _ = component_ids;
-    let _ = slices;
-    todo!()
+    let iter = fields
+        .into_iter()
+        .map(|(component_id, mut slice)| (component_id, slice.as_field_mut_ptr()));
+    let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
+    let slices = B::slices_from_raw_parts_mut(&(), ptrs, len);
+    unsafe { B::slice_mut_ptrs_to_slices(&(), slices) }
 }
 
 #[inline]
@@ -321,11 +192,8 @@ where
     I: IntoIterator<Item = (F, Option<DropFn>)>,
     F: AsMut<[u8]>,
 {
-    // fields.into_iter().for_each(|(mut field, drop_fn)| {
-    //     let Some(drop_fn) = drop_fn else { return };
-    //     unsafe { drop_fn(field.as_mut().as_mut_ptr()) }
-    // })
-
-    let _ = fields;
-    todo!()
+    fields.into_iter().for_each(|(mut field, drop_fn)| {
+        let Some(drop_fn) = drop_fn else { return };
+        unsafe { drop_fn(field.as_mut().as_mut_ptr()) }
+    })
 }

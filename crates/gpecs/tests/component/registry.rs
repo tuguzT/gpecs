@@ -72,5 +72,5 @@ fn register_with_descriptor() {
     assert_eq!(info.type_id(), None);
     assert_eq!(info.name(), "Mass");
     assert_eq!(info.descriptor().layout(), Layout::new::<f32>());
-    assert_eq!(info.drop_fn(), None);
+    assert!(info.drop_fn().is_none());
 }

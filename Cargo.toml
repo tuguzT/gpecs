@@ -13,6 +13,7 @@ members = [
     # Standalone benchmarks
     "benches/gpecs_soa_bench",
     "benches/gpecs_ecs_benchmark",
+    "benches/gpecs_ecs_benchmark_types",
     "benches/gpecs_ecs_benchmark_shader",
     # Standalone examples
     "examples/gpecs_simple",
@@ -34,7 +35,7 @@ gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
 gpecs_soa_erased = { path = "crates/gpecs_soa_erased" }
 gpecs_types = { path = "crates/gpecs_types" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
-gpecs_ecs_benchmark = { path = "benches/gpecs_ecs_benchmark" }
+gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "f583740" }
 indexmap = { version = "2.10" }
 petgraph = { version = "0.8" }

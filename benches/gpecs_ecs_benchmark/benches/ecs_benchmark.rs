@@ -11,7 +11,7 @@ use std::{
 };
 
 use gpecs::{context::error::IncompatibleBundleError, prelude::*};
-use gpecs_ecs_benchmark::{
+use gpecs_ecs_benchmark_types::{
     components::{
         Damage, Data, Health, Player, PlayerType, Position, Sprite, Velocity, DEFAULT_SEED,
         NONE_SPRITE, SPAWN_SPRITE,

@@ -1,0 +1,12 @@
+[package]
+name = "gpecs_ecs_benchmark_types"
+description = "Basics of `ecs_benchmark` implementation for (probably) ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpecs_types = { workspace = true }
+bytemuck = { workspace = true, features = ["derive"] }

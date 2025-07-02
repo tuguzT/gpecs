@@ -515,7 +515,7 @@ dependencies = [
  "const_format",
  "env_logger",
  "gpecs",
- "gpecs_types",
+ "gpecs_ecs_benchmark_types",
  "itertools 0.14.0",
  "log",
  "pollster",
@@ -527,11 +527,19 @@ dependencies = [
 name = "gpecs_ecs_benchmark_shader"
 version = "0.0.0"
 dependencies = [
- "gpecs_ecs_benchmark",
+ "gpecs_ecs_benchmark_types",
  "gpecs_types",
  "spirv-std",
  "static_assertions",
  "unroll",
+]
+
+[[package]]
+name = "gpecs_ecs_benchmark_types"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "gpecs_types",
 ]
 
 [[package]]

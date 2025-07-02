@@ -7,12 +7,10 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
-[dependencies]
-gpecs_types = { workspace = true }
-bytemuck = { workspace = true, features = ["derive"] }
-
 [dev-dependencies]
 gpecs = { workspace = true }
+gpecs_ecs_benchmark_types = { workspace = true }
+bytemuck = { workspace = true, features = ["derive"] }
 log = { workspace = true }
 env_logger = { workspace = true }
 wgpu = { workspace = true, features = ["spirv"] }

@@ -36,6 +36,7 @@ gpecs_soa_erased = { path = "crates/gpecs_soa_erased" }
 gpecs_types = { path = "crates/gpecs_types" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
+cargo-gpu = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "e574460" }
 spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "f583740" }
 indexmap = { version = "2.10" }
 petgraph = { version = "0.8" }

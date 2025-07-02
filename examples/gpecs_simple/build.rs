@@ -1,35 +1,25 @@
-use std::{env, path, process::Command};
+use std::error::Error;
 
+use cargo_gpu::{spirv_builder::SpirvMetadata, Install};
 use const_format::formatcp;
 
 const SHADER_CRATE_NAME: &str = "gpecs_simple_shader";
 const SHADER_CRATE_PATH: &str = formatcp!("./../{SHADER_CRATE_NAME}");
 
-fn main() {
-    let out_dir = env::var("OUT_DIR").unwrap();
-    let out_dir = path::absolute(out_dir).expect("failed to get absolute path");
-    let shader_crate_path = path::absolute(SHADER_CRATE_PATH).expect("failed to get absolute path");
+fn main() -> Result<(), Box<dyn Error>> {
+    let backend_args = Install::from_shader_crate(SHADER_CRATE_PATH.into());
+    let backend = backend_args.run()?;
 
-    let output = Command::new("cargo")
-        .arg("gpu")
-        .arg("build")
-        .arg("--auto-install-rust-toolchain")
-        .arg("--shader-crate")
-        .arg(&shader_crate_path)
-        .arg("--output-dir")
-        .arg(&out_dir)
-        .output()
-        .expect("failed to build shaders");
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!("failed to build shaders:\n{stderr}");
-    }
+    let builder = backend
+        .to_spirv_builder(SHADER_CRATE_PATH, "spirv-unknown-vulkan1.2")
+        .shader_crate_default_features(false)
+        .shader_crate_features(["nightly".into()])
+        .spirv_metadata(SpirvMetadata::Full);
+    let compile_result = builder.build()?;
 
-    let shader_crate_path = shader_crate_path.display();
-
-    let shader_file_path = out_dir.join(SHADER_CRATE_NAME).with_extension("spv");
-    let shader_file_path = shader_file_path.display();
-
+    let shader_file_path = compile_result.module.unwrap_single().display();
     println!("cargo::rustc-env={SHADER_CRATE_NAME}.spv={shader_file_path}");
-    println!("cargo::rerun-if-changed={shader_crate_path}");
+    println!("cargo::rerun-if-changed={SHADER_CRATE_PATH}");
+
+    Ok(())
 }

@@ -9,10 +9,10 @@ use core::{
 use crate::soa::traits::FieldDescriptor;
 
 use super::{
-    assert::{check_buffer_align, check_layout, check_slice_buffer_len},
-    error::{ErasedFieldSliceError, IntoValueError},
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
     ErasedFieldSliceIter, ErasedFieldSliceMutPtr, ErasedFieldSlicePtr,
+    assert::{check_buffer_align, check_layout, check_slice_buffer_len},
+    error::{ErasedFieldSliceError, IntoValueError},
 };
 
 pub struct ErasedFieldSliceMut<'a> {

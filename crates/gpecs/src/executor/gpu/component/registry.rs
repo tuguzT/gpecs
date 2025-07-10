@@ -197,7 +197,7 @@ impl GpuComponentRegistry {
     }
 
     #[inline]
-    pub fn component_ids(&self) -> GpuComponentIds {
+    pub fn component_ids(&self) -> GpuComponentIds<'_> {
         let Self { components } = self;
 
         // SAFETY: `GpuComponentId` is a #[repr(transparent)] struct around `ComponentId`,

@@ -1,6 +1,5 @@
 #![warn(clippy::all)]
 // TODO `#![warn(missing_docs)]` after implementation & tests
-#![forbid(unsafe_op_in_unsafe_fn)]
 #![no_std]
 
 use gpecs_ecs_benchmark_types::{

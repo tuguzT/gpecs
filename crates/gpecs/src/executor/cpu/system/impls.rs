@@ -100,7 +100,7 @@ impl SystemParam for &Context {
     type Error<'context> = Infallible;
 
     #[inline]
-    fn get_param(context: &mut Context) -> SystemParamResult<Self> {
+    fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {
         Ok(&*context)
     }
 }
@@ -110,7 +110,7 @@ impl SystemParam for &mut Context {
     type Error<'context> = Infallible;
 
     #[inline]
-    fn get_param(context: &mut Context) -> SystemParamResult<Self> {
+    fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {
         Ok(context)
     }
 }
@@ -123,7 +123,7 @@ where
     type Error<'context> = GetComponentsError;
 
     #[inline]
-    fn get_param(context: &mut Context) -> SystemParamResult<Self> {
+    fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {
         context.bundles::<B>()
     }
 }
@@ -136,7 +136,7 @@ where
     type Error<'context> = GetComponentsError;
 
     #[inline]
-    fn get_param(context: &mut Context) -> SystemParamResult<Self> {
+    fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {
         context.bundles_mut::<B>()
     }
 }

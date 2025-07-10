@@ -224,7 +224,7 @@ impl GpuArchetypeRegistry {
     }
 
     #[inline]
-    pub fn archetype_ids(&self) -> GpuArchetypeIds {
+    pub fn archetype_ids(&self) -> GpuArchetypeIds<'_> {
         let Self { gpu_archetypes } = self;
 
         // SAFETY: `GpuArchetypeId` is a #[repr(transparent)] struct around `ArchetypeId`,

@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut, BufferData, SoaSlicePtr},
+    ptr::{BufferData, SoaSlicePtr, is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut},
     traits::{SoaToOwned, SoaTrustedFields},
 };
 
@@ -100,14 +100,14 @@ where
     }
 
     #[inline]
-    pub fn slices(&self) -> SoaSlices<T> {
+    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
         let context = self.context();
         let slices = self.as_slices();
         SoaSlices::new(context, slices)
     }
 
     #[inline]
-    pub fn slices_mut(&mut self) -> SoaSlicesMut<T> {
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
         let len = self.len();
         let context = unsafe { ptr::from_ref(self).context() };
         let ptrs = self.as_mut_ptrs();
@@ -116,22 +116,22 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<T> {
+    pub fn iter(&self) -> Iter<'_, '_, T> {
         self.slices().into_iter()
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<T>) {
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
         self.slices().into_iter_with_context()
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
         self.slices_mut().into_iter()
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<T>) {
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
         self.slices_mut().into_iter_mut_with_context()
     }
 

@@ -2,12 +2,12 @@ use gpecs_soa_erased::field::ErasedFieldMutPtr;
 
 use crate::{
     component::{
-        registry::{ComponentId, ComponentRegistry},
         Component,
+        registry::{ComponentId, ComponentRegistry},
     },
     soa::{
         identity::Identity,
-        traits::impls::{count_idents, SoaTupleImplHelper},
+        traits::impls::{SoaTupleImplHelper, count_idents},
     },
 };
 

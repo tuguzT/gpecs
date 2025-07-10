@@ -6,9 +6,9 @@ pub use self::{
     ptrs_mut::{ErasedSoaMutPtrs, ErasedSoaMutPtrsIter},
     refs::{ErasedSoaRefs, ErasedSoaRefsIter},
     refs_mut::{ErasedSoaRefsMut, ErasedSoaRefsMutIter},
-    slice_ptrs::{soa_slice_from_raw_parts, ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter},
+    slice_ptrs::{ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter, soa_slice_from_raw_parts},
     slice_ptrs_mut::{
-        soa_slice_from_raw_parts_mut, ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter,
+        ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter, soa_slice_from_raw_parts_mut,
     },
     slices::{ErasedSoaSlices, ErasedSoaSlicesIter},
     slices_mut::{ErasedSoaSlicesMut, ErasedSoaSlicesMutIter},

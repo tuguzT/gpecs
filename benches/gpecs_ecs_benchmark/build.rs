@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cargo_gpu::{spirv_builder::SpirvMetadata, Install};
+use cargo_gpu::{Install, spirv_builder::SpirvMetadata};
 use const_format::formatcp;
 
 const SHADER_CRATE_NAME: &str = "gpecs_ecs_benchmark_shader";

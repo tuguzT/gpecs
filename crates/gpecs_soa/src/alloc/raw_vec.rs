@@ -13,8 +13,8 @@ use core_alloc::{
 
 use crate::{
     ptr::{
-        buffer_layout, capacity_from, is_zst, ptrs, should_allocate, slice_from_raw_parts_mut,
-        BufferData, BufferDataPtr, BufferDataPtrMut,
+        BufferData, BufferDataPtr, BufferDataPtrMut, buffer_layout, capacity_from, is_zst, ptrs,
+        should_allocate, slice_from_raw_parts_mut,
     },
     slice::SoaSlice,
     traits::{Soa, SoaTrustedFields},

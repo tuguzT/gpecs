@@ -404,7 +404,9 @@ fn _init_wgpu_position_tag_download_buffer(
             .storage()
             .storage_buffer_bindings()
     };
-    log::debug!("{position_tag_gpu_archetype_id:?} buffer bindings:\n{position_tag_storage_buffer_bindings:#?}");
+    log::debug!(
+        "{position_tag_gpu_archetype_id:?} buffer bindings:\n{position_tag_storage_buffer_bindings:#?}"
+    );
 
     let position_tag_positions_binding = position_tag_storage_buffer_bindings
         .components

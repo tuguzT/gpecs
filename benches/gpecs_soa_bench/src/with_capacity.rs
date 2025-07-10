@@ -3,7 +3,7 @@ use std::hint::black_box;
 use gpecs_soa::prelude::*;
 use gpecs_soa_erased::erased::{ErasedSoaContext, ErasedSoaVec};
 
-use crate::{soa_vecs::SoaVecs, Big, Large, Medium, Small, Tiny, Zero};
+use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
 pub trait WithCapacity: SoaVecs<Context: Default> {
     fn soa_slf_with_capacity(capacity: usize) -> SoaVec<Self> {

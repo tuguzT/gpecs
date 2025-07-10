@@ -28,9 +28,11 @@ fn three_items() {
     assert_eq!(world1.into_u16(), 1);
     assert_eq!(world2.into_u16(), 2);
     assert_eq!(world3.into_u16(), 3);
-    assert!(worlds
-        .world_ids()
-        .eq([WorldId::new(), world1, world2, world3]));
+    assert!(
+        worlds
+            .world_ids()
+            .eq([WorldId::new(), world1, world2, world3])
+    );
 }
 
 #[test]

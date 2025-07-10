@@ -1,6 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
-    mem::{offset_of, ManuallyDrop, MaybeUninit},
+    mem::{ManuallyDrop, MaybeUninit, offset_of},
     ptr,
 };
 
@@ -448,7 +448,7 @@ where
 mod tests {
     use core::alloc::Layout;
 
-    use crate::ptr::{should_allocate, BufferData, BufferPrefix};
+    use crate::ptr::{BufferData, BufferPrefix, should_allocate};
 
     use super::{buffer_layout_not_padded, capacity_from_not_padded};
 

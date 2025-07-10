@@ -6,7 +6,7 @@ use core::{
 
 use crate::{
     assert::{check_same_layout, check_same_len},
-    erased::{assert::assert_descriptors, error::IntoValueError, ErasedSoaMutPtrs, ErasedSoaRefs},
+    erased::{ErasedSoaMutPtrs, ErasedSoaRefs, assert::assert_descriptors, error::IntoValueError},
     field::ErasedFieldPtr,
     soa::traits::{FieldDescriptor, Soa},
 };

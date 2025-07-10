@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     ptr::is_zst,
-    slice::{range, Iter, SoaSlices},
+    slice::{Iter, SoaSlices, range},
 };
 
 use super::{Soa, SoaVec};

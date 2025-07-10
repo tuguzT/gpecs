@@ -18,8 +18,8 @@ use self::{
     archetype::registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
     bundle::GpuBundle,
     component::{
-        registry::{GpuComponentId, GpuComponentRegistry},
         GpuComponent,
+        registry::{GpuComponentId, GpuComponentRegistry},
     },
     system::registry::{GpuSystemId, GpuSystemInfo, GpuSystemRegistry},
 };
@@ -190,11 +190,11 @@ impl<'context> GpuExecutor<'context> {
     where
         B: GpuBundle,
     {
-        let Self {
-            context,
+        let &mut Self {
+            ref mut context,
             ref device,
-            components: gpu_components,
-            archetypes: gpu_archetypes,
+            components: ref mut gpu_components,
+            archetypes: ref mut gpu_archetypes,
             ..
         } = self;
         #[allow(unsafe_code)]
@@ -241,10 +241,10 @@ impl<'context> GpuExecutor<'context> {
         I: IntoIterator<Item = GpuComponentId>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
-        let Self {
+        let &mut Self {
             ref context,
             ref device,
-            systems,
+            ref mut systems,
             ..
         } = self;
         let components = context.components();
@@ -285,13 +285,13 @@ impl<'context> GpuExecutor<'context> {
         I: IntoIterator<Item = (GpuSystemId, B)>,
         B: IntoIterator<Item = BindGroupEntry<'a>>,
     {
-        let Self {
+        let &mut Self {
             ref context,
             ref device,
             ref archetypes,
             ref systems,
             ref schedule,
-            schedule_cache,
+            ref mut schedule_cache,
             ..
         } = self;
 
@@ -308,14 +308,14 @@ impl<'context> GpuExecutor<'context> {
 
     #[inline]
     pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
-        let Self {
+        let &mut Self {
             ref context,
             ref device,
             ref archetypes,
-            systems,
-            schedule,
-            schedule_cache,
-            timestamp_query_resources,
+            ref mut systems,
+            ref mut schedule,
+            ref mut schedule_cache,
+            ref mut timestamp_query_resources,
             ..
         } = self;
 
@@ -527,7 +527,9 @@ impl<'context> GpuExecutor<'context> {
 
                 let system_archetypes = schedule_cache.entry(system_id).or_default();
                 if let Some(_) = system_archetypes.insert(archetype_id, bind_group) {
-                    unreachable!("archetype {archetype_id:?} cannot have multiple bind groups for system {system_id:?}");
+                    unreachable!(
+                        "archetype {archetype_id:?} cannot have multiple bind groups for system {system_id:?}"
+                    );
                 };
             }
         }

@@ -11,8 +11,8 @@ use crate::{
 };
 
 use super::{
-    assert::check_layout, error::IntoValueError, ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
-    ErasedFieldRefMut,
+    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut, assert::check_layout,
+    error::IntoValueError,
 };
 
 pub struct ErasedField {

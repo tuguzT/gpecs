@@ -1,7 +1,7 @@
 use std::any::type_name;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use gpecs_soa_bench::{names::*, work::Work, Big, Large, Small, Tiny};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use gpecs_soa_bench::{Big, Large, Small, Tiny, names::*, work::Work};
 
 fn work<T>(c: &mut Criterion)
 where

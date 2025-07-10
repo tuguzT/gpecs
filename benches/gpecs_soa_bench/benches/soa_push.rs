@@ -1,9 +1,9 @@
 use std::{any::type_name, hint::black_box};
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use gpecs_soa_bench::{
-    clear::Clear, names::*, push::Push, with_capacity::WithCapacity, Big, Large, Medium, Small,
-    Tiny, Zero,
+    Big, Large, Medium, Small, Tiny, Zero, clear::Clear, names::*, push::Push,
+    with_capacity::WithCapacity,
 };
 use gpecs_soa_erased::erased::ErasedSoa;
 

@@ -9,9 +9,5 @@ pub fn update_damage(health: &mut Health, damage: &Damage) {
 
 // This exists because `rust_gpu` can't handle `Ord::max` somehow
 fn max(a: i32, b: i32) -> i32 {
-    if b < a {
-        a
-    } else {
-        b
-    }
+    if b < a { a } else { b }
 }

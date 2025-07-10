@@ -188,9 +188,9 @@ impl SystemShader {
     pub fn components_bind_group_layout_entries(
         &self,
     ) -> impl DoubleEndedIterator<Item = (GpuComponentId, Option<&BindGroupLayoutEntry>)>
-           + ExactSizeIterator
-           + FusedIterator
-           + Clone {
+    + ExactSizeIterator
+    + FusedIterator
+    + Clone {
         let Self {
             components_bind_group_layout_entries,
             ..

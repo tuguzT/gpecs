@@ -8,9 +8,9 @@ use crate::soa::traits::FieldDescriptor;
 
 use super::{
     super::assert::check_same_len,
+    ErasedFieldPtr,
     assert::{check_buffer_align, check_layout},
     error::{ErasedFieldError, IntoValueError},
-    ErasedFieldPtr,
 };
 
 #[derive(Clone, Copy)]

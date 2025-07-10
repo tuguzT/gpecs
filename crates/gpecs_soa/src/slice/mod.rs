@@ -3,7 +3,7 @@ use core::ops;
 use crate::traits::Soa;
 
 pub use self::{
-    dst::{from_raw_parts, from_raw_parts_mut, SoaSlice},
+    dst::{SoaSlice, from_raw_parts, from_raw_parts_mut},
     index::SoaSliceIndex,
     iter::{Iter, IterMut},
     slices::{SoaSlices, SoaSlicesMut},

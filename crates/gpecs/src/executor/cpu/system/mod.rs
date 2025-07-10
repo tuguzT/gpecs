@@ -29,5 +29,5 @@ pub trait SystemParam: Sized {
     type Item<'context>: SystemParam;
     type Error<'context>;
 
-    fn get_param(context: &mut Context) -> SystemParamResult<Self>;
+    fn get_param(context: &mut Context) -> SystemParamResult<'_, Self>;
 }

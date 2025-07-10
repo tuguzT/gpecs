@@ -3,10 +3,10 @@ use core::{iter, ptr::NonNull};
 
 use crate::{
     erased::{
-        assert::assert_descriptors, soa_slice_from_raw_parts, soa_slice_from_raw_parts_mut,
         ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs,
         ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs,
-        ErasedSoaSlices, ErasedSoaSlicesMut,
+        ErasedSoaSlices, ErasedSoaSlicesMut, assert::assert_descriptors, soa_slice_from_raw_parts,
+        soa_slice_from_raw_parts_mut,
     },
     soa::traits::{FieldDescriptor, Soa},
 };

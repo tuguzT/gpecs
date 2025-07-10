@@ -1,7 +1,7 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::{transmute, ManuallyDrop},
+    mem::{ManuallyDrop, transmute},
     ptr::{self, NonNull},
 };
 

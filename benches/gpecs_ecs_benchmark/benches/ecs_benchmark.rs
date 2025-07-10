@@ -13,8 +13,8 @@ use std::{
 use gpecs::{context::error::IncompatibleBundleError, prelude::*};
 use gpecs_ecs_benchmark_types::{
     components::{
-        Damage, Data, Health, Player, PlayerType, Position, Sprite, Velocity, DEFAULT_SEED,
-        NONE_SPRITE, SPAWN_SPRITE,
+        DEFAULT_SEED, Damage, Data, Health, NONE_SPRITE, Player, PlayerType, Position,
+        SPAWN_SPRITE, Sprite, Velocity,
     },
     framebuffer::{Framebuffer, FramebufferDesc},
     systems::{

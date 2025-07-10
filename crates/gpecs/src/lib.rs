@@ -3,7 +3,6 @@
 #![warn(clippy::all)]
 // TODO `#![warn(missing_docs)]` after implementation & tests
 #![deny(unsafe_code)] // allow it only for bundle and archetype storage impls
-#![forbid(unsafe_op_in_unsafe_fn)]
 // TODO `#![no_std]` with `alloc` enabled
 
 pub use gpecs_sparse::soa;

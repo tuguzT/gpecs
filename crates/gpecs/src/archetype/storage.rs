@@ -16,7 +16,7 @@ use gpecs_sparse::{
     pair::{KeyValueSlices, KeyValueSlicesMut},
     set::EpochSparseSet,
 };
-use indexmap::{map::Keys, IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet, map::Keys};
 
 use crate::{
     bundle::Bundle,
@@ -30,9 +30,9 @@ use crate::{
 
 use super::{
     erased::{
-        drop_erased_in_place, from_erased_fields, from_erased_refs, from_erased_refs_mut,
-        from_erased_slices, from_erased_slices_mut, get_component_info_fail, into_erased_fields,
-        validate_components, ErasedComponents,
+        ErasedComponents, drop_erased_in_place, from_erased_fields, from_erased_refs,
+        from_erased_refs_mut, from_erased_slices, from_erased_slices_mut, get_component_info_fail,
+        into_erased_fields, validate_components,
     },
     error::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
@@ -367,7 +367,7 @@ impl ArchetypeStorage {
     pub fn bundles<B>(
         &self,
         components: &ComponentRegistry,
-    ) -> Result<Bundles<B>, IncompatibleBundleError>
+    ) -> Result<Bundles<'_, B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -389,15 +389,15 @@ impl ArchetypeStorage {
     pub fn bundles_mut<B>(
         &mut self,
         components: &ComponentRegistry,
-    ) -> Result<BundlesMut<B>, IncompatibleBundleError>
+    ) -> Result<BundlesMut<'_, B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
         self.bundle_compatibility::<B>(components)?;
 
-        let Self {
+        let &mut Self {
             ref component_ids,
-            erased_storage,
+            ref mut erased_storage,
         } = self;
 
         let (entities, fields) =
@@ -419,7 +419,7 @@ impl ArchetypeStorage {
         self.bundle_compatibility::<B>(components)?;
 
         let Self {
-            ref component_ids,
+            component_ids,
             erased_storage,
         } = self;
 
@@ -443,9 +443,9 @@ impl ArchetypeStorage {
     {
         self.bundle_compatibility::<B>(components)?;
 
-        let Self {
+        let &mut Self {
             ref component_ids,
-            erased_storage,
+            ref mut erased_storage,
         } = self;
 
         let Some(fields) =
@@ -472,9 +472,9 @@ impl ArchetypeStorage {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
-        let Self {
+        let &mut Self {
             ref component_ids,
-            erased_storage,
+            ref mut erased_storage,
         } = self;
 
         let bundle_component_ids = B::get_components(components)
@@ -507,9 +507,9 @@ impl ArchetypeStorage {
     {
         self.bundle_compatibility_exact::<B>(components)?;
 
-        let Self {
+        let &mut Self {
             ref component_ids,
-            erased_storage,
+            ref mut erased_storage,
         } = self;
 
         let Some(fields) =
@@ -530,9 +530,9 @@ impl ArchetypeStorage {
     #[inline]
     #[track_caller]
     pub fn destroy_in_place(&mut self, entity: Entity) -> bool {
-        let Self {
+        let &mut Self {
             ref component_ids,
-            erased_storage,
+            ref mut erased_storage,
         } = self;
         let Some(mut erased_fields) = erased_storage.swap_remove(entity.into()) else {
             return false;
@@ -563,9 +563,9 @@ impl ArchetypeStorage {
         entity: Entity,
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>> {
-        let Self {
+        let &mut Self {
             ref component_ids,
-            erased_storage,
+            ref mut erased_storage,
         } = self;
 
         ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
@@ -578,9 +578,9 @@ impl ArchetypeStorage {
         components: &ComponentRegistry,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>> {
-        let Self {
+        let &mut Self {
             ref component_ids,
-            erased_storage,
+            ref mut erased_storage,
         } = self;
 
         ErasedStorageExt::remove(erased_storage, components, component_ids, entity)
@@ -591,7 +591,7 @@ impl ArchetypeStorage {
     pub(crate) fn erased_components(
         &self,
         components: &ComponentRegistry,
-    ) -> (&[Entity], ErasedComponents<ErasedFieldSlice>) {
+    ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_>>) {
         let Self {
             component_ids,
             erased_storage,
@@ -606,7 +606,7 @@ impl ArchetypeStorage {
     pub(crate) fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
-    ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut>) {
+    ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_>>) {
         let Self {
             component_ids,
             erased_storage,
@@ -629,9 +629,9 @@ impl Debug for ArchetypeStorage {
 
 impl Drop for ArchetypeStorage {
     fn drop(&mut self) {
-        let Self {
+        let &mut Self {
             ref component_ids,
-            erased_storage,
+            ref mut erased_storage,
         } = self;
 
         erased_storage

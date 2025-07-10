@@ -197,7 +197,7 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<Meta> {
+    pub fn iter(&self) -> Iter<'_, '_, Meta> {
         let Self { inner } = self;
 
         let inner = inner.iter();
@@ -205,7 +205,7 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<Meta> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, Meta> {
         let Self { inner } = self;
 
         let inner = inner.iter_mut();

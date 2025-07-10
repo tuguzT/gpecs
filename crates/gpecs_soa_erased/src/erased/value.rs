@@ -7,11 +7,11 @@ use core::{
 use crate::{
     aligned_bytes::AlignedBytes,
     assert::{check_same_layout, check_same_len},
-    erased::{error::IntoValueError, ErasedSoaRefs, ErasedSoaRefsMut},
+    erased::{ErasedSoaRefs, ErasedSoaRefsMut, error::IntoValueError},
     error::LenMismatchError,
     field::ErasedField,
     soa::{
-        traits::{buffer_layout, buffer_offsets, FieldDescriptor, Soa},
+        traits::{FieldDescriptor, Soa, buffer_layout, buffer_offsets},
         vec::SoaVec,
     },
 };
@@ -174,7 +174,7 @@ impl ErasedSoa {
     }
 
     #[inline]
-    pub fn as_refs(&self) -> ErasedSoaRefs {
+    pub fn as_refs(&self) -> ErasedSoaRefs<'_, '_> {
         let Self {
             buffer,
             descriptors,
@@ -183,9 +183,9 @@ impl ErasedSoa {
     }
 
     #[inline]
-    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut {
-        let Self {
-            buffer,
+    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, '_> {
+        let &mut Self {
+            ref mut buffer,
             ref descriptors,
         } = self;
         unsafe { ErasedSoaRefsMut::new_unchecked(descriptors, buffer.as_mut_ptr(), 1, 0) }

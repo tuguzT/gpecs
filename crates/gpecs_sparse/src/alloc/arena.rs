@@ -263,7 +263,7 @@ where
     }
 
     #[inline]
-    pub fn slices(&self) -> SoaSlices<V> {
+    pub fn slices(&self) -> SoaSlices<'_, '_, V> {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.slices().into_slices_with_context();
@@ -272,7 +272,7 @@ where
     }
 
     #[inline]
-    pub fn slices_mut(&mut self) -> SoaSlicesMut<V> {
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, V> {
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.slices_mut().into_slices_with_context();
@@ -364,14 +364,14 @@ where
 
     #[inline]
     #[allow(unsafe_code)]
-    pub fn as_view(&self) -> EpochSparseView<K, V> {
+    pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V> {
         let Self { dense, sparse, .. } = self;
         unsafe { EpochSparseView::new_unchecked(dense.slices(), sparse) }
     }
 
     #[inline]
     #[allow(unsafe_code)]
-    pub fn as_mut_view(&mut self) -> EpochSparseViewMut<K, V> {
+    pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V> {
         let Self { dense, sparse, .. } = self;
         unsafe { EpochSparseViewMut::new_unchecked(dense.slices_mut(), sparse) }
     }
@@ -979,7 +979,7 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) -> Keys<K, V> {
+    pub fn keys(&self) -> Keys<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.slices().into_iter();
         Keys::new(inner)
@@ -993,14 +993,14 @@ where
     }
 
     #[inline]
-    pub fn values(&self) -> Values<K, V> {
+    pub fn values(&self) -> Values<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.slices().into_iter();
         Values::new(inner)
     }
 
     #[inline]
-    pub fn values_mut(&mut self) -> ValuesMut<K, V> {
+    pub fn values_mut(&mut self) -> ValuesMut<'_, '_, K, V> {
         let view_mut = self.as_mut_view();
         view_mut.into_values_mut()
     }
@@ -1013,13 +1013,13 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<K, V> {
+    pub fn iter(&self) -> Iter<'_, '_, K, V> {
         let view = self.as_view();
         view.into_iter()
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<K, V> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, K, V> {
         let view_mut = self.as_mut_view();
         view_mut.into_iter()
     }

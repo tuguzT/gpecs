@@ -3,7 +3,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem::{transmute, ManuallyDrop},
+    mem::{ManuallyDrop, transmute},
     ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
     ptr,
 };
@@ -13,12 +13,12 @@ pub use super::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
     ptr::{
-        buffer_layout, capacity_from, ptrs, should_allocate, BufferData, BufferDataPtr,
-        BufferDataPtrMut,
+        BufferData, BufferDataPtr, BufferDataPtrMut, buffer_layout, capacity_from, ptrs,
+        should_allocate,
     },
     slice::{
-        from_raw_parts, from_raw_parts_mut, range, IndexHelper, IndexHelperMut, Iter, IterMut,
-        SoaSlice, SoaSlices, SoaSlicesMut,
+        IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
+        from_raw_parts, from_raw_parts_mut, range,
     },
     traits::{Soa, SoaToOwned, SoaTrustedFields},
 };
@@ -312,14 +312,14 @@ where
     }
 
     #[inline]
-    pub fn slices(&self) -> SoaSlices<T> {
+    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
         let context = self.context();
         let slices = self.as_slices();
         SoaSlices::new(context, slices)
     }
 
     #[inline]
-    pub fn slices_mut(&mut self) -> SoaSlicesMut<T> {
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
         let context = unsafe { &*self.as_ptr().ptr_to_context() };
         let slices = self.as_mut_slices();
         SoaSlicesMut::new(context, slices)

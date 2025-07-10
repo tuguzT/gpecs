@@ -8,9 +8,9 @@ use crate::soa::traits::FieldDescriptor;
 
 use super::{
     super::assert::check_same_len,
+    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
     assert::{check_buffer_align, check_layout},
     error::{ErasedFieldError, IntoValueError},
-    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
 };
 
 pub struct ErasedFieldRefMut<'a> {

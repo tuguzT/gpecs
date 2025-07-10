@@ -12,7 +12,7 @@ use crate::{
     wrappers::{MutPtrs, Ptrs},
 };
 
-use super::{slice_index_usize_fail, IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex};
+use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, slice_index_usize_fail};
 
 pub struct SoaSlices<'c, 'a, T>
 where
@@ -241,13 +241,13 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<T> {
+    pub fn iter(&self) -> Iter<'_, '_, T> {
         let (_, iter) = self.iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<T>) {
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
         let context = self.context();
         (context, Iter::new(self.clone()))
     }
@@ -861,13 +861,13 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<T> {
+    pub fn iter(&self) -> Iter<'_, '_, T> {
         let (_, iter) = self.iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<T>) {
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
         let (context, ptrs, len) = unsafe { self.as_parts() };
         let ptrs = T::ptrs_cast_const(context, ptrs);
         let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
@@ -875,13 +875,13 @@ where
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
         let (_, iter) = self.iter_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<T>) {
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
         let (context, ptrs, len) = unsafe { self.as_parts() };
         let slices = unsafe { Self::from_parts(context, ptrs.clone(), len) };
         (context, IterMut::new(slices))

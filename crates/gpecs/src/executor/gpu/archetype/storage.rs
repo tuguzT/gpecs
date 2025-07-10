@@ -2,8 +2,8 @@ use std::ptr;
 
 use indexmap::IndexMap;
 use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
     Buffer, BufferAddress, BufferBinding, BufferSize, BufferUsages, Device,
+    util::{BufferInitDescriptor, DeviceExt},
 };
 
 use crate::{
@@ -126,7 +126,7 @@ impl GpuArchetypeStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub unsafe fn storage_buffer_bindings(&self) -> BufferBindings {
+    pub unsafe fn storage_buffer_bindings(&self) -> BufferBindings<'_> {
         let Self {
             storage_buffer,
             entities_binding,

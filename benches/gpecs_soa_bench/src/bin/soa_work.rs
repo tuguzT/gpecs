@@ -1,4 +1,4 @@
-use gpecs_soa_bench::{work::Work, Large};
+use gpecs_soa_bench::{Large, work::Work};
 
 fn work<T>(count: usize) -> T::Output
 where

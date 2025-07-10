@@ -1,5 +1,5 @@
 use gpecs::{
-    entity::{registry::EntityRegistry, Entity, EntityEpoch},
+    entity::{Entity, EntityEpoch, registry::EntityRegistry},
     world::registry::WorldRegistry,
 };
 

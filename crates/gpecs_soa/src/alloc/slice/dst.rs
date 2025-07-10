@@ -2,7 +2,7 @@ use core::{cmp, ptr::NonNull};
 use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
-    ptr::{slice_from_raw_parts_mut, BufferData},
+    ptr::{BufferData, slice_from_raw_parts_mut},
     slice::{Iter, IterMut, SoaSlice},
     traits::{SoaToOwned, SoaTrustedFields},
     vec::{IntoIter, SoaVec},

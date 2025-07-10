@@ -8,11 +8,11 @@ use core::{
 
 use crate::{
     assert::{check_same_layout, check_same_len},
-    erased::{error::IntoValueError, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs},
-    field::{field_slice_from_raw_parts_mut, ErasedFieldMutPtr, ErasedFieldSliceMut},
+    erased::{ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs, error::IntoValueError},
+    field::{ErasedFieldMutPtr, ErasedFieldSliceMut, field_slice_from_raw_parts_mut},
     soa::{
         slice::range,
-        traits::{buffer_layout, FieldDescriptor, Soa},
+        traits::{FieldDescriptor, Soa, buffer_layout},
     },
 };
 

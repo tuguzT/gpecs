@@ -1,9 +1,9 @@
 use crate::context::Context;
 
 use self::system::{
+    IntoSystem,
     registry::{SystemId, SystemRegistry},
     schedule::SystemSchedule,
-    IntoSystem,
 };
 
 pub mod system;
@@ -66,9 +66,9 @@ impl<'context> CpuExecutor<'context> {
 
     #[inline]
     pub fn execute(&mut self) {
-        let Self {
-            context,
-            systems,
+        let &mut Self {
+            ref mut context,
+            ref mut systems,
             ref schedule,
         } = self;
 

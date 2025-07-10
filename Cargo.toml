@@ -25,8 +25,8 @@ members = [
 version = "0.0.0"
 authors = ["tuguzT <timurka.tugushev@gmail.com>"]
 license = "MIT OR Apache-2.0"
-edition = "2021"
-rust-version = "1.84.0"
+edition = "2024"
+rust-version = "1.88.0"
 
 [workspace.dependencies]
 gpecs = { path = "crates/gpecs" }
@@ -37,7 +37,7 @@ gpecs_types = { path = "crates/gpecs_types" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 cargo-gpu = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "7fc4560" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "f583740" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "4a9e76c" }
 indexmap = { version = "2.10" }
 petgraph = { version = "0.8" }
 itertools = { version = "0.14", default-features = false }

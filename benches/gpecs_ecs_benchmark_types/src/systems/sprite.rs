@@ -1,6 +1,6 @@
 use crate::components::{
-    Health, Player, PlayerType, Sprite, StatusEffect, GRAVE_SPRITE, MONSTER_SPRITE, NPC_SPRITE,
-    PLAYER_SPRITE, SPAWN_SPRITE,
+    GRAVE_SPRITE, Health, MONSTER_SPRITE, NPC_SPRITE, PLAYER_SPRITE, Player, PlayerType,
+    SPAWN_SPRITE, Sprite, StatusEffect,
 };
 
 pub fn update_sprite(sprite: &mut Sprite, player: &Player, health: &Health) {

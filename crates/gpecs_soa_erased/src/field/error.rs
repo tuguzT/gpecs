@@ -63,7 +63,10 @@ impl Display for PtrNotAlignedError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { ptr, target_align } = self;
         let align_offset = ptr.align_offset(target_align.get());
-        write!(f, "pointer {ptr:p} is not aligned to {target_align} (its current align offset is {align_offset})")
+        write!(
+            f,
+            "pointer {ptr:p} is not aligned to {target_align} (its current align offset is {align_offset})"
+        )
     }
 }
 

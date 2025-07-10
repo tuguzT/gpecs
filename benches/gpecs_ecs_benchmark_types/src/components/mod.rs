@@ -1,12 +1,12 @@
 pub use self::{
     damage::Damage,
-    data::{Data, DEFAULT_SEED},
+    data::{DEFAULT_SEED, Data},
     empty::Empty,
     health::{Health, StatusEffect},
     player::{Player, PlayerType},
     position::Position,
     sprite::{
-        Sprite, GRAVE_SPRITE, MONSTER_SPRITE, NONE_SPRITE, NPC_SPRITE, PLAYER_SPRITE, SPAWN_SPRITE,
+        GRAVE_SPRITE, MONSTER_SPRITE, NONE_SPRITE, NPC_SPRITE, PLAYER_SPRITE, SPAWN_SPRITE, Sprite,
     },
     velocity::Velocity,
 };

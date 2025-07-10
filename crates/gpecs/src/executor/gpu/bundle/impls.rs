@@ -1,12 +1,12 @@
 use crate::{
     component::registry::ComponentRegistry,
     executor::gpu::component::{
-        registry::{GpuComponentId, GpuComponentRegistry},
         GpuComponent,
+        registry::{GpuComponentId, GpuComponentRegistry},
     },
     soa::{
         identity::Identity,
-        traits::impls::{count_idents, SoaTupleImplHelper},
+        traits::impls::{SoaTupleImplHelper, count_idents},
     },
 };
 

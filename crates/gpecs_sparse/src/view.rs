@@ -230,21 +230,21 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) -> Keys<K, V> {
+    pub fn keys(&self) -> Keys<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Keys::new(inner)
     }
 
     #[inline]
-    pub fn values(&self) -> Values<K, V> {
+    pub fn values(&self) -> Values<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Values::new(inner)
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<K, V> {
+    pub fn iter(&self) -> Iter<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Iter::new(inner)
@@ -1004,21 +1004,21 @@ where
     }
 
     #[inline]
-    pub fn keys(&self) -> Keys<K, V> {
+    pub fn keys(&self) -> Keys<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Keys::new(inner)
     }
 
     #[inline]
-    pub fn values(&self) -> Values<K, V> {
+    pub fn values(&self) -> Values<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Values::new(inner)
     }
 
     #[inline]
-    pub fn values_mut(&mut self) -> ValuesMut<K, V> {
+    pub fn values_mut(&mut self) -> ValuesMut<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter_mut();
         ValuesMut::new(inner)
@@ -1032,14 +1032,14 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<K, V> {
+    pub fn iter(&self) -> Iter<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter();
         Iter::new(inner)
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<K, V> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.iter_mut();
         IterMut::new(inner)

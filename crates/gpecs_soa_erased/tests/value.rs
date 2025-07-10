@@ -24,11 +24,13 @@ fn value() {
         FieldDescriptor::of::<u32>(),
         FieldDescriptor::of::<String>(),
     ];
-    assert!(erased_value
-        .field_descriptors()
-        .iter()
-        .map(FieldDescriptor::layout)
-        .eq(descriptors.iter().map(FieldDescriptor::layout)));
+    assert!(
+        erased_value
+            .field_descriptors()
+            .iter()
+            .map(FieldDescriptor::layout)
+            .eq(descriptors.iter().map(FieldDescriptor::layout))
+    );
 
     let erased_refs = erased_value.as_refs();
     assert_eq!(erased_refs.into_iter().len(), 5);
@@ -101,11 +103,13 @@ fn value() {
         ErasedFieldRef::new(descriptors[2], i2_bytes).expect("incorrect inputs"),
         ErasedFieldRef::new(descriptors[3], i1_bytes).expect("incorrect inputs"),
     ];
-    assert!(erased_refs
-        .into_iter()
-        .take(4)
-        .map(ErasedFieldRef::into_buffer)
-        .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)));
+    assert!(
+        erased_refs
+            .into_iter()
+            .take(4)
+            .map(ErasedFieldRef::into_buffer)
+            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer))
+    );
 
     let mut fields = erased_value.into_fields().into_vec();
     let field = fields.pop().expect("string field should exist");
@@ -116,11 +120,13 @@ fn value() {
 
     let erased_value = ErasedSoa::new(fields.into_iter().map(ErasedField::into_parts))
         .expect("all the fields should be valid");
-    assert!(erased_value
-        .as_refs()
-        .into_iter()
-        .map(ErasedFieldRef::into_buffer)
-        .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)));
+    assert!(
+        erased_value
+            .as_refs()
+            .into_iter()
+            .map(ErasedFieldRef::into_buffer)
+            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer))
+    );
 
     let value = unsafe { erased_value.into::<((), u32, u16, u8)>(&context) }
         .expect("all the fields should be valid");
@@ -135,20 +141,24 @@ fn value_zst() {
     let erased_value = ErasedSoa::from(&context, value);
 
     let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(erased_value
-        .field_descriptors()
-        .iter()
-        .map(FieldDescriptor::layout)
-        .eq(descriptors.iter().map(FieldDescriptor::layout)));
+    assert!(
+        erased_value
+            .field_descriptors()
+            .iter()
+            .map(FieldDescriptor::layout)
+            .eq(descriptors.iter().map(FieldDescriptor::layout))
+    );
 
     let field_refs = [
         ErasedFieldRef::new(FieldDescriptor::of::<()>(), [].as_slice()).expect("incorrect inputs"),
     ];
-    assert!(erased_value
-        .as_refs()
-        .into_iter()
-        .map(ErasedFieldRef::into_buffer)
-        .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)));
+    assert!(
+        erased_value
+            .as_refs()
+            .into_iter()
+            .map(ErasedFieldRef::into_buffer)
+            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer))
+    );
 
     let value =
         unsafe { erased_value.into::<()>(&context) }.expect("all the fields should be valid");

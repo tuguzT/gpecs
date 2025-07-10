@@ -1,6 +1,5 @@
 #![warn(clippy::all)]
 // TODO `#![warn(missing_docs)]` after implementation & tests
-#![forbid(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![no_std]
 

@@ -11,12 +11,12 @@ use crate::{
     },
     bundle::Bundle,
     component::{
-        registry::{ComponentId, ComponentInfo, ComponentRegistry},
         Component,
+        registry::{ComponentId, ComponentInfo, ComponentRegistry},
     },
     entity::{
-        registry::{self as entities, EntityRegistry},
         Entity,
+        registry::{self as entities, EntityRegistry},
     },
     world::registry::{WorldId, WorldRegistry},
 };
@@ -63,7 +63,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn as_parts(&self) -> ContextPartsRefs {
+    pub fn as_parts(&self) -> ContextPartsRefs<'_> {
         let Self {
             worlds,
             entities,
@@ -99,7 +99,7 @@ impl Context {
 
     #[inline]
     #[allow(unsafe_code)]
-    pub unsafe fn as_parts_mut(&mut self) -> ContextPartsRefsMut {
+    pub unsafe fn as_parts_mut(&mut self) -> ContextPartsRefsMut<'_> {
         let Self {
             worlds,
             entities,
@@ -286,7 +286,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn bundles<B>(&self) -> Result<Bundles<B>, GetComponentsError>
+    pub fn bundles<B>(&self) -> Result<Bundles<'_, '_, B>, GetComponentsError>
     where
         B: Bundle,
     {
@@ -299,7 +299,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn bundles_mut<B>(&mut self) -> Result<BundlesMut<B>, GetComponentsError>
+    pub fn bundles_mut<B>(&mut self) -> Result<BundlesMut<'_, '_, B>, GetComponentsError>
     where
         B: Bundle,
     {

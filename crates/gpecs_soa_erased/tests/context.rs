@@ -12,11 +12,13 @@ fn context() {
 fn context_of() {
     let context = ErasedSoaContext::of::<()>(&());
     let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(context
-        .field_descriptors()
-        .iter()
-        .map(FieldDescriptor::layout)
-        .eq(descriptors.iter().map(FieldDescriptor::layout)));
+    assert!(
+        context
+            .field_descriptors()
+            .iter()
+            .map(FieldDescriptor::layout)
+            .eq(descriptors.iter().map(FieldDescriptor::layout))
+    );
 
     let context = ErasedSoaContext::of::<(u32, u16, u8)>(&());
     let descriptors = [
@@ -24,9 +26,11 @@ fn context_of() {
         FieldDescriptor::of::<u16>(),
         FieldDescriptor::of::<u32>(),
     ];
-    assert!(context
-        .field_descriptors()
-        .iter()
-        .map(FieldDescriptor::layout)
-        .eq(descriptors.iter().map(FieldDescriptor::layout)));
+    assert!(
+        context
+            .field_descriptors()
+            .iter()
+            .map(FieldDescriptor::layout)
+            .eq(descriptors.iter().map(FieldDescriptor::layout))
+    );
 }

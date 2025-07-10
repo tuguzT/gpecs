@@ -7,9 +7,9 @@ use core::{
 
 use crate::{
     assert::{check_same_layout, check_same_len},
-    erased::{error::IntoValueError, ErasedSoaMutPtrs, ErasedSoaPtrs},
+    erased::{ErasedSoaMutPtrs, ErasedSoaPtrs, error::IntoValueError},
     field::{ErasedFieldMutPtr, ErasedFieldRefMut},
-    soa::traits::{buffer_layout, FieldDescriptor, Soa},
+    soa::traits::{FieldDescriptor, Soa, buffer_layout},
 };
 
 #[derive(Debug, Clone, Copy)]

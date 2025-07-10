@@ -154,7 +154,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs<'_>
     where
         I: SoaSliceIndex<T>,
@@ -164,7 +163,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn get_unchecked_with_context<I>(&self, index: I) -> (&T::Context, I::Ptrs<'_>)
     where
         I: SoaSliceIndex<T>,
@@ -176,7 +174,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'c>
     where
         I: SoaSliceIndex<T>,
@@ -186,7 +183,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn into_get_unchecked_with_context<I>(
         self,
         index: I,
@@ -682,7 +678,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs<'_>
     where
         I: SoaSliceIndex<T>,
@@ -692,7 +687,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn get_unchecked_with_context<I>(&self, index: I) -> (&T::Context, I::Ptrs<'_>)
     where
         I: SoaSliceIndex<T>,
@@ -704,7 +698,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'c>
     where
         I: SoaSliceIndex<T>,
@@ -714,7 +707,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn into_get_unchecked_with_context<I>(
         self,
         index: I,
@@ -730,7 +722,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> I::MutPtrs<'_>
     where
         I: SoaSliceIndex<T>,
@@ -740,7 +731,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn get_unchecked_mut_with_context<I>(
         &mut self,
         index: I,
@@ -755,7 +745,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn into_get_unchecked_mut<I>(self, index: I) -> I::MutPtrs<'c>
     where
         I: SoaSliceIndex<T>,
@@ -765,7 +754,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn into_get_unchecked_mut_with_context<I>(
         self,
         index: I,

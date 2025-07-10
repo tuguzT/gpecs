@@ -15,8 +15,6 @@ crate-type = ["dylib", "lib"]
 gpecs_types = { workspace = true }
 gpecs_simple_types = { workspace = true }
 spirv-std = { workspace = true }
-unroll = { workspace = true }
-static_assertions = { workspace = true }
 
 [features]
 nightly = []

@@ -9,7 +9,6 @@ use crate::{
     traits::{Soa, SoaTrustedFields},
 };
 
-#[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn slice_from_raw_parts<T>(
     data: *const BufferData<T>,
@@ -24,7 +23,6 @@ where
     ptr::slice_from_raw_parts(data, len) as _
 }
 
-#[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn slice_from_raw_parts_mut<T>(
     data: *mut BufferData<T>,
@@ -70,19 +68,15 @@ pub trait SoaSlicePtr<T>: Copy + private_slice_ptr::Sealed
 where
     T: SoaTrustedFields,
 {
-    #[allow(clippy::missing_safety_doc)]
     unsafe fn context<'a>(self) -> &'a T::Context;
 
-    #[allow(clippy::missing_safety_doc)]
     unsafe fn len(self) -> usize;
 
-    #[allow(clippy::missing_safety_doc)]
     #[inline(always)]
     unsafe fn is_empty(self) -> bool {
         unsafe { self.len() == 0 }
     }
 
-    #[allow(clippy::missing_safety_doc)]
     unsafe fn capacity(self) -> usize;
 
     fn as_ptr(self) -> *const BufferData<T>;
@@ -125,19 +119,15 @@ pub trait SoaSlicePtrMut<T>: Copy + private_slice_ptr::Sealed
 where
     T: SoaTrustedFields,
 {
-    #[allow(clippy::missing_safety_doc)]
     unsafe fn context<'a>(self) -> &'a T::Context;
 
-    #[allow(clippy::missing_safety_doc)]
     unsafe fn len(self) -> usize;
 
-    #[allow(clippy::missing_safety_doc)]
     #[inline(always)]
     unsafe fn is_empty(self) -> bool {
         unsafe { self.len() == 0 }
     }
 
-    #[allow(clippy::missing_safety_doc)]
     unsafe fn capacity(self) -> usize;
 
     fn as_mut_ptr(self) -> *mut BufferData<T>;

@@ -1,8 +1,6 @@
 //! Nothing too special, too =)
 
-#![warn(clippy::all)]
-// TODO `#![warn(missing_docs)]` after implementation & tests
-#![deny(unsafe_code)] // allow it only for some method definitions
+#![deny(unsafe_code)]
 #![no_std]
 
 pub use gpecs_sparse::soa;

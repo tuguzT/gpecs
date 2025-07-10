@@ -1,8 +1,5 @@
 //! Nothing too special for now...
 
-#![warn(clippy::all)]
-// TODO `#![warn(missing_docs)]` after implementation & tests
-
 pub mod clear;
 pub mod names;
 pub mod push;

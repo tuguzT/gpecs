@@ -188,7 +188,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs<'_>
     where
         I: SoaSliceIndex<T>,
@@ -197,7 +196,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> I::MutPtrs<'_>
     where
         I: SoaSliceIndex<T>,
@@ -476,7 +474,6 @@ where
 {
 }
 
-#[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts<'slice, T>(
     data: *const BufferData<T>,
@@ -489,7 +486,6 @@ where
     unsafe { &*slice_from_raw_parts(data, len, capacity) }
 }
 
-#[allow(clippy::missing_safety_doc)]
 #[inline]
 pub unsafe fn from_raw_parts_mut<'slice, T>(
     data: *mut BufferData<T>,

@@ -22,3 +22,6 @@ renderdoc = { workspace = true }
 [build-dependencies]
 cargo-gpu = { workspace = true }
 const_format = { workspace = true }
+
+[lints]
+workspace = true

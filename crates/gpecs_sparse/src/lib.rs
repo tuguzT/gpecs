@@ -1,8 +1,6 @@
 //! Nothing too special for now...
 
-#![warn(clippy::all)]
-// TODO `#![warn(missing_docs)]` after implementation & tests
-#![deny(unsafe_code)] // allow it only for key-value pair & for mutable access to keys and items
+#![deny(unsafe_code)]
 #![cfg_attr(not(test), no_std)]
 
 #[cfg(feature = "alloc")]

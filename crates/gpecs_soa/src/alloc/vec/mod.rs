@@ -99,7 +99,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, len: usize, capacity: usize) -> Self {
         Self {
             buffer: unsafe { RawSoaVec::from_raw_parts(ptr, capacity) },
@@ -326,7 +325,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         debug_assert!(new_len <= self.capacity());
 

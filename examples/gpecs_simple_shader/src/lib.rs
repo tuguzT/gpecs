@@ -1,5 +1,3 @@
-#![warn(clippy::all)]
-// TODO `#![warn(missing_docs)]` after implementation & tests
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![no_std]
 
@@ -9,10 +7,8 @@ use spirv_std::{
     glam::{UVec3, Vec3},
     spirv,
 };
-use unroll::unroll_for_loops;
 
 #[spirv(compute(threads(64)))]
-#[unroll_for_loops]
 pub fn update_entity_position(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &mut [Entity],
@@ -32,7 +28,6 @@ pub fn update_entity_position(
 }
 
 #[spirv(compute(threads(64)))]
-#[unroll_for_loops]
 pub fn update_entity_mass(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &mut [Entity],

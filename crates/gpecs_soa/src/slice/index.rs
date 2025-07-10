@@ -7,7 +7,6 @@ use super::{
     slice_index_usize_fail, slice_start_index_len_fail, slice_start_index_overflow_fail,
 };
 
-#[allow(clippy::missing_safety_doc)]
 pub unsafe trait SoaSliceIndex<T>: private_slice_index::Sealed
 where
     T: Soa,

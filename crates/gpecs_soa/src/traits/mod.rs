@@ -17,7 +17,6 @@ pub type DefaultContext = ();
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays (or SoA) pattern.
-#[allow(clippy::missing_safety_doc)]
 pub unsafe trait Soa: Sized {
     /// Type of context used to perform all operations of this trait.
     ///

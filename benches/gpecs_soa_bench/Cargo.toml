@@ -14,6 +14,9 @@ gpecs_soa_erased = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 
+[lints]
+workspace = true
+
 [[bench]]
 name = "soa_push"
 harness = false

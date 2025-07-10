@@ -13,3 +13,6 @@ gpecs_soa = { workspace = true }
 [features]
 default = ["alloc"]
 alloc = ["gpecs_soa/alloc"]
+
+[lints]
+workspace = true

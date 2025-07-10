@@ -49,14 +49,18 @@ const_format = { version = "0.2" }
 env_logger = { version = "0.11" }
 log = { version = "0.4" }
 glam = { version = "0.30" }
-unroll = { version = "0.1" }
-static_assertions = { version = "1.1" }
 wgpu = { version = "26" }
 renderdoc = { version = "0.12" }
 
-[workspace.lints.rust.unexpected_cfgs]
-level = "warn"
-check-cfg = ['cfg(target_arch, values("spirv"))']
+[workspace.lints.rust]
+# TODO make it "warn" after implementation & tests
+missing_docs = "allow"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_arch, values("spirv"))'] }
+
+[workspace.lints.clippy]
+all = "warn"
+# TODO make it "warn" after implementation & tests
+missing_safety_doc = "allow"
 
 [profile.release]
 debug = true

@@ -1,5 +1,3 @@
-#![warn(clippy::all)]
-// TODO `#![warn(missing_docs)]` after implementation & tests
 #![no_std]
 
 use gpecs_ecs_benchmark_types::{

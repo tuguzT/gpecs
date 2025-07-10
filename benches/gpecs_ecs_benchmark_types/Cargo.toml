@@ -10,3 +10,6 @@ rust-version.workspace = true
 [dependencies]
 gpecs_types = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

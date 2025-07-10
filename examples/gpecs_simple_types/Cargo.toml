@@ -11,3 +11,6 @@ publish = false
 [dependencies]
 gpecs_types = { workspace = true }
 spirv-std = { workspace = true }
+
+[lints]
+workspace = true

@@ -533,11 +533,10 @@ fn init_renderdoc() -> Option<RenderDoc<V141>> {
 
 fn wgpu_raw_device_window(device: &wgpu::Device) -> (*const c_void, *const c_void) {
     let device_raw = unsafe {
-        device.as_hal::<wgpu::hal::api::Vulkan, _, _>(|device| {
-            device
-                .map(|device| transmute(device.raw_device().handle()))
-                .unwrap_or(null::<c_void>())
-        })
+        device
+            .as_hal::<wgpu::hal::api::Vulkan>()
+            .map(|device| transmute(device.raw_device().handle()))
+            .unwrap_or(null::<c_void>())
     };
     let window_raw = null::<c_void>();
     (device_raw, window_raw)

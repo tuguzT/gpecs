@@ -766,10 +766,15 @@ where
     V::FieldDescriptors<'context>: Clone,
 {
     fn clone(&self) -> Self {
+        let Self {
+            key,
+            ref value,
+            phantom,
+        } = *self;
         Self {
-            key: self.key.clone(),
-            phantom: self.phantom.clone(),
-            value: self.value.clone(),
+            key,
+            value: value.clone(),
+            phantom,
         }
     }
 }
@@ -841,9 +846,10 @@ where
     V::Ptrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, value } = self;
         f.debug_struct("KeyValuePtrs")
-            .field("key", &self.key)
-            .field("value", &self.value)
+            .field("key", key)
+            .field("value", value)
             .finish()
     }
 }
@@ -854,7 +860,8 @@ where
     V::Ptrs<'context>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key && self.value == other.value
+        let Self { key, value } = self;
+        *key == other.key && *value == other.value
     }
 }
 
@@ -871,11 +878,12 @@ where
     V::Ptrs<'context>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.key.partial_cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.partial_cmp(&other.key) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.value.partial_cmp(&other.value)
+        value.partial_cmp(&other.value)
     }
 }
 
@@ -885,11 +893,12 @@ where
     V::Ptrs<'context>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.key.cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.cmp(&other.key) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.value.cmp(&other.value)
+        value.cmp(&other.value)
     }
 }
 
@@ -899,8 +908,9 @@ where
     V::Ptrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.key.hash(state);
-        self.value.hash(state);
+        let Self { key, value } = self;
+        key.hash(state);
+        value.hash(state);
     }
 }
 
@@ -909,10 +919,9 @@ where
     V: Soa,
 {
     fn clone(&self) -> Self {
-        Self {
-            key: self.key,
-            value: self.value.clone(),
-        }
+        let Self { key, ref value } = *self;
+        let value = value.clone();
+        Self { key, value }
     }
 }
 
@@ -959,9 +968,10 @@ where
     V::MutPtrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, value } = self;
         f.debug_struct("KeyValueMutPtrs")
-            .field("key", &self.key)
-            .field("value", &self.value)
+            .field("key", key)
+            .field("value", value)
             .finish()
     }
 }
@@ -972,7 +982,8 @@ where
     V::MutPtrs<'context>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key && self.value == other.value
+        let Self { key, value } = self;
+        *key == other.key && *value == other.value
     }
 }
 
@@ -989,11 +1000,12 @@ where
     V::MutPtrs<'context>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.key.partial_cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.partial_cmp(&other.key) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.value.partial_cmp(&other.value)
+        value.partial_cmp(&other.value)
     }
 }
 
@@ -1003,11 +1015,12 @@ where
     V::MutPtrs<'context>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.key.cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.cmp(&other.key) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.value.cmp(&other.value)
+        value.cmp(&other.value)
     }
 }
 
@@ -1017,8 +1030,9 @@ where
     V::MutPtrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.key.hash(state);
-        self.value.hash(state);
+        let Self { key, value } = self;
+        key.hash(state);
+        value.hash(state);
     }
 }
 
@@ -1028,10 +1042,9 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            key: self.key,
-            value: self.value.clone(),
-        }
+        let Self { key, ref value } = *self;
+        let value = value.clone();
+        Self { key, value }
     }
 }
 
@@ -1080,9 +1093,10 @@ where
     V::NonNullPtrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, value } = self;
         f.debug_struct("KeyValueNonNullPtrs")
-            .field("key", &self.key)
-            .field("value", &self.value)
+            .field("key", key)
+            .field("value", value)
             .finish()
     }
 }
@@ -1093,7 +1107,8 @@ where
     V::NonNullPtrs<'context>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key && self.value == other.value
+        let Self { key, value } = self;
+        *key == other.key && *value == other.value
     }
 }
 
@@ -1110,11 +1125,12 @@ where
     V::NonNullPtrs<'context>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.key.partial_cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.partial_cmp(&other.key) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.value.partial_cmp(&other.value)
+        value.partial_cmp(&other.value)
     }
 }
 
@@ -1124,11 +1140,12 @@ where
     V::NonNullPtrs<'context>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.key.cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.cmp(&other.key) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.value.cmp(&other.value)
+        value.cmp(&other.value)
     }
 }
 
@@ -1138,8 +1155,9 @@ where
     V::NonNullPtrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.key.hash(state);
-        self.value.hash(state);
+        let Self { key, value } = self;
+        key.hash(state);
+        value.hash(state);
     }
 }
 
@@ -1149,10 +1167,9 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            key: self.key,
-            value: self.value.clone(),
-        }
+        let Self { key, ref value } = *self;
+        let value = value.clone();
+        Self { key, value }
     }
 }
 
@@ -1203,9 +1220,10 @@ where
     V::Refs<'context, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, value } = self;
         f.debug_struct("KeyValueRefs")
-            .field("key", &self.key)
-            .field("value", &self.value)
+            .field("key", key)
+            .field("value", value)
             .finish()
     }
 }
@@ -1217,7 +1235,8 @@ where
     V::Refs<'context, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key && self.value == other.value
+        let Self { key, value } = self;
+        *key == other.key && *value == other.value
     }
 }
 
@@ -1236,11 +1255,12 @@ where
     V::Refs<'context, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.key.partial_cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.partial_cmp(&other.key) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.value.partial_cmp(&other.value)
+        value.partial_cmp(&other.value)
     }
 }
 
@@ -1251,11 +1271,12 @@ where
     V::Refs<'context, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.key.cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.cmp(&other.key) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.value.cmp(&other.value)
+        value.cmp(&other.value)
     }
 }
 
@@ -1266,8 +1287,9 @@ where
     V::Refs<'context, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.key.hash(state);
-        self.value.hash(state);
+        let Self { key, value } = self;
+        key.hash(state);
+        value.hash(state);
     }
 }
 
@@ -1279,10 +1301,9 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            key: self.key,
-            value: self.value.clone(),
-        }
+        let Self { key, ref value } = *self;
+        let value = value.clone();
+        Self { key, value }
     }
 }
 
@@ -1364,9 +1385,10 @@ where
     V::RefsMut<'context, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { key, value } = self;
         f.debug_struct("KeyValueRefsMut")
-            .field("key", &self.key)
-            .field("value", &self.value)
+            .field("key", key)
+            .field("value", value)
             .finish()
     }
 }
@@ -1378,7 +1400,8 @@ where
     V::RefsMut<'context, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key && self.value == other.value
+        let Self { key, value } = self;
+        *key == other.key && *value == other.value
     }
 }
 
@@ -1397,11 +1420,12 @@ where
     V::RefsMut<'context, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.key.partial_cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.partial_cmp(&other.key) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.value.partial_cmp(&other.value)
+        value.partial_cmp(&other.value)
     }
 }
 
@@ -1412,11 +1436,12 @@ where
     V::RefsMut<'context, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.key.cmp(&other.key) {
+        let Self { key, value } = self;
+        match key.cmp(&other.key) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.value.cmp(&other.value)
+        value.cmp(&other.value)
     }
 }
 
@@ -1427,8 +1452,9 @@ where
     V::RefsMut<'context, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.key.hash(state);
-        self.value.hash(state);
+        let Self { key, value } = self;
+        key.hash(state);
+        value.hash(state);
     }
 }
 
@@ -1470,9 +1496,10 @@ where
     V::SlicePtrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { keys, values } = self;
         f.debug_struct("KeyValueSlicePtrs")
-            .field("keys", &self.keys)
-            .field("values", &self.values)
+            .field("keys", keys)
+            .field("values", values)
             .finish()
     }
 }
@@ -1484,7 +1511,8 @@ where
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
-        self.keys == other.keys && self.values == other.values
+        let Self { keys, values } = self;
+        *keys == other.keys && *values == other.values
     }
 }
 
@@ -1502,11 +1530,12 @@ where
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.keys.partial_cmp(&other.keys) {
+        let Self { keys, values } = self;
+        match keys.partial_cmp(&other.keys) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.values.partial_cmp(&other.values)
+        values.partial_cmp(&other.values)
     }
 }
 
@@ -1517,11 +1546,12 @@ where
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.keys.cmp(&other.keys) {
+        let Self { keys, values } = self;
+        match keys.cmp(&other.keys) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.values.cmp(&other.values)
+        values.cmp(&other.values)
     }
 }
 
@@ -1531,8 +1561,9 @@ where
     V::SlicePtrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.keys.hash(state);
-        self.values.hash(state);
+        let Self { keys, values } = self;
+        keys.hash(state);
+        values.hash(state);
     }
 }
 
@@ -1542,10 +1573,9 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            keys: self.keys,
-            values: self.values.clone(),
-        }
+        let Self { keys, ref values } = *self;
+        let values = values.clone();
+        Self { keys, values }
     }
 }
 
@@ -1594,9 +1624,10 @@ where
     V::SliceMutPtrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { keys, values } = self;
         f.debug_struct("KeyValueSliceMutPtrs")
-            .field("keys", &self.keys)
-            .field("values", &self.values)
+            .field("keys", keys)
+            .field("values", values)
             .finish()
     }
 }
@@ -1608,7 +1639,8 @@ where
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
-        self.keys == other.keys && self.values == other.values
+        let Self { keys, values } = self;
+        *keys == other.keys && *values == other.values
     }
 }
 
@@ -1626,11 +1658,12 @@ where
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.keys.partial_cmp(&other.keys) {
+        let Self { keys, values } = self;
+        match keys.partial_cmp(&other.keys) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.values.partial_cmp(&other.values)
+        values.partial_cmp(&other.values)
     }
 }
 
@@ -1641,11 +1674,12 @@ where
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.keys.cmp(&other.keys) {
+        let Self { keys, values } = self;
+        match keys.cmp(&other.keys) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.values.cmp(&other.values)
+        values.cmp(&other.values)
     }
 }
 
@@ -1655,8 +1689,9 @@ where
     V::SliceMutPtrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.keys.hash(state);
-        self.values.hash(state);
+        let Self { keys, values } = self;
+        keys.hash(state);
+        values.hash(state);
     }
 }
 
@@ -1666,10 +1701,9 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            keys: self.keys,
-            values: self.values.clone(),
-        }
+        let Self { keys, ref values } = *self;
+        let values = values.clone();
+        Self { keys, values }
     }
 }
 
@@ -1722,9 +1756,10 @@ where
     V::Slices<'context, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { keys, values } = self;
         f.debug_struct("KeyValueSlices")
-            .field("keys", &self.keys)
-            .field("values", &self.values)
+            .field("keys", keys)
+            .field("values", values)
             .finish()
     }
 }
@@ -1751,7 +1786,8 @@ where
     V::Slices<'context, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.keys == other.keys && self.values == other.values
+        let Self { keys, values } = self;
+        *keys == other.keys && *values == other.values
     }
 }
 
@@ -1770,11 +1806,12 @@ where
     V::Slices<'context, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.keys.partial_cmp(&other.keys) {
+        let Self { keys, values } = self;
+        match keys.partial_cmp(&other.keys) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.values.partial_cmp(&other.values)
+        values.partial_cmp(&other.values)
     }
 }
 
@@ -1785,11 +1822,12 @@ where
     V::Slices<'context, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.keys.cmp(&other.keys) {
+        let Self { keys, values } = self;
+        match keys.cmp(&other.keys) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.values.cmp(&other.values)
+        values.cmp(&other.values)
     }
 }
 
@@ -1800,8 +1838,9 @@ where
     V::Slices<'context, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.keys.hash(state);
-        self.values.hash(state);
+        let Self { keys, values } = self;
+        keys.hash(state);
+        values.hash(state);
     }
 }
 
@@ -1813,10 +1852,9 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            keys: self.keys,
-            values: self.values.clone(),
-        }
+        let Self { keys, ref values } = *self;
+        let values = values.clone();
+        Self { keys, values }
     }
 }
 
@@ -1870,9 +1908,10 @@ where
     V::SlicesMut<'context, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { keys, values } = self;
         f.debug_struct("KeyValueSlicesMut")
-            .field("keys", &self.keys)
-            .field("values", &self.values)
+            .field("keys", keys)
+            .field("values", values)
             .finish()
     }
 }
@@ -1899,7 +1938,8 @@ where
     V::SlicesMut<'context, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.keys == other.keys && self.values == other.values
+        let Self { keys, values } = self;
+        *keys == other.keys && *values == other.values
     }
 }
 
@@ -1918,11 +1958,12 @@ where
     V::SlicesMut<'context, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        match self.keys.partial_cmp(&other.keys) {
+        let Self { keys, values } = self;
+        match keys.partial_cmp(&other.keys) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.values.partial_cmp(&other.values)
+        values.partial_cmp(&other.values)
     }
 }
 
@@ -1933,11 +1974,12 @@ where
     V::SlicesMut<'context, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        match self.keys.cmp(&other.keys) {
+        let Self { keys, values } = self;
+        match keys.cmp(&other.keys) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.values.cmp(&other.values)
+        values.cmp(&other.values)
     }
 }
 
@@ -1948,7 +1990,8 @@ where
     V::SlicesMut<'context, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.keys.hash(state);
-        self.values.hash(state);
+        let Self { keys, values } = self;
+        keys.hash(state);
+        values.hash(state);
     }
 }

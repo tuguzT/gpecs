@@ -54,9 +54,10 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
+        let Self { inner } = self;
+
+        let inner = inner.clone();
+        Self { inner }
     }
 }
 
@@ -268,9 +269,10 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
+        let Self { inner } = self;
+
+        let inner = inner.clone();
+        Self { inner }
     }
 }
 

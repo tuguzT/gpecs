@@ -168,7 +168,8 @@ impl ErasedFieldSlicePtrIter {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.end - self.start
+        let Self { start, end, .. } = *self;
+        end - start
     }
 
     #[inline]
@@ -186,19 +187,31 @@ impl ErasedFieldSlicePtrIter {
 
     #[inline]
     unsafe fn post_inc_start(&mut self, offset: usize) -> *mut u8 {
-        let count = self.start * self.desc.layout().size();
-        let ptr = unsafe { self.buffer.as_ptr().add(count) };
+        let Self {
+            buffer,
+            ref desc,
+            ref mut start,
+            ..
+        } = *self;
 
-        self.start += offset;
+        let count = *start * desc.layout().size();
+        let ptr = unsafe { buffer.as_ptr().add(count) };
+        *start += offset;
         ptr
     }
 
     #[inline]
     unsafe fn pre_dec_end(&mut self, offset: usize) -> *mut u8 {
-        self.end -= offset;
+        let Self {
+            buffer,
+            ref desc,
+            ref mut end,
+            ..
+        } = *self;
 
-        let count = self.end * self.desc.layout().size();
-        let ptr = unsafe { self.buffer.as_ptr().add(count) };
+        *end -= offset;
+        let count = *end * desc.layout().size();
+        let ptr = unsafe { buffer.as_ptr().add(count) };
         ptr
     }
 }
@@ -216,11 +229,17 @@ impl Debug for ErasedFieldSlicePtrIter {
 
 impl Clone for ErasedFieldSlicePtrIter {
     fn clone(&self) -> Self {
+        let Self {
+            desc,
+            buffer,
+            start,
+            end,
+        } = *self;
         Self {
-            desc: self.desc.clone(),
-            buffer: self.buffer.clone(),
-            start: self.start.clone(),
-            end: self.end.clone(),
+            desc,
+            buffer,
+            start,
+            end,
         }
     }
 }
@@ -235,15 +254,16 @@ impl<'a> Iterator for ErasedFieldSlicePtrIter {
             return None;
         }
 
+        let Self { desc, .. } = *self;
         let ptr = unsafe { self.post_inc_start(1) };
-        let buffer = ptr::slice_from_raw_parts(ptr, self.desc.layout().size());
-        let ptr = unsafe { ErasedFieldPtr::new_unchecked(self.desc, buffer) };
+        let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
+        let ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
         Some(ptr)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.len();
+        let len = ErasedFieldSlicePtrIter::len(self);
         (len, Some(len))
     }
 
@@ -252,12 +272,12 @@ impl<'a> Iterator for ErasedFieldSlicePtrIter {
     where
         Self: Sized,
     {
-        self.len()
+        ErasedFieldSlicePtrIter::len(&self)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= self.len() {
+        if n >= ErasedFieldSlicePtrIter::len(self) {
             self.start = self.end;
             return None;
         }
@@ -281,6 +301,10 @@ impl<'a> Iterator for ErasedFieldSlicePtrIter {
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
+        if ErasedFieldSlicePtrIter::is_empty(&self) {
+            return init;
+        }
+
         // this implementation consists of the following optimizations compared to the
         // default implementation:
         // - do-while loop, as is llvm's preferred loop shape,
@@ -288,20 +312,18 @@ impl<'a> Iterator for ErasedFieldSlicePtrIter {
         // - bumps an index instead of a pointer since the latter case inhibits
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
-        if ErasedFieldSlicePtrIter::is_empty(&self) {
-            return init;
-        }
+        let Self { desc, buffer, .. } = self;
+        let len = ErasedFieldSlicePtrIter::len(&self);
+        let ptr = buffer.as_ptr();
         let mut acc = init;
         let mut i = 0;
-        let len = self.len();
-        let ptr = self.buffer.as_ptr();
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
             let item = unsafe {
-                let data = ptr.add(i * self.desc.layout().size());
-                let buffer = ptr::slice_from_raw_parts(data, self.desc.layout().size());
-                ErasedFieldPtr::new_unchecked(self.desc, buffer)
+                let data = ptr.add(i * desc.layout().size());
+                let buffer = ptr::slice_from_raw_parts(data, desc.layout().size());
+                ErasedFieldPtr::new_unchecked(desc, buffer)
             };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
@@ -388,7 +410,7 @@ impl<'a> Iterator for ErasedFieldSlicePtrIter {
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = self.len();
+        let n = ErasedFieldSlicePtrIter::len(self);
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -406,7 +428,7 @@ impl<'a> Iterator for ErasedFieldSlicePtrIter {
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = self.len();
+        let n = ErasedFieldSlicePtrIter::len(self);
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -426,15 +448,16 @@ impl DoubleEndedIterator for ErasedFieldSlicePtrIter {
             return None;
         }
 
+        let Self { desc, .. } = *self;
         let ptr = unsafe { self.pre_dec_end(1) };
-        let buffer = ptr::slice_from_raw_parts(ptr, self.desc.layout().size());
-        let ptr = unsafe { ErasedFieldPtr::new_unchecked(self.desc, buffer) };
+        let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
+        let ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
         Some(ptr)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= self.len() {
+        if n >= ErasedFieldSlicePtrIter::len(self) {
             self.end = self.start;
             return None;
         }

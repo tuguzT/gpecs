@@ -373,9 +373,6 @@ where
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let capacity = self.capacity();
-        state.write_usize(capacity);
-
         let slices = self.as_slices();
         slices.hash(state);
     }

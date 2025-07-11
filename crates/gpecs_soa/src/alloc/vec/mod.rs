@@ -967,26 +967,26 @@ where
     }
 }
 
-impl<'me, T> From<&'me SoaSlice<T>> for SoaVec<T>
+impl<T> From<&SoaSlice<T>> for SoaVec<T>
 where
     T: SoaTrustedFields,
     T::Context: Clone,
-    T::Refs<'me, 'me>: SoaToOwned<'me, 'me, Owned = T>,
+    for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
     #[inline]
-    fn from(value: &'me SoaSlice<T>) -> Self {
+    fn from(value: &SoaSlice<T>) -> Self {
         value.to_vec()
     }
 }
 
-impl<'me, T> From<&'me mut SoaSlice<T>> for SoaVec<T>
+impl<T> From<&mut SoaSlice<T>> for SoaVec<T>
 where
     T: SoaTrustedFields,
     T::Context: Clone,
-    T::Refs<'me, 'me>: SoaToOwned<'me, 'me, Owned = T>,
+    for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
     #[inline]
-    fn from(value: &'me mut SoaSlice<T>) -> Self {
+    fn from(value: &mut SoaSlice<T>) -> Self {
         value.to_vec()
     }
 }

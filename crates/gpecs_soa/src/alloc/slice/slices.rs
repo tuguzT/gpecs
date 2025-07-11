@@ -15,7 +15,7 @@ where
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
-        T::Refs<'c, 'a>: SoaToOwned<'c, 'a, Owned = T>,
+        for<'ca, 'any> T::Refs<'ca, 'any>: SoaToOwned<'ca, 'any, Owned = T>,
         T::Context: Clone,
     {
         let len = self.len();
@@ -54,7 +54,7 @@ where
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
-        T::Refs<'c, 'a>: SoaToOwned<'c, 'a, Owned = T>,
+        for<'ca, 'any> T::Refs<'ca, 'any>: SoaToOwned<'ca, 'any, Owned = T>,
         T::Context: Clone,
     {
         let len = self.len();

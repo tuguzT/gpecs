@@ -2,7 +2,7 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::{ManuallyDrop, transmute},
-    ptr::{self, NonNull},
+    ptr::NonNull,
 };
 
 use crate::{
@@ -46,7 +46,8 @@ where
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.end - self.start
+        let Self { start, end, .. } = *self;
+        end - start
     }
 
     #[inline]
@@ -56,7 +57,8 @@ where
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        unsafe { Self::context_of(self.buffer) }
+        let Self { buffer, .. } = *self;
+        unsafe { Self::context_of(buffer) }
     }
 
     #[inline]
@@ -67,12 +69,13 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_, '_> {
+        let Self { start, .. } = *self;
         let context = self.context();
         let ptrs = T::ptrs_cast_const(context, self.ptrs());
         let len = self.len();
 
         unsafe {
-            let ptrs = T::ptrs_add(context, ptrs, self.start);
+            let ptrs = T::ptrs_add(context, ptrs, start);
             let slices = T::slices_from_raw_parts(context, ptrs, len);
             T::slice_ptrs_to_slices(context, slices)
         }
@@ -80,12 +83,13 @@ where
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_, '_> {
+        let Self { start, .. } = *self;
         let context = self.context();
         let ptrs = self.ptrs();
         let len = self.len();
 
         unsafe {
-            let ptrs = T::ptrs_add_mut(context, ptrs, self.start);
+            let ptrs = T::ptrs_add_mut(context, ptrs, start);
             let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
             T::slice_mut_ptrs_to_slices(context, slices)
         }
@@ -93,8 +97,9 @@ where
 
     #[inline]
     fn ptrs(&self) -> T::MutPtrs<'_> {
+        let Self { ptrs, .. } = self;
         let context = self.context();
-        let ptrs = self.ptrs.clone().into_inner();
+        let ptrs = ptrs.clone().into_inner();
         T::nonnull_to_ptrs(context, ptrs)
     }
 
@@ -187,26 +192,33 @@ where
             T: Soa,
         {
             fn drop(&mut self) {
+                let &mut Self(&mut IntoIter {
+                    buffer, capacity, ..
+                }) = self;
                 unsafe {
                     // `IntoIter::alloc` is not used anymore after this and will be dropped by RawVec
                     // let alloc = ManuallyDrop::take(&mut self.0.alloc);
+
                     // RawVec handles deallocation
-                    let _ = RawSoaVec::<T>::from_nonnull(self.0.buffer, self.0.capacity);
+                    let _ = RawSoaVec::<T>::from_nonnull(buffer, capacity);
                 }
             }
         }
 
-        let guard = DropGuard(self);
+        let mut guard = DropGuard(self);
 
         // destroy the remaining elements
-        if IntoIter::is_empty(guard.0) {
+        let DropGuard(iter) = &mut guard;
+        if IntoIter::is_empty(iter) {
             return;
         }
 
-        let context = ptr::from_ref(guard.0.context());
-        let slices = guard.0.as_mut_slices();
-        let slices = T::slices_mut_as_slice_ptrs(unsafe { &*context }, slices);
-        unsafe { T::slices_drop_in_place(&*context, slices) }
+        let &mut &mut Self { buffer, .. } = iter;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let slices = iter.as_mut_slices();
+        let slices = T::slices_mut_as_slice_ptrs(context, slices);
+        unsafe { T::slices_drop_in_place(context, slices) }
         // now `guard` will be dropped and do the rest
     }
 }
@@ -224,19 +236,25 @@ where
             return None;
         }
 
-        unsafe {
-            let context = Self::context_of(self.buffer);
-            let ptrs = self.ptrs.clone().into_inner();
-            let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
-            let ptrs = Self::post_inc_start(&mut self.start, ptrs, context, 1);
-            let item = T::ptrs_read(context, ptrs);
-            Some(item)
-        }
+        let Self {
+            buffer,
+            ref ptrs,
+            ref mut start,
+            ..
+        } = *self;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
+        let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
+
+        let item = unsafe { T::ptrs_read(context, ptrs) };
+        Some(item)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.len();
+        let len = IntoIter::len(self);
         (len, Some(len))
     }
 
@@ -245,7 +263,7 @@ where
     where
         Self: Sized,
     {
-        self.len()
+        IntoIter::len(&self)
     }
 
     #[inline]
@@ -255,11 +273,18 @@ where
             return None;
         }
 
+        let Self {
+            buffer,
+            ref ptrs,
+            ref mut start,
+            ..
+        } = *self;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
         unsafe {
-            let context = Self::context_of(self.buffer);
-            let ptrs = self.ptrs.clone().into_inner();
-            let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
-            Self::post_inc_start(&mut self.start, ptrs, context, n);
+            Self::post_inc_start(start, ptrs, context, n);
         }
         self.next()
     }
@@ -277,6 +302,10 @@ where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
+        if IntoIter::is_empty(&self) {
+            return init;
+        }
+
         // this implementation consists of the following optimizations compared to the
         // default implementation:
         // - do-while loop, as is llvm's preferred loop shape,
@@ -284,17 +313,15 @@ where
         // - bumps an index instead of a pointer since the latter case inhibits
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
-        if IntoIter::is_empty(&self) {
-            return init;
-        }
+        let len = self.len();
+        let ptrs = self.ptrs();
+        let context = self.context();
         let mut acc = init;
         let mut i = 0;
-        let len = self.len();
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
-            let context = self.context();
-            let ptrs = T::ptrs_cast_const(context, self.ptrs());
+            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
             let item = unsafe {
                 let ptrs = T::ptrs_add(context, ptrs, i);
                 T::ptrs_read(context, ptrs)
@@ -384,7 +411,7 @@ where
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = self.len();
+        let n = IntoIter::len(self);
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -402,7 +429,7 @@ where
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = self.len();
+        let n = IntoIter::len(self);
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -425,14 +452,20 @@ where
             return None;
         }
 
-        unsafe {
-            let context = Self::context_of(self.buffer);
-            let ptrs = self.ptrs.clone().into_inner();
-            let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
-            let ptrs = Self::pre_dec_end(&mut self.end, ptrs, context, 1);
-            let item = T::ptrs_read(context, ptrs);
-            Some(item)
-        }
+        let Self {
+            buffer,
+            ref ptrs,
+            ref mut end,
+            ..
+        } = *self;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
+        let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
+
+        let item = unsafe { T::ptrs_read(context, ptrs) };
+        Some(item)
     }
 
     #[inline]
@@ -442,11 +475,18 @@ where
             return None;
         }
 
+        let Self {
+            buffer,
+            ref ptrs,
+            ref mut end,
+            ..
+        } = *self;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
         unsafe {
-            let context = Self::context_of(self.buffer);
-            let ptrs = self.ptrs.clone().into_inner();
-            let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
-            Self::pre_dec_end(&mut self.end, ptrs, context, n);
+            Self::pre_dec_end(end, ptrs, context, n);
         }
         self.next_back()
     }

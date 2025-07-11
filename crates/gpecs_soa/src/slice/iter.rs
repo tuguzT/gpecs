@@ -38,7 +38,8 @@ where
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.end - self.start
+        let Self { start, end, .. } = *self;
+        end - start
     }
 
     #[inline]
@@ -48,24 +49,25 @@ where
 
     #[inline]
     pub fn context(&self) -> &'c T::Context {
-        self.context
+        let Self { context, .. } = *self;
+        context
     }
 
     fn ptrs(&self) -> T::Ptrs<'c> {
-        let context = self.context();
-        let ptrs = self.ptrs.clone().into_inner();
+        let Self { context, ptrs, .. } = self;
+        let ptrs = ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         T::ptrs_cast_const(context, ptrs)
     }
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'c, 'a> {
-        let context = self.context();
+        let Self { context, start, .. } = *self;
         let ptrs = self.ptrs();
         let len = self.len();
 
         unsafe {
-            let ptrs = T::ptrs_add(context, ptrs, self.start);
+            let ptrs = T::ptrs_add(context, ptrs, start);
             let slices = T::slices_from_raw_parts(context, ptrs, len);
             T::slice_ptrs_to_slices(context, slices)
         }
@@ -170,10 +172,15 @@ where
             return None;
         }
 
-        let context = self.context;
-        let ptrs = self.ptrs.clone().into_inner();
+        let Self {
+            context,
+            ref ptrs,
+            ref mut start,
+            ..
+        } = *self;
+        let ptrs = ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
-        let ptrs = unsafe { Self::post_inc_start(&mut self.start, ptrs, context, 1) };
+        let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
         let ptrs = T::ptrs_cast_const(context, ptrs);
 
         let refs = unsafe { T::ptrs_to_refs(context, ptrs) };
@@ -182,7 +189,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.len();
+        let len = Iter::len(self);
         (len, Some(len))
     }
 
@@ -191,7 +198,7 @@ where
     where
         Self: Sized,
     {
-        self.len()
+        Iter::len(&self)
     }
 
     #[inline]
@@ -201,11 +208,16 @@ where
             return None;
         }
 
+        let Self {
+            context,
+            ref ptrs,
+            ref mut start,
+            ..
+        } = *self;
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = T::nonnull_to_ptrs(context, ptrs);
         unsafe {
-            let context = self.context;
-            let ptrs = self.ptrs.clone().into_inner();
-            let ptrs = T::nonnull_to_ptrs(context, ptrs);
-            Self::post_inc_start(&mut self.start, ptrs, context, n);
+            Self::post_inc_start(start, ptrs, context, n);
         }
         self.next()
     }
@@ -223,6 +235,10 @@ where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
+        if Iter::is_empty(&self) {
+            return init;
+        }
+
         // this implementation consists of the following optimizations compared to the
         // default implementation:
         // - do-while loop, as is llvm's preferred loop shape,
@@ -230,18 +246,15 @@ where
         // - bumps an index instead of a pointer since the latter case inhibits
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
-        if Iter::is_empty(&self) {
-            return init;
-        }
+        let Self { context, ptrs, .. } = &self;
+        let len = Iter::len(&self);
         let mut acc = init;
         let mut i = 0;
-        let len = self.len();
-        let context = self.context;
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
             let ptrs = {
-                let ptrs = self.ptrs.clone().into_inner();
+                let ptrs = ptrs.clone().into_inner();
                 let ptrs = T::nonnull_to_ptrs(context, ptrs);
                 T::ptrs_cast_const(context, ptrs)
             };
@@ -334,7 +347,7 @@ where
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = self.len();
+        let n = Iter::len(self);
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -352,7 +365,7 @@ where
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = self.len();
+        let n = Iter::len(self);
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -375,10 +388,15 @@ where
             return None;
         }
 
-        let context = self.context;
-        let ptrs = self.ptrs.clone().into_inner();
+        let Self {
+            context,
+            ref ptrs,
+            ref mut end,
+            ..
+        } = *self;
+        let ptrs = ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
-        let ptrs = unsafe { Self::pre_dec_end(&mut self.end, ptrs, context, 1) };
+        let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
         let ptrs = T::ptrs_cast_const(context, ptrs);
 
         let refs = unsafe { T::ptrs_to_refs(context, ptrs) };
@@ -387,16 +405,21 @@ where
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= self.len() {
+        if n >= Iter::len(self) {
             self.end = self.start;
             return None;
         }
 
+        let Self {
+            context,
+            ref ptrs,
+            ref mut end,
+            ..
+        } = *self;
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = T::nonnull_to_ptrs(context, ptrs);
         unsafe {
-            let context = self.context;
-            let ptrs = self.ptrs.clone().into_inner();
-            let ptrs = T::nonnull_to_ptrs(context, ptrs);
-            Self::pre_dec_end(&mut self.end, ptrs, context, n);
+            Self::pre_dec_end(end, ptrs, context, n);
         }
         self.next_back()
     }
@@ -444,7 +467,8 @@ where
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.end - self.start
+        let Self { start, end, .. } = *self;
+        end - start
     }
 
     #[inline]
@@ -454,20 +478,21 @@ where
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        self.context
+        let Self { context, .. } = *self;
+        context
     }
 
     fn ptrs(&self) -> T::MutPtrs<'_> {
-        let context = self.context();
-        let ptrs = self.ptrs.clone().into_inner();
+        let Self { context, ptrs, .. } = self;
+        let ptrs = ptrs.clone().into_inner();
         T::nonnull_to_ptrs(context, ptrs)
     }
 
     #[inline]
     pub fn into_slices(self) -> T::SlicesMut<'c, 'a> {
         let len = self.len();
-        let context = self.context;
-        let ptrs = self.ptrs.into_inner();
+        let Self { context, ptrs, .. } = self;
+        let ptrs = ptrs.into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
 
         unsafe {
@@ -479,12 +504,13 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_, '_> {
+        let Self { context, start, .. } = *self;
         let len = self.len();
-        let context = self.context();
-        let ptrs = T::ptrs_cast_const(context, self.ptrs());
+        let ptrs = self.ptrs();
+        let ptrs = T::ptrs_cast_const(context, ptrs);
 
         unsafe {
-            let ptrs = T::ptrs_add(context, ptrs, self.start);
+            let ptrs = T::ptrs_add(context, ptrs, start);
             let slices = T::slices_from_raw_parts(context, ptrs, len);
             T::slice_ptrs_to_slices(context, slices)
         }
@@ -566,10 +592,15 @@ where
             return None;
         }
 
-        let context = self.context;
-        let ptrs = self.ptrs.clone().into_inner();
+        let Self {
+            context,
+            ref ptrs,
+            ref mut start,
+            ..
+        } = *self;
+        let ptrs = ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
-        let ptrs = unsafe { Self::post_inc_start(&mut self.start, ptrs, context, 1) };
+        let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
 
         let refs = unsafe { T::ptrs_to_refs_mut(context, ptrs) };
         Some(refs)
@@ -577,7 +608,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.len();
+        let len = IterMut::len(self);
         (len, Some(len))
     }
 
@@ -586,7 +617,7 @@ where
     where
         Self: Sized,
     {
-        self.len()
+        IterMut::len(&self)
     }
 
     #[inline]
@@ -596,11 +627,16 @@ where
             return None;
         }
 
+        let Self {
+            context,
+            ref ptrs,
+            ref mut start,
+            ..
+        } = *self;
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = T::nonnull_to_ptrs(context, ptrs);
         unsafe {
-            let context = self.context;
-            let ptrs = self.ptrs.clone().into_inner();
-            let ptrs = T::nonnull_to_ptrs(context, ptrs);
-            Self::post_inc_start(&mut self.start, ptrs, context, n);
+            Self::post_inc_start(start, ptrs, context, n);
         }
         self.next()
     }
@@ -618,6 +654,10 @@ where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
+        if IterMut::is_empty(&self) {
+            return init;
+        }
+
         // this implementation consists of the following optimizations compared to the
         // default implementation:
         // - do-while loop, as is llvm's preferred loop shape,
@@ -625,17 +665,14 @@ where
         // - bumps an index instead of a pointer since the latter case inhibits
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
-        if IterMut::is_empty(&self) {
-            return init;
-        }
+        let Self { context, ptrs, .. } = &self;
+        let len = IterMut::len(&self);
         let mut acc = init;
         let mut i = 0;
-        let len = self.len();
-        let context = self.context;
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
-            let ptrs = self.ptrs.clone().into_inner();
+            let ptrs = ptrs.clone().into_inner();
             let ptrs = T::nonnull_to_ptrs(context, ptrs);
             let item = unsafe {
                 let ptrs = T::ptrs_add_mut(context, ptrs, i);
@@ -726,7 +763,7 @@ where
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = self.len();
+        let n = IterMut::len(self);
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -744,7 +781,7 @@ where
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = self.len();
+        let n = IterMut::len(self);
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -767,10 +804,15 @@ where
             return None;
         }
 
-        let context = self.context;
-        let ptrs = self.ptrs.clone().into_inner();
+        let Self {
+            context,
+            ref ptrs,
+            ref mut end,
+            ..
+        } = *self;
+        let ptrs = ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
-        let ptrs = unsafe { Self::pre_dec_end(&mut self.end, ptrs, context, 1) };
+        let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
 
         let refs = unsafe { T::ptrs_to_refs_mut(context, ptrs) };
         Some(refs)
@@ -783,11 +825,16 @@ where
             return None;
         }
 
+        let Self {
+            context,
+            ref ptrs,
+            ref mut end,
+            ..
+        } = *self;
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = T::nonnull_to_ptrs(context, ptrs);
         unsafe {
-            let context = self.context;
-            let ptrs = self.ptrs.clone().into_inner();
-            let ptrs = T::nonnull_to_ptrs(context, ptrs);
-            Self::pre_dec_end(&mut self.end, ptrs, context, n);
+            Self::pre_dec_end(end, ptrs, context, n);
         }
         self.next_back()
     }

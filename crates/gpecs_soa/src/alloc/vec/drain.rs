@@ -70,12 +70,14 @@ where
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        self.iter.context()
+        let Self { iter, .. } = self;
+        iter.context()
     }
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_, '_> {
-        self.iter.as_slices()
+        let Self { iter, .. } = self;
+        iter.as_slices()
     }
 }
 
@@ -123,8 +125,10 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let context = ptr::from_ref(self.iter.context());
-        self.iter.next().map(|refs| unsafe {
+        let Self { iter, .. } = self;
+
+        let context = ptr::from_ref(iter.context());
+        iter.next().map(|refs| unsafe {
             let context = &*context;
             T::ptrs_read(context, T::refs_as_ptrs(context, refs))
         })
@@ -132,7 +136,8 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.iter.size_hint()
+        let Self { iter, .. } = self;
+        iter.size_hint()
     }
 }
 
@@ -142,8 +147,10 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let context = ptr::from_ref(self.iter.context());
-        self.iter.next_back().map(|refs| unsafe {
+        let Self { iter, .. } = self;
+
+        let context = ptr::from_ref(iter.context());
+        iter.next_back().map(|refs| unsafe {
             let context = &*context;
             T::ptrs_read(context, T::refs_as_ptrs(context, refs))
         })
@@ -156,7 +163,8 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        self.iter.len()
+        let Self { iter, .. } = self;
+        iter.len()
     }
 }
 
@@ -177,14 +185,20 @@ where
             T: Soa,
         {
             fn drop(&mut self) {
-                if self.0.tail_len == 0 {
+                let &mut Self(&mut Drain {
+                    tail_start,
+                    tail_len,
+                    mut vec,
+                    ..
+                }) = self;
+                if tail_len == 0 {
                     return;
                 }
                 unsafe {
-                    let source_vec = self.0.vec.as_mut();
+                    let source_vec = vec.as_mut();
                     // memory-move back untouched tail, update to new length
                     let start = source_vec.len();
-                    let tail = self.0.tail_start;
+                    let tail = tail_start;
                     if tail != start {
                         let src = source_vec.as_ptrs();
                         let dst = source_vec.buffer.ptrs();
@@ -192,15 +206,20 @@ where
 
                         let src = T::ptrs_add(context, src, tail);
                         let dst = T::ptrs_add_mut(context, dst, start);
-                        T::ptrs_copy(context, src, dst, self.0.tail_len);
+                        T::ptrs_copy(context, src, dst, tail_len);
                     }
-                    source_vec.set_len(start + self.0.tail_len);
+                    source_vec.set_len(start + tail_len);
                 }
             }
         }
 
-        let drop_len = self.iter.len();
-        let mut vec = self.vec;
+        let Self {
+            ref iter,
+            tail_len,
+            mut vec,
+            ..
+        } = *self;
+        let drop_len = iter.len();
 
         let context = unsafe { vec.as_ref() }.context();
         if is_zst::<T>(context) {
@@ -209,8 +228,8 @@ where
             unsafe {
                 let vec = vec.as_mut();
                 let old_len = vec.len();
-                vec.set_len(old_len + drop_len + self.tail_len);
-                vec.truncate(old_len + self.tail_len);
+                vec.set_len(old_len + drop_len + tail_len);
+                vec.truncate(old_len + tail_len);
             }
 
             return;

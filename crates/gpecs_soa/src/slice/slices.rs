@@ -359,9 +359,6 @@ where
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let len = self.len();
-        state.write_usize(len);
-
         let slices = self.as_slices();
         slices.hash(state);
     }
@@ -922,11 +919,9 @@ where
         // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
         // checked to have the same length. The slices cannot overlap because
         // mutable references are exclusive.
-        unsafe {
-            let dst = self.ptrs.clone().into_inner();
-            let context = self.context;
-            T::ptrs_copy_nonoverlapping(context, src.as_ptrs(), dst, len);
-        }
+        let Self { context, ptrs, .. } = self;
+        let dst = ptrs.clone().into_inner();
+        unsafe { T::ptrs_copy_nonoverlapping(context, src.as_ptrs(), dst, len) }
     }
 
     #[inline]
@@ -1169,9 +1164,6 @@ where
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let len = self.len();
-        state.write_usize(len);
-
         let slices = self.as_slices();
         slices.hash(state);
     }

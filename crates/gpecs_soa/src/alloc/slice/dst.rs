@@ -1,4 +1,4 @@
-use core::{cmp, ptr::NonNull};
+use core::{cmp, ptr};
 use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
@@ -23,7 +23,7 @@ where
     #[inline]
     pub fn to_vec<'me>(&'me self) -> SoaVec<T>
     where
-        T::Refs<'me, 'me>: SoaToOwned<'me, 'me, Owned = T>,
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
         T::Context: Clone,
     {
         self.slices().to_vec()
@@ -132,7 +132,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
+        let data = ptr::dangling_mut::<BufferData<T>>();
         unsafe { Box::from_raw(slice_from_raw_parts_mut(data, 0, 0)) }
     }
 }

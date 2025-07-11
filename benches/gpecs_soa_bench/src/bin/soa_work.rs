@@ -19,9 +19,13 @@ where
 }
 
 fn main() {
-    let large = work::<Large>(100_000);
-    println!("Result of work for `Large` is {large:?}");
+    const COUNT: usize = 1_000_000;
 
-    let large_erased = work_erased::<Large>(100_000);
-    println!("Result of work for erased `Large` is {large_erased:?}");
+    let work = work::<Large>(COUNT);
+    println!("result of work for `Large` is {work:?}");
+
+    let work_erased = work_erased::<Large>(COUNT);
+    println!("result of work for erased `Large` is {work_erased:?}");
+
+    assert_eq!(work, work_erased, "results should match");
 }

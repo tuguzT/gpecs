@@ -285,7 +285,7 @@ fn slices_one_item() {
 
     let slices = Slices::new(&context, (&u8s, &u64s, &u16s, &units));
     assert_eq!(slices.len(), 1);
-    assert!(slices.contains_by_refs((&1, &2, &3, &())));
+    assert!(slices.contains(&(&1, &2, &3, &())));
 
     assert_eq!(
         slices.as_slices(),
@@ -330,12 +330,12 @@ fn slices_one_item() {
         ),
     );
     assert_eq!(slices_mut.index_mut(0), (&mut 1, &mut 2, &mut 3, &mut ()));
-    assert!(slices_mut.contains_by_refs((&1, &2, &3, &())));
+    assert!(slices_mut.contains(&(&1, &2, &3, &())));
 
     slices_mut.copy_from_slices(Slices::new(&context, (&[0], &[0], &[0], &[()])));
     assert_eq!(slices_mut.len(), 1);
     assert_eq!(slices_mut.index_mut(0), (&mut 0, &mut 0, &mut 0, &mut ()));
-    assert!(!slices_mut.contains_by_refs((&1, &2, &3, &())));
+    assert!(!slices_mut.contains(&(&1, &2, &3, &())));
     assert_eq!(
         slices_mut.as_mut_slices(),
         (
@@ -384,7 +384,7 @@ fn vec_one_item() {
     vec.push((1, 2, 3, ()));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
-    assert!(vec.contains_by_refs((&1, &2, &3, &())));
+    assert!(vec.contains(&(&1, &2, &3, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -525,7 +525,7 @@ fn slices_one_item_zst() {
 
     let slices = Slices::new(&context, (&zst1s, &zst2s, &zst3s));
     assert_eq!(slices.len(), 1);
-    assert!(slices.contains_by_refs((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert!(slices.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     assert_eq!(
         slices.as_slices(),
@@ -561,7 +561,7 @@ fn slices_one_item_zst() {
         slices_mut.index_mut(0),
         (&mut ZST1, &mut ZST2(()), &mut ZST3 { empty: () }),
     );
-    assert!(slices_mut.contains_by_refs((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert!(slices_mut.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     slices_mut.copy_from_slices(Slices::new(
         &context,
@@ -617,7 +617,7 @@ fn vec_one_item_zst() {
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
-    assert!(vec.contains_by_refs((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert!(vec.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -904,7 +904,7 @@ fn vec_three_items() {
     let mut vec = Vec::from_iter(iter::repeat((0, "0".to_owned(), 0, ())).take(3));
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains_by_refs((&0, &"0".to_owned(), &0, &())));
+    assert!(vec.contains(&(&0, &"0".to_owned(), &0, &())));
 
     assert_eq!(
         format!("{vec:?}"),
@@ -918,7 +918,7 @@ fn vec_three_items() {
 
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains_by_refs((&4, &"5".to_owned(), &6, &())));
+    assert!(vec.contains(&(&4, &"5".to_owned(), &6, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -1066,7 +1066,7 @@ fn vec_three_items() {
     assert_eq!((t, u, v, w), (8, "8".to_owned(), 9, ()));
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains_by_refs((&8, &"8".to_owned(), &9, &())));
+    assert!(!vec.contains(&(&8, &"8".to_owned(), &9, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -1077,7 +1077,7 @@ fn vec_three_items() {
     assert_eq!((t, u, v, w), (2, "2".to_owned(), 3, ()));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains_by_refs((&2, &"2".to_owned(), &3, &())));
+    assert!(!vec.contains(&(&2, &"2".to_owned(), &3, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -1088,7 +1088,7 @@ fn vec_three_items() {
     assert_eq!((t, u, v, w), (5, "5".to_owned(), 6, ()));
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains_by_refs((&5, &"5".to_owned(), &6, &())));
+    assert!(!vec.contains(&(&5, &"5".to_owned(), &6, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -1383,7 +1383,7 @@ fn vec_three_items_zst() {
     let vec = Vec::from_iter([(ZST1, ZST2(()), ZST3 { empty: () }); 3]);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains_by_refs((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert!(vec.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -1554,7 +1554,7 @@ fn vec_three_items_zst() {
     vec.clear();
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains_by_refs((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert!(!vec.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();

@@ -255,21 +255,12 @@ where
     }
 
     #[inline]
-    pub fn contains(&self, value: &T) -> bool
+    pub fn contains<'me, V>(&'me self, value: &V) -> bool
     where
-        T::Refs<'c, 'a>: PartialEq<T>,
+        T::Refs<'me, 'me>: PartialEq<V>,
     {
-        let mut iter = self.clone().into_iter();
-        iter.any(|item| item == *value)
-    }
-
-    #[inline]
-    pub fn contains_by_refs<'cr, 'r>(&self, refs: T::Refs<'cr, 'r>) -> bool
-    where
-        T::Refs<'c, 'a>: PartialEq<T::Refs<'cr, 'r>>,
-    {
-        let mut iter = self.clone().into_iter();
-        iter.any(|item| item == refs)
+        let mut iter = self.into_iter();
+        iter.any(|item| item.eq(value))
     }
 }
 
@@ -888,25 +879,12 @@ where
     }
 
     #[inline]
-    pub fn contains(&self, value: &T) -> bool
+    pub fn contains<'me, V>(&'me self, value: &V) -> bool
     where
-        T::Refs<'c, 'a>: PartialEq<T>,
+        T::Refs<'me, 'me>: PartialEq<V>,
     {
-        let (context, ptrs, len) = unsafe { self.as_parts() };
-        let ptrs = T::ptrs_cast_const(context, ptrs.clone());
-        let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
-        slices.contains(value)
-    }
-
-    #[inline]
-    pub fn contains_by_refs<'cr, 'r>(&self, refs: T::Refs<'cr, 'r>) -> bool
-    where
-        T::Refs<'c, 'a>: PartialEq<T::Refs<'cr, 'r>>,
-    {
-        let (context, ptrs, len) = unsafe { self.as_parts() };
-        let ptrs = T::ptrs_cast_const(context, ptrs.clone());
-        let slices = unsafe { SoaSlices::<T>::from_parts(context, ptrs, len) };
-        slices.contains_by_refs(refs)
+        let mut iter = self.into_iter();
+        iter.any(|item| item.eq(value))
     }
 
     #[inline]

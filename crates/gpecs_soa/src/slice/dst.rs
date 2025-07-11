@@ -136,19 +136,12 @@ where
     }
 
     #[inline]
-    pub fn contains<'me>(&'me self, value: &T) -> bool
+    pub fn contains<'me, V>(&'me self, value: &V) -> bool
     where
-        T::Refs<'me, 'me>: PartialEq<T>,
+        T::Refs<'me, 'me>: PartialEq<V>,
     {
-        self.slices().contains(value)
-    }
-
-    #[inline]
-    pub fn contains_by_refs<'me, 'c, 'r>(&'me self, refs: T::Refs<'c, 'r>) -> bool
-    where
-        T::Refs<'me, 'me>: PartialEq<T::Refs<'c, 'r>>,
-    {
-        self.slices().contains_by_refs(refs)
+        let mut iter = self.into_iter();
+        iter.any(|item| item.eq(value))
     }
 
     #[inline]

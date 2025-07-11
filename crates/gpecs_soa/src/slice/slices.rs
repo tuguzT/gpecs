@@ -70,7 +70,7 @@ where
             ..
         } = *self;
 
-        let slices = T::slices_from_raw_parts(context, ptrs.as_inner().clone(), len);
+        let slices = T::slices_from_raw_parts(context, ptrs.clone().into_inner(), len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -95,7 +95,7 @@ where
     #[inline]
     pub fn as_ptrs(&self) -> T::Ptrs<'_> {
         let Self { ptrs, .. } = self;
-        ptrs.as_inner().clone()
+        ptrs.clone().into_inner()
     }
 
     #[inline]
@@ -514,7 +514,7 @@ where
             ..
         } = *self;
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs.as_inner().clone(), len);
+        let slices = T::slices_from_raw_parts_mut(context, ptrs.clone().into_inner(), len);
         let slices = T::slice_ptrs_cast_const(context, slices);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
@@ -535,7 +535,7 @@ where
             ..
         } = *self;
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs.as_inner().clone(), len);
+        let slices = T::slices_from_raw_parts_mut(context, ptrs.clone().into_inner(), len);
         let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -562,13 +562,13 @@ where
         let Self {
             context, ref ptrs, ..
         } = *self;
-        T::ptrs_cast_const(context, ptrs.as_inner().clone())
+        T::ptrs_cast_const(context, ptrs.clone().into_inner())
     }
 
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> T::MutPtrs<'_> {
         let Self { ptrs, .. } = self;
-        ptrs.as_inner().clone()
+        ptrs.clone().into_inner()
     }
 
     #[inline]
@@ -579,7 +579,7 @@ where
             len,
             ..
         } = *self;
-        (context, ptrs.as_inner().clone(), len)
+        (context, ptrs.clone().into_inner(), len)
     }
 
     #[inline]
@@ -945,7 +945,7 @@ where
         // checked to have the same length. The slices cannot overlap because
         // mutable references are exclusive.
         unsafe {
-            let dst = self.ptrs.as_inner().clone();
+            let dst = self.ptrs.clone().into_inner();
             let context = self.context;
             T::ptrs_copy_nonoverlapping(context, src.as_ptrs(), dst, len);
         }

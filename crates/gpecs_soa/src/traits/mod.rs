@@ -38,6 +38,12 @@ pub unsafe trait Soa: Sized {
     /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
     type FieldDescriptors<'context>: IntoIterator<Item: AsRef<FieldDescriptor>>;
 
+    /// Restricts [field descriptors](Soa::FieldDescriptors)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short>;
+
     /// Returns [field descriptors](Soa::FieldDescriptors) for each field of [`Fields`](Soa::Fields).
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_>;
 
@@ -75,18 +81,22 @@ pub unsafe trait Soa: Sized {
     /// Unlike [field descriptors](Soa::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
-    ///
-    /// This type should be covariant over given lifetime.
     type Ptrs<'context>: Clone;
+
+    /// Restricts pointers to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
 
     /// Non-empty collection of mutable pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Unlike [field descriptors](Soa::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
-    ///
-    /// This type should be covariant over given lifetime.
     type MutPtrs<'context>: Clone;
+
+    /// Restricts mutable pointers to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
     /// Returns dangling pointers to each field of [`Fields`](Soa::Fields).
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_>;
@@ -273,9 +283,13 @@ pub unsafe trait Soa: Sized {
     ///
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
-    ///
-    /// This type should be covariant over given lifetime.
     type NonNullPtrs<'context>: Clone;
+
+    /// Restricts non-null pointers to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+        from: Self::NonNullPtrs<'long>,
+    ) -> Self::NonNullPtrs<'short>;
 
     /// Creates non-null pointers to each field of [`Fields`](Soa::Fields).
     ///
@@ -296,20 +310,28 @@ pub unsafe trait Soa: Sized {
     /// Non-empty collection of references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
-    ///
-    /// This type should be covariant over `'context` lifetime.
     type Refs<'context, 'a>
     where
         Self: 'a;
 
+    /// Restricts references to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_refs<'a, 'short, 'long: 'short>(
+        from: Self::Refs<'long, 'a>,
+    ) -> Self::Refs<'short, 'a>;
+
     /// Non-empty collection of mutable references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
-    ///
-    /// This type should be covariant over `'context` lifetime.
     type RefsMut<'context, 'a>
     where
         Self: 'a;
+
+    /// Restricts mutable references to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_refs_mut<'a, 'short, 'long: 'short>(
+        from: Self::RefsMut<'long, 'a>,
+    ) -> Self::RefsMut<'short, 'a>;
 
     /// Converts pointers to each field of [`Fields`](Soa::Fields)
     /// to their references by dereferencing each one of them.
@@ -355,16 +377,24 @@ pub unsafe trait Soa: Sized {
     /// Non-empty collection of slice pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
-    ///
-    /// This type should be covariant over given lifetime.
     type SlicePtrs<'context>: Clone;
+
+    /// Restricts slice pointers to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SlicePtrs<'long>,
+    ) -> Self::SlicePtrs<'short>;
 
     /// Non-empty collection of mutable slice pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
-    ///
-    /// This type should be covariant over given lifetime.
     type SliceMutPtrs<'context>: Clone;
+
+    /// Restricts mutable slice pointers to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+        from: Self::SliceMutPtrs<'long>,
+    ) -> Self::SliceMutPtrs<'short>;
 
     /// Forms slice pointers to each field of [`Fields`](Soa::Fields)
     /// from pointers to each field and a length.
@@ -429,20 +459,28 @@ pub unsafe trait Soa: Sized {
     /// Non-empty collection of slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
-    ///
-    /// This type should be covariant over `'context` lifetime.
     type Slices<'context, 'a>
     where
         Self: 'a;
 
+    /// Restricts slices to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_slices<'a, 'short, 'long: 'short>(
+        from: Self::Slices<'long, 'a>,
+    ) -> Self::Slices<'short, 'a>;
+
     /// Non-empty collection of mutable slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
-    ///
-    /// This type should be covariant over `'context` lifetime.
     type SlicesMut<'context, 'a>
     where
         Self: 'a;
+
+    /// Restricts mutable slices to each field of [`Fields`](Soa::Fields)
+    /// to be covariant over `'context` lifetime.
+    fn upcast_slices_mut<'a, 'short, 'long: 'short>(
+        from: Self::SlicesMut<'long, 'a>,
+    ) -> Self::SlicesMut<'short, 'a>;
 
     /// Converts slice pointers to each field of [`Fields`](Soa::Fields)
     /// to their slices by dereferencing each one of them.

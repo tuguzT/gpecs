@@ -94,7 +94,7 @@ where
     #[inline]
     fn ptrs(&self) -> T::MutPtrs<'_> {
         let context = self.context();
-        let ptrs = self.ptrs.as_inner().clone();
+        let ptrs = self.ptrs.clone().into_inner();
         T::nonnull_to_ptrs(context, ptrs)
     }
 
@@ -226,7 +226,7 @@ where
 
         unsafe {
             let context = Self::context_of(self.buffer);
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
             let ptrs = Self::post_inc_start(&mut self.start, ptrs, context, 1);
             let item = T::ptrs_read(context, ptrs);
@@ -257,7 +257,7 @@ where
 
         unsafe {
             let context = Self::context_of(self.buffer);
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
             Self::post_inc_start(&mut self.start, ptrs, context, n);
         }
@@ -427,7 +427,7 @@ where
 
         unsafe {
             let context = Self::context_of(self.buffer);
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
             let ptrs = Self::pre_dec_end(&mut self.end, ptrs, context, 1);
             let item = T::ptrs_read(context, ptrs);
@@ -444,7 +444,7 @@ where
 
         unsafe {
             let context = Self::context_of(self.buffer);
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
             Self::pre_dec_end(&mut self.end, ptrs, context, n);
         }

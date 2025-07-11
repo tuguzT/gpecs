@@ -14,7 +14,7 @@ where
     T: Soa,
 {
     inner: T::NonNullPtrs<'static>,
-    _phantom: PhantomData<&'context ()>,
+    phantom: PhantomData<&'context ()>,
 }
 
 impl<'context, T> NonNullPtrs<'context, T>
@@ -25,28 +25,14 @@ where
     pub fn new(inner: T::NonNullPtrs<'context>) -> Self {
         Self {
             inner: unsafe { transmute(inner) },
-            _phantom: PhantomData,
+            phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn as_inner(&self) -> &T::NonNullPtrs<'context> {
-        let Self { inner, .. } = self;
-        unsafe { transmute(inner) }
-    }
-
-    #[inline]
-    #[allow(dead_code)]
-    pub fn as_inner_mut(&mut self) -> &mut T::NonNullPtrs<'context> {
-        let Self { inner, .. } = self;
-        unsafe { transmute(inner) }
-    }
-
-    #[inline]
-    #[allow(dead_code)]
     pub fn into_inner(self) -> T::NonNullPtrs<'context> {
         let Self { inner, .. } = self;
-        unsafe { transmute(inner) }
+        T::upcast_nonnull_ptrs(inner)
     }
 }
 
@@ -56,7 +42,7 @@ where
     for<'any> T::NonNullPtrs<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let inner = self.as_inner();
+        let Self { inner, .. } = self;
         f.debug_tuple("NonNullPtrs").field(inner).finish()
     }
 }
@@ -69,7 +55,7 @@ where
     fn default() -> Self {
         Self {
             inner: Default::default(),
-            _phantom: Default::default(),
+            phantom: Default::default(),
         }
     }
 }
@@ -79,11 +65,10 @@ where
     T: Soa,
 {
     fn clone(&self) -> Self {
-        let Self { inner, _phantom } = self;
-        Self {
-            inner: inner.clone(),
-            _phantom: _phantom.clone(),
-        }
+        let Self { ref inner, phantom } = *self;
+
+        let inner = inner.clone();
+        Self { inner, phantom }
     }
 }
 
@@ -100,8 +85,8 @@ where
     for<'any> T::NonNullPtrs<'any>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        let Self { inner, _phantom } = self;
-        *inner == other.inner && *_phantom == other._phantom
+        let Self { inner, phantom } = self;
+        *inner == other.inner && *phantom == other.phantom
     }
 }
 
@@ -118,13 +103,13 @@ where
     for<'any> T::NonNullPtrs<'any>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let Self { inner, _phantom } = self;
+        let Self { inner, phantom } = self;
 
         match inner.partial_cmp(&other.inner) {
             Some(cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        _phantom.partial_cmp(&other._phantom)
+        phantom.partial_cmp(&other.phantom)
     }
 }
 
@@ -134,12 +119,13 @@ where
     for<'any> T::NonNullPtrs<'any>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self { inner, _phantom } = self;
+        let Self { inner, phantom } = self;
+
         match inner.cmp(&other.inner) {
             cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        _phantom.cmp(&other._phantom)
+        phantom.cmp(&other.phantom)
     }
 }
 
@@ -149,7 +135,9 @@ where
     for<'any> T::NonNullPtrs<'any>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.inner.hash(state);
-        self._phantom.hash(state);
+        let Self { inner, phantom } = self;
+
+        inner.hash(state);
+        phantom.hash(state);
     }
 }

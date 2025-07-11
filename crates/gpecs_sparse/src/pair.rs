@@ -51,6 +51,24 @@ where
     type FieldDescriptors<'context> = KeyValueFieldDescriptors<'context, K, V>;
 
     #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short> {
+        let KeyValueFieldDescriptors {
+            key,
+            value,
+            phantom,
+        } = from;
+
+        let value = V::upcast_field_descriptors(value);
+        KeyValueFieldDescriptors {
+            key,
+            value,
+            phantom,
+        }
+    }
+
+    #[inline]
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_> {
         KeyValueFieldDescriptors::new(context)
     }
@@ -64,7 +82,22 @@ where
     }
 
     type Ptrs<'context> = KeyValuePtrs<'context, K, V>;
+
+    #[inline]
+    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+        let KeyValuePtrs { key, value } = from;
+        let value = V::upcast_ptrs(value);
+        KeyValuePtrs { key, value }
+    }
+
     type MutPtrs<'context> = KeyValueMutPtrs<'context, K, V>;
+
+    #[inline]
+    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+        let KeyValueMutPtrs { key, value } = from;
+        let value = V::upcast_mut_ptrs(value);
+        KeyValueMutPtrs { key, value }
+    }
 
     #[inline]
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_> {
@@ -299,6 +332,15 @@ where
     type NonNullPtrs<'context> = KeyValueNonNullPtrs<'context, K, V>;
 
     #[inline]
+    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+        from: Self::NonNullPtrs<'long>,
+    ) -> Self::NonNullPtrs<'short> {
+        let KeyValueNonNullPtrs { key, value } = from;
+        let value = V::upcast_nonnull_ptrs(value);
+        KeyValueNonNullPtrs { key, value }
+    }
+
+    #[inline]
     unsafe fn ptrs_to_nonnull<'context>(
         context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
@@ -327,10 +369,28 @@ where
     where
         Self: 'a;
 
+    #[inline]
+    fn upcast_refs<'a, 'short, 'long: 'short>(
+        from: Self::Refs<'long, 'a>,
+    ) -> Self::Refs<'short, 'a> {
+        let KeyValueRefs { key, value } = from;
+        let value = V::upcast_refs(value);
+        KeyValueRefs { key, value }
+    }
+
     type RefsMut<'context, 'a>
         = KeyValueRefsMut<'context, 'a, K, V>
     where
         Self: 'a;
+
+    #[inline]
+    fn upcast_refs_mut<'a, 'short, 'long: 'short>(
+        from: Self::RefsMut<'long, 'a>,
+    ) -> Self::RefsMut<'short, 'a> {
+        let KeyValueRefsMut { key, value } = from;
+        let value = V::upcast_refs_mut(value);
+        KeyValueRefsMut { key, value }
+    }
 
     #[inline]
     unsafe fn ptrs_to_refs<'context, 'a>(
@@ -394,7 +454,25 @@ where
 
     type SlicePtrs<'context> = KeyValueSlicePtrs<'context, K, V>;
 
+    #[inline]
+    fn upcast_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SlicePtrs<'long>,
+    ) -> Self::SlicePtrs<'short> {
+        let KeyValueSlicePtrs { keys, values } = from;
+        let values = V::upcast_slice_ptrs(values);
+        KeyValueSlicePtrs { keys, values }
+    }
+
     type SliceMutPtrs<'context> = KeyValueSliceMutPtrs<'context, K, V>;
+
+    #[inline]
+    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+        from: Self::SliceMutPtrs<'long>,
+    ) -> Self::SliceMutPtrs<'short> {
+        let KeyValueSliceMutPtrs { keys, values } = from;
+        let values = V::upcast_slice_mut_ptrs(values);
+        KeyValueSliceMutPtrs { keys, values }
+    }
 
     #[inline]
     fn slices_from_raw_parts<'context>(
@@ -495,10 +573,28 @@ where
     where
         Self: 'a;
 
+    #[inline]
+    fn upcast_slices<'a, 'short, 'long: 'short>(
+        from: Self::Slices<'long, 'a>,
+    ) -> Self::Slices<'short, 'a> {
+        let KeyValueSlices { keys, values } = from;
+        let values = V::upcast_slices(values);
+        KeyValueSlices { keys, values }
+    }
+
     type SlicesMut<'context, 'a>
         = KeyValueSlicesMut<'context, 'a, K, V>
     where
         Self: 'a;
+
+    #[inline]
+    fn upcast_slices_mut<'a, 'short, 'long: 'short>(
+        from: Self::SlicesMut<'long, 'a>,
+    ) -> Self::SlicesMut<'short, 'a> {
+        let KeyValueSlicesMut { keys, values } = from;
+        let values = V::upcast_slices_mut(values);
+        KeyValueSlicesMut { keys, values }
+    }
 
     #[inline]
     unsafe fn slice_ptrs_to_slices<'context, 'a>(

@@ -48,7 +48,15 @@ pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
 unsafe impl Soa for () {
     type Context = DefaultContext;
     type Fields = Self;
+
     type FieldDescriptors<'context> = [FieldDescriptor; 1];
+
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short> {
+        from
+    }
 
     #[inline]
     fn field_descriptors(_context: &Self::Context) -> Self::FieldDescriptors<'_> {
@@ -66,7 +74,18 @@ unsafe impl Soa for () {
     }
 
     type Ptrs<'context> = *const Self;
+
+    #[inline]
+    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+        from
+    }
+
     type MutPtrs<'context> = *mut Self;
+
+    #[inline]
+    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+        from
+    }
 
     #[inline]
     fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
@@ -187,6 +206,13 @@ unsafe impl Soa for () {
     type NonNullPtrs<'context> = NonNull<Self>;
 
     #[inline]
+    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+        from: Self::NonNullPtrs<'long>,
+    ) -> Self::NonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
     unsafe fn ptrs_to_nonnull<'context>(
         _context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
@@ -207,10 +233,24 @@ unsafe impl Soa for () {
     where
         Self: 'a;
 
+    #[inline]
+    fn upcast_refs<'a, 'short, 'long: 'short>(
+        from: Self::Refs<'long, 'a>,
+    ) -> Self::Refs<'short, 'a> {
+        from
+    }
+
     type RefsMut<'context, 'a>
         = &'a mut Self
     where
         Self: 'a;
+
+    #[inline]
+    fn upcast_refs_mut<'a, 'short, 'long: 'short>(
+        from: Self::RefsMut<'long, 'a>,
+    ) -> Self::RefsMut<'short, 'a> {
+        from
+    }
 
     #[inline]
     unsafe fn ptrs_to_refs<'context, 'a>(
@@ -253,7 +293,22 @@ unsafe impl Soa for () {
     }
 
     type SlicePtrs<'context> = *const [Self];
+
+    #[inline]
+    fn upcast_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SlicePtrs<'long>,
+    ) -> Self::SlicePtrs<'short> {
+        from
+    }
+
     type SliceMutPtrs<'context> = *mut [Self];
+
+    #[inline]
+    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+        from: Self::SliceMutPtrs<'long>,
+    ) -> Self::SliceMutPtrs<'short> {
+        from
+    }
 
     #[inline]
     fn slices_from_raw_parts<'context>(
@@ -320,10 +375,24 @@ unsafe impl Soa for () {
     where
         Self: 'a;
 
+    #[inline]
+    fn upcast_slices<'a, 'short, 'long: 'short>(
+        from: Self::Slices<'long, 'a>,
+    ) -> Self::Slices<'short, 'a> {
+        from
+    }
+
     type SlicesMut<'context, 'a>
         = &'a mut [Self]
     where
         Self: 'a;
+
+    #[inline]
+    fn upcast_slices_mut<'a, 'short, 'long: 'short>(
+        from: Self::SlicesMut<'long, 'a>,
+    ) -> Self::SlicesMut<'short, 'a> {
+        from
+    }
 
     #[inline]
     unsafe fn slice_ptrs_to_slices<'context, 'a>(
@@ -494,7 +563,15 @@ macro_rules! soa_tuple_impl {
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
             type Context = DefaultContext;
             type Fields = Self;
+
             type FieldDescriptors<'context> = [FieldDescriptor; count_idents!($($types,)*)];
+
+            #[inline]
+            fn upcast_field_descriptors<'short, 'long: 'short>(
+                from: Self::FieldDescriptors<'long>,
+            ) -> Self::FieldDescriptors<'short> {
+                from
+            }
 
             #[inline]
             fn field_descriptors(_context: &Self::Context) -> Self::FieldDescriptors<'_> {
@@ -513,7 +590,18 @@ macro_rules! soa_tuple_impl {
             }
 
             type Ptrs<'context> = ($(*const $types,)*);
+
+            #[inline]
+            fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+                from
+            }
+
             type MutPtrs<'context> = ($(*mut $types,)*);
+
+            #[inline]
+            fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+                from
+            }
 
             #[inline]
             fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
@@ -680,6 +768,13 @@ macro_rules! soa_tuple_impl {
             type NonNullPtrs<'context> = ($(NonNull<$types>,)*);
 
             #[inline]
+            fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+                from: Self::NonNullPtrs<'long>,
+            ) -> Self::NonNullPtrs<'short> {
+                from
+            }
+
+            #[inline]
             unsafe fn ptrs_to_nonnull<'context>(
                 _context: &'context Self::Context,
                 ptrs: Self::MutPtrs<'context>,
@@ -702,10 +797,24 @@ macro_rules! soa_tuple_impl {
             where
                 Self: 'a;
 
+            #[inline]
+            fn upcast_refs<'a, 'short, 'long: 'short>(
+                from: Self::Refs<'long, 'a>,
+            ) -> Self::Refs<'short, 'a> {
+                from
+            }
+
             type RefsMut<'context, 'a>
                 = ($(&'a mut $types,)*)
             where
                 Self: 'a;
+
+            #[inline]
+            fn upcast_refs_mut<'a, 'short, 'long: 'short>(
+                from: Self::RefsMut<'long, 'a>,
+            ) -> Self::RefsMut<'short, 'a> {
+                from
+            }
 
             #[inline]
             unsafe fn ptrs_to_refs<'context, 'a>(
@@ -753,7 +862,22 @@ macro_rules! soa_tuple_impl {
             }
 
             type SlicePtrs<'context> = ($(*const [$types],)*);
+
+            #[inline]
+            fn upcast_slice_ptrs<'short, 'long: 'short>(
+                from: Self::SlicePtrs<'long>,
+            ) -> Self::SlicePtrs<'short> {
+                from
+            }
+
             type SliceMutPtrs<'context> = ($(*mut [$types],)*);
+
+            #[inline]
+            fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+                from: Self::SliceMutPtrs<'long>,
+            ) -> Self::SliceMutPtrs<'short> {
+                from
+            }
 
             #[inline]
             fn slices_from_raw_parts<'context>(
@@ -830,10 +954,24 @@ macro_rules! soa_tuple_impl {
             where
                 Self: 'a;
 
+            #[inline]
+            fn upcast_slices<'a, 'short, 'long: 'short>(
+                from: Self::Slices<'long, 'a>,
+            ) -> Self::Slices<'short, 'a> {
+                from
+            }
+
             type SlicesMut<'context, 'a>
                 = ($(&'a mut [$types],)*)
             where
                 Self: 'a;
+
+            #[inline]
+            fn upcast_slices_mut<'a, 'short, 'long: 'short>(
+                from: Self::SlicesMut<'long, 'a>,
+            ) -> Self::SlicesMut<'short, 'a> {
+                from
+            }
 
             #[inline]
             unsafe fn slice_ptrs_to_slices<'context, 'a>(

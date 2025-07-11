@@ -224,6 +224,13 @@ unsafe impl<T> Soa for Identity<T> {
     type FieldDescriptors<'context> = [FieldDescriptor; 1];
 
     #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short> {
+        from
+    }
+
+    #[inline]
     fn field_descriptors(_context: &Self::Context) -> Self::FieldDescriptors<'_> {
         [FieldDescriptor::of::<T>()]
     }
@@ -242,7 +249,18 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     type Ptrs<'context> = *const Self;
+
+    #[inline]
+    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+        from
+    }
+
     type MutPtrs<'context> = *mut Self;
+
+    #[inline]
+    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+        from
+    }
 
     #[inline]
     fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
@@ -365,6 +383,13 @@ unsafe impl<T> Soa for Identity<T> {
     type NonNullPtrs<'context> = NonNull<Self>;
 
     #[inline]
+    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+        from: Self::NonNullPtrs<'long>,
+    ) -> Self::NonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
     unsafe fn ptrs_to_nonnull<'context>(
         _context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
@@ -385,10 +410,24 @@ unsafe impl<T> Soa for Identity<T> {
     where
         Self: 'a;
 
+    #[inline]
+    fn upcast_refs<'a, 'short, 'long: 'short>(
+        from: Self::Refs<'long, 'a>,
+    ) -> Self::Refs<'short, 'a> {
+        from
+    }
+
     type RefsMut<'context, 'a>
         = &'a mut Self
     where
         Self: 'a;
+
+    #[inline]
+    fn upcast_refs_mut<'a, 'short, 'long: 'short>(
+        from: Self::RefsMut<'long, 'a>,
+    ) -> Self::RefsMut<'short, 'a> {
+        from
+    }
 
     #[inline]
     unsafe fn ptrs_to_refs<'context, 'a>(
@@ -431,7 +470,22 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     type SlicePtrs<'context> = *const [Self];
+
+    #[inline]
+    fn upcast_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SlicePtrs<'long>,
+    ) -> Self::SlicePtrs<'short> {
+        from
+    }
+
     type SliceMutPtrs<'context> = *mut [Self];
+
+    #[inline]
+    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+        from: Self::SliceMutPtrs<'long>,
+    ) -> Self::SliceMutPtrs<'short> {
+        from
+    }
 
     #[inline]
     fn slices_from_raw_parts<'context>(
@@ -498,10 +552,24 @@ unsafe impl<T> Soa for Identity<T> {
     where
         Self: 'a;
 
+    #[inline]
+    fn upcast_slices<'a, 'short, 'long: 'short>(
+        from: Self::Slices<'long, 'a>,
+    ) -> Self::Slices<'short, 'a> {
+        from
+    }
+
     type SlicesMut<'context, 'a>
         = &'a mut [Self]
     where
         Self: 'a;
+
+    #[inline]
+    fn upcast_slices_mut<'a, 'short, 'long: 'short>(
+        from: Self::SlicesMut<'long, 'a>,
+    ) -> Self::SlicesMut<'short, 'a> {
+        from
+    }
 
     #[inline]
     unsafe fn slice_ptrs_to_slices<'context, 'a>(

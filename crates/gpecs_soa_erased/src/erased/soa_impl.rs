@@ -18,12 +18,30 @@ unsafe impl Soa for ErasedSoa {
     type FieldDescriptors<'context> = &'context [FieldDescriptor];
 
     #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short> {
+        from
+    }
+
+    #[inline]
     fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_> {
         context.field_descriptors()
     }
 
     type Ptrs<'context> = ErasedSoaPtrs<'context>;
+
+    #[inline]
+    fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
+        from
+    }
+
     type MutPtrs<'context> = ErasedSoaMutPtrs<'context>;
+
+    #[inline]
+    fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
+        from
+    }
 
     #[inline]
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_> {
@@ -213,6 +231,13 @@ unsafe impl Soa for ErasedSoa {
     type NonNullPtrs<'context> = ErasedSoaNonNullPtrs<'context>;
 
     #[inline]
+    fn upcast_nonnull_ptrs<'short, 'long: 'short>(
+        from: Self::NonNullPtrs<'long>,
+    ) -> Self::NonNullPtrs<'short> {
+        from
+    }
+
+    #[inline]
     unsafe fn ptrs_to_nonnull<'context>(
         context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
@@ -243,10 +268,24 @@ unsafe impl Soa for ErasedSoa {
     where
         Self: 'a;
 
+    #[inline]
+    fn upcast_refs<'a, 'short, 'long: 'short>(
+        from: Self::Refs<'long, 'a>,
+    ) -> Self::Refs<'short, 'a> {
+        from
+    }
+
     type RefsMut<'context, 'a>
         = ErasedSoaRefsMut<'context, 'a>
     where
         Self: 'a;
+
+    #[inline]
+    fn upcast_refs_mut<'a, 'short, 'long: 'short>(
+        from: Self::RefsMut<'long, 'a>,
+    ) -> Self::RefsMut<'short, 'a> {
+        from
+    }
 
     #[inline]
     unsafe fn ptrs_to_refs<'context, 'a>(
@@ -306,7 +345,22 @@ unsafe impl Soa for ErasedSoa {
     }
 
     type SlicePtrs<'context> = ErasedSoaSlicePtrs<'context>;
+
+    #[inline]
+    fn upcast_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SlicePtrs<'long>,
+    ) -> Self::SlicePtrs<'short> {
+        from
+    }
+
     type SliceMutPtrs<'context> = ErasedSoaSliceMutPtrs<'context>;
+
+    #[inline]
+    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+        from: Self::SliceMutPtrs<'long>,
+    ) -> Self::SliceMutPtrs<'short> {
+        from
+    }
 
     #[inline]
     fn slices_from_raw_parts<'context>(
@@ -397,10 +451,24 @@ unsafe impl Soa for ErasedSoa {
     where
         Self: 'a;
 
+    #[inline]
+    fn upcast_slices<'a, 'short, 'long: 'short>(
+        from: Self::Slices<'long, 'a>,
+    ) -> Self::Slices<'short, 'a> {
+        from
+    }
+
     type SlicesMut<'context, 'a>
         = ErasedSoaSlicesMut<'context, 'a>
     where
         Self: 'a;
+
+    #[inline]
+    fn upcast_slices_mut<'a, 'short, 'long: 'short>(
+        from: Self::SlicesMut<'long, 'a>,
+    ) -> Self::SlicesMut<'short, 'a> {
+        from
+    }
 
     #[inline]
     unsafe fn slice_ptrs_to_slices<'context, 'a>(

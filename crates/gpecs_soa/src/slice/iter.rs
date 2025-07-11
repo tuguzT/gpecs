@@ -53,7 +53,7 @@ where
 
     fn ptrs(&self) -> T::Ptrs<'c> {
         let context = self.context();
-        let ptrs = self.ptrs.as_inner().clone();
+        let ptrs = self.ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         T::ptrs_cast_const(context, ptrs)
     }
@@ -171,7 +171,7 @@ where
         }
 
         let context = self.context;
-        let ptrs = self.ptrs.as_inner().clone();
+        let ptrs = self.ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         let ptrs = unsafe { Self::post_inc_start(&mut self.start, ptrs, context, 1) };
         let ptrs = T::ptrs_cast_const(context, ptrs);
@@ -203,7 +203,7 @@ where
 
         unsafe {
             let context = self.context;
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::nonnull_to_ptrs(context, ptrs);
             Self::post_inc_start(&mut self.start, ptrs, context, n);
         }
@@ -241,7 +241,7 @@ where
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
             let ptrs = {
-                let ptrs = self.ptrs.as_inner().clone();
+                let ptrs = self.ptrs.clone().into_inner();
                 let ptrs = T::nonnull_to_ptrs(context, ptrs);
                 T::ptrs_cast_const(context, ptrs)
             };
@@ -376,7 +376,7 @@ where
         }
 
         let context = self.context;
-        let ptrs = self.ptrs.as_inner().clone();
+        let ptrs = self.ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         let ptrs = unsafe { Self::pre_dec_end(&mut self.end, ptrs, context, 1) };
         let ptrs = T::ptrs_cast_const(context, ptrs);
@@ -394,7 +394,7 @@ where
 
         unsafe {
             let context = self.context;
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::nonnull_to_ptrs(context, ptrs);
             Self::pre_dec_end(&mut self.end, ptrs, context, n);
         }
@@ -459,7 +459,7 @@ where
 
     fn ptrs(&self) -> T::MutPtrs<'_> {
         let context = self.context();
-        let ptrs = self.ptrs.as_inner().clone();
+        let ptrs = self.ptrs.clone().into_inner();
         T::nonnull_to_ptrs(context, ptrs)
     }
 
@@ -567,7 +567,7 @@ where
         }
 
         let context = self.context;
-        let ptrs = self.ptrs.as_inner().clone();
+        let ptrs = self.ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         let ptrs = unsafe { Self::post_inc_start(&mut self.start, ptrs, context, 1) };
 
@@ -598,7 +598,7 @@ where
 
         unsafe {
             let context = self.context;
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::nonnull_to_ptrs(context, ptrs);
             Self::post_inc_start(&mut self.start, ptrs, context, n);
         }
@@ -635,7 +635,7 @@ where
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::nonnull_to_ptrs(context, ptrs);
             let item = unsafe {
                 let ptrs = T::ptrs_add_mut(context, ptrs, i);
@@ -768,7 +768,7 @@ where
         }
 
         let context = self.context;
-        let ptrs = self.ptrs.as_inner().clone();
+        let ptrs = self.ptrs.clone().into_inner();
         let ptrs = T::nonnull_to_ptrs(context, ptrs);
         let ptrs = unsafe { Self::pre_dec_end(&mut self.end, ptrs, context, 1) };
 
@@ -785,7 +785,7 @@ where
 
         unsafe {
             let context = self.context;
-            let ptrs = self.ptrs.as_inner().clone();
+            let ptrs = self.ptrs.clone().into_inner();
             let ptrs = T::nonnull_to_ptrs(context, ptrs);
             Self::pre_dec_end(&mut self.end, ptrs, context, n);
         }

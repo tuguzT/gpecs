@@ -51,12 +51,14 @@ where
 
     #[inline]
     pub fn as_ptr(&self) -> *const BufferData<T> {
-        self.buffer.as_ptr()
+        let Self { buffer } = self;
+        buffer.as_ptr()
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
-        self.buffer.as_mut_ptr()
+        let Self { buffer } = self;
+        buffer.as_mut_ptr()
     }
 
     #[inline]
@@ -65,10 +67,8 @@ where
         let context = self.context();
         let len = self.capacity();
 
-        unsafe {
-            let ptrs = ptrs::<T>(context, ptr, len).unwrap_unchecked();
-            T::ptrs_cast_const(context, ptrs)
-        }
+        let ptrs = unsafe { ptrs::<T>(context, ptr, len).unwrap_unchecked() };
+        T::ptrs_cast_const(context, ptrs)
     }
 
     #[inline]
@@ -76,6 +76,7 @@ where
         let ptr = self.as_mut_ptr();
         let context = self.context();
         let len = self.capacity();
+
         unsafe { ptrs::<T>(context, ptr, len).unwrap_unchecked() }
     }
 
@@ -393,7 +394,7 @@ where
         unsafe {
             let context = &*context;
             let slices = T::slices_mut_as_slice_ptrs(context, slices);
-            T::slices_drop_in_place(&*context, slices);
+            T::slices_drop_in_place(context, slices);
         }
     }
 }

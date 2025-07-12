@@ -1,36 +1,12 @@
 use core::{
     alloc::{Layout, LayoutError},
     any::type_name,
-    array,
     marker::PhantomData,
     ptr::{self, NonNull},
     slice,
 };
 
 use super::{DefaultContext, FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
-
-#[inline]
-#[track_caller]
-pub fn collect_array<T, const N: usize>(iter: impl IntoIterator<Item = T>) -> [T; N] {
-    #[cold]
-    #[inline(never)]
-    #[track_caller]
-    fn collect_fail(actual_len: usize, required_len: usize) -> ! {
-        panic!("iterator should have {required_len} items, but got {actual_len}")
-    }
-
-    let mut iter = iter.into_iter();
-    let array = array::from_fn(|index| {
-        let Some(offset) = iter.next() else {
-            collect_fail(index, N);
-        };
-        offset
-    });
-    match iter.count() {
-        0 => array,
-        len => collect_fail(len + N, N),
-    }
-}
 
 #[inline]
 #[track_caller]
@@ -519,7 +495,8 @@ pub use count_idents;
 pub struct SoaTupleImplHelper<T>(PhantomData<T>);
 
 #[inline]
-const fn permutation<const N: usize>() -> [usize; N] {
+#[doc(hidden)]
+pub const fn permutation<const N: usize>() -> [usize; N] {
     let mut permutation = [0; N];
     let mut i = 0;
     while i < N {
@@ -530,7 +507,8 @@ const fn permutation<const N: usize>() -> [usize; N] {
 }
 
 #[inline]
-const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize; N] {
+#[doc(hidden)]
+pub const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize; N] {
     let mut permutation = permutation::<N>();
     let mut i = 1;
     while i < N {

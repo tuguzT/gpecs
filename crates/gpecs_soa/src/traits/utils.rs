@@ -17,16 +17,23 @@ pub struct BufferOffsets<I> {
 impl<I> BufferOffsets<I> {
     /// Layout of a buffer needed to store all fields processed by self.
     #[inline]
-    pub fn layout(&self) -> Layout {
+    pub const fn layout(&self) -> Layout {
         let Self { layout, .. } = *self;
         layout
     }
 
     /// Capacity of a buffer needed to store all fields processed by self.
     #[inline]
-    pub fn capacity(&self) -> usize {
+    pub const fn capacity(&self) -> usize {
         let Self { capacity, .. } = *self;
         capacity
+    }
+
+    /// Returns an iterator over all fields to be processed by self.
+    #[inline]
+    pub fn into_fields(self) -> I {
+        let Self { fields, .. } = self;
+        fields
     }
 }
 
@@ -103,7 +110,7 @@ where
 
 /// Copy of [`Layout::repeat()`] functionality which could be used on stable channel.
 #[inline]
-pub fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
+pub const fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
     const ERR: LayoutError = match Layout::from_size_align(usize::MAX, 1) {
         Ok(_) => unreachable!(),
         Err(err) => err,

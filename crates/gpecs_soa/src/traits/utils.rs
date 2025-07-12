@@ -8,13 +8,19 @@ use super::FieldDescriptor;
 /// Iterator of offsets for each provided field in a single buffer of provided capacity.
 ///
 /// Resulting layout could be retrieved using [`layout()`](BufferOffsets::layout()) method.
-pub struct BufferOffsets<I> {
-    fields: I,
+pub struct BufferOffsets<I>
+where
+    I: ?Sized,
+{
     layout: Layout,
     capacity: usize,
+    fields: I,
 }
 
-impl<I> BufferOffsets<I> {
+impl<I> BufferOffsets<I>
+where
+    I: ?Sized,
+{
     /// Layout of a buffer needed to store all fields processed by self.
     #[inline]
     pub const fn layout(&self) -> Layout {
@@ -28,7 +34,9 @@ impl<I> BufferOffsets<I> {
         let Self { capacity, .. } = *self;
         capacity
     }
+}
 
+impl<I> BufferOffsets<I> {
     /// Returns an iterator over all fields to be processed by self.
     #[inline]
     pub fn into_fields(self) -> I {
@@ -39,7 +47,7 @@ impl<I> BufferOffsets<I> {
 
 impl<I> Iterator for BufferOffsets<I>
 where
-    I: Iterator<Item: AsRef<FieldDescriptor>>,
+    I: ?Sized + Iterator<Item: AsRef<FieldDescriptor>>,
 {
     type Item = Result<usize, LayoutError>;
 
@@ -70,7 +78,7 @@ where
 
 impl<I> ExactSizeIterator for BufferOffsets<I>
 where
-    I: Iterator<Item: AsRef<FieldDescriptor>> + ExactSizeIterator,
+    I: ?Sized + Iterator<Item: AsRef<FieldDescriptor>> + ExactSizeIterator,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -80,7 +88,7 @@ where
 }
 
 impl<I> FusedIterator for BufferOffsets<I> where
-    I: Iterator<Item: AsRef<FieldDescriptor>> + FusedIterator
+    I: ?Sized + Iterator<Item: AsRef<FieldDescriptor>> + FusedIterator
 {
 }
 

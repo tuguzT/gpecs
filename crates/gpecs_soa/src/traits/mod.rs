@@ -85,7 +85,7 @@ pub unsafe trait Soa: Sized {
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type Ptrs<'context>: Clone;
 
-    /// Restricts pointers to each field of [`Fields`](Soa::Fields)
+    /// Restricts [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
 
@@ -96,14 +96,14 @@ pub unsafe trait Soa: Sized {
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type MutPtrs<'context>: Clone;
 
-    /// Restricts mutable pointers to each field of [`Fields`](Soa::Fields)
+    /// Restricts [mutable pointers](Soa::MutPtrs) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
-    /// Returns dangling pointers to each field of [`Fields`](Soa::Fields).
+    /// Returns dangling [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields).
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_>;
 
-    /// Creates pointers to each field of [`Fields`](Soa::Fields)
+    /// Creates [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
     /// from a given buffer with given capacity.
     ///
     /// Implementations of this method should not account for a [`Context`](Soa::Context),
@@ -119,19 +119,21 @@ pub unsafe trait Soa: Sized {
         capacity: usize,
     ) -> Self::MutPtrs<'context>;
 
-    /// Converts pointers to the mutable ones of each field of [`Fields`](Soa::Fields).
+    /// Converts [pointers](Soa::Ptrs) of each field of [`Fields`](Soa::Fields)
+    /// to the [mutable ones](Soa::MutPtrs).
     fn ptrs_cast_const<'context>(
         context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
     ) -> Self::Ptrs<'context>;
 
-    /// Converts mutable pointers to the const ones of each field of [`Fields`](Soa::Fields).
+    /// Converts [mutable pointers](Soa::MutPtrs) of each field of [`Fields`](Soa::Fields)
+    /// to the [const ones](Soa::Ptrs).
     fn ptrs_cast_mut<'context>(
         context: &'context Self::Context,
         ptrs: Self::Ptrs<'context>,
     ) -> Self::MutPtrs<'context>;
 
-    /// Adds an unsigned offset to each pointer.
+    /// Adds an unsigned offset to [each pointer](Soa::Ptrs) of each field of [`Fields`](Soa::Fields).
     ///
     /// All the safety requirements resulting from applying [`pointer::add()`] method to each pointer
     /// should be satisfied to be safe to call this method.
@@ -143,7 +145,7 @@ pub unsafe trait Soa: Sized {
         offset: usize,
     ) -> Self::Ptrs<'context>;
 
-    /// Adds an unsigned offset to each mutable pointer.
+    /// Adds an unsigned offset to [each mutable pointer](Soa::MutPtrs) of each field of [`Fields`](Soa::Fields).
     ///
     /// All the safety requirements resulting from applying [`pointer::add()`] method to each pointer
     /// should be satisfied to be safe to call this method.
@@ -155,7 +157,7 @@ pub unsafe trait Soa: Sized {
         offset: usize,
     ) -> Self::MutPtrs<'context>;
 
-    /// Calculates the distance between two pointers
+    /// Calculates the distance between two [pointers](Soa::Ptrs)
     /// to each field of [`Fields`](Soa::Fields) within the same allocation.
     ///
     /// All the safety requirements resulting from applying [`pointer::offset_from()`] method to each pointer
@@ -171,7 +173,7 @@ pub unsafe trait Soa: Sized {
         origin: Self::Ptrs<'_>,
     ) -> isize;
 
-    /// Calculates the distance between two mutable pointers
+    /// Calculates the distance between two [mutable pointers](Soa::MutPtrs)
     /// to each field of [`Fields`](Soa::Fields) within the same allocation.
     ///
     /// All the safety requirements resulting from applying [`pointer::offset_from()`] method to each pointer
@@ -187,7 +189,7 @@ pub unsafe trait Soa: Sized {
         origin: Self::Ptrs<'_>,
     ) -> isize;
 
-    /// Swaps the values at two mutable locations of the [`Fields`](Soa::Fields)
+    /// Swaps the values at two [mutable locations](Soa::MutPtrs) of the [`Fields`](Soa::Fields)
     /// sequentially in the same order as they are stored in the buffer,
     /// without deinitializing either.
     ///
@@ -196,7 +198,7 @@ pub unsafe trait Soa: Sized {
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_swap(context: &Self::Context, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>);
 
-    /// Copies `count * size_of::<Fields[0]>() + ...` bytes from src to dst
+    /// Copies `count * size_of::<Fields[0]>() + ...` bytes from [src](Soa::Ptrs) to [dst](Soa::MutPtrs)
     /// for each field of [`Fields`](Soa::Fields)
     /// sequentially in the same order as they are stored in the buffer.
     /// The source and destination may overlap.
@@ -214,7 +216,7 @@ pub unsafe trait Soa: Sized {
         len: usize,
     );
 
-    /// Copies `count * size_of::<Fields[0]>() + ...` bytes from src to dst
+    /// Copies `count * size_of::<Fields[0]>() + ...` bytes from [src](Soa::Ptrs) to [dst](Soa::MutPtrs)
     /// for each field of [`Fields`](Soa::Fields)
     /// sequentially in the *reverse* order as they are stored in the buffer.
     /// The source and destination may overlap.
@@ -232,7 +234,7 @@ pub unsafe trait Soa: Sized {
         len: usize,
     );
 
-    /// Copies `count * size_of::<Fields[0]>() + ...` bytes from src to dst
+    /// Copies `count * size_of::<Fields[0]>() + ...` bytes from [src](Soa::Ptrs) to [dst](Soa::MutPtrs)
     /// for each field of [`Fields`](Soa::Fields) sequentially in unspecified order.
     /// The source and destination must not overlap.
     ///
@@ -249,7 +251,7 @@ pub unsafe trait Soa: Sized {
         len: usize,
     );
 
-    /// Constructs the value from reading each field to which src points without moving them.
+    /// Constructs the value from reading each field to which [src](Soa::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.
     ///
     /// All the safety requirements resulting from applying
@@ -257,7 +259,7 @@ pub unsafe trait Soa: Sized {
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self;
 
-    /// Overwrites a memory location of each field of [`Fields`](Soa::Fields)
+    /// Overwrites a memory [location](Soa::MutPtrs) of each field of [`Fields`](Soa::Fields)
     /// with the given value without reading or dropping the old value.
     ///
     /// All the safety requirements resulting from applying
@@ -287,13 +289,13 @@ pub unsafe trait Soa: Sized {
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type NonNullPtrs<'context>: Clone;
 
-    /// Restricts non-null pointers to each field of [`Fields`](Soa::Fields)
+    /// Restricts [non-null pointers](Soa::NonNullPtrs) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short>;
 
-    /// Creates non-null pointers to each field of [`Fields`](Soa::Fields).
+    /// Creates [non-null pointers](Soa::NonNullPtrs) to each field of [`Fields`](Soa::Fields).
     ///
     /// All the safety requirements resulting from applying
     /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
@@ -303,7 +305,8 @@ pub unsafe trait Soa: Sized {
         ptrs: Self::MutPtrs<'context>,
     ) -> Self::NonNullPtrs<'context>;
 
-    /// Acquires the underlying pointers from non-null pointers to each field of [`Fields`](Soa::Fields).
+    /// Acquires the underlying [pointers](Soa::MutPtrs) from [non-null pointers](Soa::NonNullPtrs)
+    /// to each field of [`Fields`](Soa::Fields).
     fn nonnull_to_ptrs<'context>(
         context: &'context Self::Context,
         ptrs: Self::NonNullPtrs<'context>,
@@ -316,7 +319,7 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    /// Restricts references to each field of [`Fields`](Soa::Fields)
+    /// Restricts [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_refs<'a, 'short, 'long: 'short>(
         from: Self::Refs<'long, 'a>,
@@ -329,14 +332,14 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    /// Restricts mutable references to each field of [`Fields`](Soa::Fields)
+    /// Restricts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_refs_mut<'a, 'short, 'long: 'short>(
         from: Self::RefsMut<'long, 'a>,
     ) -> Self::RefsMut<'short, 'a>;
 
-    /// Converts pointers to each field of [`Fields`](Soa::Fields)
-    /// to their references by dereferencing each one of them.
+    /// Converts [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
+    /// to their [references](Soa::Refs) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
@@ -345,8 +348,8 @@ pub unsafe trait Soa: Sized {
         ptrs: Self::Ptrs<'context>,
     ) -> Self::Refs<'context, 'a>;
 
-    /// Converts mutable pointers to each field of [`Fields`](Soa::Fields)
-    /// to their mutable references by dereferencing each one of them.
+    /// Converts [mutable pointers](Soa::MutPtrs) to each field of [`Fields`](Soa::Fields)
+    /// to their [mutable references](Soa::RefsMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
@@ -355,22 +358,22 @@ pub unsafe trait Soa: Sized {
         ptrs: Self::MutPtrs<'context>,
     ) -> Self::RefsMut<'context, 'a>;
 
-    /// Converts references to each field of [`Fields`](Soa::Fields)
-    /// to their pointers by taking the pointer of each one of them.
+    /// Converts [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
+    /// to their [pointers](Soa::Ptrs) by taking the pointer of each one of them.
     fn refs_as_ptrs<'context>(
         context: &'context Self::Context,
         refs: Self::Refs<'context, '_>,
     ) -> Self::Ptrs<'context>;
 
-    /// Converts mutable references to each field of [`Fields`](Soa::Fields)
-    /// to their mutable pointers by taking the pointer of each one of them.
+    /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
+    /// to their [mutable pointers](Soa::MutPtrs) by taking the pointer of each one of them.
     fn refs_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, '_>,
     ) -> Self::MutPtrs<'context>;
 
-    /// Converts mutable references to each field of [`Fields`](Soa::Fields)
-    /// to their references by explicitly converting each one of them via `&*` operator combination.
+    /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
+    /// to their [references](Soa::Refs) by explicitly converting each one of them via `&*` operator combination.
     fn refs_mut_as_refs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
@@ -381,7 +384,7 @@ pub unsafe trait Soa: Sized {
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
     type SlicePtrs<'context>: Clone;
 
-    /// Restricts slice pointers to each field of [`Fields`](Soa::Fields)
+    /// Restricts [slice pointers](Soa::SlicePtrs) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_slice_ptrs<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
@@ -392,14 +395,14 @@ pub unsafe trait Soa: Sized {
     /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
     type SliceMutPtrs<'context>: Clone;
 
-    /// Restricts mutable slice pointers to each field of [`Fields`](Soa::Fields)
+    /// Restricts [mutable slice pointers](Soa::SliceMutPtrs) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short>;
 
-    /// Forms slice pointers to each field of [`Fields`](Soa::Fields)
-    /// from pointers to each field and a length.
+    /// Forms [slice pointers](Soa::SlicePtrs) to each field of [`Fields`](Soa::Fields)
+    /// from [pointers](Soa::Ptrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
     fn slices_from_raw_parts<'context>(
@@ -408,8 +411,8 @@ pub unsafe trait Soa: Sized {
         len: usize,
     ) -> Self::SlicePtrs<'context>;
 
-    /// Forms mutable slice pointers to each field of [`Fields`](Soa::Fields)
-    /// from mutable pointers to each field and a length.
+    /// Forms [mutable slice pointers](Soa::SliceMutPtrs) to each field of [`Fields`](Soa::Fields)
+    /// from [mutable pointers](Soa::MutPtrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
     fn slices_from_raw_parts_mut<'context>(
@@ -418,41 +421,43 @@ pub unsafe trait Soa: Sized {
         len: usize,
     ) -> Self::SliceMutPtrs<'context>;
 
-    /// Converts slice pointers to the mutable ones of each field of [`Fields`](Soa::Fields).
+    /// Converts [slice pointers](Soa::SlicePtrs) of each field of [`Fields`](Soa::Fields)
+    /// to the [mutable ones](Soa::SliceMutPtrs).
     fn slice_ptrs_cast_const<'context>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::SlicePtrs<'context>;
 
-    /// Converts mutable slice pointers to the const ones of each field of [`Fields`](Soa::Fields).
+    /// Converts [mutable slice pointers](Soa::SliceMutPtrs) of each field of [`Fields`](Soa::Fields)
+    /// to the [const ones](Soa::SlicePtrs).
     fn slice_ptrs_cast_mut<'context>(
         context: &'context Self::Context,
         slices: Self::SlicePtrs<'context>,
     ) -> Self::SliceMutPtrs<'context>;
 
-    /// Returns the number of elements in slices to each slice pointer of [`Fields`](Soa::Fields),
+    /// Returns the number of elements in slices to each [slice pointer](Soa::SlicePtrs) of [`Fields`](Soa::Fields),
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the slice pointers,
     /// or else this method could panic.
     fn slice_ptrs_len(context: &Self::Context, slices: &Self::SlicePtrs<'_>) -> usize;
 
-    /// Returns the number of elements in slices to each mutable slice pointer of [`Fields`](Soa::Fields),
+    /// Returns the number of elements in slices to each [mutable slice pointer](Soa::SliceMutPtrs) of [`Fields`](Soa::Fields),
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the mutable slice pointers,
     /// or else this method could panic.
     fn slice_mut_ptrs_len(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize;
 
-    /// Returns pointers to the slice's buffer
-    /// of each slice pointer of [`Fields`](Soa::Fields).
+    /// Returns [pointers](Soa::Ptrs) to the slice's buffer
+    /// of each [slice pointer](Soa::SlicePtrs) of [`Fields`](Soa::Fields).
     fn slice_ptrs_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicePtrs<'context>,
     ) -> Self::Ptrs<'context>;
 
-    /// Returns mutable pointers to the slice's buffer
-    /// of each mutable slice pointer of [`Fields`](Soa::Fields).
+    /// Returns [mutable pointers](Soa::MutPtrs) to the slice's buffer
+    /// of each [mutable slice pointer](Soa::SliceMutPtrs) of [`Fields`](Soa::Fields).
     fn slice_mut_ptrs_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
@@ -465,7 +470,7 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    /// Restricts slices to each field of [`Fields`](Soa::Fields)
+    /// Restricts [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_slices<'a, 'short, 'long: 'short>(
         from: Self::Slices<'long, 'a>,
@@ -478,14 +483,14 @@ pub unsafe trait Soa: Sized {
     where
         Self: 'a;
 
-    /// Restricts mutable slices to each field of [`Fields`](Soa::Fields)
+    /// Restricts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over `'context` lifetime.
     fn upcast_slices_mut<'a, 'short, 'long: 'short>(
         from: Self::SlicesMut<'long, 'a>,
     ) -> Self::SlicesMut<'short, 'a>;
 
-    /// Converts slice pointers to each field of [`Fields`](Soa::Fields)
-    /// to their slices by dereferencing each one of them.
+    /// Converts [slice pointers](Soa::SlicePtrs) to each field of [`Fields`](Soa::Fields)
+    /// to their [slices](Soa::Slices) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each slice pointer
     /// should be satisfied to be safe to call this method.
@@ -494,8 +499,8 @@ pub unsafe trait Soa: Sized {
         slices: Self::SlicePtrs<'context>,
     ) -> Self::Slices<'context, 'a>;
 
-    /// Converts mutable slice pointers to each field of [`Fields`](Soa::Fields)
-    /// to their mutable slices by dereferencing each one of them.
+    /// Converts [mutable slice pointers](Soa::SliceMutPtrs) to each field of [`Fields`](Soa::Fields)
+    /// to their [mutable slices](Soa::SlicesMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
     /// should be satisfied to be safe to call this method.
@@ -504,56 +509,56 @@ pub unsafe trait Soa: Sized {
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::SlicesMut<'context, 'a>;
 
-    /// Returns the number of elements in slices to each field of [`Fields`](Soa::Fields),
+    /// Returns the number of elements in [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields),
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the slices,
     /// or else this method could panic.
     fn slices_len(context: &Self::Context, slices: &Self::Slices<'_, '_>) -> usize;
 
-    /// Returns the number of elements in slices to each field of [`Fields`](Soa::Fields),
+    /// Returns the number of elements in [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields),
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the mutable slices,
     /// or else this method could panic.
     fn slices_mut_len(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize;
 
-    /// Converts slices to each field of [`Fields`](Soa::Fields)
-    /// to their slice pointers by taking the pointer of each one of them.
+    /// Converts [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields)
+    /// to their [slice pointers](Soa::SlicePtrs) by taking the pointer of each one of them.
     fn slices_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::SlicePtrs<'context>;
 
-    /// Converts mutable slices to each field of [`Fields`](Soa::Fields)
-    /// to their mutable slice pointers by taking the pointer of each one of them.
+    /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
+    /// to their [mutable slice pointers](Soa::SliceMutPtrs) by taking the pointer of each one of them.
     fn slices_mut_as_slice_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::SliceMutPtrs<'context>;
 
-    /// Converts mutable slices to each field of [`Fields`](Soa::Fields)
-    /// to their slices by explicitly converting each one of them via `&*` operator combination.
+    /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
+    /// to their [slices](Soa::Slices) by explicitly converting each one of them via `&*` operator combination.
     fn slices_mut_as_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a>;
 
-    /// Returns pointers to the slice's buffer
-    /// of each slice of [`Fields`](Soa::Fields).
+    /// Returns [pointers](Soa::Ptrs) to the slice's buffer
+    /// of each [slice](Soa::Slices) of [`Fields`](Soa::Fields).
     fn slices_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, '_>,
     ) -> Self::Ptrs<'context>;
 
-    /// Returns mutable pointers to the slice's buffer
-    /// of each mutable slice of [`Fields`](Soa::Fields).
+    /// Returns [mutable pointers](Soa::MutPtrs) to the slice's buffer
+    /// of each [mutable slice](Soa::SlicesMut) of [`Fields`](Soa::Fields).
     fn slices_mut_as_ptrs<'context>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, '_>,
     ) -> Self::MutPtrs<'context>;
 
-    /// Executes the destructors (if any) for the each slice of [`Fields`](Soa::Fields).
+    /// Executes the destructors (if any) for the each [slice](Soa::SliceMutPtrs) of [`Fields`](Soa::Fields).
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each slice pointer
@@ -597,7 +602,7 @@ pub trait SoaToOwned<'context, 'a> {
         *target = self.to_owned();
     }
 
-    /// Uses borrowed data to replace owned data located by `target` pointers,
+    /// Uses borrowed data to replace owned data located by `target` [pointers](Soa::MutPtrs),
     /// usually by cloning each field of [`Fields`](Soa::Fields).
     unsafe fn clone_into_ptrs(
         &self,
@@ -610,7 +615,7 @@ pub trait SoaToOwned<'context, 'a> {
         }
     }
 
-    /// Uses borrowed data to replace owned data located by `target` references,
+    /// Uses borrowed data to replace owned data located by `target` [references](Soa::RefsMut),
     /// usually by cloning each field of [`Fields`](Soa::Fields).
     fn clone_into_refs<'c>(
         &self,

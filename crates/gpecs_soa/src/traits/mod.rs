@@ -3,7 +3,7 @@ use core::alloc::{Layout, LayoutError};
 pub use self::{
     desc::FieldDescriptor,
     utils::{BufferOffsets, buffer_layout, buffer_offsets, repeat_layout},
-    wrapper::{MutPtrs, NonNullPtrs, Ptrs},
+    wrapper::{FieldDescriptors, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut},
 };
 
 #[doc(hidden)]

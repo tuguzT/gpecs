@@ -4,7 +4,7 @@ use core::{
     marker::PhantomData,
 };
 
-use crate::{traits::Soa, wrappers::NonNullPtrs};
+use crate::traits::{NonNullPtrs, Soa};
 
 use super::{SoaSlices, SoaSlicesMut};
 

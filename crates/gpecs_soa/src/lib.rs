@@ -17,4 +17,3 @@ pub mod traits;
 
 #[cfg(feature = "alloc")]
 mod alloc;
-mod wrappers;

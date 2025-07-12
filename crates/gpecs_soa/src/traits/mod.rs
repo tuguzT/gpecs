@@ -3,6 +3,7 @@ use core::alloc::{Layout, LayoutError};
 pub use self::{
     desc::FieldDescriptor,
     utils::{BufferOffsets, buffer_layout, buffer_offsets, repeat_layout},
+    wrapper::{MutPtrs, NonNullPtrs, Ptrs},
 };
 
 #[doc(hidden)]
@@ -10,6 +11,7 @@ pub mod impls;
 
 mod desc;
 mod utils;
+mod wrapper;
 
 /// Type of [context](Soa::Context) which should be used for [`Soa`] trait implementations
 /// which fields' size and alignment are known at compile-time.

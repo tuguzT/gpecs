@@ -10,7 +10,7 @@ use crate::traits::Soa;
 
 /// Type wrapper for [slices](Soa::Slices)
 /// to each field of [`Fields`](Soa::Fields)
-/// which is covariant over `'context` lifetime.
+/// which is covariant over generic lifetimes.
 #[repr(transparent)]
 pub struct Slices<'context, 'a, T>
 where

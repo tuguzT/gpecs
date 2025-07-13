@@ -9,7 +9,7 @@ use core::{
 use crate::traits::Soa;
 
 /// Type wrapper for [field descriptors](Soa::FieldDescriptors)
-/// which is covariant over `'context` lifetime.
+/// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct FieldDescriptors<'context, T>
 where

@@ -44,7 +44,7 @@ pub unsafe trait Soa: Sized {
     type FieldDescriptors<'context>: IntoIterator<Item: AsRef<FieldDescriptor>>;
 
     /// Restricts [field descriptors](Soa::FieldDescriptors)
-    /// to be covariant over `'context` lifetime.
+    /// to be covariant over generic lifetime.
     fn upcast_field_descriptors<'short, 'long: 'short>(
         from: Self::FieldDescriptors<'long>,
     ) -> Self::FieldDescriptors<'short>;
@@ -89,7 +89,7 @@ pub unsafe trait Soa: Sized {
     type Ptrs<'context>: Clone;
 
     /// Restricts [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
+    /// to be covariant over generic lifetime.
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
 
     /// Non-empty collection of mutable pointers to each field of [`Fields`](Soa::Fields).
@@ -100,7 +100,7 @@ pub unsafe trait Soa: Sized {
     type MutPtrs<'context>: Clone;
 
     /// Restricts [mutable pointers](Soa::MutPtrs) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
+    /// to be covariant over generic lifetime.
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
     /// Returns dangling [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields).
@@ -293,7 +293,7 @@ pub unsafe trait Soa: Sized {
     type NonNullPtrs<'context>: Clone;
 
     /// Restricts [non-null pointers](Soa::NonNullPtrs) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
+    /// to be covariant over generic lifetime.
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short>;
@@ -323,10 +323,10 @@ pub unsafe trait Soa: Sized {
         Self: 'a;
 
     /// Restricts [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
-    fn upcast_refs<'a, 'short, 'long: 'short>(
-        from: Self::Refs<'long, 'a>,
-    ) -> Self::Refs<'short, 'a>;
+    /// to be covariant over generic lifetimes.
+    fn upcast_refs<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+        from: Self::Refs<'long, 'a_long>,
+    ) -> Self::Refs<'short, 'a_short>;
 
     /// Non-empty collection of mutable references to each field of [`Fields`](Soa::Fields).
     ///
@@ -336,10 +336,10 @@ pub unsafe trait Soa: Sized {
         Self: 'a;
 
     /// Restricts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
-    fn upcast_refs_mut<'a, 'short, 'long: 'short>(
-        from: Self::RefsMut<'long, 'a>,
-    ) -> Self::RefsMut<'short, 'a>;
+    /// to be covariant over generic lifetimes.
+    fn upcast_refs_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+        from: Self::RefsMut<'long, 'a_long>,
+    ) -> Self::RefsMut<'short, 'a_short>;
 
     /// Converts [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
     /// to their [references](Soa::Refs) by dereferencing each one of them.
@@ -388,7 +388,7 @@ pub unsafe trait Soa: Sized {
     type SlicePtrs<'context>: Clone;
 
     /// Restricts [slice pointers](Soa::SlicePtrs) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
+    /// to be covariant over generic lifetime.
     fn upcast_slice_ptrs<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short>;
@@ -399,7 +399,7 @@ pub unsafe trait Soa: Sized {
     type SliceMutPtrs<'context>: Clone;
 
     /// Restricts [mutable slice pointers](Soa::SliceMutPtrs) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
+    /// to be covariant over generic lifetime.
     fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short>;
@@ -474,10 +474,10 @@ pub unsafe trait Soa: Sized {
         Self: 'a;
 
     /// Restricts [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
-    fn upcast_slices<'a, 'short, 'long: 'short>(
-        from: Self::Slices<'long, 'a>,
-    ) -> Self::Slices<'short, 'a>;
+    /// to be covariant over generic lifetimes.
+    fn upcast_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+        from: Self::Slices<'long, 'a_long>,
+    ) -> Self::Slices<'short, 'a_short>;
 
     /// Non-empty collection of mutable slices of each field of [`Fields`](Soa::Fields).
     ///
@@ -487,10 +487,10 @@ pub unsafe trait Soa: Sized {
         Self: 'a;
 
     /// Restricts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
-    /// to be covariant over `'context` lifetime.
-    fn upcast_slices_mut<'a, 'short, 'long: 'short>(
-        from: Self::SlicesMut<'long, 'a>,
-    ) -> Self::SlicesMut<'short, 'a>;
+    /// to be covariant over generic lifetimes.
+    fn upcast_slices_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+        from: Self::SlicesMut<'long, 'a_long>,
+    ) -> Self::SlicesMut<'short, 'a_short>;
 
     /// Converts [slice pointers](Soa::SlicePtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [slices](Soa::Slices) by dereferencing each one of them.

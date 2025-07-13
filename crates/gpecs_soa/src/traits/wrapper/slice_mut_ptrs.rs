@@ -10,7 +10,7 @@ use crate::traits::Soa;
 
 /// Type wrapper for [mutable slice pointers](Soa::SliceMutPtrs)
 /// to each field of [`Fields`](Soa::Fields)
-/// which is covariant over `'context` lifetime.
+/// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct SliceMutPtrs<'context, T>
 where

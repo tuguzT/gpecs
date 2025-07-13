@@ -370,9 +370,9 @@ where
         Self: 'a;
 
     #[inline]
-    fn upcast_refs<'a, 'short, 'long: 'short>(
-        from: Self::Refs<'long, 'a>,
-    ) -> Self::Refs<'short, 'a> {
+    fn upcast_refs<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+        from: Self::Refs<'long, 'a_long>,
+    ) -> Self::Refs<'short, 'a_short> {
         let KeyValueRefs { key, value } = from;
         let value = V::upcast_refs(value);
         KeyValueRefs { key, value }
@@ -384,9 +384,9 @@ where
         Self: 'a;
 
     #[inline]
-    fn upcast_refs_mut<'a, 'short, 'long: 'short>(
-        from: Self::RefsMut<'long, 'a>,
-    ) -> Self::RefsMut<'short, 'a> {
+    fn upcast_refs_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+        from: Self::RefsMut<'long, 'a_long>,
+    ) -> Self::RefsMut<'short, 'a_short> {
         let KeyValueRefsMut { key, value } = from;
         let value = V::upcast_refs_mut(value);
         KeyValueRefsMut { key, value }
@@ -574,9 +574,9 @@ where
         Self: 'a;
 
     #[inline]
-    fn upcast_slices<'a, 'short, 'long: 'short>(
-        from: Self::Slices<'long, 'a>,
-    ) -> Self::Slices<'short, 'a> {
+    fn upcast_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+        from: Self::Slices<'long, 'a_long>,
+    ) -> Self::Slices<'short, 'a_short> {
         let KeyValueSlices { keys, values } = from;
         let values = V::upcast_slices(values);
         KeyValueSlices { keys, values }
@@ -588,9 +588,9 @@ where
         Self: 'a;
 
     #[inline]
-    fn upcast_slices_mut<'a, 'short, 'long: 'short>(
-        from: Self::SlicesMut<'long, 'a>,
-    ) -> Self::SlicesMut<'short, 'a> {
+    fn upcast_slices_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+        from: Self::SlicesMut<'long, 'a_long>,
+    ) -> Self::SlicesMut<'short, 'a_short> {
         let KeyValueSlicesMut { keys, values } = from;
         let values = V::upcast_slices_mut(values);
         KeyValueSlicesMut { keys, values }

@@ -277,13 +277,11 @@ pub unsafe trait Soa: Sized {
     /// should be satisfied to be safe to call this method.
     ///
     /// By default, this method just reads the value from ptrs on the stack and then drops it.
-    unsafe fn ptrs_drop_in_place<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-    ) {
+    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs<'_>) {
+        let ptrs = Self::upcast_mut_ptrs(ptrs);
         let ptrs = Self::ptrs_cast_const(context, ptrs);
         let value = unsafe { Self::ptrs_read(context, ptrs) };
-        drop(value);
+        drop(value)
     }
 
     /// Non-empty collection of non-null pointers to each field of [`Fields`](Soa::Fields).
@@ -568,17 +566,13 @@ pub unsafe trait Soa: Sized {
     /// should be satisfied to be safe to call this method.
     ///
     /// By default, this method just iterates by all the fields of slices and drops such fields one by one.
-    unsafe fn slices_drop_in_place<'context>(
-        context: &'context Self::Context,
-        slices: Self::SliceMutPtrs<'context>,
-    ) {
+    unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs<'_>) {
+        let slices = Self::upcast_slice_mut_ptrs(slices);
         let len = Self::slice_mut_ptrs_len(context, &slices);
         let ptrs = Self::slice_mut_ptrs_as_ptrs(context, slices);
         for index in 0..len {
-            unsafe {
-                let ptrs = Self::ptrs_add_mut(context, ptrs.clone(), index);
-                Self::ptrs_drop_in_place(context, ptrs);
-            }
+            let ptrs = unsafe { Self::ptrs_add_mut(context, ptrs.clone(), index) };
+            unsafe { Self::ptrs_drop_in_place(context, ptrs) }
         }
     }
 }
@@ -626,9 +620,7 @@ pub trait SoaToOwned<'context, 'a> {
         target: <Self::Owned as Soa>::RefsMut<'c, '_>,
     ) {
         let target = <Self::Owned as Soa>::refs_mut_as_ptrs(context, target);
-        unsafe {
-            self.clone_into_ptrs(context, target);
-        }
+        unsafe { self.clone_into_ptrs(context, target) }
     }
 }
 

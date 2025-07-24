@@ -317,10 +317,7 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_drop_in_place<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-    ) {
+    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs<'_>) {
         let KeyValueMutPtrs { key, value } = ptrs;
 
         unsafe {
@@ -707,10 +704,7 @@ where
     }
 
     #[inline]
-    unsafe fn slices_drop_in_place<'context>(
-        context: &'context Self::Context,
-        slices: Self::SliceMutPtrs<'context>,
-    ) {
+    unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs<'_>) {
         let KeyValueSliceMutPtrs { keys, values } = slices;
 
         unsafe {

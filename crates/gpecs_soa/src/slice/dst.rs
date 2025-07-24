@@ -227,7 +227,7 @@ where
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         self.slices_mut()
-            .sort_unstable_with_permutation(permutation);
+            .sort_unstable_with_permutation(permutation)
     }
 
     #[inline]
@@ -236,7 +236,7 @@ where
         for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.slices_mut()
-            .sort_unstable_with_permutation_by(permutation, compare);
+            .sort_unstable_with_permutation_by(permutation, compare)
     }
 
     #[inline]
@@ -246,7 +246,7 @@ where
         K: Ord,
     {
         self.slices_mut()
-            .sort_unstable_with_permutation_by_key(permutation, f);
+            .sort_unstable_with_permutation_by_key(permutation, f)
     }
 }
 
@@ -389,13 +389,10 @@ where
             return;
         }
 
-        let context = ptr::from_ref(self.context());
-        let slices = self.as_mut_slices();
-        unsafe {
-            let context = &*context;
-            let slices = T::slices_mut_as_slice_ptrs(context, slices);
-            T::slices_drop_in_place(context, slices);
-        }
+        let mut slices = self.slices_mut();
+        let (context, slices) = slices.as_mut_slices_with_context();
+        let slices = T::slices_mut_as_slice_ptrs(context, slices);
+        unsafe { T::slices_drop_in_place(context, slices) }
     }
 }
 

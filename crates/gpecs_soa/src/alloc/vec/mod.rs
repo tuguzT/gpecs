@@ -148,9 +148,7 @@ where
         };
         let new_ptrs = self.buffer.ptrs();
         let context = self.context();
-        unsafe {
-            T::ptrs_copy_rev(context, old_ptrs, new_ptrs, self.len());
-        }
+        unsafe { T::ptrs_copy_rev(context, old_ptrs, new_ptrs, self.len()) }
     }
 
     #[inline]
@@ -166,9 +164,7 @@ where
         let old_ptrs = self.as_ptrs();
         let new_ptrs = unsafe { ptrs::<T>(context, ptr, new_capacity).unwrap_unchecked() };
 
-        unsafe {
-            T::ptrs_copy(context, old_ptrs, new_ptrs, self.len());
-        }
+        unsafe { T::ptrs_copy(context, old_ptrs, new_ptrs, self.len()) }
     }
 
     pub fn reserve(&mut self, additional: usize) {
@@ -460,7 +456,7 @@ where
             let refs = T::upcast_refs_mut(refs);
             let refs = T::refs_mut_as_refs(unsafe { &*context }, refs);
             f(refs)
-        });
+        })
     }
 
     pub fn retain_mut<F>(&mut self, mut f: F)
@@ -865,7 +861,7 @@ where
 
     #[inline]
     fn clone_from(&mut self, source: &Self) {
-        self.slices_mut().clone_from_slices(source.slices());
+        self.slices_mut().clone_from_slices(source.slices())
     }
 }
 

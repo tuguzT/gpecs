@@ -338,7 +338,7 @@ impl Work for Large {
         for (_, b, _, _, e, f, _, _, i, _) in iter {
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
-                - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
+                - i.iter().fold(u32::MAX, |acc, item| (acc - item) << 3);
         }
         black_box(result)
     }
@@ -357,7 +357,7 @@ impl Work for Large {
             let (_, b, _, _, e, f, _, _, i, _) = unsafe { refs.into::<Self>(&()) }.unwrap();
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
-                - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
+                - i.iter().fold(u32::MAX, |acc, item| (acc - item) << 3);
         }
         black_box(result)
     }
@@ -407,7 +407,7 @@ impl Work for Large {
         for (((((((((_, b), _), _), e), f), _), _), i), _) in iter {
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
-                - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
+                - i.iter().fold(u32::MAX, |acc, item| (acc - item) << 3);
         }
         black_box(result)
     }
@@ -423,7 +423,7 @@ impl Work for Large {
         for (_, b, _, _, e, f, _, _, i, _) in iter {
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
-                - i.iter().fold(u32::MAX, |acc, item| acc - item << 3);
+                - i.iter().fold(u32::MAX, |acc, item| (acc - item) << 3);
         }
         black_box(result)
     }

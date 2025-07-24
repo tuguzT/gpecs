@@ -54,11 +54,10 @@ where
             ref mut buffer,
         } = *self;
 
+        let buffer = buffer.as_mut();
         let FramebufferDesc { width, height } = desc;
-        if y >= 0 && y < height as i32 {
-            if x >= 0 && x < width as i32 {
-                buffer.as_mut()[(x + y * width as i32) as usize] = char;
-            }
+        if y >= 0 && y < height as i32 && x >= 0 && x < width as i32 {
+            buffer[(x + y * width as i32) as usize] = char;
         }
     }
 }

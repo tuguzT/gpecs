@@ -26,8 +26,7 @@ where
     ) -> Self::MaybeGpuComponentIds {
         let component_id = components
             .component_id::<T>()
-            .map(|id| gpu_components.map_component_id(id))
-            .flatten();
+            .and_then(|id| gpu_components.map_component_id(id));
         [component_id]
     }
 
@@ -62,8 +61,7 @@ macro_rules! gpu_bundle_tuple_impl {
                 let component_ids = [$(
                     components
                         .component_id::<$types>()
-                        .map(|id| gpu_components.map_component_id(id))
-                        .flatten(),
+                        .and_then(|id| gpu_components.map_component_id(id)),
                 )*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
                 component_ids

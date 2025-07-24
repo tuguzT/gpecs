@@ -334,8 +334,7 @@ impl<'a> ErasedFieldSliceIterMut<'a> {
 
         *end -= offset;
         let count = *end * desc.layout().size();
-        let ptr = unsafe { buffer.as_ptr().add(count) };
-        ptr
+        unsafe { buffer.as_ptr().add(count) }
     }
 }
 

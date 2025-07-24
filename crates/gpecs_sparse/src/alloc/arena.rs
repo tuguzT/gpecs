@@ -409,8 +409,7 @@ where
                 extend_sparse(&mut sparse, new_len, &mut sparse_vacant_head)?;
             } else {
                 let sparse_item = unwrap_sparse_item(sparse.as_slice(), sparse_index);
-                let next_vacant = unwrap_next_vacant(sparse_item.kind())
-                    .clone()
+                let next_vacant = (*unwrap_next_vacant(sparse_item.kind()))
                     .try_into()
                     .map_err(TooLargeSparseIndexError::new)?;
                 remove_from_vacant_list(
@@ -534,7 +533,7 @@ where
         } = self;
 
         if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
-            let next_vacant = match unwrap_next_vacant(sparse_item.kind()).clone().try_into() {
+            let next_vacant = match (*unwrap_next_vacant(sparse_item.kind())).try_into() {
                 Ok(next_vacant) => next_vacant,
                 Err(error) => {
                     let kind = TooLargeSparseIndexError::new(error).into();
@@ -542,7 +541,7 @@ where
                 }
             };
 
-            let sparse_index = match sparse_vacant_head.clone().try_into() {
+            let sparse_index = match (*sparse_vacant_head).try_into() {
                 Ok(sparse_index) => sparse_index,
                 Err(error) => {
                     let kind = TooSmallSparseIndexError::new(error).into();
@@ -572,7 +571,7 @@ where
             return Ok(key);
         }
 
-        let sparse_index = match sparse_vacant_head.clone().try_into() {
+        let sparse_index = match (*sparse_vacant_head).try_into() {
             Ok(sparse_index) => sparse_index,
             Err(error) => {
                 let kind = TooSmallSparseIndexError::new(error).into();
@@ -1169,15 +1168,15 @@ where
 {
     fn clone(&self) -> Self {
         let Self {
-            dense,
-            sparse,
+            ref dense,
+            ref sparse,
             sparse_vacant_head,
-        } = self;
+        } = *self;
 
         Self {
             dense: dense.clone(),
             sparse: sparse.clone(),
-            sparse_vacant_head: sparse_vacant_head.clone(),
+            sparse_vacant_head,
         }
     }
 

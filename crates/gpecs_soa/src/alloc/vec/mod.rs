@@ -3,7 +3,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem::{ManuallyDrop, transmute},
+    mem::ManuallyDrop,
     ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
     ptr,
 };
@@ -451,20 +451,21 @@ where
     }
 
     #[inline]
-    pub fn retain<'me, F>(&'me mut self, mut f: F)
+    pub fn retain<F>(&mut self, mut f: F)
     where
-        F: FnMut(T::Refs<'me, '_>) -> bool,
+        F: FnMut(T::Refs<'_, '_>) -> bool,
     {
         let context = ptr::from_ref(self.context());
         self.retain_mut(|refs| {
+            let refs = T::upcast_refs_mut(refs);
             let refs = T::refs_mut_as_refs(unsafe { &*context }, refs);
             f(refs)
         });
     }
 
-    pub fn retain_mut<'me, F>(&'me mut self, mut f: F)
+    pub fn retain_mut<F>(&mut self, mut f: F)
     where
-        F: FnMut(T::RefsMut<'me, '_>) -> bool,
+        F: FnMut(T::RefsMut<'_, '_>) -> bool,
     {
         let original_len = self.len();
         // Avoid double drop if the drop guard is not executed,
@@ -529,13 +530,13 @@ where
             original_len,
         };
 
-        fn process_loop<'me, F, T, const DELETED: bool>(
+        fn process_loop<F, T, const DELETED: bool>(
             original_len: usize,
             f: &mut F,
             g: &mut BackshiftOnDrop<'_, T>,
         ) where
             T: Soa,
-            F: FnMut(T::RefsMut<'me, '_>) -> bool,
+            F: FnMut(T::RefsMut<'_, '_>) -> bool,
         {
             while g.processed_len != original_len {
                 let ptrs = g.v.buffer.ptrs();
@@ -544,7 +545,6 @@ where
                 let cur = unsafe { T::ptrs_add_mut(context, ptrs, g.processed_len) };
                 let res = unsafe {
                     let cur = T::ptrs_to_refs_mut(context, cur.clone());
-                    let cur = transmute(cur);
                     !f(cur)
                 };
                 if res {
@@ -678,7 +678,7 @@ where
         let context = self.context();
         let ptrs = self.buffer.ptrs();
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-        unsafe { T::slices_drop_in_place(&*context, slices) }
+        unsafe { T::slices_drop_in_place(context, slices) }
     }
 }
 

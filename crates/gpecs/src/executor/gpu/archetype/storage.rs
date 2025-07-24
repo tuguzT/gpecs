@@ -7,7 +7,7 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::registry::ArchetypeInfo, component::registry::ComponentRegistry, entity::Entity,
+    archetype::registry::ArchetypeInfo, component::registry::ComponentRegistry,
     prelude::ComponentId,
 };
 
@@ -45,7 +45,7 @@ impl GpuArchetypeStorage {
         let (entities, erased_components) = info.storage().erased_components(components);
         let mut component_bindings = IndexMap::with_capacity(erased_components.len());
 
-        let entities_byte_count = entities.len() * size_of::<Entity>();
+        let entities_byte_count = size_of_val(entities);
         let entities_binding = u64::try_from(entities_byte_count)
             .unwrap()
             .try_into()

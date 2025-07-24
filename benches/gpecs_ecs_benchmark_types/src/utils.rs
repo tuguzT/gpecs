@@ -19,10 +19,10 @@ impl RandomXoshiro128 {
         Self { state }
     }
 
-    pub fn next(&mut self) -> u32 {
+    pub fn generate(&mut self) -> u32 {
         let Self { state } = self;
 
-        let result = Self::rotl(state[1] * 5, 7) * 9;
+        let result = u32::rotate_left(state[1] * 5, 7) * 9;
 
         let t = state[1] << 9;
         state[2] ^= state[0];
@@ -30,7 +30,7 @@ impl RandomXoshiro128 {
         state[1] ^= state[2];
         state[0] ^= state[3];
         state[2] ^= t;
-        state[3] = Self::rotl(state[3], 11);
+        state[3] = u32::rotate_left(state[3], 11);
 
         result
     }
@@ -42,10 +42,15 @@ impl RandomXoshiro128 {
         } = range;
 
         let r = high - low + 1;
-        (self.next() % r) + low
+        (self.generate() % r) + low
     }
+}
 
-    fn rotl(x: u32, k: u32) -> u32 {
-        (x << k) | (x >> (32 - k))
+impl Iterator for RandomXoshiro128 {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self.generate();
+        Some(item)
     }
 }

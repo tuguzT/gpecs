@@ -5,13 +5,14 @@ use system::schedule::GpuSystemSchedule;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, BindingResource, Buffer,
     BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features,
-    QuerySet, QuerySetDescriptor, QueryType, ShaderModule,
+    QuerySet, QuerySetDescriptor, QueryType,
 };
 
 use crate::{
     archetype::error::{DuplicateComponentError, GetComponentsError},
     component::registry::ComponentInfo,
     context::Context,
+    executor::gpu::system::registry::GpuSystemDescriptor,
 };
 
 use self::{
@@ -228,17 +229,12 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    pub fn register_system<I, B>(
+    pub fn register_system<C, B>(
         &mut self,
-        shader_module: ShaderModule,
-        workgroup_count: Option<u32>,
-        entry_point: Option<&str>,
-        bind_entities: bool,
-        bind_components: I,
-        additional_bindings: B,
+        descriptor: GpuSystemDescriptor<C, B>,
     ) -> Result<GpuSystemId, DuplicateComponentError>
     where
-        I: IntoIterator<Item = GpuComponentId>,
+        C: IntoIterator<Item = GpuComponentId>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
         let &mut Self {
@@ -247,18 +243,9 @@ impl<'context> GpuExecutor<'context> {
             ref mut systems,
             ..
         } = self;
-        let components = context.components();
 
-        systems.register_system(
-            components,
-            device,
-            shader_module,
-            workgroup_count,
-            entry_point,
-            bind_entities,
-            bind_components,
-            additional_bindings,
-        )
+        let components = context.components();
+        systems.register_system(components, device, descriptor)
     }
 
     #[inline]
@@ -526,7 +513,7 @@ impl<'context> GpuExecutor<'context> {
                 let bind_group = device.create_bind_group(&bind_group_desc);
 
                 let system_archetypes = schedule_cache.entry(system_id).or_default();
-                if let Some(_) = system_archetypes.insert(archetype_id, bind_group) {
+                if system_archetypes.insert(archetype_id, bind_group).is_some() {
                     unreachable!(
                         "archetype {archetype_id:?} cannot have multiple bind groups for system {system_id:?}"
                     );

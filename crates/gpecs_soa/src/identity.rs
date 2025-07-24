@@ -40,7 +40,8 @@ impl<T> Identity<T> {
     }
 }
 
-pub trait IdentityPtr<T: ?Sized> {
+pub trait IdentityPtr<T: ?Sized>: private::Sealed {
+    #[allow(clippy::wrong_self_convention, reason = "method of pointer type")]
     fn as_inner_ptr(self) -> *const T;
 }
 
@@ -54,7 +55,8 @@ where
     }
 }
 
-pub trait IdentityMutPtr<T: ?Sized> {
+pub trait IdentityMutPtr<T: ?Sized>: private::Sealed {
+    #[allow(clippy::wrong_self_convention, reason = "method of pointer type")]
     fn as_inner_mut_ptr(self) -> *mut T;
 }
 
@@ -68,7 +70,8 @@ where
     }
 }
 
-pub trait IdentitySlicePtr<T> {
+pub trait IdentitySlicePtr<T>: private::Sealed {
+    #[allow(clippy::wrong_self_convention, reason = "method of pointer type")]
     fn as_inner_ptr(self) -> *const [T];
 }
 
@@ -79,7 +82,8 @@ impl<T> IdentitySlicePtr<T> for *const [Identity<T>] {
     }
 }
 
-pub trait IdentitySliceMutPtr<T> {
+pub trait IdentitySliceMutPtr<T>: private::Sealed {
+    #[allow(clippy::wrong_self_convention, reason = "method of pointer type")]
     fn as_inner_mut_ptr(self) -> *mut [T];
 }
 
@@ -90,7 +94,7 @@ impl<T> IdentitySliceMutPtr<T> for *mut [Identity<T>] {
     }
 }
 
-pub trait IdentitySlice<T> {
+pub trait IdentitySlice<T>: private::Sealed {
     fn as_inner(&self) -> &[T];
     fn as_inner_mut(&mut self) -> &mut [T];
 }
@@ -107,6 +111,22 @@ impl<T> IdentitySlice<T> for [Identity<T>] {
         let inner = ptr::from_mut(self).as_inner_mut_ptr();
         unsafe { &mut *inner }
     }
+}
+
+mod private {
+    use super::Identity;
+
+    pub trait Sealed {}
+
+    impl<T> Sealed for *const Identity<T> where T: ?Sized {}
+
+    impl<T> Sealed for *mut Identity<T> where T: ?Sized {}
+
+    impl<T> Sealed for *const [Identity<T>] {}
+
+    impl<T> Sealed for *mut [Identity<T>] {}
+
+    impl<T> Sealed for [Identity<T>] {}
 }
 
 impl<T> From<T> for Identity<T> {

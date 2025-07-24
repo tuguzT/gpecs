@@ -33,7 +33,8 @@ where
 
         let buffer = vec.buffer.ptr();
         let context = vec.context();
-        let ptrs = unsafe { transmute(T::ptrs_to_nonnull(context, vec.buffer.ptrs())) };
+        let ptrs = unsafe { T::ptrs_to_nonnull(context, vec.buffer.ptrs()) };
+        let ptrs = unsafe { transmute::<T::NonNullPtrs<'_>, T::NonNullPtrs<'_>>(ptrs) };
         Self {
             buffer: unsafe { NonNull::new_unchecked(buffer) },
             capacity: vec.capacity(),

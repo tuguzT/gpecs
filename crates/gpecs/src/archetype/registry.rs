@@ -224,7 +224,7 @@ impl ArchetypeRegistry {
         key: ArchetypeKey,
     ) -> ArchetypeId {
         let f = |components| ArchetypeStorage::new(components, component_ids.iter().copied());
-        Self::register(archetypes, graph, components, &component_ids, key, f)
+        Self::register(archetypes, graph, components, component_ids, key, f)
     }
 
     #[inline]
@@ -277,7 +277,7 @@ impl ArchetypeRegistry {
         let id = archetype_id_from_usize(index);
 
         let info = ArchetypeInfo { id, storage };
-        if let Some(_) = archetypes.insert(key, info) {
+        if archetypes.insert(key, info).is_some() {
             unreachable!("duplicate archetype registration")
         }
 
@@ -494,7 +494,7 @@ impl ArchetypeRegistry {
         let Some(component_id) = component_ids.into_iter().next() else {
             unreachable!("bundle should contain at least one component")
         };
-        return MissingComponentError::new(component_id).into();
+        MissingComponentError::new(component_id).into()
     }
 
     #[inline]
@@ -632,11 +632,11 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
         let fields = {
-            let context = DefaultContext::default();
-            into_erased_fields::<B>(components, &context, component_ids, value)
+            let context = &DefaultContext::default();
+            into_erased_fields::<B>(components, context, component_ids, value)
         };
         fields.into_iter().for_each(|(component_id, field)| {
-            if let Some(_) = old_fields.insert(component_id, field) {
+            if old_fields.insert(component_id, field).is_some() {
                 unreachable!("duplicated component {component_id:?}")
             }
         });
@@ -696,8 +696,8 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
         let fields = {
-            let context = DefaultContext::default();
-            into_erased_fields::<B>(components, &context, component_ids, value)
+            let context = &DefaultContext::default();
+            into_erased_fields::<B>(components, context, component_ids, value)
         };
 
         let mut fields_to_drop = ErasedComponents::new();
@@ -705,7 +705,7 @@ impl ArchetypeRegistry {
             let Some(to_drop) = old_fields.insert(component_id, field) else {
                 return;
             };
-            if let Some(_) = fields_to_drop.insert(component_id, to_drop) {
+            if fields_to_drop.insert(component_id, to_drop).is_some() {
                 unreachable!("duplicated component {component_id:?}")
             }
         });
@@ -785,10 +785,11 @@ impl ArchetypeRegistry {
                 (component_id, field)
             })
             .collect();
+
         #[allow(unsafe_code)]
         let value = unsafe {
-            let context = DefaultContext::default();
-            from_erased_fields(components, &context, component_ids, fields)
+            let context = &DefaultContext::default();
+            from_erased_fields(components, context, component_ids, fields)
         };
 
         let new_fields = old_fields;
@@ -1020,7 +1021,7 @@ impl ArchetypeRegistry {
     ) -> ArchetypeId {
         let Some(archetype_id) = archetype_id else {
             let key = component_ids.iter().copied().collect();
-            return Self::register_from_slice(archetypes, graph, components, &component_ids, key);
+            return Self::register_from_slice(archetypes, graph, components, component_ids, key);
         };
         if let &[component_id] = component_ids {
             if let Some(archetype_id) =
@@ -1773,15 +1774,15 @@ where
 {
     fn clone(&self) -> Self {
         let Self {
-            archetypes,
+            ref archetypes,
             components,
             phantom,
-        } = self;
+        } = *self;
 
         Self {
             archetypes: archetypes.clone(),
             components,
-            phantom: phantom.clone(),
+            phantom,
         }
     }
 }

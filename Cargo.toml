@@ -58,7 +58,7 @@ missing_docs = "allow"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_arch, values("spirv"))'] }
 
 [workspace.lints.clippy]
-all = "warn"
+all = { level = "warn", priority = -1 }
 # TODO make it "warn" after implementation & tests
 missing_safety_doc = "allow"
 

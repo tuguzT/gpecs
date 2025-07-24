@@ -94,6 +94,7 @@ unsafe impl Soa for () {
     }
 
     #[inline]
+    #[allow(clippy::zst_offset, reason = "reference to other manual impls")]
     unsafe fn ptrs_add<'context>(
         _context: &'context Self::Context,
         ptrs: Self::Ptrs<'context>,
@@ -103,6 +104,7 @@ unsafe impl Soa for () {
     }
 
     #[inline]
+    #[allow(clippy::zst_offset, reason = "reference to other manual impls")]
     unsafe fn ptrs_add_mut<'context>(
         _context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,

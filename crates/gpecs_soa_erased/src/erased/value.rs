@@ -88,7 +88,7 @@ impl ErasedSoa {
     {
         let descriptors: Box<[_]> = T::field_descriptors(context)
             .into_iter()
-            .map(|desc| desc.as_ref().clone())
+            .map(|desc| *desc.as_ref())
             .collect();
 
         let layout = T::buffer_layout(context, 1)

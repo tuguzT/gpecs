@@ -108,6 +108,11 @@ impl SliceLenMismatchError {
     }
 
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
     pub fn expected(&self) -> usize {
         let Self { item_size, len, .. } = *self;
         item_size * len

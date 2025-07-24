@@ -211,8 +211,7 @@ impl ErasedFieldSlicePtrIter {
 
         *end -= offset;
         let count = *end * desc.layout().size();
-        let ptr = unsafe { buffer.as_ptr().add(count) };
-        ptr
+        unsafe { buffer.as_ptr().add(count) }
     }
 }
 
@@ -245,7 +244,7 @@ impl Clone for ErasedFieldSlicePtrIter {
 }
 
 #[allow(clippy::while_let_on_iterator)]
-impl<'a> Iterator for ErasedFieldSlicePtrIter {
+impl Iterator for ErasedFieldSlicePtrIter {
     type Item = ErasedFieldPtr;
 
     #[inline]

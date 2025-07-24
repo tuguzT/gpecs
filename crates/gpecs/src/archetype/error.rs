@@ -332,7 +332,7 @@ impl Error for IncompatibleBundleError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[non_exhaustive]
 pub struct TooFewComponentsError;
 

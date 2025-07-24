@@ -55,7 +55,7 @@ impl ComponentDescriptor {
             name: any::type_name::<T>().into(),
             type_id: Some(TypeId::of::<T>()),
             desc: FieldDescriptor::of::<T>(),
-            drop_fn: mem::needs_drop::<T>().then(|| to_drop),
+            drop_fn: mem::needs_drop::<T>().then_some(to_drop),
         }
     }
 
@@ -148,13 +148,11 @@ impl ComponentRegistry {
         } = self;
 
         let type_id = TypeId::of::<T>();
-        type_ids
-            .entry(type_id)
-            .or_insert_with(|| {
-                let descriptor = ComponentDescriptor::of::<T>();
-                Self::register_inner(components, descriptor)
-            })
-            .clone()
+        let register = || {
+            let descriptor = ComponentDescriptor::of::<T>();
+            Self::register_inner(components, descriptor)
+        };
+        *type_ids.entry(type_id).or_insert_with(register)
     }
 
     #[inline]

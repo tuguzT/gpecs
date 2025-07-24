@@ -15,7 +15,7 @@ use crate::{
     executor::gpu::component::registry::GpuComponentId,
 };
 
-use super::registry::GpuSystemId;
+use super::registry::{GpuSystemDescriptor, GpuSystemId};
 
 #[derive(Debug)]
 pub struct SystemShader {
@@ -32,21 +32,25 @@ pub struct SystemShader {
 impl SystemShader {
     #[inline]
     #[allow(unsafe_code)]
-    pub(super) fn new<I, B>(
+    pub(super) fn new<C, B>(
         components: &ComponentRegistry,
         gpu_device: &Device,
-        shader_module: ShaderModule,
-        workgroup_count: Option<u32>,
-        entry_point: Option<&str>,
         system_id: GpuSystemId,
-        bind_entities: bool,
-        bind_components: I,
-        additional_bindings: B,
+        descriptor: GpuSystemDescriptor<C, B>,
     ) -> Result<Self, DuplicateComponentError>
     where
-        I: IntoIterator<Item = GpuComponentId>,
+        C: IntoIterator<Item = GpuComponentId>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
+        let GpuSystemDescriptor {
+            shader_module,
+            entry_point,
+            workgroup_count,
+            bind_components,
+            bind_entities,
+            additional_bindings,
+        } = descriptor;
+
         let component_ids = bind_components.into_iter().map(Into::into);
         let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?;
         let component_ids: IndexSet<_> = component_ids
@@ -112,8 +116,9 @@ impl SystemShader {
                 },
                 count: None,
             };
-            if let Some(_) = components_bind_group_layout_entries
+            if components_bind_group_layout_entries
                 .insert(component_id, Some(component_bind_group_layout_entry))
+                .is_some()
             {
                 unreachable!("duplicate component {component_id:?} in shader {system_id:?}");
             };

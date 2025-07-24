@@ -125,7 +125,6 @@ where
         }
     }
 
-    #[must_use]
     fn try_allocate_in(
         context: T::Context,
         capacity: usize,
@@ -174,7 +173,6 @@ where
     }
 
     #[inline]
-    #[must_use]
     pub fn try_with_capacity(
         context: T::Context,
         capacity: usize,
@@ -193,7 +191,6 @@ where
     }
 
     #[inline]
-    #[must_use]
     #[allow(dead_code)]
     pub fn try_with_capacity_zeroed(
         context: T::Context,

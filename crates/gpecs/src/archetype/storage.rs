@@ -480,8 +480,8 @@ impl ArchetypeStorage {
         let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let context = DefaultContext::default();
-        let fields = into_erased_fields::<B>(components, &context, bundle_component_ids, value);
+        let context = &DefaultContext::default();
+        let fields = into_erased_fields::<B>(components, context, bundle_component_ids, value);
         let Some(fields) =
             ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
         else {
@@ -491,7 +491,7 @@ impl ArchetypeStorage {
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
         let value =
-            unsafe { from_erased_fields::<B>(components, &context, bundle_component_ids, fields) };
+            unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))
     }
 
@@ -520,10 +520,9 @@ impl ArchetypeStorage {
         let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let value = unsafe {
-            let context = DefaultContext::default();
-            from_erased_fields::<B>(components, &context, bundle_component_ids, fields)
-        };
+        let context = &DefaultContext::default();
+        let value =
+            unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
         Ok(Some(value))
     }
 

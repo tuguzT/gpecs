@@ -29,7 +29,7 @@ where
     #[inline]
     pub fn new(inner: T::NonNullPtrs<'context>) -> Self {
         Self {
-            inner: unsafe { transmute(inner) },
+            inner: unsafe { transmute::<T::NonNullPtrs<'_>, T::NonNullPtrs<'_>>(inner) },
             phantom: PhantomData,
         }
     }

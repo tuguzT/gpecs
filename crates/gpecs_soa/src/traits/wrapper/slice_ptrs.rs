@@ -29,7 +29,7 @@ where
     #[inline]
     pub fn new(inner: T::SlicePtrs<'context>) -> Self {
         Self {
-            inner: unsafe { transmute(inner) },
+            inner: unsafe { transmute::<T::SlicePtrs<'_>, T::SlicePtrs<'_>>(inner) },
             phantom: PhantomData,
         }
     }

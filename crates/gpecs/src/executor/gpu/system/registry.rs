@@ -64,6 +64,15 @@ impl GpuSystemInfo {
     }
 }
 
+pub struct GpuSystemDescriptor<'entry_point, Components, Bindings> {
+    pub shader_module: ShaderModule,
+    pub workgroup_count: Option<u32>,
+    pub entry_point: Option<&'entry_point str>,
+    pub bind_entities: bool,
+    pub bind_components: Components,
+    pub additional_bindings: Bindings,
+}
+
 #[derive(Debug, Default)]
 pub struct GpuSystemRegistry {
     systems: Vec<GpuSystemInfo>,
@@ -78,19 +87,14 @@ impl GpuSystemRegistry {
     }
 
     #[inline]
-    pub fn register_system<I, B>(
+    pub fn register_system<C, B>(
         &mut self,
         components: &ComponentRegistry,
         gpu_device: &Device,
-        shader_module: ShaderModule,
-        workgroup_count: Option<u32>,
-        entry_point: Option<&str>,
-        bind_entities: bool,
-        bind_components: I,
-        additional_bindings: B,
+        descriptor: GpuSystemDescriptor<C, B>,
     ) -> Result<GpuSystemId, DuplicateComponentError>
     where
-        I: IntoIterator<Item = GpuComponentId>,
+        C: IntoIterator<Item = GpuComponentId>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
         let Self { systems } = self;
@@ -98,17 +102,7 @@ impl GpuSystemRegistry {
         let index = systems.len();
         let id = gpu_system_id_from_usize(index);
 
-        let shader = SystemShader::new(
-            components,
-            gpu_device,
-            shader_module,
-            workgroup_count,
-            entry_point,
-            id,
-            bind_entities,
-            bind_components,
-            additional_bindings,
-        )?;
+        let shader = SystemShader::new(components, gpu_device, id, descriptor)?;
         let info = GpuSystemInfo { id, shader };
         systems.push(info);
 

@@ -27,7 +27,7 @@ where
     #[inline]
     pub fn new(inner: T::FieldDescriptors<'context>) -> Self {
         Self {
-            inner: unsafe { transmute(inner) },
+            inner: unsafe { transmute::<T::FieldDescriptors<'_>, T::FieldDescriptors<'_>>(inner) },
             phantom: PhantomData,
         }
     }

@@ -198,7 +198,7 @@ where
     pub fn insert(self, value: V) -> V::RefsMut<'a, 'a> {
         let Self { key, container, .. } = self;
 
-        if let Err(_) = container.try_insert(key, value) {
+        if container.try_insert(key, value).is_err() {
             unreachable!()
         }
 
@@ -214,7 +214,7 @@ where
             phantom,
         } = self;
 
-        if let Err(_) = container.try_insert(key, value) {
+        if container.try_insert(key, value).is_err() {
             unreachable!()
         }
         let dense_index = container.slices().len() - 1;

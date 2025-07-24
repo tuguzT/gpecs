@@ -395,7 +395,7 @@ fn init_components(
         .get_bundle_mut::<(Position, Player, Health, Damage, Sprite)>(entity)
         .expect("entity should be present & have all these components");
 
-    let mut rng = RandomXoshiro128::new(rng.next());
+    let mut rng = RandomXoshiro128::new(rng.generate());
     let r#type = player_type.unwrap_or_else(|| {
         let rate = rng.range(1..100);
         match rate {
@@ -558,15 +558,16 @@ fn register_gpu_systems(
         },
         count: None,
     };
+    let update_position_system_descriptor = GpuSystemDescriptor {
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_position"),
+        workgroup_count: Some(64),
+        bind_entities: false,
+        bind_components: [position_id, velocity_id],
+        additional_bindings: [time_delta_uniform_buffer_entry],
+    };
     let update_position_system = executor
-        .register_system(
-            shader_module.clone(),
-            Some(64),
-            Some("update_position"),
-            false,
-            [position_id, velocity_id],
-            [time_delta_uniform_buffer_entry],
-        )
+        .register_system(update_position_system_descriptor)
         .expect("archetype components should be unique");
     executor.add_system(update_position_system);
 
@@ -574,63 +575,68 @@ fn register_gpu_systems(
         binding: 1,
         ..time_delta_uniform_buffer_entry
     };
+    let update_data_system_descriptor = GpuSystemDescriptor {
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_data"),
+        workgroup_count: Some(64),
+        bind_entities: false,
+        bind_components: [data_id],
+        additional_bindings: [time_delta_uniform_buffer_entry],
+    };
     let update_data_system = executor
-        .register_system(
-            shader_module.clone(),
-            Some(64),
-            Some("update_data"),
-            false,
-            [data_id],
-            [time_delta_uniform_buffer_entry],
-        )
+        .register_system(update_data_system_descriptor)
         .expect("archetype components should be unique");
     executor.add_system(update_data_system);
 
+    let update_components_system_descriptor = GpuSystemDescriptor {
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_components"),
+        workgroup_count: Some(64),
+        bind_entities: false,
+        bind_components: [position_id, velocity_id, data_id],
+        additional_bindings: [],
+    };
     let update_components_system = executor
-        .register_system(
-            shader_module.clone(),
-            Some(64),
-            Some("update_components"),
-            false,
-            [position_id, velocity_id, data_id],
-            [],
-        )
+        .register_system(update_components_system_descriptor)
         .expect("archetype components should be unique");
     executor.add_system(update_components_system);
 
+    let update_health_system_descriptor = GpuSystemDescriptor {
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_health"),
+        workgroup_count: Some(64),
+        bind_entities: false,
+        bind_components: [health_id],
+        additional_bindings: [],
+    };
     let update_health_system = executor
-        .register_system(
-            shader_module.clone(),
-            Some(64),
-            Some("update_health"),
-            false,
-            [health_id],
-            [],
-        )
+        .register_system(update_health_system_descriptor)
         .expect("archetype components should be unique");
     executor.add_system(update_health_system);
 
+    let update_damage_system_descriptor = GpuSystemDescriptor {
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_damage"),
+        workgroup_count: Some(64),
+        bind_entities: false,
+        bind_components: [health_id, damage_id],
+        additional_bindings: [],
+    };
     let update_damage_system = executor
-        .register_system(
-            shader_module.clone(),
-            Some(64),
-            Some("update_damage"),
-            false,
-            [health_id, damage_id],
-            [],
-        )
+        .register_system(update_damage_system_descriptor)
         .expect("archetype components should be unique");
     executor.add_system(update_damage_system);
 
+    let update_sprite_system_descriptor = GpuSystemDescriptor {
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_sprite"),
+        workgroup_count: Some(64),
+        bind_entities: false,
+        bind_components: [sprite_id, player_id, health_id],
+        additional_bindings: [],
+    };
     let update_sprite_system = executor
-        .register_system(
-            shader_module.clone(),
-            Some(64),
-            Some("update_sprite"),
-            false,
-            [sprite_id, player_id, health_id],
-            [],
-        )
+        .register_system(update_sprite_system_descriptor)
         .expect("archetype components should be unique");
     executor.add_system(update_sprite_system);
 
@@ -664,15 +670,16 @@ fn register_gpu_systems(
         },
         count: None,
     };
+    let render_sprite_system_descriptor = GpuSystemDescriptor {
+        shader_module,
+        entry_point: Some("render_sprite"),
+        workgroup_count: Some(64),
+        bind_entities: false,
+        bind_components: [position_id, sprite_id],
+        additional_bindings: [framebuffer_data_entry, framebuffer_desc_entry],
+    };
     let render_sprite_system = executor
-        .register_system(
-            shader_module,
-            Some(64),
-            Some("render_sprite"),
-            false,
-            [position_id, sprite_id],
-            [framebuffer_data_entry, framebuffer_desc_entry],
-        )
+        .register_system(render_sprite_system_descriptor)
         .expect("archetype components should be unique");
     executor.add_system(render_sprite_system);
 

@@ -47,7 +47,7 @@ fn main() {
     }
 
     // Return context from the executor
-    let mut context = executor.into_context();
+    let _ = executor.into_context();
 
     let (device, queue) = init_wgpu();
 
@@ -68,27 +68,29 @@ fn main() {
     let shader_module = init_wgpu_shader(&device);
 
     let position_gpu_id = executor.register_component::<Position>();
+    let position_gpu_system_descriptor = GpuSystemDescriptor {
+        shader_module: shader_module.clone(),
+        entry_point: Some("update_entity_position"),
+        workgroup_count: Some(64),
+        bind_entities: true,
+        bind_components: [position_gpu_id],
+        additional_bindings: [],
+    };
     let positions_gpu_system_id = executor
-        .register_system(
-            shader_module.clone(),
-            Some(64),
-            Some("update_entity_position"),
-            true,
-            [position_gpu_id],
-            [],
-        )
+        .register_system(position_gpu_system_descriptor)
         .expect("GPU system by shader module should be registered");
 
     let mass_gpu_id = executor.register_component::<Mass>();
+    let mass_gpu_system_descriptor = GpuSystemDescriptor {
+        shader_module,
+        entry_point: Some("update_entity_mass"),
+        workgroup_count: Some(64),
+        bind_entities: true,
+        bind_components: [mass_gpu_id],
+        additional_bindings: [],
+    };
     let mass_gpu_system_id = executor
-        .register_system(
-            shader_module,
-            Some(64),
-            Some("update_entity_mass"),
-            true,
-            [mass_gpu_id],
-            [],
-        )
+        .register_system(mass_gpu_system_descriptor)
         .expect("GPU system by shader module should be registered");
 
     let _tag_gpu_id = executor.register_component::<Tag>();
@@ -486,7 +488,7 @@ fn _wgpu_copy_into_position_tag_download_buffer(
         command_encoder.copy_buffer_to_buffer(
             position_tag_positions_binding.buffer,
             position_tag_positions_binding.offset,
-            &position_tag_download_buffer,
+            position_tag_download_buffer,
             0,
             position_tag_positions_binding.size.unwrap().get(),
         );

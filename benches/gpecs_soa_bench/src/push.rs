@@ -25,6 +25,7 @@ pub trait Push: SoaVecs {
 }
 
 impl Push for Zero {
+    #[allow(clippy::let_unit_value, reason = "reference for other manual impls")]
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self) {
         let value = black_box(value);
         vecs.push(value);

@@ -13,10 +13,7 @@ impl ErasedSoaContext {
     where
         I: IntoIterator<Item: AsRef<FieldDescriptor>>,
     {
-        let descriptors = descriptors
-            .into_iter()
-            .map(|desc| desc.as_ref().clone())
-            .collect();
+        let descriptors = descriptors.into_iter().map(|desc| *desc.as_ref()).collect();
         Self { descriptors }
     }
 

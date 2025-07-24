@@ -331,7 +331,7 @@ impl Context {
             let kind = EntityNotFoundError::new(entity).into();
             return Err(InsertBundleExactError { value, kind });
         };
-        let location = archetype_id.clone().into();
+        let location = (*archetype_id).into();
         let new_archetype_id =
             archetypes.insert_bundle_exact_with::<B>(components, entity, value, location)?;
         *archetype_id = Some(new_archetype_id);
@@ -354,7 +354,7 @@ impl Context {
             let kind = EntityNotFoundError::new(entity).into();
             return Err(InsertBundleError { value, kind });
         };
-        let location = archetype_id.clone().into();
+        let location = (*archetype_id).into();
         let new_archetype_id =
             archetypes.insert_bundle_with::<B>(components, entity, value, location)?;
         *archetype_id = Some(new_archetype_id);
@@ -376,7 +376,7 @@ impl Context {
         let Some(archetype_id) = entities.get_mut(entity) else {
             return Err(EntityNotFoundError::new(entity).into());
         };
-        let location = archetype_id.clone().into();
+        let location = (*archetype_id).into();
         let new_archetype_id = archetypes.remove_bundle_with::<B>(components, entity, location)?;
         *archetype_id = new_archetype_id;
         Ok(())
@@ -397,7 +397,7 @@ impl Context {
         let Some(archetype_id) = entities.get_mut(entity) else {
             return Err(EntityNotFoundError::new(entity).into());
         };
-        let location = archetype_id.clone().into();
+        let location = (*archetype_id).into();
         let (value, new_archetype_id) =
             archetypes.remove_bundle_exact_with::<B>(components, entity, location)?;
         *archetype_id = new_archetype_id;

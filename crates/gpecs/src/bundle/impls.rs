@@ -18,6 +18,8 @@ unsafe impl<T> Bundle for Identity<T>
 where
     T: Component,
 {
+    const CONTEXT: &'static Self::Context = &();
+
     type MaybeComponentIds = [Option<ComponentId>; 1];
 
     #[inline]
@@ -35,10 +37,7 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_iter<'context, I>(
-        components: &ComponentRegistry,
-        iter: I,
-    ) -> Self::MutPtrs<'context>
+    unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> Self::MutPtrs<'static>
     where
         I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
     {
@@ -59,6 +58,8 @@ macro_rules! bundle_tuple_impl {
         where
             $($types: Component,)*
         {
+            const CONTEXT: &'static Self::Context = &();
+
             type MaybeComponentIds = [Option<ComponentId>; count_idents!($($types,)*)];
 
             #[inline]
@@ -82,10 +83,7 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_from_iter<'context, _I>(
-                components: &ComponentRegistry,
-                iter: _I,
-            ) -> Self::MutPtrs<'context>
+            unsafe fn ptrs_from_iter<_I>(components: &ComponentRegistry, iter: _I) -> Self::MutPtrs<'static>
             where
                 _I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
             {

@@ -16,16 +16,12 @@ mod desc;
 mod utils;
 mod wrapper;
 
-/// Type of [context](Soa::Context) which should be used for [`Soa`] trait implementations
-/// which fields' size and alignment are known at compile-time.
-pub type DefaultContext = ();
-
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays (or SoA) pattern.
 pub unsafe trait Soa: Sized {
     /// Type of context used to perform all operations of this trait.
     ///
-    /// Most of the time, this should be [unit](DefaultContext) type.
+    /// Most of the time, this should be zero-sized type.
     /// This is true for all the types with fields' size and alignment known at compile-time.
     type Context;
 

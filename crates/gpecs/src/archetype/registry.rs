@@ -28,10 +28,7 @@ use crate::{
         utils::{try_collect_component_ids, try_collect_maybe_component_ids},
     },
     entity::Entity,
-    soa::{
-        slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
-        traits::DefaultContext,
-    },
+    soa::slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
 };
 
 use super::{
@@ -631,10 +628,7 @@ impl ArchetypeRegistry {
 
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
-        let fields = {
-            let context = &DefaultContext::default();
-            into_erased_fields::<B>(components, context, component_ids, value)
-        };
+        let fields = into_erased_fields::<B>(components, B::CONTEXT, component_ids, value);
         fields.into_iter().for_each(|(component_id, field)| {
             if old_fields.insert(component_id, field).is_some() {
                 unreachable!("duplicated component {component_id:?}")
@@ -695,10 +689,7 @@ impl ArchetypeRegistry {
 
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
-        let fields = {
-            let context = &DefaultContext::default();
-            into_erased_fields::<B>(components, context, component_ids, value)
-        };
+        let fields = into_erased_fields::<B>(components, B::CONTEXT, component_ids, value);
 
         let mut fields_to_drop = ErasedComponents::new();
         fields.into_iter().for_each(|(component_id, field)| {
@@ -787,10 +778,7 @@ impl ArchetypeRegistry {
             .collect();
 
         #[allow(unsafe_code)]
-        let value = unsafe {
-            let context = &DefaultContext::default();
-            from_erased_fields(components, context, component_ids, fields)
-        };
+        let value = unsafe { from_erased_fields(components, B::CONTEXT, component_ids, fields) };
 
         let new_fields = old_fields;
         Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);
@@ -1840,10 +1828,7 @@ where
         };
 
         let entities = entities.iter().copied();
-        let components = {
-            const CONTEXT: DefaultContext = ();
-            SoaSlices::<B>::new(&CONTEXT, components)
-        };
+        let components = SoaSlices::new(B::CONTEXT, components);
         entities.zip(components)
     }
 }
@@ -2078,10 +2063,7 @@ where
         };
 
         let entities = entities.iter().copied();
-        let components = {
-            const CONTEXT: DefaultContext = ();
-            SoaSlicesMut::<B>::new(&CONTEXT, components)
-        };
+        let components = SoaSlicesMut::new(B::CONTEXT, components);
         entities.zip(components)
     }
 }

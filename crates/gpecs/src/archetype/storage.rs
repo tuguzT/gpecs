@@ -25,7 +25,7 @@ use crate::{
         utils::{try_collect_component_ids, try_collect_maybe_component_ids},
     },
     entity::Entity,
-    soa::traits::{DefaultContext, FieldDescriptor, Soa},
+    soa::traits::{FieldDescriptor, Soa},
 };
 
 use super::{
@@ -130,7 +130,7 @@ impl ArchetypeStorage {
             ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
         })?;
 
-        let context = ErasedSoaContext::of::<B>(&DefaultContext::default());
+        let context = ErasedSoaContext::of::<B>(B::CONTEXT);
         let erased_storage = ErasedStorage::with_context(context);
 
         Ok(Self {
@@ -353,7 +353,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn entities(&self) -> &[Entity] {
         let Self { erased_storage, .. } = self;
-        ErasedStorageExt::entities(erased_storage)
+        erased_storage.entities()
     }
 
     #[inline]
@@ -378,9 +378,9 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let (entities, fields) =
-            ErasedStorageExt::components(erased_storage, components, component_ids);
+        let (entities, fields) = erased_storage.erased_components(components, component_ids);
         let components = unsafe { from_erased_slices::<B>(components, entities.len(), fields) };
+        let components = B::upcast_slices(components);
         Ok((entities, components))
     }
 
@@ -400,9 +400,9 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = self;
 
-        let (entities, fields) =
-            ErasedStorageExt::components_mut(erased_storage, components, component_ids);
+        let (entities, fields) = erased_storage.erased_components_mut(components, component_ids);
         let components = unsafe { from_erased_slices_mut::<B>(components, entities.len(), fields) };
+        let components = B::upcast_slices_mut(components);
         Ok((entities, components))
     }
 
@@ -423,11 +423,11 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let Some(fields) = ErasedStorageExt::get(erased_storage, components, component_ids, entity)
-        else {
+        let Some(fields) = erased_storage.get_erased(components, component_ids, entity) else {
             return Ok(None);
         };
         let refs = unsafe { from_erased_refs::<B>(components, fields) };
+        let refs = B::upcast_refs(refs);
         Ok(Some(refs))
     }
 
@@ -448,12 +448,11 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = self;
 
-        let Some(fields) =
-            ErasedStorageExt::get_mut(erased_storage, components, component_ids, entity)
-        else {
+        let Some(fields) = erased_storage.get_erased_mut(components, component_ids, entity) else {
             return Ok(None);
         };
         let refs = unsafe { from_erased_refs_mut::<B>(components, fields) };
+        let refs = B::upcast_refs_mut(refs);
         Ok(Some(refs))
     }
 
@@ -480,18 +479,17 @@ impl ArchetypeStorage {
         let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let context = &DefaultContext::default();
-        let fields = into_erased_fields::<B>(components, context, bundle_component_ids, value);
-        let Some(fields) =
-            ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
+        let fields = into_erased_fields::<B>(components, B::CONTEXT, bundle_component_ids, value);
+        let Some(fields) = erased_storage.insert_erased(components, component_ids, entity, fields)
         else {
             return Ok(None);
         };
         let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let value =
-            unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
+        let value = unsafe {
+            from_erased_fields::<B>(components, B::CONTEXT, bundle_component_ids, fields)
+        };
         Ok(Some(value))
     }
 
@@ -512,17 +510,15 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = self;
 
-        let Some(fields) =
-            ErasedStorageExt::remove(erased_storage, components, component_ids, entity)
-        else {
+        let Some(fields) = erased_storage.remove_erased(components, component_ids, entity) else {
             return Ok(None);
         };
         let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let context = &DefaultContext::default();
-        let value =
-            unsafe { from_erased_fields::<B>(components, context, bundle_component_ids, fields) };
+        let value = unsafe {
+            from_erased_fields::<B>(components, B::CONTEXT, bundle_component_ids, fields)
+        };
         Ok(Some(value))
     }
 
@@ -566,8 +562,7 @@ impl ArchetypeStorage {
             ref component_ids,
             ref mut erased_storage,
         } = self;
-
-        ErasedStorageExt::insert(erased_storage, components, component_ids, entity, fields)
+        erased_storage.insert_erased(components, component_ids, entity, fields)
     }
 
     #[inline]
@@ -581,8 +576,7 @@ impl ArchetypeStorage {
             ref component_ids,
             ref mut erased_storage,
         } = self;
-
-        ErasedStorageExt::remove(erased_storage, components, component_ids, entity)
+        erased_storage.remove_erased(components, component_ids, entity)
     }
 
     #[inline]
@@ -595,8 +589,7 @@ impl ArchetypeStorage {
             component_ids,
             erased_storage,
         } = self;
-
-        ErasedStorageExt::components(erased_storage, components, component_ids)
+        erased_storage.erased_components(components, component_ids)
     }
 
     #[inline]
@@ -610,8 +603,7 @@ impl ArchetypeStorage {
             component_ids,
             erased_storage,
         } = self;
-
-        ErasedStorageExt::components_mut(erased_storage, components, component_ids)
+        erased_storage.erased_components_mut(components, component_ids)
     }
 }
 
@@ -727,19 +719,19 @@ impl FusedIterator for ComponentIds<'_> {}
 trait ErasedStorageExt {
     fn entities(&self) -> &[Entity];
 
-    fn components(
+    fn erased_components(
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_>>);
 
-    fn components_mut(
+    fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_>>);
 
-    fn insert(
+    fn insert_erased(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
@@ -747,21 +739,21 @@ trait ErasedStorageExt {
         fields: ErasedComponents<ErasedField>,
     ) -> Option<ErasedComponents<ErasedField>>;
 
-    fn remove(
+    fn remove_erased(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedField>>;
 
-    fn get(
+    fn get_erased(
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>>;
 
-    fn get_mut(
+    fn get_erased_mut(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
@@ -779,7 +771,7 @@ impl ErasedStorageExt for ErasedStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    fn components(
+    fn erased_components(
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
@@ -800,7 +792,7 @@ impl ErasedStorageExt for ErasedStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    fn components_mut(
+    fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
@@ -821,7 +813,7 @@ impl ErasedStorageExt for ErasedStorage {
 
     #[inline]
     #[allow(unsafe_code)]
-    fn insert(
+    fn insert_erased(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
@@ -841,7 +833,7 @@ impl ErasedStorageExt for ErasedStorage {
     }
 
     #[inline]
-    fn remove(
+    fn remove_erased(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
@@ -856,7 +848,7 @@ impl ErasedStorageExt for ErasedStorage {
     }
 
     #[inline]
-    fn get(
+    fn get_erased(
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
@@ -873,7 +865,7 @@ impl ErasedStorageExt for ErasedStorage {
     }
 
     #[inline]
-    fn get_mut(
+    fn get_erased_mut(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,

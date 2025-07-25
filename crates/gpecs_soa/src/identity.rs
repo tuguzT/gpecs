@@ -7,8 +7,7 @@ use core::{
 };
 
 use crate::traits::{
-    DefaultContext, FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields,
-    impls::debug_assert_ptr_is_aligned,
+    FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields, impls::debug_assert_ptr_is_aligned,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
@@ -238,8 +237,8 @@ where
 }
 
 unsafe impl<T> Soa for Identity<T> {
-    type Context = DefaultContext;
-    type Fields = Identity<T>;
+    type Context = ();
+    type Fields = Self;
 
     type FieldDescriptors<'context> = [FieldDescriptor; 1];
 

@@ -6,7 +6,7 @@ use core::{
     slice,
 };
 
-use super::{DefaultContext, FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
+use super::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
 
 #[inline]
 #[track_caller]
@@ -22,7 +22,7 @@ pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
 }
 
 unsafe impl Soa for () {
-    type Context = DefaultContext;
+    type Context = Self;
     type Fields = Self;
 
     type FieldDescriptors<'context> = [FieldDescriptor; 1];
@@ -541,7 +541,7 @@ macro_rules! soa_tuple_impl {
         }
 
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
-            type Context = DefaultContext;
+            type Context = ();
             type Fields = Self;
 
             type FieldDescriptors<'context> = [FieldDescriptor; count_idents!($($types,)*)];

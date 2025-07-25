@@ -34,7 +34,7 @@ mod partial_ord;
 
 pub struct SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     pub(super) buffer: RawSoaVec<T>,
     len: usize,
@@ -42,7 +42,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     pub fn new() -> Self
@@ -342,6 +342,202 @@ where
         }
     }
 
+    #[inline]
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut(T::Refs<'_, '_>) -> bool,
+    {
+        let context = ptr::from_ref(self.context());
+        self.retain_mut(|refs| {
+            let refs = T::upcast_refs_mut(refs);
+            let refs = T::refs_mut_as_refs(unsafe { &*context }, refs);
+            f(refs)
+        })
+    }
+
+    pub fn retain_mut<F>(&mut self, mut f: F)
+    where
+        F: FnMut(T::RefsMut<'_, '_>) -> bool,
+    {
+        let original_len = self.len();
+        // Avoid double drop if the drop guard is not executed,
+        // since we may make some holes during the process.
+        unsafe { self.set_len(0) };
+
+        // Vec: [Kept, Kept, Hole, Hole, Hole, Hole, Unchecked, Unchecked]
+        //      |<-              processed len   ->| ^- next to check
+        //                  |<-  deleted cnt     ->|
+        //      |<-              original_len                          ->|
+        // Kept: Elements which predicate returns true on.
+        // Hole: Moved or dropped element slot.
+        // Unchecked: Unchecked valid elements.
+        //
+        // This drop guard will be invoked when predicate or `drop` of element panicked.
+        // It shifts unchecked elements to cover holes and `set_len` to the correct length.
+        // In cases when predicate and `drop` never panick, it will be optimized out.
+        struct BackshiftOnDrop<'a, T>
+        where
+            T: Soa + ?Sized,
+        {
+            v: &'a mut SoaVec<T>,
+            processed_len: usize,
+            deleted_cnt: usize,
+            original_len: usize,
+        }
+
+        impl<T> Drop for BackshiftOnDrop<'_, T>
+        where
+            T: Soa + ?Sized,
+        {
+            fn drop(&mut self) {
+                if self.deleted_cnt > 0 {
+                    // SAFETY: Trailing unchecked items must be valid since we never touch them.
+                    unsafe {
+                        let ptrs = self.v.buffer.ptrs();
+                        let context = self.v.context();
+
+                        T::ptrs_copy(
+                            context,
+                            T::ptrs_add(
+                                context,
+                                T::ptrs_cast_const(context, ptrs.clone()),
+                                self.processed_len,
+                            ),
+                            T::ptrs_add_mut(context, ptrs, self.processed_len - self.deleted_cnt),
+                            self.original_len - self.processed_len,
+                        );
+                    }
+                }
+                // SAFETY: After filling holes, all items are in contiguous memory.
+                unsafe {
+                    self.v.set_len(self.original_len - self.deleted_cnt);
+                }
+            }
+        }
+
+        let mut g = BackshiftOnDrop {
+            v: self,
+            processed_len: 0,
+            deleted_cnt: 0,
+            original_len,
+        };
+
+        fn process_loop<F, T, const DELETED: bool>(
+            original_len: usize,
+            f: &mut F,
+            g: &mut BackshiftOnDrop<'_, T>,
+        ) where
+            T: Soa + ?Sized,
+            F: FnMut(T::RefsMut<'_, '_>) -> bool,
+        {
+            while g.processed_len != original_len {
+                let ptrs = g.v.buffer.ptrs();
+                let context = g.v.context();
+                // SAFETY: Unchecked element must be valid.
+                let cur = unsafe { T::ptrs_add_mut(context, ptrs, g.processed_len) };
+                let res = unsafe {
+                    let cur = T::ptrs_to_refs_mut(context, cur.clone());
+                    !f(cur)
+                };
+                if res {
+                    // Advance early to avoid double drop if `drop_in_place` panicked.
+                    g.processed_len += 1;
+                    g.deleted_cnt += 1;
+                    // SAFETY: We never touch this element again after dropped.
+                    unsafe {
+                        let context = g.v.context();
+                        T::ptrs_drop_in_place(context, cur);
+                    }
+                    // We already advanced the counter.
+                    if DELETED {
+                        continue;
+                    } else {
+                        break;
+                    }
+                }
+                if DELETED {
+                    // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
+                    // We use copy for move, and never touch this element again.
+                    unsafe {
+                        let ptrs = g.v.buffer.ptrs();
+                        let context = g.v.context();
+                        T::ptrs_copy_nonoverlapping(
+                            context,
+                            T::ptrs_cast_const(context, cur),
+                            T::ptrs_add_mut(context, ptrs, g.processed_len - g.deleted_cnt),
+                            1,
+                        );
+                    }
+                }
+                g.processed_len += 1;
+            }
+        }
+
+        // Stage 1: Nothing was deleted.
+        process_loop::<F, T, false>(original_len, &mut f, &mut g);
+
+        // Stage 2: Some elements were deleted.
+        process_loop::<F, T, true>(original_len, &mut f, &mut g);
+
+        // All item are processed. This can be optimized to `set_len` by LLVM.
+        drop(g);
+    }
+
+    #[track_caller]
+    pub fn extend_from_within<R>(&mut self, src: R)
+    where
+        R: RangeBounds<usize>,
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
+    {
+        let range = range(src, ..self.len());
+        self.reserve(range.len());
+
+        let mut set_len_on_drop = SetLenOnDrop {
+            local_len: self.len(),
+            vec: self,
+        };
+
+        let context = set_len_on_drop.vec.context();
+        for index in range {
+            unsafe {
+                let slices = set_len_on_drop.vec.slices();
+                let refs = T::ptrs_to_refs(context, slices.get_unchecked(index));
+                let dst = T::ptrs_add_mut(
+                    context,
+                    set_len_on_drop.vec.buffer.ptrs(),
+                    set_len_on_drop.local_len,
+                );
+                refs.clone_into_ptrs(context, dst);
+            }
+            set_len_on_drop.local_len += 1;
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn drain<R>(&mut self, range: R) -> Drain<'_, T>
+    where
+        R: RangeBounds<usize>,
+    {
+        Drain::new(self, range)
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        let len = self.len();
+        unsafe { self.set_len(0) }
+
+        let context = self.context();
+        let ptrs = self.buffer.ptrs();
+        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        unsafe { T::slices_drop_in_place(context, slices) }
+    }
+}
+
+impl<T> SoaVec<T>
+where
+    T: Soa,
+{
     pub fn swap_remove(&mut self, index: usize) -> T {
         #[cold]
         #[inline(never)]
@@ -446,147 +642,6 @@ where
         }
     }
 
-    #[inline]
-    pub fn retain<F>(&mut self, mut f: F)
-    where
-        F: FnMut(T::Refs<'_, '_>) -> bool,
-    {
-        let context = ptr::from_ref(self.context());
-        self.retain_mut(|refs| {
-            let refs = T::upcast_refs_mut(refs);
-            let refs = T::refs_mut_as_refs(unsafe { &*context }, refs);
-            f(refs)
-        })
-    }
-
-    pub fn retain_mut<F>(&mut self, mut f: F)
-    where
-        F: FnMut(T::RefsMut<'_, '_>) -> bool,
-    {
-        let original_len = self.len();
-        // Avoid double drop if the drop guard is not executed,
-        // since we may make some holes during the process.
-        unsafe { self.set_len(0) };
-
-        // Vec: [Kept, Kept, Hole, Hole, Hole, Hole, Unchecked, Unchecked]
-        //      |<-              processed len   ->| ^- next to check
-        //                  |<-  deleted cnt     ->|
-        //      |<-              original_len                          ->|
-        // Kept: Elements which predicate returns true on.
-        // Hole: Moved or dropped element slot.
-        // Unchecked: Unchecked valid elements.
-        //
-        // This drop guard will be invoked when predicate or `drop` of element panicked.
-        // It shifts unchecked elements to cover holes and `set_len` to the correct length.
-        // In cases when predicate and `drop` never panick, it will be optimized out.
-        struct BackshiftOnDrop<'a, T>
-        where
-            T: Soa,
-        {
-            v: &'a mut SoaVec<T>,
-            processed_len: usize,
-            deleted_cnt: usize,
-            original_len: usize,
-        }
-
-        impl<T> Drop for BackshiftOnDrop<'_, T>
-        where
-            T: Soa,
-        {
-            fn drop(&mut self) {
-                if self.deleted_cnt > 0 {
-                    // SAFETY: Trailing unchecked items must be valid since we never touch them.
-                    unsafe {
-                        let ptrs = self.v.buffer.ptrs();
-                        let context = self.v.context();
-
-                        T::ptrs_copy(
-                            context,
-                            T::ptrs_add(
-                                context,
-                                T::ptrs_cast_const(context, ptrs.clone()),
-                                self.processed_len,
-                            ),
-                            T::ptrs_add_mut(context, ptrs, self.processed_len - self.deleted_cnt),
-                            self.original_len - self.processed_len,
-                        );
-                    }
-                }
-                // SAFETY: After filling holes, all items are in contiguous memory.
-                unsafe {
-                    self.v.set_len(self.original_len - self.deleted_cnt);
-                }
-            }
-        }
-
-        let mut g = BackshiftOnDrop {
-            v: self,
-            processed_len: 0,
-            deleted_cnt: 0,
-            original_len,
-        };
-
-        fn process_loop<F, T, const DELETED: bool>(
-            original_len: usize,
-            f: &mut F,
-            g: &mut BackshiftOnDrop<'_, T>,
-        ) where
-            T: Soa,
-            F: FnMut(T::RefsMut<'_, '_>) -> bool,
-        {
-            while g.processed_len != original_len {
-                let ptrs = g.v.buffer.ptrs();
-                let context = g.v.context();
-                // SAFETY: Unchecked element must be valid.
-                let cur = unsafe { T::ptrs_add_mut(context, ptrs, g.processed_len) };
-                let res = unsafe {
-                    let cur = T::ptrs_to_refs_mut(context, cur.clone());
-                    !f(cur)
-                };
-                if res {
-                    // Advance early to avoid double drop if `drop_in_place` panicked.
-                    g.processed_len += 1;
-                    g.deleted_cnt += 1;
-                    // SAFETY: We never touch this element again after dropped.
-                    unsafe {
-                        let context = g.v.context();
-                        T::ptrs_drop_in_place(context, cur);
-                    }
-                    // We already advanced the counter.
-                    if DELETED {
-                        continue;
-                    } else {
-                        break;
-                    }
-                }
-                if DELETED {
-                    // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
-                    // We use copy for move, and never touch this element again.
-                    unsafe {
-                        let ptrs = g.v.buffer.ptrs();
-                        let context = g.v.context();
-                        T::ptrs_copy_nonoverlapping(
-                            context,
-                            T::ptrs_cast_const(context, cur),
-                            T::ptrs_add_mut(context, ptrs, g.processed_len - g.deleted_cnt),
-                            1,
-                        );
-                    }
-                }
-                g.processed_len += 1;
-            }
-        }
-
-        // Stage 1: Nothing was deleted.
-        process_loop::<F, T, false>(original_len, &mut f, &mut g);
-
-        // Stage 2: Some elements were deleted.
-        process_loop::<F, T, true>(original_len, &mut f, &mut g);
-
-        // All item are processed. This can be optimized to `set_len` by LLVM.
-        drop(g);
-    }
-
     pub fn push(&mut self, value: T) {
         let len = self.len();
         let capacity = self.capacity();
@@ -609,36 +664,6 @@ where
         }
     }
 
-    #[track_caller]
-    pub fn extend_from_within<R>(&mut self, src: R)
-    where
-        R: RangeBounds<usize>,
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-    {
-        let range = range(src, ..self.len());
-        self.reserve(range.len());
-
-        let mut set_len_on_drop = SetLenOnDrop {
-            local_len: self.len(),
-            vec: self,
-        };
-
-        let context = set_len_on_drop.vec.context();
-        for index in range {
-            unsafe {
-                let slices = set_len_on_drop.vec.slices();
-                let refs = T::ptrs_to_refs(context, slices.get_unchecked(index));
-                let dst = T::ptrs_add_mut(
-                    context,
-                    set_len_on_drop.vec.buffer.ptrs(),
-                    set_len_on_drop.local_len,
-                );
-                refs.clone_into_ptrs(context, dst);
-            }
-            set_len_on_drop.local_len += 1;
-        }
-    }
-
     pub fn pop(&mut self) -> Option<T> {
         let len = self.len();
         if len == 0 {
@@ -656,31 +681,11 @@ where
             Some(value)
         }
     }
-
-    #[inline]
-    #[track_caller]
-    pub fn drain<R>(&mut self, range: R) -> Drain<'_, T>
-    where
-        R: RangeBounds<usize>,
-    {
-        Drain::new(self, range)
-    }
-
-    #[inline]
-    pub fn clear(&mut self) {
-        let len = self.len();
-        unsafe { self.set_len(0) }
-
-        let context = self.context();
-        let ptrs = self.buffer.ptrs();
-        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-        unsafe { T::slices_drop_in_place(context, slices) }
-    }
 }
 
 impl<T> SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     pub fn as_slice(&self) -> &SoaSlice<T>
@@ -738,7 +743,7 @@ where
 
 impl<T> Debug for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     #[inline]
@@ -750,7 +755,7 @@ where
 
 impl<T> Default for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Context: Default,
 {
     #[inline]
@@ -761,7 +766,7 @@ where
 
 impl<T> AsRef<SoaVec<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &SoaVec<T> {
@@ -771,7 +776,7 @@ where
 
 impl<T> AsRef<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &SoaSlice<T> {
@@ -781,7 +786,7 @@ where
 
 impl<T> AsMut<SoaVec<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut SoaVec<T> {
@@ -791,7 +796,7 @@ where
 
 impl<T> AsMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut SoaSlice<T> {
@@ -801,7 +806,7 @@ where
 
 impl<T> Borrow<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn borrow(&self) -> &SoaSlice<T> {
@@ -811,7 +816,7 @@ where
 
 impl<T> BorrowMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn borrow_mut(&mut self) -> &mut SoaSlice<T> {
@@ -821,14 +826,14 @@ where
 
 impl<T> Eq for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Eq,
 {
 }
 
 impl<T> Ord for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -838,7 +843,7 @@ where
 
 impl<T> Hash for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Hash,
 {
     #[inline]
@@ -850,7 +855,7 @@ where
 
 impl<T> Clone for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {
@@ -867,7 +872,7 @@ where
 
 impl<T> Deref for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     type Target = SoaSlice<T>;
 
@@ -882,7 +887,7 @@ where
 
 impl<T> DerefMut for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -895,7 +900,7 @@ where
 
 impl<T, U, I> Index<I> for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     U: ?Sized,
     for<'c, 'any> I: IndexHelper<'c, 'any, T, Output = U>,
 {
@@ -908,7 +913,7 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     U: ?Sized,
     for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
@@ -955,7 +960,7 @@ where
 
 impl<T> From<Box<SoaSlice<T>>> for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn from(value: Box<SoaSlice<T>>) -> Self {
@@ -965,7 +970,7 @@ where
 
 impl<T> From<&SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
@@ -977,7 +982,7 @@ where
 
 impl<T> From<&mut SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
@@ -989,7 +994,7 @@ where
 
 impl<'r, T> IntoIterator for &'r SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::Refs<'r, 'r>;
     type IntoIter = Iter<'r, 'r, T>;
@@ -1002,7 +1007,7 @@ where
 
 impl<'r, T> IntoIterator for &'r mut SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::RefsMut<'r, 'r>;
     type IntoIter = IterMut<'r, 'r, T>;
@@ -1065,7 +1070,7 @@ where
 
 impl<T> Drop for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn drop(&mut self) {
         if self.is_empty() {
@@ -1084,7 +1089,7 @@ where
 #[inline]
 fn actual_capacity<T>(context: &T::Context, capacity: usize) -> usize
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     let buffer_layout =
         buffer_layout::<T>(context, capacity).expect("layout size should not exceed `isize::MAX`");

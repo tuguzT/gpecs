@@ -10,7 +10,7 @@ use super::{SoaSlices, SoaSlicesMut};
 
 pub struct Iter<'c, 'a, T>
 where
-    T: Soa + 'a,
+    T: Soa + ?Sized + 'a,
 {
     context: &'c T::Context,
     ptrs: NonNullPtrs<'c, T>,
@@ -21,7 +21,7 @@ where
 
 impl<'c, 'a, T> Iter<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(slices: SoaSlices<'c, 'a, T>) -> Self {
@@ -101,7 +101,7 @@ where
 
 unsafe impl<T> Send for Iter<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Send,
     T::Context: Send,
 {
@@ -109,7 +109,7 @@ where
 
 unsafe impl<T> Sync for Iter<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Sync,
     T::Context: Sync,
 {
@@ -117,6 +117,7 @@ where
 
 impl<T, U> AsRef<[U]> for Iter<'_, '_, T>
 where
+    T: Soa + ?Sized,
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
@@ -126,7 +127,7 @@ where
 
 impl<T> Debug for Iter<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     #[inline]
@@ -138,7 +139,7 @@ where
 
 impl<T> Clone for Iter<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -162,7 +163,7 @@ where
 #[allow(clippy::while_let_on_iterator)]
 impl<'c, 'a, T> Iterator for Iter<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::Refs<'c, 'a>;
 
@@ -380,7 +381,7 @@ where
 
 impl<T> DoubleEndedIterator for Iter<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -427,7 +428,7 @@ where
 
 impl<T> ExactSizeIterator for Iter<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -435,11 +436,11 @@ where
     }
 }
 
-impl<T> FusedIterator for Iter<'_, '_, T> where T: Soa {}
+impl<T> FusedIterator for Iter<'_, '_, T> where T: Soa + ?Sized {}
 
 pub struct IterMut<'c, 'a, T>
 where
-    T: Soa + 'a,
+    T: Soa + ?Sized + 'a,
 {
     context: &'c T::Context,
     ptrs: NonNullPtrs<'c, T>,
@@ -450,7 +451,7 @@ where
 
 impl<'c, 'a, T> IterMut<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     pub(super) fn new(slices: SoaSlicesMut<'c, 'a, T>) -> Self {
@@ -544,7 +545,7 @@ where
 
 unsafe impl<T> Send for IterMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Send,
     T::Context: Send,
 {
@@ -552,7 +553,7 @@ where
 
 unsafe impl<T> Sync for IterMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Sync,
     T::Context: Sync,
 {
@@ -560,6 +561,7 @@ where
 
 impl<T, U> AsRef<[U]> for IterMut<'_, '_, T>
 where
+    T: Soa + ?Sized,
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
@@ -569,7 +571,7 @@ where
 
 impl<T> Debug for IterMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     #[inline]
@@ -582,7 +584,7 @@ where
 #[allow(clippy::while_let_on_iterator)]
 impl<'c, 'a, T> Iterator for IterMut<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::RefsMut<'c, 'a>;
 
@@ -796,7 +798,7 @@ where
 
 impl<T> DoubleEndedIterator for IterMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -842,7 +844,7 @@ where
 
 impl<T> ExactSizeIterator for IterMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -850,4 +852,4 @@ where
     }
 }
 
-impl<T> FusedIterator for IterMut<'_, '_, T> where T: Soa {}
+impl<T> FusedIterator for IterMut<'_, '_, T> where T: Soa + ?Sized {}

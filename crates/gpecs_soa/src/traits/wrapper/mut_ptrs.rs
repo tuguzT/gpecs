@@ -14,7 +14,7 @@ use crate::traits::Soa;
 #[repr(transparent)]
 pub struct MutPtrs<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     inner: T::MutPtrs<'static>,
     phantom: PhantomData<&'context ()>,
@@ -22,7 +22,7 @@ where
 
 impl<'context, T> MutPtrs<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     /// Creates self from the [mutable pointers](Soa::MutPtrs)
     /// to each field of [`Fields`](Soa::Fields).
@@ -45,7 +45,7 @@ where
 
 impl<T> Debug for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::MutPtrs<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,7 +56,7 @@ where
 
 impl<T> Default for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::MutPtrs<'any>: Default,
 {
     fn default() -> Self {
@@ -69,7 +69,7 @@ where
 
 impl<T> Clone for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -80,14 +80,14 @@ where
 
 impl<T> Copy for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::MutPtrs<'any>: Copy,
 {
 }
 
 impl<T> PartialEq for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::MutPtrs<'any>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -98,14 +98,14 @@ where
 
 impl<T> Eq for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::MutPtrs<'any>: Eq,
 {
 }
 
 impl<T> PartialOrd for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::MutPtrs<'any>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -120,7 +120,7 @@ where
 
 impl<T> Ord for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::MutPtrs<'any>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -135,7 +135,7 @@ where
 
 impl<T> Hash for MutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::MutPtrs<'any>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

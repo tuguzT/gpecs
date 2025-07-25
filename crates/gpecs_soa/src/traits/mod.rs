@@ -18,7 +18,7 @@ mod wrapper;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays (or SoA) pattern.
-pub unsafe trait Soa: Sized {
+pub unsafe trait Soa {
     /// Type of context used to perform all operations of this trait.
     ///
     /// Most of the time, this should be zero-sized type.
@@ -250,35 +250,34 @@ pub unsafe trait Soa: Sized {
         len: usize,
     );
 
+    // TODO semantics (maybe introduce new trait to read data into input if Self is !Sized)
     /// Constructs the value from reading each field to which [src](Soa::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::read()`](core::ptr::read) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self;
+    unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self
+    where
+        Self: Sized;
 
+    // TODO semantics (maybe introduce new trait to write data from input if Self is !Sized)
     /// Overwrites a memory [location](Soa::MutPtrs) of each field of [`Fields`](Soa::Fields)
     /// with the given value without reading or dropping the old value.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::write()`](core::ptr::write) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self);
+    unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self)
+    where
+        Self: Sized;
 
     /// Executes the destructors (if any) for the each field of [`Fields`](Soa::Fields) located at ptrs.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each pointer
     /// should be satisfied to be safe to call this method.
-    ///
-    /// By default, this method just reads the value from ptrs on the stack and then drops it.
-    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs<'_>) {
-        let ptrs = Self::upcast_mut_ptrs(ptrs);
-        let ptrs = Self::ptrs_cast_const(context, ptrs);
-        let value = unsafe { Self::ptrs_read(context, ptrs) };
-        drop(value)
-    }
+    unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs<'_>);
 
     /// Non-empty collection of non-null pointers to each field of [`Fields`](Soa::Fields).
     ///

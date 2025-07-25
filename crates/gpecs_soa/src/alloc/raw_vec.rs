@@ -97,7 +97,7 @@ enum AllocInit {
 
 pub struct RawSoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     ptr: NonNull<BufferData<T>>,
     capacity: usize,
@@ -105,7 +105,7 @@ where
 
 impl<T> RawSoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     // Tiny Vecs are dumb. Skip to:
     // - 8 if the element size is 1, because any heap allocators is likely
@@ -298,7 +298,7 @@ where
         #[cold]
         fn do_reserve_and_handle<T>(this: &mut RawSoaVec<T>, len: usize, additional: usize)
         where
-            T: Soa,
+            T: Soa + ?Sized,
         {
             if let Err(err) = this.grow_amortized(len, additional) {
                 handle_error(err);
@@ -443,7 +443,7 @@ where
 
 impl<T> Drop for RawSoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn drop(&mut self) {
         let context = unsafe { ptr::read(self.ptr().cast_const().ptr_to_context()) };
@@ -457,7 +457,7 @@ where
 
 unsafe impl<T> Send for RawSoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Send,
     T::Context: Send,
 {
@@ -465,7 +465,7 @@ where
 
 unsafe impl<T> Sync for RawSoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Sync,
     T::Context: Sync,
 {

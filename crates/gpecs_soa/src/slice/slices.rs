@@ -15,7 +15,7 @@ use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, slice_ind
 
 pub struct SoaSlices<'c, 'a, T>
 where
-    T: Soa + 'a,
+    T: Soa + ?Sized + 'a,
 {
     context: &'c T::Context,
     ptrs: Ptrs<'c, T>,
@@ -25,7 +25,7 @@ where
 
 impl<'c, 'a, T> SoaSlices<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     pub fn new(context: &'c T::Context, slices: T::Slices<'c, 'a>) -> Self {
@@ -265,7 +265,7 @@ where
 
 impl<'c, 'a, T> From<&'c T::Context> for SoaSlices<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn from(context: &'c T::Context) -> Self {
         let ptrs = T::ptrs_dangling(context);
@@ -276,7 +276,7 @@ where
 
 impl<T> Debug for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     #[inline]
@@ -288,7 +288,7 @@ where
 
 impl<'c, 'a, T> AsRef<SoaSlices<'c, 'a, T>> for SoaSlices<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -298,6 +298,7 @@ where
 
 impl<T, U> AsRef<[U]> for SoaSlices<'_, '_, T>
 where
+    T: Soa + ?Sized,
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
@@ -307,7 +308,7 @@ where
 
 impl<T> PartialEq for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
 {
     #[inline]
@@ -324,14 +325,14 @@ where
 
 impl<T> Eq for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Eq,
 {
 }
 
 impl<T> PartialOrd for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
 {
     #[inline]
@@ -342,7 +343,7 @@ where
 
 impl<T> Ord for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Ord,
 {
     #[inline]
@@ -353,7 +354,7 @@ where
 
 impl<T> Hash for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Hash,
 {
     #[inline]
@@ -365,7 +366,7 @@ where
 
 impl<T> Clone for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn clone(&self) -> Self {
         let Self {
@@ -385,14 +386,14 @@ where
 
 impl<T> Copy for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: Copy,
 {
 }
 
 impl<T, U, I> Index<I> for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     U: ?Sized,
     for<'c, 'any> I: IndexHelper<'c, 'any, T, Output = U>,
 {
@@ -405,7 +406,7 @@ where
 
 impl<'r, T> IntoIterator for &'r SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::Refs<'r, 'r>;
     type IntoIter = Iter<'r, 'r, T>;
@@ -418,7 +419,7 @@ where
 
 impl<'c, 'a, T> IntoIterator for SoaSlices<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::Refs<'c, 'a>;
     type IntoIter = Iter<'c, 'a, T>;
@@ -431,7 +432,7 @@ where
 
 unsafe impl<T> Send for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Send,
     T::Context: Send,
 {
@@ -439,7 +440,7 @@ where
 
 unsafe impl<T> Sync for SoaSlices<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Sync,
     T::Context: Sync,
 {
@@ -447,7 +448,7 @@ where
 
 pub struct SoaSlicesMut<'c, 'a, T>
 where
-    T: Soa + 'a,
+    T: Soa + ?Sized + 'a,
 {
     context: &'c T::Context,
     ptrs: MutPtrs<'c, T>,
@@ -457,7 +458,7 @@ where
 
 impl<'c, 'a, T> SoaSlicesMut<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     pub fn new(context: &'c T::Context, slices: T::SlicesMut<'c, 'a>) -> Self {
@@ -1040,7 +1041,7 @@ fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
 
 impl<'c, 'a, T> From<SoaSlicesMut<'c, 'a, T>> for SoaSlices<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn from(slices: SoaSlicesMut<'c, 'a, T>) -> Self {
         let (context, ptrs, len) = slices.into_parts();
@@ -1052,7 +1053,7 @@ where
 
 impl<'c, 'a, T> From<&'c T::Context> for SoaSlicesMut<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn from(context: &'c T::Context) -> Self {
         let ptrs = T::ptrs_dangling(context);
@@ -1062,7 +1063,7 @@ where
 
 impl<T> Debug for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     #[inline]
@@ -1074,7 +1075,7 @@ where
 
 impl<'c, 'a, T> AsRef<SoaSlicesMut<'c, 'a, T>> for SoaSlicesMut<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -1084,6 +1085,7 @@ where
 
 impl<T, U> AsRef<[U]> for SoaSlicesMut<'_, '_, T>
 where
+    T: Soa + ?Sized,
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
@@ -1093,7 +1095,7 @@ where
 
 impl<'c, 'a, T> AsMut<SoaSlicesMut<'c, 'a, T>> for SoaSlicesMut<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -1103,6 +1105,7 @@ where
 
 impl<T, U> AsMut<[U]> for SoaSlicesMut<'_, '_, T>
 where
+    T: Soa + ?Sized,
     for<'c, 'any> T: Soa<SlicesMut<'c, 'any> = &'any mut [U]> + 'any,
 {
     fn as_mut(&mut self) -> &mut [U] {
@@ -1112,7 +1115,7 @@ where
 
 impl<T> PartialEq for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
 {
     #[inline]
@@ -1129,14 +1132,14 @@ where
 
 impl<T> Eq for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Eq,
 {
 }
 
 impl<T> PartialOrd for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
 {
     #[inline]
@@ -1147,7 +1150,7 @@ where
 
 impl<T> Ord for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Ord,
 {
     #[inline]
@@ -1158,7 +1161,7 @@ where
 
 impl<T> Hash for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Hash,
 {
     #[inline]
@@ -1170,7 +1173,7 @@ where
 
 impl<T, U, I> Index<I> for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     U: ?Sized,
     for<'c, 'any> I: IndexHelper<'c, 'any, T, Output = U>,
 {
@@ -1183,7 +1186,7 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     U: ?Sized,
     for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
@@ -1194,7 +1197,7 @@ where
 
 impl<'r, T> IntoIterator for &'r SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::Refs<'r, 'r>;
     type IntoIter = Iter<'r, 'r, T>;
@@ -1207,7 +1210,7 @@ where
 
 impl<'r, T> IntoIterator for &'r mut SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::RefsMut<'r, 'r>;
     type IntoIter = IterMut<'r, 'r, T>;
@@ -1220,7 +1223,7 @@ where
 
 impl<'c, 'a, T> IntoIterator for SoaSlicesMut<'c, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = T::RefsMut<'c, 'a>;
     type IntoIter = IterMut<'c, 'a, T>;
@@ -1233,7 +1236,7 @@ where
 
 unsafe impl<T> Send for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Send,
     T::Context: Send,
 {
@@ -1241,7 +1244,7 @@ where
 
 unsafe impl<T> Sync for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Sync,
     T::Context: Sync,
 {

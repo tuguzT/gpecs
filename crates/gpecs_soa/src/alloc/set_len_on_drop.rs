@@ -4,7 +4,7 @@ use super::vec::SoaVec;
 
 pub(crate) struct SetLenOnDrop<'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     pub vec: &'a mut SoaVec<T>,
     pub local_len: usize,
@@ -12,7 +12,7 @@ where
 
 impl<T> Drop for SetLenOnDrop<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     fn drop(&mut self) {

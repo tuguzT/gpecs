@@ -13,7 +13,7 @@ use crate::traits::Soa;
 #[repr(transparent)]
 pub struct FieldDescriptors<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     inner: T::FieldDescriptors<'static>,
     phantom: PhantomData<&'context ()>,
@@ -21,7 +21,7 @@ where
 
 impl<'context, T> FieldDescriptors<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     /// Creates self from the [field descriptors](Soa::FieldDescriptors).
     #[inline]
@@ -42,7 +42,7 @@ where
 
 impl<T> Debug for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -53,7 +53,7 @@ where
 
 impl<T> Default for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: Default,
 {
     fn default() -> Self {
@@ -66,7 +66,7 @@ where
 
 impl<T> Clone for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: Clone,
 {
     fn clone(&self) -> Self {
@@ -78,14 +78,14 @@ where
 
 impl<T> Copy for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: Copy,
 {
 }
 
 impl<T> PartialEq for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -96,14 +96,14 @@ where
 
 impl<T> Eq for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: Eq,
 {
 }
 
 impl<T> PartialOrd for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -118,7 +118,7 @@ where
 
 impl<T> Ord for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -133,7 +133,7 @@ where
 
 impl<T> Hash for FieldDescriptors<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::FieldDescriptors<'any>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -145,7 +145,7 @@ where
 
 impl<'context, T> IntoIterator for FieldDescriptors<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Item = <T::FieldDescriptors<'context> as IntoIterator>::Item;
     type IntoIter = <T::FieldDescriptors<'context> as IntoIterator>::IntoIter;

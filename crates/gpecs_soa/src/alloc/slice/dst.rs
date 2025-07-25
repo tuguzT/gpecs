@@ -10,7 +10,7 @@ use crate::{
 
 impl<T> SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     pub fn into_vec(self: Box<Self>) -> SoaVec<T> {
@@ -128,7 +128,7 @@ where
 
 impl<T> Default for Box<SoaSlice<T>>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn default() -> Self {
@@ -139,7 +139,7 @@ where
 
 impl<T> ToOwned for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {
@@ -162,7 +162,7 @@ where
 
 impl<'r, T> IntoIterator for &'r Box<SoaSlice<T>>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     type Item = T::Refs<'r, 'r>;
     type IntoIter = Iter<'r, 'r, T>;
@@ -175,7 +175,7 @@ where
 
 impl<'r, T> IntoIterator for &'r mut Box<SoaSlice<T>>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     type Item = T::RefsMut<'r, 'r>;
     type IntoIter = IterMut<'r, 'r, T>;

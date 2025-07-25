@@ -16,7 +16,7 @@ pub unsafe fn slice_from_raw_parts<T>(
     capacity: usize,
 ) -> *const SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     let context = unsafe { &*data.ptr_to_context() };
     let len = len_for_inner::<T>(context, len, capacity);
@@ -30,7 +30,7 @@ pub unsafe fn slice_from_raw_parts_mut<T>(
     capacity: usize,
 ) -> *mut SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     let context = unsafe { &*data.ptr_to_context() };
     let len = len_for_inner::<T>(context, len, capacity);
@@ -40,7 +40,7 @@ where
 #[inline]
 fn len_for_inner<T>(context: &T::Context, len: usize, capacity: usize) -> usize
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     if !should_allocate::<T>(context, capacity) {
         return len;
@@ -57,7 +57,7 @@ where
 /// [`Fields`](`Soa::Fields`) and [`Context`](`Soa::Context`) associated types of `T`.
 pub union BufferData<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     _len_align: [usize; 0],
     _fields: ManuallyDrop<MaybeUninit<T::Fields>>,
@@ -66,7 +66,7 @@ where
 
 pub trait SoaSlicePtr<T>: Copy + private_slice_ptr::Sealed
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     unsafe fn context<'a>(self) -> &'a T::Context;
 
@@ -84,7 +84,7 @@ where
 
 impl<T> SoaSlicePtr<T> for *const SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
@@ -117,7 +117,7 @@ where
 
 pub trait SoaSlicePtrMut<T>: Copy + private_slice_ptr::Sealed
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     unsafe fn context<'a>(self) -> &'a T::Context;
 
@@ -135,7 +135,7 @@ where
 
 impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
@@ -168,7 +168,7 @@ where
 
 fn slice_buffer_layout<T>(ptr: *const SoaSlice<T>) -> Layout
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     let buffer = ptr.into_inner();
 
@@ -179,14 +179,14 @@ where
 
 trait SoaSlicePtrIntoInner<T>: Copy
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     fn into_inner(self) -> *const [BufferData<T>];
 }
 
 impl<T> SoaSlicePtrIntoInner<T> for *const SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline(always)]
     fn into_inner(self) -> *const [BufferData<T>] {
@@ -196,14 +196,14 @@ where
 
 trait SoaSlicePtrIntoInnerMut<T>: Copy
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     fn into_inner_mut(self) -> *mut [BufferData<T>];
 }
 
 impl<T> SoaSlicePtrIntoInnerMut<T> for *mut SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline(always)]
     fn into_inner_mut(self) -> *mut [BufferData<T>] {
@@ -214,7 +214,7 @@ where
 #[repr(C)]
 pub(crate) struct BufferPrefix<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     _fields_align: [T::Fields; 0],
     context: T::Context,
@@ -224,7 +224,7 @@ where
 const _: () = {
     const fn assert_safety_preconditions<T>()
     where
-        T: Soa,
+        T: Soa + ?Sized,
     {
         assert!(
             offset_of!(BufferPrefix<T>, context) == 0,
@@ -244,7 +244,7 @@ const _: () = {
 
 pub(crate) trait BufferDataPtr<T>: Copy
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     unsafe fn ptr_to_len(self) -> *const usize;
     fn ptr_to_context(self) -> *const T::Context;
@@ -252,7 +252,7 @@ where
 
 impl<T> BufferDataPtr<T> for *const BufferData<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     unsafe fn ptr_to_len(self) -> *const usize {
@@ -269,7 +269,7 @@ where
 
 pub(crate) trait BufferDataPtrMut<T>: Copy
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     unsafe fn ptr_to_len_mut(self) -> *mut usize;
     fn ptr_to_context_mut(self) -> *mut T::Context;
@@ -277,7 +277,7 @@ where
 
 impl<T> BufferDataPtrMut<T> for *mut BufferData<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     unsafe fn ptr_to_len_mut(self) -> *mut usize {
@@ -297,15 +297,15 @@ mod private_slice_ptr {
 
     pub trait Sealed {}
 
-    impl<T> Sealed for *const SoaSlice<T> where T: SoaTrustedFields {}
-    impl<T> Sealed for *mut SoaSlice<T> where T: SoaTrustedFields {}
+    impl<T> Sealed for *const SoaSlice<T> where T: SoaTrustedFields + ?Sized {}
+    impl<T> Sealed for *mut SoaSlice<T> where T: SoaTrustedFields + ?Sized {}
 }
 
 #[inline]
 #[track_caller]
 pub(crate) fn is_zst<T>(context: &T::Context) -> bool
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     let packed_size = T::field_descriptors(context)
         .into_iter()
@@ -318,7 +318,7 @@ where
 #[track_caller]
 pub(crate) fn is_context_zst<T>() -> bool
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     size_of::<T::Context>() == 0
 }
@@ -326,7 +326,7 @@ where
 #[inline]
 pub(crate) fn should_allocate<T>(context: &T::Context, capacity: usize) -> bool
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>(context) || capacity == 0);
     !should_not_allocate
@@ -335,7 +335,7 @@ where
 #[inline]
 fn buffer_layout_not_padded<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
         if is_context_zst::<T>() {
@@ -354,7 +354,7 @@ where
 #[inline]
 pub(crate) fn buffer_layout<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
         if is_context_zst::<T>() {
@@ -379,7 +379,7 @@ where
 #[inline]
 fn capacity_from_not_padded<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     let size_of_prefix = size_of::<BufferPrefix<T>>();
     if is_zst::<T>(context) || buffer_layout.size() < size_of_prefix {
@@ -395,7 +395,7 @@ where
 #[inline]
 pub(crate) fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     let size_of_prefix = size_of::<BufferPrefix<T>>();
     if is_zst::<T>(context) || buffer_layout.size() < size_of_prefix {
@@ -418,7 +418,7 @@ pub(crate) unsafe fn ptrs<T>(
     capacity: usize,
 ) -> Result<T::MutPtrs<'_>, LayoutError>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
         return Ok(T::ptrs_dangling(context));

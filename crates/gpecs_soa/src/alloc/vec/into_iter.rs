@@ -14,7 +14,7 @@ use crate::{
 
 pub struct IntoIter<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     buffer: NonNull<BufferData<T>>,
     capacity: usize,
@@ -25,7 +25,7 @@ where
 
 impl<T> IntoIter<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     pub(super) fn new(vec: SoaVec<T>) -> Self {
@@ -131,7 +131,7 @@ where
 
 unsafe impl<T> Send for IntoIter<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Send,
     T::Context: Send,
 {
@@ -139,7 +139,7 @@ where
 
 unsafe impl<T> Sync for IntoIter<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Sync,
     T::Context: Sync,
 {
@@ -147,6 +147,7 @@ where
 
 impl<T, U> AsRef<[U]> for IntoIter<T>
 where
+    T: Soa + ?Sized,
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
@@ -156,7 +157,7 @@ where
 
 impl<T> Debug for IntoIter<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     #[inline]
@@ -168,7 +169,7 @@ where
 
 impl<T> Default for IntoIter<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Context: Default,
 {
     #[inline]
@@ -180,16 +181,16 @@ where
 
 impl<T> Drop for IntoIter<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn drop(&mut self) {
         struct DropGuard<'a, T>(&'a mut IntoIter<T>)
         where
-            T: Soa;
+            T: Soa + ?Sized;
 
         impl<T> Drop for DropGuard<'_, T>
         where
-            T: Soa,
+            T: Soa + ?Sized,
         {
             fn drop(&mut self) {
                 let &mut Self(&mut IntoIter {

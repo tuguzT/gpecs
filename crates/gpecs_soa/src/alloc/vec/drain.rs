@@ -14,7 +14,7 @@ use super::{Soa, SoaVec};
 
 pub struct Drain<'a, T>
 where
-    T: Soa + 'a,
+    T: Soa + ?Sized + 'a,
 {
     /// Index of tail to preserve
     tail_start: usize,
@@ -27,7 +27,7 @@ where
 
 impl<'a, T> Drain<'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -83,7 +83,7 @@ where
 
 unsafe impl<T> Send for Drain<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Send,
     T::Context: Send,
 {
@@ -91,7 +91,7 @@ where
 
 unsafe impl<T> Sync for Drain<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     T::Fields: Sync,
     T::Context: Sync,
 {
@@ -99,6 +99,7 @@ where
 
 impl<T, U> AsRef<[U]> for Drain<'_, T>
 where
+    T: Soa + ?Sized,
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
@@ -108,7 +109,7 @@ where
 
 impl<T> Debug for Drain<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -172,17 +173,17 @@ impl<T> FusedIterator for Drain<'_, T> where T: Soa {}
 
 impl<T> Drop for Drain<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn drop(&mut self) {
         /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
         struct DropGuard<'r, 'a, T>(&'r mut Drain<'a, T>)
         where
-            T: Soa;
+            T: Soa + ?Sized;
 
         impl<T> Drop for DropGuard<'_, '_, T>
         where
-            T: Soa,
+            T: Soa + ?Sized,
         {
             fn drop(&mut self) {
                 let &mut Self(&mut Drain {

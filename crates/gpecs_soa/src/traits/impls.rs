@@ -455,7 +455,7 @@ impl<'a> SoaToOwned<'_, 'a> for &'a () {
     fn to_owned(&self) -> Self::Owned {}
 
     #[inline]
-    fn clone_into(&self, _context: &mut Self::Owned) {}
+    fn clone_into(&self, _target: &mut Self::Owned) {}
 
     #[inline]
     unsafe fn clone_into_ptrs(

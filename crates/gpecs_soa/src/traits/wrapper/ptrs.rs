@@ -14,7 +14,7 @@ use crate::traits::Soa;
 #[repr(transparent)]
 pub struct Ptrs<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     inner: T::Ptrs<'static>,
     phantom: PhantomData<&'context ()>,
@@ -22,7 +22,7 @@ where
 
 impl<'context, T> Ptrs<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     /// Creates self from the [pointers](Soa::Ptrs)
     /// to each field of [`Fields`](Soa::Fields).
@@ -45,7 +45,7 @@ where
 
 impl<T> Debug for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,7 +56,7 @@ where
 
 impl<T> Default for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: Default,
 {
     fn default() -> Self {
@@ -69,7 +69,7 @@ where
 
 impl<T> Clone for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -80,14 +80,14 @@ where
 
 impl<T> Copy for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: Copy,
 {
 }
 
 impl<T> PartialEq for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -98,14 +98,14 @@ where
 
 impl<T> Eq for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: Eq,
 {
 }
 
 impl<T> PartialOrd for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -120,7 +120,7 @@ where
 
 impl<T> Ord for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -135,7 +135,7 @@ where
 
 impl<T> Hash for Ptrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Ptrs<'any>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

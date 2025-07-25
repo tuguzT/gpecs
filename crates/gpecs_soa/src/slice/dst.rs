@@ -16,14 +16,14 @@ use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, SoaSlices
 #[repr(transparent)]
 pub struct SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     buffer: [BufferData<T>],
 }
 
 impl<T> SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     pub fn context(&self) -> &T::Context {
@@ -252,7 +252,7 @@ where
 
 impl<T> Debug for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
     #[inline]
@@ -264,7 +264,7 @@ where
 
 impl<T> Default for &SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn default() -> Self {
@@ -275,7 +275,7 @@ where
 
 impl<T> Default for &mut SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn default() -> Self {
@@ -286,7 +286,7 @@ where
 
 impl<T> AsRef<SoaSlice<T>> for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -296,6 +296,7 @@ where
 
 impl<T, U> AsRef<[U]> for SoaSlice<T>
 where
+    T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T: SoaTrustedFields<Slices<'c, 'any> = &'any [U]> + 'any,
 {
     fn as_ref(&self) -> &[U] {
@@ -305,7 +306,7 @@ where
 
 impl<T> AsMut<SoaSlice<T>> for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -315,6 +316,7 @@ where
 
 impl<T, U> AsMut<[U]> for SoaSlice<T>
 where
+    T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T: SoaTrustedFields<SlicesMut<'c, 'any> = &'any mut [U]> + 'any,
 {
     fn as_mut(&mut self) -> &mut [U] {
@@ -324,7 +326,7 @@ where
 
 impl<T> PartialEq for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
 {
     #[inline]
@@ -340,14 +342,14 @@ where
 
 impl<T> Eq for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Eq,
 {
 }
 
 impl<T> PartialOrd for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
 {
     #[inline]
@@ -358,7 +360,7 @@ where
 
 impl<T> Ord for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Ord,
 {
     #[inline]
@@ -369,7 +371,7 @@ where
 
 impl<T> Hash for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Hash,
 {
     #[inline]
@@ -381,7 +383,7 @@ where
 
 impl<T> Drop for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn drop(&mut self) {
@@ -398,7 +400,7 @@ where
 
 impl<T, U, I> Index<I> for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     U: ?Sized,
     for<'c, 'any> I: IndexHelper<'c, 'any, T, Output = U>,
 {
@@ -411,7 +413,7 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     U: ?Sized,
     for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
@@ -422,7 +424,7 @@ where
 
 impl<'r, T> IntoIterator for &'r SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     type Item = T::Refs<'r, 'r>;
     type IntoIter = Iter<'r, 'r, T>;
@@ -435,7 +437,7 @@ where
 
 impl<'r, T> IntoIterator for &'r mut SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     type Item = T::RefsMut<'r, 'r>;
     type IntoIter = IterMut<'r, 'r, T>;
@@ -448,7 +450,7 @@ where
 
 unsafe impl<T> Send for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     T::Fields: Send,
     T::Context: Send,
 {
@@ -456,7 +458,7 @@ where
 
 unsafe impl<T> Sync for SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
     T::Fields: Sync,
     T::Context: Sync,
 {
@@ -469,7 +471,7 @@ pub unsafe fn from_raw_parts<'slice, T>(
     capacity: usize,
 ) -> &'slice SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     unsafe { &*slice_from_raw_parts(data, len, capacity) }
 }
@@ -481,7 +483,7 @@ pub unsafe fn from_raw_parts_mut<'slice, T>(
     capacity: usize,
 ) -> &'slice mut SoaSlice<T>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + ?Sized,
 {
     unsafe { &mut *slice_from_raw_parts_mut(data, len, capacity) }
 }

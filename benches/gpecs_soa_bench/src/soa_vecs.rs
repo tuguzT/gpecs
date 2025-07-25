@@ -2,7 +2,7 @@ use gpecs_soa::prelude::*;
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero};
 
-pub trait SoaVecs: Soa {
+pub trait SoaVecs: Soa + Sized {
     type Vecs;
 }
 

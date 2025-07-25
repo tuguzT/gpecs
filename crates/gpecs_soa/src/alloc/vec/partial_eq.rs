@@ -10,7 +10,7 @@ macro_rules! __impl_slice_eq {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
         impl<T, $($vars)*> PartialEq<$rhs> for $lhs
         where
-            T: SoaTrustedFields,
+            T: SoaTrustedFields + ?Sized,
             for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
             $($ty: $bound)?
         {
@@ -25,7 +25,7 @@ macro_rules! __impl_slice_eq {
 
 impl<T> PartialEq<SoaVec<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
 {
     #[inline]

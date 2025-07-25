@@ -14,7 +14,7 @@ use crate::traits::Soa;
 #[repr(transparent)]
 pub struct Slices<'context, 'a, T>
 where
-    T: Soa + 'a,
+    T: Soa + ?Sized + 'a,
 {
     inner: T::Slices<'static, 'a>,
     phantom: PhantomData<&'context ()>,
@@ -22,7 +22,7 @@ where
 
 impl<'context, 'a, T> Slices<'context, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     /// Creates self from the [slices](Soa::Slices)
     /// to each field of [`Fields`](Soa::Fields).
@@ -45,7 +45,7 @@ where
 
 impl<'a, T> Debug for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,7 +56,7 @@ where
 
 impl<'a, T> Default for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: Default,
 {
     fn default() -> Self {
@@ -69,7 +69,7 @@ where
 
 impl<'a, T> Clone for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: Clone,
 {
     fn clone(&self) -> Self {
@@ -81,14 +81,14 @@ where
 
 impl<'a, T> Copy for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: Copy,
 {
 }
 
 impl<'a, T> PartialEq for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -99,14 +99,14 @@ where
 
 impl<'a, T> Eq for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: Eq,
 {
 }
 
 impl<'a, T> PartialOrd for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -121,7 +121,7 @@ where
 
 impl<'a, T> Ord for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -136,7 +136,7 @@ where
 
 impl<'a, T> Hash for Slices<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Slices<'any, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

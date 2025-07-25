@@ -9,7 +9,7 @@ use super::{
 
 pub unsafe trait SoaSliceIndex<T>: private_slice_index::Sealed
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
     where
@@ -62,7 +62,7 @@ where
 
 unsafe impl<T> SoaSliceIndex<T> for usize
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
         = T::Refs<'context, 'a>
@@ -175,7 +175,7 @@ where
 
 unsafe impl<T> SoaSliceIndex<T> for ops::Range<usize>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
         = T::Slices<'context, 'a>
@@ -316,7 +316,7 @@ where
 
 unsafe impl<T> SoaSliceIndex<T> for ops::RangeTo<usize>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
         = T::Slices<'context, 'a>
@@ -395,7 +395,7 @@ where
 
 unsafe impl<T> SoaSliceIndex<T> for ops::RangeFrom<usize>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
         = T::Slices<'context, 'a>
@@ -496,7 +496,7 @@ where
 
 unsafe impl<T> SoaSliceIndex<T> for ops::RangeFull
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
         = T::Slices<'context, 'a>
@@ -586,7 +586,7 @@ fn range_into_slice_range(range: ops::RangeInclusive<usize>) -> ops::Range<usize
 
 unsafe impl<T> SoaSliceIndex<T> for ops::RangeInclusive<usize>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
         = T::Slices<'context, 'a>
@@ -677,7 +677,7 @@ where
 
 unsafe impl<T> SoaSliceIndex<T> for ops::RangeToInclusive<usize>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
         = T::Slices<'context, 'a>
@@ -827,7 +827,7 @@ fn into_slice_range(
 
 unsafe impl<T> SoaSliceIndex<T> for (ops::Bound<usize>, ops::Bound<usize>)
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     type Refs<'context, 'a>
         = T::Slices<'context, 'a>

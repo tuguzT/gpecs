@@ -14,7 +14,7 @@ use crate::traits::Soa;
 #[repr(transparent)]
 pub struct Refs<'context, 'a, T>
 where
-    T: Soa + 'a,
+    T: Soa + ?Sized + 'a,
 {
     inner: T::Refs<'static, 'a>,
     phantom: PhantomData<&'context ()>,
@@ -22,7 +22,7 @@ where
 
 impl<'context, 'a, T> Refs<'context, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     /// Creates self from the [references](Soa::Refs)
     /// to each field of [`Fields`](Soa::Fields).
@@ -45,7 +45,7 @@ where
 
 impl<'a, T> Debug for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,7 +56,7 @@ where
 
 impl<'a, T> Default for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: Default,
 {
     fn default() -> Self {
@@ -69,7 +69,7 @@ where
 
 impl<'a, T> Clone for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: Clone,
 {
     fn clone(&self) -> Self {
@@ -81,14 +81,14 @@ where
 
 impl<'a, T> Copy for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: Copy,
 {
 }
 
 impl<'a, T> PartialEq for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -99,14 +99,14 @@ where
 
 impl<'a, T> Eq for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: Eq,
 {
 }
 
 impl<'a, T> PartialOrd for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -121,7 +121,7 @@ where
 
 impl<'a, T> Ord for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -136,7 +136,7 @@ where
 
 impl<'a, T> Hash for Refs<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::Refs<'any, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

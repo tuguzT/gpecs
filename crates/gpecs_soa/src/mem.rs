@@ -20,7 +20,7 @@ where
 /// Version of [`core::mem::swap()`] but for [SoA][`Soa`] references.
 pub fn swap<T>(context: &T::Context, x: T::RefsMut<'_, '_>, y: T::RefsMut<'_, '_>)
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     let x = T::refs_mut_as_ptrs(context, T::upcast_refs_mut(x));
     let y = T::refs_mut_as_ptrs(context, T::upcast_refs_mut(y));

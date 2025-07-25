@@ -14,7 +14,7 @@ use crate::traits::Soa;
 #[repr(transparent)]
 pub struct SlicesMut<'context, 'a, T>
 where
-    T: Soa + 'a,
+    T: Soa + ?Sized + 'a,
 {
     inner: T::SlicesMut<'static, 'a>,
     phantom: PhantomData<&'context ()>,
@@ -22,7 +22,7 @@ where
 
 impl<'context, 'a, T> SlicesMut<'context, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     /// Creates self from the [mutable slices](Soa::SlicesMut)
     /// to each field of [`Fields`](Soa::Fields).
@@ -45,7 +45,7 @@ where
 
 impl<'a, T> Debug for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,7 +56,7 @@ where
 
 impl<'a, T> Default for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: Default,
 {
     fn default() -> Self {
@@ -69,7 +69,7 @@ where
 
 impl<'a, T> Clone for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: Clone,
 {
     fn clone(&self) -> Self {
@@ -81,14 +81,14 @@ where
 
 impl<'a, T> Copy for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: Copy,
 {
 }
 
 impl<'a, T> PartialEq for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -99,14 +99,14 @@ where
 
 impl<'a, T> Eq for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: Eq,
 {
 }
 
 impl<'a, T> PartialOrd for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -121,7 +121,7 @@ where
 
 impl<'a, T> Ord for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -136,7 +136,7 @@ where
 
 impl<'a, T> Hash for SlicesMut<'_, 'a, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SlicesMut<'any, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

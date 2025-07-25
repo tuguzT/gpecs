@@ -10,7 +10,7 @@ macro_rules! __impl_slice_ord {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
         impl<T, $($vars)*> PartialOrd<$rhs> for $lhs
         where
-            T: SoaTrustedFields,
+            T: SoaTrustedFields + ?Sized,
             for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
             $($ty: $bound)?
         {
@@ -24,7 +24,7 @@ macro_rules! __impl_slice_ord {
 
 impl<T> PartialOrd<SoaVec<T>> for SoaVec<T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
 {
     #[inline]

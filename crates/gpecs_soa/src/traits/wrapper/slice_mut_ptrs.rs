@@ -14,7 +14,7 @@ use crate::traits::Soa;
 #[repr(transparent)]
 pub struct SliceMutPtrs<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     inner: T::SliceMutPtrs<'static>,
     phantom: PhantomData<&'context ()>,
@@ -22,7 +22,7 @@ where
 
 impl<'context, T> SliceMutPtrs<'context, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     /// Creates self from the [mutable slice pointers](Soa::SliceMutPtrs)
     /// to each field of [`Fields`](Soa::Fields).
@@ -45,7 +45,7 @@ where
 
 impl<T> Debug for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SliceMutPtrs<'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,7 +56,7 @@ where
 
 impl<T> Default for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SliceMutPtrs<'any>: Default,
 {
     fn default() -> Self {
@@ -69,7 +69,7 @@ where
 
 impl<T> Clone for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -80,14 +80,14 @@ where
 
 impl<T> Copy for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SliceMutPtrs<'any>: Copy,
 {
 }
 
 impl<T> PartialEq for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SliceMutPtrs<'any>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -98,14 +98,14 @@ where
 
 impl<T> Eq for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SliceMutPtrs<'any>: Eq,
 {
 }
 
 impl<T> PartialOrd for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SliceMutPtrs<'any>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -120,7 +120,7 @@ where
 
 impl<T> Ord for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SliceMutPtrs<'any>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -135,7 +135,7 @@ where
 
 impl<T> Hash for SliceMutPtrs<'_, T>
 where
-    T: Soa,
+    T: Soa + ?Sized,
     for<'any> T::SliceMutPtrs<'any>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

@@ -1,5 +1,5 @@
 pub use self::{
-    context::ErasedSoaContext,
+    context::{BoxedErasedSoaContext, ErasedSoaContext},
     fields::ErasedSoaFields,
     nonnull_ptrs::{ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter},
     ptrs::{ErasedSoaPtrs, ErasedSoaPtrsIter},

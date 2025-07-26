@@ -102,13 +102,15 @@ impl ArchetypeStorage {
             ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
         })?;
 
-        let descriptors = component_ids.keys().map(|&component_id| {
-            let info = components
-                .get_component_info(component_id)
-                .unwrap_or_else(|| get_component_info_fail(&component_id));
-            info.descriptor()
-        });
-        let context = ErasedSoaContext::new(descriptors);
+        let context = component_ids
+            .keys()
+            .map(|&component_id| {
+                let info = components
+                    .get_component_info(component_id)
+                    .unwrap_or_else(|| get_component_info_fail(&component_id));
+                info.descriptor()
+            })
+            .collect();
         let erased_storage = ErasedStorage::with_context(context);
 
         Ok(Self {

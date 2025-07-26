@@ -3,7 +3,7 @@ use core::{iter, ptr::NonNull};
 
 use crate::{
     erased::{
-        ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs,
+        BoxedErasedSoaContext, ErasedSoa, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs,
         ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs,
         ErasedSoaSlices, ErasedSoaSlicesMut, assert::assert_descriptors, soa_slice_from_raw_parts,
         soa_slice_from_raw_parts_mut,
@@ -12,7 +12,7 @@ use crate::{
 };
 
 unsafe impl Soa for ErasedSoa {
-    type Context = ErasedSoaContext;
+    type Context = BoxedErasedSoaContext;
     type Fields = ErasedSoaFields;
 
     type FieldDescriptors<'context> = &'context [FieldDescriptor];

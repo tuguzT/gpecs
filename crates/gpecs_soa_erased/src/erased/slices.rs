@@ -7,8 +7,8 @@ use core::{
 };
 
 use crate::{
-    assert::{check_same_layout, check_same_len},
     erased::{ErasedSoaSlicePtrs, error::IntoValueError},
+    error::{check_layout, check_len},
     field::{ErasedFieldPtr, ErasedFieldSlice, field_slice_from_raw_parts},
     soa::{
         slice::range,
@@ -127,11 +127,11 @@ impl<'context, 'a> ErasedSoaSlices<'context, 'a> {
             .into_iter()
             .zip(self)
             .try_fold(0, |len, (desc, slice)| {
-                check_same_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
+                check_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
                 Ok(len + 1)
             })
             .and_then(|len| {
-                check_same_len(len, descriptors.len())?;
+                check_len(len, descriptors.len())?;
                 Ok(())
             });
         if let Err(error) = result {

@@ -1,10 +1,6 @@
 use std::{ptr, slice};
 
-use gpecs_soa_erased::{
-    erased::ErasedSoa,
-    field::{ErasedField, ErasedFieldRef},
-    soa::traits::FieldDescriptor,
-};
+use gpecs_soa_erased::{erased::ErasedSoa, field::ErasedFieldRef, soa::traits::FieldDescriptor};
 
 #[test]
 fn value() {
@@ -111,15 +107,20 @@ fn value() {
             .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer))
     );
 
-    let mut fields = erased_value.into_fields().into_vec();
+    let mut fields = erased_value
+        .into_fields()
+        .expect("allocation of small byte array should succeed")
+        .into_vec();
     let field = fields.pop().expect("string field should exist");
     assert_eq!(
         unsafe { field.into::<String>() }.expect("layouts should match"),
         str,
     );
 
-    let erased_value = ErasedSoa::new(fields.into_iter().map(ErasedField::into_parts))
-        .expect("all the fields should be valid");
+    let fields = fields
+        .iter()
+        .map(|field| (field.descriptor(), field.as_slice()));
+    let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
     assert!(
         erased_value
             .as_refs()

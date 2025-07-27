@@ -1,11 +1,13 @@
 use core::ptr::{self, NonNull};
 
-use crate::{assert::check_same_layout, soa::traits::FieldDescriptor};
+use crate::{
+    error::{check_align, check_layout, check_len},
+    soa::traits::FieldDescriptor,
+};
 
 use super::{
-    super::assert::check_same_len,
-    assert::{check_buffer_align, check_layout},
-    error::{ErasedFieldError, IntoValueError},
+    assert::check_into_layout,
+    error::{ErasedFieldPtrError, IntoValueError},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -17,10 +19,10 @@ pub struct ErasedFieldNonNullPtr {
 impl ErasedFieldNonNullPtr {
     #[inline]
     #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: NonNull<[u8]>) -> Result<Self, ErasedFieldError> {
+    pub fn new(desc: FieldDescriptor, buffer: NonNull<[u8]>) -> Result<Self, ErasedFieldPtrError> {
         let ptr = buffer.cast();
-        check_buffer_align(ptr.as_ptr(), desc.layout())?;
-        check_same_len(buffer.len(), desc.layout().size())?;
+        check_len(buffer.len(), desc.layout().size())?;
+        check_align(ptr.as_ptr(), desc.layout())?;
 
         Ok(Self { desc, ptr })
     }
@@ -54,7 +56,7 @@ impl ErasedFieldNonNullPtr {
 
     #[inline]
     pub fn into<T>(self) -> Result<NonNull<T>, IntoValueError<Self>> {
-        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
         Ok(ptr.cast())
     }
@@ -74,8 +76,7 @@ impl ErasedFieldNonNullPtr {
     #[track_caller]
     pub unsafe fn offset_from(self, origin: Self) -> isize {
         let Self { desc, ptr } = self;
-        check_same_layout(origin.descriptor().layout(), desc.layout())
-            .expect("layouts should match");
+        check_layout(origin.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let offset = unsafe { ptr.offset_from(origin.as_ptr()) };
         let field_size = desc
@@ -92,7 +93,7 @@ impl ErasedFieldNonNullPtr {
     #[track_caller]
     pub unsafe fn swap(self, with: Self, temp: &mut [u8]) {
         let Self { desc, .. } = self;
-        check_same_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
+        check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let count = desc.layout().size();
         assert!(temp.len() >= count);
@@ -110,7 +111,7 @@ impl ErasedFieldNonNullPtr {
     #[track_caller]
     pub unsafe fn copy_from(self, from: Self, count: usize, temp: &mut [u8]) {
         let Self { desc, .. } = self;
-        check_same_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
+        check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let count = count * desc.layout().size();
         assert!(temp.len() >= count);
@@ -127,7 +128,7 @@ impl ErasedFieldNonNullPtr {
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping(self, from: Self, count: usize) {
         let Self { desc, .. } = self;
-        check_same_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
+        check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let count = count * desc.layout().size();
         let src = from.as_ptr();

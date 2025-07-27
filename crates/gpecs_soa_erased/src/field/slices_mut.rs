@@ -6,13 +6,13 @@ use core::{
     slice,
 };
 
-use crate::soa::traits::FieldDescriptor;
+use crate::{error::check_align, soa::traits::FieldDescriptor};
 
 use super::{
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
     ErasedFieldSliceIter, ErasedFieldSliceMutPtr, ErasedFieldSlicePtr,
-    assert::{check_buffer_align, check_layout, check_slice_buffer_len},
-    error::{ErasedFieldSliceError, IntoValueError},
+    assert::{check_into_layout, check_slice_buffer_len},
+    error::{ErasedFieldSlicePtrError, IntoValueError},
 };
 
 pub struct ErasedFieldSliceMut<'a> {
@@ -29,9 +29,9 @@ impl<'a> ErasedFieldSliceMut<'a> {
         desc: FieldDescriptor,
         buffer: &'a mut [u8],
         len: usize,
-    ) -> Result<Self, ErasedFieldSliceError> {
+    ) -> Result<Self, ErasedFieldSlicePtrError> {
         let ptr = buffer.as_mut_ptr();
-        check_buffer_align(ptr, desc.layout())?;
+        check_align(ptr, desc.layout())?;
         check_slice_buffer_len(buffer.len(), desc.layout().size(), len)?;
 
         Ok(Self {
@@ -70,7 +70,7 @@ impl<'a> ErasedFieldSliceMut<'a> {
     #[inline]
     pub unsafe fn into<T>(self) -> Result<&'a mut [T], IntoValueError<Self>> {
         let Self { desc, .. } = self;
-        let me = check_layout::<T, _>(desc.layout(), self)?;
+        let me = check_into_layout::<T, _>(desc.layout(), self)?;
         let Self { ptr, len, .. } = me;
 
         let data = ptr.cast();
@@ -80,7 +80,7 @@ impl<'a> ErasedFieldSliceMut<'a> {
     #[inline]
     pub unsafe fn cast<T>(&self) -> Result<&[T], IntoValueError<&Self>> {
         let Self { desc, .. } = self;
-        let me = check_layout::<T, _>(desc.layout(), self)?;
+        let me = check_into_layout::<T, _>(desc.layout(), self)?;
         let Self { ptr, len, .. } = *me;
 
         let data = ptr.cast();
@@ -90,7 +90,7 @@ impl<'a> ErasedFieldSliceMut<'a> {
     #[inline]
     pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut [T], IntoValueError<&mut Self>> {
         let Self { desc, .. } = self;
-        let me = check_layout::<T, _>(desc.layout(), self)?;
+        let me = check_into_layout::<T, _>(desc.layout(), self)?;
         let Self { ptr, len, .. } = *me;
 
         let data = ptr.cast();

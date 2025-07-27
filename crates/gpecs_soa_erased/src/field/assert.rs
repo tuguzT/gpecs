@@ -1,8 +1,8 @@
 use core::alloc::Layout;
 
-use crate::assert::check_same_layout;
+use crate::error::check_layout;
 
-use super::error::{IntoValueError, PtrNotAlignedError, SliceLenMismatchError};
+use super::error::{IntoValueError, SliceLenMismatchError};
 
 #[inline]
 pub fn check_slice_buffer_len(
@@ -24,16 +24,9 @@ pub fn check_slice_buffer_len(
 }
 
 #[inline]
-pub fn check_buffer_align(ptr: *const u8, target_layout: Layout) -> Result<(), PtrNotAlignedError> {
-    match ptr.align_offset(target_layout.align()) {
-        0 => Ok(()),
-        _ => Err(PtrNotAlignedError::new(ptr, target_layout)),
-    }
-}
-
-#[inline]
-pub fn check_layout<T, U>(layout: Layout, value: U) -> Result<U, IntoValueError<U>> {
-    match check_same_layout(layout, Layout::new::<T>()) {
+pub fn check_into_layout<T, U>(layout: Layout, value: U) -> Result<U, IntoValueError<U>> {
+    let expected = Layout::new::<T>();
+    match check_layout(layout, expected) {
         Ok(()) => Ok(value),
         Err(reason) => Err(IntoValueError::new(value, reason)),
     }

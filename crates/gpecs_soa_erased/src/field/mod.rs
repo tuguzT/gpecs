@@ -10,7 +10,7 @@ pub use self::{
     },
     slices::{ErasedFieldSlice, ErasedFieldSliceIter},
     slices_mut::{ErasedFieldSliceIterMut, ErasedFieldSliceMut},
-    value::ErasedField,
+    value::{BoxedErasedField, ErasedField},
 };
 
 pub mod error;

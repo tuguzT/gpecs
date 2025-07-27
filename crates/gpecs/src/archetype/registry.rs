@@ -10,7 +10,7 @@ use std::{
 
 pub use gpecs_types::archetype::ArchetypeId;
 
-use gpecs_soa_erased::field::ErasedField;
+use gpecs_soa_erased::field::BoxedErasedField;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use petgraph::{
@@ -890,7 +890,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-        fields: ErasedComponents<ErasedField>,
+        fields: ErasedComponents<BoxedErasedField>,
     ) {
         let Some(archetype_id) = archetype_id else {
             unsafe { Self::drop_erased_in_place(components, fields) }
@@ -912,7 +912,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-    ) -> ErasedComponents<ErasedField> {
+    ) -> ErasedComponents<BoxedErasedField> {
         let Some(archetype_id) = archetype_id else {
             return ErasedComponents::with_capacity(1);
         };

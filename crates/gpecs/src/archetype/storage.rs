@@ -7,7 +7,7 @@ use std::{
 use gpecs_soa_erased::{
     erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefsMut},
     field::{
-        ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
+        BoxedErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
 };
 use gpecs_sparse::{
@@ -558,8 +558,8 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-        fields: ErasedComponents<ErasedField>,
-    ) -> Option<ErasedComponents<ErasedField>> {
+        fields: ErasedComponents<BoxedErasedField>,
+    ) -> Option<ErasedComponents<BoxedErasedField>> {
         let &mut Self {
             ref component_ids,
             ref mut erased_storage,
@@ -573,7 +573,7 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedField>> {
+    ) -> Option<ErasedComponents<BoxedErasedField>> {
         let &mut Self {
             ref component_ids,
             ref mut erased_storage,
@@ -738,15 +738,15 @@ trait ErasedStorageExt {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-        fields: ErasedComponents<ErasedField>,
-    ) -> Option<ErasedComponents<ErasedField>>;
+        fields: ErasedComponents<BoxedErasedField>,
+    ) -> Option<ErasedComponents<BoxedErasedField>>;
 
     fn remove_erased(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedField>>;
+    ) -> Option<ErasedComponents<BoxedErasedField>>;
 
     fn get_erased(
         &self,
@@ -820,8 +820,8 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-        fields: ErasedComponents<ErasedField>,
-    ) -> Option<ErasedComponents<ErasedField>> {
+        fields: ErasedComponents<BoxedErasedField>,
+    ) -> Option<ErasedComponents<BoxedErasedField>> {
         let value = unsafe {
             let component_ids = component_ids.keys().copied();
             from_erased_fields::<ErasedSoa>(components, self.context(), component_ids, fields)
@@ -840,7 +840,7 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedField>> {
+    ) -> Option<ErasedComponents<BoxedErasedField>> {
         let value = ErasedStorage::swap_remove(self, entity.into())?;
 
         let component_ids = component_ids.keys().copied();

@@ -1,7 +1,7 @@
 use gpecs_soa_erased::{
     erased::ErasedSoa,
     field::{
-        ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
+        BoxedErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
 };
 use indexmap::IndexMap;
@@ -88,13 +88,13 @@ pub unsafe fn from_erased_fields<T>(
     components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    fields: ErasedComponents<ErasedField>,
+    fields: ErasedComponents<BoxedErasedField>,
 ) -> T
 where
     T: Soa,
 {
     let fields = reorder_fields::<T, _, _>(components, context, component_ids, fields)
-        .map(ErasedField::into_parts);
+        .map(|field| (field.descriptor(), Box::from(field.as_slice())));
     let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
     unsafe { erased_value.into::<T>(context) }.expect("all the fields should be valid")
 }
@@ -105,11 +105,11 @@ pub fn into_erased_fields<T>(
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     value: T,
-) -> ErasedComponents<ErasedField>
+) -> ErasedComponents<BoxedErasedField>
 where
     T: Soa,
 {
-    let erased_value = ErasedSoa::from(context, value).into_fields();
+    let erased_value = ErasedSoa::from(context, value).into_fields().unwrap();
     validate_components::<T, _>(components, context, component_ids)
         .zip(erased_value)
         .collect()

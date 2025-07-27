@@ -5,8 +5,8 @@ use core::{
 };
 
 use crate::{
-    assert::{check_same_layout, check_same_len},
     erased::{ErasedSoaMutPtrs, ErasedSoaRefs, assert::assert_descriptors, error::IntoValueError},
+    error::{check_layout, check_len},
     field::ErasedFieldPtr,
     soa::traits::{FieldDescriptor, Soa},
 };
@@ -101,11 +101,11 @@ impl<'context> ErasedSoaPtrs<'context> {
             .into_iter()
             .zip(self)
             .try_fold(0, |len, (desc, slice)| {
-                check_same_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
+                check_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
                 Ok(len + 1)
             })
             .and_then(|len| {
-                check_same_len(len, descriptors.len())?;
+                check_len(len, descriptors.len())?;
                 Ok(())
             });
         if let Err(error) = result {

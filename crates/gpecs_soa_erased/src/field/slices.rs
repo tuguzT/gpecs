@@ -6,12 +6,12 @@ use core::{
     slice,
 };
 
-use crate::soa::traits::FieldDescriptor;
+use crate::{error::check_align, soa::traits::FieldDescriptor};
 
 use super::{
     ErasedFieldPtr, ErasedFieldRef, ErasedFieldSlicePtr,
-    assert::{check_buffer_align, check_layout, check_slice_buffer_len},
-    error::{ErasedFieldSliceError, IntoValueError},
+    assert::{check_into_layout, check_slice_buffer_len},
+    error::{ErasedFieldSlicePtrError, IntoValueError},
 };
 
 #[derive(Clone, Copy)]
@@ -29,9 +29,9 @@ impl<'a> ErasedFieldSlice<'a> {
         desc: FieldDescriptor,
         buffer: &'a [u8],
         len: usize,
-    ) -> Result<Self, ErasedFieldSliceError> {
+    ) -> Result<Self, ErasedFieldSlicePtrError> {
         let ptr = buffer.as_ptr();
-        check_buffer_align(buffer.as_ptr(), desc.layout())?;
+        check_align(buffer.as_ptr(), desc.layout())?;
         check_slice_buffer_len(buffer.len(), desc.layout().size(), len)?;
 
         Ok(Self {
@@ -70,7 +70,7 @@ impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     pub unsafe fn into<T>(self) -> Result<&'a [T], IntoValueError<Self>> {
         let Self { desc, .. } = self;
-        let me = check_layout::<T, _>(desc.layout(), self)?;
+        let me = check_into_layout::<T, _>(desc.layout(), self)?;
         let Self { ptr, len, .. } = me;
 
         let data = ptr.cast();
@@ -80,7 +80,7 @@ impl<'a> ErasedFieldSlice<'a> {
     #[inline]
     pub unsafe fn cast<T>(&self) -> Result<&[T], IntoValueError<&Self>> {
         let Self { desc, .. } = *self;
-        let me = check_layout::<T, _>(desc.layout(), self)?;
+        let me = check_into_layout::<T, _>(desc.layout(), self)?;
         let Self { ptr, len, .. } = *me;
 
         let data = ptr.cast();

@@ -5,13 +5,13 @@ use core::{
     slice,
 };
 
-use crate::soa::traits::FieldDescriptor;
+use crate::{error::check_align, soa::traits::FieldDescriptor};
 
 use super::{
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSlicePtr,
     ErasedFieldSlicePtrIter,
-    assert::{check_buffer_align, check_layout, check_slice_buffer_len},
-    error::{ErasedFieldSliceError, IntoValueError},
+    assert::{check_into_layout, check_slice_buffer_len},
+    error::{ErasedFieldSlicePtrError, IntoValueError},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -28,9 +28,9 @@ impl ErasedFieldSliceMutPtr {
         desc: FieldDescriptor,
         buffer: *mut [u8],
         len: usize,
-    ) -> Result<Self, ErasedFieldSliceError> {
+    ) -> Result<Self, ErasedFieldSlicePtrError> {
         let ptr = buffer.cast();
-        check_buffer_align(ptr, desc.layout())?;
+        check_align(ptr, desc.layout())?;
         check_slice_buffer_len(buffer.len(), desc.layout().size(), len)?;
 
         Ok(Self { desc, ptr, len })
@@ -57,7 +57,7 @@ impl ErasedFieldSliceMutPtr {
 
     #[inline]
     pub fn into<T>(self) -> Result<*mut [T], IntoValueError<Self>> {
-        let me = check_layout::<T, _>(self.desc.layout(), self)?;
+        let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, len, .. } = me;
         Ok(ptr::slice_from_raw_parts_mut(ptr.cast(), len))
     }

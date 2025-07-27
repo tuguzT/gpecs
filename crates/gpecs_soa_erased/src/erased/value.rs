@@ -5,11 +5,10 @@ use core::{
 };
 
 use crate::{
-    aligned_bytes::AlignedBytes,
-    assert::{check_same_layout, check_same_len},
+    aligned_bytes::{AlignedBoxedByteSlice, AllocError},
     erased::{ErasedSoaRefs, ErasedSoaRefsMut, error::IntoValueError},
-    error::LenMismatchError,
-    field::ErasedField,
+    error::{LenMismatchError, check_layout, check_len},
+    field::{BoxedErasedField, error::ErasedFieldFromDescError},
     soa::{
         traits::{FieldDescriptor, Soa, buffer_layout, buffer_offsets},
         vec::SoaVec,
@@ -19,7 +18,7 @@ use crate::{
 pub type ErasedSoaVec = SoaVec<ErasedSoa>;
 
 pub struct ErasedSoa {
-    buffer: AlignedBytes,
+    buffer: AlignedBoxedByteSlice,
     descriptors: Box<[FieldDescriptor]>,
 }
 
@@ -33,7 +32,7 @@ impl ErasedSoa {
         let fields = fields
             .into_iter()
             .map(|(desc, src)| {
-                check_same_len(src.as_ref().len(), desc.layout().size())?;
+                check_len(src.as_ref().len(), desc.layout().size())?;
                 Ok((desc, src))
             })
             .collect::<Result<Box<_>, _>>()?;
@@ -65,7 +64,7 @@ impl ErasedSoa {
 
         let layout = buffer_layout(&descriptors, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
-        let mut buffer = AlignedBytes::new(layout);
+        let mut buffer = AlignedBoxedByteSlice::new(layout).unwrap();
 
         let offsets = buffer_offsets(&descriptors, 1).map(Result::unwrap);
         for ((desc, src), offset) in descriptors.iter().zip(fields).zip(offsets) {
@@ -93,7 +92,7 @@ impl ErasedSoa {
 
         let layout = T::buffer_layout(context, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
-        let mut buffer = AlignedBytes::new(layout);
+        let mut buffer = AlignedBoxedByteSlice::new(layout).unwrap();
 
         unsafe {
             let dst = T::ptrs_from_buffer(context, buffer.as_mut_ptr(), 1);
@@ -119,11 +118,11 @@ impl ErasedSoa {
             .into_iter()
             .zip(descriptors)
             .try_fold(0, |len, (desc, self_desc)| {
-                check_same_layout(self_desc.layout(), desc.as_ref().layout())?;
+                check_layout(self_desc.layout(), desc.as_ref().layout())?;
                 Ok(len + 1)
             })
             .and_then(|len| {
-                check_same_len(len, descriptors.len())?;
+                check_len(len, descriptors.len())?;
                 Ok(())
             });
         if let Err(error) = result {
@@ -132,7 +131,7 @@ impl ErasedSoa {
 
         let layout = T::buffer_layout(context, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
-        if let Err(error) = check_same_len(layout.size(), buffer.layout().size()) {
+        if let Err(error) = check_len(layout.size(), buffer.layout().size()) {
             return Err(IntoValueError::new(self, error.into()));
         }
 
@@ -145,7 +144,7 @@ impl ErasedSoa {
     }
 
     #[inline]
-    pub fn into_fields(self) -> Box<[ErasedField]> {
+    pub fn into_fields(self) -> Result<Box<[BoxedErasedField]>, AllocError> {
         let Self {
             buffer,
             ref descriptors,
@@ -153,7 +152,7 @@ impl ErasedSoa {
 
         let layout = buffer_layout(descriptors, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
-        check_same_len(layout.size(), buffer.layout().size()).expect("buffer length should match");
+        check_len(layout.size(), buffer.layout().size()).expect("buffer length should match");
 
         let offsets = buffer_offsets(descriptors, 1).map(Result::unwrap);
         descriptors
@@ -161,8 +160,12 @@ impl ErasedSoa {
             .zip(offsets)
             .map(|(&desc, offset)| {
                 let data = unsafe { buffer.as_ptr().add(offset) };
-                let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-                unsafe { ErasedField::new_unchecked(desc, buffer) }
+                let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
+                match BoxedErasedField::from_desc(desc, data) {
+                    Ok(field) => Ok(field),
+                    Err(ErasedFieldFromDescError::FromDesc(err)) => Err(err),
+                    Err(ErasedFieldFromDescError::LenMismatch(err)) => unreachable!("{err}"),
+                }
             })
             .collect()
     }

@@ -1,52 +1,68 @@
-use alloc::alloc::{alloc, dealloc, handle_alloc_error, realloc};
+use alloc::alloc::{alloc, dealloc, realloc};
 use core::{
     alloc::Layout,
+    error::Error,
+    fmt::{self, Display},
+    mem::MaybeUninit,
     ptr::{self, NonNull},
+    slice,
 };
 
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+/// Just a copy of unstable [`core::alloc::AllocError`].
+pub struct AllocError;
+
+impl Display for AllocError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("memory allocation failed")
+    }
+}
+
+impl Error for AllocError {}
+
 #[derive(Debug)]
-pub struct AlignedBytes {
+pub struct AlignedBoxedByteSlice {
     ptr: NonNull<u8>,
     layout: Layout,
 }
 
-impl AlignedBytes {
+impl AlignedBoxedByteSlice {
     #[inline]
-    pub fn new(layout: Layout) -> Self {
+    pub fn new(layout: Layout) -> Result<Self, AllocError> {
         let ptr = match layout.size() {
             0 => ptr::without_provenance_mut(layout.align()),
             _ => unsafe { alloc(layout) },
         };
         let Some(ptr) = NonNull::new(ptr) else {
-            handle_alloc_error(layout);
+            return Err(AllocError);
         };
+
+        let me = Self { ptr, layout };
+        Ok(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(ptr: NonNull<u8>, layout: Layout) -> Self {
         Self { ptr, layout }
     }
 
     #[inline]
-    #[allow(dead_code)]
-    pub unsafe fn from_parts(ptr: *mut u8, layout: Layout) -> Self {
-        let ptr = unsafe { NonNull::new_unchecked(ptr) };
-        Self { ptr, layout }
-    }
-
-    #[inline]
-    #[allow(dead_code)]
-    pub fn into_parts(self) -> (*mut u8, Layout) {
+    pub fn into_parts(self) -> (NonNull<u8>, Layout) {
         let Self { ptr, layout } = self;
-        (ptr.as_ptr(), layout)
+        (ptr, layout)
     }
 
     #[inline]
-    pub fn layout(&self) -> Layout {
-        let Self { layout, .. } = *self;
-        layout
+    pub fn as_nonnull_ptr(&self) -> NonNull<u8> {
+        let Self { ptr, .. } = *self;
+        ptr
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
         let Self { ptr, .. } = *self;
-        ptr.as_ptr()
+        ptr.as_ptr().cast_const()
     }
 
     #[inline]
@@ -56,49 +72,87 @@ impl AlignedBytes {
     }
 
     #[inline]
-    #[allow(dead_code)]
-    pub fn set_layout(&mut self, layout: Layout) {
+    pub fn layout(&self) -> Layout {
+        let Self { layout, .. } = *self;
+        layout
+    }
+
+    #[inline]
+    pub fn as_uninit_slice(&self) -> &[MaybeUninit<u8>] {
+        let Self { ptr, layout } = *self;
+
+        let data = ptr.as_ptr().cast_const().cast();
+        let len = layout.size();
+        unsafe { slice::from_raw_parts(data, len) }
+    }
+
+    #[inline]
+    pub fn as_uninit_slice_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+        let Self { ptr, layout } = *self;
+
+        let data = ptr.as_ptr().cast();
+        let len = layout.size();
+        unsafe { slice::from_raw_parts_mut(data, len) }
+    }
+
+    #[inline]
+    pub fn set_layout(&mut self, layout: Layout) -> Result<(), AllocError> {
         let new_layout = layout;
         let Self { ptr, layout } = *self;
         if layout == new_layout {
-            return;
+            return Ok(());
         }
 
         if new_layout.size() != 0 && layout.align() == new_layout.align() {
             let new_ptr = unsafe { realloc(ptr.as_ptr(), layout, new_layout.size()) };
             let Some(new_ptr) = NonNull::new(new_ptr) else {
-                handle_alloc_error(new_layout);
+                return Err(AllocError);
             };
 
             self.ptr = new_ptr;
             self.layout = new_layout;
-            return;
+            return Ok(());
         }
 
-        let mut new = Self::new(new_layout);
+        let mut new = Self::new(new_layout)?;
         unsafe {
             let count = Ord::min(layout.size(), new_layout.size());
             ptr::copy_nonoverlapping(ptr.as_ptr(), new.as_mut_ptr(), count);
         }
         *self = new;
+        Ok(())
     }
 }
 
-impl AsRef<AlignedBytes> for AlignedBytes {
+impl AsRef<AlignedBoxedByteSlice> for AlignedBoxedByteSlice {
     #[inline]
-    fn as_ref(&self) -> &AlignedBytes {
+    fn as_ref(&self) -> &AlignedBoxedByteSlice {
         self
     }
 }
 
-impl AsMut<AlignedBytes> for AlignedBytes {
+impl AsMut<AlignedBoxedByteSlice> for AlignedBoxedByteSlice {
     #[inline]
-    fn as_mut(&mut self) -> &mut AlignedBytes {
+    fn as_mut(&mut self) -> &mut AlignedBoxedByteSlice {
         self
     }
 }
 
-impl Drop for AlignedBytes {
+impl AsRef<[MaybeUninit<u8>]> for AlignedBoxedByteSlice {
+    #[inline]
+    fn as_ref(&self) -> &[MaybeUninit<u8>] {
+        self.as_uninit_slice()
+    }
+}
+
+impl AsMut<[MaybeUninit<u8>]> for AlignedBoxedByteSlice {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+        self.as_uninit_slice_mut()
+    }
+}
+
+impl Drop for AlignedBoxedByteSlice {
     fn drop(&mut self) {
         let Self { ptr, layout } = *self;
         if layout.size() == 0 {
@@ -115,7 +169,7 @@ mod tests {
     #[test]
     fn new() {
         let layout = Layout::new::<u64>();
-        let mut bytes = AlignedBytes::new(layout);
+        let mut bytes = AlignedBoxedByteSlice::new(layout).unwrap();
 
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
@@ -131,7 +185,7 @@ mod tests {
     #[test]
     fn new_zst() {
         let layout = Layout::new::<()>();
-        let mut bytes = AlignedBytes::new(layout);
+        let mut bytes = AlignedBoxedByteSlice::new(layout).unwrap();
 
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
@@ -151,11 +205,11 @@ mod tests {
     #[test]
     fn set_layout() {
         let layout = Layout::new::<u64>();
-        let mut bytes = AlignedBytes::new(layout);
+        let mut bytes = AlignedBoxedByteSlice::new(layout).unwrap();
         unsafe { bytes.as_mut_ptr().cast::<u64>().write(42) }
 
         let layout = Layout::new::<u128>();
-        bytes.set_layout(layout);
+        bytes.set_layout(layout).unwrap();
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
 
@@ -164,7 +218,7 @@ mod tests {
         assert_eq!(value, 42);
 
         let layout = Layout::new::<u32>();
-        bytes.set_layout(layout);
+        bytes.set_layout(layout).unwrap();
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
 
@@ -173,7 +227,7 @@ mod tests {
         assert_eq!(value, 42);
 
         let layout = Layout::new::<(u32, u32)>();
-        bytes.set_layout(layout);
+        bytes.set_layout(layout).unwrap();
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
 
@@ -182,7 +236,7 @@ mod tests {
         assert_eq!(value, 42);
 
         let layout = Layout::new::<()>();
-        bytes.set_layout(layout);
+        bytes.set_layout(layout).unwrap();
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
 

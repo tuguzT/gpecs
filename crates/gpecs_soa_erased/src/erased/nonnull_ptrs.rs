@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem::MaybeUninit,
     ptr::{self, NonNull},
     slice,
 };
@@ -164,7 +165,7 @@ impl<'context> ErasedSoaNonNullPtrs<'context> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap(self, with: ErasedSoaNonNullPtrs<'_>, temp: &mut [u8]) {
+    pub unsafe fn swap(self, with: ErasedSoaNonNullPtrs<'_>, temp: &mut [MaybeUninit<u8>]) {
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors, with.field_descriptors());
 
@@ -173,7 +174,12 @@ impl<'context> ErasedSoaNonNullPtrs<'context> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from(self, from: ErasedSoaNonNullPtrs<'_>, count: usize, temp: &mut [u8]) {
+    pub unsafe fn copy_from(
+        self,
+        from: ErasedSoaNonNullPtrs<'_>,
+        count: usize,
+        temp: &mut [MaybeUninit<u8>],
+    ) {
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors, from.field_descriptors());
 
@@ -187,7 +193,7 @@ impl<'context> ErasedSoaNonNullPtrs<'context> {
         self,
         from: ErasedSoaNonNullPtrs<'_>,
         count: usize,
-        temp: &mut [u8],
+        temp: &mut [MaybeUninit<u8>],
     ) {
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors, from.field_descriptors());
@@ -197,7 +203,7 @@ impl<'context> ErasedSoaNonNullPtrs<'context> {
         fn rec(
             iter: &mut itertools::ZipEq<ErasedSoaNonNullPtrsIter<'_>, ErasedSoaNonNullPtrsIter<'_>>,
             count: usize,
-            temp: &mut [u8],
+            temp: &mut [MaybeUninit<u8>],
         ) {
             let Some((this, from)) = iter.next() else {
                 return;

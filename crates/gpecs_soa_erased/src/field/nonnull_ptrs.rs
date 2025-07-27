@@ -1,4 +1,7 @@
-use core::ptr::{self, NonNull};
+use core::{
+    mem::MaybeUninit,
+    ptr::{self, NonNull},
+};
 
 use crate::{
     error::{check_align, check_layout, check_len},
@@ -91,7 +94,7 @@ impl ErasedFieldNonNullPtr {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap(self, with: Self, temp: &mut [u8]) {
+    pub unsafe fn swap(self, with: Self, temp: &mut [MaybeUninit<u8>]) {
         let Self { desc, .. } = self;
         check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
@@ -101,15 +104,15 @@ impl ErasedFieldNonNullPtr {
         let a = self.as_ptr();
         let b = with.as_ptr();
         unsafe {
-            ptr::copy_nonoverlapping(a.as_ptr(), temp.as_mut_ptr(), count);
+            ptr::copy_nonoverlapping(a.as_ptr(), temp.as_mut_ptr().cast(), count);
             ptr::copy(b.as_ptr(), a.as_ptr(), count);
-            ptr::copy_nonoverlapping(temp.as_ptr(), b.as_ptr(), count);
+            ptr::copy_nonoverlapping(temp.as_ptr().cast(), b.as_ptr(), count);
         }
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from(self, from: Self, count: usize, temp: &mut [u8]) {
+    pub unsafe fn copy_from(self, from: Self, count: usize, temp: &mut [MaybeUninit<u8>]) {
         let Self { desc, .. } = self;
         check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
@@ -119,8 +122,8 @@ impl ErasedFieldNonNullPtr {
         let src = from.as_ptr();
         let dst = self.as_ptr();
         unsafe {
-            ptr::copy_nonoverlapping(src.as_ptr(), temp.as_mut_ptr(), count);
-            ptr::copy_nonoverlapping(temp.as_ptr(), dst.as_ptr(), count);
+            ptr::copy_nonoverlapping(src.as_ptr(), temp.as_mut_ptr().cast(), count);
+            ptr::copy_nonoverlapping(temp.as_ptr().cast(), dst.as_ptr(), count);
         }
     }
 

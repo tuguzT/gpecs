@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem::MaybeUninit,
     ptr, slice,
 };
 
@@ -177,7 +178,7 @@ impl<'context> ErasedSoaMutPtrs<'context> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap(self, with: ErasedSoaMutPtrs<'_>, temp: &mut [u8]) {
+    pub unsafe fn swap(self, with: ErasedSoaMutPtrs<'_>, temp: &mut [MaybeUninit<u8>]) {
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors, with.field_descriptors());
 
@@ -186,7 +187,12 @@ impl<'context> ErasedSoaMutPtrs<'context> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from(self, from: ErasedSoaPtrs<'_>, count: usize, temp: &mut [u8]) {
+    pub unsafe fn copy_from(
+        self,
+        from: ErasedSoaPtrs<'_>,
+        count: usize,
+        temp: &mut [MaybeUninit<u8>],
+    ) {
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors, from.field_descriptors());
 
@@ -196,7 +202,12 @@ impl<'context> ErasedSoaMutPtrs<'context> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_rev(self, from: ErasedSoaPtrs<'_>, count: usize, temp: &mut [u8]) {
+    pub unsafe fn copy_from_rev(
+        self,
+        from: ErasedSoaPtrs<'_>,
+        count: usize,
+        temp: &mut [MaybeUninit<u8>],
+    ) {
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors, from.field_descriptors());
 
@@ -205,7 +216,7 @@ impl<'context> ErasedSoaMutPtrs<'context> {
         fn rec(
             iter: &mut itertools::ZipEq<ErasedSoaMutPtrsIter<'_>, ErasedSoaPtrsIter<'_>>,
             count: usize,
-            temp: &mut [u8],
+            temp: &mut [MaybeUninit<u8>],
         ) {
             let Some((this, from)) = iter.next() else {
                 return;

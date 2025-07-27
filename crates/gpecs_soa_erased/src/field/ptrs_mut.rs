@@ -1,4 +1,4 @@
-use core::{ptr, slice};
+use core::{mem::MaybeUninit, ptr, slice};
 
 use crate::{
     error::{check_align, check_layout, check_len},
@@ -96,7 +96,7 @@ impl ErasedFieldMutPtr {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap(self, with: Self, temp: &mut [u8]) {
+    pub unsafe fn swap(self, with: Self, temp: &mut [MaybeUninit<u8>]) {
         let Self { desc, .. } = self;
         check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
@@ -106,15 +106,20 @@ impl ErasedFieldMutPtr {
         let a = self.as_ptr();
         let b = with.as_ptr();
         unsafe {
-            ptr::copy_nonoverlapping(a, temp.as_mut_ptr(), count);
+            ptr::copy_nonoverlapping(a, temp.as_mut_ptr().cast(), count);
             ptr::copy(b, a, count);
-            ptr::copy_nonoverlapping(temp.as_ptr(), b, count);
+            ptr::copy_nonoverlapping(temp.as_ptr().cast(), b, count);
         }
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from(self, from: ErasedFieldPtr, count: usize, temp: &mut [u8]) {
+    pub unsafe fn copy_from(
+        self,
+        from: ErasedFieldPtr,
+        count: usize,
+        temp: &mut [MaybeUninit<u8>],
+    ) {
         let Self { desc, .. } = self;
         check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
@@ -124,8 +129,8 @@ impl ErasedFieldMutPtr {
         let src = from.as_ptr();
         let dst = self.as_ptr();
         unsafe {
-            ptr::copy_nonoverlapping(src, temp.as_mut_ptr(), count);
-            ptr::copy_nonoverlapping(temp.as_ptr(), dst, count);
+            ptr::copy_nonoverlapping(src, temp.as_mut_ptr().cast(), count);
+            ptr::copy_nonoverlapping(temp.as_ptr().cast(), dst, count);
         }
     }
 

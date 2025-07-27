@@ -172,7 +172,7 @@ impl Debug for NotAlignedError {
         }
 
         let Self { ptr, target_align } = self;
-        f.debug_struct("PtrNotAlignedError")
+        f.debug_struct("NotAlignedError")
             .field("ptr", ptr)
             .field("target_align", target_align)
             .finish()

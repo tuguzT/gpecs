@@ -1,5 +1,8 @@
 pub use self::{
-    context::{BoxedErasedSoaContext, ErasedSoaContext},
+    context::{
+        BorrowBytes, BoxedErasedSoaContext, ErasedSoaContext, ErasedSoaContextIntoIter, NewBytes,
+        RefCellByteVecError, RefCellUninitByteSliceError,
+    },
     fields::ErasedSoaFields,
     nonnull_ptrs::{ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter},
     ptrs::{ErasedSoaPtrs, ErasedSoaPtrsIter},

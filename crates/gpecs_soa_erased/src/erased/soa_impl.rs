@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use core::ptr::NonNull;
 
 use crate::{
@@ -142,7 +141,7 @@ unsafe impl Soa for ErasedSoa {
             .map(|desc| desc.layout().size())
             .max()
             .unwrap_or(0);
-        let mut temp = Box::new_uninit_slice(count);
+        let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
         unsafe { a.swap(b, &mut temp) }
     }
 
@@ -162,7 +161,7 @@ unsafe impl Soa for ErasedSoa {
             .map(|desc| desc.layout().size() * len)
             .max()
             .unwrap_or(0);
-        let mut temp = Box::new_uninit_slice(count);
+        let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
         unsafe { dst.copy_from(src, len, &mut temp) }
     }
 
@@ -182,7 +181,7 @@ unsafe impl Soa for ErasedSoa {
             .map(|desc| desc.layout().size() * len)
             .max()
             .unwrap_or(0);
-        let mut temp = Box::new_uninit_slice(count);
+        let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
         unsafe { dst.copy_from_rev(src, len, &mut temp) }
     }
 

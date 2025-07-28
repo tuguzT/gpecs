@@ -1,7 +1,7 @@
 use std::{array, hint::black_box, iter::Zip, slice};
 
 use gpecs_soa::{prelude::*, slice as soa_slice};
-use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaVec};
+use gpecs_soa_erased::erased::{BoxedErasedSoa, ErasedSoa};
 
 use crate::{Big, Large, Small, Tiny, push::Push, with_capacity::WithCapacity};
 
@@ -27,11 +27,11 @@ pub trait Work: WithCapacity + Push {
 
     fn soa_slf_work(iter: Self::SoaSlfIter<'_, '_>) -> Self::Output;
 
-    fn soa_ser_prepare_vec(count: usize) -> ErasedSoaVec {
+    fn soa_ser_prepare_vec(count: usize) -> SoaVec<BoxedErasedSoa> {
         let mut vec = Self::soa_ser_with_capacity(count);
         for index in 0..count {
             let value = black_box(Self::work_item(index));
-            let value = ErasedSoa::from(&Default::default(), value);
+            let value = ErasedSoa::from_value(&Default::default(), value).unwrap();
             Self::soa_ser_push(&mut vec, value);
         }
         black_box(vec)
@@ -40,7 +40,7 @@ pub trait Work: WithCapacity + Push {
     type SoaSerIter<'context, 'a>: Iterator + Clone;
 
     fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, ErasedSoa>,
+        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
     ) -> Self::SoaSerIter<'context, 'a>;
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_, '_>) -> Self::Output;
@@ -100,10 +100,10 @@ impl Work for Tiny {
         black_box(result)
     }
 
-    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, ErasedSoa>;
+    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, BoxedErasedSoa>;
 
     fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, ErasedSoa>,
+        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
     ) -> Self::SoaSerIter<'context, 'a> {
         data.into_iter()
     }
@@ -171,10 +171,10 @@ impl Work for Small {
         black_box(result)
     }
 
-    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, ErasedSoa>;
+    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, BoxedErasedSoa>;
 
     fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, ErasedSoa>,
+        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
     ) -> Self::SoaSerIter<'context, 'a> {
         data.into_iter()
     }
@@ -249,10 +249,10 @@ impl Work for Big {
         black_box(result)
     }
 
-    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, ErasedSoa>;
+    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, BoxedErasedSoa>;
 
     fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, ErasedSoa>,
+        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
     ) -> Self::SoaSerIter<'context, 'a> {
         data.into_iter()
     }
@@ -343,10 +343,10 @@ impl Work for Large {
         black_box(result)
     }
 
-    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, ErasedSoa>;
+    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, BoxedErasedSoa>;
 
     fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, ErasedSoa>,
+        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
     ) -> Self::SoaSerIter<'context, 'a> {
         data.into_iter()
     }

@@ -5,7 +5,7 @@ use gpecs_soa::traits::{Soa, buffer_layout};
 use gpecs_soa_bench::{
     Big, Large, Medium, Small, Tiny, Zero, names::*, with_capacity::WithCapacity,
 };
-use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaContext};
+use gpecs_soa_erased::erased::{BoxedErasedSoa, ErasedSoaContext};
 
 fn with_capacity<T>(c: &mut Criterion)
 where
@@ -18,7 +18,7 @@ where
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
         let context = ErasedSoaContext::of::<T>(&Default::default());
-        let fields = <ErasedSoa as Soa>::field_descriptors(&context);
+        let fields = <BoxedErasedSoa as Soa>::field_descriptors(&context);
         let buffer_layout = buffer_layout(fields, capacity).unwrap();
         let bytes = buffer_layout.size();
         group

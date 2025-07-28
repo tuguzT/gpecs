@@ -8,7 +8,7 @@ use crate::{
 use super::{
     ErasedFieldMutPtr, ErasedFieldRef,
     assert::check_into_layout,
-    error::{ErasedFieldPtrError, IntoValueError},
+    error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -54,7 +54,7 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
-    pub fn into<T>(self) -> Result<*const T, IntoValueError<Self>> {
+    pub fn into<T>(self) -> Result<*const T, ErasedFieldIntoValueError<Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
         Ok(ptr.cast())

@@ -2,7 +2,7 @@ use core::{alloc::Layout, mem::MaybeUninit};
 
 use crate::error::{NotAlignedError, check_align};
 
-pub struct AlignedByteSlice<T>
+pub struct AlignedUninitByteSlice<T>
 where
     T: ?Sized,
 {
@@ -10,7 +10,7 @@ where
     bytes: T,
 }
 
-impl<T> AlignedByteSlice<T> {
+impl<T> AlignedUninitByteSlice<T> {
     #[inline]
     pub fn new(bytes: T, layout: Layout) -> Result<Self, NotAlignedError>
     where
@@ -30,7 +30,7 @@ impl<T> AlignedByteSlice<T> {
     }
 }
 
-impl<T> AlignedByteSlice<T>
+impl<T> AlignedUninitByteSlice<T>
 where
     T: ?Sized,
 {
@@ -71,7 +71,7 @@ where
     }
 }
 
-impl<T> AsRef<[MaybeUninit<u8>]> for AlignedByteSlice<T>
+impl<T> AsRef<[MaybeUninit<u8>]> for AlignedUninitByteSlice<T>
 where
     T: AsRef<[MaybeUninit<u8>]> + ?Sized,
 {
@@ -81,7 +81,7 @@ where
     }
 }
 
-impl<T> AsMut<[MaybeUninit<u8>]> for AlignedByteSlice<T>
+impl<T> AsMut<[MaybeUninit<u8>]> for AlignedUninitByteSlice<T>
 where
     T: AsMut<[MaybeUninit<u8>]> + ?Sized,
 {

@@ -99,7 +99,7 @@ impl Error for SliceLenMismatchError {}
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct IntoValueError<T>
+pub struct ErasedFieldIntoValueError<T>
 where
     T: ?Sized,
 {
@@ -107,14 +107,14 @@ where
     pub value: T,
 }
 
-impl<T> IntoValueError<T> {
+impl<T> ErasedFieldIntoValueError<T> {
     #[inline]
     pub(super) fn new(value: T, reason: LayoutMismatchError) -> Self {
         Self { reason, value }
     }
 }
 
-impl<T> Display for IntoValueError<T>
+impl<T> Display for ErasedFieldIntoValueError<T>
 where
     T: Display + ?Sized,
 {
@@ -124,7 +124,7 @@ where
     }
 }
 
-impl<T> Error for IntoValueError<T>
+impl<T> Error for ErasedFieldIntoValueError<T>
 where
     T: Debug + Display + ?Sized,
 {
@@ -255,15 +255,15 @@ impl Error for ErasedFieldError {
     }
 }
 
-pub enum ErasedFieldFromDescError<T>
+pub enum ErasedFieldFromDescDataError<T>
 where
     T: AlignedBytesFromLayout,
 {
     LenMismatch(LenMismatchError),
-    FromDesc(T::Error),
+    FromLayout(T::Error),
 }
 
-impl<T> From<LenMismatchError> for ErasedFieldFromDescError<T>
+impl<T> From<LenMismatchError> for ErasedFieldFromDescDataError<T>
 where
     T: AlignedBytesFromLayout,
 {
@@ -273,7 +273,7 @@ where
     }
 }
 
-impl<T> Clone for ErasedFieldFromDescError<T>
+impl<T> Clone for ErasedFieldFromDescDataError<T>
 where
     T: AlignedBytesFromLayout,
     T::Error: Clone,
@@ -281,12 +281,12 @@ where
     fn clone(&self) -> Self {
         match self {
             Self::LenMismatch(error) => Self::LenMismatch(error.clone()),
-            Self::FromDesc(error) => Self::FromDesc(error.clone()),
+            Self::FromLayout(error) => Self::FromLayout(error.clone()),
         }
     }
 }
 
-impl<T> Debug for ErasedFieldFromDescError<T>
+impl<T> Debug for ErasedFieldFromDescDataError<T>
 where
     T: AlignedBytesFromLayout,
     T::Error: Debug,
@@ -294,12 +294,12 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
-            Self::FromDesc(error) => f.debug_tuple("FromDesc").field(error).finish(),
+            Self::FromLayout(error) => f.debug_tuple("FromLayout").field(error).finish(),
         }
     }
 }
 
-impl<T> Display for ErasedFieldFromDescError<T>
+impl<T> Display for ErasedFieldFromDescDataError<T>
 where
     T: AlignedBytesFromLayout,
     T::Error: Display,
@@ -307,12 +307,12 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LenMismatch(error) => Display::fmt(error, f),
-            Self::FromDesc(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl<T> Error for ErasedFieldFromDescError<T>
+impl<T> Error for ErasedFieldFromDescDataError<T>
 where
     T: AlignedBytesFromLayout,
     T::Error: Error,
@@ -320,8 +320,100 @@ where
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::LenMismatch(error) => Some(error),
-            Self::FromDesc(_) => None,
+            Self::FromLayout(_) => None,
         }
+    }
+}
+
+#[derive(Clone)]
+#[non_exhaustive]
+pub struct ErasedFieldFromValueError<B, T>
+where
+    B: AlignedBytesFromLayout,
+    T: ?Sized,
+{
+    pub reason: B::Error,
+    pub value: T,
+}
+
+impl<B, T> Debug for ErasedFieldFromValueError<B, T>
+where
+    B: AlignedBytesFromLayout,
+    B::Error: Debug,
+    T: Debug + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, value } = self;
+        f.debug_struct("ErasedFieldFromValueError")
+            .field("reason", reason)
+            .field("value", &value)
+            .finish()
+    }
+}
+
+impl<B, T> ErasedFieldFromValueError<B, T>
+where
+    B: AlignedBytesFromLayout,
+{
+    #[inline]
+    pub(crate) fn new(reason: B::Error, value: T) -> Self {
+        Self { reason, value }
+    }
+}
+
+impl<B, T> Display for ErasedFieldFromValueError<B, T>
+where
+    B: AlignedBytesFromLayout,
+    B::Error: Display,
+    T: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, value } = self;
+        write!(f, "failed to convert {value}: {reason}")
+    }
+}
+
+impl<B, T> Error for ErasedFieldFromValueError<B, T>
+where
+    B: AlignedBytesFromLayout,
+    B::Error: Debug + Display,
+    T: Debug + Display + ?Sized,
+{
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ErasedFieldFromBytesError<T>
+where
+    T: ?Sized,
+{
+    pub reason: ErasedFieldError,
+    pub bytes: T,
+}
+
+impl<T> ErasedFieldFromBytesError<T> {
+    pub(crate) fn new(reason: ErasedFieldError, bytes: T) -> Self {
+        Self { reason, bytes }
+    }
+}
+
+impl<T> Display for ErasedFieldFromBytesError<T>
+where
+    T: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, bytes } = self;
+        write!(f, "failed to create erased field with {bytes}: {reason}")
+    }
+}
+
+impl<T> Error for ErasedFieldFromBytesError<T>
+where
+    T: Debug + Display + ?Sized,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
     }
 }
 

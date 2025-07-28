@@ -1,119 +1,105 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 use core::{
     fmt::{self, Debug},
+    iter::FusedIterator,
+    marker::PhantomData,
     ptr, slice,
 };
+use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
-    aligned_bytes::{AlignedBoxedByteSlice, AllocError},
-    erased::{ErasedSoaRefs, ErasedSoaRefsMut, error::IntoValueError},
-    error::{LenMismatchError, check_layout, check_len},
-    field::{BoxedErasedField, error::ErasedFieldFromDescError},
-    soa::{
-        traits::{FieldDescriptor, Soa, buffer_layout, buffer_offsets},
-        vec::SoaVec,
+    aligned_bytes::{AlignedBytes, AlignedBytesFromLayout, AlignedUninitBoxedByteSlice},
+    erased::{
+        ErasedSoaRefs, ErasedSoaRefsMut,
+        error::{
+            ErasedSoaFromBytesFieldsDescriptorsError, ErasedSoaFromFieldsDescriptorsError,
+            ErasedSoaIntoValueError, IterOrFieldLenMismatchError,
+        },
     },
+    error::{LayoutMismatchError, LenMismatchError, check_layout, check_len},
+    field::{ErasedField, error::ErasedFieldFromDescDataError},
+    soa::traits::{BufferOffsets, FieldDescriptor, Soa, buffer_layout, buffer_offsets},
 };
 
-pub type ErasedSoaVec = SoaVec<ErasedSoa>;
+pub type BoxedErasedSoa = ErasedSoa<AlignedUninitBoxedByteSlice, Box<[FieldDescriptor]>>;
 
-pub struct ErasedSoa {
-    buffer: AlignedBoxedByteSlice,
-    descriptors: Box<[FieldDescriptor]>,
+pub struct ErasedSoa<B, D> {
+    bytes: B,
+    descriptors: D,
 }
 
-impl ErasedSoa {
+impl<B, D> ErasedSoa<B, D>
+where
+    D: AsRef<[FieldDescriptor]>,
+{
     #[inline]
-    pub fn new<I, F>(fields: I) -> Result<Self, LenMismatchError>
+    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
+        let Self { descriptors, .. } = self;
+        descriptors.as_ref()
+    }
+}
+
+impl<B, D> ErasedSoa<B, D>
+where
+    B: AlignedBytes,
+    D: AsRef<[FieldDescriptor]>,
+{
+    #[inline]
+    pub fn from_bytes_fields_descriptors<I, F>(
+        mut bytes: B,
+        fields: I,
+        descriptors: D,
+    ) -> Result<Self, ErasedSoaFromBytesFieldsDescriptorsError>
     where
-        I: IntoIterator<Item = (FieldDescriptor, F)>,
+        I: IntoIterator<Item = F>,
         F: AsRef<[u8]>,
     {
-        let fields = fields
-            .into_iter()
-            .map(|(desc, src)| {
-                check_len(src.as_ref().len(), desc.layout().size())?;
-                Ok((desc, src))
-            })
-            .collect::<Result<Box<_>, _>>()?;
-        let me = unsafe { Self::actual_new(fields) };
+        let layout = bytes.layout();
+        let expected_layout = buffer_layout(descriptors.as_ref(), 1)
+            .expect("buffer layout size should not exceed `isize::MAX`");
+        check_layout(layout, expected_layout)?;
+
+        fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
+
+        let me = Self { bytes, descriptors };
         Ok(me)
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked<I, F>(fields: I) -> Self
-    where
-        I: IntoIterator<Item = (FieldDescriptor, F)>,
-        F: AsRef<[u8]>,
-    {
-        if cfg!(debug_assertions) {
-            return Self::new(fields).expect("incorrect inputs");
-        }
-        unsafe { Self::actual_new(fields) }
+    pub fn as_refs(&self) -> ErasedSoaRefs<'_, '_> {
+        let Self { bytes, descriptors } = self;
+
+        let descriptors = descriptors.as_ref();
+        let buffer = bytes.as_ptr();
+        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, 1, 0) }
     }
 
     #[inline]
-    unsafe fn actual_new<I, F>(fields: I) -> Self
-    where
-        I: IntoIterator<Item = (FieldDescriptor, F)>,
-        F: AsRef<[u8]>,
-    {
-        let (descriptors, fields): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
-        let descriptors = descriptors.into_boxed_slice();
+    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, '_> {
+        let Self {
+            ref mut bytes,
+            ref descriptors,
+        } = *self;
 
-        let layout = buffer_layout(&descriptors, 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
-        let mut buffer = AlignedBoxedByteSlice::new(layout).unwrap();
-
-        let offsets = buffer_offsets(&descriptors, 1).map(Result::unwrap);
-        for ((desc, src), offset) in descriptors.iter().zip(fields).zip(offsets) {
-            let src = src.as_ref().as_ptr();
-            let dst = unsafe { buffer.as_mut_ptr().add(offset) };
-
-            let len = desc.layout().size();
-            unsafe { ptr::copy_nonoverlapping(src, dst, len) }
-        }
-        Self {
-            buffer,
-            descriptors,
-        }
+        let descriptors = descriptors.as_ref();
+        let buffer = bytes.as_mut_ptr();
+        unsafe { ErasedSoaRefsMut::new_unchecked(descriptors, buffer, 1, 0) }
     }
 
     #[inline]
-    pub fn from<T>(context: &T::Context, value: T) -> Self
-    where
-        T: Soa,
-    {
-        let descriptors: Box<[_]> = T::field_descriptors(context)
-            .into_iter()
-            .map(|desc| *desc.as_ref())
-            .collect();
-
-        let layout = T::buffer_layout(context, 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
-        let mut buffer = AlignedBoxedByteSlice::new(layout).unwrap();
-
-        unsafe {
-            let dst = T::ptrs_from_buffer(context, buffer.as_mut_ptr(), 1);
-            T::ptrs_write(context, dst, value);
-        }
-
-        Self {
-            buffer,
-            descriptors,
-        }
-    }
-
-    #[inline]
-    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T, IntoValueError<Self>>
+    pub unsafe fn into_value<T>(
+        self,
+        context: &T::Context,
+    ) -> Result<T, ErasedSoaIntoValueError<Self>>
     where
         T: Soa,
     {
         let Self {
-            buffer,
-            descriptors,
-        } = &self;
+            ref descriptors,
+            ref bytes,
+        } = self;
+        let descriptors = descriptors.as_ref();
+
         let result = T::field_descriptors(context)
             .into_iter()
             .zip(descriptors)
@@ -126,78 +112,256 @@ impl ErasedSoa {
                 Ok(())
             });
         if let Err(error) = result {
-            return Err(IntoValueError::new(self, error));
+            return Err(ErasedSoaIntoValueError::new(self, error));
         }
 
         let layout = T::buffer_layout(context, 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
-        if let Err(error) = check_len(layout.size(), buffer.layout().size()) {
-            return Err(IntoValueError::new(self, error.into()));
+        if let Err(error) = check_len(layout.size(), bytes.layout().size()) {
+            return Err(ErasedSoaIntoValueError::new(self, error.into()));
         }
 
-        let Self { mut buffer, .. } = self;
+        let Self { mut bytes, .. } = self;
         let value = unsafe {
-            let src = T::ptrs_from_buffer(context, buffer.as_mut_ptr(), 1);
+            let src = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
             T::ptrs_read(context, T::ptrs_cast_const(context, src))
         };
         Ok(value)
     }
+}
 
+impl<B, D> ErasedSoa<B, D>
+where
+    B: AlignedBytesFromLayout,
+    D: AsRef<[FieldDescriptor]>,
+{
     #[inline]
-    pub fn into_fields(self) -> Result<Box<[BoxedErasedField]>, AllocError> {
-        let Self {
-            buffer,
-            ref descriptors,
-        } = self;
+    pub fn from_fields_descriptors<I, F>(
+        fields: I,
+        descriptors: D,
+    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<B>>
+    where
+        I: IntoIterator<Item = F>,
+        F: AsRef<[u8]>,
+    {
+        use ErasedSoaFromFieldsDescriptorsError as Error;
 
-        let layout = buffer_layout(descriptors, 1)
+        let layout = buffer_layout(descriptors.as_ref(), 1)
             .expect("buffer layout size should not exceed `isize::MAX`");
-        check_len(layout.size(), buffer.layout().size()).expect("buffer length should match");
 
-        let offsets = buffer_offsets(descriptors, 1).map(Result::unwrap);
-        descriptors
-            .iter()
-            .zip(offsets)
-            .map(|(&desc, offset)| {
-                let data = unsafe { buffer.as_ptr().add(offset) };
-                let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-                match BoxedErasedField::from_desc(desc, data) {
-                    Ok(field) => Ok(field),
-                    Err(ErasedFieldFromDescError::FromDesc(err)) => Err(err),
-                    Err(ErasedFieldFromDescError::LenMismatch(err)) => unreachable!("{err}"),
-                }
-            })
-            .collect()
-    }
+        let mut bytes = B::from_layout(layout).map_err(Error::FromLayout)?;
+        fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
 
-    #[inline]
-    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
-        let Self { descriptors, .. } = self;
-        descriptors.as_ref()
-    }
-
-    #[inline]
-    pub fn as_refs(&self) -> ErasedSoaRefs<'_, '_> {
-        let Self {
-            buffer,
-            descriptors,
-        } = self;
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer.as_ptr(), 1, 0) }
-    }
-
-    #[inline]
-    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, '_> {
-        let &mut Self {
-            ref mut buffer,
-            ref descriptors,
-        } = self;
-        unsafe { ErasedSoaRefsMut::new_unchecked(descriptors, buffer.as_mut_ptr(), 1, 0) }
+        let me = Self { bytes, descriptors };
+        Ok(me)
     }
 }
 
-impl Debug for ErasedSoa {
+impl<B, D> ErasedSoa<B, D>
+where
+    B: AlignedBytes,
+    D: FromIterator<FieldDescriptor>,
+{
+    #[inline]
+    pub fn from_bytes_value<T>(
+        mut bytes: B,
+        context: &T::Context,
+        value: T,
+    ) -> Result<Self, LayoutMismatchError>
+    where
+        T: Soa,
+    {
+        let descriptors = T::field_descriptors(context)
+            .into_iter()
+            .map(|desc| *desc.as_ref())
+            .collect();
+
+        let expected_layout = T::buffer_layout(context, 1)
+            .expect("buffer layout size should not exceed `isize::MAX`");
+        let layout = bytes.layout();
+        check_layout(layout, expected_layout)?;
+
+        unsafe {
+            let dst = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
+            T::ptrs_write(context, dst, value);
+        }
+
+        let me = Self { bytes, descriptors };
+        Ok(me)
+    }
+}
+
+impl<B, D> ErasedSoa<B, D>
+where
+    B: AlignedBytesFromLayout,
+    D: FromIterator<FieldDescriptor>,
+{
+    #[inline]
+    pub fn from_value<T>(context: &T::Context, value: T) -> Result<Self, B::Error>
+    where
+        T: Soa,
+    {
+        let descriptors = T::field_descriptors(context)
+            .into_iter()
+            .map(|desc| *desc.as_ref())
+            .collect();
+
+        let layout = T::buffer_layout(context, 1)
+            .expect("buffer layout size should not exceed `isize::MAX`");
+        let mut bytes = B::from_layout(layout)?;
+
+        unsafe {
+            let dst = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
+            T::ptrs_write(context, dst, value);
+        }
+
+        let me = Self { bytes, descriptors };
+        Ok(me)
+    }
+}
+
+#[derive(Clone)]
+pub struct ErasedSoaIntoFields<B, I, T> {
+    bytes: B,
+    offsets: BufferOffsets<I>,
+    phantom: PhantomData<T>,
+}
+
+impl<B, I, T> ErasedSoaIntoFields<B, I, T> {
+    fn new(bytes: B, offsets: BufferOffsets<I>) -> Self {
+        Self {
+            bytes,
+            offsets,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<B, I, T> Debug for ErasedSoaIntoFields<B, I, T>
+where
+    B: Debug,
+    I: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { bytes, offsets, .. } = self;
+        f.debug_struct("ErasedSoaIntoFields")
+            .field("bytes", bytes)
+            .field("offsets", offsets)
+            .finish()
+    }
+}
+
+impl<B, I, T> Iterator for ErasedSoaIntoFields<B, I, T>
+where
+    B: AlignedBytes,
+    I: Iterator<Item: AsRef<FieldDescriptor>>,
+    T: AlignedBytesFromLayout,
+{
+    type Item = Result<ErasedField<T>, ErasedFieldFromDescDataError<T>>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref bytes,
+            ref mut offsets,
+            ..
+        } = *self;
+
+        let (desc, offset) = offsets.next()?.unwrap();
+        let data = unsafe { bytes.as_ptr().add(offset) };
+        let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
+        let item = ErasedField::from_desc_data(desc, data);
+        Some(item)
+    }
+}
+
+impl<B, I, T> ExactSizeIterator for ErasedSoaIntoFields<B, I, T>
+where
+    B: AlignedBytes,
+    I: Iterator<Item: AsRef<FieldDescriptor>> + ExactSizeIterator,
+    T: AlignedBytesFromLayout,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { offsets, .. } = self;
+        offsets.len()
+    }
+}
+
+impl<B, I, T> FusedIterator for ErasedSoaIntoFields<B, I, T>
+where
+    B: AlignedBytes,
+    I: Iterator<Item: AsRef<FieldDescriptor>> + FusedIterator,
+    T: AlignedBytesFromLayout,
+{
+}
+
+impl<B, D> ErasedSoa<B, D>
+where
+    B: AlignedBytes,
+    D: AsRef<[FieldDescriptor]> + IntoIterator<Item: AsRef<FieldDescriptor>>,
+{
+    #[inline]
+    pub fn into_fields<T>(self) -> ErasedSoaIntoFields<B, D::IntoIter, T>
+    where
+        T: AlignedBytesFromLayout,
+    {
+        let Self { bytes, descriptors } = self;
+
+        let layout = buffer_layout(descriptors.as_ref(), 1)
+            .expect("buffer layout size should not exceed `isize::MAX`");
+        check_len(layout.size(), bytes.layout().size()).expect("buffer length should match");
+
+        let offsets = buffer_offsets(descriptors, 1);
+        ErasedSoaIntoFields::new(bytes, offsets)
+    }
+}
+
+impl<B, D> Debug for ErasedSoa<B, D>
+where
+    B: AlignedBytes,
+    D: AsRef<[FieldDescriptor]>,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = &self.as_refs().into_iter();
         f.debug_struct("ErasedSoa").field("fields", fields).finish()
     }
+}
+
+fn fill_bytes_with_fields<B, I, F>(
+    bytes: &mut B,
+    fields: I,
+    descriptors: &[FieldDescriptor],
+) -> Result<(), IterOrFieldLenMismatchError>
+where
+    B: AlignedBytes + ?Sized,
+    I: IntoIterator<Item = F>,
+    F: AsRef<[u8]>,
+{
+    use IterOrFieldLenMismatchError as Error;
+
+    let mut field_index = 0;
+    let descriptors_len = descriptors.len();
+    let offsets = buffer_offsets(descriptors, 1).map(Result::unwrap);
+    offsets.zip_longest(fields).try_for_each(|item| {
+        let Both((desc, offset), src) = item else {
+            let err = LenMismatchError::new(descriptors_len, field_index);
+            let err = Error::IterLenMismatch(err);
+            return Err(err);
+        };
+
+        let src = src.as_ref();
+        let len = desc.layout().size();
+        check_len(src.len(), len)
+            .map_err(|error| Error::FieldLenMismatch { error, field_index })?;
+
+        let src = src.as_ptr();
+        let dst = unsafe { bytes.as_mut_ptr().add(offset) };
+        unsafe {
+            ptr::copy_nonoverlapping(src, dst, len);
+        }
+
+        field_index += 1;
+        Ok(())
+    })
 }

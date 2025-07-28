@@ -10,7 +10,7 @@ use crate::{
 
 use super::{
     assert::check_into_layout,
-    error::{ErasedFieldPtrError, IntoValueError},
+    error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -58,7 +58,7 @@ impl ErasedFieldNonNullPtr {
     }
 
     #[inline]
-    pub fn into<T>(self) -> Result<NonNull<T>, IntoValueError<Self>> {
+    pub fn into<T>(self) -> Result<NonNull<T>, ErasedFieldIntoValueError<Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
         Ok(ptr.cast())

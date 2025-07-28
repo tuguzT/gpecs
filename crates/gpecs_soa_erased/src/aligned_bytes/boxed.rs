@@ -22,12 +22,12 @@ impl Display for AllocError {
 impl Error for AllocError {}
 
 #[derive(Debug)]
-pub struct AlignedBoxedByteSlice {
+pub struct AlignedUninitBoxedByteSlice {
     ptr: NonNull<u8>,
     layout: Layout,
 }
 
-impl AlignedBoxedByteSlice {
+impl AlignedUninitBoxedByteSlice {
     #[inline]
     pub fn new(layout: Layout) -> Result<Self, AllocError> {
         let ptr = match layout.size() {
@@ -124,35 +124,35 @@ impl AlignedBoxedByteSlice {
     }
 }
 
-impl AsRef<AlignedBoxedByteSlice> for AlignedBoxedByteSlice {
+impl AsRef<AlignedUninitBoxedByteSlice> for AlignedUninitBoxedByteSlice {
     #[inline]
-    fn as_ref(&self) -> &AlignedBoxedByteSlice {
+    fn as_ref(&self) -> &AlignedUninitBoxedByteSlice {
         self
     }
 }
 
-impl AsMut<AlignedBoxedByteSlice> for AlignedBoxedByteSlice {
+impl AsMut<AlignedUninitBoxedByteSlice> for AlignedUninitBoxedByteSlice {
     #[inline]
-    fn as_mut(&mut self) -> &mut AlignedBoxedByteSlice {
+    fn as_mut(&mut self) -> &mut AlignedUninitBoxedByteSlice {
         self
     }
 }
 
-impl AsRef<[MaybeUninit<u8>]> for AlignedBoxedByteSlice {
+impl AsRef<[MaybeUninit<u8>]> for AlignedUninitBoxedByteSlice {
     #[inline]
     fn as_ref(&self) -> &[MaybeUninit<u8>] {
         self.as_uninit_slice()
     }
 }
 
-impl AsMut<[MaybeUninit<u8>]> for AlignedBoxedByteSlice {
+impl AsMut<[MaybeUninit<u8>]> for AlignedUninitBoxedByteSlice {
     #[inline]
     fn as_mut(&mut self) -> &mut [MaybeUninit<u8>] {
         self.as_uninit_slice_mut()
     }
 }
 
-impl Drop for AlignedBoxedByteSlice {
+impl Drop for AlignedUninitBoxedByteSlice {
     fn drop(&mut self) {
         let Self { ptr, layout } = *self;
         if layout.size() == 0 {
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn new() {
         let layout = Layout::new::<u64>();
-        let mut bytes = AlignedBoxedByteSlice::new(layout).unwrap();
+        let mut bytes = AlignedUninitBoxedByteSlice::new(layout).unwrap();
 
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn new_zst() {
         let layout = Layout::new::<()>();
-        let mut bytes = AlignedBoxedByteSlice::new(layout).unwrap();
+        let mut bytes = AlignedUninitBoxedByteSlice::new(layout).unwrap();
 
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn set_layout() {
         let layout = Layout::new::<u64>();
-        let mut bytes = AlignedBoxedByteSlice::new(layout).unwrap();
+        let mut bytes = AlignedUninitBoxedByteSlice::new(layout).unwrap();
         unsafe { bytes.as_mut_ptr().cast::<u64>().write(42) }
 
         let layout = Layout::new::<u128>();

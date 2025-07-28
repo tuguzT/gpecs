@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    erased::{ErasedSoaSlicePtrs, error::IntoValueError},
+    erased::{ErasedSoaSlicePtrs, error::ErasedSoaIntoValueError},
     error::{check_layout, check_len},
     field::{ErasedFieldPtr, ErasedFieldSlice, field_slice_from_raw_parts},
     soa::{
@@ -110,7 +110,7 @@ impl<'context, 'a> ErasedSoaSlices<'context, 'a> {
     pub unsafe fn into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::Slices<'_, 'a>, IntoValueError<Self>>
+    ) -> Result<T::Slices<'_, 'a>, ErasedSoaIntoValueError<Self>>
     where
         T: Soa,
     {
@@ -135,7 +135,7 @@ impl<'context, 'a> ErasedSoaSlices<'context, 'a> {
                 Ok(())
             });
         if let Err(error) = result {
-            return Err(IntoValueError::new(self, error));
+            return Err(ErasedSoaIntoValueError::new(self, error));
         }
 
         unsafe {

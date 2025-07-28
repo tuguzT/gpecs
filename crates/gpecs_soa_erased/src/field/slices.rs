@@ -11,7 +11,7 @@ use crate::{error::check_align, soa::traits::FieldDescriptor};
 use super::{
     ErasedFieldPtr, ErasedFieldRef, ErasedFieldSlicePtr,
     assert::{check_into_layout, check_slice_buffer_len},
-    error::{ErasedFieldSlicePtrError, IntoValueError},
+    error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
 };
 
 #[derive(Clone, Copy)]
@@ -68,7 +68,7 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self) -> Result<&'a [T], IntoValueError<Self>> {
+    pub unsafe fn into<T>(self) -> Result<&'a [T], ErasedFieldIntoValueError<Self>> {
         let Self { desc, .. } = self;
         let me = check_into_layout::<T, _>(desc.layout(), self)?;
         let Self { ptr, len, .. } = me;
@@ -78,7 +78,7 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&[T], IntoValueError<&Self>> {
+    pub unsafe fn cast<T>(&self) -> Result<&[T], ErasedFieldIntoValueError<&Self>> {
         let Self { desc, .. } = *self;
         let me = check_into_layout::<T, _>(desc.layout(), self)?;
         let Self { ptr, len, .. } = *me;

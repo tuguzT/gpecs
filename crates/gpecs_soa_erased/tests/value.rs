@@ -1,6 +1,10 @@
 use std::{ptr, slice};
 
-use gpecs_soa_erased::{erased::ErasedSoa, field::ErasedFieldRef, soa::traits::FieldDescriptor};
+use gpecs_soa_erased::{
+    erased::BoxedErasedSoa,
+    field::{BoxedErasedField, ErasedField, ErasedFieldRef},
+    soa::traits::FieldDescriptor,
+};
 
 #[test]
 fn value() {
@@ -11,7 +15,7 @@ fn value() {
     let i3 = 3;
     let str = "hello";
     let value = ((), str.to_owned(), i1, i2, i3);
-    let erased_value = ErasedSoa::from(&context, value);
+    let erased_value = BoxedErasedSoa::from_value(&context, value).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -109,18 +113,18 @@ fn value() {
 
     let mut fields = erased_value
         .into_fields()
-        .expect("allocation of small byte array should succeed")
-        .into_vec();
-    let field = fields.pop().expect("string field should exist");
+        .collect::<Result<Vec<_>, _>>()
+        .expect("allocation of small byte array should succeed");
+    let field: BoxedErasedField = fields.pop().expect("string field should exist");
     assert_eq!(
-        unsafe { field.into::<String>() }.expect("layouts should match"),
+        unsafe { field.into_value::<String>() }.expect("layouts should match"),
         str,
     );
 
-    let fields = fields
-        .iter()
-        .map(|field| (field.descriptor(), field.as_slice()));
-    let erased_value = ErasedSoa::new(fields).expect("all the fields should be valid");
+    let (descriptors, fields): (Vec<_>, Vec<_>) =
+        fields.into_iter().map(ErasedField::into_parts).unzip();
+    let erased_value = BoxedErasedSoa::from_fields_descriptors(fields, descriptors.into())
+        .expect("all the fields should be valid");
     assert!(
         erased_value
             .as_refs()
@@ -129,7 +133,7 @@ fn value() {
             .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer))
     );
 
-    let value = unsafe { erased_value.into::<((), u32, u16, u8)>(&context) }
+    let value = unsafe { erased_value.into_value::<((), u32, u16, u8)>(&context) }
         .expect("all the fields should be valid");
     assert_eq!(value, ((), i1, i2, i3));
 }
@@ -139,7 +143,7 @@ fn value_zst() {
     let context = ();
 
     let value = ();
-    let erased_value = ErasedSoa::from(&context, value);
+    let erased_value = BoxedErasedSoa::from_value(&context, value).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     assert!(
@@ -162,6 +166,6 @@ fn value_zst() {
     );
 
     let value =
-        unsafe { erased_value.into::<()>(&context) }.expect("all the fields should be valid");
+        unsafe { erased_value.into_value::<()>(&context) }.expect("all the fields should be valid");
     assert_eq!(value, ());
 }

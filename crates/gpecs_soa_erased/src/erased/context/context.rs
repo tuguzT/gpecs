@@ -132,6 +132,17 @@ where
     }
 }
 
+impl<I, R> ExactSizeIterator for ErasedSoaContextIntoIter<I, R>
+where
+    I: ExactSizeIterator,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { iter, .. } = self;
+        iter.len()
+    }
+}
+
 impl<I, R> FusedIterator for ErasedSoaContextIntoIter<I, R> where I: FusedIterator {}
 
 impl<D, R> IntoIterator for ErasedSoaContext<D, R>

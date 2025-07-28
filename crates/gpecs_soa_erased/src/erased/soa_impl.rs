@@ -1,16 +1,15 @@
 use core::ptr::NonNull;
 
-use crate::{
-    erased::{
-        BoxedErasedSoaContext, ErasedSoa, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs,
-        ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs,
-        ErasedSoaSlices, ErasedSoaSlicesMut, assert::assert_descriptors, soa_slice_from_raw_parts,
-        soa_slice_from_raw_parts_mut,
-    },
-    soa::traits::{FieldDescriptor, Soa},
+use crate::soa::traits::{FieldDescriptor, Soa};
+
+use super::{
+    BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs,
+    ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs,
+    ErasedSoaSlices, ErasedSoaSlicesMut, assert::assert_descriptors, soa_slice_from_raw_parts,
+    soa_slice_from_raw_parts_mut,
 };
 
-unsafe impl Soa for ErasedSoa {
+unsafe impl Soa for BoxedErasedSoa {
     type Context = BoxedErasedSoaContext;
     type Fields = ErasedSoaFields;
 
@@ -204,11 +203,11 @@ unsafe impl Soa for ErasedSoa {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, src.field_descriptors());
 
-        let fields = descriptors
-            .iter()
-            .zip(src)
-            .map(|(desc, src)| (*desc, unsafe { src.deref().into_buffer() }));
-        unsafe { Self::new_unchecked(fields) }
+        let fields = src
+            .into_iter()
+            .map(|src| unsafe { src.deref().into_buffer() });
+        Self::from_fields_descriptors(fields, descriptors.into())
+            .expect("length of fields should be equal to the length of descriptors")
     }
 
     #[inline]

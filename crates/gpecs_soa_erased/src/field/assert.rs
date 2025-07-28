@@ -2,7 +2,7 @@ use core::alloc::Layout;
 
 use crate::error::check_layout;
 
-use super::error::{IntoValueError, SliceLenMismatchError};
+use super::error::{ErasedFieldIntoValueError, SliceLenMismatchError};
 
 #[inline]
 pub fn check_slice_buffer_len(
@@ -24,10 +24,13 @@ pub fn check_slice_buffer_len(
 }
 
 #[inline]
-pub fn check_into_layout<T, U>(layout: Layout, value: U) -> Result<U, IntoValueError<U>> {
+pub fn check_into_layout<T, U>(
+    layout: Layout,
+    value: U,
+) -> Result<U, ErasedFieldIntoValueError<U>> {
     let expected = Layout::new::<T>();
     match check_layout(layout, expected) {
         Ok(()) => Ok(value),
-        Err(reason) => Err(IntoValueError::new(value, reason)),
+        Err(reason) => Err(ErasedFieldIntoValueError::new(value, reason)),
     }
 }

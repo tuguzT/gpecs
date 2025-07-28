@@ -12,7 +12,7 @@ use crate::{
 use super::{
     ErasedFieldPtr,
     assert::check_into_layout,
-    error::{ErasedFieldPtrError, IntoValueError},
+    error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
 };
 
 #[derive(Clone, Copy)]
@@ -61,7 +61,7 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self) -> Result<&'a T, IntoValueError<Self>> {
+    pub unsafe fn into<T>(self) -> Result<&'a T, ErasedFieldIntoValueError<Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 
@@ -70,7 +70,7 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&T, IntoValueError<&Self>> {
+    pub unsafe fn cast<T>(&self) -> Result<&T, ErasedFieldIntoValueError<&Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 

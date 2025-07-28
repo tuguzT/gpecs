@@ -11,7 +11,7 @@ use super::{
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSlicePtr,
     ErasedFieldSlicePtrIter,
     assert::{check_into_layout, check_slice_buffer_len},
-    error::{ErasedFieldSlicePtrError, IntoValueError},
+    error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -56,7 +56,7 @@ impl ErasedFieldSliceMutPtr {
     }
 
     #[inline]
-    pub fn into<T>(self) -> Result<*mut [T], IntoValueError<Self>> {
+    pub fn into<T>(self) -> Result<*mut [T], ErasedFieldIntoValueError<Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, len, .. } = me;
         Ok(ptr::slice_from_raw_parts_mut(ptr.cast(), len))

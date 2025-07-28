@@ -14,7 +14,7 @@ pub struct LenMismatchError {
 impl LenMismatchError {
     #[inline]
     #[track_caller]
-    fn new(expected: usize, actual: usize) -> Self {
+    pub fn new(expected: usize, actual: usize) -> Self {
         assert_ne!(
             expected, actual,
             "expected and actual lengths should differ from each other",
@@ -75,7 +75,7 @@ pub struct LayoutMismatchError {
 impl LayoutMismatchError {
     #[inline]
     #[track_caller]
-    fn new(expected: Layout, actual: Layout) -> Self {
+    pub fn new(expected: Layout, actual: Layout) -> Self {
         assert_ne!(
             expected, actual,
             "expected and actual layouts should differ from each other",
@@ -144,11 +144,16 @@ const _: () = assert!(
 
 impl NotAlignedError {
     #[inline]
-    fn new(ptr: *const u8, target_layout: Layout) -> Self {
-        let target_align = target_layout
+    pub fn new(ptr: *const u8, target_layout: Layout) -> Self {
+        let target_align: NonZeroUsize = target_layout
             .align()
             .try_into()
             .expect("alignment should not be zero because it is power of two");
+        assert!(
+            ptr.align_offset(target_align.get()) != 0,
+            "the pointer {ptr:p} should not be aligned to {target_align}",
+        );
+
         Self { ptr, target_align }
     }
 

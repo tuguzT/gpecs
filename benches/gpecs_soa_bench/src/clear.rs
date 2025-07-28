@@ -1,5 +1,5 @@
 use gpecs_soa::prelude::*;
-use gpecs_soa_erased::erased::ErasedSoaVec;
+use gpecs_soa_erased::erased::BoxedErasedSoa;
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
@@ -8,7 +8,7 @@ pub trait Clear: SoaVecs {
         vec.clear();
     }
 
-    fn soa_ser_clear(vec: &mut ErasedSoaVec) {
+    fn soa_ser_clear(vec: &mut SoaVec<BoxedErasedSoa>) {
         vec.clear();
     }
 

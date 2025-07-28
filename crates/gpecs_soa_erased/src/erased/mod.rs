@@ -15,7 +15,7 @@ pub use self::{
     },
     slices::{ErasedSoaSlices, ErasedSoaSlicesIter},
     slices_mut::{ErasedSoaSlicesMut, ErasedSoaSlicesMutIter},
-    value::{ErasedSoa, ErasedSoaVec},
+    value::{BoxedErasedSoa, ErasedSoa, ErasedSoaIntoFields},
 };
 
 pub mod error;

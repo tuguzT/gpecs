@@ -5,7 +5,7 @@ use std::{
 };
 
 use gpecs_soa_erased::{
-    erased::{ErasedSoa, ErasedSoaContext, ErasedSoaRefsMut},
+    erased::{BoxedErasedSoa, ErasedSoaContext, ErasedSoaRefsMut},
     field::{
         BoxedErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
     },
@@ -77,7 +77,7 @@ impl From<NoEpochEntity> for Entity {
 pub type Bundles<'a, B> = (&'a [Entity], <B as Soa>::Slices<'a, 'a>);
 pub type BundlesMut<'a, B> = (&'a [Entity], <B as Soa>::SlicesMut<'a, 'a>);
 
-type ErasedStorage = EpochSparseSet<NoEpochEntity, ErasedSoa>;
+type ErasedStorage = EpochSparseSet<NoEpochEntity, BoxedErasedSoa>;
 type ComponentIdMap = IndexMap<ComponentId, Option<DropFn>>;
 
 pub struct ArchetypeStorage {
@@ -783,7 +783,7 @@ impl ErasedStorageExt for ErasedStorage {
 
         let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
-        let fields = validate_components::<ErasedSoa, _>(components, context, component_ids)
+        let fields = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
             .zip(values)
             .collect();
         if entities.len() != values.len() {
@@ -804,7 +804,7 @@ impl ErasedStorageExt for ErasedStorage {
 
         let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
-        let fields = validate_components::<ErasedSoa, _>(components, context, component_ids)
+        let fields = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
             .zip(values)
             .collect();
         if entities.len() != values.len() {
@@ -824,13 +824,14 @@ impl ErasedStorageExt for ErasedStorage {
     ) -> Option<ErasedComponents<BoxedErasedField>> {
         let value = unsafe {
             let component_ids = component_ids.keys().copied();
-            from_erased_fields::<ErasedSoa>(components, self.context(), component_ids, fields)
+            from_erased_fields::<BoxedErasedSoa>(components, self.context(), component_ids, fields)
         };
         let value = ErasedStorage::insert(self, entity.into(), value)?;
 
         let component_ids = component_ids.keys().copied();
         let context = self.context();
-        let fields = into_erased_fields::<ErasedSoa>(components, context, component_ids, value);
+        let fields =
+            into_erased_fields::<BoxedErasedSoa>(components, context, component_ids, value);
         Some(fields)
     }
 
@@ -845,7 +846,8 @@ impl ErasedStorageExt for ErasedStorage {
 
         let component_ids = component_ids.keys().copied();
         let context = self.context();
-        let fields = into_erased_fields::<ErasedSoa>(components, context, component_ids, value);
+        let fields =
+            into_erased_fields::<BoxedErasedSoa>(components, context, component_ids, value);
         Some(fields)
     }
 
@@ -860,7 +862,7 @@ impl ErasedStorageExt for ErasedStorage {
         let (context, refs) = view.into_get_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
-        let refs = validate_components::<ErasedSoa, _>(components, context, component_ids)
+        let refs = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
             .zip(refs?)
             .collect();
         Some(refs)
@@ -877,7 +879,7 @@ impl ErasedStorageExt for ErasedStorage {
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
-        let refs = validate_components::<ErasedSoa, _>(components, context, component_ids)
+        let refs = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
             .zip(refs?)
             .collect();
         Some(refs)

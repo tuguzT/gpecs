@@ -5,7 +5,9 @@ use core::{
 };
 
 use crate::{
-    erased::{ErasedSoaMutPtrs, ErasedSoaRefs, assert::assert_descriptors, error::IntoValueError},
+    erased::{
+        ErasedSoaMutPtrs, ErasedSoaRefs, assert::assert_descriptors, error::ErasedSoaIntoValueError,
+    },
     error::{check_layout, check_len},
     field::ErasedFieldPtr,
     soa::traits::{FieldDescriptor, Soa},
@@ -86,7 +88,10 @@ impl<'context> ErasedSoaPtrs<'context> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self, context: &T::Context) -> Result<T::Ptrs<'_>, IntoValueError<Self>>
+    pub unsafe fn into<T>(
+        self,
+        context: &T::Context,
+    ) -> Result<T::Ptrs<'_>, ErasedSoaIntoValueError<Self>>
     where
         T: Soa,
     {
@@ -109,7 +114,7 @@ impl<'context> ErasedSoaPtrs<'context> {
                 Ok(())
             });
         if let Err(error) = result {
-            return Err(IntoValueError::new(self, error));
+            return Err(ErasedSoaIntoValueError::new(self, error));
         }
 
         unsafe {

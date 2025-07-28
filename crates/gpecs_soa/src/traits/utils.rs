@@ -8,6 +8,7 @@ use super::FieldDescriptor;
 /// Iterator of offsets for each provided field in a single buffer of provided capacity.
 ///
 /// Resulting layout could be retrieved using [`layout()`](BufferOffsets::layout()) method.
+#[derive(Debug, Clone)]
 pub struct BufferOffsets<I>
 where
     I: ?Sized,
@@ -49,7 +50,7 @@ impl<I> Iterator for BufferOffsets<I>
 where
     I: ?Sized + Iterator<Item: AsRef<FieldDescriptor>>,
 {
-    type Item = Result<usize, LayoutError>;
+    type Item = Result<(FieldDescriptor, usize), LayoutError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -59,14 +60,15 @@ where
             capacity,
         } = *self;
 
-        let field_layout = fields.next()?.as_ref().layout();
-        let region = repeat_layout(field_layout, capacity);
+        let desc = *fields.next()?.as_ref();
+        let region = repeat_layout(desc.layout(), capacity);
         let offset = region.and_then(|region| {
             let offset;
             (*layout, offset) = layout.extend(region)?;
             Ok(offset)
         });
-        Some(offset)
+        let item = offset.map(|offset| (desc, offset));
+        Some(item)
     }
 
     #[inline]

@@ -12,7 +12,7 @@ use crate::{
 use super::{
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
     assert::check_into_layout,
-    error::{ErasedFieldPtrError, IntoValueError},
+    error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
 };
 
 pub struct ErasedFieldRefMut<'a> {
@@ -60,7 +60,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub unsafe fn into<T>(self) -> Result<&'a mut T, IntoValueError<Self>> {
+    pub unsafe fn into<T>(self) -> Result<&'a mut T, ErasedFieldIntoValueError<Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 
@@ -69,7 +69,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&T, IntoValueError<&Self>> {
+    pub unsafe fn cast<T>(&self) -> Result<&T, ErasedFieldIntoValueError<&Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 
@@ -78,7 +78,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, IntoValueError<&mut Self>> {
+    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, ErasedFieldIntoValueError<&mut Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
         let Self { ptr, .. } = me;
 

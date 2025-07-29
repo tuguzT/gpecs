@@ -1,6 +1,5 @@
-use core::iter::FusedIterator;
-
 use alloc::boxed::Box;
+use core::iter::FusedIterator;
 
 use crate::{
     erased::{NewBytes, context::BorrowBytes},

@@ -160,7 +160,7 @@ impl<'context> ErasedSoaSlicePtrs<'context> {
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> ErasedSoaPtrs<'context> {
+    pub fn as_ptrs(&self) -> ErasedSoaPtrs<&'context [FieldDescriptor]> {
         let Self {
             descriptors,
             buffer,
@@ -197,7 +197,10 @@ impl<'context> IntoIterator for ErasedSoaSlicePtrs<'context> {
 }
 
 #[inline]
-pub fn soa_slice_from_raw_parts(data: ErasedSoaPtrs<'_>, len: usize) -> ErasedSoaSlicePtrs<'_> {
+pub fn soa_slice_from_raw_parts(
+    data: ErasedSoaPtrs<&[FieldDescriptor]>,
+    len: usize,
+) -> ErasedSoaSlicePtrs<'_> {
     let (descriptors, buffer, capacity, start) = data.into_parts();
     let end = start.checked_add(len).unwrap();
     unsafe { ErasedSoaSlicePtrs::new(descriptors, buffer, capacity, start..end) }

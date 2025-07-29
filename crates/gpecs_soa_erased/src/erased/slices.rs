@@ -1,4 +1,5 @@
 use core::{
+    alloc::LayoutError,
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
@@ -34,12 +35,11 @@ impl<'context, 'a> ErasedSoaSlices<'context, 'a> {
         buffer: &'a [u8],
         capacity: usize,
         range: R,
-    ) -> Self
+    ) -> Result<Self, LayoutError>
     where
         R: RangeBounds<usize>,
     {
-        let layout = buffer_layout(descriptors, capacity)
-            .expect("buffer layout size should not exceed `isize::MAX`");
+        let layout = buffer_layout(descriptors, capacity)?;
         assert!(
             buffer.len() >= layout.size(),
             "buffer length ({buffer_len}) should be equal to or larger than expected layout size ({layout_size})",
@@ -48,7 +48,8 @@ impl<'context, 'a> ErasedSoaSlices<'context, 'a> {
         );
 
         let buffer = buffer.as_ptr();
-        unsafe { Self::new_unchecked(descriptors, buffer, capacity, range) }
+        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, range) };
+        Ok(me)
     }
 
     #[inline]

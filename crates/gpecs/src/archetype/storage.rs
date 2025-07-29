@@ -541,7 +541,10 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    fn destroy_refs_mut(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut) {
+    fn destroy_refs_mut<A>(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut<'_, A>)
+    where
+        A: AsRef<[FieldDescriptor]>,
+    {
         let fields = erased_refs_mut.into_iter();
         debug_assert_eq!(fields.len(), component_ids.len());
 

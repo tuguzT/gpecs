@@ -27,14 +27,14 @@ unsafe impl Soa for BoxedErasedSoa {
         context.field_descriptors()
     }
 
-    type Ptrs<'context> = ErasedSoaPtrs<'context>;
+    type Ptrs<'context> = ErasedSoaPtrs<&'context [FieldDescriptor]>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
         from
     }
 
-    type MutPtrs<'context> = ErasedSoaMutPtrs<'context>;
+    type MutPtrs<'context> = ErasedSoaMutPtrs<&'context [FieldDescriptor]>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -113,7 +113,7 @@ unsafe impl Soa for BoxedErasedSoa {
         assert_descriptors(descriptors, ptrs.field_descriptors());
         assert_descriptors(descriptors, origin.field_descriptors());
 
-        unsafe { ptrs.offset_from(origin) }
+        unsafe { ptrs.offset_from(&origin) }
     }
 
     #[inline]
@@ -126,7 +126,7 @@ unsafe impl Soa for BoxedErasedSoa {
         assert_descriptors(descriptors, ptrs.field_descriptors());
         assert_descriptors(descriptors, origin.field_descriptors());
 
-        unsafe { ptrs.offset_from(origin) }
+        unsafe { ptrs.offset_from(&origin) }
     }
 
     #[inline]
@@ -141,7 +141,7 @@ unsafe impl Soa for BoxedErasedSoa {
             .max()
             .unwrap_or(0);
         let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
-        unsafe { a.swap(b, &mut temp) }
+        unsafe { a.swap(&b, &mut temp) }
     }
 
     #[inline]
@@ -161,7 +161,7 @@ unsafe impl Soa for BoxedErasedSoa {
             .max()
             .unwrap_or(0);
         let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
-        unsafe { dst.copy_from(src, len, &mut temp) }
+        unsafe { dst.copy_from(&src, len, &mut temp) }
     }
 
     #[inline]
@@ -181,7 +181,7 @@ unsafe impl Soa for BoxedErasedSoa {
             .max()
             .unwrap_or(0);
         let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
-        unsafe { dst.copy_from_rev(src, len, &mut temp) }
+        unsafe { dst.copy_from_rev(&src, len, &mut temp) }
     }
 
     #[inline]
@@ -195,7 +195,7 @@ unsafe impl Soa for BoxedErasedSoa {
         assert_descriptors(descriptors, src.field_descriptors());
         assert_descriptors(descriptors, dst.field_descriptors());
 
-        unsafe { dst.copy_from_nonoverlapping(src, len) }
+        unsafe { dst.copy_from_nonoverlapping(&src, len) }
     }
 
     #[inline]
@@ -226,7 +226,7 @@ unsafe impl Soa for BoxedErasedSoa {
         // do nothing; it's safe to not drop anything
     }
 
-    type NonNullPtrs<'context> = ErasedSoaNonNullPtrs<'context>;
+    type NonNullPtrs<'context> = ErasedSoaNonNullPtrs<&'context [FieldDescriptor]>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -262,7 +262,7 @@ unsafe impl Soa for BoxedErasedSoa {
     }
 
     type Refs<'context, 'a>
-        = ErasedSoaRefs<'context, 'a>
+        = ErasedSoaRefs<'a, &'context [FieldDescriptor]>
     where
         Self: 'a;
 
@@ -274,7 +274,7 @@ unsafe impl Soa for BoxedErasedSoa {
     }
 
     type RefsMut<'context, 'a>
-        = ErasedSoaRefsMut<'context, 'a>
+        = ErasedSoaRefsMut<'a, &'context [FieldDescriptor]>
     where
         Self: 'a;
 
@@ -315,18 +315,18 @@ unsafe impl Soa for BoxedErasedSoa {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, refs.field_descriptors());
 
-        refs.as_ptr()
+        refs.into_ptr()
     }
 
     #[inline]
     fn refs_mut_as_ptrs<'context>(
         context: &'context Self::Context,
-        mut refs: Self::RefsMut<'context, '_>,
+        refs: Self::RefsMut<'context, '_>,
     ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, refs.field_descriptors());
 
-        refs.as_mut_ptr()
+        refs.into_mut_ptr()
     }
 
     #[inline]

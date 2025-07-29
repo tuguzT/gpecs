@@ -172,7 +172,7 @@ impl<'context> ErasedSoaSliceMutPtrs<'context> {
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> ErasedSoaPtrs<'context> {
+    pub fn as_ptrs(&self) -> ErasedSoaPtrs<&'context [FieldDescriptor]> {
         let Self {
             descriptors,
             buffer,
@@ -184,7 +184,7 @@ impl<'context> ErasedSoaSliceMutPtrs<'context> {
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> ErasedSoaMutPtrs<'context> {
+    pub fn as_mut_ptrs(&mut self) -> ErasedSoaMutPtrs<&'context [FieldDescriptor]> {
         let Self {
             descriptors,
             buffer,
@@ -222,7 +222,7 @@ impl<'context> IntoIterator for ErasedSoaSliceMutPtrs<'context> {
 
 #[inline]
 pub fn soa_slice_from_raw_parts_mut(
-    data: ErasedSoaMutPtrs<'_>,
+    data: ErasedSoaMutPtrs<&[FieldDescriptor]>,
     len: usize,
 ) -> ErasedSoaSliceMutPtrs<'_> {
     let (descriptors, buffer, capacity, start) = data.into_parts();

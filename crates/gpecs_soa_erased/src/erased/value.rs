@@ -12,11 +12,12 @@ use crate::{
     erased::{
         ErasedSoaRefs, ErasedSoaRefsMut,
         error::{
-            ErasedSoaFromBytesFieldsDescriptorsError, ErasedSoaFromFieldsDescriptorsError,
-            ErasedSoaIntoValueError, IterOrFieldLenMismatchError,
+            ErasedSoaFromBytesFieldsDescriptorsError, ErasedSoaFromBytesValueError,
+            ErasedSoaFromFieldsDescriptorsError, ErasedSoaFromValueError, ErasedSoaIntoValueError,
+            IterOrFieldLenMismatchError,
         },
     },
-    error::{LayoutMismatchError, LenMismatchError, check_layout, check_len},
+    error::{LenMismatchError, check_layout, check_len},
     field::{ErasedField, error::ErasedFieldFromDescDataError},
     soa::traits::{BufferOffsets, FieldDescriptor, Soa, buffer_layout, buffer_offsets},
 };
@@ -55,8 +56,7 @@ where
         F: AsRef<[u8]>,
     {
         let layout = bytes.layout();
-        let expected_layout = buffer_layout(descriptors.as_ref(), 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
+        let expected_layout = buffer_layout(descriptors.as_ref(), 1)?;
         check_layout(layout, expected_layout)?;
 
         fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
@@ -66,7 +66,7 @@ where
     }
 
     #[inline]
-    pub fn as_refs(&self) -> ErasedSoaRefs<'_, '_> {
+    pub fn as_refs(&self) -> ErasedSoaRefs<'_, &[FieldDescriptor]> {
         let Self { bytes, descriptors } = self;
 
         let descriptors = descriptors.as_ref();
@@ -75,7 +75,7 @@ where
     }
 
     #[inline]
-    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, '_> {
+    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, &[FieldDescriptor]> {
         let Self {
             ref mut bytes,
             ref descriptors,
@@ -115,8 +115,10 @@ where
             return Err(ErasedSoaIntoValueError::new(self, error));
         }
 
-        let layout = T::buffer_layout(context, 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
+        let layout = match T::buffer_layout(context, 1) {
+            Ok(layout) => layout,
+            Err(error) => return Err(ErasedSoaIntoValueError::new(self, error.into())),
+        };
         if let Err(error) = check_len(layout.size(), bytes.layout().size()) {
             return Err(ErasedSoaIntoValueError::new(self, error.into()));
         }
@@ -146,9 +148,7 @@ where
     {
         use ErasedSoaFromFieldsDescriptorsError as Error;
 
-        let layout = buffer_layout(descriptors.as_ref(), 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
-
+        let layout = buffer_layout(descriptors.as_ref(), 1)?;
         let mut bytes = B::from_layout(layout).map_err(Error::FromLayout)?;
         fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
 
@@ -167,7 +167,7 @@ where
         mut bytes: B,
         context: &T::Context,
         value: T,
-    ) -> Result<Self, LayoutMismatchError>
+    ) -> Result<Self, ErasedSoaFromBytesValueError>
     where
         T: Soa,
     {
@@ -176,8 +176,7 @@ where
             .map(|desc| *desc.as_ref())
             .collect();
 
-        let expected_layout = T::buffer_layout(context, 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
+        let expected_layout = T::buffer_layout(context, 1)?;
         let layout = bytes.layout();
         check_layout(layout, expected_layout)?;
 
@@ -197,7 +196,7 @@ where
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn from_value<T>(context: &T::Context, value: T) -> Result<Self, B::Error>
+    pub fn from_value<T>(context: &T::Context, value: T) -> Result<Self, ErasedSoaFromValueError<B>>
     where
         T: Soa,
     {
@@ -206,9 +205,8 @@ where
             .map(|desc| *desc.as_ref())
             .collect();
 
-        let layout = T::buffer_layout(context, 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
-        let mut bytes = B::from_layout(layout)?;
+        let layout = T::buffer_layout(context, 1)?;
+        let mut bytes = B::from_layout(layout).map_err(ErasedSoaFromValueError::FromLayout)?;
 
         unsafe {
             let dst = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);

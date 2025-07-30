@@ -114,7 +114,8 @@ where
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        let Self { len, .. } = *self;
+        len
     }
 
     #[inline]
@@ -124,12 +125,14 @@ where
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.buffer.capacity()
+        let Self { buffer, .. } = self;
+        buffer.capacity()
     }
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        self.buffer.context()
+        let Self { buffer, .. } = self;
+        buffer.context()
     }
 
     #[inline]
@@ -147,7 +150,7 @@ where
             T::ptrs_cast_const(context, ptrs)
         };
         let new_ptrs = self.buffer.ptrs();
-        let context = self.context();
+
         unsafe { T::ptrs_copy_rev(context, old_ptrs, new_ptrs, self.len()) }
     }
 
@@ -168,12 +171,14 @@ where
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        if !self.buffer.needs_to_grow(self.len, additional) {
+        let len = self.len();
+        let old_capacity = self.capacity();
+        let Self { buffer, .. } = self;
+
+        if !buffer.needs_to_grow(len, additional) {
             return;
         }
-
-        let old_capacity = self.capacity();
-        self.buffer.reserve(self.len, additional);
+        buffer.reserve(len, additional);
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -182,12 +187,14 @@ where
     }
 
     pub fn reserve_exact(&mut self, additional: usize) {
-        if !self.buffer.needs_to_grow(self.len, additional) {
+        let len = self.len();
+        let old_capacity = self.capacity();
+        let Self { buffer, .. } = self;
+
+        if !buffer.needs_to_grow(len, additional) {
             return;
         }
-
-        let old_capacity = self.capacity();
-        self.buffer.reserve_exact(self.len, additional);
+        buffer.reserve_exact(len, additional);
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -196,12 +203,14 @@ where
     }
 
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        if !self.buffer.needs_to_grow(self.len, additional) {
+        let len = self.len();
+        let old_capacity = self.capacity();
+        let Self { buffer, .. } = self;
+
+        if !buffer.needs_to_grow(len, additional) {
             return Ok(());
         }
-
-        let old_capacity = self.capacity();
-        self.buffer.try_reserve(self.len, additional)?;
+        buffer.try_reserve(len, additional)?;
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -211,12 +220,14 @@ where
     }
 
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        if !self.buffer.needs_to_grow(self.len, additional) {
+        let len = self.len();
+        let old_capacity = self.capacity();
+        let Self { buffer, .. } = self;
+
+        if !buffer.needs_to_grow(len, additional) {
             return Ok(());
         }
-
-        let old_capacity = self.capacity();
-        self.buffer.try_reserve_exact(self.len, additional)?;
+        buffer.try_reserve_exact(len, additional)?;
 
         match old_capacity {
             0 => self.set_len_in_buffer(0),
@@ -226,12 +237,13 @@ where
     }
 
     pub fn shrink_to_fit(&mut self) {
-        if self.capacity() <= self.len {
+        let len = self.len();
+        if self.capacity() <= len {
             return;
         }
 
         let context = self.context();
-        let new_capacity = actual_capacity::<T>(context, self.len);
+        let new_capacity = actual_capacity::<T>(context, len);
         self.move_left(new_capacity);
         self.buffer.shrink_to_fit(new_capacity);
     }
@@ -242,48 +254,52 @@ where
         }
 
         let context = self.context();
-        let new_capacity = actual_capacity::<T>(context, cmp::max(self.len, min_capacity));
+        let new_capacity = actual_capacity::<T>(context, cmp::max(self.len(), min_capacity));
         self.move_left(new_capacity);
         self.buffer.shrink_to_fit(new_capacity);
     }
 
     pub fn truncate(&mut self, len: usize) {
-        if len > self.len {
+        let old_len = self.len();
+        if len > old_len {
             return;
         }
 
-        let remaining_len = self.len - len;
+        let remaining_len = old_len - len;
         unsafe {
             self.set_len(len);
 
             let context = self.context();
             let ptrs = T::ptrs_add_mut(context, self.buffer.ptrs(), len);
             let slices = T::slices_from_raw_parts_mut(context, ptrs, remaining_len);
-            let context = self.context();
             T::slices_drop_in_place(context, slices);
         }
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const BufferData<T> {
-        self.buffer.ptr().cast_const()
+        let Self { buffer, .. } = self;
+        buffer.ptr().cast_const()
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
-        self.buffer.ptr()
+        let Self { buffer, .. } = self;
+        buffer.ptr()
     }
 
     #[inline]
     pub fn as_ptrs(&self) -> T::Ptrs<'_> {
-        let ptrs = self.buffer.ptrs();
+        let Self { buffer, .. } = self;
+        let ptrs = buffer.ptrs();
         let context = self.context();
         T::ptrs_cast_const(context, ptrs)
     }
 
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> T::MutPtrs<'_> {
-        self.buffer.ptrs()
+        let Self { buffer, .. } = self;
+        buffer.ptrs()
     }
 
     #[inline]
@@ -362,7 +378,9 @@ where
         let original_len = self.len();
         // Avoid double drop if the drop guard is not executed,
         // since we may make some holes during the process.
-        unsafe { self.set_len(0) };
+        unsafe {
+            self.set_len(0);
+        }
 
         // Vec: [Kept, Kept, Hole, Hole, Hole, Hole, Unchecked, Unchecked]
         //      |<-              processed len   ->| ^- next to check
@@ -390,27 +408,27 @@ where
             T: Soa + ?Sized,
         {
             fn drop(&mut self) {
-                if self.deleted_cnt > 0 {
+                let Self {
+                    ref mut v,
+                    processed_len,
+                    deleted_cnt,
+                    original_len,
+                } = *self;
+
+                if deleted_cnt > 0 {
+                    let ptrs = v.buffer.ptrs();
+                    let context = v.context();
                     // SAFETY: Trailing unchecked items must be valid since we never touch them.
                     unsafe {
-                        let ptrs = self.v.buffer.ptrs();
-                        let context = self.v.context();
-
-                        T::ptrs_copy(
-                            context,
-                            T::ptrs_add(
-                                context,
-                                T::ptrs_cast_const(context, ptrs.clone()),
-                                self.processed_len,
-                            ),
-                            T::ptrs_add_mut(context, ptrs, self.processed_len - self.deleted_cnt),
-                            self.original_len - self.processed_len,
-                        );
+                        let src = T::ptrs_cast_const(context, ptrs.clone());
+                        let src = T::ptrs_add(context, src, processed_len);
+                        let dst = T::ptrs_add_mut(context, ptrs, processed_len - deleted_cnt);
+                        T::ptrs_copy(context, src, dst, original_len - processed_len);
                     }
                 }
                 // SAFETY: After filling holes, all items are in contiguous memory.
                 unsafe {
-                    self.v.set_len(self.original_len - self.deleted_cnt);
+                    v.set_len(original_len - deleted_cnt);
                 }
             }
         }
@@ -455,18 +473,16 @@ where
                         break;
                     }
                 }
+
                 if DELETED {
+                    let ptrs = g.v.buffer.ptrs();
+                    let context = g.v.context();
                     // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
                     // We use copy for move, and never touch this element again.
                     unsafe {
-                        let ptrs = g.v.buffer.ptrs();
-                        let context = g.v.context();
-                        T::ptrs_copy_nonoverlapping(
-                            context,
-                            T::ptrs_cast_const(context, cur),
-                            T::ptrs_add_mut(context, ptrs, g.processed_len - g.deleted_cnt),
-                            1,
-                        );
+                        let src = T::ptrs_cast_const(context, cur);
+                        let dst = T::ptrs_add_mut(context, ptrs, g.processed_len - g.deleted_cnt);
+                        T::ptrs_copy_nonoverlapping(context, src, dst, 1);
                     }
                 }
                 g.processed_len += 1;
@@ -499,14 +515,11 @@ where
 
         let context = set_len_on_drop.vec.context();
         for index in range {
+            let slices = set_len_on_drop.vec.slices();
+            let refs = unsafe { T::ptrs_to_refs(context, slices.get_unchecked(index)) };
             unsafe {
-                let slices = set_len_on_drop.vec.slices();
-                let refs = T::ptrs_to_refs(context, slices.get_unchecked(index));
-                let dst = T::ptrs_add_mut(
-                    context,
-                    set_len_on_drop.vec.buffer.ptrs(),
-                    set_len_on_drop.local_len,
-                );
+                let ptrs = set_len_on_drop.vec.buffer.ptrs();
+                let dst = T::ptrs_add_mut(context, ptrs, set_len_on_drop.local_len);
                 refs.clone_into_ptrs(context, dst);
             }
             set_len_on_drop.local_len += 1;
@@ -525,7 +538,9 @@ where
     #[inline]
     pub fn clear(&mut self) {
         let len = self.len();
-        unsafe { self.set_len(0) }
+        unsafe {
+            self.set_len(0);
+        }
 
         let context = self.context();
         let ptrs = self.buffer.ptrs();
@@ -551,24 +566,22 @@ where
             assert_failed(index, len);
         }
 
-        unsafe {
-            let ptrs = self.buffer.ptrs();
-            let context = self.context();
-            let value = {
-                let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
-                T::ptrs_read(context, T::ptrs_cast_const(context, ptrs))
-            };
+        let ptrs = self.buffer.ptrs();
+        let context = self.context();
+        let value = unsafe {
+            let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
+            T::ptrs_read(context, T::ptrs_cast_const(context, ptrs))
+        };
 
-            T::ptrs_copy(
-                context,
-                T::ptrs_add(context, T::ptrs_cast_const(context, ptrs.clone()), len - 1),
-                T::ptrs_add_mut(context, ptrs, index),
-                1,
-            );
+        unsafe {
+            let src = T::ptrs_add(context, T::ptrs_cast_const(context, ptrs.clone()), len - 1);
+            let dst = T::ptrs_add_mut(context, ptrs, index);
+            T::ptrs_copy(context, src, dst, 1);
 
             self.set_len(len - 1);
-            value
         }
+
+        value
     }
 
     pub fn insert(&mut self, index: usize, value: T) {
@@ -594,11 +607,10 @@ where
             }
         }
 
+        let ptrs = self.buffer.ptrs();
+        let context = self.context();
+        let ptrs = unsafe { T::ptrs_add_mut(context, ptrs, index) };
         unsafe {
-            let ptrs = self.buffer.ptrs();
-            let context = self.context();
-            let ptrs = T::ptrs_add_mut(context, ptrs, index);
-
             if index < len {
                 let src = T::ptrs_cast_const(context, ptrs.clone());
                 let dst = T::ptrs_add_mut(context, ptrs.clone(), 1);
@@ -623,23 +635,18 @@ where
             assert_failed(index, len);
         }
 
+        let ptrs = self.buffer.ptrs();
+        let context = self.context();
+        let ptrs = unsafe { T::ptrs_add_mut(context, ptrs, index) };
+
+        let value = unsafe { T::ptrs_read(context, T::ptrs_cast_const(context, ptrs.clone())) };
         unsafe {
-            let ptrs = self.buffer.ptrs();
-            let context = self.context();
-            let ptrs = T::ptrs_add_mut(context, ptrs, index);
+            let src = T::ptrs_add(context, T::ptrs_cast_const(context, ptrs.clone()), 1);
+            T::ptrs_copy(context, src, ptrs, len - index - 1);
 
-            let value = T::ptrs_read(context, T::ptrs_cast_const(context, ptrs.clone()));
-
-            T::ptrs_copy(
-                context,
-                T::ptrs_add(context, T::ptrs_cast_const(context, ptrs.clone()), 1),
-                ptrs,
-                len - index - 1,
-            );
             self.set_len(len - 1);
-
-            value
         }
+        value
     }
 
     pub fn push(&mut self, value: T) {
@@ -654,12 +661,12 @@ where
             }
         }
 
+        let ptrs = self.buffer.ptrs();
+        let context = self.context();
         unsafe {
-            let ptrs = self.buffer.ptrs();
-            let context = self.context();
             let ptrs = T::ptrs_add_mut(context, ptrs, len);
-
             T::ptrs_write(context, ptrs, value);
+
             self.set_len(len + 1);
         }
     }
@@ -670,16 +677,15 @@ where
             return None;
         }
 
+        let ptrs = self.as_ptrs();
+        let context = self.context();
+        let ptrs = unsafe { T::ptrs_add(context, ptrs, len - 1) };
+
+        let value = unsafe { T::ptrs_read(context, ptrs) };
         unsafe {
-            let ptrs = self.as_ptrs();
-            let context = self.context();
-            let ptrs = T::ptrs_add(context, ptrs, len - 1);
-
-            let value = T::ptrs_read(context, ptrs);
             self.set_len(len - 1);
-
-            Some(value)
         }
+        Some(value)
     }
 }
 
@@ -707,11 +713,9 @@ where
         self.shrink_to_fit();
         let me = ManuallyDrop::new(self);
 
-        unsafe {
-            let buffer = ptr::read(&me.buffer);
-            let len = me.len;
-            buffer.into_box(len)
-        }
+        let buffer = unsafe { ptr::read(&me.buffer) };
+        let len = me.len;
+        unsafe { buffer.into_box(len) }
     }
 
     #[track_caller]
@@ -729,11 +733,8 @@ where
         let context = set_len_on_drop.vec.context();
         for refs in other.iter() {
             unsafe {
-                let dst = T::ptrs_add_mut(
-                    context,
-                    set_len_on_drop.vec.buffer.ptrs(),
-                    set_len_on_drop.local_len,
-                );
+                let ptrs = set_len_on_drop.vec.buffer.ptrs();
+                let dst = T::ptrs_add_mut(context, ptrs, set_len_on_drop.local_len);
                 refs.clone_into_ptrs(context, dst);
             }
             set_len_on_drop.local_len += 1;

@@ -191,13 +191,13 @@ impl<'context> GpuExecutor<'context> {
     where
         B: GpuBundle,
     {
-        let &mut Self {
+        let Self {
             ref mut context,
             ref device,
             components: ref mut gpu_components,
             archetypes: ref mut gpu_archetypes,
             ..
-        } = self;
+        } = *self;
         #[allow(unsafe_code)]
         let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
 
@@ -237,12 +237,12 @@ impl<'context> GpuExecutor<'context> {
         C: IntoIterator<Item = GpuComponentId>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
-        let &mut Self {
+        let Self {
             ref context,
             ref device,
             ref mut systems,
             ..
-        } = self;
+        } = *self;
 
         let components = context.components();
         systems.register_system(components, device, descriptor)
@@ -272,7 +272,7 @@ impl<'context> GpuExecutor<'context> {
         I: IntoIterator<Item = (GpuSystemId, B)>,
         B: IntoIterator<Item = BindGroupEntry<'a>>,
     {
-        let &mut Self {
+        let Self {
             ref context,
             ref device,
             ref archetypes,
@@ -280,7 +280,7 @@ impl<'context> GpuExecutor<'context> {
             ref schedule,
             ref mut schedule_cache,
             ..
-        } = self;
+        } = *self;
 
         let new_cache = Self::cache_schedule(
             context,
@@ -295,7 +295,7 @@ impl<'context> GpuExecutor<'context> {
 
     #[inline]
     pub fn execute(&mut self, command_encoder: &mut CommandEncoder) {
-        let &mut Self {
+        let Self {
             ref context,
             ref device,
             ref archetypes,
@@ -304,7 +304,7 @@ impl<'context> GpuExecutor<'context> {
             ref mut schedule_cache,
             ref mut timestamp_query_resources,
             ..
-        } = self;
+        } = *self;
 
         let cache_schedule = || {
             Self::cache_schedule::<_, [_; 0]>(context, device, archetypes, systems, schedule, [])

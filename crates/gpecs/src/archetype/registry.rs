@@ -1491,10 +1491,10 @@ impl<'a> Iterator for CompatibleArchetypes<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let &mut Self {
+        let Self {
             ref component_ids,
             ref mut infos,
-        } = self;
+        } = *self;
 
         infos.find(|info| compatible_archetypes_predicate(info, component_ids))
     }
@@ -1537,10 +1537,10 @@ impl<'a> Iterator for CompatibleArchetypes<'a> {
 impl DoubleEndedIterator for CompatibleArchetypes<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let &mut Self {
+        let Self {
             ref component_ids,
             ref mut infos,
-        } = self;
+        } = *self;
 
         infos.rfind(|info| compatible_archetypes_predicate(info, component_ids))
     }
@@ -1626,10 +1626,10 @@ impl<'a> Iterator for CompatibleArchetypesMut<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let &mut Self {
+        let Self {
             ref component_ids,
             ref mut infos,
-        } = self;
+        } = *self;
 
         infos.find(|info| compatible_archetypes_predicate(info, component_ids))
     }
@@ -1672,10 +1672,10 @@ impl<'a> Iterator for CompatibleArchetypesMut<'a> {
 impl DoubleEndedIterator for CompatibleArchetypesMut<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let &mut Self {
+        let Self {
             ref component_ids,
             ref mut infos,
-        } = self;
+        } = *self;
 
         infos.rfind(|info| compatible_archetypes_predicate(info, component_ids))
     }

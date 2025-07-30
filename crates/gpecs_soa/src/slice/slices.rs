@@ -40,7 +40,8 @@ where
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        let Self { len, .. } = *self;
+        len
     }
 
     #[inline]
@@ -473,7 +474,8 @@ where
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        let Self { len, .. } = *self;
+        len
     }
 
     #[inline]

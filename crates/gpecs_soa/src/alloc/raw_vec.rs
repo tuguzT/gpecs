@@ -33,7 +33,8 @@ impl TryReserveError {
     #[inline]
     #[must_use]
     pub fn kind(&self) -> TryReserveErrorKind {
-        self.kind.clone()
+        let Self { kind } = self;
+        kind.clone()
     }
 }
 
@@ -73,7 +74,8 @@ impl Display for TryReserveError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.write_str("memory allocation failed")?;
 
-        let reason = match self.kind {
+        let Self { kind } = self;
+        let reason = match kind {
             CapacityOverflow => " because the computed capacity exceeded the collection's maximum",
             AllocError { .. } => " because the memory allocator returned an error",
         };
@@ -255,7 +257,8 @@ where
 
     #[inline]
     pub fn non_null(&self) -> NonNull<BufferData<T>> {
-        self.ptr
+        let Self { ptr, .. } = *self;
+        ptr
     }
 
     #[inline]
@@ -286,12 +289,15 @@ where
         if is_zst::<T>(context) {
             return usize::MAX;
         }
-        self.capacity
+
+        let Self { capacity, .. } = *self;
+        capacity
     }
 
     #[inline]
     fn current_memory(&self, context: &T::Context) -> Option<(NonNull<u8>, Layout)> {
-        if !should_allocate::<T>(context, self.capacity) {
+        let Self { ptr, capacity } = *self;
+        if !should_allocate::<T>(context, capacity) {
             return None;
         }
 
@@ -300,8 +306,8 @@ where
         // has already been allocated so we know it can't overflow and currently Rust does not
         // support such types. So we can do better by skipping some checks and avoid an unwrap.
         unsafe {
-            let layout = buffer_layout::<T>(context, self.capacity).unwrap_unchecked();
-            Some((self.ptr.cast(), layout))
+            let layout = buffer_layout::<T>(context, capacity).unwrap_unchecked();
+            Some((ptr.cast(), layout))
         }
     }
 
@@ -369,7 +375,8 @@ where
 
     #[inline]
     pub fn needs_to_grow(&self, len: usize, additional: usize) -> bool {
-        additional > self.capacity.wrapping_sub(len)
+        let Self { capacity, .. } = self;
+        additional > capacity.wrapping_sub(len)
     }
 
     #[inline]
@@ -463,12 +470,13 @@ where
     T: Soa + ?Sized,
 {
     fn drop(&mut self) {
+        // Read context from the pointer to safely drop it on stack
         let context = unsafe { ptr::read(self.ptr().cast_const().ptr_to_context()) };
-        if let Some((ptr, layout)) = self.current_memory(&context) {
-            unsafe {
-                dealloc(ptr.as_ptr(), layout);
-            }
-        }
+
+        let Some((ptr, layout)) = self.current_memory(&context) else {
+            return;
+        };
+        unsafe { dealloc(ptr.as_ptr(), layout) }
     }
 }
 

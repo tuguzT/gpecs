@@ -193,9 +193,11 @@ where
             T: Soa + ?Sized,
         {
             fn drop(&mut self) {
-                let &mut Self(&mut IntoIter {
+                let Self(iter) = self;
+                let IntoIter {
                     buffer, capacity, ..
-                }) = self;
+                } = **iter;
+
                 unsafe {
                     // `IntoIter::alloc` is not used anymore after this and will be dropped by RawVec
                     // let alloc = ManuallyDrop::take(&mut self.0.alloc);
@@ -214,7 +216,7 @@ where
             return;
         }
 
-        let &mut &mut Self { buffer, .. } = iter;
+        let Self { buffer, .. } = **iter;
         let context = unsafe { Self::context_of(buffer) };
 
         let slices = iter.as_mut_slices();

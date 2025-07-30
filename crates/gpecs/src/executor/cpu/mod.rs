@@ -66,11 +66,11 @@ impl<'context> CpuExecutor<'context> {
 
     #[inline]
     pub fn execute(&mut self) {
-        let &mut Self {
+        let Self {
             ref mut context,
             ref mut systems,
             ref schedule,
-        } = self;
+        } = *self;
 
         schedule.iter().for_each(|system_id| {
             let Some(info) = systems.get_system_info_mut(system_id) else {

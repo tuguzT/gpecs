@@ -186,12 +186,14 @@ where
             T: Soa + ?Sized,
         {
             fn drop(&mut self) {
-                let &mut Self(&mut Drain {
+                let Self(drain) = self;
+                let Drain {
                     tail_start,
                     tail_len,
                     mut vec,
                     ..
-                }) = self;
+                } = **drain;
+
                 if tail_len == 0 {
                     return;
                 }

@@ -315,7 +315,7 @@ unsafe impl Soa for BoxedErasedSoa {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, refs.field_descriptors());
 
-        refs.into_ptr()
+        refs.into_ptrs()
     }
 
     #[inline]
@@ -326,7 +326,7 @@ unsafe impl Soa for BoxedErasedSoa {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, refs.field_descriptors());
 
-        refs.into_mut_ptr()
+        refs.into_mut_ptrs()
     }
 
     #[inline]
@@ -342,7 +342,7 @@ unsafe impl Soa for BoxedErasedSoa {
         unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 
-    type SlicePtrs<'context> = ErasedSoaSlicePtrs<'context>;
+    type SlicePtrs<'context> = ErasedSoaSlicePtrs<&'context [FieldDescriptor]>;
 
     #[inline]
     fn upcast_slice_ptrs<'short, 'long: 'short>(
@@ -351,7 +351,7 @@ unsafe impl Soa for BoxedErasedSoa {
         from
     }
 
-    type SliceMutPtrs<'context> = ErasedSoaSliceMutPtrs<'context>;
+    type SliceMutPtrs<'context> = ErasedSoaSliceMutPtrs<&'context [FieldDescriptor]>;
 
     #[inline]
     fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
@@ -430,22 +430,22 @@ unsafe impl Soa for BoxedErasedSoa {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, slices.field_descriptors());
 
-        slices.as_ptrs()
+        slices.into_ptrs()
     }
 
     #[inline]
     fn slice_mut_ptrs_as_ptrs<'context>(
         context: &'context Self::Context,
-        mut slices: Self::SliceMutPtrs<'context>,
+        slices: Self::SliceMutPtrs<'context>,
     ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, slices.field_descriptors());
 
-        slices.as_mut_ptrs()
+        slices.into_mut_ptrs()
     }
 
     type Slices<'context, 'a>
-        = ErasedSoaSlices<'context, 'a>
+        = ErasedSoaSlices<'a, &'context [FieldDescriptor]>
     where
         Self: 'a;
 
@@ -457,7 +457,7 @@ unsafe impl Soa for BoxedErasedSoa {
     }
 
     type SlicesMut<'context, 'a>
-        = ErasedSoaSlicesMut<'context, 'a>
+        = ErasedSoaSlicesMut<'a, &'context [FieldDescriptor]>
     where
         Self: 'a;
 
@@ -514,18 +514,18 @@ unsafe impl Soa for BoxedErasedSoa {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, slices.field_descriptors());
 
-        slices.as_ptrs()
+        slices.into_ptrs()
     }
 
     #[inline]
     fn slices_mut_as_slice_ptrs<'context>(
         context: &'context Self::Context,
-        mut slices: Self::SlicesMut<'context, '_>,
+        slices: Self::SlicesMut<'context, '_>,
     ) -> Self::SliceMutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, slices.field_descriptors());
 
-        slices.as_mut_ptrs()
+        slices.into_mut_ptrs()
     }
 
     fn slices_mut_as_slices<'context, 'a>(
@@ -548,18 +548,18 @@ unsafe impl Soa for BoxedErasedSoa {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, slices.field_descriptors());
 
-        slices.as_ptrs().as_ptrs()
+        slices.into_ptrs().into_ptrs()
     }
 
     #[inline]
     fn slices_mut_as_ptrs<'context>(
         context: &'context Self::Context,
-        mut slices: Self::SlicesMut<'context, '_>,
+        slices: Self::SlicesMut<'context, '_>,
     ) -> Self::MutPtrs<'context> {
         let descriptors = context.field_descriptors();
         assert_descriptors(descriptors, slices.field_descriptors());
 
-        slices.as_mut_ptrs().as_mut_ptrs()
+        slices.into_mut_ptrs().into_mut_ptrs()
     }
 
     #[inline]

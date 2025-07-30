@@ -101,7 +101,7 @@ where
     pub fn dangling(descriptors: D) -> Self {
         let addr = descriptors
             .as_ref()
-            .into_iter()
+            .iter()
             .map(|desc| desc.layout().align())
             .max()
             .unwrap_or(1);
@@ -109,7 +109,7 @@ where
 
         let packed_size = descriptors
             .as_ref()
-            .into_iter()
+            .iter()
             .map(|desc| desc.layout().size())
             .sum::<usize>();
         let capacity = match packed_size {
@@ -311,7 +311,7 @@ where
         } = *self;
 
         ErasedSoaMutPtrsIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,
@@ -336,7 +336,7 @@ where
         } = *self;
 
         ErasedSoaMutPtrsIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,
@@ -429,7 +429,7 @@ where
         } = *self;
 
         let entries = ErasedSoaMutPtrsIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,

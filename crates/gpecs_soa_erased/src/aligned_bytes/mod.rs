@@ -120,7 +120,7 @@ where
 /// # Safety
 ///
 /// - [`set_layout`](AlignedBytesFromLayout::set_layout) method should preserve old data
-/// by copying it from the old byte slice to the new one
+///   by copying it from the old byte slice to the new one
 pub unsafe trait AlignedBytesFromLayout: AlignedBytes + Sized {
     type Error;
 

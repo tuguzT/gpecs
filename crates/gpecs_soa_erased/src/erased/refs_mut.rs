@@ -25,7 +25,7 @@ where
     descriptors: D,
 }
 
-impl<'a, D> ErasedSoaRefsMut<'a, D> {
+impl<D> ErasedSoaRefsMut<'_, D> {
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
@@ -55,7 +55,7 @@ impl<'a, D> ErasedSoaRefsMut<'a, D> {
     }
 
     #[inline]
-    pub fn into_ptr(self) -> ErasedSoaPtrs<D> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D> {
         let Self {
             descriptors,
             buffer,
@@ -67,7 +67,7 @@ impl<'a, D> ErasedSoaRefsMut<'a, D> {
     }
 
     #[inline]
-    pub fn into_mut_ptr(self) -> ErasedSoaMutPtrs<D> {
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D> {
         let Self {
             descriptors,
             buffer,
@@ -145,7 +145,7 @@ where
     }
 }
 
-impl<'a, D> ErasedSoaRefsMut<'a, D>
+impl<D> ErasedSoaRefsMut<'_, D>
 where
     D: ?Sized,
 {
@@ -168,7 +168,7 @@ where
     }
 }
 
-impl<'a, D> ErasedSoaRefsMut<'a, D>
+impl<D> ErasedSoaRefsMut<'_, D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
@@ -197,7 +197,7 @@ where
         } = *self;
 
         ErasedSoaRefsMutIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,
@@ -224,7 +224,7 @@ where
         } = *self;
 
         ErasedSoaRefsMutIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,
@@ -322,7 +322,7 @@ where
         } = *self;
 
         let entries = ErasedSoaRefsMutIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,

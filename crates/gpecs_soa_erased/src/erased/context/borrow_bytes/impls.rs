@@ -95,13 +95,10 @@ impl BorrowBytes for RefCell<[MaybeUninit<u8>]> {
     type Error = RefCellUninitByteSliceError;
 
     fn borrow_bytes(&self, count: usize) -> Result<Self::Output<'_>, Self::Error> {
-        let mut bytes = self.try_borrow_mut()?;
-        check_len(bytes.as_mut().len(), count)?;
+        let bytes = self.try_borrow_mut()?;
+        check_len(bytes.len(), count)?;
 
-        let bytes = RefMut::map(bytes, |bytes| {
-            let bytes = bytes.as_mut();
-            &mut bytes[..count]
-        });
+        let bytes = RefMut::map(bytes, |bytes| &mut bytes[..count]);
         Ok(bytes)
     }
 }

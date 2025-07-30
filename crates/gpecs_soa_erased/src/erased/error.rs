@@ -88,7 +88,7 @@ impl Error for ErasedSoaFromBytesFieldsDescriptorsError {
 
 pub enum ErasedSoaFromFieldsDescriptorsError<B>
 where
-    B: AlignedBytesFromLayout + ?Sized,
+    B: AlignedBytesFromLayout,
 {
     LenMismatch(IterOrFieldLenMismatchError),
     InvalidLayout(LayoutError),
@@ -97,7 +97,7 @@ where
 
 impl<B> From<IterOrFieldLenMismatchError> for ErasedSoaFromFieldsDescriptorsError<B>
 where
-    B: AlignedBytesFromLayout + ?Sized,
+    B: AlignedBytesFromLayout,
 {
     #[inline]
     fn from(value: IterOrFieldLenMismatchError) -> Self {
@@ -107,7 +107,7 @@ where
 
 impl<B> From<LayoutError> for ErasedSoaFromFieldsDescriptorsError<B>
 where
-    B: AlignedBytesFromLayout + ?Sized,
+    B: AlignedBytesFromLayout,
 {
     #[inline]
     fn from(value: LayoutError) -> Self {
@@ -117,7 +117,7 @@ where
 
 impl<B> Debug for ErasedSoaFromFieldsDescriptorsError<B>
 where
-    B: AlignedBytesFromLayout + ?Sized,
+    B: AlignedBytesFromLayout,
     B::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -131,7 +131,7 @@ where
 
 impl<B> Display for ErasedSoaFromFieldsDescriptorsError<B>
 where
-    B: AlignedBytesFromLayout + ?Sized,
+    B: AlignedBytesFromLayout,
     B::Error: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -145,7 +145,7 @@ where
 
 impl<B> Clone for ErasedSoaFromFieldsDescriptorsError<B>
 where
-    B: AlignedBytesFromLayout + ?Sized,
+    B: AlignedBytesFromLayout,
     B::Error: Clone,
 {
     fn clone(&self) -> Self {
@@ -166,7 +166,7 @@ where
 
 impl<B> Error for ErasedSoaFromFieldsDescriptorsError<B>
 where
-    B: AlignedBytesFromLayout + ?Sized,
+    B: AlignedBytesFromLayout,
     B::Error: Debug + Display,
 {
 }

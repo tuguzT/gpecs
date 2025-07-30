@@ -25,7 +25,7 @@ where
     descriptors: D,
 }
 
-impl<'a, D> ErasedSoaRefs<'a, D> {
+impl<D> ErasedSoaRefs<'_, D> {
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
@@ -55,7 +55,7 @@ impl<'a, D> ErasedSoaRefs<'a, D> {
     }
 
     #[inline]
-    pub fn into_ptr(self) -> ErasedSoaPtrs<D> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D> {
         let Self {
             descriptors,
             buffer,
@@ -186,7 +186,7 @@ where
         } = *self;
 
         ErasedSoaRefsIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,
@@ -213,7 +213,7 @@ where
         } = *self;
 
         ErasedSoaRefsIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,
@@ -311,7 +311,7 @@ where
         } = *self;
 
         let entries = ErasedSoaRefsIter {
-            descriptors: descriptors.as_ref().into_iter(),
+            descriptors: descriptors.as_ref().iter(),
             buffer,
             capacity,
             offset,

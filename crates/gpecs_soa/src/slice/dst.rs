@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    ptr::{BufferData, SoaSlicePtr, is_zst, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut},
+    ptr::{BufferData, SoaSlicePtr, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut},
     traits::{SoaToOwned, SoaTrustedFields},
 };
 
@@ -42,10 +42,6 @@ where
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        let context = self.context();
-        if is_zst::<T>(context) {
-            return usize::MAX;
-        }
         unsafe { ptr::from_ref(self).capacity() }
     }
 

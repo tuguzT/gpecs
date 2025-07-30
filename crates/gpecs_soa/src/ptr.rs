@@ -59,7 +59,7 @@ pub union BufferData<T>
 where
     T: Soa + ?Sized,
 {
-    _len_align: [usize; 0],
+    _align: ManuallyDrop<BufferAlign<T>>,
     _fields: ManuallyDrop<MaybeUninit<T::Fields>>,
     _context: ManuallyDrop<MaybeUninit<T::Context>>,
 }
@@ -103,9 +103,16 @@ where
 
     #[inline]
     unsafe fn capacity(self) -> usize {
-        let buffer_layout = slice_buffer_layout(self);
         let context = unsafe { self.context() };
-        capacity_from::<T>(context, buffer_layout)
+        if is_zst::<T>(context) {
+            return usize::MAX;
+        }
+
+        let buffer_layout = slice_buffer_layout(self);
+        match buffer_layout.size() {
+            0 => 0,
+            _ => unsafe { ptr::read(self.as_ptr().ptr_to_capacity()) },
+        }
     }
 
     #[inline]
@@ -154,9 +161,16 @@ where
 
     #[inline]
     unsafe fn capacity(self) -> usize {
-        let buffer_layout = slice_buffer_layout(self);
         let context = unsafe { self.context() };
-        capacity_from::<T>(context, buffer_layout)
+        if is_zst::<T>(context) {
+            return usize::MAX;
+        }
+
+        let buffer_layout = slice_buffer_layout(self);
+        match buffer_layout.size() {
+            0 => 0,
+            _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_capacity_mut()) },
+        }
     }
 
     #[inline]
@@ -211,14 +225,25 @@ where
     }
 }
 
-#[repr(C)]
-pub(crate) struct BufferPrefix<T>
+struct BufferAlign<T>
 where
     T: Soa + ?Sized,
 {
-    _fields_align: [T::Fields; 0],
+    _fields: [T::Fields; 0],
+    _context: [T::Context; 0],
+    _len: [usize; 0],
+    _capacity: [usize; 0],
+}
+
+#[repr(C)]
+struct BufferPrefix<T>
+where
+    T: Soa + ?Sized,
+{
+    _align: BufferAlign<T>,
     context: T::Context,
     len: usize,
+    capacity: usize,
 }
 
 const _: () = {
@@ -247,6 +272,7 @@ where
     T: Soa + ?Sized,
 {
     unsafe fn ptr_to_len(self) -> *const usize;
+    unsafe fn ptr_to_capacity(self) -> *const usize;
     fn ptr_to_context(self) -> *const T::Context;
 }
 
@@ -261,6 +287,13 @@ where
         len.cast()
     }
 
+    #[inline]
+    unsafe fn ptr_to_capacity(self) -> *const usize {
+        let prefix = self.cast::<u8>();
+        let capacity = unsafe { prefix.add(offset_of!(BufferPrefix<T>, capacity)) };
+        capacity.cast()
+    }
+
     #[inline(always)]
     fn ptr_to_context(self) -> *const T::Context {
         self.cast()
@@ -272,6 +305,7 @@ where
     T: Soa + ?Sized,
 {
     unsafe fn ptr_to_len_mut(self) -> *mut usize;
+    unsafe fn ptr_to_capacity_mut(self) -> *mut usize;
     fn ptr_to_context_mut(self) -> *mut T::Context;
 }
 
@@ -284,6 +318,13 @@ where
         let prefix = self.cast::<u8>();
         let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
         len.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_capacity_mut(self) -> *mut usize {
+        let prefix = self.cast::<u8>();
+        let capacity = unsafe { prefix.add(offset_of!(BufferPrefix<T>, capacity)) };
+        capacity.cast()
     }
 
     #[inline(always)]

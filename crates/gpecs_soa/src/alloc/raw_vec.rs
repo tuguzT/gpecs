@@ -160,7 +160,23 @@ where
             let dst = ptr.as_ptr().ptr_to_context_mut();
             ptr::write(dst, context);
         }
-        Ok(Self { ptr, capacity })
+
+        let mut me = Self { ptr, capacity };
+        me.set_capacity_in_buffer(capacity);
+        Ok(me)
+    }
+
+    #[inline]
+    fn set_capacity_in_buffer(&mut self, new_capacity: usize) {
+        let context = self.context();
+        if !should_allocate::<T>(context, new_capacity) {
+            return;
+        }
+
+        unsafe {
+            let capacity = self.ptr.as_ptr().ptr_to_capacity_mut();
+            ptr::write(capacity, new_capacity);
+        }
     }
 
     #[inline]
@@ -360,6 +376,7 @@ where
     unsafe fn set_ptr_and_capacity(&mut self, ptr: NonNull<BufferData<T>>, capacity: usize) {
         self.ptr = ptr;
         self.capacity = capacity;
+        self.set_capacity_in_buffer(capacity);
     }
 
     fn grow_amortized(&mut self, len: usize, additional: usize) -> Result<(), TryReserveError> {

@@ -1,4 +1,4 @@
-use core::{mem::MaybeUninit, ptr, slice};
+use core::{ptr, slice};
 
 use crate::{
     error::{check_align, check_layout, check_len},
@@ -96,42 +96,28 @@ impl ErasedFieldMutPtr {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap(self, with: Self, temp: &mut [MaybeUninit<u8>]) {
+    pub unsafe fn swap(self, with: Self) {
         let Self { desc, .. } = self;
         check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let count = desc.layout().size();
-        assert!(temp.len() >= count);
-
         let a = self.as_ptr();
         let b = with.as_ptr();
-        unsafe {
-            ptr::copy_nonoverlapping(a, temp.as_mut_ptr().cast(), count);
-            ptr::copy(b, a, count);
-            ptr::copy_nonoverlapping(temp.as_ptr().cast(), b, count);
+        let count = desc.layout().size();
+        for i in 0..count {
+            unsafe { ptr::swap(a.add(i), b.add(i)) }
         }
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from(
-        self,
-        from: ErasedFieldPtr,
-        count: usize,
-        temp: &mut [MaybeUninit<u8>],
-    ) {
+    pub unsafe fn copy_from(self, from: ErasedFieldPtr, count: usize) {
         let Self { desc, .. } = self;
         check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let count = count * desc.layout().size();
-        assert!(temp.len() >= count);
-
         let src = from.as_ptr();
         let dst = self.as_ptr();
-        unsafe {
-            ptr::copy_nonoverlapping(src, temp.as_mut_ptr().cast(), count);
-            ptr::copy_nonoverlapping(temp.as_ptr().cast(), dst, count);
-        }
+        let count = count * desc.layout().size();
+        unsafe { ptr::copy(src, dst, count) }
     }
 
     #[inline]
@@ -143,9 +129,7 @@ impl ErasedFieldMutPtr {
         let count = count * desc.layout().size();
         let src = from.as_ptr();
         let dst = self.as_ptr();
-        unsafe {
-            ptr::copy_nonoverlapping(src, dst, count);
-        }
+        unsafe { ptr::copy_nonoverlapping(src, dst, count) }
     }
 
     #[inline]

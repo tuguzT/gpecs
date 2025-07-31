@@ -2,7 +2,6 @@ use core::{fmt::Debug, ptr::NonNull};
 
 use crate::{
     aligned_bytes::AlignedBytesFromLayout,
-    erased::NewBytes,
     soa::traits::{FieldDescriptor, Soa},
 };
 
@@ -19,7 +18,7 @@ where
     B::Error: Debug,
     D: AsRef<[FieldDescriptor]> + FromIterator<FieldDescriptor>,
 {
-    type Context = ErasedSoaContext<D, NewBytes>;
+    type Context = ErasedSoaContext<D>;
     type Fields = ErasedSoaFields;
 
     type FieldDescriptors<'context> = &'context [FieldDescriptor];
@@ -144,13 +143,7 @@ where
         assert_descriptors(descriptors, a.field_descriptors());
         assert_descriptors(descriptors, b.field_descriptors());
 
-        let count = descriptors
-            .iter()
-            .map(|desc| desc.layout().size())
-            .max()
-            .unwrap_or(0);
-        let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
-        unsafe { a.swap(&b, &mut temp) }
+        unsafe { a.swap(&b) }
     }
 
     #[inline]
@@ -164,13 +157,7 @@ where
         assert_descriptors(descriptors, src.field_descriptors());
         assert_descriptors(descriptors, dst.field_descriptors());
 
-        let count = descriptors
-            .iter()
-            .map(|desc| desc.layout().size() * len)
-            .max()
-            .unwrap_or(0);
-        let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
-        unsafe { dst.copy_from(&src, len, &mut temp) }
+        unsafe { dst.copy_from(&src, len) }
     }
 
     #[inline]
@@ -184,13 +171,7 @@ where
         assert_descriptors(descriptors, src.field_descriptors());
         assert_descriptors(descriptors, dst.field_descriptors());
 
-        let count = descriptors
-            .iter()
-            .map(|desc| desc.layout().size() * len)
-            .max()
-            .unwrap_or(0);
-        let mut temp = context.borrow_bytes(count).expect("failed to borrow bytes");
-        unsafe { dst.copy_from_rev(&src, len, &mut temp) }
+        unsafe { dst.copy_from_rev(&src, len) }
     }
 
     #[inline]

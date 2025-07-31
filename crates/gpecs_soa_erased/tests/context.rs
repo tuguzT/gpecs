@@ -7,7 +7,7 @@ use gpecs_soa_erased::{
 #[cfg_attr(miri, ignore)]
 fn context() {
     let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
-    let _context = ErasedSoaContext::new(descriptors, ());
+    let _context = ErasedSoaContext::new(descriptors);
 }
 
 #[test]

@@ -1,7 +1,6 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::MaybeUninit,
     ptr::{self, NonNull},
     slice,
 };
@@ -184,41 +183,32 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap<A>(&self, with: &ErasedSoaNonNullPtrs<A>, temp: &mut [MaybeUninit<u8>])
+    pub unsafe fn swap<A>(&self, with: &ErasedSoaNonNullPtrs<A>)
     where
         A: AsRef<[FieldDescriptor]>,
     {
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors.as_ref(), with.field_descriptors());
 
-        itertools::zip_eq(self, with).for_each(|(me, with)| unsafe { me.swap(with, temp) })
+        itertools::zip_eq(self, with).for_each(|(me, with)| unsafe { me.swap(with) })
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from<A>(
-        &self,
-        from: &ErasedSoaNonNullPtrs<A>,
-        count: usize,
-        temp: &mut [MaybeUninit<u8>],
-    ) where
+    pub unsafe fn copy_from<A>(&self, from: &ErasedSoaNonNullPtrs<A>, count: usize)
+    where
         A: AsRef<[FieldDescriptor]>,
     {
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
-        itertools::zip_eq(self, from)
-            .for_each(|(me, from)| unsafe { me.copy_from(from, count, temp) })
+        itertools::zip_eq(self, from).for_each(|(me, from)| unsafe { me.copy_from(from, count) })
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_rev<A>(
-        &self,
-        from: &ErasedSoaNonNullPtrs<A>,
-        count: usize,
-        temp: &mut [MaybeUninit<u8>],
-    ) where
+    pub unsafe fn copy_from_rev<A>(&self, from: &ErasedSoaNonNullPtrs<A>, count: usize)
+    where
         A: AsRef<[FieldDescriptor]>,
     {
         let Self { descriptors, .. } = self;
@@ -232,17 +222,16 @@ where
                 ErasedSoaNonNullPtrsIter<slice::Iter<'_, FieldDescriptor>>,
             >,
             count: usize,
-            temp: &mut [MaybeUninit<u8>],
         ) {
             let Some((me, from)) = iter.next() else {
                 return;
             };
-            rec(iter, count, temp);
-            unsafe { me.copy_from(from, count, temp) }
+            rec(iter, count);
+            unsafe { me.copy_from(from, count) }
         }
 
         let mut iter = itertools::zip_eq(self, from);
-        rec(&mut iter, count, temp)
+        rec(&mut iter, count)
     }
 
     #[inline]

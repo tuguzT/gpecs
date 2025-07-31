@@ -264,7 +264,8 @@ where
 impl<B, I, T> Iterator for ErasedSoaIntoFields<B, I, T>
 where
     B: AlignedBytes + ?Sized,
-    I: Iterator<Item: AsRef<FieldDescriptor>>,
+    I: Iterator,
+    I::Item: AsRef<FieldDescriptor>,
     T: AlignedBytesFromLayout,
 {
     type Item = Result<ErasedField<T>, ErasedFieldFromDescDataError<T>>;
@@ -288,7 +289,8 @@ where
 impl<B, I, T> ExactSizeIterator for ErasedSoaIntoFields<B, I, T>
 where
     B: AlignedBytes + ?Sized,
-    I: Iterator<Item: AsRef<FieldDescriptor>> + ExactSizeIterator,
+    I: ExactSizeIterator,
+    I::Item: AsRef<FieldDescriptor>,
     T: AlignedBytesFromLayout,
 {
     #[inline]
@@ -301,7 +303,8 @@ where
 impl<B, I, T> FusedIterator for ErasedSoaIntoFields<B, I, T>
 where
     B: AlignedBytes + ?Sized,
-    I: Iterator<Item: AsRef<FieldDescriptor>> + FusedIterator,
+    I: FusedIterator,
+    I::Item: AsRef<FieldDescriptor>,
     T: AlignedBytesFromLayout,
 {
 }

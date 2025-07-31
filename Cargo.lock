@@ -813,6 +813,7 @@ version = "0.0.0"
 name = "gpecs_soa_bench"
 version = "0.0.0"
 dependencies = [
+ "arrayvec",
  "criterion",
  "gpecs_soa",
  "gpecs_soa_erased",

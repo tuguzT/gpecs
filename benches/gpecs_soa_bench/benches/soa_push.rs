@@ -5,7 +5,6 @@ use gpecs_soa_bench::{
     Big, Large, Medium, Small, Tiny, Zero, clear::Clear, names::*, push::Push,
     with_capacity::WithCapacity,
 };
-use gpecs_soa_erased::erased::ErasedSoa;
 
 fn push<T>(c: &mut Criterion)
 where
@@ -22,12 +21,10 @@ where
                 BenchmarkId::new(SOA_SER_FUNCTION_NAME, count),
                 &count,
                 |b, &count| {
-                    let context = Default::default();
                     let mut vec = T::soa_ser_with_capacity(0);
                     b.iter(|| {
                         for _ in 0..count {
-                            let value =
-                                ErasedSoa::from_value::<T>(&context, Default::default()).unwrap();
+                            let value = Default::default();
                             T::soa_ser_push(&mut vec, value);
                         }
                         black_box(&mut vec);
@@ -99,7 +96,6 @@ where
 
     let mut group = c.benchmark_group(&group_name);
     for count in COUNT_RANGE {
-        let context = Default::default();
         let mut vec = T::soa_ser_with_capacity(count);
         group
             .throughput(Throughput::Elements(count.try_into().unwrap()))
@@ -109,8 +105,7 @@ where
                 |b, &count| {
                     b.iter(|| {
                         for _ in 0..count {
-                            let value =
-                                ErasedSoa::from_value::<T>(&context, Default::default()).unwrap();
+                            let value = Default::default();
                             T::soa_ser_push(&mut vec, value);
                         }
                         black_box(&mut vec);

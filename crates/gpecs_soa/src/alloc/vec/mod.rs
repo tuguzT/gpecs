@@ -3,7 +3,7 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem::ManuallyDrop,
+    mem::{ManuallyDrop, forget},
     ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
     ptr,
 };
@@ -545,18 +545,16 @@ where
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
         unsafe { T::slices_drop_in_place(context, slices) }
     }
-}
 
-impl<T> SoaVec<T>
-where
-    T: Soa,
-{
-    pub fn swap_remove(&mut self, index: usize) -> T {
+    pub fn swap_remove_into<F, R>(&mut self, index: usize, f: F) -> R
+    where
+        F: FnOnce(&T::Context, T::Ptrs<'_>) -> R,
+    {
         #[cold]
         #[inline(never)]
         #[track_caller]
         fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("swap_remove index (is {index}) should be < len (is {len})");
+            panic!("swap_remove index (which is {index}) should be < len (which is {len})")
         }
 
         let len = self.len();
@@ -566,9 +564,9 @@ where
 
         let ptrs = self.buffer.ptrs();
         let context = self.context();
-        let value = unsafe {
+        let result = unsafe {
             let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
-            T::ptrs_read(context, T::ptrs_cast_const(context, ptrs))
+            f(context, T::ptrs_cast_const(context, ptrs))
         };
 
         unsafe {
@@ -579,10 +577,66 @@ where
             self.set_len(len - 1);
         }
 
-        value
+        result
     }
 
-    pub fn insert(&mut self, index: usize, value: T) {
+    pub fn remove_into<F, R>(&mut self, index: usize, f: F) -> R
+    where
+        F: FnOnce(&T::Context, T::Ptrs<'_>) -> R,
+    {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed(index: usize, len: usize) -> ! {
+            panic!("removal index (is {index}) should be < len (is {len})");
+        }
+
+        let len = self.len();
+        if index >= len {
+            assert_failed(index, len);
+        }
+
+        let ptrs = self.buffer.ptrs();
+        let context = self.context();
+
+        let ptrs = unsafe { T::ptrs_add_mut(context, ptrs, index) };
+        let result = f(context, T::ptrs_cast_const(context, ptrs.clone()));
+
+        unsafe {
+            let src = T::ptrs_add(context, T::ptrs_cast_const(context, ptrs.clone()), 1);
+            T::ptrs_copy(context, src, ptrs, len - index - 1);
+
+            self.set_len(len - 1);
+        }
+
+        result
+    }
+
+    pub fn pop_into<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&T::Context, Option<T::Ptrs<'_>>) -> R,
+    {
+        let len = self.len();
+        let context = self.context();
+        if len == 0 {
+            return f(context, None);
+        }
+
+        let ptrs = self.as_ptrs();
+        let src = unsafe { T::ptrs_add(context, ptrs, len - 1) };
+        let result = f(context, Some(src));
+
+        unsafe {
+            self.set_len(len - 1);
+        }
+
+        result
+    }
+
+    pub fn insert_from<F, R>(&mut self, index: usize, f: F) -> R
+    where
+        F: FnOnce(&T::Context, T::MutPtrs<'_>) -> R,
+    {
         #[cold]
         #[inline(never)]
         #[track_caller]
@@ -605,49 +659,64 @@ where
             }
         }
 
-        let ptrs = self.buffer.ptrs();
-        let context = self.context();
-        let ptrs = unsafe { T::ptrs_add_mut(context, ptrs, index) };
-        unsafe {
-            if index < len {
-                let src = T::ptrs_cast_const(context, ptrs.clone());
-                let dst = T::ptrs_add_mut(context, ptrs.clone(), 1);
-                T::ptrs_copy(context, src, dst, len - index);
+        let Self { buffer, .. } = self;
+        let context = buffer.context();
+        let ptrs = unsafe { T::ptrs_add_mut(context, buffer.ptrs(), index) };
+
+        if index < len {
+            let src = T::ptrs_cast_const(context, ptrs.clone());
+            let dst = unsafe { T::ptrs_add_mut(context, ptrs.clone(), 1) };
+            unsafe { T::ptrs_copy(context, src, dst, len - index) }
+        }
+
+        struct CopyBackGuard<'a, T>
+        where
+            T: Soa + ?Sized,
+        {
+            v: &'a mut SoaVec<T>,
+            index: usize,
+        }
+
+        impl<'a, T> Drop for CopyBackGuard<'a, T>
+        where
+            T: Soa + ?Sized,
+        {
+            fn drop(&mut self) {
+                let Self { ref v, index } = *self;
+                let SoaVec { ref buffer, len } = **v;
+
+                let context = buffer.context();
+                let ptrs = unsafe { T::ptrs_add_mut(context, buffer.ptrs(), index) };
+
+                if index < len {
+                    let src = T::ptrs_cast_const(context, ptrs.clone());
+                    let src = unsafe { T::ptrs_add(context, src, 1) };
+                    let dst = ptrs;
+                    unsafe { T::ptrs_copy_rev(context, src, dst, len - index) }
+                }
             }
-            T::ptrs_write(context, ptrs, value);
-
-            self.set_len(len + 1);
-        }
-    }
-
-    pub fn remove(&mut self, index: usize) -> T {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("removal index (is {index}) should be < len (is {len})");
         }
 
-        let len = self.len();
-        if index >= len {
-            assert_failed(index, len);
-        }
+        drop(ptrs);
+        let mut guard = CopyBackGuard { v: self, index };
+        let CopyBackGuard { v, .. } = &mut guard;
 
-        let ptrs = self.buffer.ptrs();
-        let context = self.context();
-        let ptrs = unsafe { T::ptrs_add_mut(context, ptrs, index) };
+        let context = v.buffer.context();
+        let ptrs = unsafe { T::ptrs_add_mut(context, v.buffer.ptrs(), index) };
+        let result = f(context, ptrs);
 
-        let value = unsafe { T::ptrs_read(context, T::ptrs_cast_const(context, ptrs.clone())) };
         unsafe {
-            let src = T::ptrs_add(context, T::ptrs_cast_const(context, ptrs.clone()), 1);
-            T::ptrs_copy(context, src, ptrs, len - index - 1);
-
-            self.set_len(len - 1);
+            guard.v.set_len(len + 1);
         }
-        value
+        forget(guard);
+
+        result
     }
 
-    pub fn push(&mut self, value: T) {
+    pub fn push_from<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&T::Context, T::MutPtrs<'_>) -> R,
+    {
         let len = self.len();
         let capacity = self.capacity();
         if len == capacity {
@@ -661,29 +730,45 @@ where
 
         let ptrs = self.buffer.ptrs();
         let context = self.context();
-        unsafe {
-            let ptrs = T::ptrs_add_mut(context, ptrs, len);
-            T::ptrs_write(context, ptrs, value);
 
+        let dst = unsafe { T::ptrs_add_mut(context, ptrs, len) };
+        let result = f(context, dst);
+        unsafe {
             self.set_len(len + 1);
         }
+        result
+    }
+}
+
+impl<T> SoaVec<T>
+where
+    T: Soa,
+{
+    #[inline]
+    pub fn swap_remove(&mut self, index: usize) -> T {
+        self.swap_remove_into(index, |context, src| unsafe { T::ptrs_read(context, src) })
     }
 
+    #[inline]
+    pub fn remove(&mut self, index: usize) -> T {
+        self.remove_into(index, |context, src| unsafe { T::ptrs_read(context, src) })
+    }
+
+    #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        let len = self.len();
-        if len == 0 {
-            return None;
-        }
+        self.pop_into(|context, src| unsafe { T::ptrs_read(context, src?).into() })
+    }
 
-        let ptrs = self.as_ptrs();
-        let context = self.context();
-        let ptrs = unsafe { T::ptrs_add(context, ptrs, len - 1) };
+    #[inline]
+    pub fn insert(&mut self, index: usize, value: T) {
+        self.insert_from(index, |context, dst| unsafe {
+            T::ptrs_write(context, dst, value)
+        })
+    }
 
-        let value = unsafe { T::ptrs_read(context, ptrs) };
-        unsafe {
-            self.set_len(len - 1);
-        }
-        Some(value)
+    #[inline]
+    pub fn push(&mut self, value: T) {
+        self.push_from(|context, dst| unsafe { T::ptrs_write(context, dst, value) })
     }
 }
 

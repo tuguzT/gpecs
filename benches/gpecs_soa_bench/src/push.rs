@@ -1,18 +1,23 @@
-use std::hint::black_box;
+use std::{alloc::Layout, hint::black_box, mem::MaybeUninit};
 
-use gpecs_soa::prelude::*;
-use gpecs_soa_erased::erased::BoxedErasedSoa;
+use arrayvec::ArrayVec;
+use gpecs_soa::{prelude::*, traits::FieldDescriptor};
+use gpecs_soa_erased::{
+    aligned_bytes::AlignedUninitByteSlice,
+    erased::{BoxedErasedSoa, ErasedSoa},
+};
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
-pub trait Push: SoaVecs {
+pub trait Push: SoaVecs<Context: Default> {
     fn soa_slf_push(vec: &mut SoaVec<Self>, value: Self) {
         let value = black_box(value);
         vec.push(value);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: BoxedErasedSoa) {
-        let value = black_box(value);
+    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
+        let context = Default::default();
+        let value = ErasedSoa::from_value(&context, black_box(value)).unwrap();
         vec.push(value);
     }
 
@@ -24,11 +29,28 @@ pub trait Push: SoaVecs {
     }
 }
 
+type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
+
 impl Push for Zero {
     #[allow(clippy::let_unit_value, reason = "reference for other manual impls")]
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self) {
         let value = black_box(value);
         vecs.push(value);
+    }
+
+    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
+        let context = Default::default();
+        let value = black_box(value);
+
+        let bytes = [MaybeUninit::<u8>::zeroed(); size_of::<Self>() * 2];
+        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let value =
+            ErasedSoa::<_, ArrayDescriptors<1>>::from_bytes_value(bytes, &context, value).unwrap();
+
+        vec.push_from(|_, dst| unsafe {
+            let ptrs = value.as_refs().into_ptrs();
+            dst.copy_from(&ptrs, 1)
+        });
     }
 }
 
@@ -37,6 +59,27 @@ impl Push for Tiny {
         let (values,) = vecs;
         let (value,) = black_box(value);
         values.push(value);
+    }
+
+    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
+        let context = Default::default();
+        let value = black_box(value);
+
+        let mut bytes = [0_u8; size_of::<Self>() * 2];
+        let bytes = unsafe {
+            let (_, bytes, _) = bytes.align_to_mut::<Self>();
+            let (_, bytes, _) = bytes.align_to_mut();
+            bytes
+        };
+
+        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let value =
+            ErasedSoa::<_, ArrayDescriptors<1>>::from_bytes_value(bytes, &context, value).unwrap();
+
+        vec.push_from(|_, dst| unsafe {
+            let ptrs = value.as_refs().into_ptrs();
+            dst.copy_from(&ptrs, 1)
+        });
     }
 }
 
@@ -48,6 +91,27 @@ impl Push for Small {
         ys.push(y);
         zs.push(z);
     }
+
+    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
+        let context = Default::default();
+        let value = black_box(value);
+
+        let mut bytes = [0_u8; size_of::<Self>() * 2];
+        let bytes = unsafe {
+            let (_, bytes, _) = bytes.align_to_mut::<Self>();
+            let (_, bytes, _) = bytes.align_to_mut();
+            bytes
+        };
+
+        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let value =
+            ErasedSoa::<_, ArrayDescriptors<3>>::from_bytes_value(bytes, &context, value).unwrap();
+
+        vec.push_from(|_, dst| unsafe {
+            let ptrs = value.as_refs().into_ptrs();
+            dst.copy_from(&ptrs, 1)
+        });
+    }
 }
 
 impl Push for Medium {
@@ -57,6 +121,27 @@ impl Push for Medium {
         smalls1.push(small1);
         smalls2.push(small2);
         smalls3.push(small3);
+    }
+
+    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
+        let context = Default::default();
+        let value = black_box(value);
+
+        let mut bytes = [0_u8; size_of::<Self>() * 2];
+        let bytes = unsafe {
+            let (_, bytes, _) = bytes.align_to_mut::<Self>();
+            let (_, bytes, _) = bytes.align_to_mut();
+            bytes
+        };
+
+        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let value =
+            ErasedSoa::<_, ArrayDescriptors<3>>::from_bytes_value(bytes, &context, value).unwrap();
+
+        vec.push_from(|_, dst| unsafe {
+            let ptrs = value.as_refs().into_ptrs();
+            dst.copy_from(&ptrs, 1)
+        });
     }
 }
 
@@ -69,6 +154,27 @@ impl Push for Big {
         arrays.push(array);
         strs1.push(str1);
         strs2.push(str2);
+    }
+
+    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
+        let context = Default::default();
+        let value = black_box(value);
+
+        let mut bytes = [0_u8; size_of::<Self>() * 2];
+        let bytes = unsafe {
+            let (_, bytes, _) = bytes.align_to_mut::<Self>();
+            let (_, bytes, _) = bytes.align_to_mut();
+            bytes
+        };
+
+        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let value =
+            ErasedSoa::<_, ArrayDescriptors<5>>::from_bytes_value(bytes, &context, value).unwrap();
+
+        vec.push_from(|_, dst| unsafe {
+            let ptrs = value.as_refs().into_ptrs();
+            dst.copy_from(&ptrs, 1)
+        });
     }
 }
 
@@ -98,5 +204,26 @@ impl Push for Large {
         arrays8.push(array8);
         arrays9.push(array9);
         arrays10.push(array10);
+    }
+
+    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
+        let context = Default::default();
+        let value = black_box(value);
+
+        let mut bytes = [0_u8; size_of::<Self>() * 2];
+        let bytes = unsafe {
+            let (_, bytes, _) = bytes.align_to_mut::<Self>();
+            let (_, bytes, _) = bytes.align_to_mut();
+            bytes
+        };
+
+        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let value =
+            ErasedSoa::<_, ArrayDescriptors<10>>::from_bytes_value(bytes, &context, value).unwrap();
+
+        vec.push_from(|_, dst| unsafe {
+            let ptrs = value.as_refs().into_ptrs();
+            dst.copy_from(&ptrs, 1)
+        });
     }
 }

@@ -24,9 +24,12 @@ use crate::{
 
 pub type BoxedErasedSoa = ErasedSoa<AlignedUninitBoxedByteSlice, Box<[FieldDescriptor]>>;
 
-pub struct ErasedSoa<B, D> {
-    bytes: B,
+pub struct ErasedSoa<B, D>
+where
+    B: ?Sized,
+{
     descriptors: D,
+    bytes: B,
 }
 
 impl<B, D> ErasedSoa<B, D>
@@ -63,27 +66,6 @@ where
 
         let me = Self { bytes, descriptors };
         Ok(me)
-    }
-
-    #[inline]
-    pub fn as_refs(&self) -> ErasedSoaRefs<'_, &[FieldDescriptor]> {
-        let Self { bytes, descriptors } = self;
-
-        let descriptors = descriptors.as_ref();
-        let buffer = bytes.as_ptr();
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, 1, 0) }
-    }
-
-    #[inline]
-    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, &[FieldDescriptor]> {
-        let Self {
-            ref mut bytes,
-            ref descriptors,
-        } = *self;
-
-        let descriptors = descriptors.as_ref();
-        let buffer = bytes.as_mut_ptr();
-        unsafe { ErasedSoaRefsMut::new_unchecked(descriptors, buffer, 1, 0) }
     }
 
     #[inline]
@@ -129,6 +111,33 @@ where
             T::ptrs_read(context, T::ptrs_cast_const(context, src))
         };
         Ok(value)
+    }
+}
+
+impl<B, D> ErasedSoa<B, D>
+where
+    B: AlignedBytes + ?Sized,
+    D: AsRef<[FieldDescriptor]>,
+{
+    #[inline]
+    pub fn as_refs(&self) -> ErasedSoaRefs<'_, &[FieldDescriptor]> {
+        let Self { bytes, descriptors } = self;
+
+        let descriptors = descriptors.as_ref();
+        let buffer = bytes.as_ptr();
+        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, 1, 0) }
+    }
+
+    #[inline]
+    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, &[FieldDescriptor]> {
+        let Self {
+            ref mut bytes,
+            ref descriptors,
+        } = *self;
+
+        let descriptors = descriptors.as_ref();
+        let buffer = bytes.as_mut_ptr();
+        unsafe { ErasedSoaRefsMut::new_unchecked(descriptors, buffer, 1, 0) }
     }
 }
 
@@ -219,10 +228,13 @@ where
 }
 
 #[derive(Clone)]
-pub struct ErasedSoaIntoFields<B, I, T> {
-    bytes: B,
+pub struct ErasedSoaIntoFields<B, I, T>
+where
+    B: ?Sized,
+{
     offsets: BufferOffsets<I>,
     phantom: PhantomData<T>,
+    bytes: B,
 }
 
 impl<B, I, T> ErasedSoaIntoFields<B, I, T> {
@@ -237,13 +249,13 @@ impl<B, I, T> ErasedSoaIntoFields<B, I, T> {
 
 impl<B, I, T> Debug for ErasedSoaIntoFields<B, I, T>
 where
-    B: Debug,
+    B: Debug + ?Sized,
     I: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { bytes, offsets, .. } = self;
         f.debug_struct("ErasedSoaIntoFields")
-            .field("bytes", bytes)
+            .field("bytes", &bytes)
             .field("offsets", offsets)
             .finish()
     }
@@ -251,7 +263,7 @@ where
 
 impl<B, I, T> Iterator for ErasedSoaIntoFields<B, I, T>
 where
-    B: AlignedBytes,
+    B: AlignedBytes + ?Sized,
     I: Iterator<Item: AsRef<FieldDescriptor>>,
     T: AlignedBytesFromLayout,
 {
@@ -275,7 +287,7 @@ where
 
 impl<B, I, T> ExactSizeIterator for ErasedSoaIntoFields<B, I, T>
 where
-    B: AlignedBytes,
+    B: AlignedBytes + ?Sized,
     I: Iterator<Item: AsRef<FieldDescriptor>> + ExactSizeIterator,
     T: AlignedBytesFromLayout,
 {
@@ -288,7 +300,7 @@ where
 
 impl<B, I, T> FusedIterator for ErasedSoaIntoFields<B, I, T>
 where
-    B: AlignedBytes,
+    B: AlignedBytes + ?Sized,
     I: Iterator<Item: AsRef<FieldDescriptor>> + FusedIterator,
     T: AlignedBytesFromLayout,
 {
@@ -317,7 +329,7 @@ where
 
 impl<B, D> Debug for ErasedSoa<B, D>
 where
-    B: AlignedBytes,
+    B: AlignedBytes + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

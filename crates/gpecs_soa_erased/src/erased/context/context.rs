@@ -9,14 +9,17 @@ use crate::{
 pub type BoxedErasedSoaContext = ErasedSoaContext<Box<[FieldDescriptor]>, NewBytes>;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ErasedSoaContext<D, R> {
+pub struct ErasedSoaContext<D, B>
+where
+    B: ?Sized,
+{
     descriptors: D,
-    borrow_bytes: R,
+    borrow_bytes: B,
 }
 
-impl<D, R> ErasedSoaContext<D, R> {
+impl<D, B> ErasedSoaContext<D, B> {
     #[inline]
-    pub fn new(descriptors: D, borrow_bytes: R) -> Self {
+    pub fn new(descriptors: D, borrow_bytes: B) -> Self {
         Self {
             descriptors,
             borrow_bytes,
@@ -24,7 +27,7 @@ impl<D, R> ErasedSoaContext<D, R> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, R) {
+    pub fn into_parts(self) -> (D, B) {
         let Self {
             descriptors,
             borrow_bytes,
@@ -33,9 +36,10 @@ impl<D, R> ErasedSoaContext<D, R> {
     }
 }
 
-impl<D, R> ErasedSoaContext<D, R>
+impl<D, B> ErasedSoaContext<D, B>
 where
     D: AsRef<[FieldDescriptor]>,
+    B: ?Sized,
 {
     #[inline]
     pub fn field_descriptors(&self) -> &[FieldDescriptor] {
@@ -44,21 +48,21 @@ where
     }
 }
 
-impl<D, R> ErasedSoaContext<D, R>
+impl<D, B> ErasedSoaContext<D, B>
 where
-    R: BorrowBytes,
+    B: BorrowBytes + ?Sized,
 {
     #[inline]
-    pub fn borrow_bytes(&self, count: usize) -> Result<R::Output<'_>, R::Error> {
+    pub fn borrow_bytes(&self, count: usize) -> Result<B::Output<'_>, B::Error> {
         let Self { borrow_bytes, .. } = self;
         borrow_bytes.borrow_bytes(count)
     }
 }
 
-impl<D, R> ErasedSoaContext<D, R>
+impl<D, B> ErasedSoaContext<D, B>
 where
     D: FromIterator<FieldDescriptor>,
-    R: Default,
+    B: Default,
 {
     #[inline]
     pub fn of<T>(context: &T::Context) -> Self
@@ -70,11 +74,11 @@ where
     }
 }
 
-impl<A, D, R> FromIterator<A> for ErasedSoaContext<D, R>
+impl<A, D, B> FromIterator<A> for ErasedSoaContext<D, B>
 where
     A: AsRef<FieldDescriptor>,
     D: FromIterator<FieldDescriptor>,
-    R: Default,
+    B: Default,
 {
     #[inline]
     fn from_iter<T>(iter: T) -> Self
@@ -88,22 +92,26 @@ where
     }
 }
 
-pub struct ErasedSoaContextIntoIter<I, R> {
+pub struct ErasedSoaContextIntoIter<I, B>
+where
+    B: ?Sized,
+{
     iter: I,
-    borrow_bytes: R,
+    borrow_bytes: B,
 }
 
-impl<I, R> ErasedSoaContextIntoIter<I, R> {
+impl<I, B> ErasedSoaContextIntoIter<I, B> {
     #[inline]
-    pub fn into_parts(self) -> (I, R) {
+    pub fn into_parts(self) -> (I, B) {
         let Self { iter, borrow_bytes } = self;
         (iter, borrow_bytes)
     }
 }
 
-impl<I, R> Iterator for ErasedSoaContextIntoIter<I, R>
+impl<I, B> Iterator for ErasedSoaContextIntoIter<I, B>
 where
     I: Iterator,
+    B: ?Sized,
 {
     type Item = I::Item;
 
@@ -120,9 +128,10 @@ where
     }
 }
 
-impl<I, R> DoubleEndedIterator for ErasedSoaContextIntoIter<I, R>
+impl<I, B> DoubleEndedIterator for ErasedSoaContextIntoIter<I, B>
 where
     I: DoubleEndedIterator,
+    B: ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -131,9 +140,10 @@ where
     }
 }
 
-impl<I, R> ExactSizeIterator for ErasedSoaContextIntoIter<I, R>
+impl<I, B> ExactSizeIterator for ErasedSoaContextIntoIter<I, B>
 where
     I: ExactSizeIterator,
+    B: ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -142,14 +152,19 @@ where
     }
 }
 
-impl<I, R> FusedIterator for ErasedSoaContextIntoIter<I, R> where I: FusedIterator {}
+impl<I, B> FusedIterator for ErasedSoaContextIntoIter<I, B>
+where
+    I: FusedIterator,
+    B: ?Sized,
+{
+}
 
-impl<D, R> IntoIterator for ErasedSoaContext<D, R>
+impl<D, B> IntoIterator for ErasedSoaContext<D, B>
 where
     D: IntoIterator<Item = FieldDescriptor>,
 {
     type Item = FieldDescriptor;
-    type IntoIter = ErasedSoaContextIntoIter<D::IntoIter, R>;
+    type IntoIter = ErasedSoaContextIntoIter<D::IntoIter, B>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

@@ -414,10 +414,13 @@ where
     }
 
     #[inline]
-    fn refs_as_ptrs<'context>(
+    fn refs_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        refs: Self::Refs<'context, '_>,
-    ) -> Self::Ptrs<'context> {
+        refs: Self::Refs<'context, 'a>,
+    ) -> Self::Ptrs<'context>
+    where
+        Self: 'a,
+    {
         let KeyValueRefs { key, value } = refs;
         KeyValuePtrs {
             key: ptr::from_ref(key),
@@ -426,10 +429,13 @@ where
     }
 
     #[inline]
-    fn refs_mut_as_ptrs<'context>(
+    fn refs_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        refs: Self::RefsMut<'context, '_>,
-    ) -> Self::MutPtrs<'context> {
+        refs: Self::RefsMut<'context, 'a>,
+    ) -> Self::MutPtrs<'context>
+    where
+        Self: 'a,
+    {
         let KeyValueRefsMut { key, value } = refs;
         KeyValueMutPtrs {
             key: ptr::from_mut(key),
@@ -623,7 +629,10 @@ where
 
     #[inline]
     #[track_caller]
-    fn slices_len(context: &Self::Context, slices: &Self::Slices<'_, '_>) -> usize {
+    fn slices_len<'a>(context: &Self::Context, slices: &Self::Slices<'_, 'a>) -> usize
+    where
+        Self: 'a,
+    {
         let KeyValueSlices { keys, values } = slices;
 
         let keys_len = keys.len();
@@ -634,7 +643,10 @@ where
 
     #[inline]
     #[track_caller]
-    fn slices_mut_len(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize {
+    fn slices_mut_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
+    where
+        Self: 'a,
+    {
         let KeyValueSlicesMut { keys, values } = slices;
 
         let keys_len = keys.len();
@@ -644,10 +656,13 @@ where
     }
 
     #[inline]
-    fn slices_as_slice_ptrs<'context>(
+    fn slices_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::Slices<'context, '_>,
-    ) -> Self::SlicePtrs<'context> {
+        slices: Self::Slices<'context, 'a>,
+    ) -> Self::SlicePtrs<'context>
+    where
+        Self: 'a,
+    {
         let KeyValueSlices { keys, values } = slices;
         KeyValueSlicePtrs {
             keys: ptr::from_ref(keys),
@@ -656,10 +671,13 @@ where
     }
 
     #[inline]
-    fn slices_mut_as_slice_ptrs<'context>(
+    fn slices_mut_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, '_>,
-    ) -> Self::SliceMutPtrs<'context> {
+        slices: Self::SlicesMut<'context, 'a>,
+    ) -> Self::SliceMutPtrs<'context>
+    where
+        Self: 'a,
+    {
         let KeyValueSlicesMut { keys, values } = slices;
         KeyValueSliceMutPtrs {
             keys: ptr::from_mut(keys),
@@ -680,10 +698,13 @@ where
     }
 
     #[inline]
-    fn slices_as_ptrs<'context>(
+    fn slices_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::Slices<'context, '_>,
-    ) -> Self::Ptrs<'context> {
+        slices: Self::Slices<'context, 'a>,
+    ) -> Self::Ptrs<'context>
+    where
+        Self: 'a,
+    {
         let KeyValueSlices { keys, values } = slices;
         KeyValuePtrs {
             key: keys.as_ptr(),
@@ -692,10 +713,13 @@ where
     }
 
     #[inline]
-    fn slices_mut_as_ptrs<'context>(
+    fn slices_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, '_>,
-    ) -> Self::MutPtrs<'context> {
+        slices: Self::SlicesMut<'context, 'a>,
+    ) -> Self::MutPtrs<'context>
+    where
+        Self: 'a,
+    {
         let KeyValueSlicesMut { keys, values } = slices;
         KeyValueMutPtrs {
             key: keys.as_mut_ptr(),

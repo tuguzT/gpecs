@@ -319,7 +319,9 @@ pub unsafe trait Soa {
     /// to be covariant over generic lifetimes.
     fn upcast_refs<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::Refs<'long, 'a_long>,
-    ) -> Self::Refs<'short, 'a_short>;
+    ) -> Self::Refs<'short, 'a_short>
+    where
+        Self: 'a_long;
 
     /// Non-empty collection of mutable references to each field of [`Fields`](Soa::Fields).
     ///
@@ -332,7 +334,9 @@ pub unsafe trait Soa {
     /// to be covariant over generic lifetimes.
     fn upcast_refs_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::RefsMut<'long, 'a_long>,
-    ) -> Self::RefsMut<'short, 'a_short>;
+    ) -> Self::RefsMut<'short, 'a_short>
+    where
+        Self: 'a_long;
 
     /// Converts [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
     /// to their [references](Soa::Refs) by dereferencing each one of them.
@@ -342,7 +346,9 @@ pub unsafe trait Soa {
     unsafe fn ptrs_to_refs<'context, 'a>(
         context: &'context Self::Context,
         ptrs: Self::Ptrs<'context>,
-    ) -> Self::Refs<'context, 'a>;
+    ) -> Self::Refs<'context, 'a>
+    where
+        Self: 'a;
 
     /// Converts [mutable pointers](Soa::MutPtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable references](Soa::RefsMut) by dereferencing each one of them.
@@ -352,28 +358,36 @@ pub unsafe trait Soa {
     unsafe fn ptrs_to_refs_mut<'context, 'a>(
         context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
-    ) -> Self::RefsMut<'context, 'a>;
+    ) -> Self::RefsMut<'context, 'a>
+    where
+        Self: 'a;
 
     /// Converts [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
     /// to their [pointers](Soa::Ptrs) by taking the pointer of each one of them.
-    fn refs_as_ptrs<'context>(
+    fn refs_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        refs: Self::Refs<'context, '_>,
-    ) -> Self::Ptrs<'context>;
+        refs: Self::Refs<'context, 'a>,
+    ) -> Self::Ptrs<'context>
+    where
+        Self: 'a;
 
     /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable pointers](Soa::MutPtrs) by taking the pointer of each one of them.
-    fn refs_mut_as_ptrs<'context>(
+    fn refs_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        refs: Self::RefsMut<'context, '_>,
-    ) -> Self::MutPtrs<'context>;
+        refs: Self::RefsMut<'context, 'a>,
+    ) -> Self::MutPtrs<'context>
+    where
+        Self: 'a;
 
     /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
     /// to their [references](Soa::Refs) by explicitly converting each one of them via `&*` operator combination.
     fn refs_mut_as_refs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
-    ) -> Self::Refs<'context, 'a>;
+    ) -> Self::Refs<'context, 'a>
+    where
+        Self: 'a;
 
     /// Non-empty collection of slice pointers to each field of [`Fields`](Soa::Fields).
     ///
@@ -470,7 +484,9 @@ pub unsafe trait Soa {
     /// to be covariant over generic lifetimes.
     fn upcast_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::Slices<'long, 'a_long>,
-    ) -> Self::Slices<'short, 'a_short>;
+    ) -> Self::Slices<'short, 'a_short>
+    where
+        Self: 'a_long;
 
     /// Non-empty collection of mutable slices of each field of [`Fields`](Soa::Fields).
     ///
@@ -483,7 +499,9 @@ pub unsafe trait Soa {
     /// to be covariant over generic lifetimes.
     fn upcast_slices_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::SlicesMut<'long, 'a_long>,
-    ) -> Self::SlicesMut<'short, 'a_short>;
+    ) -> Self::SlicesMut<'short, 'a_short>
+    where
+        Self: 'a_long;
 
     /// Converts [slice pointers](Soa::SlicePtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [slices](Soa::Slices) by dereferencing each one of them.
@@ -493,7 +511,9 @@ pub unsafe trait Soa {
     unsafe fn slice_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicePtrs<'context>,
-    ) -> Self::Slices<'context, 'a>;
+    ) -> Self::Slices<'context, 'a>
+    where
+        Self: 'a;
 
     /// Converts [mutable slice pointers](Soa::SliceMutPtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable slices](Soa::SlicesMut) by dereferencing each one of them.
@@ -503,56 +523,72 @@ pub unsafe trait Soa {
     unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
-    ) -> Self::SlicesMut<'context, 'a>;
+    ) -> Self::SlicesMut<'context, 'a>
+    where
+        Self: 'a;
 
     /// Returns the number of elements in [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields),
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the slices,
     /// or else this method could panic.
-    fn slices_len(context: &Self::Context, slices: &Self::Slices<'_, '_>) -> usize;
+    fn slices_len<'a>(context: &Self::Context, slices: &Self::Slices<'_, 'a>) -> usize
+    where
+        Self: 'a;
 
     /// Returns the number of elements in [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields),
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the mutable slices,
     /// or else this method could panic.
-    fn slices_mut_len(context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize;
+    fn slices_mut_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
+    where
+        Self: 'a;
 
     /// Converts [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields)
     /// to their [slice pointers](Soa::SlicePtrs) by taking the pointer of each one of them.
-    fn slices_as_slice_ptrs<'context>(
+    fn slices_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::Slices<'context, '_>,
-    ) -> Self::SlicePtrs<'context>;
+        slices: Self::Slices<'context, 'a>,
+    ) -> Self::SlicePtrs<'context>
+    where
+        Self: 'a;
 
     /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable slice pointers](Soa::SliceMutPtrs) by taking the pointer of each one of them.
-    fn slices_mut_as_slice_ptrs<'context>(
+    fn slices_mut_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, '_>,
-    ) -> Self::SliceMutPtrs<'context>;
+        slices: Self::SlicesMut<'context, 'a>,
+    ) -> Self::SliceMutPtrs<'context>
+    where
+        Self: 'a;
 
     /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
     /// to their [slices](Soa::Slices) by explicitly converting each one of them via `&*` operator combination.
     fn slices_mut_as_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
-    ) -> Self::Slices<'context, 'a>;
+    ) -> Self::Slices<'context, 'a>
+    where
+        Self: 'a;
 
     /// Returns [pointers](Soa::Ptrs) to the slice's buffer
     /// of each [slice](Soa::Slices) of [`Fields`](Soa::Fields).
-    fn slices_as_ptrs<'context>(
+    fn slices_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::Slices<'context, '_>,
-    ) -> Self::Ptrs<'context>;
+        slices: Self::Slices<'context, 'a>,
+    ) -> Self::Ptrs<'context>
+    where
+        Self: 'a;
 
     /// Returns [mutable pointers](Soa::MutPtrs) to the slice's buffer
     /// of each [mutable slice](Soa::SlicesMut) of [`Fields`](Soa::Fields).
-    fn slices_mut_as_ptrs<'context>(
+    fn slices_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, '_>,
-    ) -> Self::MutPtrs<'context>;
+        slices: Self::SlicesMut<'context, 'a>,
+    ) -> Self::MutPtrs<'context>
+    where
+        Self: 'a;
 
     /// Executes the destructors (if any) for the each [slice](Soa::SliceMutPtrs) of [`Fields`](Soa::Fields).
     ///

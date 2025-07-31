@@ -247,18 +247,24 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn refs_as_ptrs<'context>(
+    fn refs_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
-        refs: Self::Refs<'context, '_>,
-    ) -> Self::Ptrs<'context> {
+        refs: Self::Refs<'context, 'a>,
+    ) -> Self::Ptrs<'context>
+    where
+        Self: 'a,
+    {
         ptr::from_ref(refs)
     }
 
     #[inline]
-    fn refs_mut_as_ptrs<'context>(
+    fn refs_mut_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
-        refs: Self::RefsMut<'context, '_>,
-    ) -> Self::MutPtrs<'context> {
+        refs: Self::RefsMut<'context, 'a>,
+    ) -> Self::MutPtrs<'context>
+    where
+        Self: 'a,
+    {
         ptr::from_mut(refs)
     }
 
@@ -393,28 +399,40 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn slices_len(_context: &Self::Context, slices: &Self::Slices<'_, '_>) -> usize {
+    fn slices_len<'a>(_context: &Self::Context, slices: &Self::Slices<'_, 'a>) -> usize
+    where
+        Self: 'a,
+    {
         slices.len()
     }
 
     #[inline]
-    fn slices_mut_len(_context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize {
+    fn slices_mut_len<'a>(_context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
+    where
+        Self: 'a,
+    {
         slices.len()
     }
 
     #[inline]
-    fn slices_as_slice_ptrs<'context>(
+    fn slices_as_slice_ptrs<'context, 'a>(
         _context: &'context Self::Context,
-        slices: Self::Slices<'context, '_>,
-    ) -> Self::SlicePtrs<'context> {
+        slices: Self::Slices<'context, 'a>,
+    ) -> Self::SlicePtrs<'context>
+    where
+        Self: 'a,
+    {
         ptr::from_ref(slices)
     }
 
     #[inline]
-    fn slices_mut_as_slice_ptrs<'context>(
+    fn slices_mut_as_slice_ptrs<'context, 'a>(
         _context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, '_>,
-    ) -> Self::SliceMutPtrs<'context> {
+        slices: Self::SlicesMut<'context, 'a>,
+    ) -> Self::SliceMutPtrs<'context>
+    where
+        Self: 'a,
+    {
         ptr::from_mut(slices)
     }
 
@@ -427,18 +445,24 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn slices_as_ptrs<'context>(
+    fn slices_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
-        slices: Self::Slices<'context, '_>,
-    ) -> Self::Ptrs<'context> {
+        slices: Self::Slices<'context, 'a>,
+    ) -> Self::Ptrs<'context>
+    where
+        Self: 'a,
+    {
         slices.as_ptr()
     }
 
     #[inline]
-    fn slices_mut_as_ptrs<'context>(
+    fn slices_mut_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, '_>,
-    ) -> Self::MutPtrs<'context> {
+        slices: Self::SlicesMut<'context, 'a>,
+    ) -> Self::MutPtrs<'context>
+    where
+        Self: 'a,
+    {
         slices.as_mut_ptr()
     }
 
@@ -815,19 +839,25 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn refs_as_ptrs<'context>(
+            fn refs_as_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
-                refs: Self::Refs<'context, '_>,
-            ) -> Self::Ptrs<'context> {
+                refs: Self::Refs<'context, 'a>,
+            ) -> Self::Ptrs<'context>
+            where
+                Self: 'a,
+            {
                 let ptrs = ($(ptr::from_ref(refs.$indices),)*);
                 ptrs
             }
 
             #[inline]
-            fn refs_mut_as_ptrs<'context>(
+            fn refs_mut_as_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
-                refs: Self::RefsMut<'context, '_>,
-            ) -> Self::MutPtrs<'context> {
+                refs: Self::RefsMut<'context, 'a>,
+            ) -> Self::MutPtrs<'context>
+            where
+                Self: 'a,
+            {
                 let ptrs = ($(ptr::from_mut(refs.$indices),)*);
                 ptrs
             }
@@ -976,33 +1006,45 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn slices_len(_context: &Self::Context, slices: &Self::Slices<'_, '_>) -> usize {
+            fn slices_len<'a>(_context: &Self::Context, slices: &Self::Slices<'_, 'a>) -> usize
+            where
+                Self: 'a,
+            {
                 let lens = [$(slices.$indices.len(),)*];
                 assert!(lens.iter().all(|len| lens[0].eq(len)));
                 lens[0]
             }
 
             #[inline]
-            fn slices_mut_len(_context: &Self::Context, slices: &Self::SlicesMut<'_, '_>) -> usize {
+            fn slices_mut_len<'a>(_context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
+            where
+                Self: 'a,
+            {
                 let lens = [$(slices.$indices.len(),)*];
                 assert!(lens.iter().all(|len| lens[0].eq(len)));
                 lens[0]
             }
 
             #[inline]
-            fn slices_as_slice_ptrs<'context>(
+            fn slices_as_slice_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
-                slices: Self::Slices<'context, '_>,
-            ) -> Self::SlicePtrs<'context> {
+                slices: Self::Slices<'context, 'a>,
+            ) -> Self::SlicePtrs<'context>
+            where
+                Self: 'a,
+            {
                 let slices = ($(ptr::from_ref(slices.$indices),)*);
                 slices
             }
 
             #[inline]
-            fn slices_mut_as_slice_ptrs<'context>(
+            fn slices_mut_as_slice_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
-                slices: Self::SlicesMut<'context, '_>,
-            ) -> Self::SliceMutPtrs<'context> {
+                slices: Self::SlicesMut<'context, 'a>,
+            ) -> Self::SliceMutPtrs<'context>
+            where
+                Self: 'a,
+            {
                 let slices = ($(ptr::from_mut(slices.$indices),)*);
                 slices
             }
@@ -1017,19 +1059,25 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn slices_as_ptrs<'context>(
+            fn slices_as_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
-                slices: Self::Slices<'context, '_>,
-            ) -> Self::Ptrs<'context> {
+                slices: Self::Slices<'context, 'a>,
+            ) -> Self::Ptrs<'context>
+            where
+                Self: 'a,
+            {
                 let slices = ($(slices.$indices.as_ptr(),)*);
                 slices
             }
 
             #[inline]
-            fn slices_mut_as_ptrs<'context>(
+            fn slices_mut_as_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
-                slices: Self::SlicesMut<'context, '_>,
-            ) -> Self::MutPtrs<'context> {
+                slices: Self::SlicesMut<'context, 'a>,
+            ) -> Self::MutPtrs<'context>
+            where
+                Self: 'a,
+            {
                 let slices = ($(slices.$indices.as_mut_ptr(),)*);
                 slices
             }

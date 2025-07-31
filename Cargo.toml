@@ -40,6 +40,7 @@ cargo-gpu = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "39b238f25b76
 spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "cf59e541ae1d53926d2e62739f6050483e653be0" }
 indexmap = { version = "2.10" }
 petgraph = { version = "0.8" }
+arrayvec = { version = "0.7", default-features = false }
 itertools = { version = "0.14", default-features = false }
 rspirv = { version = "0.12" }
 criterion = { version = "0.7", features = ["html_reports"] }

@@ -1,13 +1,19 @@
-use std::{ptr, slice};
+use std::{alloc::Layout, mem::MaybeUninit, ptr, slice};
 
+use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
-    erased::BoxedErasedSoa,
+    aligned_bytes::{AlignedUninitBoxedByteSlice, AlignedUninitByteSlice},
+    erased::ErasedSoa,
     field::{BoxedErasedField, ErasedField, ErasedFieldRef},
     soa::traits::FieldDescriptor,
 };
 
+type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
+
 #[test]
 fn value() {
+    type Value = ((), String, u32, u16, u8);
+
     let context = ();
 
     let i1 = 1;
@@ -15,7 +21,17 @@ fn value() {
     let i3 = 3;
     let str = "hello";
     let value = ((), str.to_owned(), i1, i2, i3);
-    let erased_value = BoxedErasedSoa::from_value(&context, value).unwrap();
+
+    let mut bytes = [0_u8; size_of::<Value>() * 2];
+    let bytes = unsafe {
+        let (_, bytes, _) = bytes.align_to_mut::<Value>();
+        let (_, bytes, _) = bytes.align_to_mut();
+        bytes
+    };
+
+    let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Value>()).unwrap();
+    let erased_value =
+        ErasedSoa::<_, ArrayDescriptors<5>>::from_bytes_value(bytes, &context, value).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -29,7 +45,7 @@ fn value() {
             .field_descriptors()
             .iter()
             .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .eq(descriptors.iter().map(FieldDescriptor::layout)),
     );
 
     let erased_refs = erased_value.as_refs();
@@ -81,7 +97,7 @@ fn value() {
         &str,
     );
 
-    let unit_bytes = [0u8; 0].as_slice();
+    let unit_bytes = [0u8; size_of::<()>()].as_slice();
     let i1_bytes = unsafe {
         let data = ptr::from_ref(&i1).cast();
         let len = size_of_val(&i1);
@@ -108,12 +124,12 @@ fn value() {
             .into_iter()
             .take(4)
             .map(ErasedFieldRef::into_buffer)
-            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer))
+            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),
     );
 
     let mut fields = erased_value
         .into_fields()
-        .collect::<Result<Vec<_>, _>>()
+        .collect::<Result<ArrayVec<_, 5>, _>>()
         .expect("allocation of small byte array should succeed");
     let field: BoxedErasedField = fields.pop().expect("string field should exist");
     assert_eq!(
@@ -121,16 +137,17 @@ fn value() {
         str,
     );
 
-    let (descriptors, fields): (Vec<_>, Vec<_>) =
+    let (descriptors, fields): (ArrayDescriptors<4>, ArrayVec<_, 4>) =
         fields.into_iter().map(ErasedField::into_parts).unzip();
-    let erased_value = BoxedErasedSoa::from_fields_descriptors(fields, descriptors.into())
-        .expect("all the fields should be valid");
+    let erased_value =
+        ErasedSoa::<AlignedUninitBoxedByteSlice, _>::from_fields_descriptors(fields, descriptors)
+            .expect("all the fields should be valid");
     assert!(
         erased_value
             .as_refs()
             .into_iter()
             .map(ErasedFieldRef::into_buffer)
-            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer))
+            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),
     );
 
     let value = unsafe { erased_value.into_value::<((), u32, u16, u8)>(&context) }
@@ -141,9 +158,12 @@ fn value() {
 #[test]
 fn value_zst() {
     let context = ();
-
     let value = ();
-    let erased_value = BoxedErasedSoa::from_value(&context, value).unwrap();
+
+    let bytes = [MaybeUninit::zeroed(); size_of::<()>() * 2];
+    let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<()>()).unwrap();
+    let erased_value =
+        ErasedSoa::<_, ArrayDescriptors<1>>::from_bytes_value(bytes, &context, value).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     assert!(
@@ -151,7 +171,7 @@ fn value_zst() {
             .field_descriptors()
             .iter()
             .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .eq(descriptors.iter().map(FieldDescriptor::layout)),
     );
 
     let field_refs = [
@@ -162,7 +182,7 @@ fn value_zst() {
             .as_refs()
             .into_iter()
             .map(ErasedFieldRef::into_buffer)
-            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer))
+            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),
     );
 
     let value =

@@ -100,10 +100,8 @@ where
 
     #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, len: usize, capacity: usize) -> Self {
-        Self {
-            buffer: unsafe { RawSoaVec::from_raw_parts(ptr, capacity) },
-            len,
-        }
+        let buffer = unsafe { RawSoaVec::from_raw_parts(ptr, capacity) };
+        Self { buffer, len }
     }
 
     #[inline]

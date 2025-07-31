@@ -1,7 +1,7 @@
-use gpecs_soa_erased::{
-    erased::{BoxedErasedSoaContext, ErasedSoaContext},
-    soa::traits::FieldDescriptor,
-};
+use arrayvec::ArrayVec;
+use gpecs_soa_erased::{erased::ErasedSoaContext, soa::traits::FieldDescriptor};
+
+type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
 
 #[test]
 #[cfg_attr(miri, ignore)]
@@ -13,7 +13,7 @@ fn context() {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn context_of() {
-    let context = BoxedErasedSoaContext::of::<()>(&());
+    let context = ErasedSoaContext::<ArrayDescriptors<1>>::of::<()>(&());
     let descriptors = [FieldDescriptor::of::<()>()];
     assert!(
         context
@@ -23,7 +23,7 @@ fn context_of() {
             .eq(descriptors.iter().map(FieldDescriptor::layout))
     );
 
-    let context = BoxedErasedSoaContext::of::<(u32, u16, u8)>(&());
+    let context = ErasedSoaContext::<ArrayDescriptors<3>>::of::<(u32, u16, u8)>(&());
     let descriptors = [
         FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<u16>(),

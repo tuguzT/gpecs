@@ -399,11 +399,12 @@ where
         let capacity = cmp::max(Self::min_non_zero_cap(context), capacity);
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
-        let ptr: NonNull<BufferData<_>> =
-            finish_grow(new_layout, self.current_memory(context))?.cast();
+        let current_memory = self.current_memory(context);
+        let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, current_memory)?.cast();
+
+        let context = unsafe { &*ptr.as_ptr().cast_const().ptr_to_context() };
+        let capacity = capacity_from::<T>(context, new_layout);
         unsafe {
-            let context_ptr = ptr.as_ptr().cast_const().ptr_to_context();
-            let capacity = capacity_from::<T>(&*context_ptr, new_layout);
             self.set_ptr_and_capacity(ptr, capacity);
         }
         Ok(())
@@ -418,11 +419,12 @@ where
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 
-        let ptr: NonNull<BufferData<_>> =
-            finish_grow(new_layout, self.current_memory(context))?.cast();
+        let current_memory = self.current_memory(context);
+        let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, current_memory)?.cast();
+
+        let context = unsafe { &*ptr.as_ptr().cast_const().ptr_to_context() };
+        let capacity = capacity_from::<T>(context, new_layout);
         unsafe {
-            let context_ptr = ptr.as_ptr().cast_const().ptr_to_context();
-            let capacity = capacity_from::<T>(&*context_ptr, new_layout);
             self.set_ptr_and_capacity(ptr, capacity);
         }
         Ok(())
@@ -470,8 +472,9 @@ where
     T: Soa + ?Sized,
 {
     fn drop(&mut self) {
-        // Read context from the pointer to safely drop it on stack
-        let context = unsafe { ptr::read(self.ptr().cast_const().ptr_to_context()) };
+        let context = self.context();
+        // Read context from the pointer to safely drop it on stack before buffer deallocation
+        let context = unsafe { ptr::read(context) };
 
         let Some((ptr, layout)) = self.current_memory(&context) else {
             return;

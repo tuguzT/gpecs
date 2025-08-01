@@ -590,9 +590,8 @@ where
 
 unsafe impl<B, D> SoaRead for ErasedSoa<B, D>
 where
-    B: AlignedBytesFromLayout,
-    B::Error: Debug,
-    D: AsRef<[FieldDescriptor]> + FromIterator<FieldDescriptor>,
+    B: AlignedBytesFromLayout<Error: Debug>,
+    D: AsRef<[FieldDescriptor]> + Clone,
 {
     #[inline]
     unsafe fn read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self {
@@ -602,7 +601,8 @@ where
         let fields = src
             .into_iter()
             .map(|src| unsafe { src.deref().into_buffer() });
-        Self::from_fields_descriptors(fields, descriptors.iter().copied().collect())
+        let descriptors = context.clone().into_field_descriptors();
+        Self::from_fields_descriptors(fields, descriptors)
             .expect("length of fields should be equal to the length of descriptors")
     }
 }

@@ -14,14 +14,14 @@ use crate::{
 #[repr(transparent)]
 pub struct Keys<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> Keys<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
@@ -40,7 +40,7 @@ where
 impl<K, V> Debug for Keys<'_, '_, K, V>
 where
     K: Debug,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice();
@@ -50,7 +50,7 @@ where
 
 impl<K, V> Clone for Keys<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -63,7 +63,7 @@ where
 
 impl<K, V> AsRef<[K]> for Keys<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &[K] {
@@ -73,7 +73,7 @@ where
 
 impl<'a, K, V> Iterator for Keys<'_, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = &'a K;
 
@@ -198,7 +198,7 @@ where
 
 impl<K, V> DoubleEndedIterator for Keys<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -215,7 +215,7 @@ where
 
 impl<K, V> ExactSizeIterator for Keys<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -229,14 +229,14 @@ impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: Soa {}
 #[repr(transparent)]
 pub struct Values<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> Values<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
@@ -254,7 +254,7 @@ where
 
 impl<K, V> Debug for Values<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -265,7 +265,7 @@ where
 
 impl<K, V> Clone for Values<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -278,6 +278,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for Values<'_, '_, K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -288,7 +289,7 @@ where
 
 impl<'c, 'a, K, V> Iterator for Values<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = V::Refs<'c, 'a>;
 
@@ -413,7 +414,7 @@ where
 
 impl<K, V> DoubleEndedIterator for Values<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -430,7 +431,7 @@ where
 
 impl<K, V> ExactSizeIterator for Values<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -444,14 +445,14 @@ impl<K, V> FusedIterator for Values<'_, '_, K, V> where V: Soa {}
 #[repr(transparent)]
 pub struct ValuesMut<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> ValuesMut<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>) -> Self {
@@ -477,7 +478,7 @@ where
 
 impl<K, V> Debug for ValuesMut<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -488,6 +489,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for ValuesMut<'_, '_, K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -498,7 +500,7 @@ where
 
 impl<'c, 'a, K, V> Iterator for ValuesMut<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = V::RefsMut<'c, 'a>;
 
@@ -623,7 +625,7 @@ where
 
 impl<K, V> DoubleEndedIterator for ValuesMut<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -640,7 +642,7 @@ where
 
 impl<K, V> ExactSizeIterator for ValuesMut<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -653,14 +655,14 @@ impl<K, V> FusedIterator for ValuesMut<'_, '_, K, V> where V: Soa {}
 
 pub struct Iter<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> Iter<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
@@ -695,7 +697,7 @@ where
 impl<K, V> Debug for Iter<'_, '_, K, V>
 where
     K: Debug,
-    V: Soa,
+    V: Soa + ?Sized,
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -709,7 +711,7 @@ where
 
 impl<K, V> Clone for Iter<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -722,6 +724,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for Iter<'_, '_, K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -732,7 +735,7 @@ where
 
 impl<'c, 'a, K, V> Iterator for Iter<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'a K, V::Refs<'c, 'a>);
 
@@ -785,7 +788,7 @@ where
 
 impl<K, V> DoubleEndedIterator for Iter<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -806,7 +809,7 @@ where
 
 impl<K, V> ExactSizeIterator for Iter<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -819,14 +822,14 @@ impl<K, V> FusedIterator for Iter<'_, '_, K, V> where V: Soa {}
 
 pub struct IterMut<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> IterMut<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>) -> Self {
@@ -885,7 +888,7 @@ where
 impl<K, V> Debug for IterMut<'_, '_, K, V>
 where
     K: Debug,
-    V: Soa,
+    V: Soa + ?Sized,
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -899,6 +902,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for IterMut<'_, '_, K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -909,7 +913,7 @@ where
 
 impl<'c, 'a, K, V> Iterator for IterMut<'c, 'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'a K, V::RefsMut<'c, 'a>);
 
@@ -968,7 +972,7 @@ where
 
 impl<K, V> DoubleEndedIterator for IterMut<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -989,7 +993,7 @@ where
 
 impl<K, V> ExactSizeIterator for IterMut<'_, '_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {

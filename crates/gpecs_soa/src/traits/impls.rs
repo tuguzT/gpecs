@@ -6,7 +6,7 @@ use core::{
     slice,
 };
 
-use super::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
+use super::{FieldDescriptor, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite};
 
 #[inline]
 #[track_caller]
@@ -164,16 +164,6 @@ unsafe impl Soa for () {
         len: usize,
     ) {
         unsafe { ptr::copy_nonoverlapping(src, dst, len) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_read(_context: &Self::Context, ptrs: Self::Ptrs<'_>) -> Self {
-        unsafe { ptr::read(ptrs) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_write(_context: &Self::Context, ptrs: Self::MutPtrs<'_>, value: Self) {
-        unsafe { ptr::write(ptrs, value) }
     }
 
     #[inline]
@@ -472,6 +462,20 @@ unsafe impl Soa for () {
     }
 }
 
+unsafe impl SoaRead for () {
+    #[inline]
+    unsafe fn read(_context: &Self::Context, ptrs: Self::Ptrs<'_>) -> Self {
+        unsafe { ptr::read(ptrs) }
+    }
+}
+
+unsafe impl SoaWrite for () {
+    #[inline]
+    unsafe fn write(_context: &Self::Context, ptrs: Self::MutPtrs<'_>, value: Self) {
+        unsafe { ptr::write(ptrs, value) }
+    }
+}
+
 impl<'a> SoaToOwned<'_, 'a> for &'a () {
     type Owned = ();
 
@@ -752,16 +756,6 @@ macro_rules! soa_tuple_impl {
             ) {
                 // because source and destination are non-overlapping, we can copy them in any order
                 unsafe { $(ptr::copy_nonoverlapping(src.$indices, dst.$indices, len);)* }
-            }
-
-            #[inline]
-            unsafe fn ptrs_read(_context: &Self::Context, ptrs: Self::Ptrs<'_>) -> Self {
-                unsafe { ($(ptr::read(ptrs.$indices),)*) }
-            }
-
-            #[inline]
-            unsafe fn ptrs_write(_context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
-                unsafe { $(ptr::write(dst.$indices, value.$indices);)* }
             }
 
             #[inline]
@@ -1085,6 +1079,20 @@ macro_rules! soa_tuple_impl {
             #[inline]
             unsafe fn slices_drop_in_place(_context: &Self::Context, slices: Self::SliceMutPtrs<'_>) {
                 unsafe { $(ptr::drop_in_place(slices.$indices);)* }
+            }
+        }
+
+        unsafe impl<$($types,)*> SoaRead for ($($types,)*) {
+            #[inline]
+            unsafe fn read(_context: &Self::Context, ptrs: Self::Ptrs<'_>) -> Self {
+                unsafe { ($(ptr::read(ptrs.$indices),)*) }
+            }
+        }
+
+        unsafe impl<$($types,)*> SoaWrite for ($($types,)*) {
+            #[inline]
+            unsafe fn write(_context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
+                unsafe { $(ptr::write(dst.$indices, value.$indices);)* }
             }
         }
 

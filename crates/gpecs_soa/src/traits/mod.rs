@@ -250,28 +250,6 @@ pub unsafe trait Soa {
         len: usize,
     );
 
-    // TODO semantics (maybe introduce new trait to read data into input if Self is !Sized)
-    /// Constructs the value from reading each field to which [src](Soa::Ptrs) points without moving them.
-    /// This leaves the memory in src unchanged.
-    ///
-    /// All the safety requirements resulting from applying
-    /// [`ptr::read()`](core::ptr::read) method to each pointer
-    /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self
-    where
-        Self: Sized;
-
-    // TODO semantics (maybe introduce new trait to write data from input if Self is !Sized)
-    /// Overwrites a memory [location](Soa::MutPtrs) of each field of [`Fields`](Soa::Fields)
-    /// with the given value without reading or dropping the old value.
-    ///
-    /// All the safety requirements resulting from applying
-    /// [`ptr::write()`](core::ptr::write) method to each pointer
-    /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self)
-    where
-        Self: Sized;
-
     /// Executes the destructors (if any) for the each field of [`Fields`](Soa::Fields) located at ptrs.
     ///
     /// All the safety requirements resulting from applying
@@ -608,6 +586,26 @@ pub unsafe trait Soa {
     }
 }
 
+pub unsafe trait SoaRead: Soa + Sized {
+    /// Constructs the value from reading each field to which [src](Soa::Ptrs) points without moving them.
+    /// This leaves the memory in src unchanged.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`ptr::read()`](core::ptr::read) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self;
+}
+
+pub unsafe trait SoaWrite: Soa + Sized {
+    /// Overwrites a memory [location](Soa::MutPtrs) of each field of [`Fields`](Soa::Fields)
+    /// with the given value without reading or dropping the old value.
+    ///
+    /// All the safety requirements resulting from applying
+    /// [`ptr::write()`](core::ptr::write) method to each pointer
+    /// should be satisfied to be safe to call this method.
+    unsafe fn write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self);
+}
+
 /// A generalization of [`Clone`] to borrowed data
 /// specifically for the [`Soa`] trait.
 ///
@@ -616,7 +614,7 @@ pub unsafe trait Soa {
 /// [`ToOwned`]: https://doc.rust-lang.org/stable/alloc/borrow/trait.ToOwned.html
 pub trait SoaToOwned<'context, 'a> {
     /// The resulting type after obtaining ownership.
-    type Owned: Soa<Refs<'context, 'a> = Self> + 'a;
+    type Owned: SoaWrite<Refs<'context, 'a> = Self> + 'a;
 
     /// Creates owned data from borrowed data,
     /// usually by cloning each field of [`Fields`](Soa::Fields).
@@ -638,9 +636,7 @@ pub trait SoaToOwned<'context, 'a> {
         target: <Self::Owned as Soa>::MutPtrs<'_>,
     ) {
         let owned = self.to_owned();
-        unsafe {
-            <Self::Owned as Soa>::ptrs_write(context, target, owned);
-        }
+        unsafe { <Self::Owned as SoaWrite>::write(context, target, owned) }
     }
 
     /// Uses borrowed data to replace owned data located by `target` [references](Soa::RefsMut),

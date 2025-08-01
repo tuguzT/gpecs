@@ -1,9 +1,9 @@
-use crate::traits::Soa;
+use crate::traits::{Soa, SoaRead, SoaWrite};
 
 /// Version of [`core::mem::replace()`] but for [SoA][`Soa`] references.
 pub fn replace<T>(context: &T::Context, dest: T::RefsMut<'_, '_>, src: T) -> T
 where
-    T: Soa,
+    T: SoaRead + SoaWrite,
 {
     let dest = T::refs_mut_as_ptrs(context, T::upcast_refs_mut(dest));
 
@@ -11,8 +11,8 @@ where
     // such that the old value is not duplicated. Nothing is dropped and
     // nothing here can panic.
     unsafe {
-        let result = T::ptrs_read(context, T::ptrs_cast_const(context, dest.clone()));
-        T::ptrs_write(context, dest, src);
+        let result = T::read(context, T::ptrs_cast_const(context, dest.clone()));
+        T::write(context, dest, src);
         result
     }
 }

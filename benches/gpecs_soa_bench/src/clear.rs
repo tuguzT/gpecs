@@ -3,7 +3,7 @@ use gpecs_soa_erased::erased::BoxedErasedSoa;
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
-pub trait Clear: SoaVecs {
+pub trait Clear: SoaVecs + Sized {
     fn soa_slf_clear(vec: &mut SoaVec<Self>) {
         vec.clear();
     }

@@ -8,6 +8,7 @@ use core::{
 use crate::{
     ptr::is_zst,
     slice::{Iter, SoaSlices, range},
+    traits::SoaRead,
 };
 
 use super::{Soa, SoaVec};
@@ -120,7 +121,7 @@ where
 
 impl<T> Iterator for Drain<'_, T>
 where
-    T: Soa,
+    T: SoaRead,
 {
     type Item = T;
 
@@ -131,7 +132,7 @@ where
         let context = ptr::from_ref(iter.context());
         iter.next().map(|refs| unsafe {
             let context = &*context;
-            T::ptrs_read(context, T::refs_as_ptrs(context, refs))
+            T::read(context, T::refs_as_ptrs(context, refs))
         })
     }
 
@@ -144,7 +145,7 @@ where
 
 impl<T> DoubleEndedIterator for Drain<'_, T>
 where
-    T: Soa,
+    T: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -153,14 +154,14 @@ where
         let context = ptr::from_ref(iter.context());
         iter.next_back().map(|refs| unsafe {
             let context = &*context;
-            T::ptrs_read(context, T::refs_as_ptrs(context, refs))
+            T::read(context, T::refs_as_ptrs(context, refs))
         })
     }
 }
 
 impl<T> ExactSizeIterator for Drain<'_, T>
 where
-    T: Soa,
+    T: SoaRead,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -169,7 +170,7 @@ where
     }
 }
 
-impl<T> FusedIterator for Drain<'_, T> where T: Soa {}
+impl<T> FusedIterator for Drain<'_, T> where T: SoaRead {}
 
 impl<T> Drop for Drain<'_, T>
 where

@@ -9,10 +9,13 @@ use core::{
     slice,
 };
 
-use crate::soa::traits::{FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields};
+use crate::soa::traits::{FieldDescriptor, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct KeyValuePair<K, V> {
+pub struct KeyValuePair<K, V>
+where
+    V: ?Sized,
+{
     pub key: K,
     pub value: V,
 }
@@ -43,7 +46,7 @@ impl<K, V> From<KeyValuePair<K, V>> for (K, V) {
 #[allow(unsafe_code)]
 unsafe impl<K, V> Soa for KeyValuePair<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Context = V::Context;
     type Fields = (K, V::Fields);
@@ -290,29 +293,6 @@ where
         unsafe {
             ptr::copy_nonoverlapping(src_key, dst_key, len);
             V::ptrs_copy_nonoverlapping(context, src_value, dst_value, len);
-        }
-    }
-
-    #[inline]
-    unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self {
-        let KeyValuePtrs { key, value } = src;
-        Self {
-            key: unsafe { ptr::read(key) },
-            value: unsafe { V::ptrs_read(context, value) },
-        }
-    }
-
-    #[inline]
-    unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
-        let KeyValueMutPtrs {
-            key: key_ptr,
-            value: value_ptr,
-        } = dst;
-        let Self { key, value } = value;
-
-        unsafe {
-            ptr::write(key_ptr, key);
-            V::ptrs_write(context, value_ptr, value);
         }
     }
 
@@ -739,11 +719,46 @@ where
 }
 
 #[allow(unsafe_code)]
+unsafe impl<K, V> SoaRead for KeyValuePair<K, V>
+where
+    V: SoaRead,
+{
+    #[inline]
+    unsafe fn read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self {
+        let KeyValuePtrs { key, value } = src;
+        Self {
+            key: unsafe { ptr::read(key) },
+            value: unsafe { V::read(context, value) },
+        }
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe impl<K, V> SoaWrite for KeyValuePair<K, V>
+where
+    V: SoaWrite,
+{
+    #[inline]
+    unsafe fn write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
+        let KeyValueMutPtrs {
+            key: key_ptr,
+            value: value_ptr,
+        } = dst;
+        let Self { key, value } = value;
+
+        unsafe {
+            ptr::write(key_ptr, key);
+            V::write(context, value_ptr, value);
+        }
+    }
+}
+
+#[allow(unsafe_code)]
 unsafe impl<K, V> SoaTrustedFields for KeyValuePair<K, V> where V: SoaTrustedFields {}
 
 pub struct KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     key: FieldDescriptor,
     value: V::FieldDescriptors<'context>,
@@ -752,7 +767,7 @@ where
 
 impl<'context, K, V> KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub fn new(context: &'context V::Context) -> Self {
@@ -766,7 +781,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::FieldDescriptors<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -780,7 +795,7 @@ where
 
 impl<'context, K, V> Clone for KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::FieldDescriptors<'context>: Clone,
 {
     fn clone(&self) -> Self {
@@ -799,14 +814,14 @@ where
 
 impl<'context, K, V> Copy for KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::FieldDescriptors<'context>: Copy,
 {
 }
 
 impl<'context, K, V> IntoIterator for KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = FieldDescriptor;
 
@@ -830,7 +845,7 @@ where
 
 pub struct KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     pub key: *const K,
     pub value: V::Ptrs<'context>,
@@ -838,7 +853,7 @@ where
 
 impl<'context, K, V> From<(*const K, V::Ptrs<'context>)> for KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: (*const K, V::Ptrs<'context>)) -> Self {
@@ -849,7 +864,7 @@ where
 
 impl<'context, K, V> From<KeyValuePtrs<'context, K, V>> for (*const K, V::Ptrs<'context>)
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValuePtrs<'context, K, V>) -> Self {
@@ -860,7 +875,7 @@ where
 
 impl<'context, K, V> Debug for KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Ptrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -874,7 +889,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Ptrs<'context>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -885,14 +900,14 @@ where
 
 impl<'context, K, V> Eq for KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Ptrs<'context>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Ptrs<'context>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -907,7 +922,7 @@ where
 
 impl<'context, K, V> Ord for KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Ptrs<'context>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -922,7 +937,7 @@ where
 
 impl<'context, K, V> Hash for KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Ptrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -934,7 +949,7 @@ where
 
 impl<K, V> Clone for KeyValuePtrs<'_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     fn clone(&self) -> Self {
         let Self { key, ref value } = *self;
@@ -945,14 +960,14 @@ where
 
 impl<'context, K, V> Copy for KeyValuePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Ptrs<'context>: Copy,
 {
 }
 
 pub struct KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     pub key: *mut K,
     pub value: V::MutPtrs<'context>,
@@ -960,7 +975,7 @@ where
 
 impl<'context, K, V> From<(*mut K, V::MutPtrs<'context>)> for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: (*mut K, V::MutPtrs<'context>)) -> Self {
@@ -971,7 +986,7 @@ where
 
 impl<'context, K, V> From<KeyValueMutPtrs<'context, K, V>> for (*mut K, V::MutPtrs<'context>)
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueMutPtrs<'context, K, V>) -> Self {
@@ -982,7 +997,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::MutPtrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -996,7 +1011,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::MutPtrs<'context>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1007,14 +1022,14 @@ where
 
 impl<'context, K, V> Eq for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::MutPtrs<'context>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::MutPtrs<'context>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1029,7 +1044,7 @@ where
 
 impl<'context, K, V> Ord for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::MutPtrs<'context>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1044,7 +1059,7 @@ where
 
 impl<'context, K, V> Hash for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::MutPtrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1056,7 +1071,7 @@ where
 
 impl<K, V> Clone for KeyValueMutPtrs<'_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1068,14 +1083,14 @@ where
 
 impl<'context, K, V> Copy for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::MutPtrs<'context>: Copy,
 {
 }
 
 pub struct KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     pub key: NonNull<K>,
     pub value: V::NonNullPtrs<'context>,
@@ -1084,7 +1099,7 @@ where
 impl<'context, K, V> From<(NonNull<K>, V::NonNullPtrs<'context>)>
     for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: (NonNull<K>, V::NonNullPtrs<'context>)) -> Self {
@@ -1096,7 +1111,7 @@ where
 impl<'context, K, V> From<KeyValueNonNullPtrs<'context, K, V>>
     for (NonNull<K>, V::NonNullPtrs<'context>)
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueNonNullPtrs<'context, K, V>) -> Self {
@@ -1107,7 +1122,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::NonNullPtrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1121,7 +1136,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::NonNullPtrs<'context>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1132,14 +1147,14 @@ where
 
 impl<'context, K, V> Eq for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::NonNullPtrs<'context>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::NonNullPtrs<'context>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1154,7 +1169,7 @@ where
 
 impl<'context, K, V> Ord for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::NonNullPtrs<'context>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1169,7 +1184,7 @@ where
 
 impl<'context, K, V> Hash for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::NonNullPtrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1181,7 +1196,7 @@ where
 
 impl<K, V> Clone for KeyValueNonNullPtrs<'_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1193,7 +1208,7 @@ where
 
 impl<'context, K, V> Copy for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::NonNullPtrs<'context>: Copy,
 {
 }
@@ -1201,7 +1216,7 @@ where
 pub struct KeyValueRefs<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     pub key: &'a K,
     pub value: V::Refs<'context, 'a>,
@@ -1210,7 +1225,7 @@ where
 impl<'context, 'a, K, V> From<(&'a K, V::Refs<'context, 'a>)> for KeyValueRefs<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     #[inline]
     fn from(value: (&'a K, V::Refs<'context, 'a>)) -> Self {
@@ -1222,7 +1237,7 @@ where
 impl<'context, 'a, K, V> From<KeyValueRefs<'context, 'a, K, V>> for (&'a K, V::Refs<'context, 'a>)
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     #[inline]
     fn from(value: KeyValueRefs<'context, 'a, K, V>) -> Self {
@@ -1234,7 +1249,7 @@ where
 impl<'context, 'a, K, V> Debug for KeyValueRefs<'context, 'a, K, V>
 where
     K: Debug + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Refs<'context, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1249,7 +1264,7 @@ where
 impl<'context, 'a, K, V> PartialEq for KeyValueRefs<'context, 'a, K, V>
 where
     K: PartialEq + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Refs<'context, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1261,7 +1276,7 @@ where
 impl<'context, 'a, K, V> Eq for KeyValueRefs<'context, 'a, K, V>
 where
     K: Eq + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Refs<'context, 'a>: Eq,
 {
 }
@@ -1269,7 +1284,7 @@ where
 impl<'context, 'a, K, V> PartialOrd for KeyValueRefs<'context, 'a, K, V>
 where
     K: PartialOrd + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Refs<'context, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1285,7 +1300,7 @@ where
 impl<'context, 'a, K, V> Ord for KeyValueRefs<'context, 'a, K, V>
 where
     K: Ord + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Refs<'context, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1301,7 +1316,7 @@ where
 impl<'context, 'a, K, V> Hash for KeyValueRefs<'context, 'a, K, V>
 where
     K: Hash + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Refs<'context, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1314,7 +1329,7 @@ where
 impl<'context, 'a, K, V> Clone for KeyValueRefs<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Refs<'context, 'a>: Clone,
 {
     #[inline]
@@ -1328,7 +1343,7 @@ where
 impl<'context, 'a, K, V> Copy for KeyValueRefs<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Refs<'context, 'a>: Copy,
 {
 }
@@ -1336,7 +1351,7 @@ where
 impl<'context, 'a, K, V> SoaToOwned<'context, 'a> for KeyValueRefs<'context, 'a, K, V>
 where
     K: Clone,
-    V: Soa,
+    V: SoaWrite,
     V::Refs<'context, 'a>: SoaToOwned<'context, 'a, Owned = V>,
 {
     type Owned = KeyValuePair<K, V>;
@@ -1364,7 +1379,7 @@ where
 pub struct KeyValueRefsMut<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     pub key: &'a mut K,
     pub value: V::RefsMut<'context, 'a>,
@@ -1374,7 +1389,7 @@ impl<'context, 'a, K, V> From<(&'a mut K, V::RefsMut<'context, 'a>)>
     for KeyValueRefsMut<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     #[inline]
     fn from(value: (&'a mut K, V::RefsMut<'context, 'a>)) -> Self {
@@ -1387,7 +1402,7 @@ impl<'context, 'a, K, V> From<KeyValueRefsMut<'context, 'a, K, V>>
     for (&'a mut K, V::RefsMut<'context, 'a>)
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     #[inline]
     fn from(value: KeyValueRefsMut<'context, 'a, K, V>) -> Self {
@@ -1399,7 +1414,7 @@ where
 impl<'context, 'a, K, V> Debug for KeyValueRefsMut<'context, 'a, K, V>
 where
     K: Debug + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::RefsMut<'context, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1414,7 +1429,7 @@ where
 impl<'context, 'a, K, V> PartialEq for KeyValueRefsMut<'context, 'a, K, V>
 where
     K: PartialEq + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::RefsMut<'context, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1426,7 +1441,7 @@ where
 impl<'context, 'a, K, V> Eq for KeyValueRefsMut<'context, 'a, K, V>
 where
     K: Eq + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::RefsMut<'context, 'a>: Eq,
 {
 }
@@ -1434,7 +1449,7 @@ where
 impl<'context, 'a, K, V> PartialOrd for KeyValueRefsMut<'context, 'a, K, V>
 where
     K: PartialOrd + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::RefsMut<'context, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1450,7 +1465,7 @@ where
 impl<'context, 'a, K, V> Ord for KeyValueRefsMut<'context, 'a, K, V>
 where
     K: Ord + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::RefsMut<'context, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1466,7 +1481,7 @@ where
 impl<'context, 'a, K, V> Hash for KeyValueRefsMut<'context, 'a, K, V>
 where
     K: Hash + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::RefsMut<'context, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1478,7 +1493,7 @@ where
 
 pub struct KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     pub keys: *const [K],
     pub values: V::SlicePtrs<'context>,
@@ -1487,7 +1502,7 @@ where
 impl<'context, K, V> From<(*const [K], V::SlicePtrs<'context>)>
     for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: (*const [K], V::SlicePtrs<'context>)) -> Self {
@@ -1499,7 +1514,7 @@ where
 impl<'context, K, V> From<KeyValueSlicePtrs<'context, K, V>>
     for (*const [K], V::SlicePtrs<'context>)
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueSlicePtrs<'context, K, V>) -> Self {
@@ -1510,7 +1525,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SlicePtrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1524,7 +1539,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SlicePtrs<'context>: PartialEq,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
@@ -1536,14 +1551,14 @@ where
 
 impl<'context, K, V> Eq for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SlicePtrs<'context>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SlicePtrs<'context>: PartialOrd,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
@@ -1559,7 +1574,7 @@ where
 
 impl<'context, K, V> Ord for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SlicePtrs<'context>: Ord,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
@@ -1575,7 +1590,7 @@ where
 
 impl<'context, K, V> Hash for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SlicePtrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1587,7 +1602,7 @@ where
 
 impl<K, V> Clone for KeyValueSlicePtrs<'_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1599,14 +1614,14 @@ where
 
 impl<'context, K, V> Copy for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SlicePtrs<'context>: Copy,
 {
 }
 
 pub struct KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     pub keys: *mut [K],
     pub values: V::SliceMutPtrs<'context>,
@@ -1615,7 +1630,7 @@ where
 impl<'context, K, V> From<(*mut [K], V::SliceMutPtrs<'context>)>
     for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: (*mut [K], V::SliceMutPtrs<'context>)) -> Self {
@@ -1627,7 +1642,7 @@ where
 impl<'context, K, V> From<KeyValueSliceMutPtrs<'context, K, V>>
     for (*mut [K], V::SliceMutPtrs<'context>)
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueSliceMutPtrs<'context, K, V>) -> Self {
@@ -1638,7 +1653,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SliceMutPtrs<'context>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1652,7 +1667,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SliceMutPtrs<'context>: PartialEq,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
@@ -1664,14 +1679,14 @@ where
 
 impl<'context, K, V> Eq for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SliceMutPtrs<'context>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SliceMutPtrs<'context>: PartialOrd,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
@@ -1687,7 +1702,7 @@ where
 
 impl<'context, K, V> Ord for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SliceMutPtrs<'context>: Ord,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
@@ -1703,7 +1718,7 @@ where
 
 impl<'context, K, V> Hash for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SliceMutPtrs<'context>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1715,7 +1730,7 @@ where
 
 impl<K, V> Clone for KeyValueSliceMutPtrs<'_, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1727,7 +1742,7 @@ where
 
 impl<'context, K, V> Copy for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::SliceMutPtrs<'context>: Copy,
 {
 }
@@ -1735,7 +1750,7 @@ where
 pub struct KeyValueSlices<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     pub keys: &'a [K],
     pub values: V::Slices<'context, 'a>,
@@ -1745,7 +1760,7 @@ impl<'context, 'a, K, V> From<(&'a [K], V::Slices<'context, 'a>)>
     for KeyValueSlices<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     #[inline]
     fn from(value: (&'a [K], V::Slices<'context, 'a>)) -> Self {
@@ -1758,7 +1773,7 @@ impl<'context, 'a, K, V> From<KeyValueSlices<'context, 'a, K, V>>
     for (&'a [K], V::Slices<'context, 'a>)
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     #[inline]
     fn from(value: KeyValueSlices<'context, 'a, K, V>) -> Self {
@@ -1770,7 +1785,7 @@ where
 impl<'context, 'a, K, V> Debug for KeyValueSlices<'context, 'a, K, V>
 where
     K: Debug + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1785,7 +1800,7 @@ where
 impl<'context, 'a, K, V> Default for KeyValueSlices<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: Default,
 {
     #[inline]
@@ -1800,7 +1815,7 @@ where
 impl<'context, 'a, K, V> PartialEq for KeyValueSlices<'context, 'a, K, V>
 where
     K: PartialEq + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1812,7 +1827,7 @@ where
 impl<'context, 'a, K, V> Eq for KeyValueSlices<'context, 'a, K, V>
 where
     K: Eq + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: Eq,
 {
 }
@@ -1820,7 +1835,7 @@ where
 impl<'context, 'a, K, V> PartialOrd for KeyValueSlices<'context, 'a, K, V>
 where
     K: PartialOrd + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1836,7 +1851,7 @@ where
 impl<'context, 'a, K, V> Ord for KeyValueSlices<'context, 'a, K, V>
 where
     K: Ord + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1852,7 +1867,7 @@ where
 impl<'context, 'a, K, V> Hash for KeyValueSlices<'context, 'a, K, V>
 where
     K: Hash + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1865,7 +1880,7 @@ where
 impl<'context, 'a, K, V> Clone for KeyValueSlices<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: Clone,
 {
     #[inline]
@@ -1879,7 +1894,7 @@ where
 impl<'context, 'a, K, V> Copy for KeyValueSlices<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::Slices<'context, 'a>: Copy,
 {
 }
@@ -1887,7 +1902,7 @@ where
 pub struct KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     pub keys: &'a mut [K],
     pub values: V::SlicesMut<'context, 'a>,
@@ -1897,7 +1912,7 @@ impl<'context, 'a, K, V> From<(&'a mut [K], V::SlicesMut<'context, 'a>)>
     for KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     #[inline]
     fn from(value: (&'a mut [K], V::SlicesMut<'context, 'a>)) -> Self {
@@ -1910,7 +1925,7 @@ impl<'context, 'a, K, V> From<KeyValueSlicesMut<'context, 'a, K, V>>
     for (&'a mut [K], V::SlicesMut<'context, 'a>)
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
 {
     #[inline]
     fn from(value: KeyValueSlicesMut<'context, 'a, K, V>) -> Self {
@@ -1922,7 +1937,7 @@ where
 impl<'context, 'a, K, V> Debug for KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: Debug + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::SlicesMut<'context, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1937,7 +1952,7 @@ where
 impl<'context, 'a, K, V> Default for KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::SlicesMut<'context, 'a>: Default,
 {
     #[inline]
@@ -1952,7 +1967,7 @@ where
 impl<'context, 'a, K, V> PartialEq for KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: PartialEq + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::SlicesMut<'context, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1964,7 +1979,7 @@ where
 impl<'context, 'a, K, V> Eq for KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: Eq + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::SlicesMut<'context, 'a>: Eq,
 {
 }
@@ -1972,7 +1987,7 @@ where
 impl<'context, 'a, K, V> PartialOrd for KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: PartialOrd + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::SlicesMut<'context, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1988,7 +2003,7 @@ where
 impl<'context, 'a, K, V> Ord for KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: Ord + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::SlicesMut<'context, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -2004,7 +2019,7 @@ where
 impl<'context, 'a, K, V> Hash for KeyValueSlicesMut<'context, 'a, K, V>
 where
     K: Hash + 'a,
-    V: Soa + 'a,
+    V: Soa + ?Sized + 'a,
     V::SlicesMut<'context, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

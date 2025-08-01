@@ -1,8 +1,8 @@
 use core::{fmt::Debug, ptr::NonNull};
 
 use crate::{
-    aligned_bytes::AlignedBytesFromLayout,
-    soa::traits::{FieldDescriptor, Soa},
+    aligned_bytes::{AlignedBytes, AlignedBytesFromLayout},
+    soa::traits::{FieldDescriptor, Soa, SoaRead, SoaWrite},
 };
 
 use super::{
@@ -14,9 +14,8 @@ use super::{
 
 unsafe impl<B, D> Soa for ErasedSoa<B, D>
 where
-    B: AlignedBytesFromLayout,
-    B::Error: Debug,
-    D: AsRef<[FieldDescriptor]> + FromIterator<FieldDescriptor>,
+    B: AlignedBytes + ?Sized,
+    D: AsRef<[FieldDescriptor]>,
 {
     type Context = ErasedSoaContext<D>;
     type Fields = ErasedSoaFields;
@@ -186,35 +185,6 @@ where
         assert_descriptors(descriptors, dst.field_descriptors());
 
         unsafe { dst.copy_from_nonoverlapping(&src, len) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self
-    where
-        Self: Sized,
-    {
-        let descriptors = context.field_descriptors();
-        assert_descriptors(descriptors, src.field_descriptors());
-
-        let fields = src
-            .into_iter()
-            .map(|src| unsafe { src.deref().into_buffer() });
-        Self::from_fields_descriptors(fields, descriptors.iter().copied().collect())
-            .expect("length of fields should be equal to the length of descriptors")
-    }
-
-    #[inline]
-    unsafe fn ptrs_write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self)
-    where
-        Self: Sized,
-    {
-        let descriptors = context.field_descriptors();
-        assert_descriptors(descriptors, dst.field_descriptors());
-        assert_descriptors(descriptors, value.field_descriptors());
-
-        dst.into_iter()
-            .zip(value.as_refs())
-            .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) })
     }
 
     #[inline]
@@ -615,5 +585,41 @@ where
     #[inline]
     unsafe fn slices_drop_in_place(_: &Self::Context, _: Self::SliceMutPtrs<'_>) {
         // do nothing; it's safe to not drop anything
+    }
+}
+
+unsafe impl<B, D> SoaRead for ErasedSoa<B, D>
+where
+    B: AlignedBytesFromLayout,
+    B::Error: Debug,
+    D: AsRef<[FieldDescriptor]> + FromIterator<FieldDescriptor>,
+{
+    #[inline]
+    unsafe fn read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self {
+        let descriptors = context.field_descriptors();
+        assert_descriptors(descriptors, src.field_descriptors());
+
+        let fields = src
+            .into_iter()
+            .map(|src| unsafe { src.deref().into_buffer() });
+        Self::from_fields_descriptors(fields, descriptors.iter().copied().collect())
+            .expect("length of fields should be equal to the length of descriptors")
+    }
+}
+
+unsafe impl<B, D> SoaWrite for ErasedSoa<B, D>
+where
+    B: AlignedBytes,
+    D: AsRef<[FieldDescriptor]>,
+{
+    #[inline]
+    unsafe fn write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
+        let descriptors = context.field_descriptors();
+        assert_descriptors(descriptors, dst.field_descriptors());
+        assert_descriptors(descriptors, value.field_descriptors());
+
+        dst.into_iter()
+            .zip(value.as_refs())
+            .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) })
     }
 }

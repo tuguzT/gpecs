@@ -1,7 +1,10 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    marker::PhantomData,
 };
+
+use gpecs_soa::traits::SoaRead;
 
 use crate::{
     pair::{KeyValuePair, KeyValueSlices, KeyValueSlicesMut},
@@ -11,41 +14,41 @@ use crate::{
 #[repr(transparent)]
 pub struct IntoKeys<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
-    inner: vec::IntoIter<KeyValuePair<K, V>>,
+    inner: core_alloc::vec::IntoIter<K>,
+    phantom: PhantomData<fn() -> V>,
 }
 
 impl<K, V> IntoKeys<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: vec::IntoIter<KeyValuePair<K, V>>) -> Self {
-        Self { inner }
+    pub(crate) fn new(inner: core_alloc::vec::IntoIter<K>) -> Self {
+        Self {
+            inner,
+            phantom: PhantomData,
+        }
     }
 
     #[inline]
     pub fn as_slice(&self) -> &[K] {
-        let Self { inner } = self;
-
-        let KeyValueSlices { keys, .. } = inner.as_slices();
-        keys
+        let Self { inner, .. } = self;
+        inner.as_slice()
     }
 
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [K] {
-        let Self { inner } = self;
-
-        let KeyValueSlicesMut { keys, .. } = inner.as_mut_slices();
-        keys
+        let Self { inner, .. } = self;
+        inner.as_mut_slice()
     }
 }
 
 impl<K, V> Debug for IntoKeys<K, V>
 where
     K: Debug,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice();
@@ -55,33 +58,33 @@ where
 
 impl<K, V> Default for IntoKeys<K, V>
 where
-    V: Soa,
-    V::Context: Default,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn default() -> Self {
         Self {
             inner: Default::default(),
+            phantom: PhantomData,
         }
     }
 }
 
 impl<K, V> Clone for IntoKeys<K, V>
 where
-    V: Soa,
-    vec::IntoIter<KeyValuePair<K, V>>: Clone,
+    K: Clone,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { inner } = self;
+        let Self { ref inner, phantom } = *self;
         let inner = inner.clone();
-        Self { inner }
+        Self { inner, phantom }
     }
 }
 
 impl<K, V> AsRef<[K]> for IntoKeys<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &[K] {
@@ -91,7 +94,7 @@ where
 
 impl<K, V> AsMut<[K]> for IntoKeys<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [K] {
@@ -101,19 +104,19 @@ where
 
 impl<K, V> Iterator for IntoKeys<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = K;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.next().map(|KeyValuePair { key, .. }| key)
+        let Self { inner, .. } = self;
+        inner.next()
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { inner } = self;
+        let Self { inner, .. } = self;
         inner.size_hint()
     }
 
@@ -122,38 +125,38 @@ where
     where
         Self: Sized,
     {
-        let Self { inner } = self;
+        let Self { inner, .. } = self;
         inner.count()
     }
 
     #[inline]
-    fn fold<B, F>(self, init: B, mut f: F) -> B
+    fn fold<B, F>(self, init: B, f: F) -> B
     where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        let Self { inner } = self;
-        inner.fold(init, |acc, KeyValuePair { key, .. }| f(acc, key))
+        let Self { inner, .. } = self;
+        inner.fold(init, f)
     }
 }
 
 impl<K, V> DoubleEndedIterator for IntoKeys<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.next_back().map(|KeyValuePair { key, .. }| key)
+        let Self { inner, .. } = self;
+        inner.next_back()
     }
 }
 
 impl<K, V> ExactSizeIterator for IntoKeys<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     fn len(&self) -> usize {
-        let Self { inner } = self;
+        let Self { inner, .. } = self;
         inner.len()
     }
 }
@@ -163,14 +166,14 @@ impl<K, V> FusedIterator for IntoKeys<K, V> where V: Soa {}
 #[repr(transparent)]
 pub struct IntoValues<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     inner: vec::IntoIter<KeyValuePair<K, V>>,
 }
 
 impl<K, V> IntoValues<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(inner: vec::IntoIter<KeyValuePair<K, V>>) -> Self {
@@ -196,7 +199,7 @@ where
 
 impl<K, V> Debug for IntoValues<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -207,7 +210,7 @@ where
 
 impl<K, V> Default for IntoValues<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Context: Default,
 {
     #[inline]
@@ -220,7 +223,7 @@ where
 
 impl<K, V> Clone for IntoValues<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     vec::IntoIter<KeyValuePair<K, V>>: Clone,
 {
     #[inline]
@@ -233,6 +236,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for IntoValues<K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -243,6 +247,7 @@ where
 
 impl<T, K, V> AsMut<[T]> for IntoValues<K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
 {
     #[inline]
@@ -253,7 +258,7 @@ where
 
 impl<K, V> Iterator for IntoValues<K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     type Item = V;
 
@@ -291,7 +296,7 @@ where
 
 impl<K, V> DoubleEndedIterator for IntoValues<K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -302,7 +307,7 @@ where
 
 impl<K, V> ExactSizeIterator for IntoValues<K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -310,18 +315,18 @@ where
     }
 }
 
-impl<K, V> FusedIterator for IntoValues<K, V> where V: Soa {}
+impl<K, V> FusedIterator for IntoValues<K, V> where V: SoaRead {}
 
 pub struct IntoIter<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     inner: vec::IntoIter<KeyValuePair<K, V>>,
 }
 
 impl<K, V> IntoIter<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(inner: vec::IntoIter<KeyValuePair<K, V>>) -> Self {
@@ -380,7 +385,7 @@ where
 impl<K, V> Debug for IntoIter<K, V>
 where
     K: Debug,
-    V: Soa,
+    V: Soa + ?Sized,
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -394,7 +399,7 @@ where
 
 impl<K, V> Default for IntoIter<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     V::Context: Default,
 {
     #[inline]
@@ -407,7 +412,7 @@ where
 
 impl<K, V> Clone for IntoIter<K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
     vec::IntoIter<KeyValuePair<K, V>>: Clone,
 {
     #[inline]
@@ -420,6 +425,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for IntoIter<K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -430,6 +436,7 @@ where
 
 impl<T, K, V> AsMut<[T]> for IntoIter<K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
 {
     #[inline]
@@ -440,7 +447,7 @@ where
 
 impl<K, V> Iterator for IntoIter<K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     type Item = (K, V);
 
@@ -468,7 +475,7 @@ where
 
 impl<K, V> DoubleEndedIterator for IntoIter<K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -479,7 +486,7 @@ where
 
 impl<K, V> ExactSizeIterator for IntoIter<K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -487,18 +494,18 @@ where
     }
 }
 
-impl<K, V> FusedIterator for IntoIter<K, V> where V: Soa {}
+impl<K, V> FusedIterator for IntoIter<K, V> where V: SoaRead {}
 
 pub struct Drain<'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     inner: vec::Drain<'a, KeyValuePair<K, V>>,
 }
 
 impl<'a, K, V> Drain<'a, K, V>
 where
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub(crate) fn new(inner: vec::Drain<'a, KeyValuePair<K, V>>) -> Self {
@@ -525,7 +532,7 @@ where
 impl<K, V> Debug for Drain<'_, K, V>
 where
     K: Debug,
-    V: Soa,
+    V: Soa + ?Sized,
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -540,6 +547,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for Drain<'_, K, V>
 where
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -550,7 +558,7 @@ where
 
 impl<K, V> Iterator for Drain<'_, K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     type Item = (K, V);
 
@@ -569,7 +577,7 @@ where
 
 impl<K, V> DoubleEndedIterator for Drain<'_, K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -580,7 +588,7 @@ where
 
 impl<K, V> ExactSizeIterator for Drain<'_, K, V>
 where
-    V: Soa,
+    V: SoaRead,
 {
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -588,4 +596,4 @@ where
     }
 }
 
-impl<K, V> FusedIterator for Drain<'_, K, V> where V: Soa {}
+impl<K, V> FusedIterator for Drain<'_, K, V> where V: SoaRead {}

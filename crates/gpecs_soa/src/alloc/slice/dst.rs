@@ -4,7 +4,7 @@ use core_alloc::{borrow::ToOwned, boxed::Box};
 use crate::{
     ptr::{BufferData, slice_from_raw_parts_mut},
     slice::{Iter, IterMut, SoaSlice},
-    traits::{SoaToOwned, SoaTrustedFields},
+    traits::{SoaRead, SoaToOwned, SoaTrustedFields},
     vec::{IntoIter, SoaVec},
 };
 
@@ -188,7 +188,7 @@ where
 
 impl<T> IntoIterator for Box<SoaSlice<T>>
 where
-    T: SoaTrustedFields,
+    T: SoaTrustedFields + SoaRead,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;

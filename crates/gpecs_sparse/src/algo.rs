@@ -67,7 +67,7 @@ pub fn sparse_get<'context, 'a, K, V>(
 ) -> Option<V::Refs<'context, 'a>>
 where
     K: Key + 'a,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     let sparse_index: usize = key.sparse_index().try_into().ok()?;
     let sparse_item = sparse
@@ -101,7 +101,7 @@ pub fn sparse_index<'context, 'a, K, V>(
 ) -> V::Refs<'context, 'a>
 where
     K: Key + Debug + 'a,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     match sparse_get(dense, sparse, key) {
         Some(value) => value,
@@ -116,7 +116,7 @@ pub fn sparse_get_mut<'context, 'a, K, V>(
 ) -> Option<V::RefsMut<'context, 'a>>
 where
     K: Key + 'a,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     let sparse_index: usize = key.sparse_index().try_into().ok()?;
     let sparse_item = sparse
@@ -140,7 +140,7 @@ pub fn sparse_index_mut<'context, 'a, K, V>(
 ) -> V::RefsMut<'context, 'a>
 where
     K: Key + Debug + 'a,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     match sparse_get_mut(dense, sparse, key) {
         Some(value) => value,
@@ -155,7 +155,7 @@ pub fn sparse_get_with_key<'context, 'a, K, V>(
 ) -> Option<(K, V::Refs<'context, 'a>)>
 where
     K: Key + 'a,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     let sparse_item = sparse.get::<usize>(sparse_index.try_into().ok()?)?;
     let dense_index = sparse_item.dense_index()?;
@@ -174,7 +174,7 @@ pub fn sparse_get_mut_with_key<'context, 'a, K, V>(
 ) -> Option<(K, V::RefsMut<'context, 'a>)>
 where
     K: Key + 'a,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     let sparse_item = sparse.get::<usize>(sparse_index.try_into().ok()?)?;
     let dense_index = sparse_item.dense_index()?;

@@ -10,8 +10,11 @@ pub use self::{
     },
     slices::{ErasedFieldSlice, ErasedFieldSliceIter},
     slices_mut::{ErasedFieldSliceIterMut, ErasedFieldSliceMut},
-    value::{BoxedErasedField, ErasedField},
+    value::ErasedField,
 };
+
+#[cfg(feature = "alloc")]
+pub use self::value::BoxedErasedField;
 
 pub mod error;
 

@@ -7,7 +7,8 @@ use core::{
 };
 
 use crate::traits::{
-    FieldDescriptor, Soa, SoaToOwned, SoaTrustedFields, impls::debug_assert_ptr_is_aligned,
+    FieldDescriptor, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite,
+    impls::debug_assert_ptr_is_aligned,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
@@ -385,16 +386,6 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    unsafe fn ptrs_read(_context: &Self::Context, src: Self::Ptrs<'_>) -> Self {
-        unsafe { ptr::read(src) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_write(_context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
-        unsafe { ptr::write(dst, value) }
-    }
-
-    #[inline]
     unsafe fn ptrs_drop_in_place(_context: &Self::Context, ptrs: Self::MutPtrs<'_>) {
         unsafe { ptr::drop_in_place(ptrs) }
     }
@@ -687,6 +678,20 @@ unsafe impl<T> Soa for Identity<T> {
     #[inline]
     unsafe fn slices_drop_in_place(_context: &Self::Context, slices: Self::SliceMutPtrs<'_>) {
         unsafe { ptr::drop_in_place(slices) }
+    }
+}
+
+unsafe impl<T> SoaRead for Identity<T> {
+    #[inline]
+    unsafe fn read(_context: &Self::Context, src: Self::Ptrs<'_>) -> Self {
+        unsafe { ptr::read(src) }
+    }
+}
+
+unsafe impl<T> SoaWrite for Identity<T> {
+    #[inline]
+    unsafe fn write(_context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
+        unsafe { ptr::write(dst, value) }
     }
 }
 

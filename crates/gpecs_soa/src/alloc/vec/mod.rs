@@ -20,7 +20,7 @@ use crate::{
         IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
         from_raw_parts, from_raw_parts_mut, range,
     },
-    traits::{Soa, SoaToOwned, SoaTrustedFields},
+    traits::{Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite},
 };
 
 use super::{raw_vec::RawSoaVec, set_len_on_drop::SetLenOnDrop};
@@ -742,33 +742,38 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: Soa,
+    T: SoaRead,
 {
     #[inline]
     pub fn swap_remove(&mut self, index: usize) -> T {
-        self.swap_remove_into(index, |context, src| unsafe { T::ptrs_read(context, src) })
+        self.swap_remove_into(index, |context, src| unsafe { T::read(context, src) })
     }
 
     #[inline]
     pub fn remove(&mut self, index: usize) -> T {
-        self.remove_into(index, |context, src| unsafe { T::ptrs_read(context, src) })
+        self.remove_into(index, |context, src| unsafe { T::read(context, src) })
     }
 
     #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        self.pop_into(|context, src| unsafe { T::ptrs_read(context, src?).into() })
+        self.pop_into(|context, src| unsafe { T::read(context, src?).into() })
     }
+}
 
+impl<T> SoaVec<T>
+where
+    T: SoaWrite,
+{
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
         self.insert_from(index, |context, dst| unsafe {
-            T::ptrs_write(context, dst, value)
+            T::write(context, dst, value)
         })
     }
 
     #[inline]
     pub fn push(&mut self, value: T) {
-        self.push_from(|context, dst| unsafe { T::ptrs_write(context, dst, value) })
+        self.push_from(|context, dst| unsafe { T::write(context, dst, value) })
     }
 }
 
@@ -1008,7 +1013,7 @@ where
 
 impl<T> Extend<T> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaWrite,
 {
     #[inline]
     #[track_caller]
@@ -1032,7 +1037,7 @@ where
             let context = self.context();
             unsafe {
                 let dst = T::ptrs_add_mut(context, ptrs, len);
-                T::ptrs_write(context, dst, element);
+                T::write(context, dst, element);
                 // Since next() executes user code which can panic we have to bump the length
                 // after each step.
                 // NB can't overflow since we would have had to alloc the address space
@@ -1104,7 +1109,7 @@ where
 
 impl<T> IntoIterator for SoaVec<T>
 where
-    T: Soa,
+    T: SoaRead,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;
@@ -1117,7 +1122,7 @@ where
 
 impl<T> FromIterator<T> for SoaVec<T>
 where
-    T: Soa,
+    T: SoaWrite,
     T::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
@@ -1141,7 +1146,7 @@ where
                     // SAFETY: We requested capacity at least 1
                     let dst = vector.buffer.ptrs();
                     let context = vector.context();
-                    T::ptrs_write(context, dst, element);
+                    T::write(context, dst, element);
                     vector.set_len(1);
                 }
                 vector

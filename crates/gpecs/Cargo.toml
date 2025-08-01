@@ -9,7 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_sparse = { workspace = true, features = ["alloc"] }
-gpecs_soa_erased = { workspace = true }
+gpecs_soa_erased = { workspace = true, features = ["alloc"] }
 gpecs_types = { workspace = true }
 indexmap = { workspace = true }
 petgraph = { workspace = true }

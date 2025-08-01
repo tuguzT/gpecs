@@ -5,12 +5,13 @@ use core::{
 };
 
 use crate::{
-    aligned_bytes::{
-        AlignedBytes, AlignedBytesFromLayout, AlignedInitBytes, AlignedUninitBoxedByteSlice,
-    },
+    aligned_bytes::{AlignedBytes, AlignedBytesFromLayout, AlignedInitBytes},
     error::{LenMismatchError, check_layout, check_len},
     soa::traits::FieldDescriptor,
 };
+
+#[cfg(feature = "alloc")]
+use crate::aligned_bytes::AlignedUninitBoxedByteSlice;
 
 use super::{
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
@@ -21,6 +22,7 @@ use super::{
     },
 };
 
+#[cfg(feature = "alloc")]
 pub type BoxedErasedField = ErasedField<AlignedUninitBoxedByteSlice>;
 
 pub struct ErasedField<B>

@@ -7,7 +7,7 @@ use crate::{
 impl<'a, K, V> EpochSparseViewMut<'_, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub fn sort(&mut self)

@@ -32,7 +32,7 @@ rust-version = "1.88.0"
 gpecs = { path = "crates/gpecs" }
 gpecs_soa = { path = "crates/gpecs_soa", default-features = false }
 gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
-gpecs_soa_erased = { path = "crates/gpecs_soa_erased" }
+gpecs_soa_erased = { path = "crates/gpecs_soa_erased", default-features = false }
 gpecs_types = { path = "crates/gpecs_types" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }

@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use crate::{
     bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry, DropFn},
-    soa::traits::{FieldDescriptor, Soa},
+    soa::traits::{FieldDescriptor, Soa, SoaRead, SoaWrite},
 };
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
@@ -92,7 +92,7 @@ pub unsafe fn from_erased_fields<T>(
     fields: ErasedComponents<BoxedErasedField>,
 ) -> T
 where
-    T: Soa,
+    T: SoaRead,
 {
     let (descriptors, fields): (Vec<_>, Vec<_>) =
         reorder_fields::<T, _, _>(components, context, component_ids, fields)
@@ -111,7 +111,7 @@ pub fn into_erased_fields<T>(
     value: T,
 ) -> ErasedComponents<BoxedErasedField>
 where
-    T: Soa,
+    T: SoaWrite,
 {
     let erased_value = BoxedErasedSoa::from_value(context, value)
         .unwrap()

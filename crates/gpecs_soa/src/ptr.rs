@@ -434,6 +434,7 @@ where
 }
 
 #[inline]
+#[allow(dead_code)]
 pub(crate) fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
     T: Soa + ?Sized,

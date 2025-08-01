@@ -8,7 +8,7 @@ use core::{
 use crate::{
     alloc::raw_vec::RawSoaVec,
     ptr::{BufferData, BufferDataPtr},
-    traits::{NonNullPtrs, Soa},
+    traits::{NonNullPtrs, Soa, SoaRead},
     vec::SoaVec,
 };
 
@@ -229,7 +229,7 @@ where
 #[allow(clippy::while_let_on_iterator)]
 impl<T> Iterator for IntoIter<T>
 where
-    T: Soa,
+    T: SoaRead,
 {
     type Item = T;
 
@@ -251,7 +251,7 @@ where
         let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
         let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
 
-        let item = unsafe { T::ptrs_read(context, ptrs) };
+        let item = unsafe { T::read(context, ptrs) };
         Some(item)
     }
 
@@ -327,7 +327,7 @@ where
             let ptrs = T::ptrs_cast_const(context, ptrs.clone());
             let item = unsafe {
                 let ptrs = T::ptrs_add(context, ptrs, i);
-                T::ptrs_read(context, ptrs)
+                T::read(context, ptrs)
             };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
@@ -447,7 +447,7 @@ where
 
 impl<T> DoubleEndedIterator for IntoIter<T>
 where
-    T: Soa,
+    T: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -467,7 +467,7 @@ where
         let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
         let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
 
-        let item = unsafe { T::ptrs_read(context, ptrs) };
+        let item = unsafe { T::read(context, ptrs) };
         Some(item)
     }
 
@@ -497,7 +497,7 @@ where
 
 impl<T> ExactSizeIterator for IntoIter<T>
 where
-    T: Soa,
+    T: SoaRead,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -505,4 +505,4 @@ where
     }
 }
 
-impl<T> FusedIterator for IntoIter<T> where T: Soa {}
+impl<T> FusedIterator for IntoIter<T> where T: SoaRead {}

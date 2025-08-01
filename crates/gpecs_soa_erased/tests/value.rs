@@ -1,16 +1,24 @@
-use std::{alloc::Layout, mem::MaybeUninit, ptr, slice};
+use std::{alloc::Layout, mem::MaybeUninit};
+
+#[cfg(feature = "alloc")]
+use std::{ptr, slice};
 
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
-    aligned_bytes::{AlignedUninitBoxedByteSlice, AlignedUninitByteSlice},
-    erased::ErasedSoa,
-    field::{BoxedErasedField, ErasedField, ErasedFieldRef},
+    aligned_bytes::AlignedUninitByteSlice, erased::ErasedSoa, field::ErasedFieldRef,
     soa::traits::FieldDescriptor,
+};
+
+#[cfg(feature = "alloc")]
+use gpecs_soa_erased::{
+    aligned_bytes::AlignedUninitBoxedByteSlice,
+    field::{BoxedErasedField, ErasedField},
 };
 
 type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
 
 #[test]
+#[cfg(feature = "alloc")]
 fn value() {
     type Value = ((), String, u32, u16, u8);
 

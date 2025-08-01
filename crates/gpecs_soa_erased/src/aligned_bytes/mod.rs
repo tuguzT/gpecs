@@ -1,12 +1,13 @@
 use core::{alloc::Layout, mem::MaybeUninit};
 
-pub use self::{
-    boxed::{AlignedUninitBoxedByteSlice, AllocError},
-    init::AlignedInitBytes,
-    slice::AlignedUninitByteSlice,
-};
+pub use self::{init::AlignedInitBytes, slice::AlignedUninitByteSlice};
 
+#[cfg(feature = "alloc")]
+pub use self::boxed::{AlignedUninitBoxedByteSlice, AllocError};
+
+#[cfg(feature = "alloc")]
 mod boxed;
+
 mod init;
 mod slice;
 
@@ -58,6 +59,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 unsafe impl AlignedBytes for AlignedUninitBoxedByteSlice {
     #[inline]
     fn as_ptr(&self) -> *const u8 {
@@ -139,6 +141,7 @@ pub unsafe trait AlignedBytesFromLayout: AlignedBytes + Sized {
     }
 }
 
+#[cfg(feature = "alloc")]
 unsafe impl AlignedBytesFromLayout for AlignedUninitBoxedByteSlice {
     type Error = AllocError;
 

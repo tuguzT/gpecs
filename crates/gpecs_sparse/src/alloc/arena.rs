@@ -4,7 +4,6 @@ use core::{
     hash::{self, Hash},
     ops::{Index, IndexMut},
 };
-
 use core_alloc::vec::Vec;
 
 use crate::{
@@ -28,7 +27,7 @@ use crate::{
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
-        traits::Soa,
+        traits::{Soa, SoaRead, SoaWrite},
         vec::SoaVec,
     },
     view::{EpochSparseView, EpochSparseViewMut},
@@ -44,7 +43,7 @@ pub type SparseArena<T> = EpochSparseArena<usize, T>;
 pub struct EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     dense: SoaVec<KeyValuePair<K, V>>,
     sparse: Vec<SparseItem<K>>,
@@ -54,7 +53,7 @@ where
 impl<K, V> EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     pub fn new() -> Self
@@ -219,31 +218,6 @@ where
     pub fn sparse_shrink_to_fit(&mut self) {
         let Self { sparse, .. } = self;
         sparse.shrink_to_fit();
-    }
-
-    #[inline]
-    pub fn shrink_to(&mut self, min_capacity: usize) {
-        self.truncate(min_capacity, min_capacity);
-
-        let Self { dense, sparse, .. } = self;
-        dense.shrink_to(min_capacity);
-        sparse.shrink_to(min_capacity);
-    }
-
-    #[inline]
-    pub fn dense_shrink_to(&mut self, min_capacity: usize) {
-        self.truncate(min_capacity, usize::MAX);
-
-        let Self { dense, .. } = self;
-        dense.shrink_to(min_capacity);
-    }
-
-    #[inline]
-    pub fn sparse_shrink_to(&mut self, min_capacity: usize) {
-        self.truncate(usize::MAX, min_capacity);
-
-        let Self { sparse, .. } = self;
-        sparse.shrink_to(min_capacity);
     }
 
     #[inline]
@@ -430,182 +404,6 @@ where
     }
 
     #[inline]
-    #[track_caller]
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        self.try_insert(key, value)
-            .unwrap_or_else(|error| try_insert_failed(error.kind))
-    }
-
-    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>> {
-        let Self {
-            dense,
-            sparse,
-            sparse_vacant_head,
-        } = self;
-
-        let sparse_index: usize = match key.sparse_index().try_into() {
-            Ok(sparse_index) => sparse_index,
-            Err(error) => {
-                let kind = TooLargeSparseIndexError::new(error).into();
-                return Err(TryModifyError::new(kind, value));
-            }
-        };
-        match sparse.get_mut(sparse_index) {
-            Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
-                SparseItemKind::Occupied { dense_index } => {
-                    let (context, dense) = dense.slices_mut().into_slices_with_context();
-                    let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
-
-                    let dense_index = unwrap_into_usize(dense_index);
-                    let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
-
-                    let value = soa_replace(context, dense_value, value);
-                    sparse_item.epoch = key.epoch();
-                    *dense_key = key;
-
-                    Ok(Some(value))
-                }
-                SparseItemKind::Vacant { next_vacant } => {
-                    let next_vacant = unwrap_into_usize(next_vacant);
-                    remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
-
-                    let dense_index = match dense.len().try_into() {
-                        Ok(dense_index) => dense_index,
-                        Err(error) => {
-                            let kind = TooSmallSparseIndexError::new(error).into();
-                            return Err(TryModifyError::new(kind, value));
-                        }
-                    };
-                    if let Err(error) = dense.try_reserve(1) {
-                        let kind = TryReserveError::Dense(error).into();
-                        return Err(TryModifyError::new(kind, value));
-                    }
-                    dense.push(KeyValuePair { key, value });
-                    sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
-
-                    Ok(None)
-                }
-            },
-            Some(_) => Ok(None),
-            None => {
-                let new_sparse_len = sparse_index.saturating_add(1);
-                let additional = new_sparse_len.saturating_sub(sparse.len());
-                if let Err(error) = sparse.try_reserve(additional) {
-                    let kind = TryReserveError::Sparse(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-                if let Err(error) = extend_sparse(sparse, new_sparse_len, sparse_vacant_head) {
-                    let kind = error.into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-
-                let dense_index = match dense.len().try_into() {
-                    Ok(dense_index) => dense_index,
-                    Err(error) => {
-                        let kind = TooSmallSparseIndexError::new(error).into();
-                        return Err(TryModifyError::new(kind, value));
-                    }
-                };
-                if let Err(error) = dense.try_reserve(1) {
-                    let kind = TryReserveError::Dense(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-                dense.push(KeyValuePair { key, value });
-                sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
-
-                Ok(None)
-            }
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn push(&mut self, value: V) -> K {
-        self.try_push(value)
-            .unwrap_or_else(|error| try_push_failed(error.kind))
-    }
-
-    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
-        let Self {
-            dense,
-            sparse,
-            sparse_vacant_head,
-        } = self;
-
-        if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
-            let next_vacant = match (*unwrap_next_vacant(sparse_item.kind())).try_into() {
-                Ok(next_vacant) => next_vacant,
-                Err(error) => {
-                    let kind = TooLargeSparseIndexError::new(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-            };
-
-            let sparse_index = match (*sparse_vacant_head).try_into() {
-                Ok(sparse_index) => sparse_index,
-                Err(error) => {
-                    let kind = TooSmallSparseIndexError::new(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-            };
-            let key = K::new(sparse_index, sparse_item.epoch);
-
-            let dense_index = match dense.len().try_into() {
-                Ok(dense_index) => dense_index,
-                Err(error) => {
-                    let kind = TooSmallSparseIndexError::new(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-            };
-            let sparse_item_kind = SparseItemKind::occupied(dense_index);
-
-            if let Err(error) = dense.try_reserve(1) {
-                let kind = TryReserveError::Dense(error).into();
-                return Err(TryModifyError::new(kind, value));
-            }
-            dense.push(KeyValuePair { key, value });
-
-            sparse_item.kind = sparse_item_kind;
-            *sparse_vacant_head = next_vacant;
-
-            return Ok(key);
-        }
-
-        let sparse_index = match (*sparse_vacant_head).try_into() {
-            Ok(sparse_index) => sparse_index,
-            Err(error) => {
-                let kind = TooSmallSparseIndexError::new(error).into();
-                return Err(TryModifyError::new(kind, value));
-            }
-        };
-        let key = Key::new(sparse_index, Default::default());
-
-        let dense_index = match dense.len().try_into() {
-            Ok(dense_index) => dense_index,
-            Err(error) => {
-                let kind = TooSmallSparseIndexError::new(error).into();
-                return Err(TryModifyError::new(kind, value));
-            }
-        };
-        let sparse_item = SparseItem::occupied(dense_index, Default::default());
-
-        if let Err(error) = dense.try_reserve(1) {
-            let kind = TryReserveError::Dense(error).into();
-            return Err(TryModifyError::new(kind, value));
-        }
-        if let Err(error) = sparse.try_reserve(1) {
-            let kind = TryReserveError::Sparse(error).into();
-            return Err(TryModifyError::new(kind, value));
-        }
-
-        dense.push(KeyValuePair { key, value });
-        sparse.push(sparse_item);
-        *sparse_vacant_head = dense.len();
-
-        Ok(key)
-    }
-
-    #[inline]
     pub fn swap(&mut self, first_key: K, second_key: K) {
         let mut view_mut = self.as_mut_view();
         view_mut.swap(first_key, second_key)
@@ -615,89 +413,6 @@ where
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
         let mut view_mut = self.as_mut_view();
         view_mut.swap_keys(first_key, second_key)
-    }
-
-    pub fn swap_remove(&mut self, key: K) -> Option<V> {
-        let Self {
-            dense,
-            sparse,
-            sparse_vacant_head,
-        } = self;
-
-        let sparse_index: usize = key.sparse_index().try_into().ok()?;
-        let dense_index = *sparse
-            .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())
-            .and_then(SparseItem::dense_index)?;
-        let dense_index_usize = unwrap_into_usize(dense_index);
-        check_dense_index_bounds(dense_index_usize, dense.len());
-
-        let (dense_key, value) = dense.swap_remove(dense_index_usize).into();
-        check_equal_key(key, dense_key);
-
-        if let Some(KeyValueRefs::<K, _> { key, .. }) = dense.slices().into_get(dense_index_usize) {
-            let sparse_index = unwrap_into_usize(key.sparse_index());
-            let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
-            match sparse_item.kind_mut() {
-                SparseItemKind::Occupied { dense_index: index } => *index = dense_index,
-                SparseItemKind::Vacant { next_vacant } => *next_vacant = dense_index,
-            }
-        }
-        let next_vacant = unwrap_into_index(*sparse_vacant_head);
-        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
-        *sparse_vacant_head = sparse_index;
-
-        Some(value)
-    }
-
-    pub fn remove(&mut self, key: K) -> Option<V> {
-        let Self {
-            dense,
-            sparse,
-            sparse_vacant_head,
-        } = self;
-
-        let sparse_index: usize = key.sparse_index().try_into().ok()?;
-        let dense_index = sparse
-            .get(sparse_index)
-            .take_if(|item| item.epoch == key.epoch())
-            .and_then(SparseItem::dense_index)?;
-        let dense_index = unwrap_into_usize(*dense_index);
-        check_dense_index_bounds(dense_index, dense.len());
-
-        let (dense_key, value) = dense.remove(dense_index).into();
-        check_equal_key(key, dense_key);
-
-        for KeyValueRefs::<K, _> { key, .. } in dense.slices().into_iter().skip(dense_index) {
-            let sparse_index = unwrap_into_usize(key.sparse_index());
-            let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
-            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
-            *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - 1);
-        }
-        let next_vacant = unwrap_into_index(*sparse_vacant_head);
-        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
-        *sparse_vacant_head = sparse_index;
-
-        Some(value)
-    }
-
-    pub fn pop(&mut self) -> Option<(K, V)> {
-        let Self {
-            dense,
-            sparse,
-            sparse_vacant_head,
-        } = self;
-
-        let KeyValuePair { key, value } = dense.pop()?;
-
-        let sparse_index = unwrap_into_usize(key.sparse_index());
-        check_key_bounds(sparse_index, sparse.len());
-
-        let next_vacant = unwrap_into_index(*sparse_vacant_head);
-        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
-        *sparse_vacant_head = sparse_index;
-
-        Some((key, value))
     }
 
     #[inline]
@@ -710,21 +425,6 @@ where
     pub fn replace_key(&mut self, key: K) -> Option<K> {
         let mut view_mut = self.as_mut_view();
         view_mut.replace_key(key)
-    }
-
-    pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
-        for dense_index in (dense_len..self.len()).rev() {
-            let (&key, _) = self.dense.slices().into_index(dense_index).into();
-            self.remove(key);
-        }
-        self.dense.truncate(dense_len);
-
-        for sparse_index in sparse_len..self.sparse_len() {
-            let epoch = self.sparse[sparse_index].epoch;
-            let key = K::new(unwrap_into_index(sparse_index), epoch.next());
-            self.remove(key);
-        }
-        self.sparse.truncate(sparse_len);
     }
 
     #[inline]
@@ -985,9 +685,11 @@ where
     }
 
     #[inline]
+    #[allow(clippy::unnecessary_to_owned, reason = "false positive")]
     pub fn into_keys(self) -> IntoKeys<K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.into_iter();
+        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let inner = keys.to_vec().into_iter();
         IntoKeys::new(inner)
     }
 
@@ -1005,13 +707,6 @@ where
     }
 
     #[inline]
-    pub fn into_values(self) -> IntoValues<K, V> {
-        let Self { dense, .. } = self;
-        let inner = dense.into_iter();
-        IntoValues::new(inner)
-    }
-
-    #[inline]
     pub fn iter(&self) -> Iter<'_, '_, K, V> {
         let view = self.as_view();
         view.into_iter()
@@ -1024,10 +719,328 @@ where
     }
 }
 
+impl<K, V> EpochSparseArena<K, V>
+where
+    K: Key,
+    V: SoaRead,
+{
+    #[inline]
+    pub fn shrink_to(&mut self, min_capacity: usize) {
+        self.truncate(min_capacity, min_capacity);
+
+        let Self { dense, sparse, .. } = self;
+        dense.shrink_to(min_capacity);
+        sparse.shrink_to(min_capacity);
+    }
+
+    #[inline]
+    pub fn dense_shrink_to(&mut self, min_capacity: usize) {
+        self.truncate(min_capacity, usize::MAX);
+
+        let Self { dense, .. } = self;
+        dense.shrink_to(min_capacity);
+    }
+
+    #[inline]
+    pub fn sparse_shrink_to(&mut self, min_capacity: usize) {
+        self.truncate(usize::MAX, min_capacity);
+
+        let Self { sparse, .. } = self;
+        sparse.shrink_to(min_capacity);
+    }
+
+    pub fn swap_remove(&mut self, key: K) -> Option<V> {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        let sparse_index: usize = key.sparse_index().try_into().ok()?;
+        let dense_index = *sparse
+            .get(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())
+            .and_then(SparseItem::dense_index)?;
+        let dense_index_usize = unwrap_into_usize(dense_index);
+        check_dense_index_bounds(dense_index_usize, dense.len());
+
+        let (dense_key, value) = dense.swap_remove(dense_index_usize).into();
+        check_equal_key(key, dense_key);
+
+        if let Some(KeyValueRefs::<K, _> { key, .. }) = dense.slices().into_get(dense_index_usize) {
+            let sparse_index = unwrap_into_usize(key.sparse_index());
+            let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
+            match sparse_item.kind_mut() {
+                SparseItemKind::Occupied { dense_index: index } => *index = dense_index,
+                SparseItemKind::Vacant { next_vacant } => *next_vacant = dense_index,
+            }
+        }
+        let next_vacant = unwrap_into_index(*sparse_vacant_head);
+        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+        *sparse_vacant_head = sparse_index;
+
+        Some(value)
+    }
+
+    pub fn remove(&mut self, key: K) -> Option<V> {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        let sparse_index: usize = key.sparse_index().try_into().ok()?;
+        let dense_index = sparse
+            .get(sparse_index)
+            .take_if(|item| item.epoch == key.epoch())
+            .and_then(SparseItem::dense_index)?;
+        let dense_index = unwrap_into_usize(*dense_index);
+        check_dense_index_bounds(dense_index, dense.len());
+
+        let (dense_key, value) = dense.remove(dense_index).into();
+        check_equal_key(key, dense_key);
+
+        for KeyValueRefs::<K, _> { key, .. } in dense.slices().into_iter().skip(dense_index) {
+            let sparse_index = unwrap_into_usize(key.sparse_index());
+            let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
+            let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
+            *dense_index = unwrap_into_index(unwrap_into_usize(*dense_index) - 1);
+        }
+        let next_vacant = unwrap_into_index(*sparse_vacant_head);
+        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+        *sparse_vacant_head = sparse_index;
+
+        Some(value)
+    }
+
+    pub fn pop(&mut self) -> Option<(K, V)> {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        let KeyValuePair { key, value } = dense.pop()?;
+
+        let sparse_index = unwrap_into_usize(key.sparse_index());
+        check_key_bounds(sparse_index, sparse.len());
+
+        let next_vacant = unwrap_into_index(*sparse_vacant_head);
+        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+        *sparse_vacant_head = sparse_index;
+
+        Some((key, value))
+    }
+
+    pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
+        for dense_index in (dense_len..self.len()).rev() {
+            let (&key, _) = self.dense.slices().into_index(dense_index).into();
+            self.remove(key);
+        }
+        self.dense.truncate(dense_len);
+
+        for sparse_index in sparse_len..self.sparse_len() {
+            let epoch = self.sparse[sparse_index].epoch;
+            let key = K::new(unwrap_into_index(sparse_index), epoch.next());
+            self.remove(key);
+        }
+        self.sparse.truncate(sparse_len);
+    }
+
+    #[inline]
+    pub fn into_values(self) -> IntoValues<K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.into_iter();
+        IntoValues::new(inner)
+    }
+}
+
+impl<K, V> EpochSparseArena<K, V>
+where
+    K: Key,
+    V: SoaRead + SoaWrite,
+{
+    #[inline]
+    #[track_caller]
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        self.try_insert(key, value)
+            .unwrap_or_else(|error| try_insert_failed(error.kind))
+    }
+
+    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>> {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        let sparse_index: usize = match key.sparse_index().try_into() {
+            Ok(sparse_index) => sparse_index,
+            Err(error) => {
+                let kind = TooLargeSparseIndexError::new(error).into();
+                return Err(TryModifyError::new(kind, value));
+            }
+        };
+        match sparse.get_mut(sparse_index) {
+            Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
+                SparseItemKind::Occupied { dense_index } => {
+                    let (context, dense) = dense.slices_mut().into_slices_with_context();
+                    let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
+
+                    let dense_index = unwrap_into_usize(dense_index);
+                    let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
+
+                    let value = soa_replace(context, dense_value, value);
+                    sparse_item.epoch = key.epoch();
+                    *dense_key = key;
+
+                    Ok(Some(value))
+                }
+                SparseItemKind::Vacant { next_vacant } => {
+                    let next_vacant = unwrap_into_usize(next_vacant);
+                    remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
+
+                    let dense_index = match dense.len().try_into() {
+                        Ok(dense_index) => dense_index,
+                        Err(error) => {
+                            let kind = TooSmallSparseIndexError::new(error).into();
+                            return Err(TryModifyError::new(kind, value));
+                        }
+                    };
+                    if let Err(error) = dense.try_reserve(1) {
+                        let kind = TryReserveError::Dense(error).into();
+                        return Err(TryModifyError::new(kind, value));
+                    }
+                    dense.push(KeyValuePair { key, value });
+                    sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
+
+                    Ok(None)
+                }
+            },
+            Some(_) => Ok(None),
+            None => {
+                let new_sparse_len = sparse_index.saturating_add(1);
+                let additional = new_sparse_len.saturating_sub(sparse.len());
+                if let Err(error) = sparse.try_reserve(additional) {
+                    let kind = TryReserveError::Sparse(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+                if let Err(error) = extend_sparse(sparse, new_sparse_len, sparse_vacant_head) {
+                    let kind = error.into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+
+                let dense_index = match dense.len().try_into() {
+                    Ok(dense_index) => dense_index,
+                    Err(error) => {
+                        let kind = TooSmallSparseIndexError::new(error).into();
+                        return Err(TryModifyError::new(kind, value));
+                    }
+                };
+                if let Err(error) = dense.try_reserve(1) {
+                    let kind = TryReserveError::Dense(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+                dense.push(KeyValuePair { key, value });
+                sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
+
+                Ok(None)
+            }
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn push(&mut self, value: V) -> K {
+        self.try_push(value)
+            .unwrap_or_else(|error| try_push_failed(error.kind))
+    }
+
+    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+
+        if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
+            let next_vacant = match (*unwrap_next_vacant(sparse_item.kind())).try_into() {
+                Ok(next_vacant) => next_vacant,
+                Err(error) => {
+                    let kind = TooLargeSparseIndexError::new(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+            };
+
+            let sparse_index = match (*sparse_vacant_head).try_into() {
+                Ok(sparse_index) => sparse_index,
+                Err(error) => {
+                    let kind = TooSmallSparseIndexError::new(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+            };
+            let key = K::new(sparse_index, sparse_item.epoch);
+
+            let dense_index = match dense.len().try_into() {
+                Ok(dense_index) => dense_index,
+                Err(error) => {
+                    let kind = TooSmallSparseIndexError::new(error).into();
+                    return Err(TryModifyError::new(kind, value));
+                }
+            };
+            let sparse_item_kind = SparseItemKind::occupied(dense_index);
+
+            if let Err(error) = dense.try_reserve(1) {
+                let kind = TryReserveError::Dense(error).into();
+                return Err(TryModifyError::new(kind, value));
+            }
+            dense.push(KeyValuePair { key, value });
+
+            sparse_item.kind = sparse_item_kind;
+            *sparse_vacant_head = next_vacant;
+
+            return Ok(key);
+        }
+
+        let sparse_index = match (*sparse_vacant_head).try_into() {
+            Ok(sparse_index) => sparse_index,
+            Err(error) => {
+                let kind = TooSmallSparseIndexError::new(error).into();
+                return Err(TryModifyError::new(kind, value));
+            }
+        };
+        let key = Key::new(sparse_index, Default::default());
+
+        let dense_index = match dense.len().try_into() {
+            Ok(dense_index) => dense_index,
+            Err(error) => {
+                let kind = TooSmallSparseIndexError::new(error).into();
+                return Err(TryModifyError::new(kind, value));
+            }
+        };
+        let sparse_item = SparseItem::occupied(dense_index, Default::default());
+
+        if let Err(error) = dense.try_reserve(1) {
+            let kind = TryReserveError::Dense(error).into();
+            return Err(TryModifyError::new(kind, value));
+        }
+        if let Err(error) = sparse.try_reserve(1) {
+            let kind = TryReserveError::Sparse(error).into();
+            return Err(TryModifyError::new(kind, value));
+        }
+
+        dense.push(KeyValuePair { key, value });
+        sparse.push(sparse_item);
+        *sparse_vacant_head = dense.len();
+
+        Ok(key)
+    }
+}
+
 impl<K, V> Debug for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     K::SparseIndex: Debug,
     SparseItem<K>: Debug,
     SoaVec<KeyValuePair<K, V>>: Debug,
@@ -1050,7 +1063,7 @@ where
 impl<K, V> Default for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     V::Context: Default,
 {
     fn default() -> Self {
@@ -1065,7 +1078,7 @@ where
 impl<K, V> PartialEq for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaVec<KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1084,7 +1097,7 @@ where
 impl<K, V> Eq for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaVec<KeyValuePair<K, V>>: Eq,
 {
 }
@@ -1092,7 +1105,7 @@ where
 impl<K, V> PartialOrd for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaVec<KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1117,7 +1130,7 @@ where
 impl<K, V> Ord for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaVec<KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1142,7 +1155,7 @@ where
 impl<K, V> Hash for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     K::SparseIndex: Hash,
     SparseItem<K>: Hash,
     SoaVec<KeyValuePair<K, V>>: Hash,
@@ -1163,7 +1176,7 @@ where
 impl<K, V> Clone for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaVec<KeyValuePair<K, V>>: Clone,
 {
     fn clone(&self) -> Self {
@@ -1247,7 +1260,7 @@ where
 impl<K, V> AsRef<EpochSparseArena<K, V>> for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &EpochSparseArena<K, V> {
@@ -1258,7 +1271,7 @@ where
 impl<K, V> AsMut<EpochSparseArena<K, V>> for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut EpochSparseArena<K, V> {
@@ -1269,7 +1282,7 @@ where
 impl<'r, K, V> IntoIterator for &'r EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'r K, V::Refs<'r, 'r>);
     type IntoIter = Iter<'r, 'r, K, V>;
@@ -1283,7 +1296,7 @@ where
 impl<'r, K, V> IntoIterator for &'r mut EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'r K, V::RefsMut<'r, 'r>);
     type IntoIter = IterMut<'r, 'r, K, V>;
@@ -1297,7 +1310,7 @@ where
 impl<K, V> IntoIterator for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: SoaRead,
 {
     type Item = (K, V);
 
@@ -1313,7 +1326,7 @@ where
 impl<K, V> FromIterator<KeyValuePair<K, V>> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: Soa,
+    V: SoaRead + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = KeyValuePair<K, V>>>(iter: I) -> Self {
@@ -1335,7 +1348,7 @@ where
 impl<K, V> FromIterator<(K, V)> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: Soa,
+    V: SoaRead + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
@@ -1346,7 +1359,7 @@ where
 impl<K, V> FromIterator<V> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: Soa,
+    V: SoaRead + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
@@ -1376,7 +1389,7 @@ where
 impl<K, V> Extend<KeyValuePair<K, V>> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: Soa,
+    V: SoaRead + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = KeyValuePair<K, V>>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
@@ -1393,7 +1406,7 @@ where
 impl<K, V> Extend<(K, V)> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: Soa,
+    V: SoaRead + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         self.extend(iter.into_iter().map(KeyValuePair::from))
@@ -1403,7 +1416,7 @@ where
 impl<K, V> Extend<V> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: Soa,
+    V: SoaRead + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
@@ -1420,7 +1433,7 @@ where
 impl<K, V> From<set::EpochSparseSet<K, V>> for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: set::EpochSparseSet<K, V>) -> Self {

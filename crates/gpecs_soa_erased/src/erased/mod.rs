@@ -1,5 +1,5 @@
 pub use self::{
-    context::{BoxedErasedSoaContext, ErasedSoaContext},
+    context::ErasedSoaContext,
     fields::ErasedSoaFields,
     nonnull_ptrs::{ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter},
     ptrs::{ErasedSoaPtrs, ErasedSoaPtrsIter},
@@ -12,8 +12,11 @@ pub use self::{
     },
     slices::{ErasedSoaSlices, ErasedSoaSlicesIter},
     slices_mut::{ErasedSoaSlicesMut, ErasedSoaSlicesMutIter},
-    value::{BoxedErasedSoa, ErasedSoa, ErasedSoaIntoFields},
+    value::{ErasedSoa, ErasedSoaIntoFields},
 };
+
+#[cfg(feature = "alloc")]
+pub use self::{context::BoxedErasedSoaContext, value::BoxedErasedSoa};
 
 pub mod error;
 

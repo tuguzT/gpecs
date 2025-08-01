@@ -8,11 +8,15 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-gpecs_soa = { workspace = true, features = ["alloc"] }
+gpecs_soa = { workspace = true }
 itertools = { workspace = true }
 
 [dev-dependencies]
 arrayvec = { workspace = true }
+
+[features]
+default = ["alloc"]
+alloc = ["gpecs_soa/alloc"]
 
 [lints]
 workspace = true

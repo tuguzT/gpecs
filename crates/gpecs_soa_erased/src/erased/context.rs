@@ -1,8 +1,7 @@
-use alloc::boxed::Box;
-
 use crate::soa::traits::{FieldDescriptor, Soa};
 
-pub type BoxedErasedSoaContext = ErasedSoaContext<Box<[FieldDescriptor]>>;
+#[cfg(feature = "alloc")]
+pub type BoxedErasedSoaContext = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ErasedSoaContext<D> {

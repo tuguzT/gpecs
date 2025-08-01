@@ -41,7 +41,7 @@ pub type SparseView<'c, 'a, T> = EpochSparseView<'c, 'a, usize, T>;
 pub struct EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     dense: SoaSlices<'c, 'a, KeyValuePair<K, V>>,
     sparse: &'a [SparseItem<K>],
@@ -50,7 +50,7 @@ where
 impl<'c, 'a, K, V> EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -296,7 +296,7 @@ where
 impl<'c, 'a, K, V> Debug for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SparseItem<K>: Debug,
     SoaSlices<'c, 'a, KeyValuePair<K, V>>: Debug,
 {
@@ -312,7 +312,7 @@ where
 impl<'c, 'a, K, V> From<&'c V::Context> for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     fn from(context: &'c V::Context) -> Self {
         Self {
@@ -325,7 +325,7 @@ where
 impl<K, V> Clone for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -338,7 +338,7 @@ where
 impl<'c, 'a, K, V> Copy for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlices<'c, 'a, KeyValuePair<K, V>>: Copy,
 {
 }
@@ -346,7 +346,7 @@ where
 impl<'c, 'a, K, V> PartialEq for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlices<'c, 'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -358,7 +358,7 @@ where
 impl<'c, 'a, K, V> Eq for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlices<'c, 'a, KeyValuePair<K, V>>: Eq,
 {
 }
@@ -366,7 +366,7 @@ where
 impl<'c, 'a, K, V> PartialOrd for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlices<'c, 'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -382,7 +382,7 @@ where
 impl<'c, 'a, K, V> Ord for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlices<'c, 'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -398,7 +398,7 @@ where
 impl<'c, 'a, K, V> Hash for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SparseItem<K>: Hash,
     SoaSlices<'c, 'a, KeyValuePair<K, V>>: Hash,
 {
@@ -412,6 +412,7 @@ where
 impl<T, K, V> Index<K> for EpochSparseView<'_, '_, K, V>
 where
     K: Key + Debug,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T> + 'any,
 {
     type Output = T;
@@ -425,6 +426,7 @@ where
 impl<T, K, V> AsRef<[T]> for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -436,7 +438,7 @@ where
 impl<'c, 'a, K, V> AsRef<EpochSparseView<'c, 'a, K, V>> for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &EpochSparseView<'c, 'a, K, V> {
@@ -447,7 +449,7 @@ where
 impl<'r, K, V> IntoIterator for &'r EpochSparseView<'_, '_, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'r K, V::Refs<'r, 'r>);
     type IntoIter = Iter<'r, 'r, K, V>;
@@ -461,7 +463,7 @@ where
 impl<'c, 'a, K, V> IntoIterator for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'a K, V::Refs<'c, 'a>);
     type IntoIter = Iter<'c, 'a, K, V>;
@@ -479,7 +481,7 @@ pub type SparseViewMut<'c, 'a, T> = EpochSparseViewMut<'c, 'a, usize, T>;
 pub struct EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
     sparse: &'a mut [SparseItem<K>],
@@ -488,7 +490,7 @@ where
 impl<'c, 'a, K, V> EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -1132,7 +1134,7 @@ where
 impl<'c, 'a, K, V> Debug for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SparseItem<K>: Debug,
     SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Debug,
 {
@@ -1148,7 +1150,7 @@ where
 impl<'c, 'a, K, V> From<&'c V::Context> for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     fn from(context: &'c V::Context) -> Self {
         Self {
@@ -1161,7 +1163,7 @@ where
 impl<'c, 'a, K, V> PartialEq for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1173,7 +1175,7 @@ where
 impl<'c, 'a, K, V> Eq for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Eq,
 {
 }
@@ -1181,7 +1183,7 @@ where
 impl<'c, 'a, K, V> PartialOrd for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1197,7 +1199,7 @@ where
 impl<'c, 'a, K, V> Ord for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1213,7 +1215,7 @@ where
 impl<'c, 'a, K, V> Hash for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
     SparseItem<K>: Hash,
     SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Hash,
 {
@@ -1227,6 +1229,7 @@ where
 impl<T, K, V> Index<K> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key + Debug,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T> + 'any,
 {
     type Output = T;
@@ -1240,6 +1243,7 @@ where
 impl<T, K, V> IndexMut<K> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key + Debug,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T, RefsMut<'c, 'any> = &'any mut T> + 'any,
 {
     #[inline]
@@ -1251,6 +1255,7 @@ where
 impl<T, K, V> AsRef<[T]> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -1262,6 +1267,7 @@ where
 impl<T, K, V> AsMut<[T]> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
 {
     #[inline]
@@ -1273,7 +1279,7 @@ where
 impl<'c, 'a, K, V> AsRef<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &EpochSparseViewMut<'c, 'a, K, V> {
@@ -1284,7 +1290,7 @@ where
 impl<'c, 'a, K, V> AsMut<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut EpochSparseViewMut<'c, 'a, K, V> {
@@ -1295,7 +1301,7 @@ where
 impl<'r, K, V> IntoIterator for &'r EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'r K, V::Refs<'r, 'r>);
     type IntoIter = Iter<'r, 'r, K, V>;
@@ -1309,7 +1315,7 @@ where
 impl<'r, K, V> IntoIterator for &'r mut EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'r K, V::RefsMut<'r, 'r>);
     type IntoIter = IterMut<'r, 'r, K, V>;
@@ -1323,7 +1329,7 @@ where
 impl<'c, 'a, K, V> IntoIterator for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     type Item = (&'a K, V::RefsMut<'c, 'a>);
     type IntoIter = IterMut<'c, 'a, K, V>;
@@ -1339,7 +1345,7 @@ where
 impl<'c, 'a, K, V> From<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     #[inline]
     #[allow(unsafe_code)]
@@ -1355,7 +1361,7 @@ fn check_parts<K, V>(
 ) -> Result<(), FromPartsError<K>>
 where
     K: Key,
-    V: Soa,
+    V: Soa + ?Sized,
 {
     for (sparse_index, &SparseItem::<K> { kind, epoch }) in sparse.iter().enumerate() {
         let sparse_index = sparse_index

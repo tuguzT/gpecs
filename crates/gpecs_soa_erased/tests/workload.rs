@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use std::iter;
 
 use gpecs_soa_erased::{

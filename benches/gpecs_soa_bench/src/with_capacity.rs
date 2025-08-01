@@ -5,7 +5,7 @@ use gpecs_soa_erased::erased::{BoxedErasedSoa, ErasedSoaContext};
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
-pub trait WithCapacity: SoaVecs<Context: Default> {
+pub trait WithCapacity: SoaVecs<Context: Default> + Sized {
     fn soa_slf_with_capacity(capacity: usize) -> SoaVec<Self> {
         let capacity = black_box(capacity);
         let context = Default::default();

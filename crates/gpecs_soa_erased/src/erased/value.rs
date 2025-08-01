@@ -1,14 +1,14 @@
-use alloc::boxed::Box;
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
     ptr, slice,
 };
+use gpecs_soa::traits::{SoaRead, SoaWrite};
 use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
-    aligned_bytes::{AlignedBytes, AlignedBytesFromLayout, AlignedUninitBoxedByteSlice},
+    aligned_bytes::{AlignedBytes, AlignedBytesFromLayout},
     erased::{
         ErasedSoaRefs, ErasedSoaRefsMut,
         error::{
@@ -19,10 +19,14 @@ use crate::{
     },
     error::{LenMismatchError, check_layout, check_len},
     field::{ErasedField, error::ErasedFieldFromDescDataError},
-    soa::traits::{BufferOffsets, FieldDescriptor, Soa, buffer_layout, buffer_offsets},
+    soa::traits::{BufferOffsets, FieldDescriptor, buffer_layout, buffer_offsets},
 };
 
-pub type BoxedErasedSoa = ErasedSoa<AlignedUninitBoxedByteSlice, Box<[FieldDescriptor]>>;
+#[cfg(feature = "alloc")]
+pub type BoxedErasedSoa = ErasedSoa<
+    crate::aligned_bytes::AlignedUninitBoxedByteSlice,
+    alloc::boxed::Box<[FieldDescriptor]>,
+>;
 
 pub struct ErasedSoa<B, D>
 where
@@ -74,7 +78,7 @@ where
         context: &T::Context,
     ) -> Result<T, ErasedSoaIntoValueError<Self>>
     where
-        T: Soa,
+        T: SoaRead,
     {
         let Self {
             ref descriptors,
@@ -108,7 +112,7 @@ where
         let Self { mut bytes, .. } = self;
         let value = unsafe {
             let src = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
-            T::ptrs_read(context, T::ptrs_cast_const(context, src))
+            T::read(context, T::ptrs_cast_const(context, src))
         };
         Ok(value)
     }
@@ -178,7 +182,7 @@ where
         value: T,
     ) -> Result<Self, ErasedSoaFromBytesValueError>
     where
-        T: Soa,
+        T: SoaWrite,
     {
         let descriptors = T::field_descriptors(context)
             .into_iter()
@@ -191,7 +195,7 @@ where
 
         unsafe {
             let dst = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
-            T::ptrs_write(context, dst, value);
+            T::write(context, dst, value);
         }
 
         let me = Self { bytes, descriptors };
@@ -207,7 +211,7 @@ where
     #[inline]
     pub fn from_value<T>(context: &T::Context, value: T) -> Result<Self, ErasedSoaFromValueError<B>>
     where
-        T: Soa,
+        T: SoaWrite,
     {
         let descriptors = T::field_descriptors(context)
             .into_iter()
@@ -219,7 +223,7 @@ where
 
         unsafe {
             let dst = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
-            T::ptrs_write(context, dst, value);
+            T::write(context, dst, value);
         }
 
         let me = Self { bytes, descriptors };

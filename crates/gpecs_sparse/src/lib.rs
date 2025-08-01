@@ -9,7 +9,7 @@ extern crate alloc as core_alloc;
 pub use gpecs_soa as soa;
 
 #[cfg(feature = "alloc")]
-pub use self::alloc::{arena, set};
+pub use self::alloc::{TryInsertAccess, arena, set};
 
 pub mod error;
 pub mod item;

@@ -1011,12 +1011,11 @@ impl ArchetypeRegistry {
             let key = component_ids.iter().copied().collect();
             return Self::register_from_slice(archetypes, graph, components, component_ids, key);
         };
-        if let &[component_id] = component_ids {
-            if let Some(archetype_id) =
+        if let &[component_id] = component_ids
+            && let Some(archetype_id) =
                 Self::find_archetype_after(graph, archetype_id, component_id)
-            {
-                return archetype_id;
-            }
+        {
+            return archetype_id;
         }
 
         let Some(info) = Self::get_info(archetypes, archetype_id) else {
@@ -1045,12 +1044,11 @@ impl ArchetypeRegistry {
         archetype_id: ArchetypeId,
         component_ids: &[ComponentId],
     ) -> Option<ArchetypeId> {
-        if let &[component_id] = component_ids {
-            if let Some(archetype_id) =
+        if let &[component_id] = component_ids
+            && let Some(archetype_id) =
                 Self::find_archetype_before(graph, archetype_id, component_id)
-            {
-                return Some(archetype_id);
-            }
+        {
+            return Some(archetype_id);
         }
 
         let Some(info) = Self::get_info(archetypes, archetype_id) else {

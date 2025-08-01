@@ -6,10 +6,11 @@ use core::{
     iter,
     marker::PhantomData,
     ptr::{self, NonNull},
-    slice,
 };
 
-use crate::soa::traits::{FieldDescriptor, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite};
+use crate::soa::traits::{
+    FieldDescriptor, FieldDescriptors, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite,
+};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct KeyValuePair<K, V>
@@ -57,18 +58,7 @@ where
     fn upcast_field_descriptors<'short, 'long: 'short>(
         from: Self::FieldDescriptors<'long>,
     ) -> Self::FieldDescriptors<'short> {
-        let KeyValueFieldDescriptors {
-            key,
-            value,
-            phantom,
-        } = from;
-
-        let value = V::upcast_field_descriptors(value);
-        KeyValueFieldDescriptors {
-            key,
-            value,
-            phantom,
-        }
+        from
     }
 
     #[inline]
@@ -104,10 +94,7 @@ where
 
     #[inline]
     fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_> {
-        KeyValueMutPtrs {
-            key: ptr::dangling_mut(),
-            value: V::ptrs_dangling(context),
-        }
+        KeyValueMutPtrs::dangling(context)
     }
 
     #[inline]
@@ -130,11 +117,7 @@ where
         context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
     ) -> Self::Ptrs<'context> {
-        let KeyValueMutPtrs { key, value } = ptrs;
-        KeyValuePtrs {
-            key: key.cast_const(),
-            value: V::ptrs_cast_const(context, value),
-        }
+        ptrs.cast_const(context)
     }
 
     #[inline]
@@ -142,11 +125,7 @@ where
         context: &'context Self::Context,
         ptrs: Self::Ptrs<'context>,
     ) -> Self::MutPtrs<'context> {
-        let KeyValuePtrs { key, value } = ptrs;
-        KeyValueMutPtrs {
-            key: key.cast_mut(),
-            value: V::ptrs_cast_mut(context, value),
-        }
+        ptrs.cast_mut(context)
     }
 
     #[inline]
@@ -155,11 +134,7 @@ where
         ptrs: Self::Ptrs<'context>,
         offset: usize,
     ) -> Self::Ptrs<'context> {
-        let KeyValuePtrs { key, value } = ptrs;
-        KeyValuePtrs {
-            key: unsafe { key.add(offset) },
-            value: unsafe { V::ptrs_add(context, value, offset) },
-        }
+        unsafe { ptrs.add(context, offset) }
     }
 
     #[inline]
@@ -168,11 +143,7 @@ where
         ptrs: Self::MutPtrs<'context>,
         offset: usize,
     ) -> Self::MutPtrs<'context> {
-        let KeyValueMutPtrs { key, value } = ptrs;
-        KeyValueMutPtrs {
-            key: unsafe { key.add(offset) },
-            value: unsafe { V::ptrs_add_mut(context, value, offset) },
-        }
+        unsafe { ptrs.add(context, offset) }
     }
 
     #[inline]
@@ -181,17 +152,7 @@ where
         ptrs: Self::Ptrs<'_>,
         origin: Self::Ptrs<'_>,
     ) -> isize {
-        let KeyValuePtrs { key, value } = ptrs;
-        let KeyValuePtrs {
-            key: origin_key,
-            value: origin_value,
-        } = origin;
-
-        let key_offset = unsafe { key.offset_from(origin_key) };
-        let values_offset = unsafe { V::ptrs_offset_from(context, value, origin_value) };
-        assert_eq!(key_offset, values_offset);
-
-        key_offset
+        unsafe { ptrs.offset_from(context, origin) }
     }
 
     #[inline]
@@ -200,34 +161,12 @@ where
         ptrs: Self::MutPtrs<'_>,
         origin: Self::Ptrs<'_>,
     ) -> isize {
-        let KeyValueMutPtrs { key, value } = ptrs;
-        let KeyValuePtrs {
-            key: origin_key,
-            value: origin_value,
-        } = origin;
-
-        let key_offset = unsafe { key.offset_from(origin_key) };
-        let values_offset = unsafe { V::ptrs_offset_from_mut(context, value, origin_value) };
-        assert_eq!(key_offset, values_offset);
-
-        key_offset
+        unsafe { ptrs.offset_from(context, origin) }
     }
 
     #[inline]
     unsafe fn ptrs_swap(context: &Self::Context, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
-        let KeyValueMutPtrs {
-            key: a_key,
-            value: a_value,
-        } = a;
-        let KeyValueMutPtrs {
-            key: b_key,
-            value: b_value,
-        } = b;
-
-        unsafe {
-            ptr::swap(a_key, b_key);
-            V::ptrs_swap(context, a_value, b_value);
-        }
+        unsafe { a.swap(context, b) }
     }
 
     #[inline]
@@ -237,19 +176,7 @@ where
         dst: Self::MutPtrs<'_>,
         len: usize,
     ) {
-        let KeyValuePtrs {
-            key: src_key,
-            value: src_value,
-        } = src;
-        let KeyValueMutPtrs {
-            key: dst_key,
-            value: dst_value,
-        } = dst;
-
-        unsafe {
-            ptr::copy(src_key, dst_key, len);
-            V::ptrs_copy(context, src_value, dst_value, len);
-        }
+        unsafe { dst.copy_from(context, src, len) }
     }
 
     #[inline]
@@ -259,19 +186,7 @@ where
         dst: Self::MutPtrs<'_>,
         len: usize,
     ) {
-        let KeyValuePtrs {
-            key: src_key,
-            value: src_value,
-        } = src;
-        let KeyValueMutPtrs {
-            key: dst_key,
-            value: dst_value,
-        } = dst;
-
-        unsafe {
-            V::ptrs_copy_rev(context, src_value, dst_value, len);
-            ptr::copy(src_key, dst_key, len);
-        }
+        unsafe { dst.copy_from_rev(context, src, len) }
     }
 
     #[inline]
@@ -281,29 +196,12 @@ where
         dst: Self::MutPtrs<'_>,
         len: usize,
     ) {
-        let KeyValuePtrs {
-            key: src_key,
-            value: src_value,
-        } = src;
-        let KeyValueMutPtrs {
-            key: dst_key,
-            value: dst_value,
-        } = dst;
-
-        unsafe {
-            ptr::copy_nonoverlapping(src_key, dst_key, len);
-            V::ptrs_copy_nonoverlapping(context, src_value, dst_value, len);
-        }
+        unsafe { dst.copy_from_nonoverlapping(context, src, len) }
     }
 
     #[inline]
     unsafe fn ptrs_drop_in_place(context: &Self::Context, ptrs: Self::MutPtrs<'_>) {
-        let KeyValueMutPtrs { key, value } = ptrs;
-
-        unsafe {
-            ptr::drop_in_place(key);
-            V::ptrs_drop_in_place(context, value);
-        }
+        unsafe { ptrs.drop_in_place(context) }
     }
 
     type NonNullPtrs<'context> = KeyValueNonNullPtrs<'context, K, V>;
@@ -322,11 +220,7 @@ where
         context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
     ) -> Self::NonNullPtrs<'context> {
-        let KeyValueMutPtrs { key, value } = ptrs;
-        KeyValueNonNullPtrs {
-            key: unsafe { NonNull::new_unchecked(key) },
-            value: unsafe { V::ptrs_to_nonnull(context, value) },
-        }
+        unsafe { KeyValueNonNullPtrs::new_unchecked(context, ptrs) }
     }
 
     #[inline]
@@ -334,11 +228,7 @@ where
         context: &'context Self::Context,
         ptrs: Self::NonNullPtrs<'context>,
     ) -> Self::MutPtrs<'context> {
-        let KeyValueNonNullPtrs { key, value } = ptrs;
-        KeyValueMutPtrs {
-            key: key.as_ptr(),
-            value: V::nonnull_to_ptrs(context, value),
-        }
+        ptrs.into_mut_ptrs(context)
     }
 
     type Refs<'context, 'a>
@@ -374,11 +264,7 @@ where
         context: &'context Self::Context,
         ptrs: Self::Ptrs<'context>,
     ) -> Self::Refs<'context, 'a> {
-        let KeyValuePtrs { key, value } = ptrs;
-        KeyValueRefs {
-            key: unsafe { &*key },
-            value: unsafe { V::ptrs_to_refs(context, value) },
-        }
+        unsafe { ptrs.deref(context) }
     }
 
     #[inline]
@@ -386,11 +272,7 @@ where
         context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
     ) -> Self::RefsMut<'context, 'a> {
-        let KeyValueMutPtrs { key, value } = ptrs;
-        KeyValueRefsMut {
-            key: unsafe { &mut *key },
-            value: unsafe { V::ptrs_to_refs_mut(context, value) },
-        }
+        unsafe { ptrs.deref_mut(context) }
     }
 
     #[inline]
@@ -401,11 +283,7 @@ where
     where
         Self: 'a,
     {
-        let KeyValueRefs { key, value } = refs;
-        KeyValuePtrs {
-            key: ptr::from_ref(key),
-            value: V::refs_as_ptrs(context, value),
-        }
+        refs.into_ptrs(context)
     }
 
     #[inline]
@@ -416,11 +294,7 @@ where
     where
         Self: 'a,
     {
-        let KeyValueRefsMut { key, value } = refs;
-        KeyValueMutPtrs {
-            key: ptr::from_mut(key),
-            value: V::refs_mut_as_ptrs(context, value),
-        }
+        refs.into_ptrs(context)
     }
 
     #[inline]
@@ -428,11 +302,7 @@ where
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
     ) -> Self::Refs<'context, 'a> {
-        let KeyValueRefsMut { key, value } = refs;
-        KeyValueRefs {
-            key: &*key,
-            value: V::refs_mut_as_refs(context, value),
-        }
+        refs.into_refs(context)
     }
 
     type SlicePtrs<'context> = KeyValueSlicePtrs<'context, K, V>;
@@ -463,11 +333,7 @@ where
         ptrs: Self::Ptrs<'context>,
         len: usize,
     ) -> Self::SlicePtrs<'context> {
-        let KeyValuePtrs { key, value } = ptrs;
-        KeyValueSlicePtrs {
-            keys: ptr::slice_from_raw_parts(key, len),
-            values: V::slices_from_raw_parts(context, value, len),
-        }
+        KeyValueSlicePtrs::from_raw_parts(context, ptrs, len)
     }
 
     #[inline]
@@ -476,11 +342,7 @@ where
         ptrs: Self::MutPtrs<'context>,
         len: usize,
     ) -> Self::SliceMutPtrs<'context> {
-        let KeyValueMutPtrs { key, value } = ptrs;
-        KeyValueSliceMutPtrs {
-            keys: ptr::slice_from_raw_parts_mut(key, len),
-            values: V::slices_from_raw_parts_mut(context, value, len),
-        }
+        KeyValueSliceMutPtrs::from_raw_parts(context, ptrs, len)
     }
 
     #[inline]
@@ -488,11 +350,7 @@ where
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::SlicePtrs<'context> {
-        let KeyValueSliceMutPtrs { keys, values } = slices;
-        KeyValueSlicePtrs {
-            keys: keys.cast_const(),
-            values: V::slice_ptrs_cast_const(context, values),
-        }
+        slices.cast_const(context)
     }
 
     #[inline]
@@ -500,31 +358,19 @@ where
         context: &'context Self::Context,
         slices: Self::SlicePtrs<'context>,
     ) -> Self::SliceMutPtrs<'context> {
-        let KeyValueSlicePtrs { keys, values } = slices;
-        KeyValueSliceMutPtrs {
-            keys: keys.cast_mut(),
-            values: V::slice_ptrs_cast_mut(context, values),
-        }
+        slices.cast_mut(context)
     }
 
     #[inline]
+    #[track_caller]
     fn slice_ptrs_len(context: &Self::Context, slices: &Self::SlicePtrs<'_>) -> usize {
-        let KeyValueSlicePtrs { keys, values } = slices;
-
-        let keys_len = keys.len();
-        let values_len = V::slice_ptrs_len(context, values);
-        assert_eq!(keys_len, values_len);
-        keys_len
+        slices.len(context)
     }
 
     #[inline]
+    #[track_caller]
     fn slice_mut_ptrs_len(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
-        let KeyValueSliceMutPtrs { keys, values } = slices;
-
-        let keys_len = keys.len();
-        let values_len = V::slice_mut_ptrs_len(context, values);
-        assert_eq!(keys_len, values_len);
-        keys_len
+        slices.len(context)
     }
 
     #[inline]
@@ -532,11 +378,7 @@ where
         context: &'context Self::Context,
         slices: Self::SlicePtrs<'context>,
     ) -> Self::Ptrs<'context> {
-        let KeyValueSlicePtrs { keys, values } = slices;
-        KeyValuePtrs {
-            key: keys.cast(), // should be `keys.as_ptr()` but it's unstable
-            value: V::slice_ptrs_as_ptrs(context, values),
-        }
+        slices.into_ptrs(context)
     }
 
     #[inline]
@@ -544,11 +386,7 @@ where
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::MutPtrs<'context> {
-        let KeyValueSliceMutPtrs { keys, values } = slices;
-        KeyValueMutPtrs {
-            key: keys.cast(), // should be `keys.as_mut_ptr()` but it's unstable
-            value: V::slice_mut_ptrs_as_ptrs(context, values),
-        }
+        slices.into_mut_ptrs(context)
     }
 
     type Slices<'context, 'a>
@@ -584,13 +422,7 @@ where
         context: &'context Self::Context,
         slices: Self::SlicePtrs<'context>,
     ) -> Self::Slices<'context, 'a> {
-        let len = Self::slice_ptrs_len(context, &slices);
-        let KeyValueSlicePtrs { keys, values } = slices;
-
-        KeyValueSlices {
-            keys: unsafe { slice::from_raw_parts(keys.cast(), len) },
-            values: unsafe { V::slice_ptrs_to_slices(context, values) },
-        }
+        unsafe { slices.deref(context) }
     }
 
     #[inline]
@@ -598,13 +430,7 @@ where
         context: &'context Self::Context,
         slices: Self::SliceMutPtrs<'context>,
     ) -> Self::SlicesMut<'context, 'a> {
-        let len = Self::slice_mut_ptrs_len(context, &slices);
-        let KeyValueSliceMutPtrs { keys, values } = slices;
-
-        KeyValueSlicesMut {
-            keys: unsafe { slice::from_raw_parts_mut(keys.cast(), len) },
-            values: unsafe { V::slice_mut_ptrs_to_slices(context, values) },
-        }
+        unsafe { slices.deref_mut(context) }
     }
 
     #[inline]
@@ -613,12 +439,7 @@ where
     where
         Self: 'a,
     {
-        let KeyValueSlices { keys, values } = slices;
-
-        let keys_len = keys.len();
-        let values_len = V::slices_len(context, values);
-        assert_eq!(keys_len, values_len);
-        keys_len
+        slices.len(context)
     }
 
     #[inline]
@@ -627,12 +448,7 @@ where
     where
         Self: 'a,
     {
-        let KeyValueSlicesMut { keys, values } = slices;
-
-        let keys_len = keys.len();
-        let values_len = V::slices_mut_len(context, values);
-        assert_eq!(keys_len, values_len);
-        keys_len
+        slices.len(context)
     }
 
     #[inline]
@@ -643,11 +459,7 @@ where
     where
         Self: 'a,
     {
-        let KeyValueSlices { keys, values } = slices;
-        KeyValueSlicePtrs {
-            keys: ptr::from_ref(keys),
-            values: V::slices_as_slice_ptrs(context, values),
-        }
+        slices.into_slice_ptrs(context)
     }
 
     #[inline]
@@ -658,11 +470,7 @@ where
     where
         Self: 'a,
     {
-        let KeyValueSlicesMut { keys, values } = slices;
-        KeyValueSliceMutPtrs {
-            keys: ptr::from_mut(keys),
-            values: V::slices_mut_as_slice_ptrs(context, values),
-        }
+        slices.into_slice_mut_ptrs(context)
     }
 
     #[inline]
@@ -670,11 +478,7 @@ where
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a> {
-        let KeyValueSlicesMut { keys, values } = slices;
-        KeyValueSlices {
-            keys: &*keys,
-            values: V::slices_mut_as_slices(context, values),
-        }
+        slices.into_slices(context)
     }
 
     #[inline]
@@ -685,11 +489,7 @@ where
     where
         Self: 'a,
     {
-        let KeyValueSlices { keys, values } = slices;
-        KeyValuePtrs {
-            key: keys.as_ptr(),
-            value: V::slices_as_ptrs(context, values),
-        }
+        slices.into_ptrs(context)
     }
 
     #[inline]
@@ -700,21 +500,12 @@ where
     where
         Self: 'a,
     {
-        let KeyValueSlicesMut { keys, values } = slices;
-        KeyValueMutPtrs {
-            key: keys.as_mut_ptr(),
-            value: V::slices_mut_as_ptrs(context, values),
-        }
+        slices.into_mut_ptrs(context)
     }
 
     #[inline]
     unsafe fn slices_drop_in_place(context: &Self::Context, slices: Self::SliceMutPtrs<'_>) {
-        let KeyValueSliceMutPtrs { keys, values } = slices;
-
-        unsafe {
-            ptr::drop_in_place(keys);
-            V::slices_drop_in_place(context, values);
-        }
+        unsafe { slices.drop_in_place(context) }
     }
 }
 
@@ -761,7 +552,7 @@ where
     V: Soa + ?Sized,
 {
     key: FieldDescriptor,
-    value: V::FieldDescriptors<'context>,
+    values: FieldDescriptors<'context, V>,
     phantom: PhantomData<fn() -> K>,
 }
 
@@ -773,22 +564,28 @@ where
     pub fn new(context: &'context V::Context) -> Self {
         Self {
             key: FieldDescriptor::of::<K>(),
+            values: FieldDescriptors::new(V::field_descriptors(context)),
             phantom: PhantomData,
-            value: V::field_descriptors(context),
         }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (FieldDescriptor, FieldDescriptors<'context, V>) {
+        let Self { key, values, .. } = self;
+        (key, values)
     }
 }
 
 impl<'context, K, V> Debug for KeyValueFieldDescriptors<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::FieldDescriptors<'context>: Debug,
+    FieldDescriptors<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { key, value, .. } = self;
+        let Self { key, values, .. } = self;
         f.debug_struct("KeyValueFieldLayouts")
             .field("key", key)
-            .field("value", value)
+            .field("values", values)
             .finish()
     }
 }
@@ -796,17 +593,17 @@ where
 impl<'context, K, V> Clone for KeyValueFieldDescriptors<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::FieldDescriptors<'context>: Clone,
+    FieldDescriptors<'context, V>: Clone,
 {
     fn clone(&self) -> Self {
         let Self {
             key,
-            ref value,
+            ref values,
             phantom,
         } = *self;
         Self {
             key,
-            value: value.clone(),
+            values: values.clone(),
             phantom,
         }
     }
@@ -815,7 +612,7 @@ where
 impl<'context, K, V> Copy for KeyValueFieldDescriptors<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::FieldDescriptors<'context>: Copy,
+    FieldDescriptors<'context, V>: Copy,
 {
 }
 
@@ -834,14 +631,16 @@ where
     >;
 
     fn into_iter(self) -> Self::IntoIter {
-        let Self { key, value, .. } = self;
+        let Self { key, values, .. } = self;
 
         let f: fn(<V::FieldDescriptors<'context> as IntoIterator>::Item) -> _ =
             |desc| *desc.as_ref();
-        let value = value.into_iter().map(f);
+        let value = values.into_iter().map(f);
         iter::once(key).chain(value)
     }
 }
+
+// TODO: make all the types below covariant over their lifetimes by using wrappers from `gpecs_soa::traits`
 
 pub struct KeyValuePtrs<'context, K, V>
 where
@@ -849,6 +648,59 @@ where
 {
     pub key: *const K,
     pub value: V::Ptrs<'context>,
+}
+
+impl<'context, K, V> KeyValuePtrs<'context, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
+    pub fn cast_mut(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
+        let Self { key, value } = self;
+        KeyValueMutPtrs {
+            key: key.cast_mut(),
+            value: V::ptrs_cast_mut(context, value),
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
+        let Self { key, value } = self;
+        Self {
+            key: unsafe { key.add(offset) },
+            value: unsafe { V::ptrs_add(context, value, offset) },
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn offset_from(self, context: &V::Context, origin: KeyValuePtrs<'_, K, V>) -> isize {
+        let Self { key, value } = self;
+        let KeyValuePtrs {
+            key: origin_key,
+            value: origin_value,
+        } = origin;
+
+        let key_offset = unsafe { key.offset_from(origin_key) };
+        let values_offset = unsafe { V::ptrs_offset_from(context, value, origin_value) };
+        assert_eq!(key_offset, values_offset);
+
+        key_offset
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn deref<'a>(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueRefs<'context, 'a, K, V> {
+        let Self { key, value } = self;
+
+        let key = unsafe { &*key };
+        let value = unsafe { V::ptrs_to_refs(context, value) };
+        KeyValueRefs { key, value }
+    }
 }
 
 impl<'context, K, V> From<(*const K, V::Ptrs<'context>)> for KeyValuePtrs<'context, K, V>
@@ -973,6 +825,174 @@ where
     pub value: V::MutPtrs<'context>,
 }
 
+impl<'context, K, V> KeyValueMutPtrs<'context, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
+    pub fn dangling(context: &'context V::Context) -> Self {
+        Self {
+            key: ptr::dangling_mut(),
+            value: V::ptrs_dangling(context),
+        }
+    }
+
+    #[inline]
+    pub fn cast_const(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+        let Self { key, value } = self;
+        KeyValuePtrs {
+            key: key.cast_const(),
+            value: V::ptrs_cast_const(context, value),
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
+        let Self { key, value } = self;
+        Self {
+            key: unsafe { key.add(offset) },
+            value: unsafe { V::ptrs_add_mut(context, value, offset) },
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn offset_from(self, context: &V::Context, origin: KeyValuePtrs<'_, K, V>) -> isize {
+        let Self { key, value } = self;
+        let KeyValuePtrs {
+            key: origin_key,
+            value: origin_value,
+        } = origin;
+
+        let key_offset = unsafe { key.offset_from(origin_key) };
+        let values_offset = unsafe { V::ptrs_offset_from_mut(context, value, origin_value) };
+        assert_eq!(key_offset, values_offset);
+
+        key_offset
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn swap(self, context: &V::Context, with: KeyValueMutPtrs<'_, K, V>) {
+        let Self {
+            key: this_key,
+            value: this_value,
+        } = self;
+        let KeyValueMutPtrs {
+            key: with_key,
+            value: with_value,
+        } = with;
+
+        unsafe {
+            ptr::swap(this_key, with_key);
+            V::ptrs_swap(context, this_value, with_value);
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn copy_from(self, context: &V::Context, from: KeyValuePtrs<'_, K, V>, len: usize) {
+        let Self {
+            key: dst_key,
+            value: dst_value,
+        } = self;
+        let KeyValuePtrs {
+            key: src_key,
+            value: src_value,
+        } = from;
+
+        unsafe {
+            ptr::copy(src_key, dst_key, len);
+            V::ptrs_copy(context, src_value, dst_value, len);
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn copy_from_rev(
+        self,
+        context: &V::Context,
+        from: KeyValuePtrs<'_, K, V>,
+        len: usize,
+    ) {
+        let Self {
+            key: dst_key,
+            value: dst_value,
+        } = self;
+        let KeyValuePtrs {
+            key: src_key,
+            value: src_value,
+        } = from;
+
+        unsafe {
+            V::ptrs_copy_rev(context, src_value, dst_value, len);
+            ptr::copy(src_key, dst_key, len);
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn copy_from_nonoverlapping(
+        self,
+        context: &V::Context,
+        from: KeyValuePtrs<'_, K, V>,
+        len: usize,
+    ) {
+        let Self {
+            key: dst_key,
+            value: dst_value,
+        } = self;
+        let KeyValuePtrs {
+            key: src_key,
+            value: src_value,
+        } = from;
+
+        unsafe {
+            ptr::copy_nonoverlapping(src_key, dst_key, len);
+            V::ptrs_copy_nonoverlapping(context, src_value, dst_value, len);
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn drop_in_place(self, context: &V::Context) {
+        let Self { key, value } = self;
+
+        unsafe {
+            ptr::drop_in_place(key);
+            V::ptrs_drop_in_place(context, value);
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn deref<'a>(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueRefs<'context, 'a, K, V> {
+        let Self { key, value } = self;
+
+        let key = unsafe { &*key };
+        let value = V::ptrs_cast_const(context, value);
+        let value = unsafe { V::ptrs_to_refs(context, value) };
+        KeyValueRefs { key, value }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn deref_mut<'a>(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueRefsMut<'context, 'a, K, V> {
+        let Self { key, value } = self;
+
+        let key = unsafe { &mut *key };
+        let value = unsafe { V::ptrs_to_refs_mut(context, value) };
+        KeyValueRefsMut { key, value }
+    }
+}
+
 impl<'context, K, V> From<(*mut K, V::MutPtrs<'context>)> for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
@@ -1094,6 +1114,42 @@ where
 {
     pub key: NonNull<K>,
     pub value: V::NonNullPtrs<'context>,
+}
+
+impl<'context, K, V> KeyValueNonNullPtrs<'context, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn new_unchecked(
+        context: &'context V::Context,
+        ptrs: KeyValueMutPtrs<'context, K, V>,
+    ) -> Self {
+        let KeyValueMutPtrs { key, value } = ptrs;
+        Self {
+            key: unsafe { NonNull::new_unchecked(key) },
+            value: unsafe { V::ptrs_to_nonnull(context, value) },
+        }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+        let Self { key, value } = self;
+        KeyValuePtrs {
+            key: key.as_ptr().cast_const(),
+            value: V::ptrs_cast_const(context, V::nonnull_to_ptrs(context, value)),
+        }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
+        let Self { key, value } = self;
+        KeyValueMutPtrs {
+            key: key.as_ptr(),
+            value: V::nonnull_to_ptrs(context, value),
+        }
+    }
 }
 
 impl<'context, K, V> From<(NonNull<K>, V::NonNullPtrs<'context>)>
@@ -1220,6 +1276,20 @@ where
 {
     pub key: &'a K,
     pub value: V::Refs<'context, 'a>,
+}
+
+impl<'context, 'a, K, V> KeyValueRefs<'context, 'a, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
+    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+        let Self { key, value } = self;
+        KeyValuePtrs {
+            key: ptr::from_ref(key),
+            value: V::refs_as_ptrs(context, value),
+        }
+    }
 }
 
 impl<'context, 'a, K, V> From<(&'a K, V::Refs<'context, 'a>)> for KeyValueRefs<'context, 'a, K, V>
@@ -1385,6 +1455,29 @@ where
     pub value: V::RefsMut<'context, 'a>,
 }
 
+impl<'context, 'a, K, V> KeyValueRefsMut<'context, 'a, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
+    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
+        let Self { key, value } = self;
+        KeyValueMutPtrs {
+            key: ptr::from_mut(key),
+            value: V::refs_mut_as_ptrs(context, value),
+        }
+    }
+
+    #[inline]
+    pub fn into_refs(self, context: &'context V::Context) -> KeyValueRefs<'context, 'a, K, V> {
+        let Self { key, value } = self;
+        KeyValueRefs {
+            key: &*key,
+            value: V::refs_mut_as_refs(context, value),
+        }
+    }
+}
+
 impl<'context, 'a, K, V> From<(&'a mut K, V::RefsMut<'context, 'a>)>
     for KeyValueRefsMut<'context, 'a, K, V>
 where
@@ -1497,6 +1590,67 @@ where
 {
     pub keys: *const [K],
     pub values: V::SlicePtrs<'context>,
+}
+
+impl<'context, K, V> KeyValueSlicePtrs<'context, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
+    pub fn from_raw_parts(
+        context: &'context V::Context,
+        ptrs: KeyValuePtrs<'context, K, V>,
+        len: usize,
+    ) -> Self {
+        let KeyValuePtrs { key, value } = ptrs;
+        Self {
+            keys: ptr::slice_from_raw_parts(key, len),
+            values: V::slices_from_raw_parts(context, value, len),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn len(&self, context: &V::Context) -> usize {
+        let Self { keys, values } = self;
+
+        let keys_len = keys.len();
+        let values_len = V::slice_ptrs_len(context, values);
+        assert_eq!(keys_len, values_len);
+
+        keys_len
+    }
+
+    #[inline]
+    pub fn cast_mut(self, context: &'context V::Context) -> KeyValueSliceMutPtrs<'context, K, V> {
+        let Self { keys, values } = self;
+        KeyValueSliceMutPtrs {
+            keys: keys.cast_mut(),
+            values: V::slice_ptrs_cast_mut(context, values),
+        }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+        let Self { keys, values } = self;
+        KeyValuePtrs {
+            key: keys.cast(), // should be `keys.as_ptr()` but it's unstable
+            value: V::slice_ptrs_as_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn deref<'a>(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueSlices<'context, 'a, K, V> {
+        let Self { keys, values } = self;
+        KeyValueSlices {
+            keys: unsafe { &*keys },
+            values: unsafe { V::slice_ptrs_to_slices(context, values) },
+        }
+    }
 }
 
 impl<'context, K, V> From<(*const [K], V::SlicePtrs<'context>)>
@@ -1627,6 +1781,105 @@ where
     pub values: V::SliceMutPtrs<'context>,
 }
 
+impl<'context, K, V> KeyValueSliceMutPtrs<'context, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
+    pub fn from_raw_parts(
+        context: &'context V::Context,
+        ptrs: KeyValueMutPtrs<'context, K, V>,
+        len: usize,
+    ) -> Self {
+        let KeyValueMutPtrs { key, value } = ptrs;
+        Self {
+            keys: ptr::slice_from_raw_parts_mut(key, len),
+            values: V::slices_from_raw_parts_mut(context, value, len),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn len(&self, context: &V::Context) -> usize {
+        let Self { keys, values } = self;
+
+        let keys_len = keys.len();
+        let values_len = V::slice_mut_ptrs_len(context, values);
+        assert_eq!(keys_len, values_len);
+
+        keys_len
+    }
+
+    #[inline]
+    pub fn cast_const(self, context: &'context V::Context) -> KeyValueSlicePtrs<'context, K, V> {
+        let Self { keys, values } = self;
+        KeyValueSlicePtrs {
+            keys: keys.cast_const(),
+            values: V::slice_ptrs_cast_const(context, values),
+        }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+        let Self { keys, values } = self;
+
+        let values = V::slice_ptrs_cast_const(context, values);
+        KeyValuePtrs {
+            key: keys.cast_const().cast(), // should be `keys.as_ptr()` but it's unstable
+            value: V::slice_ptrs_as_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
+        let Self { keys, values } = self;
+        KeyValueMutPtrs {
+            key: keys.cast(), // should be `keys.as_ptr()` but it's unstable
+            value: V::slice_mut_ptrs_as_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn deref<'a>(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueSlices<'context, 'a, K, V> {
+        let Self { keys, values } = self;
+
+        let values = V::slice_ptrs_cast_const(context, values);
+        KeyValueSlices {
+            keys: unsafe { &*keys },
+            values: unsafe { V::slice_ptrs_to_slices(context, values) },
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn deref_mut<'a>(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueSlicesMut<'context, 'a, K, V> {
+        let Self { keys, values } = self;
+
+        KeyValueSlicesMut {
+            keys: unsafe { &mut *keys },
+            values: unsafe { V::slice_mut_ptrs_to_slices(context, values) },
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn drop_in_place(self, context: &V::Context) {
+        let Self { keys, values } = self;
+
+        unsafe {
+            ptr::drop_in_place(keys);
+            V::slices_drop_in_place(context, values);
+        }
+    }
+}
+
 impl<'context, K, V> From<(*mut [K], V::SliceMutPtrs<'context>)>
     for KeyValueSliceMutPtrs<'context, K, V>
 where
@@ -1754,6 +2007,45 @@ where
 {
     pub keys: &'a [K],
     pub values: V::Slices<'context, 'a>,
+}
+
+impl<'context, 'a, K, V> KeyValueSlices<'context, 'a, K, V>
+where
+    K: 'a,
+    V: Soa + ?Sized,
+{
+    #[inline]
+    #[track_caller]
+    pub fn len(&self, context: &V::Context) -> usize {
+        let Self { keys, values } = self;
+
+        let keys_len = keys.len();
+        let values_len = V::slices_len(context, values);
+        assert_eq!(keys_len, values_len);
+
+        keys_len
+    }
+
+    #[inline]
+    pub fn into_slice_ptrs(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueSlicePtrs<'context, K, V> {
+        let Self { keys, values } = self;
+        KeyValueSlicePtrs {
+            keys: ptr::from_ref(keys),
+            values: V::slices_as_slice_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+        let Self { keys, values } = self;
+        KeyValuePtrs {
+            key: keys.as_ptr(),
+            value: V::slices_as_ptrs(context, values),
+        }
+    }
 }
 
 impl<'context, 'a, K, V> From<(&'a [K], V::Slices<'context, 'a>)>
@@ -1906,6 +2198,79 @@ where
 {
     pub keys: &'a mut [K],
     pub values: V::SlicesMut<'context, 'a>,
+}
+
+impl<'context, 'a, K, V> KeyValueSlicesMut<'context, 'a, K, V>
+where
+    K: 'a,
+    V: Soa + ?Sized,
+{
+    #[inline]
+    #[track_caller]
+    pub fn len(&self, context: &V::Context) -> usize {
+        let Self { keys, values } = self;
+
+        let keys_len = keys.len();
+        let values_len = V::slices_mut_len(context, values);
+        assert_eq!(keys_len, values_len);
+
+        keys_len
+    }
+
+    #[inline]
+    pub fn into_slice_ptrs(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueSlicePtrs<'context, K, V> {
+        let Self { keys, values } = self;
+
+        let values = V::slices_mut_as_slices(context, values);
+        KeyValueSlicePtrs {
+            keys: ptr::from_ref(keys),
+            values: V::slices_as_slice_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    pub fn into_slice_mut_ptrs(
+        self,
+        context: &'context V::Context,
+    ) -> KeyValueSliceMutPtrs<'context, K, V> {
+        let Self { keys, values } = self;
+        KeyValueSliceMutPtrs {
+            keys: ptr::from_mut(keys),
+            values: V::slices_mut_as_slice_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+        let Self { keys, values } = self;
+
+        let values = V::slices_mut_as_slices(context, values);
+        KeyValuePtrs {
+            key: keys.as_ptr(),
+            value: V::slices_as_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
+        let Self { keys, values } = self;
+        KeyValueMutPtrs {
+            key: keys.as_mut_ptr(),
+            value: V::slices_mut_as_ptrs(context, values),
+        }
+    }
+
+    #[inline]
+    pub fn into_slices(self, context: &'context V::Context) -> KeyValueSlices<'context, 'a, K, V> {
+        let Self { keys, values } = self;
+        KeyValueSlices {
+            keys: &*keys,
+            values: V::slices_mut_as_slices(context, values),
+        }
+    }
 }
 
 impl<'context, 'a, K, V> From<(&'a mut [K], V::SlicesMut<'context, 'a>)>

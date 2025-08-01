@@ -3,6 +3,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     ops::{Index, IndexMut},
+    ptr,
 };
 use core_alloc::vec::Vec;
 
@@ -23,19 +24,20 @@ use crate::{
         KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs, KeyValueSlices,
         KeyValueSlicesMut,
     },
-    set,
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
-        traits::{Soa, SoaRead, SoaWrite},
+        traits::{MutPtrs, RefsMut, Soa, SoaRead, SoaWrite},
         vec::SoaVec,
     },
     view::{EpochSparseView, EpochSparseViewMut},
 };
 
 use super::{
+    access::{TryInsertAccess, drop_old_then_write},
     assert::{try_entry_failed, try_insert_failed, try_push_failed},
     entry::generate_entry_types,
+    set,
 };
 
 pub type SparseArena<T> = EpochSparseArena<usize, T>;
@@ -218,6 +220,31 @@ where
     pub fn sparse_shrink_to_fit(&mut self) {
         let Self { sparse, .. } = self;
         sparse.shrink_to_fit();
+    }
+
+    #[inline]
+    pub fn shrink_to(&mut self, min_capacity: usize) {
+        self.truncate(min_capacity, min_capacity);
+
+        let Self { dense, sparse, .. } = self;
+        dense.shrink_to(min_capacity);
+        sparse.shrink_to(min_capacity);
+    }
+
+    #[inline]
+    pub fn dense_shrink_to(&mut self, min_capacity: usize) {
+        self.truncate(min_capacity, usize::MAX);
+
+        let Self { dense, .. } = self;
+        dense.shrink_to(min_capacity);
+    }
+
+    #[inline]
+    pub fn sparse_shrink_to(&mut self, min_capacity: usize) {
+        self.truncate(usize::MAX, min_capacity);
+
+        let Self { sparse, .. } = self;
+        sparse.shrink_to(min_capacity);
     }
 
     #[inline]
@@ -425,6 +452,33 @@ where
     pub fn replace_key(&mut self, key: K) -> Option<K> {
         let mut view_mut = self.as_mut_view();
         view_mut.replace_key(key)
+    }
+
+    pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
+        for dense_index in (dense_len..self.len()).rev() {
+            let (&key, _) = self.dense.slices().into_index(dense_index).into();
+
+            #[allow(unsafe_code, reason = "no other way to work with pointers")]
+            self.remove_into(key, |context, src| {
+                let Some(value) = src else { return };
+                let value = V::ptrs_cast_mut(context, V::upcast_ptrs(value));
+                unsafe { V::ptrs_drop_in_place(context, value) }
+            });
+        }
+        self.dense.truncate(dense_len);
+
+        for sparse_index in sparse_len..self.sparse_len() {
+            let epoch = self.sparse[sparse_index].epoch;
+            let key = K::new(unwrap_into_index(sparse_index), epoch.next());
+
+            #[allow(unsafe_code, reason = "no other way to work with pointers")]
+            self.remove_into(key, |context, src| {
+                let Some(value) = src else { return };
+                let value = V::ptrs_cast_mut(context, V::upcast_ptrs(value));
+                unsafe { V::ptrs_drop_in_place(context, value) }
+            });
+        }
+        self.sparse.truncate(sparse_len);
     }
 
     #[inline]
@@ -717,55 +771,39 @@ where
         let view_mut = self.as_mut_view();
         view_mut.into_iter()
     }
-}
 
-impl<K, V> EpochSparseArena<K, V>
-where
-    K: Key,
-    V: SoaRead,
-{
-    #[inline]
-    pub fn shrink_to(&mut self, min_capacity: usize) {
-        self.truncate(min_capacity, min_capacity);
-
-        let Self { dense, sparse, .. } = self;
-        dense.shrink_to(min_capacity);
-        sparse.shrink_to(min_capacity);
-    }
-
-    #[inline]
-    pub fn dense_shrink_to(&mut self, min_capacity: usize) {
-        self.truncate(min_capacity, usize::MAX);
-
-        let Self { dense, .. } = self;
-        dense.shrink_to(min_capacity);
-    }
-
-    #[inline]
-    pub fn sparse_shrink_to(&mut self, min_capacity: usize) {
-        self.truncate(usize::MAX, min_capacity);
-
-        let Self { sparse, .. } = self;
-        sparse.shrink_to(min_capacity);
-    }
-
-    pub fn swap_remove(&mut self, key: K) -> Option<V> {
+    pub fn swap_remove_into<F, R>(&mut self, key: K, f: F) -> R
+    where
+        F: FnOnce(&V::Context, Option<V::Ptrs<'_>>) -> R,
+    {
         let Self {
             dense,
             sparse,
             sparse_vacant_head,
         } = self;
+        let context = dense.context();
 
-        let sparse_index: usize = key.sparse_index().try_into().ok()?;
-        let dense_index = *sparse
-            .get(sparse_index)
+        let Some(sparse_index) = key.sparse_index().try_into().ok() else {
+            return f(context, None);
+        };
+
+        let dense_index = sparse
+            .get::<usize>(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
-            .and_then(SparseItem::dense_index)?;
+            .and_then(SparseItem::dense_index)
+            .copied();
+        let Some(dense_index) = dense_index else {
+            return f(context, None);
+        };
         let dense_index_usize = unwrap_into_usize(dense_index);
         check_dense_index_bounds(dense_index_usize, dense.len());
 
-        let (dense_key, value) = dense.swap_remove(dense_index_usize).into();
-        check_equal_key(key, dense_key);
+        #[allow(unsafe_code, reason = "no other way to work with pointers")]
+        let result = dense.swap_remove_into(dense_index_usize, |context, src| {
+            let dense_key = unsafe { ptr::read(src.key) };
+            check_equal_key(key, dense_key);
+            f(context, Some(src.value))
+        });
 
         if let Some(KeyValueRefs::<K, _> { key, .. }) = dense.slices().into_get(dense_index_usize) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
@@ -779,26 +817,41 @@ where
         sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
         *sparse_vacant_head = sparse_index;
 
-        Some(value)
+        result
     }
 
-    pub fn remove(&mut self, key: K) -> Option<V> {
+    pub fn remove_into<F, R>(&mut self, key: K, f: F) -> R
+    where
+        F: FnOnce(&V::Context, Option<V::Ptrs<'_>>) -> R,
+    {
         let Self {
             dense,
             sparse,
             sparse_vacant_head,
         } = self;
+        let context = dense.context();
 
-        let sparse_index: usize = key.sparse_index().try_into().ok()?;
+        let Some(sparse_index) = key.sparse_index().try_into().ok() else {
+            return f(context, None);
+        };
+
         let dense_index = sparse
-            .get(sparse_index)
+            .get::<usize>(sparse_index)
             .take_if(|item| item.epoch == key.epoch())
-            .and_then(SparseItem::dense_index)?;
-        let dense_index = unwrap_into_usize(*dense_index);
+            .and_then(SparseItem::dense_index)
+            .copied();
+        let Some(dense_index) = dense_index else {
+            return f(context, None);
+        };
+        let dense_index = unwrap_into_usize(dense_index);
         check_dense_index_bounds(dense_index, dense.len());
 
-        let (dense_key, value) = dense.remove(dense_index).into();
-        check_equal_key(key, dense_key);
+        #[allow(unsafe_code, reason = "no other way to work with pointers")]
+        let result = dense.remove_into(dense_index, |context, src| {
+            let dense_key = unsafe { ptr::read(src.key) };
+            check_equal_key(key, dense_key);
+            f(context, Some(src.value))
+        });
 
         for KeyValueRefs::<K, _> { key, .. } in dense.slices().into_iter().skip(dense_index) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
@@ -810,41 +863,292 @@ where
         sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
         *sparse_vacant_head = sparse_index;
 
-        Some(value)
+        result
     }
 
-    pub fn pop(&mut self) -> Option<(K, V)> {
+    pub fn pop_into<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&V::Context, Option<(K, V::Ptrs<'_>)>) -> R,
+    {
         let Self {
             dense,
             sparse,
             sparse_vacant_head,
         } = self;
 
-        let KeyValuePair { key, value } = dense.pop()?;
+        dense.pop_into(|context, src| {
+            let Some(KeyValuePtrs { key, value }) = src else {
+                return f(context, None);
+            };
+            #[allow(unsafe_code, reason = "no other way to work with pointers")]
+            let key = unsafe { ptr::read(key) };
 
-        let sparse_index = unwrap_into_usize(key.sparse_index());
-        check_key_bounds(sparse_index, sparse.len());
+            let sparse_index = unwrap_into_usize(key.sparse_index());
+            check_key_bounds(sparse_index, sparse.len());
 
-        let next_vacant = unwrap_into_index(*sparse_vacant_head);
-        sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
-        *sparse_vacant_head = sparse_index;
+            let result = f(context, Some((key, value)));
 
-        Some((key, value))
+            let next_vacant = unwrap_into_index(*sparse_vacant_head);
+            sparse[sparse_index] = SparseItem::vacant(next_vacant, key.epoch().next());
+            *sparse_vacant_head = sparse_index;
+
+            result
+        })
     }
 
-    pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
-        for dense_index in (dense_len..self.len()).rev() {
-            let (&key, _) = self.dense.slices().into_index(dense_index).into();
-            self.remove(key);
-        }
-        self.dense.truncate(dense_len);
+    #[inline]
+    #[track_caller]
+    pub fn insert_from<F, R>(&mut self, key: K, f: F) -> R
+    where
+        F: FnOnce(&V::Context, Option<TryInsertAccess<V>>) -> R,
+    {
+        self.try_insert_from(key, |context, dst| {
+            let dst = dst.unwrap_or_else(|error| try_insert_failed(error));
+            f(context, dst)
+        })
+    }
 
-        for sparse_index in sparse_len..self.sparse_len() {
-            let epoch = self.sparse[sparse_index].epoch;
-            let key = K::new(unwrap_into_index(sparse_index), epoch.next());
-            self.remove(key);
+    pub fn try_insert_from<F, R>(&mut self, key: K, f: F) -> R
+    where
+        F: FnOnce(&V::Context, Result<Option<TryInsertAccess<V>>, TryModifyErrorKind<K>>) -> R,
+    {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+        let context = dense.context();
+
+        let sparse_index: usize = match key.sparse_index().try_into() {
+            Ok(sparse_index) => sparse_index,
+            Err(error) => {
+                let error = TooLargeSparseIndexError::new(error).into();
+                return f(context, Err(error));
+            }
+        };
+
+        match sparse.get_mut(sparse_index) {
+            Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
+                SparseItemKind::Occupied { dense_index } => {
+                    let (context, dense) = dense.slices_mut().into_slices_with_context();
+                    let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
+
+                    let dense_index = unwrap_into_usize(dense_index);
+                    let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
+                    let result = f(context, Ok(Some(RefsMut::new(dense_value).into())));
+
+                    sparse_item.epoch = key.epoch();
+                    *dense_key = key;
+
+                    result
+                }
+                SparseItemKind::Vacant { next_vacant } => {
+                    let next_vacant = unwrap_into_usize(next_vacant);
+                    remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
+
+                    let dense_index = match dense.len().try_into() {
+                        Ok(dense_index) => dense_index,
+                        Err(error) => {
+                            let error = TooSmallSparseIndexError::new(error).into();
+                            return f(context, Err(error));
+                        }
+                    };
+                    if let Err(error) = dense.try_reserve(1) {
+                        let context = dense.context();
+                        let error = TryReserveError::Dense(error).into();
+                        return f(context, Err(error));
+                    }
+
+                    #[allow(unsafe_code, reason = "no other way to work with pointers")]
+                    dense.push_from(|context, dst| {
+                        let (key_ptr, value_ptrs) = dst.into();
+                        let result = f(context, Ok(Some(MutPtrs::new(value_ptrs).into())));
+
+                        sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
+                        unsafe { ptr::write(key_ptr, key) }
+
+                        result
+                    })
+                }
+            },
+            Some(_) => f(context, Ok(None)),
+            None => {
+                let new_sparse_len = sparse_index.saturating_add(1);
+                let additional = new_sparse_len.saturating_sub(sparse.len());
+                if let Err(error) = sparse.try_reserve(additional) {
+                    let error = TryReserveError::Sparse(error).into();
+                    return f(context, Err(error));
+                }
+                if let Err(error) = extend_sparse(sparse, new_sparse_len, sparse_vacant_head) {
+                    let error = error.into();
+                    return f(context, Err(error));
+                }
+
+                let dense_index: K::SparseIndex = match dense.len().try_into() {
+                    Ok(dense_index) => dense_index,
+                    Err(error) => {
+                        let error = TooSmallSparseIndexError::new(error).into();
+                        return f(context, Err(error));
+                    }
+                };
+                if let Err(error) = dense.try_reserve(1) {
+                    let context = dense.context();
+                    let error = TryReserveError::Dense(error).into();
+                    return f(context, Err(error));
+                }
+
+                #[allow(unsafe_code, reason = "no other way to work with pointers")]
+                dense.push_from(|context, dst| {
+                    let (key_ptr, value_ptrs) = dst.into();
+                    let result = f(context, Ok(Some(MutPtrs::new(value_ptrs).into())));
+
+                    sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
+                    unsafe { ptr::write(key_ptr, key) }
+
+                    result
+                })
+            }
         }
-        self.sparse.truncate(sparse_len);
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn push_from<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&V::Context, K, V::MutPtrs<'_>) -> R,
+    {
+        self.try_push_from(|context, dst| {
+            let (key, dst) = dst.unwrap_or_else(|error| try_insert_failed(error));
+            f(context, key, dst)
+        })
+    }
+
+    pub fn try_push_from<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&V::Context, Result<(K, V::MutPtrs<'_>), TryModifyErrorKind<K>>) -> R,
+    {
+        let Self {
+            dense,
+            sparse,
+            sparse_vacant_head,
+        } = self;
+        let context = dense.context();
+
+        if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
+            let next_vacant = match (*unwrap_next_vacant(sparse_item.kind())).try_into() {
+                Ok(next_vacant) => next_vacant,
+                Err(error) => {
+                    let error = TooLargeSparseIndexError::new(error).into();
+                    return f(context, Err(error));
+                }
+            };
+
+            let sparse_index = match (*sparse_vacant_head).try_into() {
+                Ok(sparse_index) => sparse_index,
+                Err(error) => {
+                    let error = TooSmallSparseIndexError::new(error).into();
+                    return f(context, Err(error));
+                }
+            };
+            let key = K::new(sparse_index, sparse_item.epoch);
+
+            let dense_index = match dense.len().try_into() {
+                Ok(dense_index) => dense_index,
+                Err(error) => {
+                    let error = TooSmallSparseIndexError::new(error).into();
+                    return f(context, Err(error));
+                }
+            };
+            let sparse_item_kind = SparseItemKind::occupied(dense_index);
+
+            if let Err(error) = dense.try_reserve(1) {
+                let context = dense.context();
+                let error = TryReserveError::Dense(error).into();
+                return f(context, Err(error));
+            }
+
+            #[allow(unsafe_code, reason = "no other way to work with pointers")]
+            return dense.push_from(|context, dst| {
+                let (key_ptr, value_ptrs) = dst.into();
+                let result = f(context, Ok((key, value_ptrs)));
+
+                sparse_item.kind = sparse_item_kind;
+                *sparse_vacant_head = next_vacant;
+                unsafe { ptr::write(key_ptr, key) }
+
+                result
+            });
+        }
+
+        let sparse_index = match (*sparse_vacant_head).try_into() {
+            Ok(sparse_index) => sparse_index,
+            Err(error) => {
+                let error = TooSmallSparseIndexError::new(error).into();
+                return f(context, Err(error));
+            }
+        };
+        let key = K::new(sparse_index, Default::default());
+
+        let dense_index = match dense.len().try_into() {
+            Ok(dense_index) => dense_index,
+            Err(error) => {
+                let error = TooSmallSparseIndexError::new(error).into();
+                return f(context, Err(error));
+            }
+        };
+        let sparse_item = SparseItem::occupied(dense_index, Default::default());
+
+        if let Err(error) = dense.try_reserve(1) {
+            let context = dense.context();
+            let error = TryReserveError::Dense(error).into();
+            return f(context, Err(error));
+        }
+        if let Err(error) = sparse.try_reserve(1) {
+            let context = dense.context();
+            let error = TryReserveError::Sparse(error).into();
+            return f(context, Err(error));
+        }
+
+        let new_sparse_vacant_head = dense.len() + 1;
+        #[allow(unsafe_code, reason = "no other way to work with pointers")]
+        dense.push_from(|context, dst| {
+            let (key_ptr, value_ptrs) = dst.into();
+            let result = f(context, Ok((key, value_ptrs)));
+
+            sparse.push(sparse_item);
+            *sparse_vacant_head = new_sparse_vacant_head;
+            unsafe { ptr::write(key_ptr, key) }
+
+            result
+        })
+    }
+}
+
+impl<K, V> EpochSparseArena<K, V>
+where
+    K: Key,
+    V: SoaRead,
+{
+    #[inline]
+    pub fn swap_remove(&mut self, key: K) -> Option<V> {
+        #[allow(unsafe_code, reason = "no other way to work with pointers")]
+        self.swap_remove_into(key, |context, src| unsafe { V::read(context, src?) }.into())
+    }
+
+    #[inline]
+    pub fn remove(&mut self, key: K) -> Option<V> {
+        #[allow(unsafe_code, reason = "no other way to work with pointers")]
+        self.remove_into(key, |context, src| unsafe { V::read(context, src?) }.into())
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> Option<(K, V)> {
+        #[allow(unsafe_code, reason = "no other way to work with pointers")]
+        self.pop_into(|context, src| {
+            let (key, value) = src?;
+            let value = unsafe { V::read(context, value) };
+            (key, value).into()
+        })
     }
 
     #[inline]
@@ -852,6 +1156,31 @@ where
         let Self { dense, .. } = self;
         let inner = dense.into_iter();
         IntoValues::new(inner)
+    }
+}
+
+impl<K, V> EpochSparseArena<K, V>
+where
+    K: Key,
+    V: SoaWrite,
+{
+    #[inline]
+    #[track_caller]
+    pub fn push(&mut self, value: V) -> K {
+        self.try_push(value)
+            .unwrap_or_else(|error| try_push_failed(error.kind))
+    }
+
+    #[inline]
+    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
+        #[allow(unsafe_code, reason = "no other way to work with pointers")]
+        self.try_push_from(|context, dst| match dst {
+            Ok((key, dst)) => {
+                unsafe { V::write(context, dst, value) }
+                Ok(key)
+            }
+            Err(error) => Err(TryModifyError::new(error, value)),
+        })
     }
 }
 
@@ -867,173 +1196,21 @@ where
             .unwrap_or_else(|error| try_insert_failed(error.kind))
     }
 
+    #[inline]
     pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>> {
-        let Self {
-            dense,
-            sparse,
-            sparse_vacant_head,
-        } = self;
-
-        let sparse_index: usize = match key.sparse_index().try_into() {
-            Ok(sparse_index) => sparse_index,
-            Err(error) => {
-                let kind = TooLargeSparseIndexError::new(error).into();
-                return Err(TryModifyError::new(kind, value));
+        self.try_insert_from(key, |context, dst| match dst {
+            Ok(Some(TryInsertAccess::ReadWrite(dst))) => {
+                let value = soa_replace(context, dst.into_inner(), value);
+                Ok(Some(value))
             }
-        };
-        match sparse.get_mut(sparse_index) {
-            Some(sparse_item) if key.epoch() >= sparse_item.epoch => match sparse_item.kind {
-                SparseItemKind::Occupied { dense_index } => {
-                    let (context, dense) = dense.slices_mut().into_slices_with_context();
-                    let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
-
-                    let dense_index = unwrap_into_usize(dense_index);
-                    let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
-
-                    let value = soa_replace(context, dense_value, value);
-                    sparse_item.epoch = key.epoch();
-                    *dense_key = key;
-
-                    Ok(Some(value))
-                }
-                SparseItemKind::Vacant { next_vacant } => {
-                    let next_vacant = unwrap_into_usize(next_vacant);
-                    remove_from_vacant_list(sparse, sparse_vacant_head, sparse_index, next_vacant);
-
-                    let dense_index = match dense.len().try_into() {
-                        Ok(dense_index) => dense_index,
-                        Err(error) => {
-                            let kind = TooSmallSparseIndexError::new(error).into();
-                            return Err(TryModifyError::new(kind, value));
-                        }
-                    };
-                    if let Err(error) = dense.try_reserve(1) {
-                        let kind = TryReserveError::Dense(error).into();
-                        return Err(TryModifyError::new(kind, value));
-                    }
-                    dense.push(KeyValuePair { key, value });
-                    sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
-
-                    Ok(None)
-                }
-            },
-            Some(_) => Ok(None),
-            None => {
-                let new_sparse_len = sparse_index.saturating_add(1);
-                let additional = new_sparse_len.saturating_sub(sparse.len());
-                if let Err(error) = sparse.try_reserve(additional) {
-                    let kind = TryReserveError::Sparse(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-                if let Err(error) = extend_sparse(sparse, new_sparse_len, sparse_vacant_head) {
-                    let kind = error.into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-
-                let dense_index = match dense.len().try_into() {
-                    Ok(dense_index) => dense_index,
-                    Err(error) => {
-                        let kind = TooSmallSparseIndexError::new(error).into();
-                        return Err(TryModifyError::new(kind, value));
-                    }
-                };
-                if let Err(error) = dense.try_reserve(1) {
-                    let kind = TryReserveError::Dense(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-                dense.push(KeyValuePair { key, value });
-                sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
-
+            #[allow(unsafe_code, reason = "no other way to work with pointers")]
+            Ok(Some(TryInsertAccess::WriteOnly(dst))) => {
+                unsafe { V::write(context, dst.into_inner(), value) }
                 Ok(None)
             }
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn push(&mut self, value: V) -> K {
-        self.try_push(value)
-            .unwrap_or_else(|error| try_push_failed(error.kind))
-    }
-
-    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
-        let Self {
-            dense,
-            sparse,
-            sparse_vacant_head,
-        } = self;
-
-        if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
-            let next_vacant = match (*unwrap_next_vacant(sparse_item.kind())).try_into() {
-                Ok(next_vacant) => next_vacant,
-                Err(error) => {
-                    let kind = TooLargeSparseIndexError::new(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-            };
-
-            let sparse_index = match (*sparse_vacant_head).try_into() {
-                Ok(sparse_index) => sparse_index,
-                Err(error) => {
-                    let kind = TooSmallSparseIndexError::new(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-            };
-            let key = K::new(sparse_index, sparse_item.epoch);
-
-            let dense_index = match dense.len().try_into() {
-                Ok(dense_index) => dense_index,
-                Err(error) => {
-                    let kind = TooSmallSparseIndexError::new(error).into();
-                    return Err(TryModifyError::new(kind, value));
-                }
-            };
-            let sparse_item_kind = SparseItemKind::occupied(dense_index);
-
-            if let Err(error) = dense.try_reserve(1) {
-                let kind = TryReserveError::Dense(error).into();
-                return Err(TryModifyError::new(kind, value));
-            }
-            dense.push(KeyValuePair { key, value });
-
-            sparse_item.kind = sparse_item_kind;
-            *sparse_vacant_head = next_vacant;
-
-            return Ok(key);
-        }
-
-        let sparse_index = match (*sparse_vacant_head).try_into() {
-            Ok(sparse_index) => sparse_index,
-            Err(error) => {
-                let kind = TooSmallSparseIndexError::new(error).into();
-                return Err(TryModifyError::new(kind, value));
-            }
-        };
-        let key = Key::new(sparse_index, Default::default());
-
-        let dense_index = match dense.len().try_into() {
-            Ok(dense_index) => dense_index,
-            Err(error) => {
-                let kind = TooSmallSparseIndexError::new(error).into();
-                return Err(TryModifyError::new(kind, value));
-            }
-        };
-        let sparse_item = SparseItem::occupied(dense_index, Default::default());
-
-        if let Err(error) = dense.try_reserve(1) {
-            let kind = TryReserveError::Dense(error).into();
-            return Err(TryModifyError::new(kind, value));
-        }
-        if let Err(error) = sparse.try_reserve(1) {
-            let kind = TryReserveError::Sparse(error).into();
-            return Err(TryModifyError::new(kind, value));
-        }
-
-        dense.push(KeyValuePair { key, value });
-        sparse.push(sparse_item);
-        *sparse_vacant_head = dense.len();
-
-        Ok(key)
+            Ok(None) => Ok(None),
+            Err(error) => Err(TryModifyError::new(error, value)),
+        })
     }
 }
 
@@ -1214,6 +1391,7 @@ where
 impl<T, K, V> Index<K> for EpochSparseArena<K, V>
 where
     K: Key + Debug,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T> + 'any,
 {
     type Output = T;
@@ -1227,6 +1405,7 @@ where
 impl<T, K, V> IndexMut<K> for EpochSparseArena<K, V>
 where
     K: Key + Debug,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T, RefsMut<'c, 'any> = &'any mut T> + 'any,
 {
     #[inline]
@@ -1238,6 +1417,7 @@ where
 impl<T, K, V> AsRef<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
 {
     #[inline]
@@ -1249,6 +1429,7 @@ where
 impl<T, K, V> AsMut<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
+    V: Soa + ?Sized,
     for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
 {
     #[inline]
@@ -1326,7 +1507,7 @@ where
 impl<K, V> FromIterator<KeyValuePair<K, V>> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaRead + SoaWrite,
+    V: SoaWrite,
     V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = KeyValuePair<K, V>>>(iter: I) -> Self {
@@ -1338,7 +1519,10 @@ where
 
         let mut me = Self::with_capacity(iter_len, iter_len);
         for KeyValuePair { key, value } in iter {
-            me.insert(key, value);
+            #[allow(unsafe_code, reason = "no other way to work with pointers")]
+            me.insert_from(key, |context, dst| unsafe {
+                drop_old_then_write(context, dst, value)
+            })
         }
 
         me
@@ -1348,7 +1532,7 @@ where
 impl<K, V> FromIterator<(K, V)> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaRead + SoaWrite,
+    V: SoaWrite,
     V::Context: Default,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
@@ -1359,16 +1543,16 @@ where
 impl<K, V> FromIterator<V> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaRead + SoaWrite,
+    V: SoaWrite,
     V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
         let dense: SoaVec<_> = iter
             .into_iter()
             .enumerate()
-            .map(|(sparse_index, value)| KeyValuePair {
-                key: K::new(sparse_index, Default::default()),
-                value,
+            .map(|(sparse_index, value)| {
+                let key = K::new(sparse_index, Default::default());
+                KeyValuePair { key, value }
             })
             .collect();
         let len = dense.len();
@@ -1389,7 +1573,7 @@ where
 impl<K, V> Extend<KeyValuePair<K, V>> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaRead + SoaWrite,
+    V: SoaWrite,
 {
     fn extend<I: IntoIterator<Item = KeyValuePair<K, V>>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
@@ -1398,7 +1582,10 @@ where
                 let (lower, _) = iter.size_hint();
                 self.reserve(lower.saturating_add(1), 0);
             }
-            self.insert(key, value);
+            #[allow(unsafe_code, reason = "no other way to work with pointers")]
+            self.insert_from(key, |context, dst| unsafe {
+                drop_old_then_write(context, dst, value)
+            })
         }
     }
 }
@@ -1406,7 +1593,7 @@ where
 impl<K, V> Extend<(K, V)> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaRead + SoaWrite,
+    V: SoaWrite,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         self.extend(iter.into_iter().map(KeyValuePair::from))
@@ -1416,7 +1603,7 @@ where
 impl<K, V> Extend<V> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaRead + SoaWrite,
+    V: SoaWrite,
 {
     fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();

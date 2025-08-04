@@ -13,7 +13,6 @@ use crate::{
 
 use super::Bundle;
 
-#[allow(unsafe_code)]
 unsafe impl<T> Bundle for Identity<T>
 where
     T: Component,
@@ -53,7 +52,6 @@ where
 
 macro_rules! bundle_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
-        #[allow(unsafe_code)]
         unsafe impl<$($types,)*> Bundle for ($($types,)*)
         where
             $($types: Component,)*

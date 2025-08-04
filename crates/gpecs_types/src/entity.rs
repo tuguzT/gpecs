@@ -37,7 +37,6 @@ impl Entity {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const fn epoch(&self) -> EntityEpoch {
         let Self { epoch_world, .. } = *self;
         let epoch = epoch_world >> Self::BITS;
@@ -51,7 +50,6 @@ impl Entity {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const fn world(&self) -> WorldId {
         let Self { epoch_world, .. } = *self;
         let world = epoch_world & Self::LO_BITS_MASK;
@@ -143,7 +141,6 @@ impl EntityEpoch {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const unsafe fn from_u32(epoch: u32) -> Self {
         Self(epoch)
     }

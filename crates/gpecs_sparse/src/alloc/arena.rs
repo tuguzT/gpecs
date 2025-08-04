@@ -303,7 +303,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_keys_slice_mut(&mut self) -> &mut [K] {
         let Self { dense, .. } = self;
 
@@ -320,7 +319,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_keys_ptr_mut(&mut self) -> *mut K {
         let Self { dense, .. } = self;
 
@@ -335,7 +333,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_sparse_slice_mut(&mut self) -> &mut [SparseItem<K>] {
         let Self { sparse, .. } = self;
         sparse.as_mut_slice()
@@ -354,21 +351,18 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_sparse_ptr_mut(&mut self) -> *mut SparseItem<K> {
         let Self { sparse, .. } = self;
         sparse.as_mut_ptr()
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V> {
         let Self { dense, sparse, .. } = self;
         unsafe { EpochSparseView::new_unchecked(dense.slices(), sparse) }
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V> {
         let Self { dense, sparse, .. } = self;
         unsafe { EpochSparseViewMut::new_unchecked(dense.slices_mut(), sparse) }
@@ -455,7 +449,6 @@ where
         for dense_index in (dense_len..self.len()).rev() {
             let (&key, _) = self.dense.slices().into_index(dense_index).into();
 
-            #[allow(unsafe_code, reason = "no other way to work with pointers")]
             self.remove_into(key, |context, src| {
                 let Some(value) = src else { return };
                 let value = V::ptrs_cast_mut(context, V::upcast_ptrs(value));
@@ -468,7 +461,6 @@ where
             let epoch = self.sparse[sparse_index].epoch;
             let key = K::new(unwrap_into_index(sparse_index), epoch.next());
 
-            #[allow(unsafe_code, reason = "no other way to work with pointers")]
             self.remove_into(key, |context, src| {
                 let Some(value) = src else { return };
                 let value = V::ptrs_cast_mut(context, V::upcast_ptrs(value));
@@ -795,7 +787,6 @@ where
         let dense_index_usize = unwrap_into_usize(dense_index);
         check_dense_index_bounds(dense_index_usize, dense.len());
 
-        #[allow(unsafe_code, reason = "no other way to work with pointers")]
         let result = dense.swap_remove_into(dense_index_usize, |context, src| {
             let dense_key = unsafe { ptr::read(src.key) };
             check_equal_key(key, dense_key);
@@ -843,7 +834,6 @@ where
         let dense_index = unwrap_into_usize(dense_index);
         check_dense_index_bounds(dense_index, dense.len());
 
-        #[allow(unsafe_code, reason = "no other way to work with pointers")]
         let result = dense.remove_into(dense_index, |context, src| {
             let dense_key = unsafe { ptr::read(src.key) };
             check_equal_key(key, dense_key);
@@ -877,7 +867,6 @@ where
             let Some(KeyValuePtrs { key, value }) = src else {
                 return f(context, None);
             };
-            #[allow(unsafe_code, reason = "no other way to work with pointers")]
             let key = unsafe { ptr::read(key) };
 
             let sparse_index = unwrap_into_usize(key.sparse_index());
@@ -956,7 +945,6 @@ where
                         return f(context, Err(error));
                     }
 
-                    #[allow(unsafe_code, reason = "no other way to work with pointers")]
                     dense.push_from(|context, dst| {
                         let (key_ptr, value_ptrs) = dst.into();
                         let result = f(context, Ok(Some(value_ptrs.into())));
@@ -994,7 +982,6 @@ where
                     return f(context, Err(error));
                 }
 
-                #[allow(unsafe_code, reason = "no other way to work with pointers")]
                 dense.push_from(|context, dst| {
                     let (key_ptr, value_ptrs) = dst.into();
                     let result = f(context, Ok(Some(value_ptrs.into())));
@@ -1064,7 +1051,6 @@ where
                 return f(context, Err(error));
             }
 
-            #[allow(unsafe_code, reason = "no other way to work with pointers")]
             return dense.push_from(|context, dst| {
                 let (key_ptr, value_ptrs) = dst.into();
                 let result = f(context, Ok((key, value_ptrs.into_inner())));
@@ -1107,7 +1093,6 @@ where
         }
 
         let new_sparse_vacant_head = dense.len() + 1;
-        #[allow(unsafe_code, reason = "no other way to work with pointers")]
         dense.push_from(|context, dst| {
             let (key_ptr, value_ptrs) = dst.into();
             let result = f(context, Ok((key, value_ptrs.into_inner())));
@@ -1128,19 +1113,16 @@ where
 {
     #[inline]
     pub fn swap_remove(&mut self, key: K) -> Option<V> {
-        #[allow(unsafe_code, reason = "no other way to work with pointers")]
         self.swap_remove_into(key, |context, src| unsafe { V::read(context, src?) }.into())
     }
 
     #[inline]
     pub fn remove(&mut self, key: K) -> Option<V> {
-        #[allow(unsafe_code, reason = "no other way to work with pointers")]
         self.remove_into(key, |context, src| unsafe { V::read(context, src?) }.into())
     }
 
     #[inline]
     pub fn pop(&mut self) -> Option<(K, V)> {
-        #[allow(unsafe_code, reason = "no other way to work with pointers")]
         self.pop_into(|context, src| {
             let (key, value) = src?;
             let value = unsafe { V::read(context, value) };
@@ -1170,7 +1152,6 @@ where
 
     #[inline]
     pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
-        #[allow(unsafe_code, reason = "no other way to work with pointers")]
         self.try_push_from(|context, dst| match dst {
             Ok((key, dst)) => {
                 unsafe { V::write(context, dst, value) }
@@ -1200,7 +1181,6 @@ where
                 let value = soa_replace(context, dst.into_inner(), value);
                 Ok(Some(value))
             }
-            #[allow(unsafe_code, reason = "no other way to work with pointers")]
             Ok(Some(TryInsertAccess::WriteOnly(dst))) => {
                 unsafe { V::write(context, dst.into_inner(), value) }
                 Ok(None)
@@ -1516,7 +1496,6 @@ where
 
         let mut me = Self::with_capacity(iter_len, iter_len);
         for KeyValuePair { key, value } in iter {
-            #[allow(unsafe_code, reason = "no other way to work with pointers")]
             me.insert_from(key, |context, dst| unsafe {
                 drop_old_then_write(context, dst, value)
             })
@@ -1579,7 +1558,6 @@ where
                 let (lower, _) = iter.size_hint();
                 self.reserve(lower.saturating_add(1), 0);
             }
-            #[allow(unsafe_code, reason = "no other way to work with pointers")]
             self.insert_from(key, |context, dst| unsafe {
                 drop_old_then_write(context, dst, value)
             })

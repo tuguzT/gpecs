@@ -1,6 +1,5 @@
 //! Nothing too special for now...
 
-#![deny(unsafe_code)]
 #![cfg_attr(not(test), no_std)]
 
 #[cfg(feature = "alloc")]

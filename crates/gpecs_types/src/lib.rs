@@ -1,6 +1,5 @@
 //! Nothing too special, too =)
 
-#![deny(unsafe_code)]
 #![no_std]
 
 pub use gpecs_sparse::soa;

@@ -8,7 +8,6 @@ use crate::{
 mod impls;
 
 /// Non-empty collection of [components](crate::component::Component).
-#[allow(unsafe_code)]
 pub unsafe trait Bundle: SoaRead + SoaWrite + 'static {
     /// Static [`Context`](crate::soa::traits::Soa::Context) instance of this bundle.
     ///

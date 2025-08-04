@@ -40,13 +40,11 @@ impl GpuArchetypeId {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const unsafe fn from_id(id: ArchetypeId) -> Self {
         Self(id)
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const unsafe fn from_u32(id: u32) -> Self {
         let id = unsafe { ArchetypeId::from_u32(id) };
         Self(id)
@@ -229,7 +227,6 @@ impl GpuArchetypeRegistry {
 
         // SAFETY: `GpuArchetypeId` is a #[repr(transparent)] struct around `ArchetypeId`,
         // which is #[repr(transparent)] around `u32`.
-        #[allow(unsafe_code)]
         let archetype_ids = unsafe {
             let slice = gpu_archetypes.as_keys_slice();
             &*(ptr::from_ref(slice) as *const [GpuArchetypeId])

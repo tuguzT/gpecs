@@ -84,7 +84,6 @@ where
 }
 
 #[inline]
-#[allow(unsafe_code)]
 pub unsafe fn from_erased_fields<T>(
     components: &ComponentRegistry,
     context: &T::Context,
@@ -124,7 +123,6 @@ where
 }
 
 #[inline]
-#[allow(unsafe_code)]
 pub unsafe fn from_erased_refs<'a, B>(
     components: &ComponentRegistry,
     fields: ErasedComponents<ErasedFieldRef<'a>>,
@@ -141,7 +139,6 @@ where
 }
 
 #[inline]
-#[allow(unsafe_code)]
 pub unsafe fn from_erased_refs_mut<'a, B>(
     components: &ComponentRegistry,
     fields: ErasedComponents<ErasedFieldRefMut<'a>>,
@@ -157,7 +154,6 @@ where
 }
 
 #[inline]
-#[allow(unsafe_code)]
 pub unsafe fn from_erased_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
@@ -176,7 +172,6 @@ where
 }
 
 #[inline]
-#[allow(unsafe_code)]
 pub unsafe fn from_erased_slices_mut<'a, B>(
     components: &ComponentRegistry,
     len: usize,
@@ -194,7 +189,6 @@ where
 }
 
 #[inline]
-#[allow(unsafe_code)]
 pub unsafe fn drop_erased_in_place<I, F>(fields: I)
 where
     I: IntoIterator<Item = (F, Option<DropFn>)>,

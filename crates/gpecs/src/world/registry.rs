@@ -162,7 +162,6 @@ impl ExactSizeIterator for WorldIds {
 impl FusedIterator for WorldIds {}
 
 #[inline]
-#[allow(unsafe_code)]
 const fn world_id_trusted(id: u16) -> WorldId {
     unsafe { WorldId::from_u16(id) }
 }

@@ -360,7 +360,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn bundles<B>(
         &self,
         components: &ComponentRegistry,
@@ -382,7 +381,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn bundles_mut<B>(
         &mut self,
         components: &ComponentRegistry,
@@ -404,7 +402,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn get_bundle<B>(
         &self,
         components: &ComponentRegistry,
@@ -429,7 +426,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn get_bundle_mut<B>(
         &mut self,
         components: &ComponentRegistry,
@@ -454,7 +450,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn insert_bundle<B>(
         &mut self,
         components: &ComponentRegistry,
@@ -491,7 +486,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn remove_bundle<B>(
         &mut self,
         components: &ComponentRegistry,
@@ -544,10 +538,7 @@ impl ArchetypeStorage {
         debug_assert_eq!(fields.len(), component_ids.len());
 
         let fields = fields.zip(component_ids.values().copied());
-        #[allow(unsafe_code)]
-        unsafe {
-            drop_erased_in_place(fields)
-        }
+        unsafe { drop_erased_in_place(fields) }
     }
 
     #[inline]
@@ -763,14 +754,12 @@ trait ErasedStorageExt {
 
 impl ErasedStorageExt for ErasedStorage {
     #[inline]
-    #[allow(unsafe_code)]
     fn entities(&self) -> &[Entity] {
         let entities = self.as_keys_slice();
         unsafe { &*(ptr::from_ref(entities) as *const [Entity]) }
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     fn erased_components(
         &self,
         components: &ComponentRegistry,
@@ -793,7 +782,6 @@ impl ErasedStorageExt for ErasedStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
@@ -816,7 +804,6 @@ impl ErasedStorageExt for ErasedStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     fn insert_erased(
         &mut self,
         components: &ComponentRegistry,

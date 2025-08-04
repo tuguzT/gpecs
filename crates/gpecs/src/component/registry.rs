@@ -41,7 +41,6 @@ impl ComponentDescriptor {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub fn of<T>() -> Self
     where
         T: Component,
@@ -336,7 +335,6 @@ fn component_id_into_usize(id: ComponentId) -> usize {
 }
 
 #[inline]
-#[allow(unsafe_code)]
 fn component_id_trusted(id: u32) -> ComponentId {
     unsafe { ComponentId::from_u32(id) }
 }

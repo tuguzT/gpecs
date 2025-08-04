@@ -6,7 +6,6 @@ use crate::{
 
 mod impls;
 
-#[allow(unsafe_code)]
 pub unsafe trait GpuBundle: Bundle + Copy {
     /// Order of component identifiers should be the same as
     /// the order of corresponding [descriptors](crate::soa::traits::Soa::FieldDescriptors).

@@ -110,7 +110,6 @@ impl ArchetypeInfo {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn storage_mut(&mut self) -> &mut ArchetypeStorage {
         let Self { storage, .. } = self;
         storage
@@ -311,7 +310,6 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn get_archetype_info_mut(&mut self, id: ArchetypeId) -> Option<&mut ArchetypeInfo> {
         let Self { archetypes, .. } = self;
         Self::get_info_mut(archetypes, id)
@@ -543,7 +541,6 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn compatible_archetypes_mut<I>(
         &mut self,
         component_ids: I,
@@ -556,7 +553,6 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn compatible_archetypes_mut_of<B>(
         &mut self,
         components: &ComponentRegistry,
@@ -700,10 +696,7 @@ impl ArchetypeRegistry {
                 unreachable!("duplicated component {component_id:?}")
             }
         });
-        #[allow(unsafe_code)]
-        unsafe {
-            Self::drop_erased_in_place(components, fields_to_drop)
-        }
+        unsafe { Self::drop_erased_in_place(components, fields_to_drop) }
 
         let new_fields = old_fields;
         let archetype_id = Some(new_archetype);
@@ -777,7 +770,6 @@ impl ArchetypeRegistry {
             })
             .collect();
 
-        #[allow(unsafe_code)]
         let value = unsafe { from_erased_fields(components, B::CONTEXT, component_ids, fields) };
 
         let new_fields = old_fields;
@@ -839,10 +831,7 @@ impl ArchetypeRegistry {
             let field = old_fields.swap_remove(&component_id)?;
             Some((component_id, field))
         });
-        #[allow(unsafe_code)]
-        unsafe {
-            Self::drop_erased_in_place(components, fields_to_drop)
-        }
+        unsafe { Self::drop_erased_in_place(components, fields_to_drop) }
 
         let new_fields = old_fields;
         Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);
@@ -868,7 +857,6 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     unsafe fn drop_erased_in_place<I, F>(components: &ComponentRegistry, fields: I)
     where
         I: IntoIterator<Item = (ComponentId, F)>,
@@ -884,7 +872,6 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     fn set_in_archetype_by_entity(
         components: &ComponentRegistry,
         archetypes: &mut Archetypes,
@@ -1982,14 +1969,12 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn archetypes_mut(&mut self) -> &mut CompatibleArchetypesMut<'a> {
         let Self { archetypes, .. } = self;
         archetypes
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn into_archetypes(self) -> CompatibleArchetypesMut<'a> {
         let Self { archetypes, .. } = self;
         archetypes
@@ -2186,7 +2171,6 @@ fn archetype_id_into_usize(id: ArchetypeId) -> usize {
 }
 
 #[inline]
-#[allow(unsafe_code)]
 fn archetype_id_trusted(id: u32) -> ArchetypeId {
     unsafe { ArchetypeId::from_u32(id) }
 }

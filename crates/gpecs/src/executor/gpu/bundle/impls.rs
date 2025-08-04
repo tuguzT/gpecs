@@ -12,7 +12,6 @@ use crate::{
 
 use super::GpuBundle;
 
-#[allow(unsafe_code)]
 unsafe impl<T> GpuBundle for Identity<T>
 where
     T: GpuComponent,
@@ -44,7 +43,6 @@ where
 
 macro_rules! gpu_bundle_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
-        #[allow(unsafe_code)]
         unsafe impl<$($types,)*> GpuBundle for ($($types,)*)
         where
             $($types: GpuComponent,)*

@@ -130,7 +130,6 @@ where
     }
 }
 
-#[allow(unsafe_code, reason = "no other way to work with pointers")]
 pub unsafe fn drop_old_then_write<V>(
     context: &V::Context,
     dst: Option<TryInsertAccess<V>>,

@@ -36,7 +36,6 @@ pub struct GpuArchetypeStorage {
 
 impl GpuArchetypeStorage {
     #[inline]
-    #[allow(unsafe_code)]
     pub(super) fn new(
         components: &ComponentRegistry,
         gpu_device: &Device,
@@ -118,14 +117,12 @@ impl GpuArchetypeStorage {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn storage_buffer(&self) -> &Buffer {
         let Self { storage_buffer, .. } = self;
         storage_buffer
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn storage_buffer_bindings(&self) -> BufferBindings<'_> {
         let Self {
             storage_buffer,

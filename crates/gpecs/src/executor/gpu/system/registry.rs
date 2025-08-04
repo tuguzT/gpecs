@@ -25,7 +25,6 @@ impl GpuSystemId {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const unsafe fn from_u32(id: u32) -> Self {
         Self(id)
     }
@@ -259,7 +258,6 @@ fn gpu_system_id_into_usize(id: GpuSystemId) -> usize {
 }
 
 #[inline]
-#[allow(unsafe_code)]
 fn gpu_system_id_trusted(id: u32) -> GpuSystemId {
     unsafe { GpuSystemId::from_u32(id) }
 }

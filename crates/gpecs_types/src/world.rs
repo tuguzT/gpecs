@@ -26,13 +26,11 @@ impl WorldId {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const unsafe fn from_u16(id: u16) -> Self {
         Self(id as u32)
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn try_from_u32(id: u32) -> Result<Self, WorldIdFromU32Error> {
         const MAX: u32 = u16::MAX as u32;
 
@@ -44,7 +42,6 @@ impl WorldId {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const unsafe fn from_u32(id: u32) -> Self {
         Self(id)
     }

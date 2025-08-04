@@ -45,7 +45,6 @@ impl<K, V> From<KeyValuePair<K, V>> for (K, V) {
     }
 }
 
-#[allow(unsafe_code)]
 unsafe impl<K, V> Soa for KeyValuePair<K, V>
 where
     V: Soa + ?Sized,
@@ -531,7 +530,6 @@ where
     }
 }
 
-#[allow(unsafe_code)]
 unsafe impl<K, V> SoaRead for KeyValuePair<K, V>
 where
     V: SoaRead,
@@ -546,7 +544,6 @@ where
     }
 }
 
-#[allow(unsafe_code)]
 unsafe impl<K, V> SoaWrite for KeyValuePair<K, V>
 where
     V: SoaWrite,
@@ -566,7 +563,6 @@ where
     }
 }
 
-#[allow(unsafe_code)]
 unsafe impl<K, V> SoaTrustedFields for KeyValuePair<K, V> where V: SoaTrustedFields {}
 
 pub struct KeyValueFieldDescriptors<'context, K, V>
@@ -684,7 +680,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
         let Self { key, value } = self;
 
@@ -694,7 +689,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn offset_from(self, context: &V::Context, origin: KeyValuePtrs<'_, K, V>) -> isize {
         let Self { key, value } = self;
         let KeyValuePtrs {
@@ -711,7 +705,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn deref<'a>(
         self,
         context: &'context V::Context,
@@ -867,7 +860,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
         let Self { key, value } = self;
 
@@ -877,7 +869,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn offset_from(self, context: &V::Context, origin: KeyValuePtrs<'_, K, V>) -> isize {
         let Self { key, value } = self;
         let KeyValuePtrs {
@@ -895,7 +886,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn swap(self, context: &V::Context, with: KeyValueMutPtrs<'_, K, V>) {
         let Self {
             key: this_key,
@@ -913,7 +903,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn copy_from(self, context: &V::Context, from: KeyValuePtrs<'_, K, V>, len: usize) {
         let Self {
             key: dst_key,
@@ -931,7 +920,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn copy_from_rev(
         self,
         context: &V::Context,
@@ -954,7 +942,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn copy_from_nonoverlapping(
         self,
         context: &V::Context,
@@ -979,7 +966,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn drop_in_place(self, context: &V::Context) {
         let Self { key, value } = self;
 
@@ -990,7 +976,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn deref<'a>(
         self,
         context: &'context V::Context,
@@ -1004,7 +989,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn deref_mut<'a>(
         self,
         context: &'context V::Context,
@@ -1145,7 +1129,6 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(
         context: &'context V::Context,
         ptrs: KeyValueMutPtrs<'context, K, V>,
@@ -1625,14 +1608,10 @@ where
         let values_len = V::slice_ptrs_len(context, &values);
         assert_eq!(keys_len, values_len);
 
-        #[allow(unsafe_code)]
-        unsafe {
-            Self::new_unchecked(keys, values)
-        }
+        unsafe { Self::new_unchecked(keys, values) }
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(keys: *const [K], values: V::SlicePtrs<'context>) -> Self {
         let values = SlicePtrs::new(values);
         Self { keys, values }
@@ -1682,7 +1661,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn deref<'a>(
         self,
         context: &'context V::Context,
@@ -1826,14 +1804,10 @@ where
         let values_len = V::slice_mut_ptrs_len(context, &values);
         assert_eq!(keys_len, values_len);
 
-        #[allow(unsafe_code)]
-        unsafe {
-            Self::new_unchecked(keys, values)
-        }
+        unsafe { Self::new_unchecked(keys, values) }
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(keys: *mut [K], values: V::SliceMutPtrs<'context>) -> Self {
         let values = SliceMutPtrs::new(values);
         Self { keys, values }
@@ -1894,7 +1868,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn deref<'a>(
         self,
         context: &'context V::Context,
@@ -1908,7 +1881,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn deref_mut<'a>(
         self,
         context: &'context V::Context,
@@ -1922,7 +1894,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn drop_in_place(self, context: &V::Context) {
         let Self { keys, values } = self;
 
@@ -2063,14 +2034,10 @@ where
         let values_len = V::slices_len(context, &values);
         assert_eq!(keys_len, values_len);
 
-        #[allow(unsafe_code)]
-        unsafe {
-            Self::new_unchecked(keys, values)
-        }
+        unsafe { Self::new_unchecked(keys, values) }
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(keys: &'a [K], values: V::Slices<'context, 'a>) -> Self {
         let values = Slices::new(values);
         Self { keys, values }
@@ -2258,14 +2225,10 @@ where
         let values_len = V::slices_mut_len(context, &values);
         assert_eq!(keys_len, values_len);
 
-        #[allow(unsafe_code)]
-        unsafe {
-            Self::new_unchecked(keys, values)
-        }
+        unsafe { Self::new_unchecked(keys, values) }
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(keys: &'a mut [K], values: V::SlicesMut<'context, 'a>) -> Self {
         let values = SlicesMut::new(values);
         Self { keys, values }

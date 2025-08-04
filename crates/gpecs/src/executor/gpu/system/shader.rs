@@ -31,7 +31,6 @@ pub struct SystemShader {
 
 impl SystemShader {
     #[inline]
-    #[allow(unsafe_code)]
     pub(super) fn new<C, B>(
         components: &ComponentRegistry,
         gpu_device: &Device,

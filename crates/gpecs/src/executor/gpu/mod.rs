@@ -41,7 +41,6 @@ pub struct TimestampQueryResources {
 
 impl TimestampQueryResources {
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn query_set(&self) -> &QuerySet {
         let Self { query_set, .. } = self;
         query_set
@@ -54,7 +53,6 @@ impl TimestampQueryResources {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn resolve_buffer(&self) -> &Buffer {
         let Self { resolve_buffer, .. } = self;
         resolve_buffer
@@ -198,7 +196,6 @@ impl<'context> GpuExecutor<'context> {
             archetypes: ref mut gpu_archetypes,
             ..
         } = *self;
-        #[allow(unsafe_code)]
         let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
 
         gpu_archetypes.register_archetype::<B>(components, archetypes, gpu_components, device)
@@ -451,7 +448,6 @@ impl<'context> GpuExecutor<'context> {
                     unreachable!("archetype {archetype_id:?} should exist");
                 };
 
-                #[allow(unsafe_code)]
                 let mut storage_buffer_bindings =
                     unsafe { archetype_info.storage().storage_buffer_bindings() };
                 let mut bind_group_entries = Vec::new();

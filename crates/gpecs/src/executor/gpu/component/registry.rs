@@ -33,13 +33,11 @@ impl GpuComponentId {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const unsafe fn from_id(id: ComponentId) -> Self {
         Self(id)
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub const unsafe fn from_u32(id: u32) -> Self {
         let id = unsafe { ComponentId::from_u32(id) };
         Self(id)
@@ -202,7 +200,6 @@ impl GpuComponentRegistry {
 
         // SAFETY: `GpuComponentId` is a #[repr(transparent)] struct around `ComponentId`,
         // which is #[repr(transparent)] around `u32`.
-        #[allow(unsafe_code)]
         let component_ids = unsafe {
             let slice = components.as_keys_slice();
             &*(ptr::from_ref(slice) as *const [GpuComponentId])

@@ -98,7 +98,6 @@ impl Context {
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_parts_mut(&mut self) -> ContextPartsRefsMut<'_> {
         let Self {
             worlds,

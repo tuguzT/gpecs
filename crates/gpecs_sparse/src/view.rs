@@ -63,7 +63,6 @@ where
 
     #[inline]
     #[track_caller]
-    #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(
         dense: SoaSlices<'c, 'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
@@ -503,7 +502,6 @@ where
 
     #[inline]
     #[track_caller]
-    #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(
         dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
         sparse: &'a mut [SparseItem<K>],
@@ -610,7 +608,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_keys_slice_mut(&mut self) -> &mut [K] {
         let Self { dense, .. } = self;
 
@@ -627,7 +624,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn into_keys_slice_mut(self) -> &'a mut [K] {
         let Self { dense, .. } = self;
 
@@ -644,7 +640,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_keys_ptr_mut(&mut self) -> *mut K {
         let Self { dense, .. } = self;
 
@@ -659,7 +654,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_sparse_slice_mut(&mut self) -> &mut [SparseItem<K>] {
         let Self { sparse, .. } = self;
         sparse
@@ -672,7 +666,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn into_sparse_slice_mut(self) -> &'a mut [SparseItem<K>] {
         let Self { sparse, .. } = self;
         sparse
@@ -685,7 +678,6 @@ where
     }
 
     #[inline]
-    #[allow(unsafe_code)]
     pub unsafe fn as_sparse_ptr_mut(&mut self) -> *mut SparseItem<K> {
         let Self { sparse, .. } = self;
         sparse.as_mut_ptr()
@@ -1345,7 +1337,6 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    #[allow(unsafe_code)]
     fn from(value: EpochSparseViewMut<'c, 'a, K, V>) -> Self {
         let EpochSparseViewMut { dense, sparse } = value;
         unsafe { Self::new_unchecked(dense.into(), sparse) }

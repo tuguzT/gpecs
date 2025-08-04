@@ -9,7 +9,8 @@ use core::{
 };
 
 use crate::soa::traits::{
-    FieldDescriptor, FieldDescriptors, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite,
+    FieldDescriptor, FieldDescriptors, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs,
+    SlicePtrs, Slices, SlicesMut, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -78,18 +79,14 @@ where
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
-        let KeyValuePtrs { key, value } = from;
-        let value = V::upcast_ptrs(value);
-        KeyValuePtrs { key, value }
+        from
     }
 
     type MutPtrs<'context> = KeyValueMutPtrs<'context, K, V>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
-        let KeyValueMutPtrs { key, value } = from;
-        let value = V::upcast_mut_ptrs(value);
-        KeyValueMutPtrs { key, value }
+        from
     }
 
     #[inline]
@@ -108,7 +105,8 @@ where
         let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
 
         let key = buffer.cast();
-        let value = unsafe { V::ptrs_from_buffer(context, buffer.add(offset), capacity) };
+        let buffer = unsafe { buffer.add(offset) };
+        let value = MutPtrs::new(unsafe { V::ptrs_from_buffer(context, buffer, capacity) });
         KeyValueMutPtrs { key, value }
     }
 
@@ -210,9 +208,7 @@ where
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short> {
-        let KeyValueNonNullPtrs { key, value } = from;
-        let value = V::upcast_nonnull_ptrs(value);
-        KeyValueNonNullPtrs { key, value }
+        from
     }
 
     #[inline]
@@ -241,7 +237,7 @@ where
         from: Self::Refs<'long, 'a_long>,
     ) -> Self::Refs<'short, 'a_short> {
         let KeyValueRefs { key, value } = from;
-        let value = V::upcast_refs(value);
+        let value = Refs::new(V::upcast_refs(value.into_inner()));
         KeyValueRefs { key, value }
     }
 
@@ -255,7 +251,7 @@ where
         from: Self::RefsMut<'long, 'a_long>,
     ) -> Self::RefsMut<'short, 'a_short> {
         let KeyValueRefsMut { key, value } = from;
-        let value = V::upcast_refs_mut(value);
+        let value = RefsMut::new(V::upcast_refs_mut(value.into_inner()));
         KeyValueRefsMut { key, value }
     }
 
@@ -315,10 +311,9 @@ where
         'a: 'context,
     {
         let KeyValuePair { key, value } = value;
-        KeyValueRefs {
-            key,
-            value: V::value_as_refs(context, value),
-        }
+
+        let value = Refs::new(V::value_as_refs(context, value));
+        KeyValueRefs { key, value }
     }
 
     #[inline]
@@ -331,10 +326,9 @@ where
         'a: 'context,
     {
         let KeyValuePair { key, value } = value;
-        KeyValueRefsMut {
-            key,
-            value: V::mut_value_as_refs(context, value),
-        }
+
+        let value = RefsMut::new(V::mut_value_as_refs(context, value));
+        KeyValueRefsMut { key, value }
     }
 
     type SlicePtrs<'context> = KeyValueSlicePtrs<'context, K, V>;
@@ -343,9 +337,7 @@ where
     fn upcast_slice_ptrs<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short> {
-        let KeyValueSlicePtrs { keys, values } = from;
-        let values = V::upcast_slice_ptrs(values);
-        KeyValueSlicePtrs { keys, values }
+        from
     }
 
     type SliceMutPtrs<'context> = KeyValueSliceMutPtrs<'context, K, V>;
@@ -354,9 +346,7 @@ where
     fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short> {
-        let KeyValueSliceMutPtrs { keys, values } = from;
-        let values = V::upcast_slice_mut_ptrs(values);
-        KeyValueSliceMutPtrs { keys, values }
+        from
     }
 
     #[inline]
@@ -431,7 +421,7 @@ where
         from: Self::Slices<'long, 'a_long>,
     ) -> Self::Slices<'short, 'a_short> {
         let KeyValueSlices { keys, values } = from;
-        let values = V::upcast_slices(values);
+        let values = Slices::new(V::upcast_slices(values.into_inner()));
         KeyValueSlices { keys, values }
     }
 
@@ -445,7 +435,7 @@ where
         from: Self::SlicesMut<'long, 'a_long>,
     ) -> Self::SlicesMut<'short, 'a_short> {
         let KeyValueSlicesMut { keys, values } = from;
-        let values = V::upcast_slices_mut(values);
+        let values = SlicesMut::new(V::upcast_slices_mut(values.into_inner()));
         KeyValueSlicesMut { keys, values }
     }
 
@@ -551,7 +541,7 @@ where
         let KeyValuePtrs { key, value } = src;
         Self {
             key: unsafe { ptr::read(key) },
-            value: unsafe { V::read(context, value) },
+            value: unsafe { V::read(context, value.into_inner()) },
         }
     }
 }
@@ -571,7 +561,7 @@ where
 
         unsafe {
             ptr::write(key_ptr, key);
-            V::write(context, value_ptr, value);
+            V::write(context, value_ptr.into_inner(), value);
         }
     }
 }
@@ -672,14 +662,12 @@ where
     }
 }
 
-// TODO: make all the types below covariant over their lifetimes by using wrappers from `gpecs_soa::traits`
-
 pub struct KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
     pub key: *const K,
-    pub value: V::Ptrs<'context>,
+    pub value: Ptrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValuePtrs<'context, K, V>
@@ -689,20 +677,20 @@ where
     #[inline]
     pub fn cast_mut(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
         let Self { key, value } = self;
-        KeyValueMutPtrs {
-            key: key.cast_mut(),
-            value: V::ptrs_cast_mut(context, value),
-        }
+
+        let key = key.cast_mut();
+        let value = MutPtrs::new(V::ptrs_cast_mut(context, value.into_inner()));
+        KeyValueMutPtrs { key, value }
     }
 
     #[inline]
     #[allow(unsafe_code)]
     pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
         let Self { key, value } = self;
-        Self {
-            key: unsafe { key.add(offset) },
-            value: unsafe { V::ptrs_add(context, value, offset) },
-        }
+
+        let key = unsafe { key.add(offset) };
+        let value = Ptrs::new(unsafe { V::ptrs_add(context, value.into_inner(), offset) });
+        Self { key, value }
     }
 
     #[inline]
@@ -715,7 +703,8 @@ where
         } = origin;
 
         let key_offset = unsafe { key.offset_from(origin_key) };
-        let values_offset = unsafe { V::ptrs_offset_from(context, value, origin_value) };
+        let values_offset =
+            unsafe { V::ptrs_offset_from(context, value.into_inner(), origin_value.into_inner()) };
         assert_eq!(key_offset, values_offset);
 
         key_offset
@@ -730,23 +719,23 @@ where
         let Self { key, value } = self;
 
         let key = unsafe { &*key };
-        let value = unsafe { V::ptrs_to_refs(context, value) };
+        let value = Refs::new(unsafe { V::ptrs_to_refs(context, value.into_inner()) });
         KeyValueRefs { key, value }
     }
 }
 
-impl<'context, K, V> From<(*const K, V::Ptrs<'context>)> for KeyValuePtrs<'context, K, V>
+impl<'context, K, V> From<(*const K, Ptrs<'context, V>)> for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (*const K, V::Ptrs<'context>)) -> Self {
+    fn from(value: (*const K, Ptrs<'context, V>)) -> Self {
         let (key, value) = value;
         Self { key, value }
     }
 }
 
-impl<'context, K, V> From<KeyValuePtrs<'context, K, V>> for (*const K, V::Ptrs<'context>)
+impl<'context, K, V> From<KeyValuePtrs<'context, K, V>> for (*const K, Ptrs<'context, V>)
 where
     V: Soa + ?Sized,
 {
@@ -760,7 +749,7 @@ where
 impl<'context, K, V> Debug for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::Ptrs<'context>: Debug,
+    Ptrs<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -774,7 +763,7 @@ where
 impl<'context, K, V> PartialEq for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::Ptrs<'context>: PartialEq,
+    Ptrs<'context, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -785,14 +774,14 @@ where
 impl<'context, K, V> Eq for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::Ptrs<'context>: Eq,
+    Ptrs<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::Ptrs<'context>: PartialOrd,
+    Ptrs<'context, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -807,7 +796,7 @@ where
 impl<'context, K, V> Ord for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::Ptrs<'context>: Ord,
+    Ptrs<'context, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -822,7 +811,7 @@ where
 impl<'context, K, V> Hash for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::Ptrs<'context>: Hash,
+    Ptrs<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -845,7 +834,7 @@ where
 impl<'context, K, V> Copy for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::Ptrs<'context>: Copy,
+    Ptrs<'context, V>: Copy,
 {
 }
 
@@ -854,7 +843,7 @@ where
     V: Soa + ?Sized,
 {
     pub key: *mut K,
-    pub value: V::MutPtrs<'context>,
+    pub value: MutPtrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValueMutPtrs<'context, K, V>
@@ -863,29 +852,28 @@ where
 {
     #[inline]
     pub fn dangling(context: &'context V::Context) -> Self {
-        Self {
-            key: ptr::dangling_mut(),
-            value: V::ptrs_dangling(context),
-        }
+        let key = ptr::dangling_mut();
+        let value = MutPtrs::new(V::ptrs_dangling(context));
+        Self { key, value }
     }
 
     #[inline]
     pub fn cast_const(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
         let Self { key, value } = self;
-        KeyValuePtrs {
-            key: key.cast_const(),
-            value: V::ptrs_cast_const(context, value),
-        }
+
+        let key = key.cast_const();
+        let value = Ptrs::new(V::ptrs_cast_const(context, value.into_inner()));
+        KeyValuePtrs { key, value }
     }
 
     #[inline]
     #[allow(unsafe_code)]
     pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
         let Self { key, value } = self;
-        Self {
-            key: unsafe { key.add(offset) },
-            value: unsafe { V::ptrs_add_mut(context, value, offset) },
-        }
+
+        let key = unsafe { key.add(offset) };
+        let value = MutPtrs::new(unsafe { V::ptrs_add_mut(context, value.into_inner(), offset) });
+        Self { key, value }
     }
 
     #[inline]
@@ -898,7 +886,9 @@ where
         } = origin;
 
         let key_offset = unsafe { key.offset_from(origin_key) };
-        let values_offset = unsafe { V::ptrs_offset_from_mut(context, value, origin_value) };
+        let values_offset = unsafe {
+            V::ptrs_offset_from_mut(context, value.into_inner(), origin_value.into_inner())
+        };
         assert_eq!(key_offset, values_offset);
 
         key_offset
@@ -918,7 +908,7 @@ where
 
         unsafe {
             ptr::swap(this_key, with_key);
-            V::ptrs_swap(context, this_value, with_value);
+            V::ptrs_swap(context, this_value.into_inner(), with_value.into_inner());
         }
     }
 
@@ -936,7 +926,7 @@ where
 
         unsafe {
             ptr::copy(src_key, dst_key, len);
-            V::ptrs_copy(context, src_value, dst_value, len);
+            V::ptrs_copy(context, src_value.into_inner(), dst_value.into_inner(), len);
         }
     }
 
@@ -958,7 +948,7 @@ where
         } = from;
 
         unsafe {
-            V::ptrs_copy_rev(context, src_value, dst_value, len);
+            V::ptrs_copy_rev(context, src_value.into_inner(), dst_value.into_inner(), len);
             ptr::copy(src_key, dst_key, len);
         }
     }
@@ -980,6 +970,8 @@ where
             value: src_value,
         } = from;
 
+        let src_value = src_value.into_inner();
+        let dst_value = dst_value.into_inner();
         unsafe {
             ptr::copy_nonoverlapping(src_key, dst_key, len);
             V::ptrs_copy_nonoverlapping(context, src_value, dst_value, len);
@@ -993,7 +985,7 @@ where
 
         unsafe {
             ptr::drop_in_place(key);
-            V::ptrs_drop_in_place(context, value);
+            V::ptrs_drop_in_place(context, value.into_inner());
         }
     }
 
@@ -1006,8 +998,8 @@ where
         let Self { key, value } = self;
 
         let key = unsafe { &*key };
-        let value = V::ptrs_cast_const(context, value);
-        let value = unsafe { V::ptrs_to_refs(context, value) };
+        let value = V::ptrs_cast_const(context, value.into_inner());
+        let value = Refs::new(unsafe { V::ptrs_to_refs(context, value) });
         KeyValueRefs { key, value }
     }
 
@@ -1020,23 +1012,23 @@ where
         let Self { key, value } = self;
 
         let key = unsafe { &mut *key };
-        let value = unsafe { V::ptrs_to_refs_mut(context, value) };
+        let value = RefsMut::new(unsafe { V::ptrs_to_refs_mut(context, value.into_inner()) });
         KeyValueRefsMut { key, value }
     }
 }
 
-impl<'context, K, V> From<(*mut K, V::MutPtrs<'context>)> for KeyValueMutPtrs<'context, K, V>
+impl<'context, K, V> From<(*mut K, MutPtrs<'context, V>)> for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (*mut K, V::MutPtrs<'context>)) -> Self {
+    fn from(value: (*mut K, MutPtrs<'context, V>)) -> Self {
         let (key, value) = value;
         Self { key, value }
     }
 }
 
-impl<'context, K, V> From<KeyValueMutPtrs<'context, K, V>> for (*mut K, V::MutPtrs<'context>)
+impl<'context, K, V> From<KeyValueMutPtrs<'context, K, V>> for (*mut K, MutPtrs<'context, V>)
 where
     V: Soa + ?Sized,
 {
@@ -1050,7 +1042,7 @@ where
 impl<'context, K, V> Debug for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::MutPtrs<'context>: Debug,
+    MutPtrs<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -1064,7 +1056,7 @@ where
 impl<'context, K, V> PartialEq for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::MutPtrs<'context>: PartialEq,
+    MutPtrs<'context, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -1075,14 +1067,14 @@ where
 impl<'context, K, V> Eq for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::MutPtrs<'context>: Eq,
+    MutPtrs<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::MutPtrs<'context>: PartialOrd,
+    MutPtrs<'context, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -1097,7 +1089,7 @@ where
 impl<'context, K, V> Ord for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::MutPtrs<'context>: Ord,
+    MutPtrs<'context, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -1112,7 +1104,7 @@ where
 impl<'context, K, V> Hash for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::MutPtrs<'context>: Hash,
+    MutPtrs<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -1136,7 +1128,7 @@ where
 impl<'context, K, V> Copy for KeyValueMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::MutPtrs<'context>: Copy,
+    MutPtrs<'context, V>: Copy,
 {
 }
 
@@ -1145,7 +1137,7 @@ where
     V: Soa + ?Sized,
 {
     pub key: NonNull<K>,
-    pub value: V::NonNullPtrs<'context>,
+    pub value: NonNullPtrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValueNonNullPtrs<'context, K, V>
@@ -1159,45 +1151,46 @@ where
         ptrs: KeyValueMutPtrs<'context, K, V>,
     ) -> Self {
         let KeyValueMutPtrs { key, value } = ptrs;
-        Self {
-            key: unsafe { NonNull::new_unchecked(key) },
-            value: unsafe { V::ptrs_to_nonnull(context, value) },
-        }
+
+        let key = unsafe { NonNull::new_unchecked(key) };
+        let value = NonNullPtrs::new(unsafe { V::ptrs_to_nonnull(context, value.into_inner()) });
+        Self { key, value }
     }
 
     #[inline]
     pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
         let Self { key, value } = self;
-        KeyValuePtrs {
-            key: key.as_ptr().cast_const(),
-            value: V::ptrs_cast_const(context, V::nonnull_to_ptrs(context, value)),
-        }
+
+        let key = key.as_ptr().cast_const();
+        let value = V::nonnull_to_ptrs(context, value.into_inner());
+        let value = Ptrs::new(V::ptrs_cast_const(context, value));
+        KeyValuePtrs { key, value }
     }
 
     #[inline]
     pub fn into_mut_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
         let Self { key, value } = self;
-        KeyValueMutPtrs {
-            key: key.as_ptr(),
-            value: V::nonnull_to_ptrs(context, value),
-        }
+
+        let key = key.as_ptr();
+        let value = MutPtrs::new(V::nonnull_to_ptrs(context, value.into_inner()));
+        KeyValueMutPtrs { key, value }
     }
 }
 
-impl<'context, K, V> From<(NonNull<K>, V::NonNullPtrs<'context>)>
+impl<'context, K, V> From<(NonNull<K>, NonNullPtrs<'context, V>)>
     for KeyValueNonNullPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (NonNull<K>, V::NonNullPtrs<'context>)) -> Self {
+    fn from(value: (NonNull<K>, NonNullPtrs<'context, V>)) -> Self {
         let (key, value) = value;
         Self { key, value }
     }
 }
 
 impl<'context, K, V> From<KeyValueNonNullPtrs<'context, K, V>>
-    for (NonNull<K>, V::NonNullPtrs<'context>)
+    for (NonNull<K>, NonNullPtrs<'context, V>)
 where
     V: Soa + ?Sized,
 {
@@ -1211,7 +1204,7 @@ where
 impl<'context, K, V> Debug for KeyValueNonNullPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::NonNullPtrs<'context>: Debug,
+    NonNullPtrs<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -1225,7 +1218,7 @@ where
 impl<'context, K, V> PartialEq for KeyValueNonNullPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::NonNullPtrs<'context>: PartialEq,
+    NonNullPtrs<'context, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -1236,14 +1229,14 @@ where
 impl<'context, K, V> Eq for KeyValueNonNullPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::NonNullPtrs<'context>: Eq,
+    NonNullPtrs<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueNonNullPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::NonNullPtrs<'context>: PartialOrd,
+    NonNullPtrs<'context, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -1258,7 +1251,7 @@ where
 impl<'context, K, V> Ord for KeyValueNonNullPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::NonNullPtrs<'context>: Ord,
+    NonNullPtrs<'context, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -1273,7 +1266,7 @@ where
 impl<'context, K, V> Hash for KeyValueNonNullPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::NonNullPtrs<'context>: Hash,
+    NonNullPtrs<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -1297,17 +1290,16 @@ where
 impl<'context, K, V> Copy for KeyValueNonNullPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::NonNullPtrs<'context>: Copy,
+    NonNullPtrs<'context, V>: Copy,
 {
 }
 
 pub struct KeyValueRefs<'context, 'a, K, V>
 where
-    K: 'a,
     V: Soa + ?Sized + 'a,
 {
     pub key: &'a K,
-    pub value: V::Refs<'context, 'a>,
+    pub value: Refs<'context, 'a, V>,
 }
 
 impl<'context, 'a, K, V> KeyValueRefs<'context, 'a, K, V>
@@ -1317,29 +1309,27 @@ where
     #[inline]
     pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
         let Self { key, value } = self;
-        KeyValuePtrs {
-            key: ptr::from_ref(key),
-            value: V::refs_as_ptrs(context, value),
-        }
+
+        let key = ptr::from_ref(key);
+        let value = Ptrs::new(V::refs_as_ptrs(context, value.into_inner()));
+        KeyValuePtrs { key, value }
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a K, V::Refs<'context, 'a>)> for KeyValueRefs<'context, 'a, K, V>
+impl<'context, 'a, K, V> From<(&'a K, Refs<'context, 'a, V>)> for KeyValueRefs<'context, 'a, K, V>
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
+    V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (&'a K, V::Refs<'context, 'a>)) -> Self {
+    fn from(value: (&'a K, Refs<'context, 'a, V>)) -> Self {
         let (key, value) = value;
         Self { key, value }
     }
 }
 
-impl<'context, 'a, K, V> From<KeyValueRefs<'context, 'a, K, V>> for (&'a K, V::Refs<'context, 'a>)
+impl<'context, 'a, K, V> From<KeyValueRefs<'context, 'a, K, V>> for (&'a K, Refs<'context, 'a, V>)
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueRefs<'context, 'a, K, V>) -> Self {
@@ -1350,9 +1340,9 @@ where
 
 impl<'context, 'a, K, V> Debug for KeyValueRefs<'context, 'a, K, V>
 where
-    K: Debug + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Refs<'context, 'a>: Debug,
+    K: Debug,
+    V: Soa + ?Sized,
+    Refs<'context, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -1365,9 +1355,9 @@ where
 
 impl<'context, 'a, K, V> PartialEq for KeyValueRefs<'context, 'a, K, V>
 where
-    K: PartialEq + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Refs<'context, 'a>: PartialEq,
+    K: PartialEq,
+    V: Soa + ?Sized,
+    Refs<'context, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -1377,17 +1367,17 @@ where
 
 impl<'context, 'a, K, V> Eq for KeyValueRefs<'context, 'a, K, V>
 where
-    K: Eq + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Refs<'context, 'a>: Eq,
+    K: Eq,
+    V: Soa + ?Sized,
+    Refs<'context, 'a, V>: Eq,
 {
 }
 
 impl<'context, 'a, K, V> PartialOrd for KeyValueRefs<'context, 'a, K, V>
 where
-    K: PartialOrd + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Refs<'context, 'a>: PartialOrd,
+    K: PartialOrd,
+    V: Soa + ?Sized,
+    Refs<'context, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -1401,9 +1391,9 @@ where
 
 impl<'context, 'a, K, V> Ord for KeyValueRefs<'context, 'a, K, V>
 where
-    K: Ord + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Refs<'context, 'a>: Ord,
+    K: Ord,
+    V: Soa + ?Sized,
+    Refs<'context, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -1417,9 +1407,9 @@ where
 
 impl<'context, 'a, K, V> Hash for KeyValueRefs<'context, 'a, K, V>
 where
-    K: Hash + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Refs<'context, 'a>: Hash,
+    K: Hash,
+    V: Soa + ?Sized,
+    Refs<'context, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -1430,9 +1420,8 @@ where
 
 impl<'context, 'a, K, V> Clone for KeyValueRefs<'context, 'a, K, V>
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
-    V::Refs<'context, 'a>: Clone,
+    V: Soa + ?Sized,
+    Refs<'context, 'a, V>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1444,9 +1433,8 @@ where
 
 impl<'context, 'a, K, V> Copy for KeyValueRefs<'context, 'a, K, V>
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
-    V::Refs<'context, 'a>: Copy,
+    V: Soa + ?Sized,
+    Refs<'context, 'a, V>: Copy,
 {
 }
 
@@ -1460,10 +1448,10 @@ where
 
     fn to_owned(&self, context: &<Self::Owned as Soa>::Context) -> Self::Owned {
         let Self { key, value } = self;
-        KeyValuePair {
-            key: (*key).clone(),
-            value: value.to_owned(context),
-        }
+
+        let key = (*key).clone();
+        let value = SoaToOwned::to_owned(value.as_inner(), context);
+        KeyValuePair { key, value }
     }
 
     fn clone_into(&self, context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
@@ -1474,17 +1462,16 @@ where
         } = target;
 
         target_key.clone_from(key);
-        value.clone_into(context, target_value);
+        SoaToOwned::clone_into(value.as_inner(), context, target_value);
     }
 }
 
 pub struct KeyValueRefsMut<'context, 'a, K, V>
 where
-    K: 'a,
     V: Soa + ?Sized + 'a,
 {
     pub key: &'a mut K,
-    pub value: V::RefsMut<'context, 'a>,
+    pub value: RefsMut<'context, 'a, V>,
 }
 
 impl<'context, 'a, K, V> KeyValueRefsMut<'context, 'a, K, V>
@@ -1494,40 +1481,38 @@ where
     #[inline]
     pub fn into_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
         let Self { key, value } = self;
-        KeyValueMutPtrs {
-            key: ptr::from_mut(key),
-            value: V::refs_mut_as_ptrs(context, value),
-        }
+
+        let key = ptr::from_mut(key);
+        let value = MutPtrs::new(V::refs_mut_as_ptrs(context, value.into_inner()));
+        KeyValueMutPtrs { key, value }
     }
 
     #[inline]
     pub fn into_refs(self, context: &'context V::Context) -> KeyValueRefs<'context, 'a, K, V> {
         let Self { key, value } = self;
-        KeyValueRefs {
-            key: &*key,
-            value: V::refs_mut_as_refs(context, value),
-        }
+
+        let key = &*key;
+        let value = Refs::new(V::refs_mut_as_refs(context, value.into_inner()));
+        KeyValueRefs { key, value }
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a mut K, V::RefsMut<'context, 'a>)>
+impl<'context, 'a, K, V> From<(&'a mut K, RefsMut<'context, 'a, V>)>
     for KeyValueRefsMut<'context, 'a, K, V>
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
+    V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (&'a mut K, V::RefsMut<'context, 'a>)) -> Self {
+    fn from(value: (&'a mut K, RefsMut<'context, 'a, V>)) -> Self {
         let (key, value) = value;
         Self { key, value }
     }
 }
 
 impl<'context, 'a, K, V> From<KeyValueRefsMut<'context, 'a, K, V>>
-    for (&'a mut K, V::RefsMut<'context, 'a>)
+    for (&'a mut K, RefsMut<'context, 'a, V>)
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueRefsMut<'context, 'a, K, V>) -> Self {
@@ -1538,9 +1523,9 @@ where
 
 impl<'context, 'a, K, V> Debug for KeyValueRefsMut<'context, 'a, K, V>
 where
-    K: Debug + 'a,
-    V: Soa + ?Sized + 'a,
-    V::RefsMut<'context, 'a>: Debug,
+    K: Debug,
+    V: Soa + ?Sized,
+    RefsMut<'context, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -1553,9 +1538,9 @@ where
 
 impl<'context, 'a, K, V> PartialEq for KeyValueRefsMut<'context, 'a, K, V>
 where
-    K: PartialEq + 'a,
-    V: Soa + ?Sized + 'a,
-    V::RefsMut<'context, 'a>: PartialEq,
+    K: PartialEq,
+    V: Soa + ?Sized,
+    RefsMut<'context, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -1565,17 +1550,17 @@ where
 
 impl<'context, 'a, K, V> Eq for KeyValueRefsMut<'context, 'a, K, V>
 where
-    K: Eq + 'a,
-    V: Soa + ?Sized + 'a,
-    V::RefsMut<'context, 'a>: Eq,
+    K: Eq,
+    V: Soa + ?Sized,
+    RefsMut<'context, 'a, V>: Eq,
 {
 }
 
 impl<'context, 'a, K, V> PartialOrd for KeyValueRefsMut<'context, 'a, K, V>
 where
-    K: PartialOrd + 'a,
-    V: Soa + ?Sized + 'a,
-    V::RefsMut<'context, 'a>: PartialOrd,
+    K: PartialOrd,
+    V: Soa + ?Sized,
+    RefsMut<'context, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -1589,9 +1574,9 @@ where
 
 impl<'context, 'a, K, V> Ord for KeyValueRefsMut<'context, 'a, K, V>
 where
-    K: Ord + 'a,
-    V: Soa + ?Sized + 'a,
-    V::RefsMut<'context, 'a>: Ord,
+    K: Ord,
+    V: Soa + ?Sized,
+    RefsMut<'context, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -1605,9 +1590,9 @@ where
 
 impl<'context, 'a, K, V> Hash for KeyValueRefsMut<'context, 'a, K, V>
 where
-    K: Hash + 'a,
-    V: Soa + ?Sized + 'a,
-    V::RefsMut<'context, 'a>: Hash,
+    K: Hash,
+    V: Soa + ?Sized,
+    RefsMut<'context, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -1621,7 +1606,7 @@ where
     V: Soa + ?Sized,
 {
     keys: *const [K],
-    values: V::SlicePtrs<'context>,
+    values: SlicePtrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValueSlicePtrs<'context, K, V>
@@ -1649,6 +1634,7 @@ where
     #[inline]
     #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(keys: *const [K], values: V::SlicePtrs<'context>) -> Self {
+        let values = SlicePtrs::new(values);
         Self { keys, values }
     }
 
@@ -1659,14 +1645,14 @@ where
         len: usize,
     ) -> Self {
         let KeyValuePtrs { key, value } = ptrs;
-        Self {
-            keys: ptr::slice_from_raw_parts(key, len),
-            values: V::slices_from_raw_parts(context, value, len),
-        }
+
+        let keys = ptr::slice_from_raw_parts(key, len);
+        let values = SlicePtrs::new(V::slices_from_raw_parts(context, value.into_inner(), len));
+        Self { keys, values }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (*const [K], V::SlicePtrs<'context>) {
+    pub fn into_parts(self) -> (*const [K], SlicePtrs<'context, V>) {
         let Self { keys, values } = self;
         (keys, values)
     }
@@ -1674,25 +1660,25 @@ where
     #[inline]
     pub fn len(&self, context: &V::Context) -> usize {
         let Self { values, .. } = self;
-        V::slice_ptrs_len(context, values)
+        V::slice_ptrs_len(context, values.as_inner())
     }
 
     #[inline]
     pub fn cast_mut(self, context: &'context V::Context) -> KeyValueSliceMutPtrs<'context, K, V> {
         let Self { keys, values } = self;
-        KeyValueSliceMutPtrs {
-            keys: keys.cast_mut(),
-            values: V::slice_ptrs_cast_mut(context, values),
-        }
+
+        let keys = keys.cast_mut();
+        let values = SliceMutPtrs::new(V::slice_ptrs_cast_mut(context, values.into_inner()));
+        KeyValueSliceMutPtrs { keys, values }
     }
 
     #[inline]
     pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
         let Self { keys, values } = self;
-        KeyValuePtrs {
-            key: keys.cast(), // should be `keys.as_ptr()` but it's unstable
-            value: V::slice_ptrs_as_ptrs(context, values),
-        }
+
+        let key = keys.cast(); // should be `keys.as_ptr()` but it's unstable
+        let value = Ptrs::new(V::slice_ptrs_as_ptrs(context, values.into_inner()));
+        KeyValuePtrs { key, value }
     }
 
     #[inline]
@@ -1702,15 +1688,15 @@ where
         context: &'context V::Context,
     ) -> KeyValueSlices<'context, 'a, K, V> {
         let Self { keys, values } = self;
-        KeyValueSlices {
-            keys: unsafe { &*keys },
-            values: unsafe { V::slice_ptrs_to_slices(context, values) },
-        }
+
+        let keys = unsafe { &*keys };
+        let values = Slices::new(unsafe { V::slice_ptrs_to_slices(context, values.into_inner()) });
+        KeyValueSlices { keys, values }
     }
 }
 
 impl<'context, K, V> From<KeyValueSlicePtrs<'context, K, V>>
-    for (*const [K], V::SlicePtrs<'context>)
+    for (*const [K], SlicePtrs<'context, V>)
 where
     V: Soa + ?Sized,
 {
@@ -1723,7 +1709,7 @@ where
 impl<'context, K, V> Debug for KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SlicePtrs<'context>: Debug,
+    SlicePtrs<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -1737,7 +1723,7 @@ where
 impl<'context, K, V> PartialEq for KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SlicePtrs<'context>: PartialEq,
+    SlicePtrs<'context, V>: PartialEq,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
@@ -1749,14 +1735,14 @@ where
 impl<'context, K, V> Eq for KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SlicePtrs<'context>: Eq,
+    SlicePtrs<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SlicePtrs<'context>: PartialOrd,
+    SlicePtrs<'context, V>: PartialOrd,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1772,7 +1758,7 @@ where
 impl<'context, K, V> Ord for KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SlicePtrs<'context>: Ord,
+    SlicePtrs<'context, V>: Ord,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1788,7 +1774,7 @@ where
 impl<'context, K, V> Hash for KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SlicePtrs<'context>: Hash,
+    SlicePtrs<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -1812,7 +1798,7 @@ where
 impl<'context, K, V> Copy for KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SlicePtrs<'context>: Copy,
+    SlicePtrs<'context, V>: Copy,
 {
 }
 
@@ -1821,7 +1807,7 @@ where
     V: Soa + ?Sized,
 {
     keys: *mut [K],
-    values: V::SliceMutPtrs<'context>,
+    values: SliceMutPtrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValueSliceMutPtrs<'context, K, V>
@@ -1849,6 +1835,7 @@ where
     #[inline]
     #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(keys: *mut [K], values: V::SliceMutPtrs<'context>) -> Self {
+        let values = SliceMutPtrs::new(values);
         Self { keys, values }
     }
 
@@ -1859,14 +1846,15 @@ where
         len: usize,
     ) -> Self {
         let KeyValueMutPtrs { key, value } = ptrs;
-        Self {
-            keys: ptr::slice_from_raw_parts_mut(key, len),
-            values: V::slices_from_raw_parts_mut(context, value, len),
-        }
+
+        let keys = ptr::slice_from_raw_parts_mut(key, len);
+        let values = V::slices_from_raw_parts_mut(context, value.into_inner(), len);
+        let values = SliceMutPtrs::new(values);
+        Self { keys, values }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (*mut [K], V::SliceMutPtrs<'context>) {
+    pub fn into_parts(self) -> (*mut [K], SliceMutPtrs<'context, V>) {
         let Self { keys, values } = self;
         (keys, values)
     }
@@ -1874,36 +1862,35 @@ where
     #[inline]
     pub fn len(&self, context: &V::Context) -> usize {
         let Self { values, .. } = self;
-        V::slice_mut_ptrs_len(context, values)
+        V::slice_mut_ptrs_len(context, values.as_inner())
     }
 
     #[inline]
     pub fn cast_const(self, context: &'context V::Context) -> KeyValueSlicePtrs<'context, K, V> {
         let Self { keys, values } = self;
-        KeyValueSlicePtrs {
-            keys: keys.cast_const(),
-            values: V::slice_ptrs_cast_const(context, values),
-        }
+
+        let keys = keys.cast_const();
+        let values = SlicePtrs::new(V::slice_ptrs_cast_const(context, values.into_inner()));
+        KeyValueSlicePtrs { keys, values }
     }
 
     #[inline]
     pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
         let Self { keys, values } = self;
 
-        let values = V::slice_ptrs_cast_const(context, values);
-        KeyValuePtrs {
-            key: keys.cast_const().cast(), // should be `keys.as_ptr()` but it's unstable
-            value: V::slice_ptrs_as_ptrs(context, values),
-        }
+        let key = keys.cast_const().cast(); // should be `keys.as_ptr()` but it's unstable
+        let values = V::slice_ptrs_cast_const(context, values.into_inner());
+        let value = Ptrs::new(V::slice_ptrs_as_ptrs(context, values));
+        KeyValuePtrs { key, value }
     }
 
     #[inline]
     pub fn into_mut_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
         let Self { keys, values } = self;
-        KeyValueMutPtrs {
-            key: keys.cast(), // should be `keys.as_ptr()` but it's unstable
-            value: V::slice_mut_ptrs_as_ptrs(context, values),
-        }
+
+        let key = keys.cast(); // should be `keys.as_ptr()` but it's unstable
+        let value = MutPtrs::new(V::slice_mut_ptrs_as_ptrs(context, values.into_inner()));
+        KeyValueMutPtrs { key, value }
     }
 
     #[inline]
@@ -1914,11 +1901,10 @@ where
     ) -> KeyValueSlices<'context, 'a, K, V> {
         let Self { keys, values } = self;
 
-        let values = V::slice_ptrs_cast_const(context, values);
-        KeyValueSlices {
-            keys: unsafe { &*keys },
-            values: unsafe { V::slice_ptrs_to_slices(context, values) },
-        }
+        let keys = unsafe { &*keys };
+        let values = V::slice_ptrs_cast_const(context, values.into_inner());
+        let values = Slices::new(unsafe { V::slice_ptrs_to_slices(context, values) });
+        KeyValueSlices { keys, values }
     }
 
     #[inline]
@@ -1929,10 +1915,10 @@ where
     ) -> KeyValueSlicesMut<'context, 'a, K, V> {
         let Self { keys, values } = self;
 
-        KeyValueSlicesMut {
-            keys: unsafe { &mut *keys },
-            values: unsafe { V::slice_mut_ptrs_to_slices(context, values) },
-        }
+        let keys = unsafe { &mut *keys };
+        let values = unsafe { V::slice_mut_ptrs_to_slices(context, values.into_inner()) };
+        let values = SlicesMut::new(values);
+        KeyValueSlicesMut { keys, values }
     }
 
     #[inline]
@@ -1942,13 +1928,13 @@ where
 
         unsafe {
             ptr::drop_in_place(keys);
-            V::slices_drop_in_place(context, values);
+            V::slices_drop_in_place(context, values.into_inner());
         }
     }
 }
 
 impl<'context, K, V> From<KeyValueSliceMutPtrs<'context, K, V>>
-    for (*mut [K], V::SliceMutPtrs<'context>)
+    for (*mut [K], SliceMutPtrs<'context, V>)
 where
     V: Soa + ?Sized,
 {
@@ -1961,7 +1947,7 @@ where
 impl<'context, K, V> Debug for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SliceMutPtrs<'context>: Debug,
+    SliceMutPtrs<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -1975,7 +1961,7 @@ where
 impl<'context, K, V> PartialEq for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SliceMutPtrs<'context>: PartialEq,
+    SliceMutPtrs<'context, V>: PartialEq,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
@@ -1987,14 +1973,14 @@ where
 impl<'context, K, V> Eq for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SliceMutPtrs<'context>: Eq,
+    SliceMutPtrs<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SliceMutPtrs<'context>: PartialOrd,
+    SliceMutPtrs<'context, V>: PartialOrd,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -2010,7 +1996,7 @@ where
 impl<'context, K, V> Ord for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SliceMutPtrs<'context>: Ord,
+    SliceMutPtrs<'context, V>: Ord,
 {
     #[allow(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -2026,7 +2012,7 @@ where
 impl<'context, K, V> Hash for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SliceMutPtrs<'context>: Hash,
+    SliceMutPtrs<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -2050,22 +2036,20 @@ where
 impl<'context, K, V> Copy for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    V::SliceMutPtrs<'context>: Copy,
+    SliceMutPtrs<'context, V>: Copy,
 {
 }
 
 pub struct KeyValueSlices<'context, 'a, K, V>
 where
-    K: 'a,
     V: Soa + ?Sized + 'a,
 {
     keys: &'a [K],
-    values: V::Slices<'context, 'a>,
+    values: Slices<'context, 'a, V>,
 }
 
 impl<'context, 'a, K, V> KeyValueSlices<'context, 'a, K, V>
 where
-    K: 'a,
     V: Soa + ?Sized,
 {
     #[inline]
@@ -2088,17 +2072,18 @@ where
     #[inline]
     #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(keys: &'a [K], values: V::Slices<'context, 'a>) -> Self {
+        let values = Slices::new(values);
         Self { keys, values }
     }
 
     #[inline]
     pub fn len(&self, context: &V::Context) -> usize {
         let Self { values, .. } = self;
-        V::slices_len(context, values)
+        V::slices_len(context, values.as_inner())
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a [K], V::Slices<'context, 'a>) {
+    pub fn into_parts(self) -> (&'a [K], Slices<'context, 'a, V>) {
         let Self { keys, values } = self;
         (keys, values)
     }
@@ -2109,27 +2094,26 @@ where
         context: &'context V::Context,
     ) -> KeyValueSlicePtrs<'context, K, V> {
         let Self { keys, values } = self;
-        KeyValueSlicePtrs {
-            keys: ptr::from_ref(keys),
-            values: V::slices_as_slice_ptrs(context, values),
-        }
+
+        let keys = ptr::from_ref(keys);
+        let values = SlicePtrs::new(V::slices_as_slice_ptrs(context, values.into_inner()));
+        KeyValueSlicePtrs { keys, values }
     }
 
     #[inline]
     pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
         let Self { keys, values } = self;
-        KeyValuePtrs {
-            key: keys.as_ptr(),
-            value: V::slices_as_ptrs(context, values),
-        }
+
+        let key = keys.as_ptr();
+        let value = Ptrs::new(V::slices_as_ptrs(context, values.into_inner()));
+        KeyValuePtrs { key, value }
     }
 }
 
 impl<'context, 'a, K, V> From<KeyValueSlices<'context, 'a, K, V>>
-    for (&'a [K], V::Slices<'context, 'a>)
+    for (&'a [K], Slices<'context, 'a, V>)
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueSlices<'context, 'a, K, V>) -> Self {
@@ -2139,9 +2123,9 @@ where
 
 impl<'context, 'a, K, V> Debug for KeyValueSlices<'context, 'a, K, V>
 where
-    K: Debug + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: Debug,
+    K: Debug,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -2154,9 +2138,8 @@ where
 
 impl<'context, 'a, K, V> Default for KeyValueSlices<'context, 'a, K, V>
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: Default,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: Default,
 {
     #[inline]
     fn default() -> Self {
@@ -2169,9 +2152,9 @@ where
 
 impl<'context, 'a, K, V> PartialEq for KeyValueSlices<'context, 'a, K, V>
 where
-    K: PartialEq + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: PartialEq,
+    K: PartialEq,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
@@ -2181,17 +2164,17 @@ where
 
 impl<'context, 'a, K, V> Eq for KeyValueSlices<'context, 'a, K, V>
 where
-    K: Eq + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: Eq,
+    K: Eq,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: Eq,
 {
 }
 
 impl<'context, 'a, K, V> PartialOrd for KeyValueSlices<'context, 'a, K, V>
 where
-    K: PartialOrd + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: PartialOrd,
+    K: PartialOrd,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
@@ -2205,9 +2188,9 @@ where
 
 impl<'context, 'a, K, V> Ord for KeyValueSlices<'context, 'a, K, V>
 where
-    K: Ord + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: Ord,
+    K: Ord,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
@@ -2221,9 +2204,9 @@ where
 
 impl<'context, 'a, K, V> Hash for KeyValueSlices<'context, 'a, K, V>
 where
-    K: Hash + 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: Hash,
+    K: Hash,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -2234,9 +2217,8 @@ where
 
 impl<'context, 'a, K, V> Clone for KeyValueSlices<'context, 'a, K, V>
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: Clone,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -2248,24 +2230,21 @@ where
 
 impl<'context, 'a, K, V> Copy for KeyValueSlices<'context, 'a, K, V>
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
-    V::Slices<'context, 'a>: Copy,
+    V: Soa + ?Sized,
+    Slices<'context, 'a, V>: Copy,
 {
 }
 
 pub struct KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: 'a,
     V: Soa + ?Sized + 'a,
 {
     keys: &'a mut [K],
-    values: V::SlicesMut<'context, 'a>,
+    values: SlicesMut<'context, 'a, V>,
 }
 
 impl<'context, 'a, K, V> KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: 'a,
     V: Soa + ?Sized,
 {
     #[inline]
@@ -2288,17 +2267,18 @@ where
     #[inline]
     #[allow(unsafe_code)]
     pub unsafe fn new_unchecked(keys: &'a mut [K], values: V::SlicesMut<'context, 'a>) -> Self {
+        let values = SlicesMut::new(values);
         Self { keys, values }
     }
 
     #[inline]
     pub fn len(&self, context: &V::Context) -> usize {
         let Self { values, .. } = self;
-        V::slices_mut_len(context, values)
+        V::slices_mut_len(context, values.as_inner())
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a mut [K], V::SlicesMut<'context, 'a>) {
+    pub fn into_parts(self) -> (&'a mut [K], SlicesMut<'context, 'a, V>) {
         let Self { keys, values } = self;
         (keys, values)
     }
@@ -2310,11 +2290,10 @@ where
     ) -> KeyValueSlicePtrs<'context, K, V> {
         let Self { keys, values } = self;
 
-        let values = V::slices_mut_as_slices(context, values);
-        KeyValueSlicePtrs {
-            keys: ptr::from_ref(keys),
-            values: V::slices_as_slice_ptrs(context, values),
-        }
+        let keys = ptr::from_ref(keys);
+        let values = V::slices_mut_as_slices(context, values.into_inner());
+        let values = SlicePtrs::new(V::slices_as_slice_ptrs(context, values));
+        KeyValueSlicePtrs { keys, values }
     }
 
     #[inline]
@@ -2323,47 +2302,45 @@ where
         context: &'context V::Context,
     ) -> KeyValueSliceMutPtrs<'context, K, V> {
         let Self { keys, values } = self;
-        KeyValueSliceMutPtrs {
-            keys: ptr::from_mut(keys),
-            values: V::slices_mut_as_slice_ptrs(context, values),
-        }
+
+        let keys = ptr::from_mut(keys);
+        let values = SliceMutPtrs::new(V::slices_mut_as_slice_ptrs(context, values.into_inner()));
+        KeyValueSliceMutPtrs { keys, values }
     }
 
     #[inline]
     pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
         let Self { keys, values } = self;
 
-        let values = V::slices_mut_as_slices(context, values);
-        KeyValuePtrs {
-            key: keys.as_ptr(),
-            value: V::slices_as_ptrs(context, values),
-        }
+        let key = keys.as_ptr();
+        let values = V::slices_mut_as_slices(context, values.into_inner());
+        let value = Ptrs::new(V::slices_as_ptrs(context, values));
+        KeyValuePtrs { key, value }
     }
 
     #[inline]
     pub fn into_mut_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
         let Self { keys, values } = self;
-        KeyValueMutPtrs {
-            key: keys.as_mut_ptr(),
-            value: V::slices_mut_as_ptrs(context, values),
-        }
+
+        let key = keys.as_mut_ptr();
+        let value = MutPtrs::new(V::slices_mut_as_ptrs(context, values.into_inner()));
+        KeyValueMutPtrs { key, value }
     }
 
     #[inline]
     pub fn into_slices(self, context: &'context V::Context) -> KeyValueSlices<'context, 'a, K, V> {
         let Self { keys, values } = self;
-        KeyValueSlices {
-            keys: &*keys,
-            values: V::slices_mut_as_slices(context, values),
-        }
+
+        let keys = &*keys;
+        let values = Slices::new(V::slices_mut_as_slices(context, values.into_inner()));
+        KeyValueSlices { keys, values }
     }
 }
 
 impl<'context, 'a, K, V> From<KeyValueSlicesMut<'context, 'a, K, V>>
-    for (&'a mut [K], V::SlicesMut<'context, 'a>)
+    for (&'a mut [K], SlicesMut<'context, 'a, V>)
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
+    V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueSlicesMut<'context, 'a, K, V>) -> Self {
@@ -2373,9 +2350,9 @@ where
 
 impl<'context, 'a, K, V> Debug for KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: Debug + 'a,
-    V: Soa + ?Sized + 'a,
-    V::SlicesMut<'context, 'a>: Debug,
+    K: Debug,
+    V: Soa + ?Sized,
+    SlicesMut<'context, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -2388,9 +2365,8 @@ where
 
 impl<'context, 'a, K, V> Default for KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
-    V::SlicesMut<'context, 'a>: Default,
+    V: Soa + ?Sized,
+    SlicesMut<'context, 'a, V>: Default,
 {
     #[inline]
     fn default() -> Self {
@@ -2403,9 +2379,9 @@ where
 
 impl<'context, 'a, K, V> PartialEq for KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: PartialEq + 'a,
-    V: Soa + ?Sized + 'a,
-    V::SlicesMut<'context, 'a>: PartialEq,
+    K: PartialEq,
+    V: Soa + ?Sized,
+    SlicesMut<'context, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
@@ -2415,17 +2391,17 @@ where
 
 impl<'context, 'a, K, V> Eq for KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: Eq + 'a,
-    V: Soa + ?Sized + 'a,
-    V::SlicesMut<'context, 'a>: Eq,
+    K: Eq,
+    V: Soa + ?Sized,
+    SlicesMut<'context, 'a, V>: Eq,
 {
 }
 
 impl<'context, 'a, K, V> PartialOrd for KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: PartialOrd + 'a,
-    V: Soa + ?Sized + 'a,
-    V::SlicesMut<'context, 'a>: PartialOrd,
+    K: PartialOrd,
+    V: Soa + ?Sized,
+    SlicesMut<'context, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
@@ -2439,9 +2415,9 @@ where
 
 impl<'context, 'a, K, V> Ord for KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: Ord + 'a,
-    V: Soa + ?Sized + 'a,
-    V::SlicesMut<'context, 'a>: Ord,
+    K: Ord,
+    V: Soa + ?Sized,
+    SlicesMut<'context, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
@@ -2455,9 +2431,9 @@ where
 
 impl<'context, 'a, K, V> Hash for KeyValueSlicesMut<'context, 'a, K, V>
 where
-    K: Hash + 'a,
-    V: Soa + ?Sized + 'a,
-    V::SlicesMut<'context, 'a>: Hash,
+    K: Hash,
+    V: Soa + ?Sized,
+    SlicesMut<'context, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;

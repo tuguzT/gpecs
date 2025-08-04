@@ -185,7 +185,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
@@ -193,7 +193,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_mut_slices().into_parts();
-        values
+        values.into_inner()
     }
 }
 
@@ -354,7 +354,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
@@ -362,7 +362,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_mut_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
@@ -370,13 +370,15 @@ where
         let Self { inner } = self;
 
         let (keys, values) = inner.as_slices().into_parts();
-        (keys, values)
+        (keys, values.into_inner())
     }
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> (&mut [K], V::SlicesMut<'_, '_>) {
         let Self { inner } = self;
-        inner.as_mut_slices().into_parts()
+
+        let (keys, values) = inner.as_mut_slices().into_parts();
+        (keys, values.into_inner())
     }
 }
 
@@ -523,7 +525,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values
+        values.into_inner()
     }
 }
 

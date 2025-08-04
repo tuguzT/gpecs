@@ -400,7 +400,7 @@ fn one_item_parts() {
     let (dense, sparse) = sparse_set.into_parts();
     let (keys, values) = dense.as_slices().into();
     assert_eq!(keys, &[2]);
-    assert_eq!(values, &[42.into()]);
+    assert_eq!(values.into_inner(), &[42.into()]);
     assert_eq!(
         sparse,
         &[
@@ -930,7 +930,7 @@ fn three_items_parts() {
     let (dense, sparse) = sparse_set.into_parts();
     let (keys, values) = dense.as_slices().into();
     assert_eq!(keys, &[2, 1, 5]);
-    assert_eq!(values, &[34.into(), 42.into(), 69.into()]);
+    assert_eq!(values.into_inner(), &[34.into(), 42.into(), 69.into()]);
     assert_eq!(
         sparse,
         &[

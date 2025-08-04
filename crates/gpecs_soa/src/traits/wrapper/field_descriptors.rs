@@ -4,6 +4,7 @@ use core::{
     hash::{self, Hash},
     marker::PhantomData,
     mem::transmute,
+    ptr,
 };
 
 use crate::traits::Soa;
@@ -30,6 +31,20 @@ where
             inner: unsafe { transmute::<T::FieldDescriptors<'_>, T::FieldDescriptors<'_>>(inner) },
             phantom: PhantomData,
         }
+    }
+
+    /// Retrieves a reference of [field descriptors](Soa::FieldDescriptors).
+    #[inline]
+    pub fn as_inner(&self) -> &T::FieldDescriptors<'context> {
+        let Self { inner, .. } = self;
+        unsafe { &*ptr::from_ref(inner).cast() }
+    }
+
+    /// Retrieves a mutable reference of [field descriptors](Soa::FieldDescriptors).
+    #[inline]
+    pub fn as_inner_mut(&mut self) -> &mut T::FieldDescriptors<'context> {
+        let Self { inner, .. } = self;
+        unsafe { &mut *ptr::from_mut(inner).cast() }
     }
 
     /// Retrieves the [field descriptors](Soa::FieldDescriptors).

@@ -248,7 +248,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values
+        values.into_inner()
     }
 }
 
@@ -296,7 +296,9 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|KeyValueRefs { value, .. }| value)
+        inner
+            .next()
+            .map(|KeyValueRefs { value, .. }| value.into_inner())
     }
 
     #[inline]
@@ -320,13 +322,17 @@ where
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|KeyValueRefs { value, .. }| value)
+        inner
+            .last()
+            .map(|KeyValueRefs { value, .. }| value.into_inner())
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|KeyValueRefs { value, .. }| value)
+        inner
+            .nth(n)
+            .map(|KeyValueRefs { value, .. }| value.into_inner())
     }
 
     #[inline]
@@ -336,7 +342,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefs { value, .. }| f(value))
+        inner.for_each(|KeyValueRefs { value, .. }| f(value.into_inner()))
     }
 
     #[inline]
@@ -346,7 +352,9 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, KeyValueRefs { value, .. }| f(acc, value))
+        inner.fold(init, |acc, KeyValueRefs { value, .. }| {
+            f(acc, value.into_inner())
+        })
     }
 
     #[inline]
@@ -356,7 +364,7 @@ where
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.all(|KeyValueRefs { value, .. }| f(value))
+        inner.all(|KeyValueRefs { value, .. }| f(value.into_inner()))
     }
 
     #[inline]
@@ -366,19 +374,19 @@ where
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.any(|KeyValueRefs { value, .. }| f(value))
+        inner.any(|KeyValueRefs { value, .. }| f(value.into_inner()))
     }
 
     #[inline]
-    fn find<P>(&mut self, mut predicate: P) -> Option<Self::Item>
+    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
     where
         Self: Sized,
         P: FnMut(&Self::Item) -> bool,
     {
         let Self { inner } = self;
         inner
-            .find(|KeyValueRefs { value, .. }| predicate(value))
-            .map(|KeyValueRefs { value, .. }| value)
+            .map(|KeyValueRefs { value, .. }| value.into_inner())
+            .find(predicate)
     }
 
     #[inline]
@@ -388,7 +396,7 @@ where
         F: FnMut(Self::Item) -> Option<B>,
     {
         let Self { inner } = self;
-        inner.find_map(|KeyValueRefs { value, .. }| f(value))
+        inner.find_map(|KeyValueRefs { value, .. }| f(value.into_inner()))
     }
 
     #[inline]
@@ -398,7 +406,7 @@ where
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.position(|KeyValueRefs { value, .. }| predicate(value))
+        inner.position(|KeyValueRefs { value, .. }| predicate(value.into_inner()))
     }
 
     #[inline]
@@ -408,7 +416,7 @@ where
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.rposition(|KeyValueRefs { value, .. }| predicate(value))
+        inner.rposition(|KeyValueRefs { value, .. }| predicate(value.into_inner()))
     }
 }
 
@@ -419,13 +427,17 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|KeyValueRefs { value, .. }| value)
+        inner
+            .next_back()
+            .map(|KeyValueRefs { value, .. }| value.into_inner())
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|KeyValueRefs { value, .. }| value)
+        inner
+            .nth_back(n)
+            .map(|KeyValueRefs { value, .. }| value.into_inner())
     }
 }
 
@@ -464,7 +476,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.into_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
@@ -472,7 +484,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values
+        values.into_inner()
     }
 }
 
@@ -507,7 +519,9 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|KeyValueRefsMut { value, .. }| value)
+        inner
+            .next()
+            .map(|KeyValueRefsMut { value, .. }| value.into_inner())
     }
 
     #[inline]
@@ -531,13 +545,17 @@ where
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|KeyValueRefsMut { value, .. }| value)
+        inner
+            .last()
+            .map(|KeyValueRefsMut { value, .. }| value.into_inner())
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|KeyValueRefsMut { value, .. }| value)
+        inner
+            .nth(n)
+            .map(|KeyValueRefsMut { value, .. }| value.into_inner())
     }
 
     #[inline]
@@ -547,7 +565,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefsMut { value, .. }| f(value))
+        inner.for_each(|KeyValueRefsMut { value, .. }| f(value.into_inner()))
     }
 
     #[inline]
@@ -557,7 +575,9 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, KeyValueRefsMut { value, .. }| f(acc, value))
+        inner.fold(init, |acc, KeyValueRefsMut { value, .. }| {
+            f(acc, value.into_inner())
+        })
     }
 
     #[inline]
@@ -567,7 +587,7 @@ where
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.all(|KeyValueRefsMut { value, .. }| f(value))
+        inner.all(|KeyValueRefsMut { value, .. }| f(value.into_inner()))
     }
 
     #[inline]
@@ -577,19 +597,19 @@ where
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.any(|KeyValueRefsMut { value, .. }| f(value))
+        inner.any(|KeyValueRefsMut { value, .. }| f(value.into_inner()))
     }
 
     #[inline]
-    fn find<P>(&mut self, mut predicate: P) -> Option<Self::Item>
+    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
     where
         Self: Sized,
         P: FnMut(&Self::Item) -> bool,
     {
         let Self { inner } = self;
         inner
-            .find(|KeyValueRefsMut { value, .. }| predicate(value))
-            .map(|KeyValueRefsMut { value, .. }| value)
+            .map(|KeyValueRefsMut { value, .. }| value.into_inner())
+            .find(predicate)
     }
 
     #[inline]
@@ -599,7 +619,7 @@ where
         F: FnMut(Self::Item) -> Option<B>,
     {
         let Self { inner } = self;
-        inner.find_map(|KeyValueRefsMut { value, .. }| f(value))
+        inner.find_map(|KeyValueRefsMut { value, .. }| f(value.into_inner()))
     }
 
     #[inline]
@@ -609,7 +629,7 @@ where
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.position(|KeyValueRefsMut { value, .. }| predicate(value))
+        inner.position(|KeyValueRefsMut { value, .. }| predicate(value.into_inner()))
     }
 
     #[inline]
@@ -619,7 +639,7 @@ where
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.rposition(|KeyValueRefsMut { value, .. }| predicate(value))
+        inner.rposition(|KeyValueRefsMut { value, .. }| predicate(value.into_inner()))
     }
 }
 
@@ -630,13 +650,17 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|KeyValueRefsMut { value, .. }| value)
+        inner
+            .next_back()
+            .map(|KeyValueRefsMut { value, .. }| value.into_inner())
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|KeyValueRefsMut { value, .. }| value)
+        inner
+            .nth_back(n)
+            .map(|KeyValueRefsMut { value, .. }| value.into_inner())
     }
 }
 
@@ -682,13 +706,15 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
     pub fn as_slices(&self) -> (&'a [K], V::Slices<'c, 'a>) {
         let Self { inner } = self;
-        inner.as_slices().into_parts()
+
+        let (keys, values) = inner.as_slices().into_parts();
+        (keys, values.into_inner())
     }
 }
 
@@ -740,7 +766,9 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|KeyValueRefs { key, value }| (key, value))
+        inner
+            .next()
+            .map(|KeyValueRefs { key, value }| (key, value.into_inner()))
     }
 
     #[inline]
@@ -764,13 +792,17 @@ where
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|KeyValueRefs { key, value }| (key, value))
+        inner
+            .last()
+            .map(|KeyValueRefs { key, value }| (key, value.into_inner()))
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|KeyValueRefs { key, value }| (key, value))
+        inner
+            .nth(n)
+            .map(|KeyValueRefs { key, value }| (key, value.into_inner()))
     }
 
     #[inline]
@@ -780,7 +812,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefs { key, value }| f((key, value)))
+        inner.for_each(|KeyValueRefs { key, value }| f((key, value.into_inner())))
     }
 }
 
@@ -793,7 +825,7 @@ where
         let Self { inner } = self;
         inner
             .next_back()
-            .map(|KeyValueRefs { key, value }| (key, value))
+            .map(|KeyValueRefs { key, value }| (key, value.into_inner()))
     }
 
     #[inline]
@@ -801,7 +833,7 @@ where
         let Self { inner } = self;
         inner
             .nth_back(n)
-            .map(|KeyValueRefs { key, value }| (key, value))
+            .map(|KeyValueRefs { key, value }| (key, value.into_inner()))
     }
 }
 
@@ -855,7 +887,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.into_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
@@ -863,7 +895,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
@@ -871,13 +903,15 @@ where
         let Self { inner } = self;
 
         let (keys, values) = inner.into_slices().into_parts();
-        (keys, values)
+        (keys, values.into_inner())
     }
 
     #[inline]
     pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
         let Self { inner } = self;
-        inner.as_slices().into_parts()
+
+        let (keys, values) = inner.as_slices().into_parts();
+        (keys, values.into_inner())
     }
 }
 
@@ -918,7 +952,7 @@ where
         let Self { inner } = self;
         inner
             .next()
-            .map(|KeyValueRefsMut { key, value }| (&*key, value))
+            .map(|KeyValueRefsMut { key, value }| (&*key, value.into_inner()))
     }
 
     #[inline]
@@ -944,7 +978,7 @@ where
         let Self { inner } = self;
         inner
             .last()
-            .map(|KeyValueRefsMut { key, value }| (&*key, value))
+            .map(|KeyValueRefsMut { key, value }| (&*key, value.into_inner()))
     }
 
     #[inline]
@@ -952,7 +986,7 @@ where
         let Self { inner } = self;
         inner
             .nth(n)
-            .map(|KeyValueRefsMut { key, value }| (&*key, value))
+            .map(|KeyValueRefsMut { key, value }| (&*key, value.into_inner()))
     }
 
     #[inline]
@@ -962,7 +996,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefsMut { key, value }| f((&*key, value)))
+        inner.for_each(|KeyValueRefsMut { key, value }| f((&*key, value.into_inner())))
     }
 }
 
@@ -975,7 +1009,7 @@ where
         let Self { inner } = self;
         inner
             .next_back()
-            .map(|KeyValueRefsMut { key, value }| (&*key, value))
+            .map(|KeyValueRefsMut { key, value }| (&*key, value.into_inner()))
     }
 
     #[inline]
@@ -983,7 +1017,7 @@ where
         let Self { inner } = self;
         inner
             .nth_back(n)
-            .map(|KeyValueRefsMut { key, value }| (&*key, value))
+            .map(|KeyValueRefsMut { key, value }| (&*key, value.into_inner()))
     }
 }
 

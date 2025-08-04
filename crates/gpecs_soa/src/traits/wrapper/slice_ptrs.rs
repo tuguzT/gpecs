@@ -4,6 +4,7 @@ use core::{
     hash::{self, Hash},
     marker::PhantomData,
     mem::transmute,
+    ptr,
 };
 
 use crate::traits::Soa;
@@ -32,6 +33,22 @@ where
             inner: unsafe { transmute::<T::SlicePtrs<'_>, T::SlicePtrs<'_>>(inner) },
             phantom: PhantomData,
         }
+    }
+
+    /// Retrieves a reference of [slice pointers](Soa::SlicePtrs)
+    /// to each field of [`Fields`](Soa::Fields) from self.
+    #[inline]
+    pub fn as_inner(&self) -> &T::SlicePtrs<'context> {
+        let Self { inner, .. } = self;
+        unsafe { &*ptr::from_ref(inner).cast() }
+    }
+
+    /// Retrieves a mutable reference of [slice pointers](Soa::SlicePtrs)
+    /// to each field of [`Fields`](Soa::Fields) from self.
+    #[inline]
+    pub fn as_inner_mut(&mut self) -> &mut T::SlicePtrs<'context> {
+        let Self { inner, .. } = self;
+        unsafe { &mut *ptr::from_mut(inner).cast() }
     }
 
     /// Retrieves the [slice pointers](Soa::SlicePtrs)

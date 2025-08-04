@@ -23,7 +23,7 @@ use crate::{
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
-        traits::{MutPtrs, RefsMut, Soa, SoaRead, SoaWrite},
+        traits::{Soa, SoaRead, SoaWrite},
         vec::SoaVec,
     },
     view::{EpochSparseView, EpochSparseViewMut},
@@ -243,7 +243,7 @@ where
         let Self { dense, .. } = self;
 
         let (_, values) = dense.as_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
@@ -251,7 +251,7 @@ where
         let Self { dense, .. } = self;
 
         let (_, values) = dense.as_mut_slices().into_parts();
-        values
+        values.into_inner()
     }
 
     #[inline]
@@ -260,7 +260,7 @@ where
 
         let (context, slices) = dense.slices().into_slices_with_context();
         let (_, values) = slices.into_parts();
-        SoaSlices::new(context, values)
+        SoaSlices::new(context, values.into_inner())
     }
 
     #[inline]
@@ -269,7 +269,7 @@ where
 
         let (context, slices) = dense.slices_mut().into_slices_with_context();
         let (_, values) = slices.into_parts();
-        SoaSlicesMut::new(context, values)
+        SoaSlicesMut::new(context, values.into_inner())
     }
 
     #[inline]
@@ -277,7 +277,7 @@ where
         let Self { dense, .. } = self;
 
         let KeyValuePtrs { value, .. } = dense.as_ptrs();
-        value
+        value.into_inner()
     }
 
     #[inline]
@@ -285,7 +285,7 @@ where
         let Self { dense, .. } = self;
 
         let KeyValueMutPtrs { value, .. } = dense.as_mut_ptrs();
-        value
+        value.into_inner()
     }
 
     #[inline]
@@ -457,7 +457,7 @@ where
         let mut last = 0;
         for curr in 0..old_len {
             let (&mut key, value) = dense.slices_mut().into_index_mut(curr).into();
-            if !f(key, value) {
+            if !f(key, value.into_inner()) {
                 let sparse_index = unwrap_into_usize(key.sparse_index());
                 sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
                 continue;
@@ -727,7 +727,7 @@ where
         let result = dense.swap_remove_into(dense_index_usize, |context, src| {
             let dense_key = unsafe { ptr::read(src.key) };
             check_equal_key(key, dense_key);
-            f(context, Some(src.value))
+            f(context, Some(src.value.into_inner()))
         });
 
         if let Some(KeyValueRefs { key, .. }) = dense.slices().into_get(dense_index_usize) {
@@ -768,7 +768,7 @@ where
         let result = dense.remove_into(dense_index, |context, src| {
             let dense_key = unsafe { ptr::read(src.key) };
             check_equal_key(key, dense_key);
-            f(context, Some(src.value))
+            f(context, Some(src.value.into_inner()))
         });
 
         for KeyValueRefs { key, .. } in dense.slices().into_iter().skip(dense_index) {
@@ -798,7 +798,7 @@ where
             let sparse_index = unwrap_into_usize(key.sparse_index());
             check_key_bounds(sparse_index, sparse.len());
 
-            let result = f(context, Some((key, value)));
+            let result = f(context, Some((key, value.into_inner())));
             sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
             result
         })
@@ -849,7 +849,7 @@ where
 
             let dense_index = unwrap_into_usize(dense_index);
             let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
-            let result = f(context, Ok(Some(RefsMut::new(dense_value).into())));
+            let result = f(context, Ok(Some(dense_value.into())));
 
             sparse_item.epoch = key.epoch();
             *dense_key = key;
@@ -873,7 +873,7 @@ where
         #[allow(unsafe_code, reason = "no other way to work with pointers")]
         dense.push_from(|context, ptrs| {
             let (key_ptr, value_ptrs) = ptrs.into();
-            let result = f(context, Ok(Some(MutPtrs::new(value_ptrs).into())));
+            let result = f(context, Ok(Some(value_ptrs.into())));
 
             *sparse_item = SparseItem::occupied(dense_index, key.epoch());
             unsafe { ptr::write(key_ptr, key) }

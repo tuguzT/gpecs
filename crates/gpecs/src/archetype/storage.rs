@@ -779,6 +779,7 @@ impl ErasedStorageExt for ErasedStorage {
         let (dense, _) = ErasedStorage::as_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (keys, values) = slices.into_parts();
+        let values = values.into_inner();
 
         let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();
@@ -801,6 +802,7 @@ impl ErasedStorageExt for ErasedStorage {
         let (dense, _) = ErasedStorage::as_mut_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (keys, values) = slices.into_parts();
+        let values = values.into_inner();
 
         let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
         let component_ids = component_ids.keys().copied();

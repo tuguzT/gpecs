@@ -7,7 +7,7 @@ use core::{
 use gpecs_soa::traits::SoaRead;
 
 use crate::{
-    pair::{KeyValuePair, KeyValueSlices, KeyValueSlicesMut},
+    pair::KeyValuePair,
     soa::{traits::Soa, vec},
 };
 
@@ -184,7 +184,7 @@ where
     pub fn as_slice(&self) -> V::Slices<'_, '_> {
         let Self { inner } = self;
 
-        let KeyValueSlices { values, .. } = inner.as_slices();
+        let (_, values) = inner.as_slices().into_parts();
         values
     }
 
@@ -192,7 +192,7 @@ where
     pub fn as_mut_slice(&mut self) -> V::SlicesMut<'_, '_> {
         let Self { inner } = self;
 
-        let KeyValueSlicesMut { values, .. } = inner.as_mut_slices();
+        let (_, values) = inner.as_mut_slices().into_parts();
         values
     }
 }
@@ -337,7 +337,7 @@ where
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { inner } = self;
 
-        let KeyValueSlices { keys, .. } = inner.as_slices();
+        let (keys, _) = inner.as_slices().into_parts();
         keys
     }
 
@@ -345,7 +345,7 @@ where
     pub fn as_keys_mut_slice(&mut self) -> &mut [K] {
         let Self { inner } = self;
 
-        let KeyValueSlicesMut { keys, .. } = inner.as_mut_slices();
+        let (keys, _) = inner.as_mut_slices().into_parts();
         keys
     }
 
@@ -353,7 +353,7 @@ where
     pub fn as_values_slice(&self) -> V::Slices<'_, '_> {
         let Self { inner } = self;
 
-        let KeyValueSlices { values, .. } = inner.as_slices();
+        let (_, values) = inner.as_slices().into_parts();
         values
     }
 
@@ -361,7 +361,7 @@ where
     pub fn as_values_mut_slice(&mut self) -> V::SlicesMut<'_, '_> {
         let Self { inner } = self;
 
-        let KeyValueSlicesMut { values, .. } = inner.as_mut_slices();
+        let (_, values) = inner.as_mut_slices().into_parts();
         values
     }
 
@@ -369,16 +369,14 @@ where
     pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
         let Self { inner } = self;
 
-        let KeyValueSlices { keys, values } = inner.as_slices();
+        let (keys, values) = inner.as_slices().into_parts();
         (keys, values)
     }
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> (&mut [K], V::SlicesMut<'_, '_>) {
         let Self { inner } = self;
-
-        let KeyValueSlicesMut { keys, values } = inner.as_mut_slices();
-        (keys, values)
+        inner.as_mut_slices().into_parts()
     }
 }
 
@@ -516,7 +514,7 @@ where
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { inner } = self;
 
-        let KeyValueSlices { keys, .. } = inner.as_slices();
+        let (keys, _) = inner.as_slices().into_parts();
         keys
     }
 
@@ -524,7 +522,7 @@ where
     pub fn as_values_slice(&self) -> V::Slices<'_, '_> {
         let Self { inner } = self;
 
-        let KeyValueSlices { values, .. } = inner.as_slices();
+        let (_, values) = inner.as_slices().into_parts();
         values
     }
 }

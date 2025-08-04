@@ -1620,14 +1620,38 @@ pub struct KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
-    pub keys: *const [K],
-    pub values: V::SlicePtrs<'context>,
+    keys: *const [K],
+    values: V::SlicePtrs<'context>,
 }
 
 impl<'context, K, V> KeyValueSlicePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
+    #[inline]
+    #[track_caller]
+    #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
+    pub fn new(
+        context: &'context V::Context,
+        keys: *const [K],
+        values: V::SlicePtrs<'context>,
+    ) -> Self {
+        let keys_len = keys.len();
+        let values_len = V::slice_ptrs_len(context, &values);
+        assert_eq!(keys_len, values_len);
+
+        #[allow(unsafe_code)]
+        unsafe {
+            Self::new_unchecked(keys, values)
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn new_unchecked(keys: *const [K], values: V::SlicePtrs<'context>) -> Self {
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn from_raw_parts(
         context: &'context V::Context,
@@ -1642,15 +1666,15 @@ where
     }
 
     #[inline]
-    #[track_caller]
-    pub fn len(&self, context: &V::Context) -> usize {
+    pub fn into_parts(self) -> (*const [K], V::SlicePtrs<'context>) {
         let Self { keys, values } = self;
+        (keys, values)
+    }
 
-        let keys_len = keys.len();
-        let values_len = V::slice_ptrs_len(context, values);
-        assert_eq!(keys_len, values_len);
-
-        keys_len
+    #[inline]
+    pub fn len(&self, context: &V::Context) -> usize {
+        let Self { values, .. } = self;
+        V::slice_ptrs_len(context, values)
     }
 
     #[inline]
@@ -1685,18 +1709,6 @@ where
     }
 }
 
-impl<'context, K, V> From<(*const [K], V::SlicePtrs<'context>)>
-    for KeyValueSlicePtrs<'context, K, V>
-where
-    V: Soa + ?Sized,
-{
-    #[inline]
-    fn from(value: (*const [K], V::SlicePtrs<'context>)) -> Self {
-        let (keys, values) = value;
-        Self { keys, values }
-    }
-}
-
 impl<'context, K, V> From<KeyValueSlicePtrs<'context, K, V>>
     for (*const [K], V::SlicePtrs<'context>)
 where
@@ -1704,8 +1716,7 @@ where
 {
     #[inline]
     fn from(value: KeyValueSlicePtrs<'context, K, V>) -> Self {
-        let KeyValueSlicePtrs { keys, values } = value;
-        (keys, values)
+        value.into_parts()
     }
 }
 
@@ -1809,14 +1820,38 @@ pub struct KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
-    pub keys: *mut [K],
-    pub values: V::SliceMutPtrs<'context>,
+    keys: *mut [K],
+    values: V::SliceMutPtrs<'context>,
 }
 
 impl<'context, K, V> KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
+    #[inline]
+    #[track_caller]
+    #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
+    pub fn new(
+        context: &'context V::Context,
+        keys: *mut [K],
+        values: V::SliceMutPtrs<'context>,
+    ) -> Self {
+        let keys_len = keys.len();
+        let values_len = V::slice_mut_ptrs_len(context, &values);
+        assert_eq!(keys_len, values_len);
+
+        #[allow(unsafe_code)]
+        unsafe {
+            Self::new_unchecked(keys, values)
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn new_unchecked(keys: *mut [K], values: V::SliceMutPtrs<'context>) -> Self {
+        Self { keys, values }
+    }
+
     #[inline]
     pub fn from_raw_parts(
         context: &'context V::Context,
@@ -1831,15 +1866,15 @@ where
     }
 
     #[inline]
-    #[track_caller]
-    pub fn len(&self, context: &V::Context) -> usize {
+    pub fn into_parts(self) -> (*mut [K], V::SliceMutPtrs<'context>) {
         let Self { keys, values } = self;
+        (keys, values)
+    }
 
-        let keys_len = keys.len();
-        let values_len = V::slice_mut_ptrs_len(context, values);
-        assert_eq!(keys_len, values_len);
-
-        keys_len
+    #[inline]
+    pub fn len(&self, context: &V::Context) -> usize {
+        let Self { values, .. } = self;
+        V::slice_mut_ptrs_len(context, values)
     }
 
     #[inline]
@@ -1912,18 +1947,6 @@ where
     }
 }
 
-impl<'context, K, V> From<(*mut [K], V::SliceMutPtrs<'context>)>
-    for KeyValueSliceMutPtrs<'context, K, V>
-where
-    V: Soa + ?Sized,
-{
-    #[inline]
-    fn from(value: (*mut [K], V::SliceMutPtrs<'context>)) -> Self {
-        let (keys, values) = value;
-        Self { keys, values }
-    }
-}
-
 impl<'context, K, V> From<KeyValueSliceMutPtrs<'context, K, V>>
     for (*mut [K], V::SliceMutPtrs<'context>)
 where
@@ -1931,8 +1954,7 @@ where
 {
     #[inline]
     fn from(value: KeyValueSliceMutPtrs<'context, K, V>) -> Self {
-        let KeyValueSliceMutPtrs { keys, values } = value;
-        (keys, values)
+        value.into_parts()
     }
 }
 
@@ -2037,8 +2059,8 @@ where
     K: 'a,
     V: Soa + ?Sized + 'a,
 {
-    pub keys: &'a [K],
-    pub values: V::Slices<'context, 'a>,
+    keys: &'a [K],
+    values: V::Slices<'context, 'a>,
 }
 
 impl<'context, 'a, K, V> KeyValueSlices<'context, 'a, K, V>
@@ -2048,14 +2070,37 @@ where
 {
     #[inline]
     #[track_caller]
-    pub fn len(&self, context: &V::Context) -> usize {
-        let Self { keys, values } = self;
-
+    pub fn new(
+        context: &'context V::Context,
+        keys: &'a [K],
+        values: V::Slices<'context, 'a>,
+    ) -> Self {
         let keys_len = keys.len();
-        let values_len = V::slices_len(context, values);
+        let values_len = V::slices_len(context, &values);
         assert_eq!(keys_len, values_len);
 
-        keys_len
+        #[allow(unsafe_code)]
+        unsafe {
+            Self::new_unchecked(keys, values)
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn new_unchecked(keys: &'a [K], values: V::Slices<'context, 'a>) -> Self {
+        Self { keys, values }
+    }
+
+    #[inline]
+    pub fn len(&self, context: &V::Context) -> usize {
+        let Self { values, .. } = self;
+        V::slices_len(context, values)
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (&'a [K], V::Slices<'context, 'a>) {
+        let Self { keys, values } = self;
+        (keys, values)
     }
 
     #[inline]
@@ -2080,19 +2125,6 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a [K], V::Slices<'context, 'a>)>
-    for KeyValueSlices<'context, 'a, K, V>
-where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
-{
-    #[inline]
-    fn from(value: (&'a [K], V::Slices<'context, 'a>)) -> Self {
-        let (keys, values) = value;
-        Self { keys, values }
-    }
-}
-
 impl<'context, 'a, K, V> From<KeyValueSlices<'context, 'a, K, V>>
     for (&'a [K], V::Slices<'context, 'a>)
 where
@@ -2101,8 +2133,7 @@ where
 {
     #[inline]
     fn from(value: KeyValueSlices<'context, 'a, K, V>) -> Self {
-        let KeyValueSlices { keys, values } = value;
-        (keys, values)
+        value.into_parts()
     }
 }
 
@@ -2228,8 +2259,8 @@ where
     K: 'a,
     V: Soa + ?Sized + 'a,
 {
-    pub keys: &'a mut [K],
-    pub values: V::SlicesMut<'context, 'a>,
+    keys: &'a mut [K],
+    values: V::SlicesMut<'context, 'a>,
 }
 
 impl<'context, 'a, K, V> KeyValueSlicesMut<'context, 'a, K, V>
@@ -2239,14 +2270,37 @@ where
 {
     #[inline]
     #[track_caller]
-    pub fn len(&self, context: &V::Context) -> usize {
-        let Self { keys, values } = self;
-
+    pub fn new(
+        context: &'context V::Context,
+        keys: &'a mut [K],
+        values: V::SlicesMut<'context, 'a>,
+    ) -> Self {
         let keys_len = keys.len();
-        let values_len = V::slices_mut_len(context, values);
+        let values_len = V::slices_mut_len(context, &values);
         assert_eq!(keys_len, values_len);
 
-        keys_len
+        #[allow(unsafe_code)]
+        unsafe {
+            Self::new_unchecked(keys, values)
+        }
+    }
+
+    #[inline]
+    #[allow(unsafe_code)]
+    pub unsafe fn new_unchecked(keys: &'a mut [K], values: V::SlicesMut<'context, 'a>) -> Self {
+        Self { keys, values }
+    }
+
+    #[inline]
+    pub fn len(&self, context: &V::Context) -> usize {
+        let Self { values, .. } = self;
+        V::slices_mut_len(context, values)
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (&'a mut [K], V::SlicesMut<'context, 'a>) {
+        let Self { keys, values } = self;
+        (keys, values)
     }
 
     #[inline]
@@ -2305,19 +2359,6 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a mut [K], V::SlicesMut<'context, 'a>)>
-    for KeyValueSlicesMut<'context, 'a, K, V>
-where
-    K: 'a,
-    V: Soa + ?Sized + 'a,
-{
-    #[inline]
-    fn from(value: (&'a mut [K], V::SlicesMut<'context, 'a>)) -> Self {
-        let (keys, values) = value;
-        Self { keys, values }
-    }
-}
-
 impl<'context, 'a, K, V> From<KeyValueSlicesMut<'context, 'a, K, V>>
     for (&'a mut [K], V::SlicesMut<'context, 'a>)
 where
@@ -2326,8 +2367,7 @@ where
 {
     #[inline]
     fn from(value: KeyValueSlicesMut<'context, 'a, K, V>) -> Self {
-        let KeyValueSlicesMut { keys, values } = value;
-        (keys, values)
+        value.into_parts()
     }
 }
 

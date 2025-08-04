@@ -19,10 +19,7 @@ use crate::{
     item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
-    pair::{
-        KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs, KeyValueSlices,
-        KeyValueSlicesMut,
-    },
+    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs},
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
@@ -245,7 +242,7 @@ where
     pub fn as_slices(&self) -> V::Slices<'_, '_> {
         let Self { dense, .. } = self;
 
-        let KeyValueSlices { values, .. } = dense.as_slices();
+        let (_, values) = dense.as_slices().into_parts();
         values
     }
 
@@ -253,7 +250,7 @@ where
     pub fn as_mut_slices(&mut self) -> V::SlicesMut<'_, '_> {
         let Self { dense, .. } = self;
 
-        let KeyValueSlicesMut { values, .. } = dense.as_mut_slices();
+        let (_, values) = dense.as_mut_slices().into_parts();
         values
     }
 
@@ -262,7 +259,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.slices().into_slices_with_context();
-        let KeyValueSlices { values, .. } = slices;
+        let (_, values) = slices.into_parts();
         SoaSlices::new(context, values)
     }
 
@@ -271,7 +268,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.slices_mut().into_slices_with_context();
-        let KeyValueSlicesMut { values, .. } = slices;
+        let (_, values) = slices.into_parts();
         SoaSlicesMut::new(context, values)
     }
 
@@ -295,7 +292,7 @@ where
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let (keys, _) = dense.as_slices().into_parts();
         keys
     }
 
@@ -304,7 +301,7 @@ where
     pub unsafe fn as_keys_slice_mut(&mut self) -> &mut [K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        let (keys, _) = dense.as_mut_slices().into_parts();
         keys
     }
 
@@ -674,7 +671,7 @@ where
     #[allow(clippy::unnecessary_to_owned, reason = "false positive")]
     pub fn into_keys(self) -> IntoKeys<K, V> {
         let Self { dense, .. } = self;
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let (keys, _) = dense.as_slices().into_parts();
         let inner = keys.to_vec().into_iter();
         IntoKeys::new(inner)
     }

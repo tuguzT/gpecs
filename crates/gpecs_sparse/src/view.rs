@@ -25,10 +25,7 @@ use crate::{
     item::{SparseItem, SparseItemKind},
     iter::{Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
-    pair::{
-        KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs, KeyValueSlices,
-        KeyValueSlicesMut,
-    },
+    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs},
     soa::{
         mem::swap as soa_swap,
         slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
@@ -114,7 +111,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.as_slices_with_context();
-        let KeyValueSlices { values, .. } = slices;
+        let (_, values) = slices.into_parts();
         (context, values)
     }
 
@@ -129,7 +126,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slices_with_context();
-        let KeyValueSlices { values, .. } = slices;
+        let (_, values) = slices.into_parts();
         (context, values)
     }
 
@@ -145,7 +142,7 @@ where
     pub fn as_keys_slice(&self) -> &'a [K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlices { keys, .. } = dense.clone().into_slices();
+        let (keys, _) = dense.clone().into_slices().into_parts();
         keys
     }
 
@@ -217,7 +214,7 @@ where
     pub fn get_epoch(&self, sparse_index: K::SparseIndex) -> Option<K::Epoch> {
         let Self { dense, sparse } = self;
 
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let (keys, _) = dense.as_slices().into_parts();
         sparse_get_epoch(keys, sparse, sparse_index)
     }
 
@@ -225,7 +222,7 @@ where
     pub fn contains_key(&self, key: K) -> bool {
         let Self { dense, sparse } = self;
 
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let (keys, _) = dense.as_slices().into_parts();
         sparse_contains_key(keys, sparse, key)
     }
 
@@ -554,7 +551,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.as_slices_with_context();
-        let KeyValueSlices { values, .. } = slices;
+        let (_, values) = slices.into_parts();
         (context, values)
     }
 
@@ -569,7 +566,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.as_mut_slices_with_context();
-        let KeyValueSlicesMut { values, .. } = slices;
+        let (_, values) = slices.into_parts();
         (context, values)
     }
 
@@ -584,7 +581,7 @@ where
         let Self { dense, .. } = self;
 
         let (context, slices) = dense.into_slices_with_context();
-        let KeyValueSlicesMut { values, .. } = slices;
+        let (_, values) = slices.into_parts();
         (context, values)
     }
 
@@ -608,7 +605,7 @@ where
     pub fn as_keys_slice(&self) -> &[K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let (keys, _) = dense.as_slices().into_parts();
         keys
     }
 
@@ -617,7 +614,7 @@ where
     pub unsafe fn as_keys_slice_mut(&mut self) -> &mut [K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        let (keys, _) = dense.as_mut_slices().into_parts();
         keys
     }
 
@@ -625,7 +622,7 @@ where
     pub fn into_keys_slice(self) -> &'a [K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlicesMut { keys, .. } = dense.into_slices();
+        let (keys, _) = dense.into_slices().into_parts();
         keys
     }
 
@@ -634,7 +631,7 @@ where
     pub unsafe fn into_keys_slice_mut(self) -> &'a mut [K] {
         let Self { dense, .. } = self;
 
-        let KeyValueSlicesMut { keys, .. } = dense.into_slices();
+        let (keys, _) = dense.into_slices().into_parts();
         keys
     }
 
@@ -710,7 +707,7 @@ where
         let Self { dense, sparse } = self;
 
         let (context, slices) = dense.as_mut_slices_with_context();
-        let KeyValueSlicesMut { values, .. } = slices;
+        let (_, values) = slices.into_parts();
         let dense = SoaSlicesMut::<V>::new(context, values);
 
         let first_index = unwrap_into_usize(first_key.sparse_index());
@@ -739,7 +736,7 @@ where
     #[inline]
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
         let Self { dense, sparse } = self;
-        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        let (keys, _) = dense.as_mut_slices().into_parts();
 
         let first_index = unwrap_into_usize(first_key.sparse_index());
         let second_index = unwrap_into_usize(second_key.sparse_index());
@@ -775,7 +772,7 @@ where
             .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
 
-        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        let (keys, _) = dense.as_mut_slices().into_parts();
         let dense_key: &mut K = unwrap_dense(keys, dense_index);
         check_equal_key(key, *dense_key);
 
@@ -794,7 +791,7 @@ where
             .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
 
-        let KeyValueSlicesMut { keys, .. } = dense.as_mut_slices();
+        let (keys, _) = dense.as_mut_slices().into_parts();
         let dense_key: &mut K = unwrap_dense(keys, dense_index);
         check_compatible_key(key, *dense_key);
 
@@ -868,7 +865,7 @@ where
         let Self { dense, sparse } = self;
 
         let (context, slices) = dense.as_mut_slices_with_context();
-        let KeyValueSlicesMut { keys, values } = slices;
+        let (keys, values) = slices.into_parts();
         let mut values = SoaSlicesMut::new(context, values);
 
         sort_keys(keys, values.iter(), sparse);
@@ -993,7 +990,7 @@ where
     pub fn get_epoch(&self, sparse_index: K::SparseIndex) -> Option<K::Epoch> {
         let Self { dense, sparse } = self;
 
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let (keys, _) = dense.as_slices().into_parts();
         sparse_get_epoch(keys, sparse, sparse_index)
     }
 
@@ -1001,7 +998,7 @@ where
     pub fn contains_key(&self, key: K) -> bool {
         let Self { dense, sparse } = self;
 
-        let KeyValueSlices { keys, .. } = dense.as_slices();
+        let (keys, _) = dense.as_slices().into_parts();
         sparse_contains_key(keys, sparse, key)
     }
 

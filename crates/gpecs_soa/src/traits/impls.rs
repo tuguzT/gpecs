@@ -266,6 +266,30 @@ unsafe impl Soa for () {
         &*refs
     }
 
+    #[inline]
+    fn value_as_refs<'context, 'a>(
+        _context: &'context Self::Context,
+        value: &'a Self,
+    ) -> Self::Refs<'context, 'a>
+    where
+        Self: 'a,
+        'a: 'context,
+    {
+        value
+    }
+
+    #[inline]
+    fn mut_value_as_refs<'context, 'a>(
+        _context: &'context Self::Context,
+        value: &'a mut Self,
+    ) -> Self::RefsMut<'context, 'a>
+    where
+        Self: 'a,
+        'a: 'context,
+    {
+        value
+    }
+
     type SlicePtrs<'context> = *const [Self];
 
     #[inline]
@@ -862,6 +886,32 @@ macro_rules! soa_tuple_impl {
                 refs: Self::RefsMut<'context, 'a>,
             ) -> Self::Refs<'context, 'a> {
                 let refs = ($(&*refs.$indices,)*);
+                refs
+            }
+
+            #[inline]
+            fn value_as_refs<'context, 'a>(
+                _context: &'context Self::Context,
+                value: &'a Self,
+            ) -> Self::Refs<'context, 'a>
+            where
+                Self: 'a,
+                'a: 'context,
+            {
+                let refs = ($(&value.$indices,)*);
+                refs
+            }
+
+            #[inline]
+            fn mut_value_as_refs<'context, 'a>(
+                _context: &'context Self::Context,
+                value: &'a mut Self,
+            ) -> Self::RefsMut<'context, 'a>
+            where
+                Self: 'a,
+                'a: 'context,
+            {
+                let refs = ($(&mut value.$indices,)*);
                 refs
             }
 

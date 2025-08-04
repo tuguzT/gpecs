@@ -485,6 +485,30 @@ unsafe impl<T> Soa for Identity<T> {
         &*refs
     }
 
+    #[inline]
+    fn value_as_refs<'context, 'a>(
+        _context: &'context Self::Context,
+        value: &'a Self,
+    ) -> Self::Refs<'context, 'a>
+    where
+        Self: 'a,
+        'a: 'context,
+    {
+        value
+    }
+
+    #[inline]
+    fn mut_value_as_refs<'context, 'a>(
+        _context: &'context Self::Context,
+        value: &'a mut Self,
+    ) -> Self::RefsMut<'context, 'a>
+    where
+        Self: 'a,
+        'a: 'context,
+    {
+        value
+    }
+
     type SlicePtrs<'context> = *const [Self];
 
     #[inline]

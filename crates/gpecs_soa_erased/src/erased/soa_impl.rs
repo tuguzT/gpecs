@@ -329,6 +329,36 @@ where
         unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 
+    #[inline]
+    fn value_as_refs<'context, 'a>(
+        context: &'context Self::Context,
+        value: &'a Self,
+    ) -> Self::Refs<'context, 'a>
+    where
+        Self: 'a,
+        'a: 'context,
+    {
+        let descriptors = context.field_descriptors();
+        assert_descriptors(descriptors, value.field_descriptors());
+
+        value.as_refs()
+    }
+
+    #[inline]
+    fn mut_value_as_refs<'context, 'a>(
+        context: &'context Self::Context,
+        value: &'a mut Self,
+    ) -> Self::RefsMut<'context, 'a>
+    where
+        Self: 'a,
+        'a: 'context,
+    {
+        let descriptors = context.field_descriptors();
+        assert_descriptors(descriptors, value.field_descriptors());
+
+        value.as_refs_mut()
+    }
+
     type SlicePtrs<'context> = ErasedSoaSlicePtrs<&'context [FieldDescriptor]>;
 
     #[inline]

@@ -305,6 +305,38 @@ where
         refs.into_refs(context)
     }
 
+    #[inline]
+    fn value_as_refs<'context, 'a>(
+        context: &'context Self::Context,
+        value: &'a Self,
+    ) -> Self::Refs<'context, 'a>
+    where
+        Self: 'a,
+        'a: 'context,
+    {
+        let KeyValuePair { key, value } = value;
+        KeyValueRefs {
+            key,
+            value: V::value_as_refs(context, value),
+        }
+    }
+
+    #[inline]
+    fn mut_value_as_refs<'context, 'a>(
+        context: &'context Self::Context,
+        value: &'a mut Self,
+    ) -> Self::RefsMut<'context, 'a>
+    where
+        Self: 'a,
+        'a: 'context,
+    {
+        let KeyValuePair { key, value } = value;
+        KeyValueRefsMut {
+            key,
+            value: V::mut_value_as_refs(context, value),
+        }
+    }
+
     type SlicePtrs<'context> = KeyValueSlicePtrs<'context, K, V>;
 
     #[inline]

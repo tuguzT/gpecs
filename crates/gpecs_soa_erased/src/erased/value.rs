@@ -38,6 +38,7 @@ where
 
 impl<B, D> ErasedSoa<B, D>
 where
+    B: ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]

@@ -1458,15 +1458,15 @@ where
 {
     type Owned = KeyValuePair<K, V>;
 
-    fn to_owned(&self) -> Self::Owned {
+    fn to_owned(&self, context: &<Self::Owned as Soa>::Context) -> Self::Owned {
         let Self { key, value } = self;
         KeyValuePair {
             key: (*key).clone(),
-            value: value.to_owned(),
+            value: value.to_owned(context),
         }
     }
 
-    fn clone_into(&self, target: &mut Self::Owned) {
+    fn clone_into(&self, context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
         let Self { key, value } = self;
         let KeyValuePair {
             key: target_key,
@@ -1474,7 +1474,7 @@ where
         } = target;
 
         target_key.clone_from(key);
-        value.clone_into(target_value);
+        value.clone_into(context, target_value);
     }
 }
 

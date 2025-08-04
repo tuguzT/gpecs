@@ -504,10 +504,10 @@ impl<'a> SoaToOwned<'_, 'a> for &'a () {
     type Owned = ();
 
     #[inline]
-    fn to_owned(&self) -> Self::Owned {}
+    fn to_owned(&self, _context: &<Self::Owned as Soa>::Context) -> Self::Owned {}
 
     #[inline]
-    fn clone_into(&self, _target: &mut Self::Owned) {}
+    fn clone_into(&self, _context: &<Self::Owned as Soa>::Context, _target: &mut Self::Owned) {}
 
     #[inline]
     unsafe fn clone_into_ptrs(
@@ -1153,13 +1153,13 @@ macro_rules! soa_tuple_impl {
             type Owned = ($($types,)*);
 
             #[inline]
-            fn to_owned(&self) -> Self::Owned {
+            fn to_owned(&self, _context: &<Self::Owned as Soa>::Context) -> Self::Owned {
                 let owned = ($(self.$indices.clone(),)*);
                 owned
             }
 
             #[inline]
-            fn clone_into(&self, target: &mut Self::Owned) {
+            fn clone_into(&self, _context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
                 $(target.$indices.clone_from(self.$indices);)*
             }
 

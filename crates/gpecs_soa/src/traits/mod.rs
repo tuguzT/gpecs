@@ -638,14 +638,14 @@ pub trait SoaToOwned<'context, 'a> {
 
     /// Creates owned data from borrowed data,
     /// usually by cloning each field of [`Fields`](Soa::Fields).
-    fn to_owned(&self) -> Self::Owned;
+    fn to_owned(&self, context: &<Self::Owned as Soa>::Context) -> Self::Owned;
 
     /// Uses borrowed data to replace owned data,
     /// usually by cloning each field of [`Fields`](Soa::Fields).
     ///
     /// This is borrow-generalized version of [`Clone::clone_from()`].
-    fn clone_into(&self, target: &mut Self::Owned) {
-        *target = self.to_owned();
+    fn clone_into(&self, context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
+        *target = self.to_owned(context);
     }
 
     /// Uses borrowed data to replace owned data located by `target` [pointers](Soa::MutPtrs),
@@ -655,7 +655,7 @@ pub trait SoaToOwned<'context, 'a> {
         context: &<Self::Owned as Soa>::Context,
         target: <Self::Owned as Soa>::MutPtrs<'_>,
     ) {
-        let owned = self.to_owned();
+        let owned = self.to_owned(context);
         unsafe { <Self::Owned as SoaWrite>::write(context, target, owned) }
     }
 

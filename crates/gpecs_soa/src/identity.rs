@@ -726,12 +726,12 @@ where
     type Owned = Identity<T>;
 
     #[inline]
-    fn to_owned(&self) -> Self::Owned {
+    fn to_owned(&self, _context: &<Self::Owned as Soa>::Context) -> Self::Owned {
         (*self).clone()
     }
 
     #[inline]
-    fn clone_into(&self, target: &mut Self::Owned) {
+    fn clone_into(&self, _context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
         target.clone_from(self);
     }
 

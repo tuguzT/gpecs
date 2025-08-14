@@ -9,8 +9,9 @@ use core::{
 };
 
 use crate::soa::traits::{
-    FieldDescriptor, FieldDescriptors, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs,
-    SlicePtrs, Slices, SlicesMut, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite,
+    CopiedFieldDescriptors, FieldDescriptor, FieldDescriptors, MutPtrs, NonNullPtrs, Ptrs, Refs,
+    RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaRead, SoaToOwned,
+    SoaTrustedFields, SoaWrite,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -642,19 +643,14 @@ where
 
     type IntoIter = iter::Chain<
         iter::Once<FieldDescriptor>,
-        iter::Map<
-            <V::FieldDescriptors<'context> as IntoIterator>::IntoIter,
-            fn(<V::FieldDescriptors<'context> as IntoIterator>::Item) -> FieldDescriptor,
-        >,
+        CopiedFieldDescriptors<<V::FieldDescriptors<'context> as IntoIterator>::IntoIter>,
     >;
 
     fn into_iter(self) -> Self::IntoIter {
         let Self { key, values, .. } = self;
 
-        let f: fn(<V::FieldDescriptors<'context> as IntoIterator>::Item) -> _ =
-            |desc| *desc.as_ref();
-        let value = values.into_iter().map(f);
-        iter::once(key).chain(value)
+        let values = CopiedFieldDescriptors(values.into_iter());
+        iter::once(key).chain(values)
     }
 }
 

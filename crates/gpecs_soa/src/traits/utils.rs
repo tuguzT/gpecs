@@ -5,6 +5,78 @@ use core::{
 
 use super::FieldDescriptor;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct CopiedFieldDescriptors<T>(pub T)
+where
+    T: ?Sized;
+
+impl<T> CopiedFieldDescriptors<T> {
+    #[inline]
+    pub fn into_inner(self) -> T {
+        let Self(inner) = self;
+        inner
+    }
+}
+
+impl<T> From<T> for CopiedFieldDescriptors<T> {
+    #[inline]
+    fn from(value: T) -> Self {
+        Self(value)
+    }
+}
+
+impl<T> Iterator for CopiedFieldDescriptors<T>
+where
+    T: Iterator + ?Sized,
+    T::Item: AsRef<FieldDescriptor>,
+{
+    type Item = FieldDescriptor;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self(inner) = self;
+        inner.next().map(|desc| *desc.as_ref())
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self(inner) = self;
+        inner.size_hint()
+    }
+}
+
+impl<T> DoubleEndedIterator for CopiedFieldDescriptors<T>
+where
+    T: DoubleEndedIterator + ?Sized,
+    T::Item: AsRef<FieldDescriptor>,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self(inner) = self;
+        inner.next_back().map(|desc| *desc.as_ref())
+    }
+}
+
+impl<T> ExactSizeIterator for CopiedFieldDescriptors<T>
+where
+    T: ExactSizeIterator + ?Sized,
+    T::Item: AsRef<FieldDescriptor>,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        let Self(inner) = self;
+        inner.len()
+    }
+}
+
+impl<T> FusedIterator for CopiedFieldDescriptors<T>
+where
+    T: FusedIterator + ?Sized,
+    T::Item: AsRef<FieldDescriptor>,
+{
+}
+
 /// Iterator of offsets for each provided field in a single buffer of provided capacity.
 ///
 /// Resulting layout could be retrieved using [`layout()`](BufferOffsets::layout()) method.
@@ -15,7 +87,7 @@ where
 {
     layout: Layout,
     capacity: usize,
-    fields: I,
+    fields: CopiedFieldDescriptors<I>,
 }
 
 impl<I> BufferOffsets<I>
@@ -42,13 +114,14 @@ impl<I> BufferOffsets<I> {
     #[inline]
     pub fn into_fields(self) -> I {
         let Self { fields, .. } = self;
-        fields
+        fields.into_inner()
     }
 }
 
 impl<I> Iterator for BufferOffsets<I>
 where
-    I: ?Sized + Iterator<Item: AsRef<FieldDescriptor>>,
+    I: Iterator + ?Sized,
+    I::Item: AsRef<FieldDescriptor>,
 {
     type Item = Result<(FieldDescriptor, usize), LayoutError>;
 
@@ -60,7 +133,7 @@ where
             capacity,
         } = *self;
 
-        let desc = *fields.next()?.as_ref();
+        let desc = fields.next()?;
         let region = repeat_layout(desc.layout(), capacity);
         let offset = region.and_then(|region| {
             let offset;
@@ -80,7 +153,8 @@ where
 
 impl<I> ExactSizeIterator for BufferOffsets<I>
 where
-    I: ?Sized + Iterator<Item: AsRef<FieldDescriptor>> + ExactSizeIterator,
+    I: ExactSizeIterator + ?Sized,
+    I::Item: AsRef<FieldDescriptor>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -89,8 +163,10 @@ where
     }
 }
 
-impl<I> FusedIterator for BufferOffsets<I> where
-    I: ?Sized + Iterator<Item: AsRef<FieldDescriptor>> + FusedIterator
+impl<I> FusedIterator for BufferOffsets<I>
+where
+    I: FusedIterator + ?Sized,
+    I::Item: AsRef<FieldDescriptor>,
 {
 }
 
@@ -102,7 +178,7 @@ where
 {
     BufferOffsets {
         layout: Layout::new::<()>(),
-        fields: fields.into_iter(),
+        fields: fields.into_iter().into(),
         capacity,
     }
 }

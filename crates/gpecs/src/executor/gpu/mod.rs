@@ -433,7 +433,7 @@ impl<'context> GpuExecutor<'context> {
 
             let shader = system_info.shader();
             let component_ids = shader
-                .components_bind_group_layout_entries()
+                .component_entries()
                 .map(|(component_id, _)| component_id.into());
             let Ok(compatible_archetypes) =
                 context.archetypes().compatible_archetypes(component_ids)
@@ -450,27 +450,22 @@ impl<'context> GpuExecutor<'context> {
 
                 let mut storage_buffer_bindings =
                     unsafe { archetype_info.storage().storage_buffer_bindings() };
-                let mut bind_group_entries = Vec::new();
+                let mut entries = Vec::new();
 
-                if let Some(entities_bind_group_layout_entry) =
-                    shader.entities_bind_group_layout_entry()
-                {
-                    let Some(entities_buffer_binding) = storage_buffer_bindings.entities else {
+                if let Some(entity_entry) = shader.entity_entry() {
+                    let Some(entity_buffer_binding) = storage_buffer_bindings.entities else {
                         continue;
                     };
-                    let entities_bind_group_entry = BindGroupEntry {
-                        binding: entities_bind_group_layout_entry.binding,
-                        resource: BindingResource::Buffer(entities_buffer_binding),
+
+                    let entity_entry = BindGroupEntry {
+                        binding: entity_entry.binding,
+                        resource: BindingResource::Buffer(entity_buffer_binding),
                     };
-                    bind_group_entries.push(entities_bind_group_entry);
+                    entries.push(entity_entry);
                 }
-                let components_bind_group_layout_entries =
-                    shader.components_bind_group_layout_entries();
-                for (component_id, component_bind_group_layout_entry) in
-                    components_bind_group_layout_entries
-                {
-                    let Some(component_bind_group_layout_entry) = component_bind_group_layout_entry
-                    else {
+
+                for (component_id, component_entry) in shader.component_entries() {
+                    let Some(component_entry) = component_entry else {
                         continue;
                     };
                     let Some(component_buffer_binding) = storage_buffer_bindings
@@ -483,13 +478,14 @@ impl<'context> GpuExecutor<'context> {
                         break;
                     };
 
-                    let component_bind_group_entry = BindGroupEntry {
-                        binding: component_bind_group_layout_entry.binding,
+                    let component_entry = BindGroupEntry {
+                        binding: component_entry.binding,
                         resource: BindingResource::Buffer(component_buffer_binding),
                     };
-                    bind_group_entries.push(component_bind_group_entry);
+                    entries.push(component_entry);
                 }
-                if bind_group_entries.is_empty() {
+
+                if entries.is_empty() {
                     continue;
                 }
 
@@ -497,14 +493,14 @@ impl<'context> GpuExecutor<'context> {
                 let additional_bindings = additional_bindings_cache
                     .get(&system_id)
                     .unwrap_or(&default_additional_bindings);
-                bind_group_entries.extend(additional_bindings.iter().cloned());
+                entries.extend(additional_bindings.iter().cloned());
 
                 let bind_group_label =
                     format!("`gpecs` {system_id:?} bind group for {archetype_id:?}");
                 let bind_group_desc = BindGroupDescriptor {
                     label: Some(&bind_group_label),
                     layout: shader.bind_group_layout(),
-                    entries: &bind_group_entries,
+                    entries: entries.as_slice(),
                 };
                 let bind_group = device.create_bind_group(&bind_group_desc);
 

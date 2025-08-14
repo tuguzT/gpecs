@@ -1,6 +1,6 @@
 use std::{iter::FusedIterator, num::NonZeroU64};
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet, map};
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferBindingType, ComputePipeline, ComputePipelineDescriptor, Device,
@@ -19,9 +19,9 @@ use super::registry::{GpuSystemDescriptor, GpuSystemId};
 
 #[derive(Debug)]
 pub struct SystemShader {
-    entities_bind_group_layout_entry: Option<BindGroupLayoutEntry>,
-    components_bind_group_layout_entries: IndexMap<GpuComponentId, Option<BindGroupLayoutEntry>>,
-    additional_bind_group_layout_entries: Vec<BindGroupLayoutEntry>,
+    entity_entry: Option<BindGroupLayoutEntry>,
+    component_entries: IndexMap<GpuComponentId, Option<BindGroupLayoutEntry>>,
+    additional_entries: Vec<BindGroupLayoutEntry>,
     shader_module: ShaderModule,
     workgroup_count: Option<u32>,
     bind_group_layout: BindGroupLayout,
@@ -57,17 +57,14 @@ impl SystemShader {
             .map(|id| unsafe { GpuComponentId::from_id(id) })
             .collect();
 
-        let additional_bind_group_layout_entries: Vec<_> =
-            additional_bindings.into_iter().collect();
+        let additional_entries: Vec<_> = additional_bindings.into_iter().collect();
 
-        let max_bind_group_layout_entries = component_ids.len()
-            + additional_bind_group_layout_entries.len()
-            + (bind_entities as usize);
-        let mut bind_group_layout_entries = Vec::with_capacity(max_bind_group_layout_entries);
+        let max_entries = component_ids.len() + additional_entries.len() + (bind_entities as usize);
+        let mut entries = Vec::with_capacity(max_entries);
 
-        let mut entities_bind_group_layout_entry = None;
+        let mut entity_entry = None;
         if bind_entities {
-            let bind_group_layout_entry = BindGroupLayoutEntry {
+            let entry = BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStages::COMPUTE,
                 ty: BindingType::Buffer {
@@ -82,12 +79,11 @@ impl SystemShader {
                 },
                 count: None,
             };
-            entities_bind_group_layout_entry = bind_group_layout_entry.into();
-            bind_group_layout_entries.push(bind_group_layout_entry);
+            entity_entry = entry.into();
+            entries.push(entry);
         }
 
-        let mut components_bind_group_layout_entries =
-            IndexMap::with_capacity(max_bind_group_layout_entries);
+        let mut component_entries = IndexMap::with_capacity(max_entries);
         for (index, &component_id) in component_ids.iter().enumerate() {
             let Some(info) = components.get_component_info(component_id.into()) else {
                 unreachable!("component {component_id:?} should exist");
@@ -99,11 +95,11 @@ impl SystemShader {
                 .try_into()
                 .expect("size of component should fit in `u64`");
             let Some(min_binding_size) = NonZeroU64::new(size_of_component) else {
-                components_bind_group_layout_entries.insert(component_id, None);
+                component_entries.insert(component_id, None);
                 continue;
             };
 
-            let component_bind_group_layout_entry = BindGroupLayoutEntry {
+            let component_entry = BindGroupLayoutEntry {
                 binding: (index + (bind_entities as usize))
                     .try_into()
                     .expect("count of bindings should fit in `u32`"),
@@ -115,21 +111,21 @@ impl SystemShader {
                 },
                 count: None,
             };
-            if components_bind_group_layout_entries
-                .insert(component_id, Some(component_bind_group_layout_entry))
+            if component_entries
+                .insert(component_id, Some(component_entry))
                 .is_some()
             {
                 unreachable!("duplicate component {component_id:?} in shader {system_id:?}");
             };
-            bind_group_layout_entries.push(component_bind_group_layout_entry);
+            entries.push(component_entry);
         }
 
-        bind_group_layout_entries.extend(additional_bind_group_layout_entries.iter().copied());
+        entries.extend(additional_entries.iter().copied());
 
         let bind_group_layout_label = format!("`gpecs` {system_id:?} bind group layout");
         let bind_group_layout_desc = BindGroupLayoutDescriptor {
             label: Some(&bind_group_layout_label),
-            entries: &bind_group_layout_entries,
+            entries: &entries,
         };
         let bind_group_layout = gpu_device.create_bind_group_layout(&bind_group_layout_desc);
 
@@ -153,9 +149,9 @@ impl SystemShader {
         let compute_pipeline = gpu_device.create_compute_pipeline(&compute_pipeline_desc);
 
         Ok(Self {
-            entities_bind_group_layout_entry,
-            components_bind_group_layout_entries,
-            additional_bind_group_layout_entries,
+            entity_entry,
+            component_entries,
+            additional_entries,
             workgroup_count,
             shader_module,
             bind_group_layout,
@@ -179,38 +175,27 @@ impl SystemShader {
     }
 
     #[inline]
-    pub fn entities_bind_group_layout_entry(&self) -> Option<&BindGroupLayoutEntry> {
-        let Self {
-            entities_bind_group_layout_entry,
-            ..
-        } = self;
-        entities_bind_group_layout_entry.as_ref()
+    pub fn entity_entry(&self) -> Option<&BindGroupLayoutEntry> {
+        let Self { entity_entry, .. } = self;
+        entity_entry.as_ref()
     }
 
     #[inline]
-    // TODO: add specific iterator type
-    pub fn components_bind_group_layout_entries(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = (GpuComponentId, Option<&BindGroupLayoutEntry>)>
-    + ExactSizeIterator
-    + FusedIterator
-    + Clone {
+    pub fn component_entries(&self) -> SystemShaderComponentEntries<'_> {
         let Self {
-            components_bind_group_layout_entries,
-            ..
+            component_entries, ..
         } = self;
-        components_bind_group_layout_entries
-            .iter()
-            .map(|(&id, entry)| (id, entry.as_ref()))
+        SystemShaderComponentEntries {
+            inner: component_entries.iter(),
+        }
     }
 
     #[inline]
-    pub fn additional_bind_group_layout_entries(&self) -> &[BindGroupLayoutEntry] {
+    pub fn additional_entries(&self) -> &[BindGroupLayoutEntry] {
         let Self {
-            additional_bind_group_layout_entries,
-            ..
+            additional_entries, ..
         } = self;
-        additional_bind_group_layout_entries
+        additional_entries
     }
 
     #[inline]
@@ -237,3 +222,75 @@ impl SystemShader {
         compute_pipeline
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct SystemShaderComponentEntries<'a> {
+    inner: map::Iter<'a, GpuComponentId, Option<BindGroupLayoutEntry>>,
+}
+
+impl<'a> Iterator for SystemShaderComponentEntries<'a> {
+    type Item = (GpuComponentId, Option<&'a BindGroupLayoutEntry>);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next().map(|(&id, entry)| (id, entry.as_ref()))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { inner } = self;
+        inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        let Self { inner } = self;
+        inner.count()
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth(n).map(|(&id, entry)| (id, entry.as_ref()))
+    }
+
+    #[inline]
+    fn last(self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.last().map(|(&id, entry)| (id, entry.as_ref()))
+    }
+
+    #[inline]
+    fn collect<B>(self) -> B
+    where
+        B: FromIterator<Self::Item>,
+    {
+        let Self { inner } = self;
+        inner.map(|(&id, entry)| (id, entry.as_ref())).collect()
+    }
+}
+
+impl DoubleEndedIterator for SystemShaderComponentEntries<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next_back().map(|(&id, entry)| (id, entry.as_ref()))
+    }
+
+    #[inline]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth_back(n).map(|(&id, entry)| (id, entry.as_ref()))
+    }
+}
+
+impl ExactSizeIterator for SystemShaderComponentEntries<'_> {
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+}
+
+impl FusedIterator for SystemShaderComponentEntries<'_> {}

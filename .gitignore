@@ -23,9 +23,13 @@ target/
 # VS Code
 .vscode/
 
-# `rust-gpu` build artifacts
-manifest.json
-*.spv
-
-# cargo flamegraph artifacts
+# cargo-flamegraph artifacts
 flamegraph.svg
+
+# OS settings and caches
+**/desktop.ini
+**/.DS_Store
+
+# Obsidian workspace cache
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json

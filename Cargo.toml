@@ -37,7 +37,7 @@ gpecs_types = { path = "crates/gpecs_types" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 cargo-gpu = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "39b238f25b7652ba79d153626e252321942cb558" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "df1628a032d22c864397417c2871b74d602af986" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "72943b58a15e72536c7ac20440de2b150012ec4d" }
 indexmap = { version = "2.10" }
 petgraph = { version = "0.8" }
 arrayvec = { version = "0.7", default-features = false }

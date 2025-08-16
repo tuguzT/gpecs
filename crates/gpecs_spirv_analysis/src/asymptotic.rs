@@ -37,6 +37,7 @@ pub enum Expr {
 }
 
 impl Expr {
+    #[must_use]
     pub fn log(self) -> Self {
         Self::Unary {
             op: UnaryOperator::Log,
@@ -44,6 +45,7 @@ impl Expr {
         }
     }
 
+    #[must_use]
     pub fn factorial(self) -> Self {
         Self::Unary {
             op: UnaryOperator::Factorial,
@@ -51,6 +53,7 @@ impl Expr {
         }
     }
 
+    #[must_use]
     pub fn pow(self, rhs: impl Into<Box<Self>>) -> Self {
         Self::Binary {
             op: BinaryOperator::Pow,
@@ -59,6 +62,7 @@ impl Expr {
         }
     }
 
+    #[must_use]
     pub fn simplify(self) -> Self {
         todo!()
     }
@@ -157,7 +161,7 @@ where
 {
     fn from(value: T) -> Self {
         let value = f64::from(value);
-        Box::new(value.into())
+        Self::new(value.into())
     }
 }
 
@@ -176,8 +180,10 @@ where
 
 impl Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use BinaryOperator::*;
-        use UnaryOperator::*;
+        use self::{
+            BinaryOperator::{Add, Div, Mul, Pow, Rem, Sub},
+            UnaryOperator::{Factorial, Log},
+        };
 
         match self {
             Self::Const(value) => value.fmt(f),

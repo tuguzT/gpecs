@@ -14,7 +14,7 @@ where
     WriteOnly(MutPtrs<'context, T>),
 }
 
-impl<'context, 'a, T> TryInsertAccess<'context, 'a, T>
+impl<'context, T> TryInsertAccess<'context, '_, T>
 where
     T: Soa + ?Sized,
 {
@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<'context, 'a, T> From<MutPtrs<'context, T>> for TryInsertAccess<'context, 'a, T>
+impl<'context, T> From<MutPtrs<'context, T>> for TryInsertAccess<'context, '_, T>
 where
     T: Soa + ?Sized,
 {

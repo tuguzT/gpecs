@@ -2,6 +2,7 @@ use std::{array, hint::black_box, iter::Zip, slice};
 
 use gpecs_soa::{prelude::*, slice as soa_slice};
 use gpecs_soa_erased::erased::BoxedErasedSoa;
+use num_traits::ToPrimitive;
 
 use crate::{Big, Large, Small, Tiny, push::Push, with_capacity::WithCapacity};
 
@@ -150,7 +151,9 @@ impl Work for Small {
     type Output = f64;
 
     fn work_item(index: usize) -> Self {
-        let index = (index + 1) as f64;
+        let index = (index + 1)
+            .to_f64()
+            .expect("index should be convertible to f64");
         (1.0 * index, 0.2 * index, -2.3 * index)
     }
 
@@ -227,7 +230,7 @@ impl Work for Big {
             small,
             small,
             array::from_fn(|i| i + index),
-            "".to_owned(),
+            String::new(),
             "Hello, World\n".to_owned(),
         )
     }
@@ -387,6 +390,7 @@ impl Work for Large {
         slice::Iter<'a, [u32; 32]>,
     >;
 
+    #[expect(clippy::many_single_char_names)]
     fn soa_std_prepare_iter(data: &Self::Vecs) -> Self::SoaStdIter<'_> {
         let (a, b, c, d, e, f, g, h, i, j) = data;
         a.iter()

@@ -203,9 +203,8 @@ pub const fn repeat_layout(layout: Layout, n: usize) -> Result<Layout, LayoutErr
     };
 
     let layout = layout.pad_to_align();
-    let size = match layout.size().checked_mul(n) {
-        Some(v) => v,
-        None => return Err(ERR),
+    let Some(size) = layout.size().checked_mul(n) else {
+        return Err(ERR);
     };
     Layout::from_size_align(size, layout.align())
 }

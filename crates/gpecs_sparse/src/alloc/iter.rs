@@ -63,7 +63,7 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            inner: Default::default(),
+            inner: core_alloc::vec::IntoIter::default(),
             phantom: PhantomData,
         }
     }
@@ -215,9 +215,8 @@ where
 {
     #[inline]
     fn default() -> Self {
-        Self {
-            inner: Default::default(),
-        }
+        let inner = vec::IntoIter::default();
+        Self { inner }
     }
 }
 
@@ -404,9 +403,8 @@ where
 {
     #[inline]
     fn default() -> Self {
-        Self {
-            inner: Default::default(),
-        }
+        let inner = vec::IntoIter::default();
+        Self { inner }
     }
 }
 

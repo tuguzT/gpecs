@@ -45,8 +45,8 @@ impl SystemShader {
             shader_module,
             entry_point,
             workgroup_count,
-            bind_components,
             bind_entities,
+            bind_components,
             additional_bindings,
         } = descriptor;
 
@@ -59,39 +59,33 @@ impl SystemShader {
 
         let additional_entries: Vec<_> = additional_bindings.into_iter().collect();
 
-        let max_entries = component_ids.len() + additional_entries.len() + (bind_entities as usize);
+        let max_entries =
+            component_ids.len() + additional_entries.len() + usize::from(bind_entities);
         let mut entries = Vec::with_capacity(max_entries);
 
-        let mut entity_entry = None;
-        if bind_entities {
-            let entry = BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::COMPUTE,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Storage { read_only: false },
-                    min_binding_size: Some(
-                        u64::try_from(size_of::<Entity>())
-                            .expect("size of `Entity` should fit in `u64`")
-                            .try_into()
-                            .expect("size of `Entity` cannot be zero"),
-                    ),
-                    has_dynamic_offset: false,
-                },
-                count: None,
-            };
-            entity_entry = entry.into();
-            entries.push(entry);
-        }
+        #[expect(clippy::items_after_statements)]
+        const ENTITY_MIN_BINDING_SIZE: NonZeroU64 =
+            NonZeroU64::new(size_of::<Entity>() as u64).expect("size of `Entity` cannot be zero");
 
-        let mut component_entries = IndexMap::with_capacity(max_entries);
-        for (index, &component_id) in component_ids.iter().enumerate() {
+        let entity_entry = bind_entities.then_some(BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStages::COMPUTE,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: false },
+                min_binding_size: Some(ENTITY_MIN_BINDING_SIZE),
+                has_dynamic_offset: false,
+            },
+            count: None,
+        });
+        entries.extend(entity_entry);
+
+        let mut component_entries = IndexMap::with_capacity(component_ids.len());
+        for (index, component_id) in component_ids.into_iter().enumerate() {
             let Some(info) = components.get_component_info(component_id.into()) else {
                 unreachable!("component {component_id:?} should exist");
             };
-            let size_of_component = info
-                .descriptor()
-                .layout()
-                .size()
+            let size_of_component = info.descriptor().layout().size();
+            let size_of_component = size_of_component
                 .try_into()
                 .expect("size of component should fit in `u64`");
             let Some(min_binding_size) = NonZeroU64::new(size_of_component) else {
@@ -100,7 +94,7 @@ impl SystemShader {
             };
 
             let component_entry = BindGroupLayoutEntry {
-                binding: (index + (bind_entities as usize))
+                binding: (index + usize::from(bind_entities))
                     .try_into()
                     .expect("count of bindings should fit in `u32`"),
                 visibility: ShaderStages::COMPUTE,
@@ -116,7 +110,7 @@ impl SystemShader {
                 .is_some()
             {
                 unreachable!("duplicate component {component_id:?} in shader {system_id:?}");
-            };
+            }
             entries.push(component_entry);
         }
 
@@ -125,7 +119,7 @@ impl SystemShader {
         let bind_group_layout_label = format!("`gpecs` {system_id:?} bind group layout");
         let bind_group_layout_desc = BindGroupLayoutDescriptor {
             label: Some(&bind_group_layout_label),
-            entries: &entries,
+            entries: entries.as_slice(),
         };
         let bind_group_layout = gpu_device.create_bind_group_layout(&bind_group_layout_desc);
 
@@ -152,8 +146,8 @@ impl SystemShader {
             entity_entry,
             component_entries,
             additional_entries,
-            workgroup_count,
             shader_module,
+            workgroup_count,
             bind_group_layout,
             pipeline_layout,
             compute_pipeline,

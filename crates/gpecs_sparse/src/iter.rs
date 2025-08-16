@@ -120,7 +120,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefs { key, .. }| f(key))
+        inner.for_each(|KeyValueRefs { key, .. }| f(key));
     }
 
     #[inline]
@@ -342,7 +342,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefs { value, .. }| f(value.into_inner()))
+        inner.for_each(|KeyValueRefs { value, .. }| f(value.into_inner()));
     }
 
     #[inline]
@@ -565,7 +565,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefsMut { value, .. }| f(value.into_inner()))
+        inner.for_each(|KeyValueRefsMut { value, .. }| f(value.into_inner()));
     }
 
     #[inline]
@@ -812,7 +812,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefs { key, value }| f((key, value.into_inner())))
+        inner.for_each(|KeyValueRefs { key, value }| f((key, value.into_inner())));
     }
 }
 
@@ -996,7 +996,7 @@ where
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|KeyValueRefsMut { key, value }| f((&*key, value.into_inner())))
+        inner.for_each(|KeyValueRefsMut { key, value }| f((&*key, value.into_inner())));
     }
 }
 

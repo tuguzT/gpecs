@@ -20,7 +20,7 @@ use crate::{
     traits::{Soa, SoaTrustedFields},
 };
 
-use self::TryReserveErrorKind::*;
+use self::TryReserveErrorKind::{AllocError, CapacityOverflow};
 
 /// The error type for `try_reserve` methods.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -90,6 +90,7 @@ const fn capacity_overflow() -> ! {
     panic!("capacity overflow");
 }
 
+#[derive(Debug, Clone, Copy)]
 enum AllocInit {
     /// The contents of the new memory are uninitialized.
     Uninitialized,
@@ -140,9 +141,8 @@ where
             return Ok(this);
         }
 
-        let layout = match buffer_layout::<T>(&context, capacity) {
-            Ok(layout) => layout,
-            Err(_) => return Err(CapacityOverflow.into()),
+        let Ok(layout) = buffer_layout::<T>(&context, capacity) else {
+            return Err(CapacityOverflow.into());
         };
         let capacity = capacity_from::<T>(&context, layout);
         alloc_guard(layout.size())?;
@@ -151,10 +151,9 @@ where
             AllocInit::Uninitialized => unsafe { alloc(layout) },
             AllocInit::Zeroed => unsafe { alloc_zeroed(layout) },
         };
-        let ptr = match NonNull::new(ptr) {
-            Some(ptr) => ptr,
+        let Some(ptr) = NonNull::new(ptr) else {
             #[rustfmt::skip]
-            None => return Err(AllocError { layout, non_exhaustive: () }.into()),
+            return Err(AllocError { layout, non_exhaustive: () }.into());
         };
 
         let ptr: NonNull<BufferData<_>> = ptr.cast();
@@ -200,7 +199,7 @@ where
 
     #[inline]
     #[must_use]
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn with_capacity_zeroed(context: T::Context, capacity: usize) -> Self {
         match Self::try_with_capacity_zeroed(context, capacity) {
             Ok(me) => me,
@@ -209,7 +208,6 @@ where
     }
 
     #[inline]
-    #[allow(dead_code)]
     pub fn try_with_capacity_zeroed(
         context: T::Context,
         capacity: usize,
@@ -276,7 +274,7 @@ where
     }
 
     #[inline]
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn non_nulls(&self) -> T::NonNullPtrs<'_> {
         let ptrs = self.ptrs();
         let context = self.context();
@@ -437,14 +435,12 @@ where
         );
 
         let context = self.context();
-        let (ptr, old_layout) = match self.current_memory(context) {
-            Some(mem) => mem,
-            None => return Ok(()),
+        let Some((ptr, old_layout)) = self.current_memory(context) else {
+            return Ok(());
         };
 
-        let new_layout = match buffer_layout::<T>(context, capacity) {
-            Ok(layout) => layout,
-            Err(_) => return Err(CapacityOverflow.into()),
+        let Ok(new_layout) = buffer_layout::<T>(context, capacity) else {
+            return Err(CapacityOverflow.into());
         };
         if new_layout.size() == 0 {
             unsafe {
@@ -455,10 +451,9 @@ where
         }
 
         let ptr = unsafe { realloc(ptr.as_ptr(), old_layout, new_layout.size()) };
-        let ptr = match NonNull::new(ptr) {
-            Some(ptr) => ptr,
+        let Some(ptr) = NonNull::new(ptr) else {
             #[rustfmt::skip]
-            None => return Err(AllocError { layout: new_layout, non_exhaustive: () }.into()),
+            return Err(AllocError { layout: new_layout, non_exhaustive: () }.into());
         };
         unsafe {
             self.set_ptr_and_capacity(ptr.cast(), capacity);
@@ -521,6 +516,7 @@ fn finish_grow(
 }
 
 #[cold]
+#[expect(clippy::needless_pass_by_value)]
 fn handle_error(error: TryReserveError) -> ! {
     match error.kind() {
         CapacityOverflow => capacity_overflow(),
@@ -528,6 +524,7 @@ fn handle_error(error: TryReserveError) -> ! {
     }
 }
 
+#[expect(clippy::inline_always)]
 #[inline(always)]
 fn alloc_guard(alloc_size: usize) -> Result<(), TryReserveError> {
     if usize::BITS < 64 && alloc_size > isize::MAX as usize {

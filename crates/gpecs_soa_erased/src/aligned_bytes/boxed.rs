@@ -124,16 +124,16 @@ impl AlignedUninitBoxedByteSlice {
     }
 }
 
-impl AsRef<AlignedUninitBoxedByteSlice> for AlignedUninitBoxedByteSlice {
+impl AsRef<Self> for AlignedUninitBoxedByteSlice {
     #[inline]
-    fn as_ref(&self) -> &AlignedUninitBoxedByteSlice {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl AsMut<AlignedUninitBoxedByteSlice> for AlignedUninitBoxedByteSlice {
+impl AsMut<Self> for AlignedUninitBoxedByteSlice {
     #[inline]
-    fn as_mut(&mut self) -> &mut AlignedUninitBoxedByteSlice {
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }

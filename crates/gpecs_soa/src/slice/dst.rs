@@ -143,22 +143,22 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn clone_from_slice(&mut self, src: &SoaSlice<T>)
+    pub fn clone_from_slice(&mut self, src: &Self)
     where
         for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
     {
         let src = src.slices();
-        self.slices_mut().clone_from_slices(src);
+        self.slices_mut().clone_from_slices(&src);
     }
 
     #[inline]
     #[track_caller]
-    pub fn copy_from_slice(&mut self, src: &SoaSlice<T>)
+    pub fn copy_from_slice(&mut self, src: &Self)
     where
         T::Fields: Copy,
     {
         let src = src.slices();
-        self.slices_mut().copy_from_slices(src);
+        self.slices_mut().copy_from_slices(&src);
     }
 
     #[inline]
@@ -223,7 +223,7 @@ where
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         self.slices_mut()
-            .sort_unstable_with_permutation(permutation)
+            .sort_unstable_with_permutation(permutation);
     }
 
     #[inline]
@@ -232,7 +232,7 @@ where
         for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.slices_mut()
-            .sort_unstable_with_permutation_by(permutation, compare)
+            .sort_unstable_with_permutation_by(permutation, compare);
     }
 
     #[inline]
@@ -242,7 +242,7 @@ where
         K: Ord,
     {
         self.slices_mut()
-            .sort_unstable_with_permutation_by_key(permutation, f)
+            .sort_unstable_with_permutation_by_key(permutation, f);
     }
 }
 
@@ -280,7 +280,7 @@ where
     }
 }
 
-impl<T> AsRef<SoaSlice<T>> for SoaSlice<T>
+impl<T> AsRef<Self> for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
 {
@@ -300,7 +300,7 @@ where
     }
 }
 
-impl<T> AsMut<SoaSlice<T>> for SoaSlice<T>
+impl<T> AsMut<Self> for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
 {
@@ -330,7 +330,7 @@ where
         self.as_slices() == other.as_slices()
     }
     #[inline]
-    #[allow(clippy::partialeq_ne_impl)]
+    #[expect(clippy::partialeq_ne_impl)]
     fn ne(&self, other: &Self) -> bool {
         self.as_slices() != other.as_slices()
     }
@@ -403,7 +403,7 @@ where
     type Output = U;
 
     fn index(&self, index: I) -> &Self::Output {
-        SoaSlice::index(self, index)
+        Self::index(self, index)
     }
 }
 
@@ -414,7 +414,7 @@ where
     for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
-        SoaSlice::index_mut(self, index)
+        Self::index_mut(self, index)
     }
 }
 

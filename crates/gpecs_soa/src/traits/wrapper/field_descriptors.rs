@@ -74,7 +74,7 @@ where
     fn default() -> Self {
         Self {
             inner: Default::default(),
-            phantom: Default::default(),
+            phantom: PhantomData,
         }
     }
 }

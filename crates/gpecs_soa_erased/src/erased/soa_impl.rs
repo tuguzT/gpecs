@@ -55,11 +55,11 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer<'context>(
-        context: &'context Self::Context,
+    unsafe fn ptrs_from_buffer(
+        context: &Self::Context,
         buffer: *mut u8,
         capacity: usize,
-    ) -> Self::MutPtrs<'context> {
+    ) -> Self::MutPtrs<'_> {
         let descriptors = context.field_descriptors();
         unsafe { ErasedSoaMutPtrs::new(descriptors, buffer, capacity, 0) }
     }
@@ -650,6 +650,6 @@ where
 
         dst.into_iter()
             .zip(value.as_refs())
-            .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) })
+            .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) });
     }
 }

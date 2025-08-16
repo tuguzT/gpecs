@@ -264,7 +264,7 @@ where
     }
 }
 
-impl<'c, 'a, T> From<&'c T::Context> for SoaSlices<'c, 'a, T>
+impl<'c, T> From<&'c T::Context> for SoaSlices<'c, '_, T>
 where
     T: Soa + ?Sized,
 {
@@ -287,7 +287,7 @@ where
     }
 }
 
-impl<'c, 'a, T> AsRef<SoaSlices<'c, 'a, T>> for SoaSlices<'c, 'a, T>
+impl<T> AsRef<Self> for SoaSlices<'_, '_, T>
 where
     T: Soa + ?Sized,
 {
@@ -318,7 +318,7 @@ where
     }
 
     #[inline]
-    #[allow(clippy::partialeq_ne_impl)]
+    #[expect(clippy::partialeq_ne_impl)]
     fn ne(&self, other: &Self) -> bool {
         self.as_slices() != other.as_slices()
     }
@@ -888,7 +888,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn clone_from_slices(&mut self, src: SoaSlices<T>)
+    pub fn clone_from_slices(&mut self, src: &SoaSlices<T>)
     where
         for<'ca, 'any> T::Refs<'ca, 'any>: SoaToOwned<'ca, 'any, Owned = T>,
     {
@@ -909,7 +909,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn copy_from_slices(&mut self, src: SoaSlices<T>)
+    pub fn copy_from_slices(&mut self, src: &SoaSlices<T>)
     where
         T::Fields: Copy,
     {
@@ -943,7 +943,7 @@ where
         unsafe {
             let a = SoaSliceIndex::<T>::get_unchecked_mut(a, context, slices.clone());
             let b = SoaSliceIndex::<T>::get_unchecked_mut(b, context, slices);
-            T::ptrs_swap(context, a, b)
+            T::ptrs_swap(context, a, b);
         }
     }
 
@@ -952,7 +952,7 @@ where
     where
         for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
-        self.sort_unstable_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b))
+        self.sort_unstable_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b));
     }
 
     #[inline]
@@ -977,8 +977,8 @@ where
                     T::ptrs_to_refs(context, ptrs)
                 };
                 compare(a, b)
-            })
-        })
+            });
+        });
     }
 
     #[inline]
@@ -997,8 +997,8 @@ where
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
-            })
-        })
+            });
+        });
     }
 
     pub(crate) fn sort_impl<F>(&mut self, permutation: &mut [usize], f: F)
@@ -1053,7 +1053,7 @@ where
     }
 }
 
-impl<'c, 'a, T> From<&'c T::Context> for SoaSlicesMut<'c, 'a, T>
+impl<'c, T> From<&'c T::Context> for SoaSlicesMut<'c, '_, T>
 where
     T: Soa + ?Sized,
 {
@@ -1075,7 +1075,7 @@ where
     }
 }
 
-impl<'c, 'a, T> AsRef<SoaSlicesMut<'c, 'a, T>> for SoaSlicesMut<'c, 'a, T>
+impl<T> AsRef<Self> for SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
 {
@@ -1095,7 +1095,7 @@ where
     }
 }
 
-impl<'c, 'a, T> AsMut<SoaSlicesMut<'c, 'a, T>> for SoaSlicesMut<'c, 'a, T>
+impl<T> AsMut<Self> for SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
 {
@@ -1126,7 +1126,7 @@ where
     }
 
     #[inline]
-    #[allow(clippy::partialeq_ne_impl)]
+    #[expect(clippy::partialeq_ne_impl)]
     fn ne(&self, other: &Self) -> bool {
         self.as_slices() != other.as_slices()
     }

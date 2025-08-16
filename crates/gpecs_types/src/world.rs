@@ -14,6 +14,7 @@ impl WorldId {
     }
 
     #[inline]
+    #[expect(clippy::cast_possible_truncation)]
     pub const fn into_u16(self) -> u16 {
         let Self(id) = self;
         id as u16

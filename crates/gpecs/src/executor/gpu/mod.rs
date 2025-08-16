@@ -328,7 +328,7 @@ impl<'context> GpuExecutor<'context> {
                 unreachable!("system {system_id:?} should exist");
             };
             let shader = system_info.shader();
-            for (&archetype_id, bind_group) in archetypes_bind_groups.iter() {
+            for (&archetype_id, bind_group) in archetypes_bind_groups {
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
                     unreachable!("archetype {archetype_id:?} should exist");
                 };
@@ -426,7 +426,7 @@ impl<'context> GpuExecutor<'context> {
         }
 
         let mut schedule_cache = ScheduleCache::default();
-        for system_id in schedule.iter() {
+        for system_id in schedule {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("system {system_id:?} should exist");
             };
@@ -509,7 +509,7 @@ impl<'context> GpuExecutor<'context> {
                     unreachable!(
                         "archetype {archetype_id:?} cannot have multiple bind groups for system {system_id:?}"
                     );
-                };
+                }
             }
         }
         schedule_cache

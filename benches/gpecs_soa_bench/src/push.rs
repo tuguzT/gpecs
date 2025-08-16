@@ -35,13 +35,13 @@ pub trait Push: SoaVecs<Context: Default> + SoaWrite {
 type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
 
 impl Push for Zero {
-    #[allow(clippy::let_unit_value, reason = "reference for other manual impls")]
+    #[expect(clippy::let_unit_value, reason = "reference for other manual impls")]
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self) {
         let value = black_box(value);
         vecs.push(value);
     }
 
-    #[allow(clippy::let_unit_value, reason = "reference for other manual impls")]
+    #[expect(clippy::let_unit_value, reason = "reference for other manual impls")]
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
         let context = &Default::default();
         let value = black_box(value);
@@ -53,7 +53,7 @@ impl Push for Zero {
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
-            dst.copy_from(&ptrs, 1)
+            dst.copy_from(&ptrs, 1);
         });
     }
 }
@@ -82,7 +82,7 @@ impl Push for Tiny {
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
-            dst.copy_from(&ptrs, 1)
+            dst.copy_from(&ptrs, 1);
         });
     }
 }
@@ -113,18 +113,18 @@ impl Push for Small {
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
-            dst.copy_from(&ptrs, 1)
+            dst.copy_from(&ptrs, 1);
         });
     }
 }
 
 impl Push for Medium {
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self) {
-        let (smalls1, smalls2, smalls3) = vecs;
-        let (small1, small2, small3) = black_box(value);
-        smalls1.push(small1);
-        smalls2.push(small2);
-        smalls3.push(small3);
+        let (a_s, b_s, c_s) = vecs;
+        let (a, b, c) = black_box(value);
+        a_s.push(a);
+        b_s.push(b);
+        c_s.push(c);
     }
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
@@ -144,20 +144,21 @@ impl Push for Medium {
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
-            dst.copy_from(&ptrs, 1)
+            dst.copy_from(&ptrs, 1);
         });
     }
 }
 
 impl Push for Big {
+    #[expect(clippy::many_single_char_names)]
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self) {
-        let (smalls1, smalls2, arrays, strs1, strs2) = vecs;
-        let (small1, small2, array, str1, str2) = black_box(value);
-        smalls1.push(small1);
-        smalls2.push(small2);
-        arrays.push(array);
-        strs1.push(str1);
-        strs2.push(str2);
+        let (a_s, b_s, c_s, d_s, e_s) = vecs;
+        let (a, b, c, d, e) = black_box(value);
+        a_s.push(a);
+        b_s.push(b);
+        c_s.push(c);
+        d_s.push(d);
+        e_s.push(e);
     }
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
@@ -177,37 +178,26 @@ impl Push for Big {
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
-            dst.copy_from(&ptrs, 1)
+            dst.copy_from(&ptrs, 1);
         });
     }
 }
 
 impl Push for Large {
+    #[expect(clippy::many_single_char_names)]
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self) {
-        let (
-            arrays1,
-            arrays2,
-            arrays3,
-            arrays4,
-            arrays5,
-            arrays6,
-            arrays7,
-            arrays8,
-            arrays9,
-            arrays10,
-        ) = vecs;
-        let (array1, array2, array3, array4, array5, array6, array7, array8, array9, array10) =
-            black_box(value);
-        arrays1.push(array1);
-        arrays2.push(array2);
-        arrays3.push(array3);
-        arrays4.push(array4);
-        arrays5.push(array5);
-        arrays6.push(array6);
-        arrays7.push(array7);
-        arrays8.push(array8);
-        arrays9.push(array9);
-        arrays10.push(array10);
+        let (a_s, b_s, c_s, d_s, e_s, f_s, g_s, h_s, i_s, j_s) = vecs;
+        let (a, b, c, d, e, f, g, h, i, j) = black_box(value);
+        a_s.push(a);
+        b_s.push(b);
+        c_s.push(c);
+        d_s.push(d);
+        e_s.push(e);
+        f_s.push(f);
+        g_s.push(g);
+        h_s.push(h);
+        i_s.push(i);
+        j_s.push(j);
     }
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
@@ -227,7 +217,7 @@ impl Push for Large {
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
-            dst.copy_from(&ptrs, 1)
+            dst.copy_from(&ptrs, 1);
         });
     }
 }

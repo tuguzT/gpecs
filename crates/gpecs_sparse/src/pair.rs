@@ -95,11 +95,11 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer<'context>(
-        context: &'context Self::Context,
+    unsafe fn ptrs_from_buffer(
+        context: &Self::Context,
         buffer: *mut u8,
         capacity: usize,
-    ) -> Self::MutPtrs<'context> {
+    ) -> Self::MutPtrs<'_> {
         let keys = unsafe { Layout::array::<K>(capacity).unwrap_unchecked() };
         let values = unsafe { V::buffer_layout(context, capacity).unwrap_unchecked() };
         let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
@@ -310,7 +310,7 @@ where
         Self: 'a,
         'a: 'context,
     {
-        let KeyValuePair { key, value } = value;
+        let Self { key, value } = value;
 
         let value = Refs::new(V::value_as_refs(context, value));
         KeyValueRefs { key, value }
@@ -325,7 +325,7 @@ where
         Self: 'a,
         'a: 'context,
     {
-        let KeyValuePair { key, value } = value;
+        let Self { key, value } = value;
 
         let value = RefsMut::new(V::mut_value_as_refs(context, value));
         KeyValueRefsMut { key, value }
@@ -676,6 +676,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
         let Self { key, value } = self;
 
@@ -856,6 +857,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
         let Self { key, value } = self;
 
@@ -1281,7 +1283,7 @@ where
     pub value: Refs<'context, 'a, V>,
 }
 
-impl<'context, 'a, K, V> KeyValueRefs<'context, 'a, K, V>
+impl<'context, K, V> KeyValueRefs<'context, '_, K, V>
 where
     V: Soa + ?Sized,
 {
@@ -1594,7 +1596,7 @@ where
 {
     #[inline]
     #[track_caller]
-    #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
+    #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
     pub fn new(
         context: &'context V::Context,
         keys: *const [K],
@@ -1699,7 +1701,7 @@ where
     V: Soa + ?Sized,
     SlicePtrs<'context, V>: PartialEq,
 {
-    #[allow(ambiguous_wide_pointer_comparisons)]
+    #[expect(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
         *keys == other.keys && *values == other.values
@@ -1718,7 +1720,7 @@ where
     V: Soa + ?Sized,
     SlicePtrs<'context, V>: PartialOrd,
 {
-    #[allow(ambiguous_wide_pointer_comparisons)]
+    #[expect(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
         match keys.partial_cmp(&other.keys) {
@@ -1734,7 +1736,7 @@ where
     V: Soa + ?Sized,
     SlicePtrs<'context, V>: Ord,
 {
-    #[allow(ambiguous_wide_pointer_comparisons)]
+    #[expect(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
         match keys.cmp(&other.keys) {
@@ -1790,7 +1792,7 @@ where
 {
     #[inline]
     #[track_caller]
-    #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
+    #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
     pub fn new(
         context: &'context V::Context,
         keys: *mut [K],
@@ -1930,7 +1932,7 @@ where
     V: Soa + ?Sized,
     SliceMutPtrs<'context, V>: PartialEq,
 {
-    #[allow(ambiguous_wide_pointer_comparisons)]
+    #[expect(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
         *keys == other.keys && *values == other.values
@@ -1949,7 +1951,7 @@ where
     V: Soa + ?Sized,
     SliceMutPtrs<'context, V>: PartialOrd,
 {
-    #[allow(ambiguous_wide_pointer_comparisons)]
+    #[expect(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
         match keys.partial_cmp(&other.keys) {
@@ -1965,7 +1967,7 @@ where
     V: Soa + ?Sized,
     SliceMutPtrs<'context, V>: Ord,
 {
-    #[allow(ambiguous_wide_pointer_comparisons)]
+    #[expect(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
         match keys.cmp(&other.keys) {
@@ -2108,7 +2110,7 @@ where
     fn default() -> Self {
         Self {
             keys: Default::default(),
-            values: Default::default(),
+            values: Slices::default(),
         }
     }
 }
@@ -2331,7 +2333,7 @@ where
     fn default() -> Self {
         Self {
             keys: Default::default(),
-            values: Default::default(),
+            values: SlicesMut::default(),
         }
     }
 }

@@ -2,7 +2,7 @@ use gpecs_types::component::{Component, GpuComponent};
 
 use crate::utils::RandomXoshiro128;
 
-pub const DEFAULT_SEED: u32 = 340383;
+pub const DEFAULT_SEED: u32 = 340_383;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[repr(C, align(16))]

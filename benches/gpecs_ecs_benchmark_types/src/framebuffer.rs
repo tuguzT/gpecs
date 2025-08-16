@@ -49,6 +49,10 @@ where
     B: AsMut<[u32]>,
 {
     pub fn draw(&mut self, x: i32, y: i32, char: u32) {
+        let (Ok(x), Ok(y)) = (u32::try_from(x), u32::try_from(y)) else {
+            return;
+        };
+
         let Self {
             desc,
             ref mut buffer,
@@ -56,8 +60,8 @@ where
 
         let buffer = buffer.as_mut();
         let FramebufferDesc { width, height } = desc;
-        if y >= 0 && y < height as i32 && x >= 0 && x < width as i32 {
-            buffer[(x + y * width as i32) as usize] = char;
+        if y < height && x < width {
+            buffer[(x + y * width) as usize] = char;
         }
     }
 }

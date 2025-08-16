@@ -291,7 +291,7 @@ impl Clone for ErasedFieldSliceIter<'_> {
     }
 }
 
-#[allow(clippy::while_let_on_iterator)]
+#[expect(clippy::while_let_on_iterator)]
 impl<'a> Iterator for ErasedFieldSliceIter<'a> {
     type Item = ErasedFieldRef<'a>;
 

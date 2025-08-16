@@ -125,7 +125,7 @@ impl From<GpuComponentDescriptor> for ComponentDescriptor {
             type_id,
             desc,
         } = value;
-        ComponentDescriptor::new(name, type_id, desc, None)
+        Self::new(name, type_id, desc, None)
     }
 }
 
@@ -264,7 +264,7 @@ impl Iterator for GpuComponentIds<'_> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.copied().for_each(f)
+        inner.copied().for_each(f);
     }
 
     #[inline]

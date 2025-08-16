@@ -19,7 +19,7 @@ impl<T> AlignedUninitByteSlice<T> {
         let ptr = bytes.as_ref().as_ptr().cast();
         check_align(ptr, layout)?;
 
-        let me = Self { bytes, layout };
+        let me = Self { layout, bytes };
         Ok(me)
     }
 

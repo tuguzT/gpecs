@@ -5,7 +5,7 @@ use core::{
     hash::{self, Hash},
     mem::{ManuallyDrop, forget},
     ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
-    ptr,
+    ptr::{self, addr_of},
 };
 use core_alloc::boxed::Box;
 
@@ -45,6 +45,7 @@ where
     T: Soa + ?Sized,
 {
     #[inline]
+    #[must_use]
     pub fn new() -> Self
     where
         T::Context: Default,
@@ -53,11 +54,13 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn with_context(context: T::Context) -> Self {
         Self::with_context_and_capacity(context, 0)
     }
 
     #[inline]
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self
     where
         T::Context: Default,
@@ -213,7 +216,7 @@ where
         match old_capacity {
             0 => self.set_len_in_buffer(0),
             _ => self.move_right(old_capacity),
-        };
+        }
         Ok(())
     }
 
@@ -230,7 +233,7 @@ where
         match old_capacity {
             0 => self.set_len_in_buffer(0),
             _ => self.move_right(old_capacity),
-        };
+        }
         Ok(())
     }
 
@@ -366,7 +369,7 @@ where
             let refs = T::upcast_refs_mut(refs);
             let refs = T::refs_mut_as_refs(unsafe { &*context }, refs);
             f(refs)
-        })
+        });
     }
 
     pub fn retain_mut<F>(&mut self, mut f: F)
@@ -391,6 +394,7 @@ where
         // This drop guard will be invoked when predicate or `drop` of element panicked.
         // It shifts unchecked elements to cover holes and `set_len` to the correct length.
         // In cases when predicate and `drop` never panick, it will be optimized out.
+        #[expect(clippy::items_after_statements)]
         struct BackshiftOnDrop<'a, T>
         where
             T: Soa + ?Sized,
@@ -401,6 +405,7 @@ where
             original_len: usize,
         }
 
+        #[expect(clippy::items_after_statements)]
         impl<T> Drop for BackshiftOnDrop<'_, T>
         where
             T: Soa + ?Sized,
@@ -438,6 +443,7 @@ where
             original_len,
         };
 
+        #[expect(clippy::items_after_statements)]
         fn process_loop<F, T, const DELETED: bool>(
             original_len: usize,
             f: &mut F,
@@ -464,12 +470,12 @@ where
                         let context = g.v.context();
                         T::ptrs_drop_in_place(context, cur);
                     }
+
                     // We already advanced the counter.
                     if DELETED {
                         continue;
-                    } else {
-                        break;
                     }
+                    break;
                 }
 
                 if DELETED {
@@ -522,6 +528,16 @@ where
             }
             set_len_on_drop.local_len += 1;
         }
+    }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        self.slices().into_iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
+        self.slices_mut().into_iter()
     }
 
     #[inline]
@@ -669,6 +685,7 @@ where
             unsafe { T::ptrs_copy(context, src, dst, len - index) }
         }
 
+        #[expect(clippy::items_after_statements)]
         struct CopyBackGuard<'a, T>
         where
             T: Soa + ?Sized,
@@ -677,7 +694,8 @@ where
             index: usize,
         }
 
-        impl<'a, T> Drop for CopyBackGuard<'a, T>
+        #[expect(clippy::items_after_statements)]
+        impl<T> Drop for CopyBackGuard<'_, T>
         where
             T: Soa + ?Sized,
         {
@@ -767,13 +785,15 @@ where
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
         self.insert_from(index, |context, dst| unsafe {
-            T::write(context, dst, value)
-        })
+            T::write(context, dst, value);
+        });
     }
 
     #[inline]
     pub fn push(&mut self, value: T) {
-        self.push_from(|context, dst| unsafe { T::write(context, dst, value) })
+        self.push_from(|context, dst| unsafe {
+            T::write(context, dst, value);
+        });
     }
 }
 
@@ -797,11 +817,12 @@ where
         self
     }
 
+    #[must_use]
     pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T>> {
         self.shrink_to_fit();
         let me = ManuallyDrop::new(self);
 
-        let buffer = unsafe { ptr::read(&me.buffer) };
+        let buffer = unsafe { ptr::read(addr_of!(me.buffer)) };
         let len = me.len;
         unsafe { buffer.into_box(len) }
     }
@@ -819,7 +840,7 @@ where
         };
 
         let context = set_len_on_drop.vec.context();
-        for refs in other.iter() {
+        for refs in other {
             unsafe {
                 let ptrs = set_len_on_drop.vec.buffer.ptrs();
                 let dst = T::ptrs_add_mut(context, ptrs, set_len_on_drop.local_len);
@@ -853,12 +874,12 @@ where
     }
 }
 
-impl<T> AsRef<SoaVec<T>> for SoaVec<T>
+impl<T> AsRef<Self> for SoaVec<T>
 where
     T: Soa + ?Sized,
 {
     #[inline]
-    fn as_ref(&self) -> &SoaVec<T> {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
@@ -873,12 +894,12 @@ where
     }
 }
 
-impl<T> AsMut<SoaVec<T>> for SoaVec<T>
+impl<T> AsMut<Self> for SoaVec<T>
 where
     T: Soa + ?Sized,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut SoaVec<T> {
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
@@ -938,7 +959,7 @@ where
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let slices = self.slices();
-        Hash::hash(&slices, state)
+        Hash::hash(&slices, state);
     }
 }
 
@@ -955,7 +976,8 @@ where
 
     #[inline]
     fn clone_from(&mut self, source: &Self) {
-        self.slices_mut().clone_from_slices(source.slices())
+        let src = &source.slices();
+        self.slices_mut().clone_from_slices(src);
     }
 }
 
@@ -1090,7 +1112,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.slices().into_iter()
+        self.iter()
     }
 }
 
@@ -1103,7 +1125,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.slices_mut().into_iter()
+        self.iter_mut()
     }
 }
 
@@ -1133,7 +1155,7 @@ where
         // So we get better branch prediction.
         let mut iter = iter.into_iter();
         let mut vector = match iter.next() {
-            None => return SoaVec::new(),
+            None => return Self::new(),
             Some(element) => {
                 let (lower, _) = iter.size_hint();
                 let context = Default::default();
@@ -1141,7 +1163,7 @@ where
                     RawSoaVec::<T>::min_non_zero_cap(&context),
                     lower.saturating_add(1),
                 );
-                let mut vector = SoaVec::with_context_and_capacity(context, initial_capacity);
+                let mut vector = Self::with_context_and_capacity(context, initial_capacity);
                 unsafe {
                     // SAFETY: We requested capacity at least 1
                     let dst = vector.buffer.ptrs();

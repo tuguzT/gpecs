@@ -48,7 +48,7 @@ fn try_modify_failed<K>(error: TryModifyErrorKind<K>, message: &str) -> !
 where
     K: Key,
 {
-    use TryModifyErrorKind::*;
+    use TryModifyErrorKind::{TooLargeSparseIndex, TooSmallSparseIndex, TryReserve};
 
     match error {
         TooLargeSparseIndex(_) => panic!("{message} (sparse index is too large for `usize`)"),

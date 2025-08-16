@@ -17,24 +17,24 @@ macro_rules! __impl_slice_eq {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool { self.as_slices() == other.as_slices() }
             #[inline]
-            #[allow(clippy::partialeq_ne_impl)]
+            #[expect(clippy::partialeq_ne_impl)]
             fn ne(&self, other: &$rhs) -> bool { self.as_slices() != other.as_slices() }
         }
     }
 }
 
-impl<T> PartialEq<SoaVec<T>> for SoaVec<T>
+impl<T> PartialEq<Self> for SoaVec<T>
 where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
 {
     #[inline]
-    fn eq(&self, other: &SoaVec<T>) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.as_slices() == other.as_slices()
     }
     #[inline]
-    #[allow(clippy::partialeq_ne_impl)]
-    fn ne(&self, other: &SoaVec<T>) -> bool {
+    #[expect(clippy::partialeq_ne_impl)]
+    fn ne(&self, other: &Self) -> bool {
         self.as_slices() != other.as_slices()
     }
 }

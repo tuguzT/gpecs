@@ -43,8 +43,9 @@ impl Key for NoEpochEntity {
     type SparseIndex = <Entity as Key>::SparseIndex;
     type Epoch = ();
 
-    fn new(sparse_index: Self::SparseIndex, _: Self::Epoch) -> Self {
-        let entity = <Entity as Key>::new(sparse_index, Default::default());
+    fn new(sparse_index: Self::SparseIndex, (): Self::Epoch) -> Self {
+        let epoch = <Entity as Key>::Epoch::default();
+        let entity = <Entity as Key>::new(sparse_index, epoch);
         Self(entity)
     }
 
@@ -93,7 +94,7 @@ impl ArchetypeStorage {
         let component_ids = try_collect_component_ids(component_ids, |map, component_id| {
             let info = components
                 .get_component_info(component_id)
-                .unwrap_or_else(|| get_component_info_fail(&component_id));
+                .unwrap_or_else(|| get_component_info_fail(component_id));
             ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
         })?;
 
@@ -102,7 +103,7 @@ impl ArchetypeStorage {
             .map(|&component_id| {
                 let info = components
                     .get_component_info(component_id)
-                    .unwrap_or_else(|| get_component_info_fail(&component_id));
+                    .unwrap_or_else(|| get_component_info_fail(component_id));
                 info.descriptor()
             })
             .collect();
@@ -123,7 +124,7 @@ impl ArchetypeStorage {
         let component_ids = try_collect_component_ids(component_ids, |map, component_id| {
             let info = components
                 .get_component_info(component_id)
-                .unwrap_or_else(|| get_component_info_fail(&component_id));
+                .unwrap_or_else(|| get_component_info_fail(component_id));
             ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
         })?;
 
@@ -532,7 +533,9 @@ impl ArchetypeStorage {
     #[inline]
     fn destroy_refs_mut<A>(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut<'_, A>)
     where
-        A: AsRef<[FieldDescriptor]>,
+        A: IntoIterator,
+        A::Item: AsRef<FieldDescriptor>,
+        A::IntoIter: AsRef<[FieldDescriptor]> + ExactSizeIterator,
     {
         let fields = erased_refs_mut.into_iter();
         debug_assert_eq!(fields.len(), component_ids.len());
@@ -585,7 +588,7 @@ impl ArchetypeStorage {
 
     #[inline]
     #[track_caller]
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub(crate) fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
@@ -618,7 +621,7 @@ impl Drop for ArchetypeStorage {
 
         erased_storage
             .values_mut()
-            .for_each(|erased_refs_mut| Self::destroy_refs_mut(component_ids, erased_refs_mut))
+            .for_each(|erased_refs_mut| Self::destroy_refs_mut(component_ids, erased_refs_mut));
     }
 }
 
@@ -765,7 +768,7 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_>>) {
-        let (dense, _) = ErasedStorage::as_view(self).into_parts();
+        let (dense, _) = Self::as_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (keys, values) = slices.into_parts();
         let values = values.into_inner();
@@ -787,7 +790,7 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_>>) {
-        let (dense, _) = ErasedStorage::as_mut_view(self).into_parts();
+        let (dense, _) = Self::as_mut_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (keys, values) = slices.into_parts();
         let values = values.into_inner();
@@ -815,7 +818,7 @@ impl ErasedStorageExt for ErasedStorage {
             let component_ids = component_ids.keys().copied();
             from_erased_fields::<BoxedErasedSoa>(components, self.context(), component_ids, fields)
         };
-        let value = ErasedStorage::insert(self, entity.into(), value)?;
+        let value = Self::insert(self, entity.into(), value)?;
 
         let component_ids = component_ids.keys().copied();
         let context = self.context();
@@ -831,7 +834,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<BoxedErasedField>> {
-        let value = ErasedStorage::swap_remove(self, entity.into())?;
+        let value = Self::swap_remove(self, entity.into())?;
 
         let component_ids = component_ids.keys().copied();
         let context = self.context();
@@ -847,7 +850,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRef<'_>>> {
-        let view = ErasedStorage::as_view(self);
+        let view = Self::as_view(self);
         let (context, refs) = view.into_get_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
@@ -864,7 +867,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {
-        let view = ErasedStorage::as_mut_view(self);
+        let view = Self::as_mut_view(self);
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();

@@ -32,9 +32,19 @@ impl GpuSystemSchedule {
     #[inline]
     pub fn iter(&self) -> GpuSystemScheduleIter<'_> {
         let Self { systems } = self;
-        GpuSystemScheduleIter {
-            inner: systems.iter().copied(),
-        }
+
+        let inner = systems.iter().copied();
+        GpuSystemScheduleIter { inner }
+    }
+}
+
+impl<'a> IntoIterator for &'a GpuSystemSchedule {
+    type Item = GpuSystemId;
+    type IntoIter = GpuSystemScheduleIter<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

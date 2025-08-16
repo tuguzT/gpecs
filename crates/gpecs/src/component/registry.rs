@@ -197,7 +197,7 @@ impl ComponentRegistry {
     #[inline]
     pub fn component_id_from(&self, type_id: TypeId) -> Option<ComponentId> {
         let Self { type_ids, .. } = self;
-        type_ids.get(&type_id).cloned()
+        type_ids.get(&type_id).copied()
     }
 
     #[inline]

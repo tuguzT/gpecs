@@ -11,6 +11,7 @@ rust-version.workspace = true
 gpecs_soa = { workspace = true, features = ["alloc"] }
 gpecs_soa_erased = { workspace = true, features = ["alloc"] }
 arrayvec = { workspace = true }
+num-traits = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

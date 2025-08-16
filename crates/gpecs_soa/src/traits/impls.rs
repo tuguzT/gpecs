@@ -18,7 +18,7 @@ pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
         type_name::<T>(),
         align_of::<T>(),
         ptr.cast::<u8>().align_offset(align_of::<T>()),
-    )
+    );
 }
 
 unsafe impl Soa for () {
@@ -69,11 +69,11 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer<'context>(
-        _context: &'context Self::Context,
+    unsafe fn ptrs_from_buffer(
+        _context: &Self::Context,
         buffer: *mut u8,
         _capacity: usize,
-    ) -> Self::MutPtrs<'context> {
+    ) -> Self::MutPtrs<'_> {
         buffer.cast()
     }
 
@@ -94,7 +94,7 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    #[allow(clippy::zst_offset, reason = "reference to other manual impls")]
+    #[expect(clippy::zst_offset, reason = "reference to other manual impls")]
     unsafe fn ptrs_add<'context>(
         _context: &'context Self::Context,
         ptrs: Self::Ptrs<'context>,
@@ -104,7 +104,7 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    #[allow(clippy::zst_offset, reason = "reference to other manual impls")]
+    #[expect(clippy::zst_offset, reason = "reference to other manual impls")]
     unsafe fn ptrs_add_mut<'context>(
         _context: &'context Self::Context,
         ptrs: Self::MutPtrs<'context>,
@@ -532,7 +532,7 @@ impl<'a> SoaToOwned<'_, 'a> for &'a () {
 macro_rules! count_idents {
     ($($idents:ident),* $(,)*) => {
         {
-            #[allow(dead_code, non_camel_case_types)]
+            #[expect(dead_code)]
             #[repr(usize)]
             enum Idents { $($idents,)* __CountIdentsLast }
 
@@ -549,6 +549,7 @@ pub use count_idents;
 pub struct SoaTupleImplHelper<T>(PhantomData<T>);
 
 #[inline]
+#[must_use]
 #[doc(hidden)]
 pub const fn permutation<const N: usize>() -> [usize; N] {
     let mut permutation = [0; N];
@@ -561,6 +562,7 @@ pub const fn permutation<const N: usize>() -> [usize; N] {
 }
 
 #[inline]
+#[must_use]
 #[doc(hidden)]
 pub const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize; N] {
     let mut permutation = permutation::<N>();
@@ -642,11 +644,11 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_from_buffer<'context>(
-                _context: &'context Self::Context,
+            unsafe fn ptrs_from_buffer(
+                _context: &Self::Context,
                 buffer: *mut u8,
                 capacity: usize,
-            ) -> Self::MutPtrs<'context> {
+            ) -> Self::MutPtrs<'_> {
                 let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();

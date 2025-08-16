@@ -9,8 +9,9 @@ use std::{
 
 use glam::Vec3;
 use gpecs::prelude::*;
-use gpecs_simple_types::*;
+use gpecs_simple_types::{Mass, Position, Tag};
 use itertools::Itertools;
+use num_traits::ToPrimitive;
 use renderdoc::{RenderDoc, V141};
 
 const ITER_COUNT: usize = 10;
@@ -20,6 +21,7 @@ const ENTITY_COUNT: u32 = if cfg!(debug_assertions) {
     1_200_000
 };
 
+#[expect(clippy::too_many_lines)]
 fn main() {
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)
@@ -210,11 +212,11 @@ fn main() {
             };
             log::info!("Timestamp query raw data: {timestamp_query_raw:?}");
 
-            let timestamp_period_nanos = queue.get_timestamp_period();
+            let timestamp_period_nanos = queue.get_timestamp_period().to_u64().unwrap();
             for (index, (&first, &second)) in timestamp_query_raw.iter().tuple_windows().enumerate()
             {
-                let nanos = (second - first) as f32 * timestamp_period_nanos;
-                let duration = Duration::from_nanos(nanos as u64);
+                let nanos = (second - first) * timestamp_period_nanos;
+                let duration = Duration::from_nanos(nanos);
                 log::info!("Timestamp query {index} duration: {duration:?}");
             }
         }
@@ -233,8 +235,8 @@ fn setup_context(context: &mut Context) {
 
         let position = Position {
             data: Vec3 {
-                x: i as f32,
-                y: -(i as f32),
+                x: i.to_f32().unwrap(),
+                y: -(i.to_f32().unwrap()),
                 z: 0.0,
             },
         };
@@ -272,9 +274,9 @@ fn update_positions(positions: BundlesMut<(Position,)>) {
 
         // log::debug!("{entity} has position of {}", position.data);
         position.data = Vec3 {
-            x: entity.index() as f32,
-            y: (entity.index() as f32) / 2.0,
-            z: -(entity.index() as f32) / 2.0,
+            x: entity.index().to_f32().unwrap(),
+            y: entity.index().to_f32().unwrap() / 2.0,
+            z: -entity.index().to_f32().unwrap() / 2.0,
         };
         log::debug!("{entity} position have been updated to {}", position.data);
 
@@ -350,9 +352,10 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
     }
 
     let features = adapter.features();
-    if !features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES) {
-        panic!("adapter does not support timestamp queries inside passes, which are required");
-    }
+    assert!(
+        features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES),
+        "adapter does not support timestamp queries inside passes, which are required",
+    );
 
     let device_desc = wgpu::DeviceDescriptor {
         label: Some("`gpecs` integration test device"),
@@ -536,12 +539,10 @@ fn init_renderdoc() -> Option<RenderDoc<V141>> {
 }
 
 fn wgpu_raw_device_window(device: &wgpu::Device) -> (*const c_void, *const c_void) {
-    let device_raw = unsafe {
-        device
-            .as_hal::<wgpu::hal::api::Vulkan>()
-            .map(|device| transmute(device.raw_device().handle()))
-            .unwrap_or(null::<c_void>())
-    };
+    let device_hal = unsafe { device.as_hal::<wgpu::hal::api::Vulkan>() };
+    let device_raw = device_hal.map_or(null::<c_void>(), |device| unsafe {
+        transmute(device.raw_device().handle())
+    });
     let window_raw = null::<c_void>();
     (device_raw, window_raw)
 }

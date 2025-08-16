@@ -32,8 +32,7 @@ impl Display for IterOrFieldLenMismatchError {
 impl Error for IterOrFieldLenMismatchError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::IterLenMismatch(error) => Some(error),
-            Self::FieldLenMismatch { error, .. } => Some(error),
+            Self::IterLenMismatch(error) | Self::FieldLenMismatch { error, .. } => Some(error),
         }
     }
 }

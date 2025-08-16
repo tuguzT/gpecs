@@ -62,6 +62,7 @@ impl ErasedFieldNonNullPtr {
     }
 
     #[inline]
+    #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { desc, ptr } = self;
 

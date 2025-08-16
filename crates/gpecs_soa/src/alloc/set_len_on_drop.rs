@@ -2,7 +2,7 @@ use crate::traits::Soa;
 
 use super::vec::SoaVec;
 
-pub(crate) struct SetLenOnDrop<'a, T>
+pub struct SetLenOnDrop<'a, T>
 where
     T: Soa + ?Sized,
 {

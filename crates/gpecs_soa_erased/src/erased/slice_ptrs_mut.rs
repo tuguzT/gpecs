@@ -38,11 +38,11 @@ impl<D> ErasedSoaSliceMutPtrs<D> {
     {
         let Range { start, end } = self::range(range, ..capacity);
         Self {
-            descriptors,
             buffer,
             capacity,
             start,
             end,
+            descriptors,
         }
     }
 
@@ -208,18 +208,10 @@ where
         let Self { descriptors, .. } = self;
         descriptors.as_ref()
     }
-}
-
-impl<'a, D> IntoIterator for &'a ErasedSoaSliceMutPtrs<D>
-where
-    D: AsRef<[FieldDescriptor]> + ?Sized,
-{
-    type Item = ErasedFieldSliceMutPtr;
-    type IntoIter = ErasedSoaSliceMutPtrsIter<slice::Iter<'a, FieldDescriptor>>;
 
     #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSliceMutPtrs {
+    pub fn iter(&self) -> ErasedSoaSliceMutPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+        let Self {
             ref descriptors,
             buffer,
             capacity,
@@ -237,7 +229,7 @@ where
     }
 }
 
-impl<'a, D> IntoIterator for &'a mut ErasedSoaSliceMutPtrs<D>
+impl<'a, D> IntoIterator for &'a ErasedSoaSliceMutPtrs<D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
@@ -246,21 +238,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSliceMutPtrs {
-            ref descriptors,
-            buffer,
-            capacity,
-            start,
-            end,
-        } = *self;
-
-        ErasedSoaSliceMutPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
-            buffer,
-            capacity,
-            start,
-            end,
-        }
+        self.iter()
     }
 }
 

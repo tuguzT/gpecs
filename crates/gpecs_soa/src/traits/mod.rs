@@ -17,7 +17,7 @@ mod utils;
 mod wrapper;
 
 /// The main trait of the [crate] which defines behavior of this type
-/// in the context of Structure of Arrays (or SoA) pattern.
+/// in the context of Structure of Arrays pattern.
 pub unsafe trait Soa {
     /// Type of context used to perform all operations of this trait.
     ///
@@ -112,11 +112,11 @@ pub unsafe trait Soa {
     ///
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
     /// must be the same as the one returned by [`buffer_layout()`](Soa::buffer_layout) method.
-    unsafe fn ptrs_from_buffer<'context>(
-        context: &'context Self::Context,
+    unsafe fn ptrs_from_buffer(
+        context: &Self::Context,
         buffer: *mut u8,
         capacity: usize,
-    ) -> Self::MutPtrs<'context>;
+    ) -> Self::MutPtrs<'_>;
 
     /// Converts [pointers](Soa::Ptrs) of each field of [`Fields`](Soa::Fields)
     /// to the [mutable ones](Soa::MutPtrs).

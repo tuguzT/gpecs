@@ -122,7 +122,7 @@ impl ErasedFieldSlicePtr {
     pub fn iter(&self) -> ErasedFieldSlicePtrIter {
         let Self { desc, ptr, len } = *self;
         let buffer = ptr::slice_from_raw_parts(ptr, len * desc.layout().size());
-        let slice = unsafe { ErasedFieldSlicePtr::new_unchecked(desc, buffer, len) };
+        let slice = unsafe { Self::new_unchecked(desc, buffer, len) };
         ErasedFieldSlicePtrIter::new(slice)
     }
 }
@@ -243,13 +243,13 @@ impl Clone for ErasedFieldSlicePtrIter {
     }
 }
 
-#[allow(clippy::while_let_on_iterator)]
+#[expect(clippy::while_let_on_iterator)]
 impl Iterator for ErasedFieldSlicePtrIter {
     type Item = ErasedFieldPtr;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if ErasedFieldSlicePtrIter::is_empty(self) {
+        if Self::is_empty(self) {
             return None;
         }
 
@@ -262,7 +262,7 @@ impl Iterator for ErasedFieldSlicePtrIter {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = ErasedFieldSlicePtrIter::len(self);
+        let len = self.len();
         (len, Some(len))
     }
 
@@ -271,12 +271,12 @@ impl Iterator for ErasedFieldSlicePtrIter {
     where
         Self: Sized,
     {
-        ErasedFieldSlicePtrIter::len(&self)
+        self.len()
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= ErasedFieldSlicePtrIter::len(self) {
+        if n >= self.len() {
             self.start = self.end;
             return None;
         }
@@ -300,7 +300,7 @@ impl Iterator for ErasedFieldSlicePtrIter {
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        if ErasedFieldSlicePtrIter::is_empty(&self) {
+        if Self::is_empty(&self) {
             return init;
         }
 
@@ -312,7 +312,7 @@ impl Iterator for ErasedFieldSlicePtrIter {
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
         let Self { desc, buffer, .. } = self;
-        let len = ErasedFieldSlicePtrIter::len(&self);
+        let len = self.len();
         let ptr = buffer.as_ptr();
         let mut acc = init;
         let mut i = 0;
@@ -409,7 +409,7 @@ impl Iterator for ErasedFieldSlicePtrIter {
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = ErasedFieldSlicePtrIter::len(self);
+        let n = self.len();
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -427,7 +427,7 @@ impl Iterator for ErasedFieldSlicePtrIter {
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = ErasedFieldSlicePtrIter::len(self);
+        let n = self.len();
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -443,7 +443,7 @@ impl Iterator for ErasedFieldSlicePtrIter {
 impl DoubleEndedIterator for ErasedFieldSlicePtrIter {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        if ErasedFieldSlicePtrIter::is_empty(self) {
+        if Self::is_empty(self) {
             return None;
         }
 
@@ -456,7 +456,7 @@ impl DoubleEndedIterator for ErasedFieldSlicePtrIter {
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= ErasedFieldSlicePtrIter::len(self) {
+        if n >= self.len() {
             self.end = self.start;
             return None;
         }
@@ -470,7 +470,7 @@ impl DoubleEndedIterator for ErasedFieldSlicePtrIter {
 
 impl ExactSizeIterator for ErasedFieldSlicePtrIter {
     fn len(&self) -> usize {
-        ErasedFieldSlicePtrIter::len(self)
+        self.len()
     }
 }
 

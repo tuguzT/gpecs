@@ -166,18 +166,10 @@ where
         let Self { descriptors, .. } = self;
         descriptors.as_ref()
     }
-}
-
-impl<'a, D> IntoIterator for &'a ErasedSoaRefs<'_, D>
-where
-    D: AsRef<[FieldDescriptor]> + ?Sized,
-{
-    type Item = ErasedFieldRef<'a>;
-    type IntoIter = ErasedSoaRefsIter<'a, slice::Iter<'a, FieldDescriptor>>;
 
     #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaRefs {
+    pub fn iter(&self) -> ErasedSoaRefsIter<'_, slice::Iter<'_, FieldDescriptor>> {
+        let Self {
             ref descriptors,
             buffer,
             capacity,
@@ -195,7 +187,7 @@ where
     }
 }
 
-impl<'a, D> IntoIterator for &'a mut ErasedSoaRefs<'_, D>
+impl<'a, D> IntoIterator for &'a ErasedSoaRefs<'_, D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
@@ -204,21 +196,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaRefs {
-            ref descriptors,
-            buffer,
-            capacity,
-            offset,
-            ..
-        } = *self;
-
-        ErasedSoaRefsIter {
-            descriptors: descriptors.as_ref().iter(),
-            buffer,
-            capacity,
-            offset,
-            phantom: PhantomData,
-        }
+        self.iter()
     }
 }
 

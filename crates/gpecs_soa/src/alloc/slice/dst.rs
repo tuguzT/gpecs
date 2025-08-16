@@ -13,6 +13,7 @@ where
     T: SoaTrustedFields + ?Sized,
 {
     #[inline]
+    #[must_use]
     pub fn into_vec(self: Box<Self>) -> SoaVec<T> {
         let len = self.len();
         let capacity = self.capacity();
@@ -34,7 +35,7 @@ where
     where
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
-        self.slices_mut().sort_with_permutation(permutation)
+        self.slices_mut().sort_with_permutation(permutation);
     }
 
     #[inline]
@@ -42,7 +43,7 @@ where
     where
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
-        self.slices_mut().sort()
+        self.slices_mut().sort();
     }
 
     #[inline]
@@ -51,7 +52,7 @@ where
         for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.slices_mut()
-            .sort_with_permutation_by(permutation, compare)
+            .sort_with_permutation_by(permutation, compare);
     }
 
     #[inline]
@@ -59,7 +60,7 @@ where
     where
         for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
-        self.slices_mut().sort_by(compare)
+        self.slices_mut().sort_by(compare);
     }
 
     #[inline]
@@ -69,7 +70,7 @@ where
         K: Ord,
     {
         self.slices_mut()
-            .sort_with_permutation_by_key(permutation, f)
+            .sort_with_permutation_by_key(permutation, f);
     }
 
     #[inline]
@@ -88,7 +89,7 @@ where
         K: Ord,
     {
         self.slices_mut()
-            .sort_with_permutation_by_cached_key(permutation, f)
+            .sort_with_permutation_by_cached_key(permutation, f);
     }
 
     #[inline]
@@ -97,7 +98,7 @@ where
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
-        self.slices_mut().sort_by_cached_key(f)
+        self.slices_mut().sort_by_cached_key(f);
     }
 
     #[inline]
@@ -113,7 +114,7 @@ where
     where
         for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
-        self.slices_mut().sort_unstable_by(compare)
+        self.slices_mut().sort_unstable_by(compare);
     }
 
     #[inline]
@@ -122,7 +123,7 @@ where
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
-        self.slices_mut().sort_unstable_by_key(f)
+        self.slices_mut().sort_unstable_by_key(f);
     }
 }
 
@@ -133,7 +134,7 @@ where
     #[inline]
     fn default() -> Self {
         let data = ptr::dangling_mut::<BufferData<T>>();
-        unsafe { Box::from_raw(slice_from_raw_parts_mut(data, 0, 0)) }
+        unsafe { Self::from_raw(slice_from_raw_parts_mut(data, 0, 0)) }
     }
 }
 

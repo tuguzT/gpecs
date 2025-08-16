@@ -42,6 +42,7 @@ indexmap = { version = "2.10" }
 petgraph = { version = "0.8" }
 arrayvec = { version = "0.7", default-features = false }
 itertools = { version = "0.14", default-features = false }
+num-traits = { version = "0.2", default-features = false }
 rspirv = { version = "0.12" }
 criterion = { version = "0.7", features = ["html_reports"] }
 pollster = { version = "0.4" }
@@ -54,16 +55,20 @@ wgpu = { version = "26" }
 renderdoc = { version = "0.12" }
 
 [workspace.lints.rust]
-# TODO make it "warn" after implementation & tests
-missing_docs = "allow"
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(target_arch, values("spirv"))',
 ] }
+# TODO make them "warn" after implementation & tests
+missing_docs = "allow"
 
 [workspace.lints.clippy]
-all = { level = "warn", priority = -1 }
-# TODO make it "warn" after implementation & tests
-missing_safety_doc = "allow"
+all = "warn"
+pedantic = "warn"
+must_use_candidate = { level = "allow", priority = 1 }
+# TODO make them "warn" after implementation & tests
+missing_safety_doc = { level = "allow", priority = 1 }
+missing_errors_doc = { level = "allow", priority = 1 }
+missing_panics_doc = { level = "allow", priority = 1 }
 
 [profile.release]
 debug = true

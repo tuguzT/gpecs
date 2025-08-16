@@ -63,7 +63,7 @@ impl GpuArchetypeStorage {
 
             let mut offset = BufferAddress::try_from(entities_byte_count)
                 .expect("entities byte count should fit into `BufferAddress`");
-            for (&component_id, slice) in erased_components.iter() {
+            for (component_id, slice) in erased_components {
                 offset = offset.div_ceil(min_offset_alignment) * min_offset_alignment;
 
                 let components_bytes = slice.buffer();

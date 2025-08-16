@@ -160,7 +160,7 @@ where
     }
 }
 
-#[allow(clippy::while_let_on_iterator)]
+#[expect(clippy::while_let_on_iterator)]
 impl<'c, 'a, T> Iterator for Iter<'c, 'a, T>
 where
     T: Soa + ?Sized,
@@ -581,7 +581,7 @@ where
     }
 }
 
-#[allow(clippy::while_let_on_iterator)]
+#[expect(clippy::while_let_on_iterator)]
 impl<'c, 'a, T> Iterator for IterMut<'c, 'a, T>
 where
     T: Soa + ?Sized,

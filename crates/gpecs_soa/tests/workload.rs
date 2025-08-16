@@ -332,7 +332,7 @@ fn slices_one_item() {
     assert_eq!(slices_mut.index_mut(0), (&mut 1, &mut 2, &mut 3, &mut ()));
     assert!(slices_mut.contains(&(&1, &2, &3, &())));
 
-    slices_mut.copy_from_slices(Slices::new(&context, (&[0], &[0], &[0], &[()])));
+    slices_mut.copy_from_slices(&Slices::new(&context, (&[0], &[0], &[0], &[()])));
     assert_eq!(slices_mut.len(), 1);
     assert_eq!(slices_mut.index_mut(0), (&mut 0, &mut 0, &mut 0, &mut ()));
     assert!(!slices_mut.contains(&(&1, &2, &3, &())));
@@ -563,7 +563,7 @@ fn slices_one_item_zst() {
     );
     assert!(slices_mut.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
-    slices_mut.copy_from_slices(Slices::new(
+    slices_mut.copy_from_slices(&Slices::new(
         &context,
         (&[ZST1], &[ZST2(())], &[ZST3 { empty: () }]),
     ));
@@ -818,7 +818,7 @@ fn slices_three_items() {
         ),
     );
 
-    sub_slices.clone_from_slices(Slices::new(
+    sub_slices.clone_from_slices(&Slices::new(
         &context,
         (
             &[0, 0],
@@ -1299,7 +1299,7 @@ fn slices_three_items_zst() {
         ),
     );
 
-    sub_slices.clone_from_slices(Slices::new(
+    sub_slices.clone_from_slices(&Slices::new(
         &context,
         (
             [ZST1; 2].as_slice(),

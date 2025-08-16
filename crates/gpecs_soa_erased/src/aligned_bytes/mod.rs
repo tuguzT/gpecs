@@ -63,17 +63,17 @@ where
 unsafe impl AlignedBytes for AlignedUninitBoxedByteSlice {
     #[inline]
     fn as_ptr(&self) -> *const u8 {
-        AlignedUninitBoxedByteSlice::as_ptr(self)
+        Self::as_ptr(self)
     }
 
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut u8 {
-        AlignedUninitBoxedByteSlice::as_mut_ptr(self)
+        Self::as_mut_ptr(self)
     }
 
     #[inline]
     fn layout(&self) -> Layout {
-        AlignedUninitBoxedByteSlice::layout(self)
+        Self::layout(self)
     }
 }
 
@@ -95,7 +95,7 @@ where
 
     #[inline]
     fn layout(&self) -> Layout {
-        AlignedUninitByteSlice::layout(self)
+        Self::layout(self)
     }
 }
 
@@ -105,17 +105,17 @@ where
 {
     #[inline]
     fn as_ptr(&self) -> *const u8 {
-        AlignedInitBytes::as_ptr(self)
+        Self::as_ptr(self)
     }
 
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut u8 {
-        AlignedInitBytes::as_mut_ptr(self)
+        Self::as_mut_ptr(self)
     }
 
     #[inline]
     fn layout(&self) -> Layout {
-        AlignedInitBytes::layout(self)
+        Self::layout(self)
     }
 }
 
@@ -147,12 +147,12 @@ unsafe impl AlignedBytesFromLayout for AlignedUninitBoxedByteSlice {
 
     #[inline]
     fn from_layout(layout: Layout) -> Result<Self, Self::Error> {
-        AlignedUninitBoxedByteSlice::new(layout)
+        Self::new(layout)
     }
 
     #[inline]
     fn set_layout(&mut self, layout: Layout) -> Result<(), Self::Error> {
-        AlignedUninitBoxedByteSlice::set_layout(self, layout)
+        Self::set_layout(self, layout)
     }
 }
 
@@ -164,11 +164,11 @@ where
 
     #[inline]
     fn from_layout(layout: Layout) -> Result<Self, Self::Error> {
-        AlignedInitBytes::from_layout(layout)
+        Self::from_layout(layout)
     }
 
     #[inline]
     fn set_layout(&mut self, layout: Layout) -> Result<(), Self::Error> {
-        AlignedInitBytes::set_layout(self, layout)
+        Self::set_layout(self, layout)
     }
 }

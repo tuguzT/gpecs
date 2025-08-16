@@ -35,7 +35,7 @@ where
 {
     fn run(&mut self, _: &mut Context) {
         let Self { f, .. } = self;
-        f()
+        f();
     }
 
     #[inline]
@@ -55,7 +55,7 @@ where
         let Ok(param) = In::get_param(context) else {
             return;
         };
-        f(param)
+        f(param);
     }
 
     #[inline]

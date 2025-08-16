@@ -4,7 +4,7 @@ use crate::{
     assert::unwrap_dense_from_sparse_index, key::Key, soa::traits::Soa, view::EpochSparseViewMut,
 };
 
-impl<'a, K, V> EpochSparseViewMut<'_, 'a, K, V>
+impl<K, V> EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
@@ -18,7 +18,7 @@ where
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
                 unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse)
-            })
+            });
         });
     }
 
@@ -45,7 +45,7 @@ where
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
-            })
+            });
         });
     }
 
@@ -61,7 +61,7 @@ where
                 let value =
                     unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse);
                 f((key, value))
-            })
+            });
         });
     }
 
@@ -77,7 +77,7 @@ where
                 let value =
                     unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse);
                 f((key, value))
-            })
+            });
         });
     }
 }

@@ -8,7 +8,7 @@ use crate::{
     vec::SoaVec,
 };
 
-impl<'c, 'a, T> SoaSlices<'c, 'a, T>
+impl<T> SoaSlices<'_, '_, T>
 where
     T: Soa + ?Sized,
 {
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<'c, 'a, T> SoaSlicesMut<'c, 'a, T>
+impl<T> SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
 {
@@ -97,7 +97,7 @@ where
         for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
-        self.sort_with_permutation(&mut permutation)
+        self.sort_with_permutation(&mut permutation);
     }
 
     #[inline]
@@ -105,7 +105,7 @@ where
     where
         for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
-        self.sort_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b))
+        self.sort_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b));
     }
 
     #[inline]
@@ -114,7 +114,7 @@ where
         for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
-        self.sort_with_permutation_by(&mut permutation, compare)
+        self.sort_with_permutation_by(&mut permutation, compare);
     }
 
     #[inline]
@@ -136,8 +136,8 @@ where
                     T::ptrs_to_refs(context, ptrs)
                 };
                 compare(a, b)
-            })
-        })
+            });
+        });
     }
 
     #[inline]
@@ -147,7 +147,7 @@ where
         K: Ord,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
-        self.sort_with_permutation_by_key(&mut permutation, f)
+        self.sort_with_permutation_by_key(&mut permutation, f);
     }
 
     #[inline]
@@ -163,8 +163,8 @@ where
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
-            })
-        })
+            });
+        });
     }
 
     #[inline]
@@ -174,7 +174,7 @@ where
         K: Ord,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
-        self.sort_with_permutation_by_cached_key(&mut permutation, f)
+        self.sort_with_permutation_by_cached_key(&mut permutation, f);
     }
 
     #[inline]
@@ -190,8 +190,8 @@ where
                 let ptrs = T::ptrs_cast_const(context, ptrs);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
-            })
-        })
+            });
+        });
     }
 
     #[inline]
@@ -200,7 +200,7 @@ where
         for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
-        self.sort_unstable_with_permutation(&mut permutation)
+        self.sort_unstable_with_permutation(&mut permutation);
     }
 
     #[inline]
@@ -209,7 +209,7 @@ where
         for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
-        self.sort_unstable_with_permutation_by(&mut permutation, compare)
+        self.sort_unstable_with_permutation_by(&mut permutation, compare);
     }
 
     #[inline]
@@ -219,6 +219,6 @@ where
         K: Ord,
     {
         let mut permutation = (0..self.len()).collect::<Box<_>>();
-        self.sort_unstable_with_permutation_by_key(&mut permutation, f)
+        self.sort_unstable_with_permutation_by_key(&mut permutation, f);
     }
 }

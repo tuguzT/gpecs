@@ -1,6 +1,6 @@
 use crate::traits::{Soa, SoaRead, SoaWrite};
 
-/// Version of [`core::mem::replace()`] but for [SoA][`Soa`] references.
+/// Version of [`core::mem::replace()`] but for [`Soa`] references.
 pub fn replace<T>(context: &T::Context, dest: T::RefsMut<'_, '_>, src: T) -> T
 where
     T: SoaRead + SoaWrite,
@@ -17,7 +17,7 @@ where
     }
 }
 
-/// Version of [`core::mem::swap()`] but for [SoA][`Soa`] references.
+/// Version of [`core::mem::swap()`] but for [`Soa`] references.
 pub fn swap<T>(context: &T::Context, x: T::RefsMut<'_, '_>, y: T::RefsMut<'_, '_>)
 where
     T: Soa + ?Sized,

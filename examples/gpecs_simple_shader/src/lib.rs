@@ -1,10 +1,11 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![no_std]
 
-use gpecs_simple_types::*;
+use gpecs_simple_types::{Mass, Position};
 use gpecs_types::{entity::Entity, soa::prelude::*};
 use spirv_std::{
     glam::{UVec3, Vec3},
+    num_traits::ToPrimitive,
     spirv,
 };
 
@@ -21,9 +22,9 @@ pub fn update_entity_position(
     let position = &mut positions[index];
 
     position.data = Vec3 {
-        x: entity.index() as f32,
-        y: (entity.index() as f32) / 2.0,
-        z: -(entity.index() as f32) / 2.0,
+        x: entity.index().to_f32().unwrap(),
+        y: entity.index().to_f32().unwrap() / 2.0,
+        z: -entity.index().to_f32().unwrap() / 2.0,
     };
 }
 
@@ -39,5 +40,5 @@ pub fn update_entity_mass(
     let entity = entities[index];
     let mass = &mut masses[index];
 
-    mass.value = entity.index() + (index as u32);
+    mass.value = entity.index() + u32::try_from(index).ok().unwrap();
 }

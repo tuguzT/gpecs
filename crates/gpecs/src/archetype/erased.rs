@@ -18,7 +18,7 @@ pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
 #[cold]
 #[track_caller]
 #[inline(never)]
-pub fn get_component_info_fail(component_id: &ComponentId) -> ! {
+pub fn get_component_info_fail(component_id: ComponentId) -> ! {
     panic!("info of component {component_id:?} should be present")
 }
 
@@ -30,7 +30,7 @@ where
 {
     let info = components
         .get_component_info(id)
-        .unwrap_or_else(|| get_component_info_fail(&id));
+        .unwrap_or_else(|| get_component_info_fail(id));
     assert_eq!(info.descriptor().layout(), desc.as_ref().layout());
 }
 
@@ -67,14 +67,14 @@ where
     #[cold]
     #[track_caller]
     #[inline(never)]
-    fn remove_field_fail(component_id: &ComponentId) -> ! {
+    fn remove_field_fail(component_id: ComponentId) -> ! {
         panic!("field of component {component_id:?} should be present")
     }
 
     let remove_field = move |(id, _)| {
         fields
             .swap_remove(&id)
-            .unwrap_or_else(|| remove_field_fail(&id))
+            .unwrap_or_else(|| remove_field_fail(id))
     };
     component_ids
         .into_iter()
@@ -197,5 +197,5 @@ where
     fields.into_iter().for_each(|(mut field, drop_fn)| {
         let Some(drop_fn) = drop_fn else { return };
         unsafe { drop_fn(field.as_mut().as_mut_ptr()) }
-    })
+    });
 }

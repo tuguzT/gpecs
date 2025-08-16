@@ -31,16 +31,16 @@ impl FieldDescriptor {
     }
 }
 
-impl AsRef<FieldDescriptor> for FieldDescriptor {
+impl AsRef<Self> for FieldDescriptor {
     #[inline]
-    fn as_ref(&self) -> &FieldDescriptor {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl AsMut<FieldDescriptor> for FieldDescriptor {
+impl AsMut<Self> for FieldDescriptor {
     #[inline]
-    fn as_mut(&mut self) -> &mut FieldDescriptor {
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }

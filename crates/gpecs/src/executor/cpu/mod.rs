@@ -76,7 +76,7 @@ impl<'context> CpuExecutor<'context> {
             let Some(info) = systems.get_system_info_mut(system_id) else {
                 unreachable!("system {system_id:?} should be present");
             };
-            info.system_mut().run(context)
+            info.system_mut().run(context);
         });
     }
 }

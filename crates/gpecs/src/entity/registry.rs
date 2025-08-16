@@ -33,6 +33,7 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         let inner = EpochSparseArena::with_capacity(capacity, capacity);
         Self { inner }
@@ -65,13 +66,13 @@ impl<Meta> EntityRegistry<Meta> {
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
         let Self { inner } = self;
-        inner.reserve(additional, additional)
+        inner.reserve(additional, additional);
     }
 
     #[inline]
     pub fn reserve_exact(&mut self, additional: usize) {
         let Self { inner } = self;
-        inner.reserve_exact(additional, additional)
+        inner.reserve_exact(additional, additional);
     }
 
     #[inline]
@@ -89,13 +90,13 @@ impl<Meta> EntityRegistry<Meta> {
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         let Self { inner } = self;
-        inner.dense_shrink_to_fit()
+        inner.dense_shrink_to_fit();
     }
 
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         let Self { inner } = self;
-        inner.dense_shrink_to(min_capacity)
+        inner.dense_shrink_to(min_capacity);
     }
 
     #[inline]
@@ -193,7 +194,7 @@ impl<Meta> EntityRegistry<Meta> {
     #[inline]
     pub fn clear(&mut self) {
         let Self { inner } = self;
-        inner.clear()
+        inner.clear();
     }
 
     #[inline]
@@ -358,7 +359,7 @@ pub struct Iter<'c, 'a, Meta> {
     inner: SparseIter<'c, 'a, Entity, Identity<Meta>>,
 }
 
-impl<'c, 'a, Meta> Iter<'c, 'a, Meta> {
+impl<'a, Meta> Iter<'_, 'a, Meta> {
     #[inline]
     pub fn entities(&self) -> &'a [Entity] {
         let Self { inner } = self;
@@ -450,7 +451,7 @@ impl<'a, Meta> Iterator for Iter<'_, 'a, Meta> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|(&entity, Identity(meta))| f((entity, meta)))
+        inner.for_each(|(&entity, Identity(meta))| f((entity, meta)));
     }
 }
 
@@ -486,7 +487,7 @@ pub struct IterMut<'c, 'a, Meta> {
     inner: SparseIterMut<'c, 'a, Entity, Identity<Meta>>,
 }
 
-impl<'c, 'a, Meta> IterMut<'c, 'a, Meta> {
+impl<'a, Meta> IterMut<'_, 'a, Meta> {
     #[inline]
     pub fn into_entities(self) -> &'a [Entity] {
         let Self { inner } = self;
@@ -589,7 +590,7 @@ impl<'a, Meta> Iterator for IterMut<'_, 'a, Meta> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.for_each(|(&entity, Identity(meta))| f((entity, meta)))
+        inner.for_each(|(&entity, Identity(meta))| f((entity, meta)));
     }
 }
 

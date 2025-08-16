@@ -306,12 +306,12 @@ where
 {
     #[inline]
     fn slices(&self) -> SoaSlices<'_, '_, V> {
-        EpochSparseSet::slices(self)
+        Self::slices(self)
     }
 
     #[inline]
     fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, V> {
-        EpochSparseSet::slices_mut(self)
+        Self::slices_mut(self)
     }
 
     #[inline]
@@ -319,7 +319,7 @@ where
     where
         V: SoaRead + SoaWrite,
     {
-        EpochSparseSet::try_insert(self, key, value)
+        Self::try_insert(self, key, value)
     }
 
     #[inline]
@@ -327,7 +327,7 @@ where
     where
         V: SoaRead,
     {
-        EpochSparseSet::remove(self, key)
+        Self::remove(self, key)
     }
 
     #[inline]
@@ -335,7 +335,7 @@ where
     where
         V: SoaRead,
     {
-        EpochSparseSet::swap_remove(self, key)
+        Self::swap_remove(self, key)
     }
 }
 
@@ -346,12 +346,12 @@ where
 {
     #[inline]
     fn slices(&self) -> SoaSlices<'_, '_, V> {
-        EpochSparseArena::slices(self)
+        Self::slices(self)
     }
 
     #[inline]
     fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, V> {
-        EpochSparseArena::slices_mut(self)
+        Self::slices_mut(self)
     }
 
     #[inline]
@@ -359,7 +359,7 @@ where
     where
         V: SoaRead + SoaWrite,
     {
-        EpochSparseArena::try_insert(self, key, value)
+        Self::try_insert(self, key, value)
     }
 
     #[inline]
@@ -367,7 +367,7 @@ where
     where
         V: SoaRead,
     {
-        EpochSparseArena::remove(self, key)
+        Self::remove(self, key)
     }
 
     #[inline]
@@ -375,7 +375,7 @@ where
     where
         V: SoaRead,
     {
-        EpochSparseArena::swap_remove(self, key)
+        Self::swap_remove(self, key)
     }
 }
 
@@ -430,6 +430,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
+            #[must_use]
             pub fn and_modify<F>(self, f: F) -> Self
             where
                 F: FnOnce(V::RefsMut<'_, '_>),
@@ -491,6 +492,7 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
+            #[must_use]
             #[track_caller]
             pub fn replace_key(self, key: K) -> Self {
                 self.try_replace_key(key)

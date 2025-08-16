@@ -69,7 +69,7 @@ where
 
         fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
 
-        let me = Self { bytes, descriptors };
+        let me = Self { descriptors, bytes };
         Ok(me)
     }
 
@@ -166,7 +166,7 @@ where
         let mut bytes = B::from_layout(layout).map_err(Error::FromLayout)?;
         fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
 
-        let me = Self { bytes, descriptors };
+        let me = Self { descriptors, bytes };
         Ok(me)
     }
 }
@@ -199,7 +199,7 @@ where
             T::write(context, dst, value);
         }
 
-        let me = Self { bytes, descriptors };
+        let me = Self { descriptors, bytes };
         Ok(me)
     }
 }
@@ -227,7 +227,7 @@ where
             T::write(context, dst, value);
         }
 
-        let me = Self { bytes, descriptors };
+        let me = Self { descriptors, bytes };
         Ok(me)
     }
 }

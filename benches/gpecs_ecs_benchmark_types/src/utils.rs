@@ -45,12 +45,3 @@ impl RandomXoshiro128 {
         (self.generate() % r) + low
     }
 }
-
-impl Iterator for RandomXoshiro128 {
-    type Item = u32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let item = self.generate();
-        Some(item)
-    }
-}

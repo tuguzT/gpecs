@@ -174,7 +174,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let vec = Default::default();
+        let vec = SoaVec::new();
         Self::new(vec)
     }
 }
@@ -212,7 +212,7 @@ where
 
         // destroy the remaining elements
         let DropGuard(iter) = &mut guard;
-        if IntoIter::is_empty(iter) {
+        if iter.is_empty() {
             return;
         }
 
@@ -226,7 +226,7 @@ where
     }
 }
 
-#[allow(clippy::while_let_on_iterator)]
+#[expect(clippy::while_let_on_iterator)]
 impl<T> Iterator for IntoIter<T>
 where
     T: SoaRead,
@@ -235,7 +235,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if IntoIter::is_empty(self) {
+        if Self::is_empty(self) {
             return None;
         }
 
@@ -257,7 +257,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = IntoIter::len(self);
+        let len = self.len();
         (len, Some(len))
     }
 
@@ -266,12 +266,12 @@ where
     where
         Self: Sized,
     {
-        IntoIter::len(&self)
+        self.len()
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if n >= IntoIter::len(self) {
+        if n >= self.len() {
             self.start = self.end;
             return None;
         }
@@ -305,7 +305,7 @@ where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        if IntoIter::is_empty(&self) {
+        if Self::is_empty(&self) {
             return init;
         }
 
@@ -414,7 +414,7 @@ where
         Self: Sized,
         P: FnMut(Self::Item) -> bool,
     {
-        let n = IntoIter::len(self);
+        let n = self.len();
         let mut i = 0;
         while let Some(x) = self.next() {
             if predicate(x) {
@@ -432,7 +432,7 @@ where
         P: FnMut(Self::Item) -> bool,
         Self: Sized + ExactSizeIterator + DoubleEndedIterator,
     {
-        let n = IntoIter::len(self);
+        let n = self.len();
         let mut i = n;
         while let Some(x) = self.next_back() {
             i -= 1;
@@ -451,7 +451,7 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        if IntoIter::is_empty(self) {
+        if Self::is_empty(self) {
             return None;
         }
 
@@ -501,7 +501,7 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        IntoIter::len(self)
+        self.len()
     }
 }
 

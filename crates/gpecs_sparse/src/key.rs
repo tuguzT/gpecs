@@ -19,7 +19,7 @@ where
     type Epoch = NoEpoch;
 
     #[inline]
-    fn new(sparse_index: Self::SparseIndex, _: Self::Epoch) -> Self {
+    fn new(sparse_index: Self::SparseIndex, (): Self::Epoch) -> Self {
         sparse_index
     }
 
@@ -29,9 +29,7 @@ where
     }
 
     #[inline]
-    fn epoch(self) -> Self::Epoch {
-        Default::default()
-    }
+    fn epoch(self) -> Self::Epoch {}
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -84,33 +82,33 @@ where
 
     #[inline]
     fn new(sparse_index: Self::SparseIndex, epoch: Self::Epoch) -> Self {
-        EpochKey::new(sparse_index, epoch)
+        Self::new(sparse_index, epoch)
     }
 
     #[inline]
     fn sparse_index(self) -> Self::SparseIndex {
-        *EpochKey::sparse_index(&self)
+        *Self::sparse_index(&self)
     }
 
     #[inline]
     fn epoch(self) -> Self::Epoch {
-        *EpochKey::epoch(&self)
+        *Self::epoch(&self)
     }
 }
 
 impl From<usize> for EpochKey<usize, NoEpoch> {
     #[inline]
     fn from(sparse_index: usize) -> Self {
-        EpochKey {
+        Self {
             sparse_index,
             epoch: NoEpoch::default(),
         }
     }
 }
 
-impl From<EpochKey<usize, NoEpoch>> for usize {
+impl From<EpochKey<Self, NoEpoch>> for usize {
     #[inline]
-    fn from(value: EpochKey<usize, NoEpoch>) -> Self {
+    fn from(value: EpochKey<Self, NoEpoch>) -> Self {
         let EpochKey { sparse_index, .. } = value;
         sparse_index
     }
@@ -126,6 +124,7 @@ impl SparseIndex for u128 {}
 impl SparseIndex for usize {}
 
 pub trait Epoch: Copy + Ord + Default {
+    #[expect(clippy::return_self_not_must_use, reason = "self implements `Copy`")]
     fn next(self) -> Self;
 }
 
@@ -133,9 +132,7 @@ pub type NoEpoch = ();
 
 impl Epoch for NoEpoch {
     #[inline]
-    fn next(self) -> Self {
-        Default::default()
-    }
+    fn next(self) -> Self {}
 }
 
 impl Epoch for u8 {

@@ -32,9 +32,19 @@ impl SystemSchedule {
     #[inline]
     pub fn iter(&self) -> SystemScheduleIter<'_> {
         let Self { systems } = self;
-        SystemScheduleIter {
-            inner: systems.iter().copied(),
-        }
+
+        let inner = systems.iter().copied();
+        SystemScheduleIter { inner }
+    }
+}
+
+impl<'a> IntoIterator for &'a SystemSchedule {
+    type Item = SystemId;
+    type IntoIter = SystemScheduleIter<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

@@ -30,7 +30,7 @@ where
     descriptors: D,
 }
 
-impl<'a, D> ErasedSoaSlicesMut<'a, D> {
+impl<D> ErasedSoaSlicesMut<'_, D> {
     #[inline]
     pub unsafe fn new_unchecked<R>(
         descriptors: D,
@@ -205,6 +205,27 @@ where
         let Self { descriptors, .. } = self;
         descriptors.as_ref()
     }
+
+    #[inline]
+    pub fn iter(&self) -> ErasedSoaSlicesMutIter<'_, slice::Iter<'_, FieldDescriptor>> {
+        let Self {
+            ref descriptors,
+            buffer,
+            capacity,
+            start,
+            end,
+            ..
+        } = *self;
+
+        ErasedSoaSlicesMutIter {
+            descriptors: descriptors.as_ref().iter(),
+            buffer,
+            capacity,
+            start,
+            end,
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<'a, D> IntoIterator for &'a ErasedSoaSlicesMut<'_, D>
@@ -216,52 +237,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSlicesMut {
-            ref descriptors,
-            buffer,
-            capacity,
-            start,
-            end,
-            phantom,
-        } = *self;
-
-        ErasedSoaSlicesMutIter {
-            descriptors: descriptors.as_ref().iter(),
-            buffer,
-            capacity,
-            start,
-            end,
-            phantom,
-        }
-    }
-}
-
-impl<'a, D> IntoIterator for &'a mut ErasedSoaSlicesMut<'_, D>
-where
-    D: AsRef<[FieldDescriptor]> + ?Sized,
-{
-    type Item = ErasedFieldSliceMut<'a>;
-    type IntoIter = ErasedSoaSlicesMutIter<'a, slice::Iter<'a, FieldDescriptor>>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaSlicesMut {
-            ref descriptors,
-            buffer,
-            capacity,
-            start,
-            end,
-            phantom,
-        } = *self;
-
-        ErasedSoaSlicesMutIter {
-            descriptors: descriptors.as_ref().iter(),
-            buffer,
-            capacity,
-            start,
-            end,
-            phantom,
-        }
+        self.iter()
     }
 }
 

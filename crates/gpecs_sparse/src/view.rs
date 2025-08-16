@@ -56,7 +56,7 @@ where
         sparse: &'a [SparseItem<K>],
     ) -> Result<Self, FromPartsError<K>> {
         let dense_reborrow = SoaSlices::new(dense.context(), dense.as_slices());
-        check_parts(dense_reborrow, sparse)?;
+        check_parts(&dense_reborrow, sparse)?;
 
         Ok(Self { dense, sparse })
     }
@@ -305,7 +305,7 @@ where
     }
 }
 
-impl<'c, 'a, K, V> From<&'c V::Context> for EpochSparseView<'c, 'a, K, V>
+impl<'c, K, V> From<&'c V::Context> for EpochSparseView<'c, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
@@ -431,13 +431,13 @@ where
     }
 }
 
-impl<'c, 'a, K, V> AsRef<EpochSparseView<'c, 'a, K, V>> for EpochSparseView<'c, 'a, K, V>
+impl<K, V> AsRef<Self> for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
 {
     #[inline]
-    fn as_ref(&self) -> &EpochSparseView<'c, 'a, K, V> {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
@@ -495,7 +495,7 @@ where
         sparse: &'a mut [SparseItem<K>],
     ) -> Result<Self, FromPartsError<K>> {
         let dense_reborrow = SoaSlices::new(dense.context(), dense.as_slices());
-        check_parts(dense_reborrow, sparse)?;
+        check_parts(&dense_reborrow, sparse)?;
 
         Ok(Self { dense, sparse })
     }
@@ -800,7 +800,7 @@ where
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
                 unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse)
-            })
+            });
         });
     }
 
@@ -827,7 +827,7 @@ where
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
-            })
+            });
         });
     }
 
@@ -843,7 +843,7 @@ where
                 let value =
                     unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse);
                 f((key, value))
-            })
+            });
         });
     }
 
@@ -1136,7 +1136,7 @@ where
     }
 }
 
-impl<'c, 'a, K, V> From<&'c V::Context> for EpochSparseViewMut<'c, 'a, K, V>
+impl<'c, K, V> From<&'c V::Context> for EpochSparseViewMut<'c, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
@@ -1265,24 +1265,24 @@ where
     }
 }
 
-impl<'c, 'a, K, V> AsRef<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseViewMut<'c, 'a, K, V>
+impl<K, V> AsRef<Self> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
 {
     #[inline]
-    fn as_ref(&self) -> &EpochSparseViewMut<'c, 'a, K, V> {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<'c, 'a, K, V> AsMut<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseViewMut<'c, 'a, K, V>
+impl<K, V> AsMut<Self> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut EpochSparseViewMut<'c, 'a, K, V> {
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
@@ -1344,7 +1344,7 @@ where
 }
 
 fn check_parts<K, V>(
-    dense: SoaSlices<KeyValuePair<K, V>>,
+    dense: &SoaSlices<KeyValuePair<K, V>>,
     sparse: &[SparseItem<K>],
 ) -> Result<(), FromPartsError<K>>
 where

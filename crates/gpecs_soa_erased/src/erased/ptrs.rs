@@ -28,10 +28,10 @@ impl<D> ErasedSoaPtrs<D> {
     #[inline]
     pub unsafe fn new(descriptors: D, buffer: *const u8, capacity: usize, offset: usize) -> Self {
         Self {
-            descriptors,
             buffer,
             capacity,
             offset,
+            descriptors,
         }
     }
 
@@ -60,6 +60,7 @@ impl<D> ErasedSoaPtrs<D> {
     }
 
     #[inline]
+    #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { offset, .. } = self;
         Self {
@@ -204,18 +205,10 @@ where
 
         unsafe { (offset - origin.offset).try_into().unwrap_unchecked() }
     }
-}
-
-impl<'a, D> IntoIterator for &'a ErasedSoaPtrs<D>
-where
-    D: AsRef<[FieldDescriptor]> + ?Sized,
-{
-    type Item = ErasedFieldPtr;
-    type IntoIter = ErasedSoaPtrsIter<slice::Iter<'a, FieldDescriptor>>;
 
     #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaPtrs {
+    pub fn iter(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+        let Self {
             ref descriptors,
             buffer,
             capacity,
@@ -231,7 +224,7 @@ where
     }
 }
 
-impl<'a, D> IntoIterator for &'a mut ErasedSoaPtrs<D>
+impl<'a, D> IntoIterator for &'a ErasedSoaPtrs<D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
@@ -240,19 +233,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaPtrs {
-            ref descriptors,
-            buffer,
-            capacity,
-            offset,
-        } = *self;
-
-        ErasedSoaPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
-            buffer,
-            capacity,
-            offset,
-        }
+        self.iter()
     }
 }
 

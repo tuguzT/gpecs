@@ -291,7 +291,7 @@ impl Iterator for GpuArchetypeIds<'_> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.copied().for_each(f)
+        inner.copied().for_each(f);
     }
 
     #[inline]

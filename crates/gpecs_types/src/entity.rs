@@ -90,15 +90,15 @@ impl Key for Entity {
     type Epoch = EntityEpoch;
 
     fn new(sparse_index: Self::SparseIndex, epoch: Self::Epoch) -> Self {
-        Entity::new(sparse_index, epoch, WorldId::default())
+        Self::new(sparse_index, epoch, WorldId::default())
     }
 
     fn sparse_index(self) -> Self::SparseIndex {
-        Entity::index(&self)
+        Self::index(&self)
     }
 
     fn epoch(self) -> Self::Epoch {
-        Entity::epoch(&self)
+        Self::epoch(&self)
     }
 }
 
@@ -113,6 +113,7 @@ impl EntityEpoch {
     }
 
     #[inline]
+    #[expect(clippy::cast_possible_truncation)]
     pub const fn into_u16(self) -> u16 {
         let Self(epoch) = self;
         epoch as u16

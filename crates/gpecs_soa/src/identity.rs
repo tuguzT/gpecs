@@ -11,7 +11,7 @@ use crate::traits::{
     impls::debug_assert_ptr_is_aligned,
 };
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct Identity<T>(pub T)
 where
@@ -41,7 +41,7 @@ impl<T> Identity<T> {
 }
 
 pub trait IdentityPtr<T: ?Sized>: private::Sealed {
-    #[allow(clippy::wrong_self_convention, reason = "method of pointer type")]
+    #[expect(clippy::wrong_self_convention, reason = "method of pointer type")]
     fn as_inner_ptr(self) -> *const T;
 }
 
@@ -56,7 +56,7 @@ where
 }
 
 pub trait IdentityMutPtr<T: ?Sized>: private::Sealed {
-    #[allow(clippy::wrong_self_convention, reason = "method of pointer type")]
+    #[expect(clippy::wrong_self_convention, reason = "method of pointer type")]
     fn as_inner_mut_ptr(self) -> *mut T;
 }
 
@@ -71,7 +71,7 @@ where
 }
 
 pub trait IdentitySlicePtr<T>: private::Sealed {
-    #[allow(clippy::wrong_self_convention, reason = "method of pointer type")]
+    #[expect(clippy::wrong_self_convention, reason = "method of pointer type")]
     fn as_inner_ptr(self) -> *const [T];
 }
 
@@ -83,7 +83,7 @@ impl<T> IdentitySlicePtr<T> for *const [Identity<T>] {
 }
 
 pub trait IdentitySliceMutPtr<T>: private::Sealed {
-    #[allow(clippy::wrong_self_convention, reason = "method of pointer type")]
+    #[expect(clippy::wrong_self_convention, reason = "method of pointer type")]
     fn as_inner_mut_ptr(self) -> *mut [T];
 }
 
@@ -222,21 +222,6 @@ where
     }
 }
 
-impl<T> Clone for Identity<T>
-where
-    T: Clone,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        (**self).clone().into()
-    }
-
-    #[inline]
-    fn clone_from(&mut self, source: &Self) {
-        (**self).clone_from(source);
-    }
-}
-
 unsafe impl<T> Soa for Identity<T> {
     type Context = ();
     type Fields = Self;
@@ -288,11 +273,11 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer<'context>(
-        _context: &'context Self::Context,
+    unsafe fn ptrs_from_buffer(
+        _context: &Self::Context,
         buffer: *mut u8,
         _capacity: usize,
-    ) -> Self::MutPtrs<'context> {
+    ) -> Self::MutPtrs<'_> {
         let ptrs = buffer.cast();
         debug_assert_ptr_is_aligned(ptrs);
         ptrs

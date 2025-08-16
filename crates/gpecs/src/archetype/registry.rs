@@ -72,14 +72,14 @@ impl EntityArchetypeLocation {
 impl From<EntityArchetype> for EntityArchetypeLocation {
     #[inline]
     fn from(value: EntityArchetype) -> Self {
-        EntityArchetypeLocation::Known(value)
+        Self::Known(value)
     }
 }
 
 impl From<Option<EntityArchetype>> for EntityArchetypeLocation {
     #[inline]
     fn from(value: Option<EntityArchetype>) -> Self {
-        EntityArchetypeLocation::from_option(value)
+        Self::from_option(value)
     }
 }
 
@@ -190,17 +190,17 @@ impl ArchetypeRegistry {
         C: Borrow<ComponentRegistry>,
         F: FnOnce(C) -> Result<ArchetypeStorage, DuplicateComponentError>,
     {
-        let (before, archetype_to) = match Self::find_archetype(archetypes, &key) {
-            Some(archetype_id) => (Default::default(), archetype_id),
-            None => {
-                let borrow = components.borrow();
-                let before = Self::register_before(archetypes, graph, borrow, component_ids, &key);
-                let Ok(storage) = f(components) else {
-                    unreachable!("components should be unique, but got {component_ids:?}")
-                };
-                let archetype_id = Self::register_one(archetypes, graph, key, storage);
-                (before, archetype_id)
-            }
+        let archetype_id = Self::find_archetype(archetypes, &key);
+        let (before, archetype_to) = if let Some(archetype_id) = archetype_id {
+            (Vec::new(), archetype_id)
+        } else {
+            let borrow = components.borrow();
+            let before = Self::register_before(archetypes, graph, borrow, component_ids, &key);
+            let Ok(storage) = f(components) else {
+                unreachable!("components should be unique, but got {component_ids:?}")
+            };
+            let archetype_id = Self::register_one(archetypes, graph, key, storage);
+            (before, archetype_id)
         };
 
         for (archetype_from, component_id) in before {
@@ -240,7 +240,7 @@ impl ArchetypeRegistry {
 
         let len = component_ids.len();
         if len <= 1 {
-            return Default::default();
+            return Vec::new();
         }
 
         let register_subset = |component_ids: Vec<_>| {
@@ -1104,7 +1104,7 @@ where
         DotConfig::EdgeNoLabel,
         DotConfig::RankDir(RankDir::LR),
     ];
-    let node_attrs = |_, (index, _): (NodeIndex<_>, _)| {
+    let node_attrs = |_, (index, &()): (NodeIndex<_>, _)| {
         let archetype_id = archetype_id_from_usize(index.index());
         let Some((_, info)) = archetypes.get_index(index.index()) else {
             unreachable!("archetype {archetype_id:?} should exist")
@@ -1314,7 +1314,7 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
             ..
         } = *self;
 
-        let skip_count = exclusive as usize;
+        let skip_count = usize::from(exclusive);
         let upper = archetypes.len().saturating_sub(skip_count);
         (0, Some(upper))
     }
@@ -1408,7 +1408,7 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
             ..
         } = *self;
 
-        let skip_count = exclusive as usize;
+        let skip_count = usize::from(exclusive);
         let upper = archetypes.len().saturating_sub(skip_count);
         (0, Some(upper))
     }

@@ -27,10 +27,10 @@ impl<D> ErasedSoaNonNullPtrs<D> {
     #[inline]
     pub unsafe fn new(descriptors: D, buffer: NonNull<u8>, capacity: usize, offset: usize) -> Self {
         Self {
-            descriptors,
             buffer,
             capacity,
             offset,
+            descriptors,
         }
     }
 
@@ -46,6 +46,7 @@ impl<D> ErasedSoaNonNullPtrs<D> {
     }
 
     #[inline]
+    #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { offset, .. } = self;
         Self {
@@ -190,7 +191,7 @@ where
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors.as_ref(), with.field_descriptors());
 
-        itertools::zip_eq(self, with).for_each(|(me, with)| unsafe { me.swap(with) })
+        itertools::zip_eq(self, with).for_each(|(me, with)| unsafe { me.swap(with) });
     }
 
     #[inline]
@@ -202,7 +203,7 @@ where
         let Self { descriptors, .. } = self;
         assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
-        itertools::zip_eq(self, from).for_each(|(me, from)| unsafe { me.copy_from(from, count) })
+        itertools::zip_eq(self, from).for_each(|(me, from)| unsafe { me.copy_from(from, count) });
     }
 
     #[inline]
@@ -216,6 +217,7 @@ where
 
         #[inline]
         #[track_caller]
+        #[expect(clippy::items_after_statements)]
         fn rec(
             iter: &mut itertools::ZipEq<
                 ErasedSoaNonNullPtrsIter<slice::Iter<'_, FieldDescriptor>>,
@@ -231,7 +233,7 @@ where
         }
 
         let mut iter = itertools::zip_eq(self, from);
-        rec(&mut iter, count)
+        rec(&mut iter, count);
     }
 
     #[inline]
@@ -244,7 +246,24 @@ where
         assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self, from)
-            .for_each(|(me, from)| unsafe { me.copy_from_nonoverlapping(from, count) })
+            .for_each(|(me, from)| unsafe { me.copy_from_nonoverlapping(from, count) });
+    }
+
+    #[inline]
+    pub fn iter(&self) -> ErasedSoaNonNullPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+        let Self {
+            ref descriptors,
+            buffer,
+            capacity,
+            offset,
+        } = *self;
+
+        ErasedSoaNonNullPtrsIter {
+            descriptors: descriptors.as_ref().iter(),
+            buffer,
+            capacity,
+            offset,
+        }
     }
 }
 
@@ -257,44 +276,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaNonNullPtrs {
-            ref descriptors,
-            buffer,
-            capacity,
-            offset,
-        } = *self;
-
-        ErasedSoaNonNullPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
-            buffer,
-            capacity,
-            offset,
-        }
-    }
-}
-
-impl<'a, D> IntoIterator for &'a mut ErasedSoaNonNullPtrs<D>
-where
-    D: AsRef<[FieldDescriptor]> + ?Sized,
-{
-    type Item = ErasedFieldNonNullPtr;
-    type IntoIter = ErasedSoaNonNullPtrsIter<slice::Iter<'a, FieldDescriptor>>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        let ErasedSoaNonNullPtrs {
-            ref descriptors,
-            buffer,
-            capacity,
-            offset,
-        } = *self;
-
-        ErasedSoaNonNullPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
-            buffer,
-            capacity,
-            offset,
-        }
+        self.iter()
     }
 }
 

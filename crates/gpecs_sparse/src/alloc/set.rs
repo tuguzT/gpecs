@@ -53,6 +53,7 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
+    #[must_use]
     pub fn new() -> Self
     where
         V::Context: Default,
@@ -64,6 +65,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn with_context(context: V::Context) -> Self {
         Self {
             dense: SoaVec::with_context(context),
@@ -72,6 +74,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn with_capacity(dense: usize, sparse: usize) -> Self
     where
         V::Context: Default,
@@ -83,6 +86,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn with_context_and_capacity(context: V::Context, dense: usize, sparse: usize) -> Self {
         Self {
             dense: SoaVec::with_context_and_capacity(context, dense),
@@ -333,6 +337,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn into_sparse_vec(self) -> Vec<SparseItem<K>> {
         let Self { sparse, .. } = self;
         sparse
@@ -363,6 +368,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn into_parts(self) -> (SoaVec<KeyValuePair<K, V>>, Vec<SparseItem<K>>) {
         let Self { dense, sparse } = self;
         (dense, sparse)
@@ -381,13 +387,13 @@ where
     #[inline]
     pub fn swap(&mut self, first_key: K, second_key: K) {
         let mut view_mut = self.as_mut_view();
-        view_mut.swap(first_key, second_key)
+        view_mut.swap(first_key, second_key);
     }
 
     #[inline]
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
         let mut view_mut = self.as_mut_view();
-        view_mut.swap_keys(first_key, second_key)
+        view_mut.swap_keys(first_key, second_key);
     }
 
     #[inline]
@@ -474,13 +480,13 @@ where
         for<'c, 'any> V::Refs<'c, 'any>: Ord,
     {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort()
+        view_mut.sort();
     }
 
     #[inline]
     pub fn sort_keys(&mut self) {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort_keys()
+        view_mut.sort_keys();
     }
 
     #[inline]
@@ -489,7 +495,7 @@ where
         F: FnMut((K, V::Refs<'_, '_>), (K, V::Refs<'_, '_>)) -> cmp::Ordering,
     {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort_by(f)
+        view_mut.sort_by(f);
     }
 
     #[inline]
@@ -499,7 +505,7 @@ where
         T: Ord,
     {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort_by_key(f)
+        view_mut.sort_by_key(f);
     }
 
     #[inline]
@@ -509,7 +515,7 @@ where
         T: Ord,
     {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort_by_cached_key(f)
+        view_mut.sort_by_cached_key(f);
     }
 
     #[inline]
@@ -518,13 +524,13 @@ where
         for<'c, 'any> V::Refs<'c, 'any>: Ord,
     {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort_unstable()
+        view_mut.sort_unstable();
     }
 
     #[inline]
     pub fn sort_keys_unstable(&mut self) {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort_keys_unstable()
+        view_mut.sort_keys_unstable();
     }
 
     #[inline]
@@ -533,7 +539,7 @@ where
         F: FnMut((K, V::Refs<'_, '_>), (K, V::Refs<'_, '_>)) -> cmp::Ordering,
     {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort_unstable_by(f)
+        view_mut.sort_unstable_by(f);
     }
 
     #[inline]
@@ -543,7 +549,7 @@ where
         T: Ord,
     {
         let mut view_mut = self.as_mut_view();
-        view_mut.sort_unstable_by_key(f)
+        view_mut.sort_unstable_by_key(f);
     }
 
     #[inline]
@@ -660,7 +666,8 @@ where
     }
 
     #[inline]
-    #[allow(clippy::unnecessary_to_owned, reason = "false positive")]
+    #[must_use]
+    #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
     pub fn into_keys(self) -> IntoKeys<K, V> {
         let Self { dense, .. } = self;
         let (keys, _) = dense.as_slices().into_parts();
@@ -893,8 +900,10 @@ where
             .iter()
             .enumerate()
             .find(|(_, SparseItem { kind, .. })| kind.is_vacant())
-            .map(|(sparse_index, &SparseItem { epoch, .. })| (sparse_index, epoch))
-            .unwrap_or_else(|| (self.sparse.len(), Default::default()));
+            .map_or_else(
+                || (sparse.len(), Default::default()),
+                |(sparse_index, &SparseItem { epoch, .. })| (sparse_index, epoch),
+            );
 
         let sparse_index = match sparse_index.try_into() {
             Ok(sparse_index) => sparse_index,
@@ -939,6 +948,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn into_values(self) -> IntoValues<K, V> {
         let Self { dense, .. } = self;
         let inner = dense.into_iter();
@@ -1022,10 +1032,7 @@ where
     V::Context: Default,
 {
     fn default() -> Self {
-        Self {
-            dense: Default::default(),
-            sparse: Default::default(),
-        }
+        Self::new()
     }
 }
 
@@ -1134,7 +1141,7 @@ where
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        EpochSparseSet::index(self, key)
+        Self::index(self, key)
     }
 }
 
@@ -1146,7 +1153,7 @@ where
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        EpochSparseSet::index_mut(self, key)
+        Self::index_mut(self, key)
     }
 }
 
@@ -1174,24 +1181,24 @@ where
     }
 }
 
-impl<K, V> AsRef<EpochSparseSet<K, V>> for EpochSparseSet<K, V>
+impl<K, V> AsRef<Self> for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
 {
     #[inline]
-    fn as_ref(&self) -> &EpochSparseSet<K, V> {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<K, V> AsMut<EpochSparseSet<K, V>> for EpochSparseSet<K, V>
+impl<K, V> AsMut<Self> for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut EpochSparseSet<K, V> {
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
@@ -1256,8 +1263,8 @@ where
         let mut me = Self::with_capacity(iter_len, iter_len);
         for KeyValuePair { key, value } in iter {
             me.insert_from(key, |context, dst| unsafe {
-                drop_old_then_write(context, dst, value)
-            })
+                drop_old_then_write(context, dst, value);
+            });
         }
 
         me
@@ -1313,8 +1320,8 @@ where
                 self.reserve(lower.saturating_add(1), 0);
             }
             self.insert_from(key, |context, dst| unsafe {
-                drop_old_then_write(context, dst, value)
-            })
+                drop_old_then_write(context, dst, value);
+            });
         }
     }
 }
@@ -1325,7 +1332,7 @@ where
     V: SoaWrite,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
-        self.extend(iter.into_iter().map(KeyValuePair::from))
+        self.extend(iter.into_iter().map(KeyValuePair::from));
     }
 }
 
@@ -1352,8 +1359,8 @@ where
             let key = K::new(sparse_index, Default::default());
 
             self.insert_from(key, |context, dst| unsafe {
-                drop_old_then_write(context, dst, value)
-            })
+                drop_old_then_write(context, dst, value);
+            });
         }
     }
 }

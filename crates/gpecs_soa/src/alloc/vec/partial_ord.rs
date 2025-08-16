@@ -22,13 +22,13 @@ macro_rules! __impl_slice_ord {
     }
 }
 
-impl<T> PartialOrd<SoaVec<T>> for SoaVec<T>
+impl<T> PartialOrd<Self> for SoaVec<T>
 where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
 {
     #[inline]
-    fn partial_cmp(&self, other: &SoaVec<T>) -> Option<::core::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<::core::cmp::Ordering> {
         PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
     }
 }

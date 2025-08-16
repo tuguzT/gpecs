@@ -64,28 +64,34 @@ where
     _context: ManuallyDrop<MaybeUninit<T::Context>>,
 }
 
-pub trait SoaSlicePtr<T>: Copy + private_slice_ptr::Sealed
+pub trait SoaSlicePtr<T>: Copy + private::Sealed
 where
     T: SoaTrustedFields + ?Sized,
 {
+    fn as_ptr(self) -> *const BufferData<T>;
+
     unsafe fn context<'a>(self) -> &'a T::Context;
 
     unsafe fn len(self) -> usize;
 
-    #[inline(always)]
+    #[inline]
     unsafe fn is_empty(self) -> bool {
         unsafe { self.len() == 0 }
     }
 
     unsafe fn capacity(self) -> usize;
-
-    fn as_ptr(self) -> *const BufferData<T>;
 }
 
 impl<T> SoaSlicePtr<T> for *const SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
 {
+    #[inline]
+    fn as_ptr(self) -> *const BufferData<T> {
+        let buffer = self.into_inner();
+        buffer.cast::<BufferData<T>>() // should be `<*const [BufferData<T>]>::as_ptr(buffer)` but it's unstable
+    }
+
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
         let buffer = self.as_ptr();
@@ -114,36 +120,36 @@ where
             _ => unsafe { ptr::read(self.as_ptr().ptr_to_capacity()) },
         }
     }
-
-    #[inline]
-    fn as_ptr(self) -> *const BufferData<T> {
-        let buffer = self.into_inner();
-        buffer as *const BufferData<T> // should be `<*const [BufferData<T>]>::as_ptr(buffer)` but it's unstable
-    }
 }
 
-pub trait SoaSlicePtrMut<T>: Copy + private_slice_ptr::Sealed
+pub trait SoaSlicePtrMut<T>: Copy + private::Sealed
 where
     T: SoaTrustedFields + ?Sized,
 {
+    fn as_mut_ptr(self) -> *mut BufferData<T>;
+
     unsafe fn context<'a>(self) -> &'a T::Context;
 
     unsafe fn len(self) -> usize;
 
-    #[inline(always)]
+    #[inline]
     unsafe fn is_empty(self) -> bool {
         unsafe { self.len() == 0 }
     }
 
     unsafe fn capacity(self) -> usize;
-
-    fn as_mut_ptr(self) -> *mut BufferData<T>;
 }
 
 impl<T> SoaSlicePtrMut<T> for *mut SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
 {
+    #[inline]
+    fn as_mut_ptr(self) -> *mut BufferData<T> {
+        let buffer = self.into_inner_mut();
+        buffer.cast::<BufferData<T>>() // should be `<*mut [BufferData<T>]>::as_mut_ptr(buffer)` but it's unstable
+    }
+
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
         let buffer = self.as_mut_ptr();
@@ -172,12 +178,6 @@ where
             _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_capacity_mut()) },
         }
     }
-
-    #[inline]
-    fn as_mut_ptr(self) -> *mut BufferData<T> {
-        let buffer = self.into_inner_mut();
-        buffer as *mut BufferData<T> // should be `<*mut [BufferData<T>]>::as_mut_ptr(buffer)` but it's unstable
-    }
 }
 
 fn slice_buffer_layout<T>(ptr: *const SoaSlice<T>) -> Layout
@@ -191,6 +191,88 @@ where
     Layout::from_size_align(size, align).expect("layout size should not exceed `isize::MAX`")
 }
 
+pub trait BufferDataPtr<T>: Copy + private::Sealed
+where
+    T: Soa + ?Sized,
+{
+    fn ptr_to_context(self) -> *const T::Context;
+    unsafe fn ptr_to_len(self) -> *const usize;
+    unsafe fn ptr_to_capacity(self) -> *const usize;
+    unsafe fn ptr_to_data(self) -> *const u8;
+}
+
+impl<T> BufferDataPtr<T> for *const BufferData<T>
+where
+    T: Soa + ?Sized,
+{
+    #[inline]
+    fn ptr_to_context(self) -> *const T::Context {
+        self.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_len(self) -> *const usize {
+        let prefix = self.cast::<u8>();
+        let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
+        len.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_capacity(self) -> *const usize {
+        let prefix = self.cast::<u8>();
+        let capacity = unsafe { prefix.add(offset_of!(BufferPrefix<T>, capacity)) };
+        capacity.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_data(self) -> *const u8 {
+        let context = unsafe { &*self.ptr_to_context() };
+        let capacity = unsafe { ptr::read(self.ptr_to_capacity()) };
+        unsafe { ptr_to_data(context, self.cast_mut(), capacity).unwrap_unchecked() }.cast_const()
+    }
+}
+
+pub trait BufferDataPtrMut<T>: Copy + private::Sealed
+where
+    T: Soa + ?Sized,
+{
+    fn ptr_to_context_mut(self) -> *mut T::Context;
+    unsafe fn ptr_to_len_mut(self) -> *mut usize;
+    unsafe fn ptr_to_capacity_mut(self) -> *mut usize;
+    unsafe fn ptr_to_data_mut(self) -> *mut u8;
+}
+
+impl<T> BufferDataPtrMut<T> for *mut BufferData<T>
+where
+    T: Soa + ?Sized,
+{
+    #[inline]
+    fn ptr_to_context_mut(self) -> *mut T::Context {
+        self.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_len_mut(self) -> *mut usize {
+        let prefix = self.cast::<u8>();
+        let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
+        len.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_capacity_mut(self) -> *mut usize {
+        let prefix = self.cast::<u8>();
+        let capacity = unsafe { prefix.add(offset_of!(BufferPrefix<T>, capacity)) };
+        capacity.cast()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_data_mut(self) -> *mut u8 {
+        let context = unsafe { &*self.ptr_to_context() };
+        let capacity = unsafe { ptr::read(self.ptr_to_capacity()) };
+        unsafe { ptr_to_data(context, self, capacity).unwrap_unchecked() }
+    }
+}
+
 trait SoaSlicePtrIntoInner<T>: Copy
 where
     T: SoaTrustedFields + ?Sized,
@@ -202,7 +284,7 @@ impl<T> SoaSlicePtrIntoInner<T> for *const SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
 {
-    #[inline(always)]
+    #[inline]
     fn into_inner(self) -> *const [BufferData<T>] {
         self as *const [BufferData<T>]
     }
@@ -219,12 +301,13 @@ impl<T> SoaSlicePtrIntoInnerMut<T> for *mut SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
 {
-    #[inline(always)]
+    #[inline]
     fn into_inner_mut(self) -> *mut [BufferData<T>] {
         self as *mut [BufferData<T>]
     }
 }
 
+#[repr(C)]
 struct BufferAlign<T>
 where
     T: Soa + ?Sized,
@@ -252,6 +335,10 @@ const _: () = {
         T: Soa + ?Sized,
     {
         assert!(
+            size_of::<BufferAlign<T>>() == 0,
+            "BufferAlign should not occupy any space",
+        );
+        assert!(
             offset_of!(BufferPrefix<T>, context) == 0,
             "context should be located at the beginning of the buffer prefix",
         );
@@ -267,79 +354,16 @@ const _: () = {
     assert_safety_preconditions::<(u128,)>();
 };
 
-pub(crate) trait BufferDataPtr<T>: Copy
-where
-    T: Soa + ?Sized,
-{
-    unsafe fn ptr_to_len(self) -> *const usize;
-    unsafe fn ptr_to_capacity(self) -> *const usize;
-    fn ptr_to_context(self) -> *const T::Context;
-}
-
-impl<T> BufferDataPtr<T> for *const BufferData<T>
-where
-    T: Soa + ?Sized,
-{
-    #[inline]
-    unsafe fn ptr_to_len(self) -> *const usize {
-        let prefix = self.cast::<u8>();
-        let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
-        len.cast()
-    }
-
-    #[inline]
-    unsafe fn ptr_to_capacity(self) -> *const usize {
-        let prefix = self.cast::<u8>();
-        let capacity = unsafe { prefix.add(offset_of!(BufferPrefix<T>, capacity)) };
-        capacity.cast()
-    }
-
-    #[inline(always)]
-    fn ptr_to_context(self) -> *const T::Context {
-        self.cast()
-    }
-}
-
-pub(crate) trait BufferDataPtrMut<T>: Copy
-where
-    T: Soa + ?Sized,
-{
-    unsafe fn ptr_to_len_mut(self) -> *mut usize;
-    unsafe fn ptr_to_capacity_mut(self) -> *mut usize;
-    fn ptr_to_context_mut(self) -> *mut T::Context;
-}
-
-impl<T> BufferDataPtrMut<T> for *mut BufferData<T>
-where
-    T: Soa + ?Sized,
-{
-    #[inline]
-    unsafe fn ptr_to_len_mut(self) -> *mut usize {
-        let prefix = self.cast::<u8>();
-        let len = unsafe { prefix.add(offset_of!(BufferPrefix<T>, len)) };
-        len.cast()
-    }
-
-    #[inline]
-    unsafe fn ptr_to_capacity_mut(self) -> *mut usize {
-        let prefix = self.cast::<u8>();
-        let capacity = unsafe { prefix.add(offset_of!(BufferPrefix<T>, capacity)) };
-        capacity.cast()
-    }
-
-    #[inline(always)]
-    fn ptr_to_context_mut(self) -> *mut T::Context {
-        self.cast()
-    }
-}
-
-mod private_slice_ptr {
-    use super::{SoaSlice, SoaTrustedFields};
+mod private {
+    use super::{BufferData, Soa, SoaSlice, SoaTrustedFields};
 
     pub trait Sealed {}
 
     impl<T> Sealed for *const SoaSlice<T> where T: SoaTrustedFields + ?Sized {}
     impl<T> Sealed for *mut SoaSlice<T> where T: SoaTrustedFields + ?Sized {}
+
+    impl<T> Sealed for *const BufferData<T> where T: Soa + ?Sized {}
+    impl<T> Sealed for *mut BufferData<T> where T: Soa + ?Sized {}
 }
 
 #[inline]
@@ -434,7 +458,7 @@ where
 }
 
 #[inline]
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "alloc"), expect(dead_code))]
 pub(crate) fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
     T: Soa + ?Sized,
@@ -466,17 +490,29 @@ where
         return Ok(T::ptrs_dangling(context));
     }
 
+    let buffer = unsafe { ptr_to_data(context, ptr, capacity)? };
+    let ptrs = unsafe { T::ptrs_from_buffer(context, buffer, capacity) };
+    Ok(ptrs)
+}
+
+unsafe fn ptr_to_data<T>(
+    context: &T::Context,
+    ptr: *mut BufferData<T>,
+    capacity: usize,
+) -> Result<*mut u8, LayoutError>
+where
+    T: Soa + ?Sized,
+{
     let layout = T::buffer_layout(context, capacity)?;
     let prefix_layout = Layout::new::<BufferPrefix<T>>();
     let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
 
     let buffer = unsafe { ptr.cast::<u8>().add(offset_from_prefix) };
-    let ptrs = unsafe { T::ptrs_from_buffer(context, buffer, capacity) };
-    Ok(ptrs)
+    Ok(buffer)
 }
 
 #[cfg(test)]
-#[allow(clippy::identity_op)]
+#[expect(clippy::identity_op)]
 mod tests {
     use core::alloc::Layout;
 

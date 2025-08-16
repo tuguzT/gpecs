@@ -349,7 +349,7 @@ impl Debug for ErasedFieldSliceIterMut<'_> {
     }
 }
 
-#[allow(clippy::while_let_on_iterator)]
+#[expect(clippy::while_let_on_iterator)]
 impl<'a> Iterator for ErasedFieldSliceIterMut<'a> {
     type Item = ErasedFieldRefMut<'a>;
 

@@ -1,4 +1,6 @@
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+use bytemuck::{Pod, Zeroable};
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct ComponentId(u32);
 

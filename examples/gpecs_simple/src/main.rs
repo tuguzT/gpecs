@@ -340,20 +340,27 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
     };
     let adapter = pollster::block_on(instance.request_adapter(&adapter_options))
         .expect("failed to create adapter");
-    log::info!("Running on:\n{:#?}", adapter.get_info());
-    log::info!("Adapter features:\n{:#?}", adapter.features());
 
-    let downlevel_capabilities = adapter.get_downlevel_capabilities();
-    if !downlevel_capabilities
-        .flags
-        .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS)
-    {
-        panic!("adapter does not support compute shaders, which are required");
-    }
+    let adapter_info = adapter.get_info();
+    log::info!("Running on:\n{adapter_info:#?}");
 
-    let features = adapter.features();
+    let adapter_features = adapter.features();
+    log::info!("Adapter features:\n{adapter_features:#?}");
+
+    let adapter_limits = adapter.limits();
+    log::info!("Adapter limits:\n{adapter_limits:#?}");
+
+    let adapter_downlevel_capabilities = adapter.get_downlevel_capabilities();
+    log::info!("Adapter downlevel capabilities:\n{adapter_downlevel_capabilities:#?}");
+
     assert!(
-        features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES),
+        adapter_downlevel_capabilities
+            .flags
+            .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS),
+        "adapter does not support compute shaders, which are required",
+    );
+    assert!(
+        adapter_features.contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES),
         "adapter does not support timestamp queries inside passes, which are required",
     );
 
@@ -361,13 +368,15 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
         label: Some("`gpecs` integration test device"),
         required_features: wgpu::Features::TIMESTAMP_QUERY
             | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
-        required_limits: adapter.limits(),
+        required_limits: adapter_limits,
         memory_hints: wgpu::MemoryHints::Performance,
         trace: wgpu::Trace::Off,
     };
     let (device, queue) = pollster::block_on(adapter.request_device(&device_desc))
         .expect("failed to create device & queue");
-    log::info!("Limits of the current device:\n{:#?}", device.limits());
+
+    let device_limits = device.limits();
+    log::info!("Limits of the current device:\n{device_limits:#?}");
 
     (device, queue)
 }

@@ -1,9 +1,9 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    ptr,
 };
 
+use bytemuck::{Pod, Zeroable, must_cast_slice};
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, ErasedSoaContext, ErasedSoaRefsMut},
     field::{
@@ -35,7 +35,7 @@ use super::{
     },
 };
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 struct NoEpochEntity(Entity);
 
@@ -759,7 +759,7 @@ impl ErasedStorageExt for ErasedStorage {
     #[inline]
     fn entities(&self) -> &[Entity] {
         let entities = self.as_keys_slice();
-        unsafe { &*(ptr::from_ref(entities) as *const [Entity]) }
+        must_cast_slice(entities)
     }
 
     #[inline]
@@ -770,10 +770,10 @@ impl ErasedStorageExt for ErasedStorage {
     ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_>>) {
         let (dense, _) = Self::as_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
-        let (keys, values) = slices.into_parts();
+        let (entities, values) = slices.into_parts();
         let values = values.into_inner();
 
-        let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
+        let entities = must_cast_slice(entities);
         let component_ids = component_ids.keys().copied();
         let fields = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
             .zip(values)
@@ -792,10 +792,10 @@ impl ErasedStorageExt for ErasedStorage {
     ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_>>) {
         let (dense, _) = Self::as_mut_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
-        let (keys, values) = slices.into_parts();
+        let (entities, values) = slices.into_parts();
         let values = values.into_inner();
 
-        let entities = unsafe { &*(ptr::from_ref(keys) as *const [Entity]) };
+        let entities = must_cast_slice(entities);
         let component_ids = component_ids.keys().copied();
         let fields = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
             .zip(values)
@@ -815,8 +815,9 @@ impl ErasedStorageExt for ErasedStorage {
         fields: ErasedComponents<BoxedErasedField>,
     ) -> Option<ErasedComponents<BoxedErasedField>> {
         let value = unsafe {
+            let context = self.context();
             let component_ids = component_ids.keys().copied();
-            from_erased_fields::<BoxedErasedSoa>(components, self.context(), component_ids, fields)
+            from_erased_fields::<BoxedErasedSoa>(components, context, component_ids, fields)
         };
         let value = Self::insert(self, entity.into(), value)?;
 

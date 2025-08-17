@@ -3,11 +3,12 @@ use core::{
     fmt::{self, Debug, Display},
 };
 
+use bytemuck::{Pod, Zeroable};
 use gpecs_sparse::key::{Epoch, Key};
 
 use crate::world::WorldId;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct Entity {
     index: u32,
@@ -102,7 +103,7 @@ impl Key for Entity {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct EntityEpoch(u32);
 

@@ -552,9 +552,9 @@ pub struct SoaTupleImplHelper<T>(PhantomData<T>);
 #[must_use]
 #[doc(hidden)]
 pub const fn permutation<const N: usize>() -> [usize; N] {
-    let mut permutation = [0; N];
+    let mut permutation = [0; _];
     let mut i = 0;
-    while i < N {
+    while i < permutation.len() {
         permutation[i] = i;
         i += 1;
     }
@@ -565,14 +565,12 @@ pub const fn permutation<const N: usize>() -> [usize; N] {
 #[must_use]
 #[doc(hidden)]
 pub const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize; N] {
-    let mut permutation = permutation::<N>();
+    let mut permutation = permutation();
     let mut i = 1;
-    while i < N {
+    while i < permutation.len() {
         let mut j = i;
         while j > 0 && layouts[permutation[j - 1]].align() > layouts[permutation[j]].align() {
-            let tmp = permutation[j - 1];
-            permutation[j - 1] = permutation[j];
-            permutation[j] = tmp;
+            permutation.swap(j - 1, j);
             j -= 1;
         }
         i += 1;

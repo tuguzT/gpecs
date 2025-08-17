@@ -11,7 +11,7 @@ use crate::{
     executor::gpu::component::registry::GpuComponentId,
 };
 
-use super::shader::SystemShader;
+use super::shader::GpuSystemShader;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
@@ -40,7 +40,7 @@ impl From<GpuSystemId> for u32 {
 #[derive(Debug)]
 pub struct GpuSystemInfo {
     id: GpuSystemId,
-    shader: SystemShader,
+    shader: GpuSystemShader,
 }
 
 impl GpuSystemInfo {
@@ -51,13 +51,13 @@ impl GpuSystemInfo {
     }
 
     #[inline]
-    pub fn shader(&self) -> &SystemShader {
+    pub fn shader(&self) -> &GpuSystemShader {
         let Self { shader, .. } = self;
         shader
     }
 
     #[inline]
-    pub fn shader_mut(&mut self) -> &mut SystemShader {
+    pub fn shader_mut(&mut self) -> &mut GpuSystemShader {
         let Self { shader, .. } = self;
         shader
     }
@@ -101,7 +101,7 @@ impl GpuSystemRegistry {
         let index = systems.len();
         let id = gpu_system_id_from_usize(index);
 
-        let shader = SystemShader::new(components, gpu_device, id, descriptor)?;
+        let shader = GpuSystemShader::new(components, gpu_device, id, descriptor)?;
         let info = GpuSystemInfo { id, shader };
         systems.push(info);
 

@@ -426,7 +426,7 @@ where
             return Ok(Layout::new::<()>());
         }
         let item_layout = Layout::new::<BufferData<T>>();
-        let size = size_of::<BufferPrefix<T>>().div_ceil(item_layout.size()) * item_layout.size();
+        let size = size_of::<BufferPrefix<T>>().next_multiple_of(item_layout.size());
         let layout = Layout::from_size_align(size, item_layout.align())?.pad_to_align();
         return Ok(layout);
     }
@@ -435,7 +435,7 @@ where
     let capacity_in_bytes = required.size();
 
     let item_layout = Layout::new::<BufferData<T>>();
-    let size = capacity_in_bytes.div_ceil(item_layout.size()) * item_layout.size();
+    let size = capacity_in_bytes.next_multiple_of(item_layout.size());
     let layout = Layout::from_size_align(size, item_layout.align())?.pad_to_align();
 
     Ok(layout)
@@ -469,7 +469,7 @@ where
     }
 
     let item_layout = Layout::new::<BufferData<T>>();
-    let size = buffer_layout.size().div_ceil(item_layout.size()) * item_layout.size();
+    let size = buffer_layout.size().next_multiple_of(item_layout.size());
     let buffer_layout = Layout::from_size_align(size, item_layout.align())
         .expect("layout size should not exceed `isize::MAX`")
         .pad_to_align();

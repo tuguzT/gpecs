@@ -3,7 +3,9 @@ use core::{
     fmt::{self, Display},
 };
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+use bytemuck::{Pod, Zeroable};
+
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct WorldId(u32);
 

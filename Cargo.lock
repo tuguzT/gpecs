@@ -728,6 +728,7 @@ dependencies = [
 name = "gpecs"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "gpecs_soa_erased",
  "gpecs_sparse",
  "gpecs_types",
@@ -853,6 +854,7 @@ version = "0.0.0"
 name = "gpecs_types"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "gpecs_sparse",
 ]
 

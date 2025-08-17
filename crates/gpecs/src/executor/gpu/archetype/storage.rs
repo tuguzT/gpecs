@@ -52,7 +52,7 @@ impl GpuArchetypeStorage {
         let entities_bytes = must_cast_slice(entities);
         let entities_byte_count = entities_bytes.len();
         let entities_binding = u64::try_from(entities_byte_count)
-            .unwrap()
+            .expect("entities byte count should fit into `u64`")
             .try_into()
             .ok()
             .map(|size| BufferBindingDescriptor { offset: 0, size });

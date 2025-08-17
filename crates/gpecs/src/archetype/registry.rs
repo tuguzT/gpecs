@@ -11,7 +11,7 @@ use std::{
 pub use gpecs_types::archetype::ArchetypeId;
 
 use gpecs_soa_erased::field::BoxedErasedField;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet, map};
 use itertools::Itertools;
 use petgraph::{
     Direction,
@@ -1417,7 +1417,7 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
 #[derive(Clone)]
 pub struct CompatibleArchetypes<'a> {
     component_ids: Box<[ComponentId]>,
-    infos: indexmap::map::Values<'a, ArchetypeKey, ArchetypeInfo>,
+    infos: map::Values<'a, ArchetypeKey, ArchetypeInfo>,
 }
 
 impl<'a> CompatibleArchetypes<'a> {
@@ -1549,7 +1549,7 @@ impl FusedIterator for CompatibleArchetypes<'_> {}
 
 pub struct CompatibleArchetypesMut<'a> {
     component_ids: Box<[ComponentId]>,
-    infos: indexmap::map::ValuesMut<'a, ArchetypeKey, ArchetypeInfo>,
+    infos: map::ValuesMut<'a, ArchetypeKey, ArchetypeInfo>,
 }
 
 impl<'a> CompatibleArchetypesMut<'a> {

@@ -424,12 +424,12 @@ fn _init_wgpu_position_tag_download_buffer(
 
     let position_tag_positions_binding = position_tag_storage_buffer_bindings
         .components
-        .get(&position_gpu_id.into_id())
+        .get(&position_gpu_id)
         .cloned()
         .flatten()?;
     let position_tag_tags_binding = position_tag_storage_buffer_bindings
         .components
-        .get(&tag_gpu_id.into_id())
+        .get(&tag_gpu_id)
         .cloned()
         .flatten();
     assert!(position_tag_tags_binding.is_none());
@@ -438,10 +438,7 @@ fn _init_wgpu_position_tag_download_buffer(
         format!("`gpecs` {position_tag_gpu_archetype_id:?} download buffer");
     let position_tag_download_buffer_desc = wgpu::BufferDescriptor {
         label: Some(&position_tag_download_buffer_label),
-        size: position_tag_positions_binding
-            .size
-            .expect("component binding never uses the whole buffer")
-            .get(),
+        size: position_tag_positions_binding.size().get(),
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     };
@@ -484,12 +481,12 @@ fn _wgpu_copy_into_position_tag_download_buffer(
 
     let position_tag_positions_binding = position_tag_storage_buffer_bindings
         .components
-        .get(&position_gpu_id.into_id())
+        .get(&position_gpu_id)
         .cloned()
         .flatten();
     let position_tag_tags_binding = position_tag_storage_buffer_bindings
         .components
-        .get(&tag_gpu_id.into_id())
+        .get(&tag_gpu_id)
         .cloned()
         .flatten();
     assert!(position_tag_tags_binding.is_none());
@@ -498,11 +495,11 @@ fn _wgpu_copy_into_position_tag_download_buffer(
         position_tag_download_buffer.zip(position_tag_positions_binding)
     {
         command_encoder.copy_buffer_to_buffer(
-            position_tag_positions_binding.buffer,
-            position_tag_positions_binding.offset,
+            position_tag_positions_binding.buffer(),
+            position_tag_positions_binding.offset(),
             position_tag_download_buffer,
             0,
-            position_tag_positions_binding.size.unwrap().get(),
+            position_tag_positions_binding.size().get(),
         );
     }
 }

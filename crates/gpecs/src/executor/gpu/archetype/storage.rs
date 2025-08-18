@@ -1,13 +1,13 @@
 use bytemuck::must_cast_slice;
 use indexmap::IndexMap;
 use wgpu::{
-    Buffer, BufferAddress, BufferBinding, BufferSize, BufferUsages, Device,
+    Buffer, BufferAddress, BufferSize, BufferSlice, BufferUsages, Device,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
 use crate::{
-    archetype::storage::ArchetypeStorage,
-    component::registry::{ComponentId, ComponentRegistry},
+    archetype::storage::ArchetypeStorage, component::registry::ComponentRegistry,
+    executor::gpu::component::registry::GpuComponentId,
 };
 
 use super::registry::GpuArchetypeId;
@@ -19,9 +19,9 @@ struct BufferBindingDescriptor {
 }
 
 #[derive(Debug)]
-pub struct BufferBindings<'a> {
-    pub entities: Option<BufferBinding<'a>>,
-    pub components: IndexMap<ComponentId, Option<BufferBinding<'a>>>,
+pub struct BufferSlices<'a> {
+    pub entities: Option<BufferSlice<'a>>,
+    pub components: IndexMap<GpuComponentId, Option<BufferSlice<'a>>>,
 }
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ pub struct GpuArchetypeStorage {
     #[expect(dead_code)]
     download_buffer: Option<Buffer>,
     entities_binding: Option<BufferBindingDescriptor>,
-    component_bindings: IndexMap<ComponentId, Option<BufferBindingDescriptor>>,
+    component_bindings: IndexMap<GpuComponentId, Option<BufferBindingDescriptor>>,
 }
 
 impl GpuArchetypeStorage {
@@ -42,10 +42,8 @@ impl GpuArchetypeStorage {
         archetype_id: GpuArchetypeId,
         archetype_storage: &ArchetypeStorage,
     ) -> Self {
-        let len = archetype_storage.len();
-
         let (entities, erased_components) = archetype_storage.erased_components(components);
-        let mut component_bindings = IndexMap::with_capacity(erased_components.len());
+        let len = archetype_storage.len();
 
         let entities_bytes = must_cast_slice(entities);
         let entities_byte_count = entities_bytes.len();
@@ -55,38 +53,41 @@ impl GpuArchetypeStorage {
             .ok()
             .map(|size| BufferBindingDescriptor { offset: 0, size });
 
-        let mut contents = Vec::from(entities_bytes);
-
         let min_offset_align = gpu_device.limits().min_storage_buffer_offset_alignment;
         let min_offset_align = min_offset_align
             .try_into()
             .expect("min storage buffer offset alignment should fit into `usize`");
 
         let mut components_offset = entities_byte_count;
-        for (component_id, slice) in erased_components {
-            components_offset = components_offset.next_multiple_of(min_offset_align);
-            contents.resize(components_offset, 0);
+        let mut storage_buffer_contents = Vec::from(entities_bytes);
+        let component_bindings = erased_components
+            .into_iter()
+            .map(|(component_id, slice)| {
+                components_offset = components_offset.next_multiple_of(min_offset_align);
+                storage_buffer_contents.resize(components_offset, 0);
 
-            let components_bytes = slice.buffer();
-            contents.extend_from_slice(components_bytes);
+                let components_bytes = slice.buffer();
+                storage_buffer_contents.extend_from_slice(components_bytes);
 
-            let components_byte_count = components_bytes.len();
-            let offset = BufferAddress::try_from(components_offset)
-                .expect("components offset should fit into `BufferAddress`");
-            let components_binding = u64::try_from(components_byte_count)
-                .expect("components byte count should fit into `u64`")
-                .try_into()
-                .ok()
-                .map(|size| BufferBindingDescriptor { offset, size });
-            component_bindings.insert(component_id, components_binding);
+                let components_byte_count = components_bytes.len();
+                let offset = BufferAddress::try_from(components_offset)
+                    .expect("components offset should fit into `BufferAddress`");
+                components_offset += components_byte_count;
 
-            components_offset += components_byte_count;
-        }
+                let gpu_component_id = unsafe { GpuComponentId::from_id(component_id) };
+                let components_binding = u64::try_from(components_byte_count)
+                    .expect("components byte count should fit into `u64`")
+                    .try_into()
+                    .ok()
+                    .map(|size| BufferBindingDescriptor { offset, size });
+                (gpu_component_id, components_binding)
+            })
+            .collect();
 
         let storage_buffer_label = format!("`gpecs` {archetype_id:?} storage buffer");
         let storage_buffer_desc = BufferInitDescriptor {
             label: Some(&storage_buffer_label),
-            contents: contents.as_slice(),
+            contents: storage_buffer_contents.as_slice(),
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
         };
         let storage_buffer = gpu_device.create_buffer_init(&storage_buffer_desc);
@@ -118,7 +119,7 @@ impl GpuArchetypeStorage {
     }
 
     #[inline]
-    pub unsafe fn storage_buffer_bindings(&self) -> BufferBindings<'_> {
+    pub unsafe fn storage_buffer_bindings(&self) -> BufferSlices<'_> {
         let Self {
             storage_buffer,
             entities_binding,
@@ -126,12 +127,12 @@ impl GpuArchetypeStorage {
             ..
         } = self;
 
-        let map_binding = |binding: BufferBindingDescriptor| BufferBinding {
-            buffer: storage_buffer,
-            offset: binding.offset,
-            size: Some(binding.size),
+        let map_binding = |binding: BufferBindingDescriptor| {
+            let start = binding.offset;
+            let end = binding.offset + binding.size.get();
+            storage_buffer.slice(start..end)
         };
-        BufferBindings {
+        BufferSlices {
             entities: entities_binding.map(map_binding),
             components: component_bindings
                 .iter()

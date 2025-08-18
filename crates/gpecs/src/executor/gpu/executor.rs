@@ -2,9 +2,9 @@ use std::{any::TypeId, num::NonZeroU32};
 
 use indexmap::IndexMap;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, BindingResource, Buffer,
-    BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features,
-    QuerySet, QuerySetDescriptor, QueryType,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferDescriptor,
+    BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features, QuerySet,
+    QuerySetDescriptor, QueryType,
 };
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
 use super::{
     archetype::{
         registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
-        storage::BufferBindings,
+        storage::BufferSlices,
     },
     bundle::GpuBundle,
     component::{
@@ -461,7 +461,7 @@ where
                 unreachable!("archetype {archetype_id:?} should exist");
             };
 
-            let BufferBindings {
+            let BufferSlices {
                 entities: entity_buffer_binding,
                 components: mut components_component_buffer_bindings,
             } = unsafe { archetype_info.storage().storage_buffer_bindings() };
@@ -474,7 +474,7 @@ where
 
                 let entity_entry = BindGroupEntry {
                     binding: entity_entry.binding,
-                    resource: BindingResource::Buffer(entity_buffer_binding),
+                    resource: entity_buffer_binding.into(),
                 };
                 bind_group_entries.extend(Some(entity_entry));
             }
@@ -484,7 +484,7 @@ where
                     continue;
                 };
                 let Some(component_buffer_binding) =
-                    components_component_buffer_bindings.swap_remove(&component_id.into_id())
+                    components_component_buffer_bindings.swap_remove(&component_id)
                 else {
                     unreachable!("archetype {archetype_id:?} should have {component_id:?}");
                 };
@@ -494,7 +494,7 @@ where
 
                 let component_entry = BindGroupEntry {
                     binding: component_entry.binding,
-                    resource: BindingResource::Buffer(component_buffer_binding),
+                    resource: component_buffer_binding.into(),
                 };
                 bind_group_entries.extend(Some(component_entry));
             }

@@ -1,5 +1,3 @@
-use std::ptr;
-
 use bytemuck::must_cast_slice;
 use indexmap::IndexMap;
 use wgpu::{
@@ -8,7 +6,7 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::registry::ArchetypeInfo,
+    archetype::storage::ArchetypeStorage,
     component::registry::{ComponentId, ComponentRegistry},
 };
 
@@ -41,12 +39,12 @@ impl GpuArchetypeStorage {
     pub(super) fn new(
         components: &ComponentRegistry,
         gpu_device: &Device,
-        info: &ArchetypeInfo,
+        archetype_id: GpuArchetypeId,
+        archetype_storage: &ArchetypeStorage,
     ) -> Self {
-        let storage = info.storage();
-        let len = storage.len();
+        let len = archetype_storage.len();
 
-        let (entities, erased_components) = storage.erased_components(components);
+        let (entities, erased_components) = archetype_storage.erased_components(components);
         let mut component_bindings = IndexMap::with_capacity(erased_components.len());
 
         let entities_bytes = must_cast_slice(entities);
@@ -67,19 +65,14 @@ impl GpuArchetypeStorage {
         let mut components_offset = entities_byte_count;
         for (component_id, slice) in erased_components {
             components_offset = components_offset.next_multiple_of(min_offset_align);
-            let offset = BufferAddress::try_from(components_offset)
-                .expect("components offset should fit into `BufferAddress`");
+            contents.resize(components_offset, 0);
 
             let components_bytes = slice.buffer();
+            contents.extend_from_slice(components_bytes);
+
             let components_byte_count = components_bytes.len();
-            contents.resize(components_offset + components_byte_count, 0);
-
-            let src = components_bytes.as_ptr().cast();
-            let dst = unsafe { contents.as_mut_ptr().add(components_offset) };
-            unsafe {
-                ptr::copy_nonoverlapping(src, dst, components_byte_count);
-            }
-
+            let offset = BufferAddress::try_from(components_offset)
+                .expect("components offset should fit into `BufferAddress`");
             let components_binding = u64::try_from(components_byte_count)
                 .expect("components byte count should fit into `u64`")
                 .try_into()
@@ -90,7 +83,6 @@ impl GpuArchetypeStorage {
             components_offset += components_byte_count;
         }
 
-        let archetype_id = unsafe { GpuArchetypeId::from_id(info.id()) };
         let storage_buffer_label = format!("`gpecs` {archetype_id:?} storage buffer");
         let storage_buffer_desc = BufferInitDescriptor {
             label: Some(&storage_buffer_label),

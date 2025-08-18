@@ -178,14 +178,13 @@ impl GpuArchetypeRegistry {
         archetypes
             .archetypes_before_inclusive(archetype_id)
             .for_each(|info| {
-                let archetype_id = info.id();
-                gpu_archetypes
-                    .entry(archetype_id.into_u32())
-                    .or_insert_with(|| {
-                        let id = GpuArchetypeId(archetype_id);
-                        let storage = GpuArchetypeStorage::new(components, gpu_device, info);
-                        GpuArchetypeInfo { id, storage }.into()
-                    });
+                let id = info.id();
+                let storage = info.storage();
+                gpu_archetypes.entry(id.into_u32()).or_insert_with(|| {
+                    let id = GpuArchetypeId(id);
+                    let storage = GpuArchetypeStorage::new(components, gpu_device, id, storage);
+                    GpuArchetypeInfo { id, storage }.into()
+                });
             });
 
         gpu_archetype_id

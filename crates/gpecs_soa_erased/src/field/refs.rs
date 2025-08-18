@@ -72,7 +72,7 @@ impl<'a> ErasedFieldRef<'a> {
     #[inline]
     pub unsafe fn cast<T>(&self) -> Result<&T, ErasedFieldIntoValueError<&Self>> {
         let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
-        let Self { ptr, .. } = me;
+        let Self { ptr, .. } = *me;
 
         let ptr = ptr.cast();
         Ok(unsafe { &*ptr })

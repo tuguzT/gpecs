@@ -11,7 +11,7 @@ rust-version.workspace = true
 gpecs_sparse = { workspace = true, features = ["alloc"] }
 gpecs_soa_erased = { workspace = true, features = ["alloc"] }
 gpecs_types = { workspace = true }
-bytemuck = { workspace = true, features = ["must_cast"] }
+bytemuck = { workspace = true, features = ["derive", "must_cast"] }
 indexmap = { workspace = true }
 petgraph = { workspace = true }
 itertools = { workspace = true, features = ["use_alloc"] }

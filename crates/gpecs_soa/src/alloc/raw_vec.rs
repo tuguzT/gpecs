@@ -261,8 +261,8 @@ where
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        let ptr = self.ptr().cast_const();
-        unsafe { &*ptr.ptr_to_context() }
+        let ptr = self.ptr();
+        unsafe { ptr.context() }
     }
 
     #[inline]
@@ -400,7 +400,7 @@ where
         let current_memory = self.current_memory(context);
         let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, current_memory)?.cast();
 
-        let context = unsafe { &*ptr.as_ptr().cast_const().ptr_to_context() };
+        let context = unsafe { ptr.as_ptr().context() };
         let capacity = capacity_from::<T>(context, new_layout);
         unsafe {
             self.set_ptr_and_capacity(ptr, capacity);
@@ -420,7 +420,7 @@ where
         let current_memory = self.current_memory(context);
         let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, current_memory)?.cast();
 
-        let context = unsafe { &*ptr.as_ptr().cast_const().ptr_to_context() };
+        let context = unsafe { ptr.as_ptr().context() };
         let capacity = capacity_from::<T>(context, new_layout);
         unsafe {
             self.set_ptr_and_capacity(ptr, capacity);

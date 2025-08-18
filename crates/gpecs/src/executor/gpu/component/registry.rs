@@ -3,9 +3,10 @@ use std::{
     borrow::Cow,
     fmt::{self, Debug},
     iter::FusedIterator,
-    ptr, slice,
+    slice,
 };
 
+use bytemuck::{Pod, Zeroable, must_cast_slice};
 use gpecs_sparse::set::EpochSparseSet;
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
 
 use super::GpuComponent;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct GpuComponentId(ComponentId);
 
@@ -198,12 +199,8 @@ impl GpuComponentRegistry {
     pub fn component_ids(&self) -> GpuComponentIds<'_> {
         let Self { components } = self;
 
-        // SAFETY: `GpuComponentId` is a #[repr(transparent)] struct around `ComponentId`,
-        // which is #[repr(transparent)] around `u32`.
-        let component_ids = unsafe {
-            let slice = components.as_keys_slice();
-            &*(ptr::from_ref(slice) as *const [GpuComponentId])
-        };
+        let keys = components.as_keys_slice();
+        let component_ids = must_cast_slice(keys);
         let inner = component_ids.iter();
         GpuComponentIds { inner }
     }

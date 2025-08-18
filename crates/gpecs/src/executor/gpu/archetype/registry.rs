@@ -1,9 +1,10 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    ptr, slice,
+    slice,
 };
 
+use bytemuck::{Pod, Zeroable, must_cast_slice};
 use gpecs_sparse::set::EpochSparseSet;
 use wgpu::Device;
 
@@ -22,7 +23,7 @@ use crate::{
 
 use super::storage::GpuArchetypeStorage;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct GpuArchetypeId(ArchetypeId);
 
@@ -225,12 +226,8 @@ impl GpuArchetypeRegistry {
     pub fn archetype_ids(&self) -> GpuArchetypeIds<'_> {
         let Self { gpu_archetypes } = self;
 
-        // SAFETY: `GpuArchetypeId` is a #[repr(transparent)] struct around `ArchetypeId`,
-        // which is #[repr(transparent)] around `u32`.
-        let archetype_ids = unsafe {
-            let slice = gpu_archetypes.as_keys_slice();
-            &*(ptr::from_ref(slice) as *const [GpuArchetypeId])
-        };
+        let keys = gpu_archetypes.as_keys_slice();
+        let archetype_ids = must_cast_slice(keys);
         let inner = archetype_ids.iter();
         GpuArchetypeIds { inner }
     }

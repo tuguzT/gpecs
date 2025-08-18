@@ -1,7 +1,7 @@
 use core::{
     alloc::{Layout, LayoutError},
     mem::{ManuallyDrop, MaybeUninit, offset_of},
-    ptr,
+    ptr::{self, NonNull},
 };
 
 use crate::{
@@ -18,7 +18,7 @@ pub unsafe fn slice_from_raw_parts<T>(
 where
     T: SoaTrustedFields + ?Sized,
 {
-    let context = unsafe { &*data.ptr_to_context() };
+    let context = unsafe { data.context() };
     let len = len_for_inner::<T>(context, len, capacity);
     ptr::slice_from_raw_parts(data, len) as _
 }
@@ -32,7 +32,7 @@ pub unsafe fn slice_from_raw_parts_mut<T>(
 where
     T: SoaTrustedFields + ?Sized,
 {
-    let context = unsafe { &*data.ptr_to_context() };
+    let context = unsafe { data.context() };
     let len = len_for_inner::<T>(context, len, capacity);
     ptr::slice_from_raw_parts_mut(data, len) as _
 }
@@ -95,7 +95,7 @@ where
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
         let buffer = self.as_ptr();
-        unsafe { &*buffer.ptr_to_context() }
+        unsafe { buffer.context() }
     }
 
     #[inline]
@@ -153,7 +153,7 @@ where
     #[inline]
     unsafe fn context<'a>(self) -> &'a <T as Soa>::Context {
         let buffer = self.as_mut_ptr();
-        unsafe { &*buffer.ptr_to_context_mut() }
+        unsafe { buffer.context() }
     }
 
     #[inline]
@@ -199,6 +199,13 @@ where
     unsafe fn ptr_to_len(self) -> *const usize;
     unsafe fn ptr_to_capacity(self) -> *const usize;
     unsafe fn ptr_to_data(self) -> *const u8;
+
+    #[inline]
+    unsafe fn context<'a>(self) -> &'a T::Context {
+        let context = self.ptr_to_context();
+        let context = unsafe { NonNull::new_unchecked(context.cast_mut()) };
+        unsafe { context.as_ref() }
+    }
 }
 
 impl<T> BufferDataPtr<T> for *const BufferData<T>
@@ -226,13 +233,13 @@ where
 
     #[inline]
     unsafe fn ptr_to_data(self) -> *const u8 {
-        let context = unsafe { &*self.ptr_to_context() };
+        let context = unsafe { self.context() };
         let capacity = unsafe { ptr::read(self.ptr_to_capacity()) };
         unsafe { ptr_to_data(context, self.cast_mut(), capacity).unwrap_unchecked() }.cast_const()
     }
 }
 
-pub trait BufferDataPtrMut<T>: Copy + private::Sealed
+pub trait BufferDataPtrMut<T>: BufferDataPtr<T>
 where
     T: Soa + ?Sized,
 {
@@ -240,6 +247,31 @@ where
     unsafe fn ptr_to_len_mut(self) -> *mut usize;
     unsafe fn ptr_to_capacity_mut(self) -> *mut usize;
     unsafe fn ptr_to_data_mut(self) -> *mut u8;
+}
+
+impl<T> BufferDataPtr<T> for *mut BufferData<T>
+where
+    T: Soa + ?Sized,
+{
+    #[inline]
+    fn ptr_to_context(self) -> *const T::Context {
+        self.cast_const().ptr_to_context()
+    }
+
+    #[inline]
+    unsafe fn ptr_to_len(self) -> *const usize {
+        unsafe { self.cast_const().ptr_to_len() }
+    }
+
+    #[inline]
+    unsafe fn ptr_to_capacity(self) -> *const usize {
+        unsafe { self.cast_const().ptr_to_capacity() }
+    }
+
+    #[inline]
+    unsafe fn ptr_to_data(self) -> *const u8 {
+        unsafe { self.cast_const().ptr_to_data() }
+    }
 }
 
 impl<T> BufferDataPtrMut<T> for *mut BufferData<T>
@@ -267,7 +299,7 @@ where
 
     #[inline]
     unsafe fn ptr_to_data_mut(self) -> *mut u8 {
-        let context = unsafe { &*self.ptr_to_context() };
+        let context = unsafe { self.context() };
         let capacity = unsafe { ptr::read(self.ptr_to_capacity()) };
         unsafe { ptr_to_data(context, self, capacity).unwrap_unchecked() }
     }

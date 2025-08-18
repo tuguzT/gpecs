@@ -4,7 +4,7 @@ use core::{
     hash::{self, Hash},
     marker::PhantomData,
     mem::transmute,
-    ptr,
+    ptr::NonNull,
 };
 
 use crate::traits::Soa;
@@ -40,7 +40,7 @@ where
     #[inline]
     pub fn as_inner(&self) -> &T::MutPtrs<'context> {
         let Self { inner, .. } = self;
-        unsafe { &*ptr::from_ref(inner).cast() }
+        unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
     /// Retrieves a mutable reference of [mutable pointers](Soa::MutPtrs)
@@ -48,7 +48,7 @@ where
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut T::MutPtrs<'context> {
         let Self { inner, .. } = self;
-        unsafe { &mut *ptr::from_mut(inner).cast() }
+        unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
     /// Retrieves the [mutable pointers](Soa::MutPtrs)

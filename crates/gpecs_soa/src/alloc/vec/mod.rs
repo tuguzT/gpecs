@@ -5,7 +5,7 @@ use core::{
     hash::{self, Hash},
     mem::{ManuallyDrop, forget},
     ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
-    ptr::{self, addr_of},
+    ptr::{self, NonNull, addr_of},
 };
 use core_alloc::boxed::Box;
 
@@ -332,7 +332,7 @@ where
 
     #[inline]
     pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        let context = unsafe { &*self.as_ptr().ptr_to_context() };
+        let context = unsafe { self.as_ptr().context() };
         let slices = self.as_mut_slices();
         SoaSlicesMut::new(context, slices)
     }
@@ -364,10 +364,11 @@ where
     where
         F: FnMut(T::Refs<'_, '_>) -> bool,
     {
-        let context = ptr::from_ref(self.context());
+        let context = NonNull::from_ref(self.context());
+        let context = unsafe { context.as_ref() };
         self.retain_mut(|refs| {
             let refs = T::upcast_refs_mut(refs);
-            let refs = T::refs_mut_as_refs(unsafe { &*context }, refs);
+            let refs = T::refs_mut_as_refs(context, refs);
             f(refs)
         });
     }

@@ -2,7 +2,7 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     ops::{Range, RangeBounds},
-    ptr::{self, NonNull},
+    ptr::NonNull,
 };
 
 use crate::{
@@ -129,10 +129,11 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        let context = ptr::from_ref(iter.context());
-        iter.next().map(|refs| unsafe {
-            let context = &*context;
-            T::read(context, T::refs_as_ptrs(context, refs))
+        let context = NonNull::from_ref(iter.context());
+        let context = unsafe { context.as_ref() };
+        iter.next().map(|refs| {
+            let src = T::refs_as_ptrs(context, refs);
+            unsafe { T::read(context, src) }
         })
     }
 
@@ -151,10 +152,11 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        let context = ptr::from_ref(iter.context());
-        iter.next_back().map(|refs| unsafe {
-            let context = &*context;
-            T::read(context, T::refs_as_ptrs(context, refs))
+        let context = NonNull::from_ref(iter.context());
+        let context = unsafe { context.as_ref() };
+        iter.next_back().map(|refs| {
+            let src = T::refs_as_ptrs(context, refs);
+            unsafe { T::read(context, src) }
         })
     }
 }

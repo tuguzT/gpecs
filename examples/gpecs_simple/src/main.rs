@@ -416,7 +416,7 @@ fn _init_wgpu_position_tag_download_buffer(
     let position_tag_storage_buffer_bindings = unsafe {
         position_tag_gpu_archetype_info
             .storage()
-            .storage_buffer_bindings()
+            .storage_buffer_slices()
     };
     log::debug!(
         "{position_tag_gpu_archetype_id:?} buffer bindings:\n{position_tag_storage_buffer_bindings:#?}"
@@ -425,12 +425,12 @@ fn _init_wgpu_position_tag_download_buffer(
     let position_tag_positions_binding = position_tag_storage_buffer_bindings
         .components
         .get(&position_gpu_id)
-        .cloned()
+        .copied()
         .flatten()?;
     let position_tag_tags_binding = position_tag_storage_buffer_bindings
         .components
         .get(&tag_gpu_id)
-        .cloned()
+        .copied()
         .flatten();
     assert!(position_tag_tags_binding.is_none());
 
@@ -476,18 +476,18 @@ fn _wgpu_copy_into_position_tag_download_buffer(
     let position_tag_storage_buffer_bindings = unsafe {
         position_tag_gpu_archetype_info
             .storage()
-            .storage_buffer_bindings()
+            .storage_buffer_slices()
     };
 
     let position_tag_positions_binding = position_tag_storage_buffer_bindings
         .components
         .get(&position_gpu_id)
-        .cloned()
+        .copied()
         .flatten();
     let position_tag_tags_binding = position_tag_storage_buffer_bindings
         .components
         .get(&tag_gpu_id)
-        .cloned()
+        .copied()
         .flatten();
     assert!(position_tag_tags_binding.is_none());
 

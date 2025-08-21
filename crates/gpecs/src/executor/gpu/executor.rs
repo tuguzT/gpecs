@@ -16,7 +16,7 @@ use crate::{
 use super::{
     archetype::{
         registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
-        storage::BufferSlices,
+        storage::GpuArchetypeStorageBufferSlices,
     },
     bundle::GpuBundle,
     component::{
@@ -461,10 +461,10 @@ where
                 unreachable!("archetype {archetype_id:?} should exist");
             };
 
-            let BufferSlices {
+            let GpuArchetypeStorageBufferSlices {
                 entities: entity_buffer_binding,
                 components: mut components_component_buffer_bindings,
-            } = unsafe { archetype_info.storage().storage_buffer_bindings() };
+            } = unsafe { archetype_info.storage().storage_buffer_slices() };
             let mut bind_group_entries = Vec::new();
 
             if let Some(entity_entry) = shader.entity_entry() {

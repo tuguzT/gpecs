@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use bytemuck::must_cast_slice;
 use indexmap::IndexMap;
 use wgpu::{
@@ -11,18 +13,6 @@ use crate::{
 };
 
 use super::registry::GpuArchetypeId;
-
-#[derive(Debug, Clone, Copy)]
-struct BufferBindingDescriptor {
-    offset: BufferAddress,
-    size: BufferSize,
-}
-
-#[derive(Debug)]
-pub struct BufferSlices<'a> {
-    pub entities: Option<BufferSlice<'a>>,
-    pub components: IndexMap<GpuComponentId, Option<BufferSlice<'a>>>,
-}
 
 #[derive(Debug)]
 pub struct GpuArchetypeStorage {
@@ -119,7 +109,7 @@ impl GpuArchetypeStorage {
     }
 
     #[inline]
-    pub unsafe fn storage_buffer_bindings(&self) -> BufferSlices<'_> {
+    pub unsafe fn storage_buffer_slices(&self) -> GpuArchetypeStorageBufferSlices<'_> {
         let Self {
             storage_buffer,
             entities_binding,
@@ -127,17 +117,32 @@ impl GpuArchetypeStorage {
             ..
         } = self;
 
-        let map_binding = |binding: BufferBindingDescriptor| {
-            let start = binding.offset;
-            let end = binding.offset + binding.size.get();
-            storage_buffer.slice(start..end)
-        };
-        BufferSlices {
-            entities: entities_binding.map(map_binding),
+        let to_slice = |binding| storage_buffer.slice(Range::from(binding));
+        GpuArchetypeStorageBufferSlices {
+            entities: entities_binding.map(to_slice),
             components: component_bindings
                 .iter()
-                .map(|(&component_id, binding)| (component_id, binding.map(map_binding)))
+                .map(|(&component_id, binding)| (component_id, binding.map(to_slice)))
                 .collect(),
         }
+    }
+}
+#[derive(Debug)]
+pub struct GpuArchetypeStorageBufferSlices<'a> {
+    pub entities: Option<BufferSlice<'a>>,
+    pub components: IndexMap<GpuComponentId, Option<BufferSlice<'a>>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BufferBindingDescriptor {
+    offset: BufferAddress,
+    size: BufferSize,
+}
+
+impl From<BufferBindingDescriptor> for Range<BufferAddress> {
+    #[inline]
+    fn from(binding: BufferBindingDescriptor) -> Self {
+        let BufferBindingDescriptor { offset, size } = binding;
+        offset..(offset + size.get())
     }
 }

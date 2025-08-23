@@ -6,7 +6,8 @@ use core::{
 
 use crate::{
     erased::{
-        ErasedSoaMutPtrs, ErasedSoaRefs, assert::assert_descriptors, error::ErasedSoaIntoValueError,
+        ErasedSoaMutPtrs, ErasedSoaRefs, assert::debug_assert_descriptors,
+        error::ErasedSoaIntoValueError,
     },
     error::{check_layout, check_len},
     field::ErasedFieldPtr,
@@ -201,7 +202,7 @@ where
 
         assert_eq!(buffer, origin.buffer);
         assert_eq!(capacity, origin.capacity);
-        assert_descriptors(descriptors.as_ref(), origin.field_descriptors());
+        debug_assert_descriptors(descriptors.as_ref(), origin.field_descriptors());
 
         unsafe { (offset - origin.offset).try_into().unwrap_unchecked() }
     }

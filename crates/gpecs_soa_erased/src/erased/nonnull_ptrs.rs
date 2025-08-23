@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    erased::{assert::assert_descriptors, error::ErasedSoaIntoValueError},
+    erased::{assert::debug_assert_descriptors, error::ErasedSoaIntoValueError},
     error::{check_layout, check_len},
     field::ErasedFieldNonNullPtr,
     soa::{field::FieldDescriptor, traits::Soa},
@@ -177,7 +177,7 @@ where
 
         assert_eq!(buffer, origin.buffer());
         assert_eq!(capacity, origin.capacity());
-        assert_descriptors(descriptors.as_ref(), origin.field_descriptors());
+        debug_assert_descriptors(descriptors.as_ref(), origin.field_descriptors());
 
         unsafe { (offset - origin.offset()).try_into().unwrap_unchecked() }
     }
@@ -189,7 +189,7 @@ where
         A: AsRef<[FieldDescriptor]>,
     {
         let Self { descriptors, .. } = self;
-        assert_descriptors(descriptors.as_ref(), with.field_descriptors());
+        debug_assert_descriptors(descriptors.as_ref(), with.field_descriptors());
 
         itertools::zip_eq(self, with).for_each(|(me, with)| unsafe { me.swap(with) });
     }
@@ -201,7 +201,7 @@ where
         A: AsRef<[FieldDescriptor]>,
     {
         let Self { descriptors, .. } = self;
-        assert_descriptors(descriptors.as_ref(), from.field_descriptors());
+        debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self, from).for_each(|(me, from)| unsafe { me.copy_from(from, count) });
     }
@@ -213,7 +213,7 @@ where
         A: AsRef<[FieldDescriptor]>,
     {
         let Self { descriptors, .. } = self;
-        assert_descriptors(descriptors.as_ref(), from.field_descriptors());
+        debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         #[inline]
         #[track_caller]
@@ -243,7 +243,7 @@ where
         A: AsRef<[FieldDescriptor]>,
     {
         let Self { descriptors, .. } = self;
-        assert_descriptors(descriptors.as_ref(), from.field_descriptors());
+        debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self, from)
             .for_each(|(me, from)| unsafe { me.copy_from_nonoverlapping(from, count) });

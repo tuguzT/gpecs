@@ -561,7 +561,7 @@ fn register_gpu_systems(
     let update_position_system_descriptor = GpuSystemDescriptor {
         shader_module: shader_module.clone(),
         entry_point: Some("update_position"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: false,
         bind_components: [position_id, velocity_id],
         additional_bindings: [time_delta_uniform_buffer_entry],
@@ -578,7 +578,7 @@ fn register_gpu_systems(
     let update_data_system_descriptor = GpuSystemDescriptor {
         shader_module: shader_module.clone(),
         entry_point: Some("update_data"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: false,
         bind_components: [data_id],
         additional_bindings: [time_delta_uniform_buffer_entry],
@@ -591,7 +591,7 @@ fn register_gpu_systems(
     let update_components_system_descriptor = GpuSystemDescriptor {
         shader_module: shader_module.clone(),
         entry_point: Some("update_components"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: false,
         bind_components: [position_id, velocity_id, data_id],
         additional_bindings: [],
@@ -604,7 +604,7 @@ fn register_gpu_systems(
     let update_health_system_descriptor = GpuSystemDescriptor {
         shader_module: shader_module.clone(),
         entry_point: Some("update_health"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: false,
         bind_components: [health_id],
         additional_bindings: [],
@@ -617,7 +617,7 @@ fn register_gpu_systems(
     let update_damage_system_descriptor = GpuSystemDescriptor {
         shader_module: shader_module.clone(),
         entry_point: Some("update_damage"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: false,
         bind_components: [health_id, damage_id],
         additional_bindings: [],
@@ -630,7 +630,7 @@ fn register_gpu_systems(
     let update_sprite_system_descriptor = GpuSystemDescriptor {
         shader_module: shader_module.clone(),
         entry_point: Some("update_sprite"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: false,
         bind_components: [sprite_id, player_id, health_id],
         additional_bindings: [],
@@ -673,7 +673,7 @@ fn register_gpu_systems(
     let render_sprite_system_descriptor = GpuSystemDescriptor {
         shader_module,
         entry_point: Some("render_sprite"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: false,
         bind_components: [position_id, sprite_id],
         additional_bindings: [framebuffer_data_entry, framebuffer_desc_entry],

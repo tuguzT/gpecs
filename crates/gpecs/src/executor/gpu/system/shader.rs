@@ -1,4 +1,7 @@
-use std::{iter::FusedIterator, num::NonZeroU64};
+use std::{
+    iter::FusedIterator,
+    num::{NonZeroU32, NonZeroU64},
+};
 
 use indexmap::{IndexMap, IndexSet, map};
 use wgpu::{
@@ -23,7 +26,7 @@ pub struct GpuSystemShader {
     component_entries: IndexMap<GpuComponentId, Option<BindGroupLayoutEntry>>,
     additional_entries: Box<[BindGroupLayoutEntry]>,
     shader_module: ShaderModule,
-    workgroup_count: Option<u32>,
+    workgroup_size: Option<NonZeroU32>,
     bind_group_layout: BindGroupLayout,
     pipeline_layout: PipelineLayout,
     compute_pipeline: ComputePipeline,
@@ -61,7 +64,7 @@ impl GpuSystemShader {
         let GpuSystemDescriptor {
             shader_module,
             entry_point,
-            workgroup_count,
+            workgroup_size,
             bind_entities,
             bind_components,
             additional_bindings,
@@ -131,7 +134,7 @@ impl GpuSystemShader {
             component_entries,
             additional_entries,
             shader_module,
-            workgroup_count,
+            workgroup_size,
             bind_group_layout,
             pipeline_layout,
             compute_pipeline,
@@ -145,11 +148,9 @@ impl GpuSystemShader {
     }
 
     #[inline]
-    pub fn workgroup_count(&self) -> Option<u32> {
-        let Self {
-            workgroup_count, ..
-        } = *self;
-        workgroup_count
+    pub fn workgroup_size(&self) -> Option<NonZeroU32> {
+        let Self { workgroup_size, .. } = *self;
+        workgroup_size
     }
 
     #[inline]

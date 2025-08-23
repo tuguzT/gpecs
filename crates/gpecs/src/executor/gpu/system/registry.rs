@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    num::NonZeroU32,
     ops::Range,
 };
 
@@ -63,9 +64,12 @@ impl GpuSystemInfo {
     }
 }
 
+pub const DEFAULT_WORKGROUP_SIZE: NonZeroU32 =
+    NonZeroU32::new(64).expect("default workgroup size cannot be zero");
+
 pub struct GpuSystemDescriptor<'entry_point, Components, Bindings> {
     pub shader_module: ShaderModule,
-    pub workgroup_count: Option<u32>,
+    pub workgroup_size: Option<NonZeroU32>,
     pub entry_point: Option<&'entry_point str>,
     pub bind_entities: bool,
     pub bind_components: Components,

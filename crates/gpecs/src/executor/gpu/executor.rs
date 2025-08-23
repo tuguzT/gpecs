@@ -24,7 +24,10 @@ use super::{
         registry::{GpuComponentId, GpuComponentRegistry},
     },
     system::{
-        registry::{GpuSystemDescriptor, GpuSystemId, GpuSystemInfo, GpuSystemRegistry},
+        registry::{
+            DEFAULT_WORKGROUP_SIZE, GpuSystemDescriptor, GpuSystemId, GpuSystemInfo,
+            GpuSystemRegistry,
+        },
         schedule::GpuSystemSchedule,
     },
 };
@@ -300,12 +303,20 @@ impl<'context> GpuExecutor<'context> {
                     unreachable!("archetype {archetype_id:?} should exist");
                 };
 
+                let storage_len = archetype_info.storage().len();
+                let workgroup_size = shader
+                    .workgroup_size()
+                    .unwrap_or(DEFAULT_WORKGROUP_SIZE)
+                    .get()
+                    .try_into()
+                    .expect("workgroup size should fit into `usize`");
+                let workgroup_count = storage_len
+                    .div_ceil(workgroup_size)
+                    .try_into()
+                    .expect("workgroup count should fit into `u32`");
+
                 compute_pass.set_pipeline(shader.compute_pipeline());
                 compute_pass.set_bind_group(0, bind_group, &[]);
-
-                let storage_len = u32::try_from(archetype_info.storage().len())
-                    .expect("storage length should fit into `u32`");
-                let workgroup_count = storage_len.div_ceil(shader.workgroup_count().unwrap_or(64));
 
                 if let Some(timestamp_query_resources) = timestamp_query_resources {
                     let TimestampQueryResources { query_set, .. } = timestamp_query_resources;

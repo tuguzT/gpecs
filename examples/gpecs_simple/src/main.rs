@@ -73,7 +73,7 @@ fn main() {
     let position_gpu_system_descriptor = GpuSystemDescriptor {
         shader_module: shader_module.clone(),
         entry_point: Some("update_entity_position"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: true,
         bind_components: [position_gpu_id],
         additional_bindings: [],
@@ -86,7 +86,7 @@ fn main() {
     let mass_gpu_system_descriptor = GpuSystemDescriptor {
         shader_module,
         entry_point: Some("update_entity_mass"),
-        workgroup_count: Some(64),
+        workgroup_size: 64.try_into().ok(),
         bind_entities: true,
         bind_components: [mass_gpu_id],
         additional_bindings: [],

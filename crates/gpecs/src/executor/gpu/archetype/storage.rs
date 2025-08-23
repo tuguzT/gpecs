@@ -6,6 +6,7 @@ use std::{
 
 use bytemuck::must_cast_slice;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use wgpu::{
     Buffer, BufferAddress, BufferSize, BufferSlice, BufferUsages, Device,
     util::{BufferInitDescriptor, DeviceExt},
@@ -74,6 +75,8 @@ impl GpuArchetypeStorage {
                 (gpu_component_id, components_binding)
             })
             .collect();
+
+        assert_bindings_do_not_overlap(entities_binding, &component_bindings);
 
         let storage_buffer_label = format!("`gpecs` {archetype_id:?} storage buffer");
         let storage_buffer_desc = BufferInitDescriptor {
@@ -147,6 +150,33 @@ impl From<BufferBindingDescriptor> for Range<BufferAddress> {
         let BufferBindingDescriptor { offset, size } = binding;
         offset..(offset + size.get())
     }
+}
+
+#[inline]
+fn assert_bindings_do_not_overlap<'a, I>(
+    entities_binding: Option<BufferBindingDescriptor>,
+    component_bindings: I,
+) where
+    I: IntoIterator<Item = (&'a GpuComponentId, &'a Option<BufferBindingDescriptor>)>,
+{
+    let entities_binding = entities_binding.map(Range::from);
+    let component_bindings = component_bindings
+        .into_iter()
+        .filter_map(|(_, &binding)| binding.map(Range::from));
+
+    entities_binding
+        .into_iter()
+        .chain(component_bindings)
+        .tuple_windows()
+        .for_each(|(lhs, rhs)| assert_ranges_do_not_overlap(lhs, rhs));
+}
+
+#[inline]
+fn assert_ranges_do_not_overlap(lhs: Range<BufferAddress>, rhs: Range<BufferAddress>) {
+    assert!(
+        lhs.end <= rhs.start || rhs.end <= lhs.start,
+        "storage buffer bindings should not overlap, but {lhs:?} and {rhs:?} do overlap",
+    );
 }
 
 #[derive(Debug, Clone)]

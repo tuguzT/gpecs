@@ -3,7 +3,7 @@ use std::{any::TypeId, num::NonZeroU32};
 use indexmap::IndexMap;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferDescriptor,
-    BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features, QuerySet,
+    BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features, QUERY_SIZE, QuerySet,
     QuerySetDescriptor, QueryType,
 };
 
@@ -28,36 +28,6 @@ use super::{
         schedule::GpuSystemSchedule,
     },
 };
-
-type ScheduleCache = IndexMap<GpuSystemId, SystemCache>;
-type SystemCache = IndexMap<GpuArchetypeId, BindGroup>;
-
-#[derive(Debug)]
-pub struct TimestampQueryResources {
-    query_set: QuerySet,
-    count: NonZeroU32,
-    resolve_buffer: Buffer,
-}
-
-impl TimestampQueryResources {
-    #[inline]
-    pub unsafe fn query_set(&self) -> &QuerySet {
-        let Self { query_set, .. } = self;
-        query_set
-    }
-
-    #[inline]
-    pub fn count(&self) -> NonZeroU32 {
-        let Self { count, .. } = self;
-        *count
-    }
-
-    #[inline]
-    pub unsafe fn resolve_buffer(&self) -> &Buffer {
-        let Self { resolve_buffer, .. } = self;
-        resolve_buffer
-    }
-}
 
 #[derive(Debug)]
 pub struct GpuExecutor<'context> {
@@ -196,8 +166,8 @@ impl<'context> GpuExecutor<'context> {
             archetypes: ref mut gpu_archetypes,
             ..
         } = *self;
-        let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
 
+        let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
         gpu_archetypes.register_archetype::<B>(components, archetypes, gpu_components, device)
     }
 
@@ -306,12 +276,10 @@ impl<'context> GpuExecutor<'context> {
         let cache_schedule = || cache_schedule_pure(context, device, archetypes, systems, schedule);
         let schedule_cache = &*schedule_cache.get_or_insert_with(cache_schedule);
 
-        let can_write_timestamps = device
-            .features()
-            .contains(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
-        if can_write_timestamps && timestamp_query_resources.is_none() {
+        if timestamp_query_resources.is_none() {
             *timestamp_query_resources = create_timestamp_query_resources(device, schedule_cache);
         }
+        let timestamp_query_resources = timestamp_query_resources.as_ref();
 
         let compute_pass_desc = ComputePassDescriptor {
             label: Some("`gpecs` executor compute pass"),
@@ -320,15 +288,18 @@ impl<'context> GpuExecutor<'context> {
         let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
 
         let mut query_index = 0;
-        for (&system_id, archetypes_bind_groups) in schedule_cache {
+        for (&system_id, system_cache) in &schedule_cache.systems {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("system {system_id:?} should exist");
             };
+
             let shader = system_info.shader();
-            for (&archetype_id, bind_group) in archetypes_bind_groups {
+            for (&archetype_id, archetype_cache) in &system_cache.archetypes {
+                let ArchetypeCache { bind_group } = archetype_cache;
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
                     unreachable!("archetype {archetype_id:?} should exist");
                 };
+
                 compute_pass.set_pipeline(shader.compute_pipeline());
                 compute_pass.set_bind_group(0, bind_group, &[]);
 
@@ -336,22 +307,23 @@ impl<'context> GpuExecutor<'context> {
                     .expect("storage length should fit into `u32`");
                 let workgroup_count = storage_len.div_ceil(shader.workgroup_count().unwrap_or(64));
 
-                if let Some(timestamp_query_resources) = timestamp_query_resources.as_ref() {
+                if let Some(timestamp_query_resources) = timestamp_query_resources {
                     let TimestampQueryResources { query_set, .. } = timestamp_query_resources;
                     compute_pass.write_timestamp(query_set, query_index);
                     query_index += 1;
                 }
                 compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
-                if let Some(timestamp_query_resources) = timestamp_query_resources.as_ref() {
+                if let Some(timestamp_query_resources) = timestamp_query_resources {
                     let TimestampQueryResources { query_set, .. } = timestamp_query_resources;
                     compute_pass.write_timestamp(query_set, query_index);
                 }
             }
             query_index += 1;
         }
+
         drop(compute_pass);
 
-        if let Some(timestamp_query_resources) = timestamp_query_resources.as_ref() {
+        if let Some(timestamp_query_resources) = timestamp_query_resources {
             let TimestampQueryResources {
                 query_set,
                 count,
@@ -365,14 +337,61 @@ impl<'context> GpuExecutor<'context> {
     //       do not grant mutable access to the context
 }
 
-const SIZE_OF_U64_AS_U64: u64 = size_of::<u64>() as u64;
+#[derive(Debug)]
+pub struct TimestampQueryResources {
+    query_set: QuerySet,
+    count: NonZeroU32,
+    resolve_buffer: Buffer,
+}
+
+impl TimestampQueryResources {
+    #[inline]
+    pub unsafe fn query_set(&self) -> &QuerySet {
+        let Self { query_set, .. } = self;
+        query_set
+    }
+
+    #[inline]
+    pub fn count(&self) -> NonZeroU32 {
+        let Self { count, .. } = *self;
+        count
+    }
+
+    #[inline]
+    pub unsafe fn resolve_buffer(&self) -> &Buffer {
+        let Self { resolve_buffer, .. } = self;
+        resolve_buffer
+    }
+}
+
+#[derive(Debug, Default)]
+struct ScheduleCache {
+    systems: IndexMap<GpuSystemId, SystemCache>,
+}
+
+#[derive(Debug, Default)]
+struct SystemCache {
+    archetypes: IndexMap<GpuArchetypeId, ArchetypeCache>,
+}
+
+#[derive(Debug)]
+struct ArchetypeCache {
+    bind_group: BindGroup,
+}
 
 #[inline]
 fn timestamp_count_for_system_cache(system_cache: &SystemCache) -> usize {
-    match system_cache.len() {
-        0 => 0,
-        count => count + 1,
+    let count = system_cache.archetypes.len();
+    if count == 0 {
+        return 0;
     }
+    count + 1
+}
+
+#[inline]
+fn resolve_buffer_size(query_set_count: NonZeroU32) -> u64 {
+    // cast operands first to avoid potential `u32` overflow
+    u64::from(query_set_count.get()) * u64::from(QUERY_SIZE)
 }
 
 #[inline]
@@ -380,7 +399,15 @@ fn create_timestamp_query_resources(
     device: &Device,
     schedule_cache: &ScheduleCache,
 ) -> Option<TimestampQueryResources> {
-    let count = schedule_cache
+    let can_write_timestamps = device
+        .features()
+        .contains(Features::TIMESTAMP_QUERY_INSIDE_PASSES);
+    if !can_write_timestamps {
+        return None;
+    }
+
+    let ScheduleCache { systems } = schedule_cache;
+    let count = systems
         .values()
         .map(timestamp_count_for_system_cache)
         .sum::<usize>()
@@ -397,7 +424,7 @@ fn create_timestamp_query_resources(
 
     let resolve_buffer_desc = BufferDescriptor {
         label: Some("`gpecs` executor query set resolve buffer"),
-        size: u64::from(count.get()) * SIZE_OF_U64_AS_U64,
+        size: resolve_buffer_size(count),
         usage: BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC,
         mapped_at_creation: false,
     };
@@ -463,7 +490,7 @@ where
 
             let GpuArchetypeStorageBufferSlices {
                 entities: entity_buffer_binding,
-                components: mut components_component_buffer_bindings,
+                components: mut component_buffer_bindings,
             } = unsafe { archetype_info.storage().storage_buffer_slices() };
             let mut bind_group_entries = Vec::new();
 
@@ -484,7 +511,7 @@ where
                     continue;
                 };
                 let Some(component_buffer_binding) =
-                    components_component_buffer_bindings.swap_remove(&component_id)
+                    component_buffer_bindings.swap_remove(&component_id)
                 else {
                     unreachable!("archetype {archetype_id:?} should have {component_id:?}");
                 };
@@ -518,8 +545,9 @@ where
             };
             let bind_group = device.create_bind_group(&bind_group_desc);
 
-            let system_archetypes = schedule_cache.entry(system_id).or_default();
-            if system_archetypes.insert(archetype_id, bind_group).is_some() {
+            let SystemCache { archetypes } = schedule_cache.systems.entry(system_id).or_default();
+            let archetype_cache = ArchetypeCache { bind_group };
+            if archetypes.insert(archetype_id, archetype_cache).is_some() {
                 unreachable!(
                     "archetype {archetype_id:?} cannot have multiple bind groups for system {system_id:?}"
                 );

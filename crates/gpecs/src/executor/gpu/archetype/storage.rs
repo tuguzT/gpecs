@@ -127,6 +127,7 @@ impl GpuArchetypeStorage {
         }
     }
 }
+
 #[derive(Debug)]
 pub struct GpuArchetypeStorageBufferSlices<'a> {
     pub entities: Option<BufferSlice<'a>>,

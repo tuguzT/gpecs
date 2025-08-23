@@ -1,10 +1,12 @@
 use core::{
-    fmt::{self, Debug},
+    alloc::LayoutError,
+    error::Error,
+    fmt::{self, Debug, Display},
     iter::FusedIterator,
     marker::PhantomData,
     ptr, slice,
 };
-use gpecs_soa::traits::{SoaRead, SoaWrite};
+
 use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
@@ -19,7 +21,10 @@ use crate::{
     },
     error::{LenMismatchError, check_layout, check_len},
     field::{ErasedField, error::ErasedFieldFromDescDataError},
-    soa::traits::{BufferOffsets, FieldDescriptor, buffer_layout, buffer_offsets},
+    soa::{
+        field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_layout, buffer_offsets},
+        traits::{SoaRead, SoaWrite},
+    },
 };
 
 #[cfg(feature = "alloc")]
@@ -232,6 +237,38 @@ where
     }
 }
 
+impl<B, D> ErasedSoa<B, D>
+where
+    B: AlignedBytes,
+    D: AsRef<[FieldDescriptor]> + IntoIterator<Item: AsRef<FieldDescriptor>>,
+{
+    #[inline]
+    pub fn into_fields<T>(self) -> ErasedSoaIntoFields<B, D::IntoIter, T>
+    where
+        T: AlignedBytesFromLayout,
+    {
+        let Self { bytes, descriptors } = self;
+
+        let layout = buffer_layout(descriptors.as_ref(), 1)
+            .expect("buffer layout size should not exceed `isize::MAX`");
+        check_len(layout.size(), bytes.layout().size()).expect("buffer length should match");
+
+        let offsets = buffer_offsets(descriptors, 1);
+        ErasedSoaIntoFields::new(bytes, offsets)
+    }
+}
+
+impl<B, D> Debug for ErasedSoa<B, D>
+where
+    B: AlignedBytes + ?Sized,
+    D: AsRef<[FieldDescriptor]>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let fields = &self.as_refs().into_iter();
+        f.debug_struct("ErasedSoa").field("fields", fields).finish()
+    }
+}
+
 #[derive(Clone)]
 pub struct ErasedSoaIntoFields<B, I, T>
 where
@@ -283,10 +320,20 @@ where
             ..
         } = *self;
 
-        let (desc, offset) = offsets.next()?.unwrap();
+        let Ok(item) = offsets.next()? else {
+            unreachable!("buffer layout should be checked way earlier")
+        };
+        let BufferOffset {
+            field_descriptor,
+            offset,
+            ..
+        } = item;
+
+        let len = field_descriptor.layout().size();
         let data = unsafe { bytes.as_ptr().add(offset) };
-        let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-        let item = ErasedField::from_desc_data(desc, data);
+        let data = unsafe { slice::from_raw_parts(data, len) };
+
+        let item = ErasedField::from_desc_data(field_descriptor, data);
         Some(item)
     }
 }
@@ -314,35 +361,64 @@ where
 {
 }
 
-impl<B, D> ErasedSoa<B, D>
-where
-    B: AlignedBytes,
-    D: AsRef<[FieldDescriptor]> + IntoIterator<Item: AsRef<FieldDescriptor>>,
-{
+#[derive(Debug, Clone)]
+enum FillBytesWithFieldsError {
+    LenMismatch(IterOrFieldLenMismatchError),
+    InvalidLayout(LayoutError),
+}
+
+impl From<IterOrFieldLenMismatchError> for FillBytesWithFieldsError {
     #[inline]
-    pub fn into_fields<T>(self) -> ErasedSoaIntoFields<B, D::IntoIter, T>
-    where
-        T: AlignedBytesFromLayout,
-    {
-        let Self { bytes, descriptors } = self;
-
-        let layout = buffer_layout(descriptors.as_ref(), 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
-        check_len(layout.size(), bytes.layout().size()).expect("buffer length should match");
-
-        let offsets = buffer_offsets(descriptors, 1);
-        ErasedSoaIntoFields::new(bytes, offsets)
+    fn from(value: IterOrFieldLenMismatchError) -> Self {
+        Self::LenMismatch(value)
     }
 }
 
-impl<B, D> Debug for ErasedSoa<B, D>
-where
-    B: AlignedBytes + ?Sized,
-    D: AsRef<[FieldDescriptor]>,
-{
+impl From<LayoutError> for FillBytesWithFieldsError {
+    #[inline]
+    fn from(value: LayoutError) -> Self {
+        Self::InvalidLayout(value)
+    }
+}
+
+impl Display for FillBytesWithFieldsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let fields = &self.as_refs().into_iter();
-        f.debug_struct("ErasedSoa").field("fields", fields).finish()
+        match self {
+            Self::LenMismatch(err) => Display::fmt(err, f),
+            Self::InvalidLayout(err) => Display::fmt(err, f),
+        }
+    }
+}
+
+impl Error for FillBytesWithFieldsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::LenMismatch(err) => Some(err),
+            Self::InvalidLayout(err) => Some(err),
+        }
+    }
+}
+
+impl From<FillBytesWithFieldsError> for ErasedSoaFromBytesFieldsDescriptorsError {
+    #[inline]
+    fn from(value: FillBytesWithFieldsError) -> Self {
+        match value {
+            FillBytesWithFieldsError::LenMismatch(err) => Self::LenMismatch(err),
+            FillBytesWithFieldsError::InvalidLayout(err) => Self::InvalidLayout(err),
+        }
+    }
+}
+
+impl<B> From<FillBytesWithFieldsError> for ErasedSoaFromFieldsDescriptorsError<B>
+where
+    B: AlignedBytesFromLayout,
+{
+    #[inline]
+    fn from(value: FillBytesWithFieldsError) -> Self {
+        match value {
+            FillBytesWithFieldsError::LenMismatch(err) => Self::LenMismatch(err),
+            FillBytesWithFieldsError::InvalidLayout(err) => Self::InvalidLayout(err),
+        }
     }
 }
 
@@ -350,36 +426,39 @@ fn fill_bytes_with_fields<B, I, F>(
     bytes: &mut B,
     fields: I,
     descriptors: &[FieldDescriptor],
-) -> Result<(), IterOrFieldLenMismatchError>
+) -> Result<(), FillBytesWithFieldsError>
 where
     B: AlignedBytes + ?Sized,
     I: IntoIterator<Item = F>,
     F: AsRef<[u8]>,
 {
-    use IterOrFieldLenMismatchError as Error;
+    use IterOrFieldLenMismatchError::{FieldLenMismatch, IterLenMismatch};
 
-    let mut field_index = 0;
-    let descriptors_len = descriptors.len();
-    let offsets = buffer_offsets(descriptors, 1).map(Result::unwrap);
-    offsets.zip_longest(fields).try_for_each(|item| {
-        let Both((desc, offset), src) = item else {
-            let err = LenMismatchError::new(descriptors_len, field_index);
-            let err = Error::IterLenMismatch(err);
-            return Err(err);
-        };
+    buffer_offsets(descriptors, 1)
+        .zip_longest(fields)
+        .enumerate()
+        .try_for_each(|(field_index, item)| {
+            let Both(item, src) = item else {
+                let err = LenMismatchError::new(descriptors.len(), field_index);
+                let err = IterLenMismatch(err).into();
+                return Err(err);
+            };
+            let BufferOffset {
+                field_descriptor,
+                offset,
+                ..
+            } = item?;
 
-        let src = src.as_ref();
-        let len = desc.layout().size();
-        check_len(src.len(), len)
-            .map_err(|error| Error::FieldLenMismatch { error, field_index })?;
+            let src = src.as_ref();
+            let len = field_descriptor.layout().size();
+            check_len(src.len(), len).map_err(|error| FieldLenMismatch { error, field_index })?;
 
-        let src = src.as_ptr();
-        let dst = unsafe { bytes.as_mut_ptr().add(offset) };
-        unsafe {
-            ptr::copy_nonoverlapping(src, dst, len);
-        }
+            let src = src.as_ptr();
+            let dst = unsafe { bytes.as_mut_ptr().add(offset) };
+            unsafe {
+                ptr::copy_nonoverlapping(src, dst, len);
+            }
 
-        field_index += 1;
-        Ok(())
-    })
+            Ok(())
+        })
 }

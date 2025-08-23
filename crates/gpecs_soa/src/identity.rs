@@ -6,9 +6,11 @@ use core::{
     slice,
 };
 
-use crate::traits::{
-    FieldDescriptor, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite,
-    impls::debug_assert_ptr_is_aligned,
+use crate::{
+    field::FieldDescriptor,
+    traits::{
+        Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite, impls::debug_assert_ptr_is_aligned,
+    },
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

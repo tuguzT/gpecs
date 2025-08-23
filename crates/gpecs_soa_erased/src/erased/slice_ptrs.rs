@@ -11,10 +11,7 @@ use crate::{
     },
     error::{check_layout, check_len},
     field::{ErasedFieldPtr, ErasedFieldSlicePtr, field_slice_from_raw_parts},
-    soa::{
-        slice::range,
-        traits::{FieldDescriptor, Soa},
-    },
+    soa::{field::FieldDescriptor, slice::range, traits::Soa},
 };
 
 #[derive(Debug, Clone, Copy)]

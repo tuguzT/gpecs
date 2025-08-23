@@ -12,8 +12,9 @@ use crate::{
     error::{check_layout, check_len},
     field::{ErasedFieldPtr, ErasedFieldSlice, field_slice_from_raw_parts},
     soa::{
+        field::{FieldDescriptor, buffer_layout},
         slice::range,
-        traits::{FieldDescriptor, Soa, buffer_layout},
+        traits::Soa,
     },
 };
 

@@ -6,7 +6,10 @@ use core::{
     slice,
 };
 
-use super::{FieldDescriptor, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite};
+use crate::{
+    field::FieldDescriptor,
+    traits::{Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite},
+};
 
 #[inline]
 #[track_caller]

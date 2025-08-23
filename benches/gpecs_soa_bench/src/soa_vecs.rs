@@ -1,4 +1,4 @@
-use gpecs_soa::prelude::*;
+use gpecs_soa_erased::soa::prelude::*;
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero};
 

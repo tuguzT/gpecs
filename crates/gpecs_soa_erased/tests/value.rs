@@ -6,7 +6,7 @@ use std::{ptr, slice};
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
     aligned_bytes::AlignedUninitByteSlice, erased::ErasedSoa, field::ErasedFieldRef,
-    soa::traits::FieldDescriptor,
+    soa::field::FieldDescriptor,
 };
 
 #[cfg(feature = "alloc")]

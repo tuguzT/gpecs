@@ -1,4 +1,4 @@
-use crate::soa::traits::{FieldDescriptor, Soa};
+use crate::soa::{field::FieldDescriptor, traits::Soa};
 
 #[cfg(feature = "alloc")]
 pub type BoxedErasedSoaContext = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>>;

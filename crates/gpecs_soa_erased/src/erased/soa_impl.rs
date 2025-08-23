@@ -2,7 +2,10 @@ use core::{fmt::Debug, ptr::NonNull};
 
 use crate::{
     aligned_bytes::{AlignedBytes, AlignedBytesFromLayout},
-    soa::traits::{FieldDescriptor, Soa, SoaRead, SoaWrite},
+    soa::{
+        field::FieldDescriptor,
+        traits::{Soa, SoaRead, SoaWrite},
+    },
 };
 
 use super::{

@@ -1,20 +1,9 @@
 use core::alloc::{Layout, LayoutError};
 
-pub use self::{
-    desc::FieldDescriptor,
-    utils::{BufferOffsets, CopiedFieldDescriptors, buffer_layout, buffer_offsets, repeat_layout},
-    wrapper::{
-        FieldDescriptors, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
-        Slices, SlicesMut,
-    },
-};
+use crate::field::{FieldDescriptor, buffer_layout};
 
 #[doc(hidden)]
 pub mod impls;
-
-mod desc;
-mod utils;
-mod wrapper;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays pattern.

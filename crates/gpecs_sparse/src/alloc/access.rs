@@ -4,7 +4,10 @@ use core::{
     hash::{self, Hash},
 };
 
-use crate::soa::traits::{MutPtrs, RefsMut, Soa, SoaWrite};
+use crate::soa::{
+    traits::{Soa, SoaWrite},
+    wrapper::{MutPtrs, RefsMut},
+};
 
 pub enum TryInsertAccess<'context, 'a, T>
 where

@@ -10,7 +10,10 @@ use indexmap::IndexMap;
 use crate::{
     bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry, DropFn},
-    soa::traits::{FieldDescriptor, Soa, SoaRead, SoaWrite},
+    soa::{
+        field::FieldDescriptor,
+        traits::{Soa, SoaRead, SoaWrite},
+    },
 };
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;

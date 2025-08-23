@@ -8,12 +8,14 @@ extern crate alloc as core_alloc;
 #[cfg(feature = "alloc")]
 pub use self::alloc::vec;
 
+pub mod field;
 pub mod identity;
 pub mod mem;
 pub mod prelude;
 pub mod ptr;
 pub mod slice;
 pub mod traits;
+pub mod wrapper;
 
 #[cfg(feature = "alloc")]
 mod alloc;

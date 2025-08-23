@@ -1,7 +1,9 @@
 use std::hint::black_box;
 
-use gpecs_soa::prelude::*;
-use gpecs_soa_erased::erased::{BoxedErasedSoa, ErasedSoaContext};
+use gpecs_soa_erased::{
+    erased::{BoxedErasedSoa, ErasedSoaContext},
+    soa::prelude::*,
+};
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 

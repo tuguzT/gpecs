@@ -8,8 +8,9 @@ use core::{
 use crate::{
     alloc::raw_vec::RawSoaVec,
     ptr::{BufferData, BufferDataPtr},
-    traits::{NonNullPtrs, Soa, SoaRead},
+    traits::{Soa, SoaRead},
     vec::SoaVec,
+    wrapper::NonNullPtrs,
 };
 
 pub struct IntoIter<T>

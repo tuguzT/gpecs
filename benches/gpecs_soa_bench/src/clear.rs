@@ -1,5 +1,4 @@
-use gpecs_soa::prelude::*;
-use gpecs_soa_erased::erased::BoxedErasedSoa;
+use gpecs_soa_erased::{erased::BoxedErasedSoa, soa::prelude::*};
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 

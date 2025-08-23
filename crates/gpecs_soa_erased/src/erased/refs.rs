@@ -10,7 +10,10 @@ use crate::{
     erased::{ErasedSoaPtrs, error::ErasedSoaIntoValueError},
     error::{check_layout, check_len},
     field::{ErasedFieldPtr, ErasedFieldRef},
-    soa::traits::{FieldDescriptor, Soa, buffer_layout},
+    soa::{
+        field::{FieldDescriptor, buffer_layout},
+        traits::Soa,
+    },
 };
 
 #[derive(Debug, Clone, Copy)]

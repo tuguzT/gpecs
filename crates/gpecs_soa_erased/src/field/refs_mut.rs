@@ -6,7 +6,7 @@ use core::{
 
 use crate::{
     error::{check_align, check_len},
-    soa::traits::FieldDescriptor,
+    soa::field::FieldDescriptor,
 };
 
 use super::{

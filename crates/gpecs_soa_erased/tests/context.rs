@@ -1,5 +1,5 @@
 use arrayvec::ArrayVec;
-use gpecs_soa_erased::{erased::ErasedSoaContext, soa::traits::FieldDescriptor};
+use gpecs_soa_erased::{erased::ErasedSoaContext, soa::field::FieldDescriptor};
 
 type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
 

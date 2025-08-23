@@ -1,11 +1,13 @@
 use std::any::type_name;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use gpecs_soa::traits::{Soa, buffer_layout};
 use gpecs_soa_bench::{
     Big, Large, Medium, Small, Tiny, Zero, names::*, with_capacity::WithCapacity,
 };
-use gpecs_soa_erased::erased::{BoxedErasedSoa, ErasedSoaContext};
+use gpecs_soa_erased::{
+    erased::{BoxedErasedSoa, ErasedSoaContext},
+    soa::{field::buffer_layout, traits::Soa},
+};
 
 fn with_capacity<T>(c: &mut Criterion)
 where

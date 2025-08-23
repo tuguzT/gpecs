@@ -820,7 +820,6 @@ version = "0.0.0"
 dependencies = [
  "arrayvec",
  "criterion",
- "gpecs_soa",
  "gpecs_soa_erased",
  "num-traits",
 ]

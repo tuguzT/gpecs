@@ -1,7 +1,9 @@
 use std::{array, hint::black_box, iter::Zip, slice};
 
-use gpecs_soa::{prelude::*, slice as soa_slice};
-use gpecs_soa_erased::erased::BoxedErasedSoa;
+use gpecs_soa_erased::{
+    erased::BoxedErasedSoa,
+    soa::{prelude::*, slice as soa_slice},
+};
 use num_traits::ToPrimitive;
 
 use crate::{Big, Large, Small, Tiny, push::Push, with_capacity::WithCapacity};

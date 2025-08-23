@@ -2,7 +2,7 @@ use core::{ptr, slice};
 
 use crate::{
     error::{check_align, check_layout, check_len},
-    soa::traits::FieldDescriptor,
+    soa::field::FieldDescriptor,
 };
 
 use super::{

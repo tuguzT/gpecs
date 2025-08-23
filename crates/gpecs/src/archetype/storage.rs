@@ -20,7 +20,7 @@ use crate::{
         utils::{try_collect_component_ids, try_collect_maybe_component_ids},
     },
     entity::Entity,
-    soa::traits::{FieldDescriptor, Soa},
+    soa::{field::FieldDescriptor, traits::Soa},
 };
 
 use super::{

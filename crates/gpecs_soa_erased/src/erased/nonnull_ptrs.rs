@@ -9,7 +9,7 @@ use crate::{
     erased::{assert::assert_descriptors, error::ErasedSoaIntoValueError},
     error::{check_layout, check_len},
     field::ErasedFieldNonNullPtr,
-    soa::traits::{FieldDescriptor, Soa},
+    soa::{field::FieldDescriptor, traits::Soa},
 };
 
 #[derive(Debug, Clone, Copy)]

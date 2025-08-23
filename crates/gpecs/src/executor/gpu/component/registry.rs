@@ -13,7 +13,7 @@ pub use gpecs_types::component::GpuComponentId;
 
 use crate::{
     component::registry::{ComponentDescriptor, ComponentId, ComponentRegistry},
-    soa::traits::FieldDescriptor,
+    soa::field::FieldDescriptor,
 };
 
 use super::GpuComponent;

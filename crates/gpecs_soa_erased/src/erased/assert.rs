@@ -1,6 +1,6 @@
 use core::ptr;
 
-use crate::soa::traits::FieldDescriptor;
+use crate::soa::field::FieldDescriptor;
 
 #[inline]
 pub fn assert_descriptors(a: &[FieldDescriptor], b: &[FieldDescriptor]) {

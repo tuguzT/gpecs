@@ -11,7 +11,7 @@ use std::{
 
 pub use gpecs_types::component::ComponentId;
 
-use crate::soa::traits::FieldDescriptor;
+use crate::soa::field::FieldDescriptor;
 
 use super::Component;
 

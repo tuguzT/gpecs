@@ -8,7 +8,8 @@ use core::{
 
 use crate::{
     ptr::is_zst,
-    traits::{MutPtrs, Ptrs, Soa, SoaToOwned},
+    traits::{Soa, SoaToOwned},
+    wrapper::{MutPtrs, Ptrs},
 };
 
 use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, slice_index_usize_fail};

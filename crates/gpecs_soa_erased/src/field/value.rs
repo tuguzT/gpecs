@@ -7,7 +7,7 @@ use core::{
 use crate::{
     aligned_bytes::{AlignedBytes, AlignedBytesFromLayout, AlignedInitBytes},
     error::{LenMismatchError, check_layout, check_len},
-    soa::traits::FieldDescriptor,
+    soa::field::FieldDescriptor,
 };
 
 #[cfg(feature = "alloc")]

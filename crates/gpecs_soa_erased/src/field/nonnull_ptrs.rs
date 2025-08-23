@@ -2,7 +2,7 @@ use core::ptr::{self, NonNull};
 
 use crate::{
     error::{check_align, check_layout, check_len},
-    soa::traits::FieldDescriptor,
+    soa::field::FieldDescriptor,
 };
 
 use super::{

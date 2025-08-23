@@ -8,10 +8,13 @@ use core::{
     ptr::{self, NonNull},
 };
 
-use crate::soa::traits::{
-    CopiedFieldDescriptors, FieldDescriptor, FieldDescriptors, MutPtrs, NonNullPtrs, Ptrs, Refs,
-    RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaRead, SoaToOwned,
-    SoaTrustedFields, SoaWrite,
+use crate::soa::{
+    field::{CopiedFieldDescriptors, FieldDescriptor},
+    traits::{Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite},
+    wrapper::{
+        FieldDescriptors, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
+        Slices, SlicesMut,
+    },
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]

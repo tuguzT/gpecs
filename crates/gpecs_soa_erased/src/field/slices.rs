@@ -6,7 +6,7 @@ use core::{
     slice,
 };
 
-use crate::{error::check_align, soa::traits::FieldDescriptor};
+use crate::{error::check_align, soa::field::FieldDescriptor};
 
 use super::{
     ErasedFieldPtr, ErasedFieldRef, ErasedFieldSlicePtr,

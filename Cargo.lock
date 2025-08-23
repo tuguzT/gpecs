@@ -734,7 +734,9 @@ dependencies = [
  "gpecs_types",
  "indexmap",
  "itertools 0.14.0",
+ "num-traits",
  "petgraph",
+ "pollster",
  "wgpu",
 ]
 

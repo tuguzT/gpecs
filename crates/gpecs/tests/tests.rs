@@ -19,4 +19,7 @@ mod archetype {
 
 mod context;
 
-mod executor;
+mod executor {
+    mod cpu;
+    mod gpu;
+}

@@ -236,7 +236,7 @@ fn setup_context(context: &mut Context) {
         let position = Position {
             data: Vec3 {
                 x: i.to_f32().unwrap(),
-                y: -(i.to_f32().unwrap()),
+                y: -i.to_f32().unwrap(),
                 z: 0.0,
             },
         };

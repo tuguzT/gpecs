@@ -1,5 +1,5 @@
 pub use self::{
-    id::ComponentId,
+    id::{ComponentId, GpuComponentId},
     traits::{Component, GpuComponent},
 };
 

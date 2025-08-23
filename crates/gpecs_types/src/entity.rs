@@ -65,14 +65,14 @@ impl Entity {
 
 impl Debug for Entity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let index = self.index();
-        let epoch = self.epoch().into_u32();
-        let world = self.world().into_u32();
+        let index = &self.index();
+        let epoch = &self.epoch().into_u32();
+        let world = &self.world().into_u32();
 
         f.debug_struct("Entity")
-            .field("index", &index)
-            .field("epoch", &epoch)
-            .field("world", &world)
+            .field("index", index)
+            .field("epoch", epoch)
+            .field("world", world)
             .finish()
     }
 }
@@ -157,8 +157,8 @@ impl From<u16> for EntityEpoch {
 
 impl From<EntityEpoch> for u16 {
     #[inline]
-    fn from(value: EntityEpoch) -> Self {
-        value.into_u16()
+    fn from(epoch: EntityEpoch) -> Self {
+        epoch.into_u16()
     }
 }
 
@@ -173,8 +173,8 @@ impl TryFrom<u32> for EntityEpoch {
 
 impl From<EntityEpoch> for u32 {
     #[inline]
-    fn from(value: EntityEpoch) -> Self {
-        value.into_u32()
+    fn from(epoch: EntityEpoch) -> Self {
+        epoch.into_u32()
     }
 }
 

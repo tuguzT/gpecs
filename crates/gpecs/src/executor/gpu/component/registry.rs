@@ -6,8 +6,10 @@ use std::{
     slice,
 };
 
-use bytemuck::{Pod, Zeroable, must_cast_slice};
+use bytemuck::must_cast_slice;
 use gpecs_sparse::set::EpochSparseSet;
+
+pub use gpecs_types::component::GpuComponentId;
 
 use crate::{
     component::registry::{ComponentDescriptor, ComponentId, ComponentRegistry},
@@ -15,57 +17,6 @@ use crate::{
 };
 
 use super::GpuComponent;
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
-#[repr(transparent)]
-pub struct GpuComponentId(ComponentId);
-
-impl GpuComponentId {
-    #[inline]
-    pub const fn into_id(self) -> ComponentId {
-        let Self(id) = self;
-        id
-    }
-
-    #[inline]
-    pub const fn into_u32(self) -> u32 {
-        let Self(id) = self;
-        id.into_u32()
-    }
-
-    #[inline]
-    pub const unsafe fn from_id(id: ComponentId) -> Self {
-        Self(id)
-    }
-
-    #[inline]
-    pub const unsafe fn from_u32(id: u32) -> Self {
-        let id = unsafe { ComponentId::from_u32(id) };
-        Self(id)
-    }
-}
-
-impl From<GpuComponentId> for u32 {
-    #[inline]
-    fn from(value: GpuComponentId) -> Self {
-        value.into_u32()
-    }
-}
-
-impl From<GpuComponentId> for ComponentId {
-    #[inline]
-    fn from(value: GpuComponentId) -> Self {
-        let GpuComponentId(id) = value;
-        id
-    }
-}
-
-impl Debug for GpuComponentId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = &self.into_u32();
-        f.debug_tuple("GpuComponentId").field(value).finish()
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct GpuComponentDescriptor {
@@ -149,7 +100,7 @@ impl GpuComponentRegistry {
         T: GpuComponent,
     {
         let id = components.register_component::<T>();
-        let id = GpuComponentId(id);
+        let id = gpu_component_id_trusted(id);
 
         let Self { components } = self;
         components.insert(id.into_u32(), ());
@@ -164,7 +115,7 @@ impl GpuComponentRegistry {
         descriptor: GpuComponentDescriptor,
     ) -> GpuComponentId {
         let id = components.register_component_with(descriptor.into());
-        let id = GpuComponentId(id);
+        let id = gpu_component_id_trusted(id);
 
         let Self { components } = self;
         components.insert(id.into_u32(), ());
@@ -192,7 +143,7 @@ impl GpuComponentRegistry {
 
     #[inline]
     pub fn map_component_id(&self, id: ComponentId) -> Option<GpuComponentId> {
-        self.contains(id).then_some(GpuComponentId(id))
+        self.contains(id).then_some(gpu_component_id_trusted(id))
     }
 
     #[inline]
@@ -351,3 +302,8 @@ impl ExactSizeIterator for GpuComponentIds<'_> {
 }
 
 impl FusedIterator for GpuComponentIds<'_> {}
+
+#[inline]
+fn gpu_component_id_trusted(id: ComponentId) -> GpuComponentId {
+    unsafe { GpuComponentId::from_id(id) }
+}

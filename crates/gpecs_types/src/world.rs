@@ -52,15 +52,15 @@ impl WorldId {
 
 impl From<WorldId> for u16 {
     #[inline]
-    fn from(value: WorldId) -> Self {
-        value.into_u16()
+    fn from(id: WorldId) -> Self {
+        id.into_u16()
     }
 }
 
 impl From<WorldId> for u32 {
     #[inline]
-    fn from(value: WorldId) -> Self {
-        value.into_u32()
+    fn from(id: WorldId) -> Self {
+        id.into_u32()
     }
 }
 

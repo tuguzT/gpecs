@@ -4,9 +4,11 @@ use std::{
     slice,
 };
 
-use bytemuck::{Pod, Zeroable, must_cast_slice};
+use bytemuck::must_cast_slice;
 use gpecs_sparse::set::EpochSparseSet;
 use wgpu::Device;
+
+pub use gpecs_types::archetype::GpuArchetypeId;
 
 use crate::{
     archetype::{
@@ -22,57 +24,6 @@ use crate::{
 };
 
 use super::storage::GpuArchetypeStorage;
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
-#[repr(transparent)]
-pub struct GpuArchetypeId(ArchetypeId);
-
-impl GpuArchetypeId {
-    #[inline]
-    pub const fn into_id(self) -> ArchetypeId {
-        let Self(id) = self;
-        id
-    }
-
-    #[inline]
-    pub const fn into_u32(self) -> u32 {
-        let Self(id) = self;
-        id.into_u32()
-    }
-
-    #[inline]
-    pub const unsafe fn from_id(id: ArchetypeId) -> Self {
-        Self(id)
-    }
-
-    #[inline]
-    pub const unsafe fn from_u32(id: u32) -> Self {
-        let id = unsafe { ArchetypeId::from_u32(id) };
-        Self(id)
-    }
-}
-
-impl From<GpuArchetypeId> for u32 {
-    #[inline]
-    fn from(value: GpuArchetypeId) -> Self {
-        value.into_u32()
-    }
-}
-
-impl From<GpuArchetypeId> for ArchetypeId {
-    #[inline]
-    fn from(value: GpuArchetypeId) -> Self {
-        let GpuArchetypeId(id) = value;
-        id
-    }
-}
-
-impl Debug for GpuArchetypeId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = &self.into_u32();
-        f.debug_tuple("GpuArchetypeId").field(value).finish()
-    }
-}
 
 #[derive(Debug)]
 pub struct GpuArchetypeInfo {
@@ -173,7 +124,7 @@ impl GpuArchetypeRegistry {
         gpu_device: &Device,
         archetype_id: ArchetypeId,
     ) -> GpuArchetypeId {
-        let gpu_archetype_id = GpuArchetypeId(archetype_id);
+        let gpu_archetype_id = gpu_archetype_id_trusted(archetype_id);
 
         archetypes
             .archetypes_before_inclusive(archetype_id)
@@ -181,7 +132,7 @@ impl GpuArchetypeRegistry {
                 let id = info.id();
                 let storage = info.storage();
                 gpu_archetypes.entry(id.into_u32()).or_insert_with(|| {
-                    let id = GpuArchetypeId(id);
+                    let id = gpu_archetype_id_trusted(id);
                     let storage = GpuArchetypeStorage::new(components, gpu_device, id, storage);
                     GpuArchetypeInfo { id, storage }.into()
                 });
@@ -218,7 +169,7 @@ impl GpuArchetypeRegistry {
 
     #[inline]
     pub fn map_archetype_id(&self, id: ArchetypeId) -> Option<GpuArchetypeId> {
-        self.contains(id).then_some(GpuArchetypeId(id))
+        self.contains(id).then_some(gpu_archetype_id_trusted(id))
     }
 
     #[inline]
@@ -377,3 +328,8 @@ impl ExactSizeIterator for GpuArchetypeIds<'_> {
 }
 
 impl FusedIterator for GpuArchetypeIds<'_> {}
+
+#[inline]
+fn gpu_archetype_id_trusted(id: ArchetypeId) -> GpuArchetypeId {
+    unsafe { GpuArchetypeId::from_id(id) }
+}

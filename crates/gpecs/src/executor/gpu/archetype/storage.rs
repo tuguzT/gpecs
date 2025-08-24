@@ -5,7 +5,7 @@ use std::{
 };
 
 use bytemuck::must_cast_slice;
-use itertools::Itertools;
+use itertools::{Itertools, chain};
 use wgpu::{
     Buffer, BufferAddress, BufferSize, BufferSlice, BufferUsages, Device,
     util::{BufferInitDescriptor, DeviceExt},
@@ -164,9 +164,7 @@ fn assert_bindings_do_not_overlap<'a, I>(
         .into_iter()
         .filter_map(|(_, &binding)| binding.map(Range::from));
 
-    entities_binding
-        .into_iter()
-        .chain(component_bindings)
+    chain(entities_binding, component_bindings)
         .tuple_windows()
         .for_each(|(lhs, rhs)| assert_ranges_do_not_overlap(lhs, rhs));
 }

@@ -1,9 +1,10 @@
 use std::{any::TypeId, num::NonZeroU32};
 
+use itertools::chain;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferDescriptor,
-    BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features, QUERY_SIZE, QuerySet,
-    QuerySetDescriptor, QueryType,
+    BufferSlice, BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features, QUERY_SIZE,
+    QuerySet, QuerySetDescriptor, QueryType,
 };
 
 use crate::{
@@ -14,10 +15,7 @@ use crate::{
 };
 
 use super::{
-    archetype::{
-        registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
-        storage::GpuArchetypeStorageBufferSlices,
-    },
+    archetype::registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
     bundle::GpuBundle,
     component::{
         GpuComponent,
@@ -444,13 +442,14 @@ impl ScheduleCache {
         systems: &GpuSystemRegistry,
         schedule: &GpuSystemSchedule,
     ) -> ScheduleCache {
+        let additional_bindings = [];
         Self::with_additional_bindings::<_, [_; 0]>(
             context,
             device,
             archetypes,
             systems,
             schedule,
-            [],
+            additional_bindings,
         )
     }
 
@@ -495,57 +494,28 @@ impl ScheduleCache {
                     unreachable!("archetype {archetype_id:?} should exist");
                 };
 
-                let GpuArchetypeStorageBufferSlices {
-                    entities: entity_buffer_binding,
-                    components: mut component_buffer_bindings,
-                } = unsafe { archetype_info.storage().storage_buffer_slices() };
-                let mut bind_group_entries = Vec::new();
-
-                if let Some(entity_entry) = shader.entity_entry() {
-                    let Some(entity_buffer_binding) = entity_buffer_binding else {
-                        continue;
-                    };
-
-                    let entity_entry = BindGroupEntry {
-                        binding: entity_entry.binding,
-                        resource: entity_buffer_binding.into(),
-                    };
-                    bind_group_entries.extend(Some(entity_entry));
-                }
-
-                for (component_id, component_entry) in shader.component_entries() {
-                    let Some(component_entry) = component_entry else {
-                        continue;
-                    };
-                    let Some(component_buffer_binding) =
-                        component_buffer_bindings.swap_remove(&component_id)
-                    else {
-                        unreachable!("archetype {archetype_id:?} should have {component_id:?}");
-                    };
-                    let Some(component_buffer_binding) = component_buffer_binding else {
-                        continue;
-                    };
-
-                    let component_entry = BindGroupEntry {
-                        binding: component_entry.binding,
-                        resource: component_buffer_binding.into(),
-                    };
-                    bind_group_entries.extend(Some(component_entry));
-                }
-
-                if bind_group_entries.is_empty() {
+                let archetype_storage = archetype_info.storage();
+                if archetype_storage.is_empty() {
                     continue;
                 }
 
+                let slices = unsafe { archetype_storage.storage_buffer_slices() };
+                let entity_binding = bind_group_entry(shader.entity_entry(), slices.entities);
+                let component_bindings =
+                    component_entries_with_slices(shader.component_entries(), slices.components)
+                        .into_iter()
+                        .filter_map(|(entry, slice)| bind_group_entry(entry, slice));
                 let additional_bindings = additional_bindings_cache
                     .get(&system_id)
                     .into_iter()
                     .flatten()
                     .cloned();
-                bind_group_entries.extend(additional_bindings);
 
                 let bind_group_label =
                     format!("`gpecs` {system_id:?} bind group for {archetype_id:?}");
+                let bind_group_entries = chain(entity_binding, component_bindings)
+                    .chain(additional_bindings)
+                    .collect::<Box<_>>();
                 let bind_group_desc = BindGroupDescriptor {
                     label: Some(&bind_group_label),
                     layout: shader.bind_group_layout(),
@@ -565,6 +535,32 @@ impl ScheduleCache {
         }
         schedule_cache
     }
+}
+
+#[inline]
+fn bind_group_entry<'a>(
+    entry: Option<&BindGroupLayoutEntry>,
+    slice: Option<BufferSlice<'a>>,
+) -> Option<BindGroupEntry<'a>> {
+    let binding = entry?.binding;
+    let resource = slice?.into();
+    Some(BindGroupEntry { binding, resource })
+}
+
+#[inline]
+fn component_entries_with_slices<'a, I>(
+    entries: I,
+    mut slices: IndexMap<GpuComponentId, Option<BufferSlice<'a>>>,
+) -> impl IntoIterator<Item = (Option<&'a BindGroupLayoutEntry>, Option<BufferSlice<'a>>)>
+where
+    I: IntoIterator<Item = (GpuComponentId, Option<&'a BindGroupLayoutEntry>)>,
+{
+    entries.into_iter().map(move |(component_id, entry)| {
+        let Some(slice) = slices.swap_remove(&component_id) else {
+            unreachable!("component {component_id:?} should exist");
+        };
+        (entry, slice)
+    })
 }
 
 #[derive(Debug, Default)]

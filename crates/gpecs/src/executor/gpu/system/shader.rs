@@ -1,4 +1,5 @@
 use std::{
+    fmt::{self, Debug},
     iter::FusedIterator,
     num::{NonZeroU32, NonZeroU64},
 };
@@ -138,27 +139,21 @@ impl GpuSystemShader {
     }
 
     #[inline]
-    pub fn entity_entry(&self) -> Option<&BindGroupLayoutEntry> {
-        let Self { entity_entry, .. } = self;
-        entity_entry.as_ref()
-    }
-
-    #[inline]
-    pub fn component_entries(&self) -> GpuSystemShaderComponentEntries<'_> {
+    pub fn bind_group_layout_entries(&self) -> GpuSystemShaderEntries<'_> {
         let Self {
-            component_entries, ..
+            entity_entry,
+            component_entries,
+            additional_entries,
+            ..
         } = self;
 
-        let inner = component_entries.iter();
-        GpuSystemShaderComponentEntries { inner }
-    }
-
-    #[inline]
-    pub fn additional_entries(&self) -> &[BindGroupLayoutEntry] {
-        let Self {
-            additional_entries, ..
-        } = self;
-        additional_entries.as_ref()
+        GpuSystemShaderEntries {
+            entities: entity_entry.as_ref(),
+            components: GpuSystemShaderComponentEntries {
+                inner: component_entries.iter(),
+            },
+            additional: additional_entries.as_ref(),
+        }
     }
 
     #[inline]
@@ -187,8 +182,21 @@ impl GpuSystemShader {
 }
 
 #[derive(Debug, Clone)]
+pub struct GpuSystemShaderEntries<'a> {
+    pub entities: Option<&'a BindGroupLayoutEntry>,
+    pub components: GpuSystemShaderComponentEntries<'a>,
+    pub additional: &'a [BindGroupLayoutEntry],
+}
+
+#[derive(Clone)]
 pub struct GpuSystemShaderComponentEntries<'a> {
     inner: IndexMapIter<'a, GpuComponentId, Option<BindGroupLayoutEntry>>,
+}
+
+impl Debug for GpuSystemShaderComponentEntries<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.clone()).finish()
+    }
 }
 
 impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {

@@ -3,7 +3,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     ops::{Index, IndexMut},
-    ptr::{self, NonNull},
+    ptr,
 };
 
 use crate::{
@@ -61,9 +61,9 @@ where
     pub fn as_ptrs(&self) -> T::Ptrs<'_> {
         let ptr = self.as_ptr().cast_mut();
         let context = self.context();
-        let len = self.capacity();
+        let capacity = self.capacity();
 
-        let ptrs = unsafe { ptrs::<T>(context, ptr, len).unwrap_unchecked() };
+        let ptrs = unsafe { ptrs::<T>(context, ptr, capacity).unwrap_unchecked() };
         T::ptrs_cast_const(context, ptrs)
     }
 
@@ -71,9 +71,9 @@ where
     pub fn as_mut_ptrs(&mut self) -> T::MutPtrs<'_> {
         let ptr = self.as_mut_ptr();
         let context = self.context();
-        let len = self.capacity();
+        let capacity = self.capacity();
 
-        unsafe { ptrs::<T>(context, ptr, len).unwrap_unchecked() }
+        unsafe { ptrs::<T>(context, ptr, capacity).unwrap_unchecked() }
     }
 
     #[inline]
@@ -264,7 +264,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
+        let data = ptr::dangling_mut();
         unsafe { from_raw_parts(data, 0, 0) }
     }
 }
@@ -275,7 +275,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let data = NonNull::<BufferData<T>>::dangling().as_ptr().cast();
+        let data = ptr::dangling_mut();
         unsafe { from_raw_parts_mut(data, 0, 0) }
     }
 }

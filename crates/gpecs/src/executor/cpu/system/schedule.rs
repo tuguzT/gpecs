@@ -1,6 +1,8 @@
 use std::iter::{self, FusedIterator};
 
-use indexmap::{IndexSet, set};
+use indexmap::set::Iter as IndexSetIter;
+
+use crate::hash::IndexSet;
 
 use super::registry::SystemId;
 
@@ -13,7 +15,7 @@ impl SystemSchedule {
     #[inline]
     pub fn new() -> Self {
         Self {
-            systems: IndexSet::new(),
+            systems: IndexSet::default(),
         }
     }
 
@@ -50,7 +52,7 @@ impl<'a> IntoIterator for &'a SystemSchedule {
 
 #[derive(Debug, Clone)]
 pub struct SystemScheduleIter<'a> {
-    inner: iter::Copied<set::Iter<'a, SystemId>>,
+    inner: iter::Copied<IndexSetIter<'a, SystemId>>,
 }
 
 impl Iterator for SystemScheduleIter<'_> {

@@ -1,6 +1,8 @@
 use std::iter::{self, FusedIterator};
 
-use indexmap::{IndexSet, set};
+use indexmap::set::Iter as IndexSetIter;
+
+use crate::hash::IndexSet;
 
 use super::registry::GpuSystemId;
 
@@ -13,7 +15,7 @@ impl GpuSystemSchedule {
     #[inline]
     pub fn new() -> Self {
         Self {
-            systems: IndexSet::new(),
+            systems: IndexSet::default(),
         }
     }
 
@@ -50,7 +52,7 @@ impl<'a> IntoIterator for &'a GpuSystemSchedule {
 
 #[derive(Debug, Clone)]
 pub struct GpuSystemScheduleIter<'a> {
-    inner: iter::Copied<set::Iter<'a, GpuSystemId>>,
+    inner: iter::Copied<IndexSetIter<'a, GpuSystemId>>,
 }
 
 impl Iterator for GpuSystemScheduleIter<'_> {

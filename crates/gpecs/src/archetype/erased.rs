@@ -5,11 +5,11 @@ use gpecs_soa_erased::{
         ErasedFieldSliceMut,
     },
 };
-use indexmap::IndexMap;
 
 use crate::{
     bundle::Bundle,
     component::registry::{ComponentId, ComponentRegistry, DropFn},
+    hash::IndexMap,
     soa::{
         field::FieldDescriptor,
         traits::{Soa, SoaRead, SoaWrite},

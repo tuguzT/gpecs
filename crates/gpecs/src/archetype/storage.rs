@@ -11,7 +11,7 @@ use gpecs_soa_erased::{
     },
 };
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
-use indexmap::{IndexMap, IndexSet, map::Keys};
+use indexmap::map::Keys as IndexMapKeys;
 
 use crate::{
     bundle::Bundle,
@@ -20,6 +20,7 @@ use crate::{
         utils::{try_collect_component_ids, try_collect_maybe_component_ids},
     },
     entity::Entity,
+    hash::{IndexMap, IndexSet},
     soa::{field::FieldDescriptor, traits::Soa},
 };
 
@@ -627,7 +628,7 @@ impl Drop for ArchetypeStorage {
 
 #[derive(Clone)]
 pub struct ComponentIds<'a> {
-    inner: Keys<'a, ComponentId, Option<DropFn>>,
+    inner: IndexMapKeys<'a, ComponentId, Option<DropFn>>,
 }
 
 impl Debug for ComponentIds<'_> {

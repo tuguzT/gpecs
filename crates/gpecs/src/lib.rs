@@ -12,3 +12,5 @@ pub mod entity;
 pub mod executor;
 pub mod prelude;
 pub mod world;
+
+mod hash;

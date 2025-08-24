@@ -11,7 +11,7 @@ use std::{
 pub use gpecs_types::archetype::ArchetypeId;
 
 use gpecs_soa_erased::field::BoxedErasedField;
-use indexmap::{IndexMap, IndexSet, map};
+use indexmap::map::{Values as IndexMapValues, ValuesMut as IndexMapValuesMut};
 use itertools::Itertools;
 use petgraph::{
     Direction,
@@ -28,6 +28,7 @@ use crate::{
         utils::{try_collect_component_ids, try_collect_maybe_component_ids},
     },
     entity::Entity,
+    hash::{IndexMap, IndexSet},
     soa::slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
 };
 
@@ -130,7 +131,7 @@ impl ArchetypeRegistry {
     #[inline]
     pub fn new() -> Self {
         Self {
-            archetypes: Archetypes::new(),
+            archetypes: Archetypes::default(),
             graph: Graph::default(),
         }
     }
@@ -687,7 +688,7 @@ impl ArchetypeRegistry {
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
         let fields = into_erased_fields::<B>(components, B::CONTEXT, component_ids, value);
 
-        let mut fields_to_drop = ErasedComponents::new();
+        let mut fields_to_drop = ErasedComponents::default();
         fields.into_iter().for_each(|(component_id, field)| {
             let Some(to_drop) = old_fields.insert(component_id, field) else {
                 return;
@@ -901,7 +902,7 @@ impl ArchetypeRegistry {
         entity: Entity,
     ) -> ErasedComponents<BoxedErasedField> {
         let Some(archetype_id) = archetype_id else {
-            return ErasedComponents::with_capacity(1);
+            return ErasedComponents::default();
         };
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
@@ -1417,7 +1418,7 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
 #[derive(Clone)]
 pub struct CompatibleArchetypes<'a> {
     component_ids: Box<[ComponentId]>,
-    infos: map::Values<'a, ArchetypeKey, ArchetypeInfo>,
+    infos: IndexMapValues<'a, ArchetypeKey, ArchetypeInfo>,
 }
 
 impl<'a> CompatibleArchetypes<'a> {
@@ -1444,10 +1445,10 @@ impl<'a> CompatibleArchetypes<'a> {
     where
         B: Bundle,
     {
-        let component_ids =
-            try_collect_maybe_component_ids(B::get_components(components), IndexSet::<_>::insert)?
-                .into_iter()
-                .collect();
+        let component_ids = B::get_components(components);
+        let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?
+            .into_iter()
+            .collect();
         let infos = archetypes.values();
         Ok(Self {
             component_ids,
@@ -1549,7 +1550,7 @@ impl FusedIterator for CompatibleArchetypes<'_> {}
 
 pub struct CompatibleArchetypesMut<'a> {
     component_ids: Box<[ComponentId]>,
-    infos: map::ValuesMut<'a, ArchetypeKey, ArchetypeInfo>,
+    infos: IndexMapValuesMut<'a, ArchetypeKey, ArchetypeInfo>,
 }
 
 impl<'a> CompatibleArchetypesMut<'a> {
@@ -1579,10 +1580,10 @@ impl<'a> CompatibleArchetypesMut<'a> {
     where
         B: Bundle,
     {
-        let component_ids =
-            try_collect_maybe_component_ids(B::get_components(components), IndexSet::<_>::insert)?
-                .into_iter()
-                .collect();
+        let component_ids = B::get_components(components);
+        let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?
+            .into_iter()
+            .collect();
         let infos = archetypes.values_mut();
         Ok(Self {
             component_ids,

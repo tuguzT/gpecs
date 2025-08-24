@@ -5,7 +5,6 @@ use std::{
 };
 
 use bytemuck::must_cast_slice;
-use indexmap::IndexMap;
 use itertools::Itertools;
 use wgpu::{
     Buffer, BufferAddress, BufferSize, BufferSlice, BufferUsages, Device,
@@ -17,6 +16,7 @@ use crate::{
     component::registry::ComponentRegistry,
     entity::Entity,
     executor::gpu::component::registry::GpuComponentId,
+    hash::IndexMap,
     soa::field::{BufferOffset, CopiedFieldDescriptors, FieldDescriptor, repeat_layout},
 };
 

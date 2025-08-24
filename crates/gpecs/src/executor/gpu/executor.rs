@@ -1,6 +1,5 @@
 use std::{any::TypeId, num::NonZeroU32};
 
-use indexmap::IndexMap;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferDescriptor,
     BufferUsages, CommandEncoder, ComputePassDescriptor, Device, Features, QUERY_SIZE, QuerySet,
@@ -11,6 +10,7 @@ use crate::{
     archetype::error::{DuplicateComponentError, GetComponentsError},
     component::registry::ComponentInfo,
     context::Context,
+    hash::IndexMap,
 };
 
 use super::{
@@ -471,7 +471,7 @@ where
     I: IntoIterator<Item = (GpuSystemId, B)>,
     B: IntoIterator<Item = BindGroupEntry<'a>>,
 {
-    let mut additional_bindings_cache = IndexMap::<GpuSystemId, Vec<BindGroupEntry>>::new();
+    let mut additional_bindings_cache = IndexMap::<GpuSystemId, Vec<BindGroupEntry>>::default();
     for (system_id, additional_bindings) in additional_bindings {
         let cached_entries = additional_bindings_cache.entry(system_id).or_default();
         cached_entries.extend(additional_bindings);

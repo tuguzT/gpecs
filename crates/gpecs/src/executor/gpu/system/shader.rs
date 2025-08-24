@@ -3,7 +3,7 @@ use std::{
     num::{NonZeroU32, NonZeroU64},
 };
 
-use indexmap::{IndexMap, IndexSet, map};
+use indexmap::map::Iter as IndexMapIter;
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferBindingType, ComputePipeline, ComputePipelineDescriptor, Device,
@@ -16,6 +16,7 @@ use crate::{
     component::{registry::ComponentRegistry, utils::try_collect_component_ids},
     entity::Entity,
     executor::gpu::component::registry::GpuComponentId,
+    hash::{IndexMap, IndexSet},
 };
 
 use super::registry::{GpuSystemDescriptor, GpuSystemId};
@@ -204,7 +205,7 @@ impl GpuSystemShader {
 
 #[derive(Debug, Clone)]
 pub struct GpuSystemShaderComponentEntries<'a> {
-    inner: map::Iter<'a, GpuComponentId, Option<BindGroupLayoutEntry>>,
+    inner: IndexMapIter<'a, GpuComponentId, Option<BindGroupLayoutEntry>>,
 }
 
 impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {

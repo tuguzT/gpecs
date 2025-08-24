@@ -115,7 +115,7 @@ impl GpuArchetypeStorage {
     }
 
     #[inline]
-    pub unsafe fn storage_buffer_slices(&self) -> GpuArchetypeStorageBufferSlices<'_> {
+    pub unsafe fn storage_buffer_slices(&self) -> GpuArchetypeStorageSlices<'_> {
         let Self {
             storage_buffer,
             entities_binding,
@@ -124,9 +124,9 @@ impl GpuArchetypeStorage {
         } = self;
 
         let slice_from_binding = slice_from_binding(storage_buffer);
-        GpuArchetypeStorageBufferSlices {
+        GpuArchetypeStorageSlices {
             entities: entities_binding.map(slice_from_binding),
-            components: GpuArchetypeStorageBufferComponentSlices {
+            components: GpuArchetypeStorageComponentSlices {
                 storage_buffer,
                 inner: component_bindings.iter(),
             },
@@ -135,24 +135,24 @@ impl GpuArchetypeStorage {
 }
 
 #[derive(Debug, Clone)]
-pub struct GpuArchetypeStorageBufferSlices<'a> {
+pub struct GpuArchetypeStorageSlices<'a> {
     pub entities: Option<BufferSlice<'a>>,
-    pub components: GpuArchetypeStorageBufferComponentSlices<'a>,
+    pub components: GpuArchetypeStorageComponentSlices<'a>,
 }
 
 #[derive(Clone)]
-pub struct GpuArchetypeStorageBufferComponentSlices<'a> {
+pub struct GpuArchetypeStorageComponentSlices<'a> {
     storage_buffer: &'a Buffer,
     inner: IndexMapIter<'a, GpuComponentId, Option<BufferBindingDescriptor>>,
 }
 
-impl Debug for GpuArchetypeStorageBufferComponentSlices<'_> {
+impl Debug for GpuArchetypeStorageComponentSlices<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map().entries(self.clone()).finish()
     }
 }
 
-impl<'a> Iterator for GpuArchetypeStorageBufferComponentSlices<'a> {
+impl<'a> Iterator for GpuArchetypeStorageComponentSlices<'a> {
     type Item = (GpuComponentId, Option<BufferSlice<'a>>);
 
     #[inline]
@@ -223,7 +223,7 @@ impl<'a> Iterator for GpuArchetypeStorageBufferComponentSlices<'a> {
     }
 }
 
-impl DoubleEndedIterator for GpuArchetypeStorageBufferComponentSlices<'_> {
+impl DoubleEndedIterator for GpuArchetypeStorageComponentSlices<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self {
@@ -251,7 +251,7 @@ impl DoubleEndedIterator for GpuArchetypeStorageBufferComponentSlices<'_> {
     }
 }
 
-impl ExactSizeIterator for GpuArchetypeStorageBufferComponentSlices<'_> {
+impl ExactSizeIterator for GpuArchetypeStorageComponentSlices<'_> {
     #[inline]
     fn len(&self) -> usize {
         let Self { inner, .. } = self;
@@ -259,7 +259,7 @@ impl ExactSizeIterator for GpuArchetypeStorageBufferComponentSlices<'_> {
     }
 }
 
-impl FusedIterator for GpuArchetypeStorageBufferComponentSlices<'_> {}
+impl FusedIterator for GpuArchetypeStorageComponentSlices<'_> {}
 
 fn slice_from_binding<'a>(
     storage_buffer: &'a Buffer,

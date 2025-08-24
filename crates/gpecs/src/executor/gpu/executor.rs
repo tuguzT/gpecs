@@ -570,7 +570,7 @@ impl ArchetypeCache {
 
         let entity_binding = bind_group_entry(shader_entries.entities, slices.entities);
         let component_bindings =
-            component_entries_with_slices(shader_entries.components, slices.components)
+            component_entries_slices(shader_entries.components, slices.components)
                 .into_iter()
                 .filter_map(|(entry, slice)| bind_group_entry(entry, slice));
 
@@ -609,13 +609,15 @@ fn bind_group_entry<'a>(
 }
 
 #[inline]
-fn component_entries_with_slices<'a, I>(
-    entries: I,
-    mut slices: IndexMap<GpuComponentId, Option<BufferSlice<'a>>>,
+fn component_entries_slices<'a, E, S>(
+    entries: E,
+    slices: S,
 ) -> impl IntoIterator<Item = (Option<&'a BindGroupLayoutEntry>, Option<BufferSlice<'a>>)>
 where
-    I: IntoIterator<Item = (GpuComponentId, Option<&'a BindGroupLayoutEntry>)>,
+    E: IntoIterator<Item = (GpuComponentId, Option<&'a BindGroupLayoutEntry>)>,
+    S: IntoIterator<Item = (GpuComponentId, Option<BufferSlice<'a>>)>,
 {
+    let mut slices: IndexMap<_, _> = slices.into_iter().collect();
     entries.into_iter().map(move |(component_id, entry)| {
         let Some(slice) = slices.swap_remove(&component_id) else {
             unreachable!("component {component_id:?} should exist");

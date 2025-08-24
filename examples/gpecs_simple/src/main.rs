@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     ffi::c_void,
     fs,
     mem::transmute,
@@ -413,22 +414,22 @@ fn _init_wgpu_position_tag_download_buffer(
     let position_tag_gpu_archetype_info = executor
         .get_archetype_info(position_tag_gpu_archetype_id)
         .expect("archetype info should be present");
-    let position_tag_storage_buffer_bindings = unsafe {
+    let position_tag_storage_buffer_slices = unsafe {
         position_tag_gpu_archetype_info
             .storage()
             .storage_buffer_slices()
     };
     log::debug!(
-        "{position_tag_gpu_archetype_id:?} buffer bindings:\n{position_tag_storage_buffer_bindings:#?}"
+        "{position_tag_gpu_archetype_id:?} buffer slices:\n{position_tag_storage_buffer_slices:#?}"
     );
 
-    let position_tag_positions_binding = position_tag_storage_buffer_bindings
-        .components
+    let position_tag_storage_buffer_component_slices: HashMap<_, _> =
+        position_tag_storage_buffer_slices.components.collect();
+    let position_tag_positions_binding = position_tag_storage_buffer_component_slices
         .get(&position_gpu_id)
         .copied()
         .flatten()?;
-    let position_tag_tags_binding = position_tag_storage_buffer_bindings
-        .components
+    let position_tag_tags_binding = position_tag_storage_buffer_component_slices
         .get(&tag_gpu_id)
         .copied()
         .flatten();
@@ -473,19 +474,19 @@ fn _wgpu_copy_into_position_tag_download_buffer(
     let position_tag_gpu_archetype_info = executor
         .get_archetype_info(position_tag_gpu_archetype_id)
         .expect("archetype info should be present");
-    let position_tag_storage_buffer_bindings = unsafe {
+    let position_tag_storage_buffer_slices = unsafe {
         position_tag_gpu_archetype_info
             .storage()
             .storage_buffer_slices()
     };
 
-    let position_tag_positions_binding = position_tag_storage_buffer_bindings
-        .components
+    let position_tag_storage_buffer_component_slices: HashMap<_, _> =
+        position_tag_storage_buffer_slices.components.collect();
+    let position_tag_positions_binding = position_tag_storage_buffer_component_slices
         .get(&position_gpu_id)
         .copied()
         .flatten();
-    let position_tag_tags_binding = position_tag_storage_buffer_bindings
-        .components
+    let position_tag_tags_binding = position_tag_storage_buffer_component_slices
         .get(&tag_gpu_id)
         .copied()
         .flatten();

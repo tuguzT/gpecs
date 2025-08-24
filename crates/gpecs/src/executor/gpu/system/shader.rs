@@ -195,7 +195,7 @@ pub struct GpuSystemShaderComponentEntries<'a> {
 
 impl Debug for GpuSystemShaderComponentEntries<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(self.clone()).finish()
+        f.debug_map().entries(self.clone()).finish()
     }
 }
 

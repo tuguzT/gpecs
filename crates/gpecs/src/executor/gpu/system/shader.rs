@@ -33,23 +33,6 @@ pub struct GpuSystemShader {
     compute_pipeline: ComputePipeline,
 }
 
-const ENTITY_MIN_BINDING_SIZE: NonZeroU64 =
-    NonZeroU64::new(size_of::<Entity>() as u64).expect("size of `Entity` cannot be zero");
-
-#[inline]
-fn buffer_entry(binding: u32, min_binding_size: NonZeroU64) -> BindGroupLayoutEntry {
-    BindGroupLayoutEntry {
-        binding,
-        visibility: ShaderStages::COMPUTE,
-        ty: BindingType::Buffer {
-            ty: BufferBindingType::Storage { read_only: false },
-            min_binding_size: Some(min_binding_size),
-            has_dynamic_offset: false,
-        },
-        count: None,
-    }
-}
-
 impl GpuSystemShader {
     #[inline]
     pub(super) fn new<C, B>(
@@ -274,3 +257,20 @@ impl ExactSizeIterator for GpuSystemShaderComponentEntries<'_> {
 }
 
 impl FusedIterator for GpuSystemShaderComponentEntries<'_> {}
+
+const ENTITY_MIN_BINDING_SIZE: NonZeroU64 =
+    NonZeroU64::new(size_of::<Entity>() as u64).expect("size of `Entity` cannot be zero");
+
+#[inline]
+fn buffer_entry(binding: u32, min_binding_size: NonZeroU64) -> BindGroupLayoutEntry {
+    BindGroupLayoutEntry {
+        binding,
+        visibility: ShaderStages::COMPUTE,
+        ty: BindingType::Buffer {
+            ty: BufferBindingType::Storage { read_only: false },
+            min_binding_size: Some(min_binding_size),
+            has_dynamic_offset: false,
+        },
+        count: None,
+    }
+}

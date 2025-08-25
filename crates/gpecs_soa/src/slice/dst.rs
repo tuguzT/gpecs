@@ -78,38 +78,48 @@ where
 
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_, '_> {
+        let (_, slices) = self.as_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_, '_>) {
         let len = self.len();
         let context = self.context();
         let ptrs = self.as_ptrs();
 
         let slices = T::slices_from_raw_parts(context, ptrs, len);
-        unsafe { T::slice_ptrs_to_slices(context, slices) }
+        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        (context, slices)
     }
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_, '_> {
+        let (_, slices) = self.as_mut_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_mut_slices_with_context(&mut self) -> (&T::Context, T::SlicesMut<'_, '_>) {
         let len = self.len();
-        let context = unsafe { ptr::from_ref(self).context() };
+        let context = unsafe { ptr::from_mut(self).context() };
         let ptrs = self.as_mut_ptrs();
 
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-        unsafe { T::slice_mut_ptrs_to_slices(context, slices) }
+        let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
+        (context, slices)
     }
 
     #[inline]
     pub fn slices(&self) -> SoaSlices<'_, '_, T> {
-        let context = self.context();
-        let slices = self.as_slices();
+        let (context, slices) = self.as_slices_with_context();
         SoaSlices::new(context, slices)
     }
 
     #[inline]
     pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        let len = self.len();
-        let context = unsafe { ptr::from_ref(self).context() };
-        let ptrs = self.as_mut_ptrs();
-
-        unsafe { SoaSlicesMut::from_parts(context, ptrs, len) }
+        let (context, slices) = self.as_mut_slices_with_context();
+        SoaSlicesMut::new(context, slices)
     }
 
     #[inline]
@@ -387,8 +397,7 @@ where
             return;
         }
 
-        let mut slices = self.slices_mut();
-        let (context, slices) = slices.as_mut_slices_with_context();
+        let (context, slices) = self.slices_mut().into_slices_with_context();
         let slices = T::slices_mut_as_slice_ptrs(context, slices);
         unsafe { T::slices_drop_in_place(context, slices) }
     }

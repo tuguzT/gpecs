@@ -262,6 +262,11 @@ unsafe impl<T> Soa for Identity<T> {
         from
     }
 
+    #[inline]
+    fn ptrs_dangling(_context: &Self::Context) -> Self::Ptrs<'_> {
+        ptr::dangling()
+    }
+
     type MutPtrs<'context> = *mut Self;
 
     #[inline]
@@ -270,7 +275,7 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling_mut(_context: &Self::Context) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
     }
 

@@ -26,6 +26,9 @@ target/
 # cargo-flamegraph artifacts
 flamegraph.svg
 
+# cargo-llvm-cov artifacts
+lcov.info
+
 # OS settings and caches
 **/desktop.ini
 **/.DS_Store

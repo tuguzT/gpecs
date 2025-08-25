@@ -85,6 +85,11 @@ where
         from
     }
 
+    #[inline]
+    fn ptrs_dangling(context: &Self::Context) -> Self::Ptrs<'_> {
+        KeyValuePtrs::dangling(context)
+    }
+
     type MutPtrs<'context> = KeyValueMutPtrs<'context, K, V>;
 
     #[inline]
@@ -93,7 +98,7 @@ where
     }
 
     #[inline]
-    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling_mut(context: &Self::Context) -> Self::MutPtrs<'_> {
         KeyValueMutPtrs::dangling(context)
     }
 
@@ -670,6 +675,13 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
+    pub fn dangling(context: &'context V::Context) -> Self {
+        let key = ptr::dangling();
+        let value = Ptrs::new(V::ptrs_dangling(context));
+        Self { key, value }
+    }
+
+    #[inline]
     pub fn cast_mut(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
         let Self { key, value } = self;
 
@@ -846,7 +858,7 @@ where
     #[inline]
     pub fn dangling(context: &'context V::Context) -> Self {
         let key = ptr::dangling_mut();
-        let value = MutPtrs::new(V::ptrs_dangling(context));
+        let value = MutPtrs::new(V::ptrs_dangling_mut(context));
         Self { key, value }
     }
 

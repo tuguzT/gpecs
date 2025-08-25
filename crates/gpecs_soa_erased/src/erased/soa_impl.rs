@@ -44,6 +44,12 @@ where
         from
     }
 
+    #[inline]
+    fn ptrs_dangling(context: &Self::Context) -> Self::Ptrs<'_> {
+        let descriptors = context.field_descriptors();
+        ErasedSoaPtrs::dangling(descriptors)
+    }
+
     type MutPtrs<'context> = ErasedSoaMutPtrs<&'context [FieldDescriptor]>;
 
     #[inline]
@@ -52,7 +58,7 @@ where
     }
 
     #[inline]
-    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling_mut(context: &Self::Context) -> Self::MutPtrs<'_> {
         let descriptors = context.field_descriptors();
         ErasedSoaMutPtrs::dangling(descriptors)
     }

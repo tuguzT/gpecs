@@ -77,6 +77,9 @@ pub unsafe trait Soa {
     /// to be covariant over generic lifetime.
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
 
+    /// Returns dangling [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields).
+    fn ptrs_dangling(context: &Self::Context) -> Self::Ptrs<'_>;
+
     /// Non-empty collection of mutable pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Unlike [field descriptors](Soa::FieldDescriptors),
@@ -88,8 +91,8 @@ pub unsafe trait Soa {
     /// to be covariant over generic lifetime.
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
-    /// Returns dangling [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields).
-    fn ptrs_dangling(context: &Self::Context) -> Self::MutPtrs<'_>;
+    /// Returns mutable dangling [pointers](Soa::MutPtrs) to each field of [`Fields`](Soa::Fields).
+    fn ptrs_dangling_mut(context: &Self::Context) -> Self::MutPtrs<'_>;
 
     /// Creates [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
     /// from a given buffer with given capacity.

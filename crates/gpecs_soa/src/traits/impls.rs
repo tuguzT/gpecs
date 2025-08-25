@@ -59,6 +59,11 @@ unsafe impl Soa for () {
         from
     }
 
+    #[inline]
+    fn ptrs_dangling(_context: &Self::Context) -> Self::Ptrs<'_> {
+        ptr::dangling()
+    }
+
     type MutPtrs<'context> = *mut Self;
 
     #[inline]
@@ -67,7 +72,7 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling_mut(_context: &Self::Context) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
     }
 
@@ -631,6 +636,12 @@ macro_rules! soa_tuple_impl {
                 from
             }
 
+            #[inline]
+            fn ptrs_dangling(_context: &Self::Context) -> Self::Ptrs<'_> {
+                let ptrs = ($(ptr::dangling::<$types>(),)*);
+                ptrs
+            }
+
             type MutPtrs<'context> = ($(*mut $types,)*);
 
             #[inline]
@@ -639,7 +650,7 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_dangling(_context: &Self::Context) -> Self::MutPtrs<'_> {
+            fn ptrs_dangling_mut(_context: &Self::Context) -> Self::MutPtrs<'_> {
                 let ptrs = ($(ptr::dangling_mut::<$types>(),)*);
                 ptrs
             }

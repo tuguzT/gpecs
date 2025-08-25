@@ -160,7 +160,7 @@ where
     unsafe fn len(self) -> usize {
         let buffer_layout = slice_buffer_layout(self);
         match buffer_layout.size() {
-            0 => self.into_inner().len(),
+            0 => self.into_inner_mut().len(),
             _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_len_mut()) },
         }
     }
@@ -519,7 +519,7 @@ where
     T: Soa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
-        return Ok(T::ptrs_dangling(context));
+        return Ok(T::ptrs_dangling_mut(context));
     }
 
     let buffer = unsafe { ptr_to_data(context, ptr, capacity)? };

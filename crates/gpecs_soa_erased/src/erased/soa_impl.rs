@@ -349,13 +349,9 @@ where
     }
 
     #[inline]
-    fn value_as_refs<'context, 'a>(
-        context: &'context Self::Context,
-        value: &'a Self,
-    ) -> Self::Refs<'context, 'a>
+    fn value_as_refs<'a>(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a, 'a>
     where
         Self: 'a,
-        'a: 'context,
     {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, value.field_descriptors());
@@ -364,13 +360,12 @@ where
     }
 
     #[inline]
-    fn mut_value_as_refs<'context, 'a>(
-        context: &'context Self::Context,
+    fn mut_value_as_refs<'a>(
+        context: &'a Self::Context,
         value: &'a mut Self,
-    ) -> Self::RefsMut<'context, 'a>
+    ) -> Self::RefsMut<'a, 'a>
     where
         Self: 'a,
-        'a: 'context,
     {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, value.field_descriptors());

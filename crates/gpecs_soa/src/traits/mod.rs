@@ -377,23 +377,18 @@ pub unsafe trait Soa {
 
     /// Retrieves [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
     /// from a given value reference by taking the reference of each one of them.
-    fn value_as_refs<'context, 'a>(
-        context: &'context Self::Context,
-        value: &'a Self,
-    ) -> Self::Refs<'context, 'a>
+    fn value_as_refs<'a>(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a, 'a>
     where
-        Self: 'a,
-        'a: 'context;
+        Self: 'a;
 
     /// Retrieves [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
     /// from a given mutable value reference by taking the mutable reference of each one of them.
-    fn mut_value_as_refs<'context, 'a>(
-        context: &'context Self::Context,
+    fn mut_value_as_refs<'a>(
+        context: &'a Self::Context,
         value: &'a mut Self,
-    ) -> Self::RefsMut<'context, 'a>
+    ) -> Self::RefsMut<'a, 'a>
     where
-        Self: 'a,
-        'a: 'context;
+        Self: 'a;
 
     /// Non-empty collection of slice pointers to each field of [`Fields`](Soa::Fields).
     ///

@@ -489,25 +489,20 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn value_as_refs<'context, 'a>(
-        _context: &'context Self::Context,
-        value: &'a Self,
-    ) -> Self::Refs<'context, 'a>
+    fn value_as_refs<'a>(_context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a, 'a>
     where
         Self: 'a,
-        'a: 'context,
     {
         value
     }
 
     #[inline]
-    fn mut_value_as_refs<'context, 'a>(
-        _context: &'context Self::Context,
+    fn mut_value_as_refs<'a>(
+        _context: &'a Self::Context,
         value: &'a mut Self,
-    ) -> Self::RefsMut<'context, 'a>
+    ) -> Self::RefsMut<'a, 'a>
     where
         Self: 'a,
-        'a: 'context,
     {
         value
     }

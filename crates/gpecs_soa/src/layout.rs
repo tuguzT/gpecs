@@ -114,6 +114,7 @@ where
 }
 
 const _: () = {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     const fn assert_safety_preconditions<T>()
     where
         T: Soa + ?Sized,

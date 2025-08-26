@@ -58,6 +58,7 @@ wgpu = { version = "26" }
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(target_arch, values("spirv"))',
+    'cfg(coverage, coverage_nightly)',
 ] }
 # TODO make them "warn" after implementation & tests
 missing_docs = "allow"

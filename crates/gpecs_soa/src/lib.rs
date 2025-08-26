@@ -1,6 +1,7 @@
 //! Nothing too special for now...
 
 #![cfg_attr(not(test), no_std)]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc as core_alloc;

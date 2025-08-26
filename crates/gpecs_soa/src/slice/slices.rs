@@ -272,6 +272,7 @@ impl<'c, T> From<&'c T::Context> for SoaSlices<'c, '_, T>
 where
     T: Soa + ?Sized,
 {
+    #[inline]
     fn from(context: &'c T::Context) -> Self {
         let ptrs = T::ptrs_dangling(context);
         unsafe { Self::from_parts(context, ptrs, 0) }
@@ -283,7 +284,6 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("SoaSlices").field(&slices).finish()
@@ -305,6 +305,7 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
+    #[inline]
     fn as_ref(&self) -> &[U] {
         self.as_slices()
     }
@@ -372,6 +373,7 @@ impl<T> Clone for SoaSlices<'_, '_, T>
 where
     T: Soa + ?Sized,
 {
+    #[inline]
     fn clone(&self) -> Self {
         let Self {
             context,
@@ -403,6 +405,7 @@ where
 {
     type Output = U;
 
+    #[inline]
     fn index(&self, index: I) -> &Self::Output {
         SoaSlices::index(self, index)
     }
@@ -1048,6 +1051,7 @@ impl<'c, 'a, T> From<SoaSlicesMut<'c, 'a, T>> for SoaSlices<'c, 'a, T>
 where
     T: Soa + ?Sized,
 {
+    #[inline]
     fn from(slices: SoaSlicesMut<'c, 'a, T>) -> Self {
         let (context, ptrs, len) = slices.into_parts();
 
@@ -1060,6 +1064,7 @@ impl<'c, T> From<&'c T::Context> for SoaSlicesMut<'c, '_, T>
 where
     T: Soa + ?Sized,
 {
+    #[inline]
     fn from(context: &'c T::Context) -> Self {
         let ptrs = T::ptrs_dangling_mut(context);
         unsafe { Self::from_parts(context, ptrs, 0) }
@@ -1071,7 +1076,6 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("SoaSlicesMut").field(&slices).finish()
@@ -1093,6 +1097,7 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
 {
+    #[inline]
     fn as_ref(&self) -> &[U] {
         self.as_slices()
     }
@@ -1113,6 +1118,7 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T: Soa<SlicesMut<'c, 'any> = &'any mut [U]> + 'any,
 {
+    #[inline]
     fn as_mut(&mut self) -> &mut [U] {
         self.as_mut_slices()
     }
@@ -1184,6 +1190,7 @@ where
 {
     type Output = U;
 
+    #[inline]
     fn index(&self, index: I) -> &Self::Output {
         SoaSlicesMut::index(self, index)
     }
@@ -1195,6 +1202,7 @@ where
     U: ?Sized,
     for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
+    #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         SoaSlicesMut::index_mut(self, index)
     }

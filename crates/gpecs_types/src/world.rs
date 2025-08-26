@@ -10,7 +10,7 @@ use bytemuck::{Pod, Zeroable};
 pub struct WorldId(u32);
 
 impl WorldId {
-    const MAX_ID: u32 = u16::MAX as u32;
+    const MAX: u32 = u16::MAX as u32;
 
     #[inline]
     pub const fn new() -> Self {
@@ -21,14 +21,14 @@ impl WorldId {
     #[expect(clippy::cast_possible_truncation)]
     pub const fn into_u16(self) -> u16 {
         let Self(id) = self;
-        debug_assert!(id <= Self::MAX_ID, "`WorldId` should fit into `u16`");
+        debug_assert!(id <= Self::MAX, "`WorldId` should fit into `u16`");
         id as u16
     }
 
     #[inline]
     pub const fn into_u32(self) -> u32 {
         let Self(id) = self;
-        debug_assert!(id <= Self::MAX_ID, "`WorldId` should fit into `u16`");
+        debug_assert!(id <= Self::MAX, "`WorldId` should fit into `u16`");
         id
     }
 
@@ -39,7 +39,7 @@ impl WorldId {
 
     #[inline]
     pub unsafe fn try_from_u32(id: u32) -> Result<Self, WorldIdFromU32Error> {
-        if id > Self::MAX_ID {
+        if id > Self::MAX {
             Err(WorldIdFromU32Error)
         } else {
             Ok(Self(id))
@@ -48,7 +48,7 @@ impl WorldId {
 
     #[inline]
     pub const unsafe fn from_u32(id: u32) -> Self {
-        debug_assert!(id <= Self::MAX_ID, "`WorldId` should fit into `u16`");
+        debug_assert!(id <= Self::MAX, "`WorldId` should fit into `u16`");
         Self(id)
     }
 }

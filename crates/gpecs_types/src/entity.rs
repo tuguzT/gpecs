@@ -66,8 +66,8 @@ impl Entity {
 impl Debug for Entity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let index = &self.index();
-        let epoch = &self.epoch().into_u32();
-        let world = &self.world().into_u32();
+        let epoch = &self.epoch();
+        let world = &self.world();
 
         f.debug_struct("Entity")
             .field("index", index)
@@ -108,6 +108,8 @@ impl Key for Entity {
 pub struct EntityEpoch(u32);
 
 impl EntityEpoch {
+    const MAX: u32 = u16::MAX as u32;
+
     #[inline]
     pub const fn new() -> Self {
         Self(0)
@@ -117,12 +119,14 @@ impl EntityEpoch {
     #[expect(clippy::cast_possible_truncation)]
     pub const fn into_u16(self) -> u16 {
         let Self(epoch) = self;
+        debug_assert!(epoch <= Self::MAX, "`EntityEpoch` should fit into `u16`");
         epoch as u16
     }
 
     #[inline]
     pub const fn into_u32(self) -> u32 {
         let Self(epoch) = self;
+        debug_assert!(epoch <= Self::MAX, "`EntityEpoch` should fit into `u16`");
         epoch
     }
 
@@ -133,9 +137,7 @@ impl EntityEpoch {
 
     #[inline]
     pub const fn try_from_u32(epoch: u32) -> Result<Self, EpochFromU32Error> {
-        const MAX: u32 = u16::MAX as u32;
-
-        if epoch > MAX {
+        if epoch > Self::MAX {
             Err(EpochFromU32Error)
         } else {
             Ok(Self(epoch))
@@ -144,6 +146,7 @@ impl EntityEpoch {
 
     #[inline]
     pub const unsafe fn from_u32(epoch: u32) -> Self {
+        debug_assert!(epoch <= Self::MAX, "`EntityEpoch` should fit into `u16`");
         Self(epoch)
     }
 }
@@ -184,7 +187,7 @@ pub struct EpochFromU32Error;
 
 impl Display for EpochFromU32Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "failed to convert `u32` into `Epoch`")
+        write!(f, "`EntityEpoch` should fit into `u16`")
     }
 }
 

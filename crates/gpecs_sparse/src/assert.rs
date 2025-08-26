@@ -60,7 +60,6 @@ pub fn unwrap_dense_index_mut<I>(kind: &mut SparseItemKind<I>) -> &mut I {
 #[cold]
 #[track_caller]
 #[inline(never)]
-#[cfg_attr(not(feature = "alloc"), expect(dead_code))]
 const fn unwrap_next_vacant_failed() -> ! {
     panic!("current sparse item should be vacant")
 }

@@ -12,10 +12,8 @@ use core_alloc::{
 };
 
 use crate::{
-    ptr::{
-        BufferData, BufferDataPtr, BufferDataPtrMut, buffer_layout, capacity_from, is_zst,
-        ptrs_from_buffer_mut, should_allocate, slice_from_raw_parts_mut,
-    },
+    layout::{BufferData, buffer_layout, capacity_from, is_zst, should_allocate},
+    ptr::{BufferDataPtr, BufferDataPtrMut, ptrs_from_buffer_mut, slice_from_raw_parts_mut},
     slice::SoaSlice,
     traits::{Soa, SoaTrustedFields},
 };

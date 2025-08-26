@@ -2,7 +2,7 @@ use core::{cmp, ptr};
 use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
-    ptr::{BufferData, slice_from_raw_parts_mut},
+    ptr::slice_from_raw_parts_mut,
     slice::{Iter, IterMut, SoaSlice},
     traits::{SoaRead, SoaToOwned, SoaTrustedFields},
     vec::{IntoIter, SoaVec},
@@ -133,7 +133,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        let data = ptr::dangling_mut::<BufferData<T>>();
+        let data = ptr::dangling_mut();
         unsafe { Self::from_raw(slice_from_raw_parts_mut(data, 0, 0)) }
     }
 }

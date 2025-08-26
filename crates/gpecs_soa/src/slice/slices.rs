@@ -7,12 +7,15 @@ use core::{
 };
 
 use crate::{
-    ptr::is_zst,
+    layout::is_zst,
+    slice::{
+        assert::slice_index_usize_fail,
+        index::{IndexHelper, IndexHelperMut, SoaSliceIndex},
+        iter::{Iter, IterMut},
+    },
     traits::{Soa, SoaToOwned},
     wrapper::{MutPtrs, Ptrs},
 };
-
-use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, slice_index_usize_fail};
 
 pub struct SoaSlices<'c, 'a, T>
 where

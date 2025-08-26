@@ -1,10 +1,11 @@
 use core::ops;
 
-use crate::traits::Soa;
-
-use super::{
-    slice_end_index_len_fail, slice_end_index_overflow_fail, slice_index_order_fail,
-    slice_index_usize_fail, slice_start_index_len_fail, slice_start_index_overflow_fail,
+use crate::{
+    slice::assert::{
+        slice_end_index_len_fail, slice_end_index_overflow_fail, slice_index_order_fail,
+        slice_index_usize_fail, slice_start_index_len_fail, slice_start_index_overflow_fail,
+    },
+    traits::Soa,
 };
 
 pub unsafe trait SoaSliceIndex<T>: private_slice_index::Sealed
@@ -930,4 +931,72 @@ mod private_slice_index {
     impl Sealed for ops::RangeToInclusive<usize> {}
 
     impl Sealed for (ops::Bound<usize>, ops::Bound<usize>) {}
+}
+
+pub trait IndexHelper<'c, 'a, T>
+where
+    Self: SoaSliceIndex<T, Refs<'c, 'a> = &'a Self::Output>,
+    T: Soa + ?Sized + 'a,
+{
+    type Output: ?Sized + 'a;
+}
+
+impl<'c, 'a, T, I, U> IndexHelper<'c, 'a, T> for I
+where
+    U: ?Sized + 'a,
+    T: Soa + ?Sized + 'a,
+    I: SoaSliceIndex<T, Refs<'c, 'a> = &'a U>,
+{
+    type Output = U;
+}
+
+pub trait IndexHelperMut<'c, 'a, T>
+where
+    Self: IndexHelper<'c, 'a, T> + SoaSliceIndex<T, RefsMut<'c, 'a> = &'a mut Self::Output>,
+    T: Soa + ?Sized + 'a,
+{
+}
+
+impl<'c, 'a, T, I, U> IndexHelperMut<'c, 'a, T> for I
+where
+    U: ?Sized + 'a,
+    T: Soa + ?Sized + 'a,
+    I: IndexHelper<'c, 'a, T, Output = U> + SoaSliceIndex<T, RefsMut<'c, 'a> = &'a mut U>,
+{
+}
+
+/// Just a copy of unstable [`core::slice::range`]
+#[must_use]
+#[track_caller]
+#[doc(hidden)]
+pub fn range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>
+where
+    R: ops::RangeBounds<usize>,
+{
+    let len = bounds.end;
+
+    let start = match range.start_bound() {
+        ops::Bound::Included(&start) => start,
+        ops::Bound::Excluded(start) => start
+            .checked_add(1)
+            .unwrap_or_else(|| slice_start_index_overflow_fail()),
+        ops::Bound::Unbounded => 0,
+    };
+
+    let end = match range.end_bound() {
+        ops::Bound::Included(end) => end
+            .checked_add(1)
+            .unwrap_or_else(|| slice_end_index_overflow_fail()),
+        ops::Bound::Excluded(&end) => end,
+        ops::Bound::Unbounded => len,
+    };
+
+    if start > end {
+        slice_index_order_fail(start, end);
+    }
+    if end > len {
+        slice_end_index_len_fail(end, len);
+    }
+
+    ops::Range { start, end }
 }

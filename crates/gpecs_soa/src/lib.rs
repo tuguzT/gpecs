@@ -19,3 +19,4 @@ pub mod wrapper;
 
 #[cfg(feature = "alloc")]
 mod alloc;
+mod layout;

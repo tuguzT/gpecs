@@ -12,10 +12,8 @@ use core_alloc::boxed::Box;
 pub use super::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
-    ptr::{
-        BufferData, BufferDataPtr, BufferDataPtrMut, buffer_layout, capacity_from,
-        ptrs_from_buffer, ptrs_from_buffer_mut, should_allocate,
-    },
+    layout::{BufferData, buffer_layout, capacity_from, should_allocate},
+    ptr::{BufferDataPtr, BufferDataPtrMut, ptrs_from_buffer, ptrs_from_buffer_mut},
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
         from_raw_parts, from_raw_parts_mut, range,

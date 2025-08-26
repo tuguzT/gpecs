@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    ptr::is_zst,
+    layout::is_zst,
     slice::{Iter, SoaSlices, range},
     traits::SoaRead,
 };

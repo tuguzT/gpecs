@@ -7,8 +7,9 @@ use core::{
 };
 
 use crate::{
+    layout::BufferData,
     ptr::{
-        BufferData, SoaSlicePtr, ptrs_from_buffer, ptrs_from_buffer_mut, slice_from_raw_parts,
+        SoaSlicePtr, ptrs_from_buffer, ptrs_from_buffer_mut, slice_from_raw_parts,
         slice_from_raw_parts_mut,
     },
     traits::{SoaToOwned, SoaTrustedFields},

@@ -16,9 +16,6 @@ macro_rules! __impl_slice_eq {
         {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool { self.as_slices() == other.as_slices() }
-            #[inline]
-            #[expect(clippy::partialeq_ne_impl)]
-            fn ne(&self, other: &$rhs) -> bool { self.as_slices() != other.as_slices() }
         }
     }
 }
@@ -31,11 +28,6 @@ where
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.as_slices() == other.as_slices()
-    }
-    #[inline]
-    #[expect(clippy::partialeq_ne_impl)]
-    fn ne(&self, other: &Self) -> bool {
-        self.as_slices() != other.as_slices()
     }
 }
 

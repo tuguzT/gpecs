@@ -320,12 +320,6 @@ where
     fn eq(&self, other: &Self) -> bool {
         self.as_slices() == other.as_slices()
     }
-
-    #[inline]
-    #[expect(clippy::partialeq_ne_impl)]
-    fn ne(&self, other: &Self) -> bool {
-        self.as_slices() != other.as_slices()
-    }
 }
 
 impl<T> Eq for SoaSlices<'_, '_, T>
@@ -1132,12 +1126,6 @@ where
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.as_slices() == other.as_slices()
-    }
-
-    #[inline]
-    #[expect(clippy::partialeq_ne_impl)]
-    fn ne(&self, other: &Self) -> bool {
-        self.as_slices() != other.as_slices()
     }
 }
 

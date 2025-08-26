@@ -12,21 +12,41 @@ fn empty() {
     let slices = Slices::new(&context, (&[], &[], &[], &[]));
     assert!(slices.is_empty());
     assert_eq!(slices.get(0), None);
+    assert_eq!(slices, Slices::from(&context));
     assert_eq!(format!("{slices:?}"), "SoaSlices(([], [], [], []))");
 
     let mut iter = slices.into_iter();
     assert_eq!(iter.len(), 0);
     assert_eq!(iter.next(), None);
 
+    let slices = slices.into_slices();
+    assert_eq!(
+        slices,
+        ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
+    );
+
     let mut slices_mut = SlicesMut::new(&context, (&mut [], &mut [], &mut [], &mut []));
     assert!(slices_mut.is_empty());
     assert_eq!(slices_mut.get_mut(0), None);
+    assert_eq!(slices_mut, SlicesMut::from(&context));
     assert_eq!(format!("{slices_mut:?}"), "SoaSlicesMut(([], [], [], []))");
 
     let mut iter = slices_mut.iter_mut();
     assert_eq!(iter.len(), 0);
     assert_eq!(iter.next(), None);
 
+    let slices_mut = slices_mut.into_slices();
+    assert_eq!(
+        slices_mut,
+        (
+            [].as_mut_slice(),
+            [].as_mut_slice(),
+            [].as_mut_slice(),
+            [].as_mut_slice(),
+        ),
+    );
+
+    let slices_mut = SlicesMut::new(&context, slices_mut);
     let slices = Slices::from(slices_mut);
     assert!(slices.is_empty());
     assert_eq!(slices.get(0), None);
@@ -43,21 +63,33 @@ fn empty_zst() {
     let slices = Slices::new(&context, (&[], &[], &[]));
     assert!(slices.is_empty());
     assert_eq!(slices.get(0), None);
+    assert_eq!(slices, Slices::from(&context));
     assert_eq!(format!("{slices:?}"), "SoaSlices(([], [], []))");
 
     let mut iter = slices.into_iter();
     assert_eq!(iter.len(), 0);
     assert_eq!(iter.next(), None);
 
+    let slices = slices.into_slices();
+    assert_eq!(slices, ([].as_slice(), [].as_slice(), [].as_slice()));
+
     let mut slices_mut = SlicesMut::new(&context, (&mut [], &mut [], &mut []));
     assert!(slices_mut.is_empty());
     assert_eq!(slices_mut.get_mut(0), None);
+    assert_eq!(slices_mut, SlicesMut::from(&context));
     assert_eq!(format!("{slices_mut:?}"), "SoaSlicesMut(([], [], []))");
 
     let mut iter = slices_mut.iter_mut();
     assert_eq!(iter.len(), 0);
     assert_eq!(iter.next(), None);
 
+    let slices_mut = slices_mut.into_slices();
+    assert_eq!(
+        slices_mut,
+        ([].as_mut_slice(), [].as_mut_slice(), [].as_mut_slice()),
+    );
+
+    let slices_mut = SlicesMut::new(&context, slices_mut);
     let slices = Slices::from(slices_mut);
     assert!(slices.is_empty());
     assert_eq!(slices.get(0), None);
@@ -102,6 +134,7 @@ fn one_item() {
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
     assert_eq!(slices.index(0), (&1, &2, &3, &()));
+    assert_ne!(slices, Slices::from(&context));
     assert_eq!(format!("{slices:?}"), "SoaSlices(([1], [2], [3], [()]))");
 
     let mut iter = slices.into_iter();
@@ -137,6 +170,7 @@ fn one_item() {
             [()].as_mut_slice(),
         ),
     );
+    assert_ne!(slices_mut, SlicesMut::from(&context));
     assert_eq!(
         format!("{slices_mut:?}"),
         "SoaSlicesMut(([0], [0], [0], [()]))",
@@ -194,6 +228,7 @@ fn one_item_zst() {
         ([].as_slice(), [].as_slice(), [].as_slice()),
     );
     assert_eq!(slices.get(0), Some((&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert_ne!(slices, Slices::from(&context));
     assert_eq!(
         format!("{slices:?}"),
         "SoaSlices(([ZST1], [ZST2(())], [ZST3 { empty: () }]))",
@@ -234,6 +269,7 @@ fn one_item_zst() {
         slices_mut.index_mut(0),
         (&mut ZST1, &mut ZST2(()), &mut ZST3 { empty: () }),
     );
+    assert_ne!(slices_mut, SlicesMut::from(&context));
     assert_eq!(
         format!("{slices_mut:?}"),
         "SoaSlicesMut(([ZST1], [ZST2(())], [ZST3 { empty: () }]))",
@@ -316,6 +352,7 @@ fn three_items() {
             [(), ()].as_slice(),
         ),
     );
+    assert_ne!(slices_mut, SlicesMut::from(&context));
     assert_eq!(
         format!("{slices_mut:?}"),
         r#"SoaSlicesMut(([1, 2, 3], ["4", "5", "6"], [7, 8, 9], [(), (), ()]))"#,
@@ -412,6 +449,7 @@ fn three_items() {
             [(), (), ()].as_slice(),
         ),
     );
+    assert_ne!(slices, Slices::from(&context));
     assert_eq!(
         format!("{slices:?}"),
         r#"SoaSlices(([1, 0, 0], ["4", "0", "0"], [7, 0, 0], [(), (), ()]))"#,
@@ -487,6 +525,7 @@ fn three_items_zst() {
             [ZST3 { empty: () }; 2].as_slice(),
         ),
     );
+    assert_ne!(slices_mut, SlicesMut::from(&context));
     assert_eq!(
         format!("{slices_mut:?}"),
         r#"SoaSlicesMut(([ZST1, ZST1, ZST1], [ZST2(()), ZST2(()), ZST2(())], [ZST3 { empty: () }, ZST3 { empty: () }, ZST3 { empty: () }]))"#,
@@ -578,6 +617,7 @@ fn three_items_zst() {
             [ZST3 { empty: () }; 3].as_slice(),
         ),
     );
+    assert_ne!(slices, Slices::from(&context));
     assert_eq!(
         format!("{slices:?}"),
         r#"SoaSlices(([ZST1, ZST1, ZST1], [ZST2(()), ZST2(()), ZST2(())], [ZST3 { empty: () }, ZST3 { empty: () }, ZST3 { empty: () }]))"#,

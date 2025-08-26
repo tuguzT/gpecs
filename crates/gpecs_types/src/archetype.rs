@@ -65,8 +65,7 @@ impl From<GpuArchetypeId> for u32 {
 impl From<GpuArchetypeId> for ArchetypeId {
     #[inline]
     fn from(id: GpuArchetypeId) -> Self {
-        let GpuArchetypeId(id) = id;
-        id
+        id.into_id()
     }
 }
 

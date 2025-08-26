@@ -146,9 +146,8 @@ where
         }
 
         unsafe {
-            let ptrs = T::ptrs_from_buffer(context, buffer.cast_mut(), capacity);
-            let ptrs = T::ptrs_add_mut(context, ptrs, offset);
-            let ptrs = T::ptrs_cast_const(context, ptrs);
+            let ptrs = T::ptrs_from_buffer(context, buffer, capacity);
+            let ptrs = T::ptrs_add(context, ptrs, offset);
             Ok(ptrs)
         }
     }

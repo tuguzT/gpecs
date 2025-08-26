@@ -90,6 +90,22 @@ where
         KeyValuePtrs::dangling(context)
     }
 
+    #[inline]
+    unsafe fn ptrs_from_buffer(
+        context: &Self::Context,
+        buffer: *const u8,
+        capacity: usize,
+    ) -> Self::Ptrs<'_> {
+        let keys = unsafe { Layout::array::<K>(capacity).unwrap_unchecked() };
+        let values = unsafe { V::buffer_layout(context, capacity).unwrap_unchecked() };
+        let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
+
+        let key = buffer.cast();
+        let buffer = unsafe { buffer.add(offset) };
+        let value = Ptrs::new(unsafe { V::ptrs_from_buffer(context, buffer, capacity) });
+        KeyValuePtrs { key, value }
+    }
+
     type MutPtrs<'context> = KeyValueMutPtrs<'context, K, V>;
 
     #[inline]
@@ -103,7 +119,7 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer(
+    unsafe fn ptrs_from_buffer_mut(
         context: &Self::Context,
         buffer: *mut u8,
         capacity: usize,
@@ -114,7 +130,7 @@ where
 
         let key = buffer.cast();
         let buffer = unsafe { buffer.add(offset) };
-        let value = MutPtrs::new(unsafe { V::ptrs_from_buffer(context, buffer, capacity) });
+        let value = MutPtrs::new(unsafe { V::ptrs_from_buffer_mut(context, buffer, capacity) });
         KeyValueMutPtrs { key, value }
     }
 

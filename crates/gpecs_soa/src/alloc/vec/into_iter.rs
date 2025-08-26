@@ -32,9 +32,9 @@ where
     pub(super) fn new(vec: SoaVec<T>) -> Self {
         let vec = ManuallyDrop::new(vec);
 
-        let buffer = vec.buffer.ptr();
+        let buffer = vec.buffer.as_mut_ptr();
         let context = vec.context();
-        let ptrs = unsafe { T::ptrs_to_nonnull(context, vec.buffer.ptrs()) };
+        let ptrs = unsafe { T::ptrs_to_nonnull(context, vec.buffer.as_mut_ptrs()) };
         let ptrs = unsafe { transmute::<T::NonNullPtrs<'_>, T::NonNullPtrs<'_>>(ptrs) };
         Self {
             buffer: unsafe { NonNull::new_unchecked(buffer) },

@@ -50,6 +50,16 @@ where
         ErasedSoaPtrs::dangling(descriptors)
     }
 
+    #[inline]
+    unsafe fn ptrs_from_buffer(
+        context: &Self::Context,
+        buffer: *const u8,
+        capacity: usize,
+    ) -> Self::Ptrs<'_> {
+        let descriptors = context.field_descriptors();
+        unsafe { ErasedSoaPtrs::new(descriptors, buffer, capacity, 0) }
+    }
+
     type MutPtrs<'context> = ErasedSoaMutPtrs<&'context [FieldDescriptor]>;
 
     #[inline]
@@ -64,7 +74,7 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer(
+    unsafe fn ptrs_from_buffer_mut(
         context: &Self::Context,
         buffer: *mut u8,
         capacity: usize,

@@ -207,7 +207,7 @@ where
                     let tail = tail_start;
                     if tail != start {
                         let src = source_vec.as_ptrs();
-                        let dst = source_vec.buffer.ptrs();
+                        let dst = source_vec.buffer.as_mut_ptrs();
                         let context = source_vec.context();
 
                         let src = T::ptrs_add(context, src, tail);

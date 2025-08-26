@@ -27,7 +27,7 @@ where
                 vec: &mut vec,
                 local_len: 0,
             };
-            let ptrs: T::MutPtrs<'_> = set_len_on_drop.vec.buffer.ptrs();
+            let ptrs: T::MutPtrs<'_> = set_len_on_drop.vec.buffer.as_mut_ptrs();
             let context = set_len_on_drop.vec.context();
             for (index, refs) in self.clone().into_iter().enumerate() {
                 set_len_on_drop.local_len = index;
@@ -66,7 +66,7 @@ where
                 vec: &mut vec,
                 local_len: 0,
             };
-            let ptrs: T::MutPtrs<'_> = set_len_on_drop.vec.buffer.ptrs();
+            let ptrs: T::MutPtrs<'_> = set_len_on_drop.vec.buffer.as_mut_ptrs();
             let context = set_len_on_drop.vec.context();
 
             let slices = {

@@ -267,6 +267,17 @@ unsafe impl<T> Soa for Identity<T> {
         ptr::dangling()
     }
 
+    #[inline]
+    unsafe fn ptrs_from_buffer(
+        _context: &Self::Context,
+        buffer: *const u8,
+        _capacity: usize,
+    ) -> Self::Ptrs<'_> {
+        let ptrs = buffer.cast();
+        debug_assert_ptr_is_aligned(ptrs);
+        ptrs
+    }
+
     type MutPtrs<'context> = *mut Self;
 
     #[inline]
@@ -280,7 +291,7 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer(
+    unsafe fn ptrs_from_buffer_mut(
         _context: &Self::Context,
         buffer: *mut u8,
         _capacity: usize,

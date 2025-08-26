@@ -140,7 +140,7 @@ where
         }
 
         unsafe {
-            let ptrs = T::ptrs_from_buffer(context, buffer, capacity);
+            let ptrs = T::ptrs_from_buffer_mut(context, buffer, capacity);
             let ptrs = T::ptrs_add_mut(context, ptrs, offset);
             let refs = T::ptrs_to_refs_mut(context, ptrs);
             Ok(refs)

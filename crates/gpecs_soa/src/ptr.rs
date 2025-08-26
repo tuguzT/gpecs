@@ -103,7 +103,7 @@ where
         let buffer_layout = slice_buffer_layout(self);
         match buffer_layout.size() {
             0 => self.into_inner().len(),
-            _ => unsafe { ptr::read(self.as_ptr().ptr_to_len()) },
+            _ => unsafe { self.as_ptr().len() },
         }
     }
 
@@ -117,7 +117,7 @@ where
         let buffer_layout = slice_buffer_layout(self);
         match buffer_layout.size() {
             0 => 0,
-            _ => unsafe { ptr::read(self.as_ptr().ptr_to_capacity()) },
+            _ => unsafe { self.as_ptr().capacity() },
         }
     }
 }
@@ -161,7 +161,7 @@ where
         let buffer_layout = slice_buffer_layout(self);
         match buffer_layout.size() {
             0 => self.into_inner_mut().len(),
-            _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_len_mut()) },
+            _ => unsafe { self.as_mut_ptr().len() },
         }
     }
 
@@ -175,7 +175,7 @@ where
         let buffer_layout = slice_buffer_layout(self);
         match buffer_layout.size() {
             0 => 0,
-            _ => unsafe { ptr::read(self.as_mut_ptr().ptr_to_capacity_mut()) },
+            _ => unsafe { self.as_mut_ptr().capacity() },
         }
     }
 }
@@ -206,6 +206,23 @@ where
         let context = unsafe { NonNull::new_unchecked(context.cast_mut()) };
         unsafe { context.as_ref() }
     }
+
+    #[inline]
+    unsafe fn len(self) -> usize {
+        let len = unsafe { self.ptr_to_len() };
+        unsafe { ptr::read(len) }
+    }
+
+    #[inline]
+    unsafe fn is_empty(self) -> bool {
+        unsafe { self.len() == 0 }
+    }
+
+    #[inline]
+    unsafe fn capacity(self) -> usize {
+        let capacity = unsafe { self.ptr_to_capacity() };
+        unsafe { ptr::read(capacity) }
+    }
 }
 
 impl<T> BufferDataPtr<T> for *const BufferData<T>
@@ -234,8 +251,8 @@ where
     #[inline]
     unsafe fn ptr_to_data(self) -> *const u8 {
         let context = unsafe { self.context() };
-        let capacity = unsafe { ptr::read(self.ptr_to_capacity()) };
-        unsafe { ptr_to_data(context, self.cast_mut(), capacity).unwrap_unchecked() }.cast_const()
+        let capacity = unsafe { self.capacity() };
+        unsafe { ptr_to_data(context, self, capacity).unwrap_unchecked() }
     }
 }
 
@@ -300,8 +317,8 @@ where
     #[inline]
     unsafe fn ptr_to_data_mut(self) -> *mut u8 {
         let context = unsafe { self.context() };
-        let capacity = unsafe { ptr::read(self.ptr_to_capacity()) };
-        unsafe { ptr_to_data(context, self, capacity).unwrap_unchecked() }
+        let capacity = unsafe { self.capacity() };
+        unsafe { ptr_to_data_mut(context, self, capacity).unwrap_unchecked() }
     }
 }
 
@@ -510,24 +527,56 @@ where
 }
 
 #[inline]
-pub(crate) unsafe fn ptrs<T>(
+pub(crate) unsafe fn ptrs_from_buffer<T>(
     context: &T::Context,
-    ptr: *mut BufferData<T>,
+    ptr: *const BufferData<T>,
     capacity: usize,
-) -> Result<T::MutPtrs<'_>, LayoutError>
+) -> T::Ptrs<'_>
 where
     T: Soa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
-        return Ok(T::ptrs_dangling_mut(context));
+        return T::ptrs_dangling(context);
     }
 
-    let buffer = unsafe { ptr_to_data(context, ptr, capacity)? };
-    let ptrs = unsafe { T::ptrs_from_buffer(context, buffer, capacity) };
-    Ok(ptrs)
+    let buffer = unsafe { ptr_to_data(context, ptr, capacity).unwrap_unchecked() };
+    unsafe { T::ptrs_from_buffer(context, buffer, capacity) }
+}
+
+#[inline]
+pub(crate) unsafe fn ptrs_from_buffer_mut<T>(
+    context: &T::Context,
+    ptr: *mut BufferData<T>,
+    capacity: usize,
+) -> T::MutPtrs<'_>
+where
+    T: Soa + ?Sized,
+{
+    if is_zst::<T>(context) || capacity == 0 {
+        return T::ptrs_dangling_mut(context);
+    }
+
+    let buffer = unsafe { ptr_to_data_mut(context, ptr, capacity).unwrap_unchecked() };
+    unsafe { T::ptrs_from_buffer_mut(context, buffer, capacity) }
 }
 
 unsafe fn ptr_to_data<T>(
+    context: &T::Context,
+    ptr: *const BufferData<T>,
+    capacity: usize,
+) -> Result<*const u8, LayoutError>
+where
+    T: Soa + ?Sized,
+{
+    let layout = T::buffer_layout(context, capacity)?;
+    let prefix_layout = Layout::new::<BufferPrefix<T>>();
+    let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
+
+    let buffer = unsafe { ptr.cast::<u8>().add(offset_from_prefix) };
+    Ok(buffer)
+}
+
+unsafe fn ptr_to_data_mut<T>(
     context: &T::Context,
     ptr: *mut BufferData<T>,
     capacity: usize,

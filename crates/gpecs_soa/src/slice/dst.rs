@@ -7,7 +7,10 @@ use core::{
 };
 
 use crate::{
-    ptr::{BufferData, SoaSlicePtr, ptrs, slice_from_raw_parts, slice_from_raw_parts_mut},
+    ptr::{
+        BufferData, SoaSlicePtr, ptrs_from_buffer, ptrs_from_buffer_mut, slice_from_raw_parts,
+        slice_from_raw_parts_mut,
+    },
     traits::{SoaToOwned, SoaTrustedFields},
 };
 
@@ -62,9 +65,7 @@ where
         let ptr = self.as_ptr().cast_mut();
         let context = self.context();
         let capacity = self.capacity();
-
-        let ptrs = unsafe { ptrs::<T>(context, ptr, capacity).unwrap_unchecked() };
-        T::ptrs_cast_const(context, ptrs)
+        unsafe { ptrs_from_buffer::<T>(context, ptr, capacity) }
     }
 
     #[inline]
@@ -72,8 +73,7 @@ where
         let ptr = self.as_mut_ptr();
         let context = self.context();
         let capacity = self.capacity();
-
-        unsafe { ptrs::<T>(context, ptr, capacity).unwrap_unchecked() }
+        unsafe { ptrs_from_buffer_mut::<T>(context, ptr, capacity) }
     }
 
     #[inline]

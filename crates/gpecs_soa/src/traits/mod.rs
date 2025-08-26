@@ -80,6 +80,22 @@ pub unsafe trait Soa {
     /// Returns dangling [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields).
     fn ptrs_dangling(context: &Self::Context) -> Self::Ptrs<'_>;
 
+    /// Creates [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
+    /// from a given buffer with given capacity.
+    ///
+    /// Implementations of this method should not account for a [`Context`](Soa::Context),
+    /// as it is handled by the crate itself.
+    ///
+    /// # Safety
+    ///
+    /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
+    /// must be the same as the one returned by [`buffer_layout()`](Soa::buffer_layout) method.
+    unsafe fn ptrs_from_buffer(
+        context: &Self::Context,
+        buffer: *const u8,
+        capacity: usize,
+    ) -> Self::Ptrs<'_>;
+
     /// Non-empty collection of mutable pointers to each field of [`Fields`](Soa::Fields).
     ///
     /// Unlike [field descriptors](Soa::FieldDescriptors),
@@ -94,7 +110,7 @@ pub unsafe trait Soa {
     /// Returns mutable dangling [pointers](Soa::MutPtrs) to each field of [`Fields`](Soa::Fields).
     fn ptrs_dangling_mut(context: &Self::Context) -> Self::MutPtrs<'_>;
 
-    /// Creates [pointers](Soa::Ptrs) to each field of [`Fields`](Soa::Fields)
+    /// Creates [mutable pointers](Soa::MutPtrs) to each field of [`Fields`](Soa::Fields)
     /// from a given buffer with given capacity.
     ///
     /// Implementations of this method should not account for a [`Context`](Soa::Context),
@@ -104,7 +120,7 @@ pub unsafe trait Soa {
     ///
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
     /// must be the same as the one returned by [`buffer_layout()`](Soa::buffer_layout) method.
-    unsafe fn ptrs_from_buffer(
+    unsafe fn ptrs_from_buffer_mut(
         context: &Self::Context,
         buffer: *mut u8,
         capacity: usize,

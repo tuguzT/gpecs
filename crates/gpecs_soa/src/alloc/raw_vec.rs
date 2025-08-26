@@ -13,8 +13,8 @@ use core_alloc::{
 
 use crate::{
     ptr::{
-        BufferData, BufferDataPtr, BufferDataPtrMut, buffer_layout, capacity_from, is_zst, ptrs,
-        should_allocate, slice_from_raw_parts_mut,
+        BufferData, BufferDataPtr, BufferDataPtrMut, buffer_layout, capacity_from, is_zst,
+        ptrs_from_buffer_mut, should_allocate, slice_from_raw_parts_mut,
     },
     slice::SoaSlice,
     traits::{Soa, SoaTrustedFields},
@@ -85,11 +85,6 @@ impl Display for TryReserveError {
 
 impl Error for TryReserveError {}
 
-#[inline(never)]
-const fn capacity_overflow() -> ! {
-    panic!("capacity overflow");
-}
-
 #[derive(Debug, Clone, Copy)]
 enum AllocInit {
     /// The contents of the new memory are uninitialized.
@@ -152,8 +147,7 @@ where
             AllocInit::Zeroed => unsafe { alloc_zeroed(layout) },
         };
         let Some(ptr) = NonNull::new(ptr) else {
-            #[rustfmt::skip]
-            return Err(AllocError { layout, non_exhaustive: () }.into());
+            return Err(alloc_error(layout).into());
         };
 
         let ptr: NonNull<BufferData<_>> = ptr.cast();
@@ -227,19 +221,15 @@ where
         );
 
         let me = ManuallyDrop::new(self);
-        unsafe {
-            let slice = slice_from_raw_parts_mut(me.ptr(), len, me.capacity());
-            Box::from_raw(slice)
-        }
+        let slice = unsafe { slice_from_raw_parts_mut(me.as_mut_ptr(), len, me.capacity()) };
+        unsafe { Box::from_raw(slice) }
     }
 
     #[inline]
     #[must_use]
     pub unsafe fn from_raw_parts(ptr: *mut BufferData<T>, capacity: usize) -> Self {
-        unsafe {
-            let ptr = NonNull::new_unchecked(ptr);
-            Self::from_nonnull(ptr, capacity)
-        }
+        let ptr = unsafe { NonNull::new_unchecked(ptr) };
+        unsafe { Self::from_nonnull(ptr, capacity) }
     }
 
     #[inline]
@@ -249,34 +239,36 @@ where
     }
 
     #[inline]
-    pub fn ptr(&self) -> *mut BufferData<T> {
-        self.non_null().as_ptr()
+    pub fn as_mut_ptr(&self) -> *mut BufferData<T> {
+        let Self { ptr, .. } = *self;
+        ptr.as_ptr()
     }
 
     #[inline]
-    pub fn non_null(&self) -> NonNull<BufferData<T>> {
+    #[expect(dead_code)]
+    pub fn as_nonnull_ptr(&self) -> NonNull<BufferData<T>> {
         let Self { ptr, .. } = *self;
         ptr
     }
 
     #[inline]
     pub fn context(&self) -> &T::Context {
-        let ptr = self.ptr();
+        let ptr = self.as_mut_ptr();
         unsafe { ptr.context() }
     }
 
     #[inline]
-    pub fn ptrs(&self) -> T::MutPtrs<'_> {
-        let ptr = self.ptr();
+    pub fn as_mut_ptrs(&self) -> T::MutPtrs<'_> {
+        let ptr = self.as_mut_ptr();
         let context = self.context();
         let capacity = self.capacity();
-        unsafe { ptrs::<T>(context, ptr, capacity).unwrap_unchecked() }
+        unsafe { ptrs_from_buffer_mut::<T>(context, ptr, capacity) }
     }
 
     #[inline]
     #[expect(dead_code)]
-    pub fn non_nulls(&self) -> T::NonNullPtrs<'_> {
-        let ptrs = self.ptrs();
+    pub fn as_nonnull_ptrs(&self) -> T::NonNullPtrs<'_> {
+        let ptrs = self.as_mut_ptrs();
         let context = self.context();
         unsafe { T::ptrs_to_nonnull(context, ptrs) }
     }
@@ -452,8 +444,7 @@ where
 
         let ptr = unsafe { realloc(ptr.as_ptr(), old_layout, new_layout.size()) };
         let Some(ptr) = NonNull::new(ptr) else {
-            #[rustfmt::skip]
-            return Err(AllocError { layout: new_layout, non_exhaustive: () }.into());
+            return Err(alloc_error(new_layout).into());
         };
         unsafe {
             self.set_ptr_and_capacity(ptr.cast(), capacity);
@@ -510,8 +501,20 @@ fn finish_grow(
 
     match NonNull::new(ptr) {
         Some(ptr) => Ok(ptr),
-        #[rustfmt::skip]
-        None => Err(AllocError { layout: new_layout, non_exhaustive: () }.into()),
+        None => Err(alloc_error(new_layout).into()),
+    }
+}
+
+#[inline(never)]
+fn capacity_overflow() -> ! {
+    panic!("capacity overflow");
+}
+
+#[inline]
+fn alloc_error(layout: Layout) -> TryReserveErrorKind {
+    AllocError {
+        layout,
+        non_exhaustive: (),
     }
 }
 

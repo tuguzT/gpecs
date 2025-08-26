@@ -115,10 +115,10 @@ where
             return Err(ErasedSoaIntoValueError::new(self, error.into()));
         }
 
-        let Self { mut bytes, .. } = self;
+        let Self { bytes, .. } = self;
         let value = unsafe {
-            let src = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
-            T::read(context, T::ptrs_cast_const(context, src))
+            let src = T::ptrs_from_buffer(context, bytes.as_ptr(), 1);
+            T::read(context, src)
         };
         Ok(value)
     }
@@ -200,7 +200,7 @@ where
         check_layout(layout, expected_layout)?;
 
         unsafe {
-            let dst = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
+            let dst = T::ptrs_from_buffer_mut(context, bytes.as_mut_ptr(), 1);
             T::write(context, dst, value);
         }
 
@@ -228,7 +228,7 @@ where
         let mut bytes = B::from_layout(layout).map_err(ErasedSoaFromValueError::FromLayout)?;
 
         unsafe {
-            let dst = T::ptrs_from_buffer(context, bytes.as_mut_ptr(), 1);
+            let dst = T::ptrs_from_buffer_mut(context, bytes.as_mut_ptr(), 1);
             T::write(context, dst, value);
         }
 

@@ -13,8 +13,8 @@ pub use super::raw_vec::{TryReserveError, TryReserveErrorKind};
 
 use crate::{
     ptr::{
-        BufferData, BufferDataPtr, BufferDataPtrMut, buffer_layout, capacity_from, ptrs,
-        should_allocate,
+        BufferData, BufferDataPtr, BufferDataPtrMut, buffer_layout, capacity_from,
+        ptrs_from_buffer, ptrs_from_buffer_mut, should_allocate,
     },
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
@@ -146,11 +146,8 @@ where
         let ptr = self.as_mut_ptr();
         let context = self.context();
 
-        let old_ptrs = unsafe {
-            let ptrs = ptrs::<T>(context, ptr, old_capacity).unwrap_unchecked();
-            T::ptrs_cast_const(context, ptrs)
-        };
-        let new_ptrs = self.buffer.ptrs();
+        let old_ptrs = unsafe { ptrs_from_buffer::<T>(context, ptr, old_capacity) };
+        let new_ptrs = self.buffer.as_mut_ptrs();
 
         unsafe { T::ptrs_copy_rev(context, old_ptrs, new_ptrs, self.len()) }
     }
@@ -166,7 +163,7 @@ where
         let context = self.context();
 
         let old_ptrs = self.as_ptrs();
-        let new_ptrs = unsafe { ptrs::<T>(context, ptr, new_capacity).unwrap_unchecked() };
+        let new_ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr, new_capacity) };
 
         unsafe { T::ptrs_copy(context, old_ptrs, new_ptrs, self.len()) }
     }
@@ -271,7 +268,7 @@ where
             self.set_len(len);
 
             let context = self.context();
-            let ptrs = T::ptrs_add_mut(context, self.buffer.ptrs(), len);
+            let ptrs = T::ptrs_add_mut(context, self.buffer.as_mut_ptrs(), len);
             let slices = T::slices_from_raw_parts_mut(context, ptrs, remaining_len);
             T::slices_drop_in_place(context, slices);
         }
@@ -280,19 +277,19 @@ where
     #[inline]
     pub fn as_ptr(&self) -> *const BufferData<T> {
         let Self { buffer, .. } = self;
-        buffer.ptr().cast_const()
+        buffer.as_mut_ptr().cast_const()
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
         let Self { buffer, .. } = self;
-        buffer.ptr()
+        buffer.as_mut_ptr()
     }
 
     #[inline]
     pub fn as_ptrs(&self) -> T::Ptrs<'_> {
         let Self { buffer, .. } = self;
-        let ptrs = buffer.ptrs();
+        let ptrs = buffer.as_mut_ptrs();
         let context = self.context();
         T::ptrs_cast_const(context, ptrs)
     }
@@ -300,7 +297,7 @@ where
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> T::MutPtrs<'_> {
         let Self { buffer, .. } = self;
-        buffer.ptrs()
+        buffer.as_mut_ptrs()
     }
 
     #[inline]
@@ -315,7 +312,7 @@ where
 
     #[inline]
     pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_, '_> {
-        let ptrs = self.buffer.ptrs();
+        let ptrs = self.buffer.as_mut_ptrs();
         let len = self.len();
         let context = self.context();
 
@@ -420,7 +417,7 @@ where
                 } = *self;
 
                 if deleted_cnt > 0 {
-                    let ptrs = v.buffer.ptrs();
+                    let ptrs = v.buffer.as_mut_ptrs();
                     let context = v.context();
                     // SAFETY: Trailing unchecked items must be valid since we never touch them.
                     unsafe {
@@ -454,7 +451,7 @@ where
             F: FnMut(T::RefsMut<'_, '_>) -> bool,
         {
             while g.processed_len != original_len {
-                let ptrs = g.v.buffer.ptrs();
+                let ptrs = g.v.buffer.as_mut_ptrs();
                 let context = g.v.context();
                 // SAFETY: Unchecked element must be valid.
                 let cur = unsafe { T::ptrs_add_mut(context, ptrs, g.processed_len) };
@@ -480,7 +477,7 @@ where
                 }
 
                 if DELETED {
-                    let ptrs = g.v.buffer.ptrs();
+                    let ptrs = g.v.buffer.as_mut_ptrs();
                     let context = g.v.context();
                     // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
                     // We use copy for move, and never touch this element again.
@@ -523,7 +520,7 @@ where
             let slices = set_len_on_drop.vec.slices();
             let refs = unsafe { T::ptrs_to_refs(context, slices.get_unchecked(index)) };
             unsafe {
-                let ptrs = set_len_on_drop.vec.buffer.ptrs();
+                let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
                 let dst = T::ptrs_add_mut(context, ptrs, set_len_on_drop.local_len);
                 refs.clone_into_ptrs(context, dst);
             }
@@ -558,7 +555,7 @@ where
         }
 
         let context = self.context();
-        let ptrs = self.buffer.ptrs();
+        let ptrs = self.buffer.as_mut_ptrs();
         let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
         unsafe { T::slices_drop_in_place(context, slices) }
     }
@@ -579,7 +576,7 @@ where
             assert_failed(index, len);
         }
 
-        let ptrs = self.buffer.ptrs();
+        let ptrs = self.buffer.as_mut_ptrs();
         let context = self.context();
         let result = unsafe {
             let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
@@ -613,7 +610,7 @@ where
             assert_failed(index, len);
         }
 
-        let ptrs = self.buffer.ptrs();
+        let ptrs = self.buffer.as_mut_ptrs();
         let context = self.context();
 
         let ptrs = unsafe { T::ptrs_add_mut(context, ptrs, index) };
@@ -678,7 +675,7 @@ where
 
         let Self { buffer, .. } = self;
         let context = buffer.context();
-        let ptrs = unsafe { T::ptrs_add_mut(context, buffer.ptrs(), index) };
+        let ptrs = unsafe { T::ptrs_add_mut(context, buffer.as_mut_ptrs(), index) };
 
         if index < len {
             let src = T::ptrs_cast_const(context, ptrs.clone());
@@ -705,7 +702,7 @@ where
                 let SoaVec { ref buffer, len } = **v;
 
                 let context = buffer.context();
-                let ptrs = unsafe { T::ptrs_add_mut(context, buffer.ptrs(), index) };
+                let ptrs = unsafe { T::ptrs_add_mut(context, buffer.as_mut_ptrs(), index) };
 
                 if index < len {
                     let src = T::ptrs_cast_const(context, ptrs.clone());
@@ -721,7 +718,7 @@ where
         let CopyBackGuard { v, .. } = &mut guard;
 
         let context = v.buffer.context();
-        let ptrs = unsafe { T::ptrs_add_mut(context, v.buffer.ptrs(), index) };
+        let ptrs = unsafe { T::ptrs_add_mut(context, v.buffer.as_mut_ptrs(), index) };
         let result = f(context, ptrs);
 
         unsafe {
@@ -747,7 +744,7 @@ where
             }
         }
 
-        let ptrs = self.buffer.ptrs();
+        let ptrs = self.buffer.as_mut_ptrs();
         let context = self.context();
 
         let dst = unsafe { T::ptrs_add_mut(context, ptrs, len) };
@@ -843,7 +840,7 @@ where
         let context = set_len_on_drop.vec.context();
         for refs in other {
             unsafe {
-                let ptrs = set_len_on_drop.vec.buffer.ptrs();
+                let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
                 let dst = T::ptrs_add_mut(context, ptrs, set_len_on_drop.local_len);
                 refs.clone_into_ptrs(context, dst);
             }
@@ -1056,7 +1053,7 @@ where
                 self.reserve(lower.saturating_add(1));
             }
 
-            let ptrs = self.buffer.ptrs();
+            let ptrs = self.buffer.as_mut_ptrs();
             let context = self.context();
             unsafe {
                 let dst = T::ptrs_add_mut(context, ptrs, len);
@@ -1167,7 +1164,7 @@ where
                 let mut vector = Self::with_context_and_capacity(context, initial_capacity);
                 unsafe {
                     // SAFETY: We requested capacity at least 1
-                    let dst = vector.buffer.ptrs();
+                    let dst = vector.buffer.as_mut_ptrs();
                     let context = vector.context();
                     T::write(context, dst, element);
                     vector.set_len(1);
@@ -1189,7 +1186,7 @@ where
             return;
         }
 
-        let ptrs = self.buffer.ptrs();
+        let ptrs = self.buffer.as_mut_ptrs();
         let len = self.len();
         let context = self.context();
 

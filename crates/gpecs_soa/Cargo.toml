@@ -7,6 +7,10 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[dev-dependencies]
+itertools = { workspace = true }
+rustc-hash = { workspace = true }
+
 [features]
 default = ["alloc"]
 alloc = []

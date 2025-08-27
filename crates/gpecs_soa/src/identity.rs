@@ -1,6 +1,7 @@
 use core::{
     alloc::{Layout, LayoutError},
     borrow::{Borrow, BorrowMut},
+    cmp,
     ops::{Deref, DerefMut},
     ptr::{self, NonNull},
     slice,
@@ -13,7 +14,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, Eq, Ord, Hash)]
 #[repr(transparent)]
 pub struct Identity<T>(pub T)
 where
@@ -135,6 +136,30 @@ impl<T> From<T> for Identity<T> {
     #[inline]
     fn from(inner: T) -> Self {
         Self(inner)
+    }
+}
+
+impl<T, U> PartialEq<Identity<U>> for Identity<T>
+where
+    T: PartialEq<U> + ?Sized,
+    U: ?Sized,
+{
+    #[inline]
+    fn eq(&self, other: &Identity<U>) -> bool {
+        self.as_inner() == other.as_inner()
+    }
+}
+
+impl<T, U> PartialOrd<Identity<U>> for Identity<T>
+where
+    T: PartialOrd<U> + ?Sized,
+    U: ?Sized,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Identity<U>) -> Option<cmp::Ordering> {
+        let this = self.as_inner();
+        let other = other.as_inner();
+        this.partial_cmp(other)
     }
 }
 

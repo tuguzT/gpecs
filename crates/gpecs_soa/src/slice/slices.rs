@@ -67,14 +67,10 @@ where
 
     #[inline]
     pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_, '_>) {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-            ..
-        } = *self;
+        let Self { context, len, .. } = *self;
 
-        let slices = T::slices_from_raw_parts(context, ptrs.clone().into_inner(), len);
+        let ptrs = self.as_ptrs();
+        let slices = T::slices_from_raw_parts(context, ptrs, len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -259,12 +255,12 @@ where
     }
 
     #[inline]
-    pub fn contains<'me, V>(&'me self, value: &V) -> bool
+    pub fn contains<'me, V>(&'me self, value: V) -> bool
     where
         T::Refs<'me, 'me>: PartialEq<V>,
     {
         let mut iter = self.into_iter();
-        iter.any(|item| item.eq(value))
+        iter.any(move |item| item.eq(&value))
     }
 }
 
@@ -303,22 +299,11 @@ where
 impl<T, U> AsRef<[U]> for SoaSlices<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
+    for<'c, 'any> T::Slices<'c, 'any>: Into<&'any [U]>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
-        self.as_slices()
-    }
-}
-
-impl<T> PartialEq for SoaSlices<'_, '_, T>
-where
-    T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
-{
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.as_slices() == other.as_slices()
+        self.as_slices().into()
     }
 }
 
@@ -329,17 +314,6 @@ where
 {
 }
 
-impl<T> PartialOrd for SoaSlices<'_, '_, T>
-where
-    T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
-{
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
-    }
-}
-
 impl<T> Ord for SoaSlices<'_, '_, T>
 where
     T: Soa + ?Sized,
@@ -347,7 +321,9 @@ where
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        Ord::cmp(&self.as_slices(), &other.as_slices())
+        let this = self.as_slices();
+        let other = other.as_slices();
+        Ord::cmp(&this, &other)
     }
 }
 
@@ -497,15 +473,10 @@ where
 
     #[inline]
     pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_, '_>) {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-            ..
-        } = *self;
+        let Self { context, len, .. } = *self;
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs.clone().into_inner(), len);
-        let slices = T::slice_ptrs_cast_const(context, slices);
+        let ptrs = self.as_ptrs();
+        let slices = T::slices_from_raw_parts(context, ptrs, len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -518,14 +489,10 @@ where
 
     #[inline]
     pub fn as_mut_slices_with_context(&mut self) -> (&T::Context, T::SlicesMut<'_, '_>) {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-            ..
-        } = *self;
+        let Self { context, len, .. } = *self;
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs.clone().into_inner(), len);
+        let ptrs = self.as_mut_ptrs();
+        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
         let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -562,14 +529,19 @@ where
     }
 
     #[inline]
-    pub(crate) unsafe fn as_parts(&self) -> (&'c T::Context, T::MutPtrs<'c>, usize) {
-        let Self {
-            context,
-            ref ptrs,
-            len,
-            ..
-        } = *self;
-        (context, ptrs.clone().into_inner(), len)
+    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
+        let Self { context, len, .. } = *self;
+
+        let ptrs = self.as_ptrs();
+        unsafe { SoaSlices::from_parts(context, ptrs, len) }
+    }
+
+    #[inline]
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
+        let Self { context, len, .. } = *self;
+
+        let ptrs = self.as_mut_ptrs();
+        unsafe { SoaSlicesMut::from_parts(context, ptrs, len) }
     }
 
     #[inline]
@@ -846,9 +818,8 @@ where
 
     #[inline]
     pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
-        let (context, ptrs, len) = unsafe { self.as_parts() };
-        let ptrs = T::ptrs_cast_const(context, ptrs);
-        let slices = unsafe { SoaSlices::from_parts(context, ptrs, len) };
+        let Self { context, .. } = *self;
+        let slices = self.slices();
         (context, Iter::new(slices))
     }
 
@@ -860,30 +831,24 @@ where
 
     #[inline]
     pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
-        let (context, ptrs, len) = unsafe { self.as_parts() };
-        let slices = unsafe { Self::from_parts(context, ptrs.clone(), len) };
+        let Self { context, .. } = *self;
+        let slices = self.slices_mut();
         (context, IterMut::new(slices))
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'c T::Context, Iter<'c, 'a, T>) {
-        let Self { context, .. } = self;
-        (context, Iter::new(self.into()))
-    }
-
-    #[inline]
-    pub fn into_iter_mut_with_context(self) -> (&'c T::Context, IterMut<'c, 'a, T>) {
+    pub fn into_iter_with_context(self) -> (&'c T::Context, IterMut<'c, 'a, T>) {
         let Self { context, .. } = self;
         (context, IterMut::new(self))
     }
 
     #[inline]
-    pub fn contains<'me, V>(&'me self, value: &V) -> bool
+    pub fn contains<'me, V>(&'me self, value: V) -> bool
     where
         T::Refs<'me, 'me>: PartialEq<V>,
     {
         let mut iter = self.into_iter();
-        iter.any(|item| item.eq(value))
+        iter.any(move |item| item.eq(&value))
     }
 
     #[inline]
@@ -921,8 +886,8 @@ where
         // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
         // checked to have the same length. The slices cannot overlap because
         // mutable references are exclusive.
-        let Self { context, ptrs, .. } = self;
-        let dst = ptrs.clone().into_inner();
+        let Self { context, .. } = *self;
+        let dst = self.as_mut_ptrs();
         unsafe { T::ptrs_copy_nonoverlapping(context, src.as_ptrs(), dst, len) }
     }
 
@@ -948,32 +913,29 @@ where
     }
 
     #[inline]
-    pub fn sort_unstable_with_permutation(&mut self, permutation: &mut [usize])
+    pub fn sort_unstable_with_permutation<P>(&mut self, permutation: P)
     where
+        P: AsMut<[usize]>,
         for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
         self.sort_unstable_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b));
     }
 
     #[inline]
-    pub fn sort_unstable_with_permutation_by<F>(
-        &mut self,
-        permutation: &mut [usize],
-        mut compare: F,
-    ) where
+    pub fn sort_unstable_with_permutation_by<P, F>(&mut self, permutation: P, mut compare: F)
+    where
+        P: AsMut<[usize]>,
         for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
     {
         self.sort_impl(permutation, |me, permutation| {
-            let (context, ptrs, _) = unsafe { me.as_parts() };
+            let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_unstable_by(|&a, &b| {
                 let a = unsafe {
-                    let ptrs = T::ptrs_add_mut(context, ptrs.clone(), a);
-                    let ptrs = T::ptrs_cast_const(context, ptrs);
+                    let ptrs = T::ptrs_add(context, ptrs.clone(), a);
                     T::ptrs_to_refs(context, ptrs)
                 };
                 let b = unsafe {
-                    let ptrs = T::ptrs_add_mut(context, ptrs.clone(), b);
-                    let ptrs = T::ptrs_cast_const(context, ptrs);
+                    let ptrs = T::ptrs_add(context, ptrs.clone(), b);
                     T::ptrs_to_refs(context, ptrs)
                 };
                 compare(a, b)
@@ -982,27 +944,25 @@ where
     }
 
     #[inline]
-    pub fn sort_unstable_with_permutation_by_key<K, F>(
-        &mut self,
-        permutation: &mut [usize],
-        mut f: F,
-    ) where
+    pub fn sort_unstable_with_permutation_by_key<P, K, F>(&mut self, permutation: P, mut f: F)
+    where
+        P: AsMut<[usize]>,
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
         self.sort_impl(permutation, |me, permutation| {
-            let (context, ptrs, _) = unsafe { me.as_parts() };
+            let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_unstable_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add_mut(context, ptrs.clone(), index);
-                let ptrs = T::ptrs_cast_const(context, ptrs);
+                let ptrs = T::ptrs_add(context, ptrs.clone(), index);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
             });
         });
     }
 
-    pub(crate) fn sort_impl<F>(&mut self, permutation: &mut [usize], f: F)
+    pub(crate) fn sort_impl<P, F>(&mut self, mut permutation: P, f: F)
     where
+        P: AsMut<[usize]>,
         F: FnOnce(&mut Self, &mut [usize]),
     {
         #[inline(never)]
@@ -1013,23 +973,26 @@ where
         }
 
         let len = self.len();
-        let context = self.context();
-        if is_zst::<T>(context) || len < 2 {
-            return;
-        }
+        let permutation = permutation.as_mut();
         if permutation.len() < len {
             permutation_len_fail(permutation.len(), len);
         }
 
+        let context = self.context();
+        if is_zst::<T>(context) || len < 2 {
+            return;
+        }
+
         f(self, permutation);
 
+        // were taken from `sort_by_cached_key()` method of slice primitive
         for src in 0..len {
-            let dst = permutation[src];
-            if src == dst {
-                continue;
+            let mut dst = permutation[src];
+            while dst < src {
+                dst = permutation[dst];
             }
+            permutation[src] = dst;
             self.swap(src, dst);
-            permutation.swap(src, dst);
         }
     }
 }
@@ -1089,11 +1052,11 @@ where
 impl<T, U> AsRef<[U]> for SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
+    for<'c, 'any> T::Slices<'c, 'any>: Into<&'any [U]>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
-        self.as_slices()
+        self.as_slices().into()
     }
 }
 
@@ -1110,22 +1073,11 @@ where
 impl<T, U> AsMut<[U]> for SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T: Soa<SlicesMut<'c, 'any> = &'any mut [U]> + 'any,
+    for<'c, 'any> T::SlicesMut<'c, 'any>: Into<&'any mut [U]>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [U] {
-        self.as_mut_slices()
-    }
-}
-
-impl<T> PartialEq for SoaSlicesMut<'_, '_, T>
-where
-    T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
-{
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.as_slices() == other.as_slices()
+        self.as_mut_slices().into()
     }
 }
 
@@ -1136,17 +1088,6 @@ where
 {
 }
 
-impl<T> PartialOrd for SoaSlicesMut<'_, '_, T>
-where
-    T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
-{
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
-    }
-}
-
 impl<T> Ord for SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
@@ -1154,7 +1095,9 @@ where
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        Ord::cmp(&self.as_slices(), &other.as_slices())
+        let this = self.as_slices();
+        let other = other.as_slices();
+        Ord::cmp(&this, &other)
     }
 }
 
@@ -1231,7 +1174,8 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        IterMut::new(self)
+        let (_, iter) = self.into_iter_with_context();
+        iter
     }
 }
 

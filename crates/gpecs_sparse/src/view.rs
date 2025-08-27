@@ -415,7 +415,7 @@ where
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        EpochSparseView::index(self, key)
+        Self::index(self, key)
     }
 }
 
@@ -423,11 +423,11 @@ impl<T, K, V> AsRef<[T]> for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
+    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_slices()
+        self.as_slices().into()
     }
 }
 
@@ -917,7 +917,7 @@ where
     #[inline]
     pub fn into_get_with_context(self, key: K) -> (&'c V::Context, Option<V::Refs<'c, 'a>>) {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.into_iter_with_context();
+        let (context, dense) = SoaSlices::from(dense).into_iter_with_context();
         (context, sparse_get(dense, sparse, key))
     }
 
@@ -943,7 +943,7 @@ where
     #[inline]
     pub fn into_get_mut_with_context(self, key: K) -> (&'c V::Context, Option<V::RefsMut<'c, 'a>>) {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.into_iter_mut_with_context();
+        let (context, dense) = dense.into_iter_with_context();
         (context, sparse_get_mut(dense, sparse, key))
     }
 
@@ -956,7 +956,7 @@ where
     #[inline]
     pub fn into_get_with_key(self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'c, 'a>)> {
         let Self { dense, sparse } = self;
-        let (_, dense) = dense.into_iter_with_context();
+        let dense = SoaSlices::from(dense);
         sparse_get_with_key(dense, sparse, sparse_index)
     }
 
@@ -1074,7 +1074,7 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.into_iter_with_context();
+        let (context, dense) = SoaSlices::from(dense).into_iter_with_context();
         (context, sparse_index(dense, sparse, key))
     }
 
@@ -1115,7 +1115,7 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
-        let (context, dense) = dense.into_iter_mut_with_context();
+        let (context, dense) = dense.into_iter_with_context();
         (context, sparse_index_mut(dense, sparse, key))
     }
 }
@@ -1225,7 +1225,7 @@ where
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        EpochSparseViewMut::index(self, key)
+        Self::index(self, key)
     }
 }
 
@@ -1237,7 +1237,7 @@ where
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        self.index_mut(key)
+        Self::index_mut(self, key)
     }
 }
 
@@ -1245,11 +1245,11 @@ impl<T, K, V> AsRef<[T]> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
+    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_slices()
+        self.as_slices().into()
     }
 }
 
@@ -1257,11 +1257,11 @@ impl<T, K, V> AsMut<[T]> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
+    for<'c, 'any> V::SlicesMut<'c, 'any>: Into<&'any mut [T]>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
-        self.as_mut_slices()
+        self.as_mut_slices().into()
     }
 }
 

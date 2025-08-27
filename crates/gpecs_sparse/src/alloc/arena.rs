@@ -1399,11 +1399,11 @@ impl<T, K, V> AsRef<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
+    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_slices()
+        self.as_slices().into()
     }
 }
 
@@ -1411,11 +1411,11 @@ impl<T, K, V> AsMut<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
+    for<'c, 'any> V::SlicesMut<'c, 'any>: Into<&'any mut [T]>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
-        self.as_mut_slices()
+        self.as_mut_slices().into()
     }
 }
 

@@ -150,10 +150,10 @@ where
 impl<T, U> AsRef<[U]> for IntoIter<T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
+    for<'c, 'any> T::Slices<'c, 'any>: Into<&'any [U]>,
 {
     fn as_ref(&self) -> &[U] {
-        self.as_slices()
+        self.as_slices().into()
     }
 }
 

@@ -236,22 +236,22 @@ where
 impl<T, K, V> AsRef<[T]> for IntoValues<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
+    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_slice()
+        self.as_slice().into()
     }
 }
 
 impl<T, K, V> AsMut<[T]> for IntoValues<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
+    for<'c, 'any> V::SlicesMut<'c, 'any>: Into<&'any mut [T]>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
-        self.as_mut_slice()
+        self.as_mut_slice().into()
     }
 }
 
@@ -424,22 +424,22 @@ where
 impl<T, K, V> AsRef<[T]> for IntoIter<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
+    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_values_slice()
+        self.as_values_slice().into()
     }
 }
 
 impl<T, K, V> AsMut<[T]> for IntoIter<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<SlicesMut<'c, 'any> = &'any mut [T]> + 'any,
+    for<'c, 'any> V::SlicesMut<'c, 'any>: Into<&'any mut [T]>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
-        self.as_values_mut_slice()
+        self.as_values_mut_slice().into()
     }
 }
 
@@ -546,11 +546,11 @@ where
 impl<T, K, V> AsRef<[T]> for Drain<'_, K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<Slices<'c, 'any> = &'any [T]> + 'any,
+    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_values_slice()
+        self.as_values_slice().into()
     }
 }
 

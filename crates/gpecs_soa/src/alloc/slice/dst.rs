@@ -31,8 +31,9 @@ where
     }
 
     #[inline]
-    pub fn sort_with_permutation(&mut self, permutation: &mut [usize])
+    pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
+        P: AsMut<[usize]>,
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         self.slices_mut().sort_with_permutation(permutation);
@@ -47,8 +48,9 @@ where
     }
 
     #[inline]
-    pub fn sort_with_permutation_by<F>(&mut self, permutation: &mut [usize], compare: F)
+    pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, compare: F)
     where
+        P: AsMut<[usize]>,
         for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.slices_mut()
@@ -64,8 +66,9 @@ where
     }
 
     #[inline]
-    pub fn sort_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], f: F)
+    pub fn sort_with_permutation_by_key<P, K, F>(&mut self, permutation: P, f: F)
     where
+        P: AsMut<[usize]>,
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
@@ -83,8 +86,9 @@ where
     }
 
     #[inline]
-    pub fn sort_with_permutation_by_cached_key<K, F>(&mut self, permutation: &mut [usize], f: F)
+    pub fn sort_with_permutation_by_cached_key<P, K, F>(&mut self, permutation: P, f: F)
     where
+        P: AsMut<[usize]>,
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {

@@ -1,42 +1,18 @@
 use crate::{
-    slice::SoaSlice,
+    slice::{SoaSlice, SoaSlices, SoaSlicesMut, partial_ord_impl},
     traits::{Soa, SoaTrustedFields},
+    vec::SoaVec,
 };
 
-use super::SoaVec;
+partial_ord_impl! { [] SoaVec<T>, Self where T: Soa }
+partial_ord_impl! { [] SoaVec<T>, SoaSlices<'_, '_, T> where T: Soa }
+partial_ord_impl! { [] SoaVec<T>, SoaSlicesMut<'_, '_, T> where T: Soa }
+partial_ord_impl! { [] SoaVec<T>, SoaSlice<T> where T: SoaTrustedFields }
+partial_ord_impl! { [] SoaVec<T>, &SoaSlice<T> where T: SoaTrustedFields }
+partial_ord_impl! { [] SoaVec<T>, &mut SoaSlice<T> where T: SoaTrustedFields }
 
-// Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
-macro_rules! __impl_slice_ord {
-    ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
-        impl<T, $($vars)*> PartialOrd<$rhs> for $lhs
-        where
-            T: SoaTrustedFields + ?Sized,
-            for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
-            $($ty: $bound)?
-        {
-            #[inline]
-            fn partial_cmp(&self, other: &$rhs) -> Option<::core::cmp::Ordering> {
-                PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
-            }
-        }
-    }
-}
-
-impl<T> PartialOrd<Self> for SoaVec<T>
-where
-    T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
-{
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<::core::cmp::Ordering> {
-        PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
-    }
-}
-
-__impl_slice_ord! { [] SoaVec<T>, SoaSlice<T> }
-__impl_slice_ord! { [] SoaVec<T>, &SoaSlice<T> }
-__impl_slice_ord! { [] SoaVec<T>, &mut SoaSlice<T> }
-
-__impl_slice_ord! { [] SoaSlice<T>, SoaVec<T> }
-__impl_slice_ord! { [] &SoaSlice<T>, SoaVec<T> }
-__impl_slice_ord! { [] &mut SoaSlice<T>, SoaVec<T> }
+partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaVec<T> where T: Soa }
+partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaVec<T> where T: Soa }
+partial_ord_impl! { [] SoaSlice<T>, SoaVec<T> where T: SoaTrustedFields }
+partial_ord_impl! { [] &SoaSlice<T>, SoaVec<T> where T: SoaTrustedFields }
+partial_ord_impl! { [] &mut SoaSlice<T>, SoaVec<T> where T: SoaTrustedFields }

@@ -140,16 +140,16 @@ where
 
     #[inline]
     pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
-        self.slices_mut().into_iter_mut_with_context()
+        self.slices_mut().into_iter_with_context()
     }
 
     #[inline]
-    pub fn contains<'me, V>(&'me self, value: &V) -> bool
+    pub fn contains<'me, V>(&'me self, value: V) -> bool
     where
         T::Refs<'me, 'me>: PartialEq<V>,
     {
         let mut iter = self.into_iter();
-        iter.any(|item| item.eq(value))
+        iter.any(move |item| item.eq(&value))
     }
 
     #[inline]
@@ -229,8 +229,9 @@ where
     }
 
     #[inline]
-    pub fn sort_unstable_with_permutation(&mut self, permutation: &mut [usize])
+    pub fn sort_unstable_with_permutation<P>(&mut self, permutation: P)
     where
+        P: AsMut<[usize]>,
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         self.slices_mut()
@@ -238,8 +239,9 @@ where
     }
 
     #[inline]
-    pub fn sort_unstable_with_permutation_by<F>(&mut self, permutation: &mut [usize], compare: F)
+    pub fn sort_unstable_with_permutation_by<P, F>(&mut self, permutation: P, compare: F)
     where
+        P: AsMut<[usize]>,
         for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.slices_mut()
@@ -247,8 +249,9 @@ where
     }
 
     #[inline]
-    pub fn sort_unstable_with_permutation_by_key<K, F>(&mut self, permutation: &mut [usize], f: F)
+    pub fn sort_unstable_with_permutation_by_key<P, K, F>(&mut self, permutation: P, f: F)
     where
+        P: AsMut<[usize]>,
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
@@ -331,33 +334,11 @@ where
     }
 }
 
-impl<T> PartialEq for SoaSlice<T>
-where
-    T: SoaTrustedFields + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: PartialEq,
-{
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.as_slices() == other.as_slices()
-    }
-}
-
 impl<T> Eq for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Eq,
 {
-}
-
-impl<T> PartialOrd for SoaSlice<T>
-where
-    T: SoaTrustedFields + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: PartialOrd,
-{
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        PartialOrd::partial_cmp(&self.as_slices(), &other.as_slices())
-    }
 }
 
 impl<T> Ord for SoaSlice<T>
@@ -367,7 +348,9 @@ where
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        Ord::cmp(&self.as_slices(), &other.as_slices())
+        let this = self.as_slices();
+        let other = other.as_slices();
+        Ord::cmp(&this, &other)
     }
 }
 

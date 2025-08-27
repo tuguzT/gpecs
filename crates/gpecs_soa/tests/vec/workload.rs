@@ -206,7 +206,7 @@ fn one_item() {
     vec.push((1, 2, 3, ()));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
-    assert!(vec.contains(&(&1, &2, &3, &())));
+    assert!(vec.contains((&1, &2, &3, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -343,7 +343,7 @@ fn one_item_zst() {
     vec.push((ZST1, ZST2(()), ZST3 { empty: () }));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
-    assert!(vec.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert!(vec.contains((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -454,7 +454,7 @@ fn three_items() {
     let mut vec = Vec::from_iter(iter::repeat((0, "0".to_owned(), 0, ())).take(3));
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains(&(&0, &"0".to_owned(), &0, &())));
+    assert!(vec.contains((&0, &"0".to_owned(), &0, &())));
 
     assert_eq!(
         format!("{vec:?}"),
@@ -468,7 +468,7 @@ fn three_items() {
 
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains(&(&4, &"5".to_owned(), &6, &())));
+    assert!(vec.contains((&4, &"5".to_owned(), &6, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -616,7 +616,7 @@ fn three_items() {
     assert_eq!((t, u, v, w), (8, "8".to_owned(), 9, ()));
     assert_eq!(vec.len(), 2);
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains(&(&8, &"8".to_owned(), &9, &())));
+    assert!(!vec.contains((&8, &"8".to_owned(), &9, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -627,7 +627,7 @@ fn three_items() {
     assert_eq!((t, u, v, w), (2, "2".to_owned(), 3, ()));
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains(&(&2, &"2".to_owned(), &3, &())));
+    assert!(!vec.contains((&2, &"2".to_owned(), &3, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -638,7 +638,7 @@ fn three_items() {
     assert_eq!((t, u, v, w), (5, "5".to_owned(), 6, ()));
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains(&(&5, &"5".to_owned(), &6, &())));
+    assert!(!vec.contains((&5, &"5".to_owned(), &6, &())));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -764,7 +764,7 @@ fn three_items_zst() {
     let vec = Vec::from_iter([(ZST1, ZST2(()), ZST3 { empty: () }); 3]);
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
-    assert!(vec.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert!(vec.contains((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
@@ -935,7 +935,7 @@ fn three_items_zst() {
     vec.clear();
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
-    assert!(!vec.contains(&(&ZST1, &ZST2(()), &ZST3 { empty: () })));
+    assert!(!vec.contains((&ZST1, &ZST2(()), &ZST3 { empty: () })));
 
     let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();

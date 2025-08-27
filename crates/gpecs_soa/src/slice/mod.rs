@@ -5,10 +5,16 @@ pub use self::{
     slices::{SoaSlices, SoaSlicesMut},
 };
 
-pub(crate) use self::index::{IndexHelper, IndexHelperMut};
+pub(crate) use self::{
+    index::{IndexHelper, IndexHelperMut},
+    partial_eq::partial_eq_impl,
+    partial_ord::partial_ord_impl,
+};
 
 mod assert;
 mod dst;
 mod index;
 mod iter;
+mod partial_eq;
+mod partial_ord;
 mod slices;

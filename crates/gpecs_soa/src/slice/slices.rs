@@ -605,8 +605,8 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        let (_, refs_mut) = self.get_mut_with_context(index);
-        refs_mut
+        let (_, refs) = self.get_mut_with_context(index);
+        refs
     }
 
     #[inline]
@@ -623,8 +623,8 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        let (_, refs_mut) = self.into_get_mut_with_context(index);
-        refs_mut
+        let (_, refs) = self.into_get_mut_with_context(index);
+        refs
     }
 
     #[inline]
@@ -776,8 +776,8 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        let (_, refs_mut) = self.index_mut_with_context(index);
-        refs_mut
+        let (_, refs) = self.index_mut_with_context(index);
+        refs
     }
 
     #[inline]
@@ -796,8 +796,8 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        let (_, refs_mut) = self.into_index_mut_with_context(index);
-        refs_mut
+        let (_, refs) = self.into_index_mut_with_context(index);
+        refs
     }
 
     #[inline]

@@ -120,6 +120,7 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Into<&'any [U]>,
 {
+    #[inline]
     fn as_ref(&self) -> &[U] {
         self.as_slices().into()
     }
@@ -130,7 +131,6 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("Iter").field(&slices).finish()
@@ -564,6 +564,7 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Into<&'any [U]>,
 {
+    #[inline]
     fn as_ref(&self) -> &[U] {
         self.as_slices().into()
     }
@@ -574,7 +575,6 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("IterMut").field(&slices).finish()

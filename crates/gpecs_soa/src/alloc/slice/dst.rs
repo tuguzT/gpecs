@@ -1,8 +1,7 @@
-use core::{cmp, ptr};
+use core::cmp;
 use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
-    ptr::slice_from_raw_parts_mut,
     slice::{Iter, IterMut, SoaSlice},
     traits::{SoaRead, SoaToOwned, SoaTrustedFields},
     vec::{IntoIter, SoaVec},
@@ -22,7 +21,7 @@ where
     }
 
     #[inline]
-    pub fn to_vec<'me>(&'me self) -> SoaVec<T>
+    pub fn to_vec(&self) -> SoaVec<T>
     where
         for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
         T::Context: Clone,
@@ -128,17 +127,6 @@ where
         K: Ord,
     {
         self.slices_mut().sort_unstable_by_key(f);
-    }
-}
-
-impl<T> Default for Box<SoaSlice<T>>
-where
-    T: SoaTrustedFields + ?Sized,
-{
-    #[inline]
-    fn default() -> Self {
-        let data = ptr::dangling_mut();
-        unsafe { Self::from_raw(slice_from_raw_parts_mut(data, 0, 0)) }
     }
 }
 

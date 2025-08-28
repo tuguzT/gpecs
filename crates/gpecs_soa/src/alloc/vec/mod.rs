@@ -34,7 +34,7 @@ pub struct SoaVec<T>
 where
     T: Soa + ?Sized,
 {
-    pub(super) buffer: RawSoaVec<T>,
+    buffer: RawSoaVec<T>,
     len: usize,
 }
 
@@ -852,7 +852,6 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("SoaVec").field(&slices).finish()
@@ -942,8 +941,11 @@ where
     T: Soa + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Ord,
 {
+    #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        Ord::cmp(&self.as_slices(), &other.as_slices())
+        let this = self.as_slices();
+        let other = other.as_slices();
+        Ord::cmp(&this, &other)
     }
 }
 
@@ -1013,6 +1015,7 @@ where
 {
     type Output = U;
 
+    #[inline]
     fn index(&self, index: I) -> &Self::Output {
         self.slices().into_index(index)
     }
@@ -1024,6 +1027,7 @@ where
     U: ?Sized,
     for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
+    #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.slices_mut().into_index_mut(index)
     }

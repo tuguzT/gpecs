@@ -177,7 +177,16 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        self.slices().into_get(index)
+        let (_, refs) = self.get_with_context(index);
+        refs
+    }
+
+    #[inline]
+    pub fn get_with_context<I>(&self, index: I) -> (&T::Context, Option<I::Refs<'_, '_>>)
+    where
+        I: SoaSliceIndex<T>,
+    {
+        self.slices().into_get_with_context(index)
     }
 
     #[inline]
@@ -185,7 +194,16 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        self.slices_mut().into_get_mut(index)
+        let (_, refs) = self.get_mut_with_context(index);
+        refs
+    }
+
+    #[inline]
+    pub fn get_mut_with_context<I>(&mut self, index: I) -> (&T::Context, Option<I::RefsMut<'_, '_>>)
+    where
+        I: SoaSliceIndex<T>,
+    {
+        self.slices_mut().into_get_mut_with_context(index)
     }
 
     #[inline]
@@ -193,7 +211,16 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        unsafe { self.slices().into_get_unchecked(index) }
+        let (_, ptrs) = unsafe { self.get_unchecked_with_context(index) };
+        ptrs
+    }
+
+    #[inline]
+    pub unsafe fn get_unchecked_with_context<I>(&self, index: I) -> (&T::Context, I::Ptrs<'_>)
+    where
+        I: SoaSliceIndex<T>,
+    {
+        unsafe { self.slices().into_get_unchecked_with_context(index) }
     }
 
     #[inline]
@@ -201,7 +228,19 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        unsafe { self.slices_mut().into_get_unchecked_mut(index) }
+        let (_, ptrs) = unsafe { self.get_unchecked_mut_with_context(index) };
+        ptrs
+    }
+
+    #[inline]
+    pub unsafe fn get_unchecked_mut_with_context<I>(
+        &mut self,
+        index: I,
+    ) -> (&T::Context, I::MutPtrs<'_>)
+    where
+        I: SoaSliceIndex<T>,
+    {
+        unsafe { self.slices_mut().into_get_unchecked_mut_with_context(index) }
     }
 
     #[inline]
@@ -210,7 +249,17 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        self.slices().into_index(index)
+        let (_, refs) = self.index_with_context(index);
+        refs
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn index_with_context<I>(&self, index: I) -> (&T::Context, I::Refs<'_, '_>)
+    where
+        I: SoaSliceIndex<T>,
+    {
+        self.slices().into_index_with_context(index)
     }
 
     #[inline]
@@ -219,7 +268,17 @@ where
     where
         I: SoaSliceIndex<T>,
     {
-        self.slices_mut().into_index_mut(index)
+        let (_, refs) = self.index_mut_with_context(index);
+        refs
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn index_mut_with_context<I>(&mut self, index: I) -> (&T::Context, I::RefsMut<'_, '_>)
+    where
+        I: SoaSliceIndex<T>,
+    {
+        self.slices_mut().into_index_mut_with_context(index)
     }
 
     #[inline]
@@ -265,32 +324,9 @@ where
     T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T::Slices<'c, 'any>: Debug,
 {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
         f.debug_tuple("SoaSlice").field(&slices).finish()
-    }
-}
-
-impl<T> Default for &SoaSlice<T>
-where
-    T: SoaTrustedFields + ?Sized,
-{
-    #[inline]
-    fn default() -> Self {
-        let data = ptr::dangling_mut();
-        unsafe { from_raw_parts(data, 0, 0) }
-    }
-}
-
-impl<T> Default for &mut SoaSlice<T>
-where
-    T: SoaTrustedFields + ?Sized,
-{
-    #[inline]
-    fn default() -> Self {
-        let data = ptr::dangling_mut();
-        unsafe { from_raw_parts_mut(data, 0, 0) }
     }
 }
 
@@ -309,6 +345,7 @@ where
     T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T: SoaTrustedFields<Slices<'c, 'any> = &'any [U]> + 'any,
 {
+    #[inline]
     fn as_ref(&self) -> &[U] {
         self.as_slices()
     }
@@ -329,6 +366,7 @@ where
     T: SoaTrustedFields + ?Sized,
     for<'c, 'any> T: SoaTrustedFields<SlicesMut<'c, 'any> = &'any mut [U]> + 'any,
 {
+    #[inline]
     fn as_mut(&mut self) -> &mut [U] {
         self.as_mut_slices()
     }
@@ -390,6 +428,7 @@ where
 {
     type Output = U;
 
+    #[inline]
     fn index(&self, index: I) -> &Self::Output {
         Self::index(self, index)
     }
@@ -401,6 +440,7 @@ where
     U: ?Sized,
     for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
 {
+    #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         Self::index_mut(self, index)
     }

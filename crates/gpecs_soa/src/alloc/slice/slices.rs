@@ -15,26 +15,25 @@ where
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
-        for<'ca, 'any> T::Refs<'ca, 'any>: SoaToOwned<'ca, 'any, Owned = T>,
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
         T::Context: Clone,
     {
         let len = self.len();
         let context = self.context().clone();
-        let mut vec = SoaVec::with_context_and_capacity(context, len);
+        let mut vec = SoaVec::<T>::with_context_and_capacity(context, len);
 
         {
             let mut set_len_on_drop = SetLenOnDrop {
                 vec: &mut vec,
                 local_len: 0,
             };
-            let ptrs: T::MutPtrs<'_> = set_len_on_drop.vec.buffer.as_mut_ptrs();
-            let context = set_len_on_drop.vec.context();
-            for (index, refs) in self.clone().into_iter().enumerate() {
+
+            let (context, ptrs, _) = set_len_on_drop.vec.slices_mut().into_parts();
+            for (index, refs) in self.iter().enumerate() {
                 set_len_on_drop.local_len = index;
-                unsafe {
-                    let dst = T::ptrs_add_mut(context, ptrs.clone(), index);
-                    refs.clone_into_ptrs(context, dst);
-                }
+
+                let dst = unsafe { T::ptrs_add_mut(context, ptrs.clone(), index) };
+                unsafe { refs.clone_into_ptrs(context, dst) }
             }
         }
 
@@ -54,41 +53,16 @@ where
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
     where
-        for<'ca, 'any> T::Refs<'ca, 'any>: SoaToOwned<'ca, 'any, Owned = T>,
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
         T::Context: Clone,
     {
-        let len = self.len();
-        let context = self.context().clone();
-        let mut vec = SoaVec::with_context_and_capacity(context, len);
-
-        {
-            let mut set_len_on_drop = SetLenOnDrop {
-                vec: &mut vec,
-                local_len: 0,
-            };
-            let ptrs: T::MutPtrs<'_> = set_len_on_drop.vec.buffer.as_mut_ptrs();
-            let context = set_len_on_drop.vec.context();
-            for (index, refs) in self.slices().into_iter().enumerate() {
-                set_len_on_drop.local_len = index;
-                unsafe {
-                    let dst = T::ptrs_add_mut(context, ptrs.clone(), index);
-                    refs.clone_into_ptrs(context, dst);
-                }
-            }
-        }
-
-        // SAFETY:
-        // the vec was allocated and initialized above to at least this length.
-        unsafe {
-            vec.set_len(len);
-        }
-        vec
+        self.slices().to_vec()
     }
 
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_with_permutation(permutation);
@@ -98,7 +72,7 @@ where
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         self.sort_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b));
     }
@@ -106,7 +80,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
-        for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
+        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_with_permutation_by(permutation, compare);
@@ -116,7 +90,7 @@ where
     pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, mut compare: F)
     where
         P: AsMut<[usize]>,
-        for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
+        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = me.slices().into_parts();
@@ -191,7 +165,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_unstable_with_permutation(permutation);
@@ -200,7 +174,7 @@ where
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
-        for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
+        for<'c, 'any> F: FnMut(T::Refs<'c, 'any>, T::Refs<'c, 'any>) -> cmp::Ordering,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_unstable_with_permutation_by(permutation, compare);

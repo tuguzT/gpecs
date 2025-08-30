@@ -1,5 +1,9 @@
 [
   "obsidian-git",
   "obsidian42-brat",
-  "advanced-exclude"
+  "advanced-exclude",
+  "folder-notes",
+  "obsidian-discordrpc",
+  "obsidian-filename-heading-sync",
+  "tag-wrangler"
 ]

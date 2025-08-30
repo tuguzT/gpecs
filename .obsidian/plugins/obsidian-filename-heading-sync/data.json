@@ -1,0 +1,12 @@
+{
+  "userIllegalSymbols": [],
+  "ignoredFiles": {},
+  "ignoreRegex": "notes/*",
+  "useFileOpenHook": true,
+  "useFileSaveHook": true,
+  "newHeadingStyle": "Prefix",
+  "replaceStyle": true,
+  "underlineString": "===",
+  "renameDebounceTimeout": 1000,
+  "insertHeadingIfMissing": true
+}

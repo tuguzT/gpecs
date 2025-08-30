@@ -1,4 +1,8 @@
 {
   "userIgnoreFilters": null,
-  "showUnsupportedFiles": true
+  "showUnsupportedFiles": true,
+  "attachmentFolderPath": "notes",
+  "showInlineTitle": false,
+  "alwaysUpdateLinks": true,
+  "useMarkdownLinks": true
 }

@@ -1,0 +1,34 @@
+filters:
+  and:
+    - file.folder == "bibliography"
+    - file.ext != "base"
+formulas:
+  Can I use it?: note["publication-date"] + "5y" > today()
+properties:
+  file.name:
+    displayName: Name
+  file.tags:
+    displayName: Tags
+  note.publication-date:
+    displayName: Publication date
+views:
+  - type: table
+    name: Table
+    order:
+      - file.name
+      - file.tags
+    sort: []
+    columnSize:
+      file.name: 640
+  - type: table
+    name: References
+    filters:
+      and:
+        - file.tags.containsAny("paper")
+    order:
+      - file.name
+      - publication-date
+      - formula.Can I use it?
+    sort:
+      - property: publication-date
+        direction: DESC

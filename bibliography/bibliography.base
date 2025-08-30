@@ -3,7 +3,7 @@ filters:
     - file.folder == "bibliography"
     - file.ext != "base"
 formulas:
-  Can I use it?: note["publication-date"] + "5y" > today()
+  Can I use it now?: note["publication-date"] + "5y" > today()
 properties:
   file.name:
     displayName: Name
@@ -11,24 +11,21 @@ properties:
     displayName: Tags
   note.publication-date:
     displayName: Publication date
+  note.source:
+    displayName: Source
 views:
   - type: table
-    name: Table
+    name: Maps of Content
+    filters:
+      and:
+        - file.tags.containsAny("paper", "conf", "book", "web")
     order:
       - file.name
       - file.tags
-    sort: []
-    columnSize:
-      file.name: 640
-  - type: table
-    name: References
-    filters:
-      and:
-        - file.tags.containsAny("paper")
-    order:
-      - file.name
       - publication-date
-      - formula.Can I use it?
+      - formula.Can I use it now?
     sort:
+      - property: formula.Can I use it now?
+        direction: DESC
       - property: publication-date
         direction: DESC

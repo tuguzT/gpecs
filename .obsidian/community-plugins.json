@@ -6,5 +6,6 @@
   "obsidian-discordrpc",
   "obsidian-filename-heading-sync",
   "tag-wrangler",
-  "sync-graph-settings"
+  "sync-graph-settings",
+  "markdownlint"
 ]

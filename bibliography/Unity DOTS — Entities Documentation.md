@@ -7,4 +7,5 @@ publication-date: 2025-08-09
 ---
 # Unity DOTS — Entities Documentation
 
-Implementation of [ECS](ecs.md) as part of Unity DOTS
+The Entities package implements [ECS](/notes/ecs/ecs.md) as part of Unity DOTS.
+It provides the data-oriented APIs and runtime for working with entities, components, and systems.

@@ -1,5 +1,5 @@
 ---
-tags:
-  - dod
+aliases:
+  - "#dod"
 ---
 # Data-oriented design

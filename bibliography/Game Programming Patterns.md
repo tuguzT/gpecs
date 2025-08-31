@@ -1,6 +1,7 @@
 ---
 tags:
   - book
+  - web
   - dod
   - render
 source: https://gameprogrammingpatterns.com

@@ -1,8 +1,13 @@
 {
   "pluginList": [
+    "ebullient/obsidian-markdownlint",
     "mnaoumov/obsidian-advanced-exclude"
   ],
   "pluginSubListFrozenVersion": [
+    {
+      "repo": "ebullient/obsidian-markdownlint",
+      "version": "latest"
+    },
     {
       "repo": "mnaoumov/obsidian-advanced-exclude",
       "version": "latest"

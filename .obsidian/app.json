@@ -1,9 +1,10 @@
 {
   "userIgnoreFilters": null,
   "showUnsupportedFiles": true,
-  "attachmentFolderPath": "notes",
+  "attachmentFolderPath": "notes/attachments",
   "showInlineTitle": false,
   "alwaysUpdateLinks": true,
   "useMarkdownLinks": true,
-  "newFileLocation": "current"
+  "newFileLocation": "current",
+  "newLinkFormat": "absolute"
 }

@@ -153,7 +153,7 @@ fn main() {
             wgpu_map_whole_buffer(timestamp_query_download_buffer.as_ref());
 
         device
-            .poll(wgpu::PollType::Wait)
+            .poll(wgpu::PollType::wait_indefinitely())
             .expect("device should poll");
 
         let duration = start.elapsed();
@@ -369,6 +369,7 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
         label: Some("`gpecs` integration test device"),
         required_features: wgpu::Features::TIMESTAMP_QUERY
             | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
+        experimental_features: wgpu::ExperimentalFeatures::disabled(),
         required_limits: adapter_limits,
         memory_hints: wgpu::MemoryHints::Performance,
         trace: wgpu::Trace::Off,

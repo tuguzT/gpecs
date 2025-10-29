@@ -197,7 +197,7 @@ fn run_gpu(context: &mut Context) {
         framebuffer_data.map_async(wgpu::MapMode::Read, |_| {});
 
         device
-            .poll(wgpu::PollType::Wait)
+            .poll(wgpu::PollType::wait_indefinitely())
             .expect("device should poll");
 
         let elapsed = timestamp.elapsed();
@@ -762,6 +762,7 @@ fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
         label: Some("`gpecs` `ecs_benchmark` device"),
         required_features: wgpu::Features::TIMESTAMP_QUERY
             | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES,
+        experimental_features: wgpu::ExperimentalFeatures::disabled(),
         required_limits: adapter.limits(),
         memory_hints: wgpu::MemoryHints::Performance,
         trace: wgpu::Trace::Off,

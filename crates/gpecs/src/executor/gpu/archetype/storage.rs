@@ -287,14 +287,15 @@ fn assert_bindings_do_not_overlap<'a, I>(
     component_bindings: I,
 ) where
     I: IntoIterator<Item = (&'a GpuComponentId, &'a Option<BufferBindingDescriptor>)>,
+    I::IntoIter: Clone,
 {
     let entities_binding = entities_binding.map(Range::from);
     let component_bindings = component_bindings
         .into_iter()
-        .filter_map(|(_, &binding)| binding.map(Range::from));
+        .filter_map(|(_, binding)| binding.map(Range::from));
 
     chain(entities_binding, component_bindings)
-        .tuple_windows()
+        .tuple_combinations()
         .for_each(|(lhs, rhs)| assert_ranges_do_not_overlap(lhs, rhs));
 }
 

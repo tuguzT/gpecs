@@ -55,7 +55,7 @@ impl GpuSystemShader {
             additional_bindings,
         } = descriptor;
 
-        let entity_entry = bind_entities.then_some(buffer_entry(0, ENTITY_MIN_BINDING_SIZE));
+        let entity_entry = bind_entities.then(|| buffer_entry(0, false, ENTITY_MIN_BINDING_SIZE));
 
         let component_ids = try_collect_component_ids(bind_components, IndexSet::<_>::insert)?;
         let component_entry = |index: usize, component_id: GpuComponentId| {
@@ -69,10 +69,10 @@ impl GpuSystemShader {
                 .expect("size of component should fit in `u64`");
             let min_binding_size = NonZeroU64::new(size_of_component)?;
 
-            let binding = (index + usize::from(bind_entities))
+            let binding_index = (index + usize::from(bind_entities))
                 .try_into()
                 .expect("count of bindings should fit in `u32`");
-            let component_entry = buffer_entry(binding, min_binding_size);
+            let component_entry = buffer_entry(binding_index, false, min_binding_size);
             Some(component_entry)
         };
         let component_entries: IndexMap<_, _> = component_ids
@@ -270,12 +270,16 @@ const ENTITY_MIN_BINDING_SIZE: NonZeroU64 =
     NonZeroU64::new(size_of::<Entity>() as u64).expect("size of `Entity` cannot be zero");
 
 #[inline]
-fn buffer_entry(binding: u32, min_binding_size: NonZeroU64) -> BindGroupLayoutEntry {
+fn buffer_entry(
+    binding_index: u32,
+    read_only: bool,
+    min_binding_size: NonZeroU64,
+) -> BindGroupLayoutEntry {
     BindGroupLayoutEntry {
-        binding,
+        binding: binding_index,
         visibility: ShaderStages::COMPUTE,
         ty: BindingType::Buffer {
-            ty: BufferBindingType::Storage { read_only: false },
+            ty: BufferBindingType::Storage { read_only },
             min_binding_size: Some(min_binding_size),
             has_dynamic_offset: false,
         },

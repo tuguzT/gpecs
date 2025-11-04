@@ -81,9 +81,9 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_from_iter<_I>(components: &ComponentRegistry, iter: _I) -> Self::MutPtrs<'static>
+            unsafe fn ptrs_from_iter<Iter>(components: &ComponentRegistry, iter: Iter) -> Self::MutPtrs<'static>
             where
-                _I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
+                Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
             {
                 let component_ids = [$(unsafe { components.component_id::<$types>().unwrap_unchecked() },)*];
 

@@ -109,13 +109,7 @@ impl GpuArchetypeStorage {
     }
 
     #[inline]
-    pub unsafe fn storage_buffer(&self) -> &Buffer {
-        let Self { storage_buffer, .. } = self;
-        storage_buffer
-    }
-
-    #[inline]
-    pub unsafe fn storage_buffer_slices(&self) -> GpuArchetypeStorageSlices<'_> {
+    pub unsafe fn slices(&self) -> GpuArchetypeStorageSlices<'_> {
         let Self {
             storage_buffer,
             entities_binding,

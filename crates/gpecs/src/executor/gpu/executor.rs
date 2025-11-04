@@ -565,7 +565,7 @@ impl ArchetypeCache {
         let shader = system_info.shader();
         let system_id = system_info.id();
 
-        let slices = unsafe { archetype_storage.storage_buffer_slices() };
+        let slices = unsafe { archetype_storage.slices() };
         let shader_entries = shader.bind_group_layout_entries();
 
         let entity_binding = bind_group_entry(shader_entries.entities, slices.entities);

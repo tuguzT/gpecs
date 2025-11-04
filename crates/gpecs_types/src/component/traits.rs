@@ -1,3 +1,3 @@
 pub trait Component: 'static {}
 
-pub trait GpuComponent: Component + Copy {}
+pub trait GpuComponent: Component + Copy + Send + Sync {}

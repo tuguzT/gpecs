@@ -133,7 +133,8 @@ impl GpuArchetypeRegistry {
                 let storage = info.storage();
                 gpu_archetypes.entry(id.into_u32()).or_insert_with(|| {
                     let id = gpu_archetype_id_trusted(id);
-                    let storage = GpuArchetypeStorage::new(components, gpu_device, id, storage);
+                    let storage = GpuArchetypeStorage::new(components, gpu_device, id, storage)
+                        .unwrap_or_else(|e| panic!("failed to create storage for {id:?}: {e}"));
                     GpuArchetypeInfo { id, storage }.into()
                 });
             });

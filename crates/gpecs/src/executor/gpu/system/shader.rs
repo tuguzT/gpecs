@@ -1,13 +1,13 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    num::{NonZeroU32, NonZeroU64},
+    num::NonZeroU32,
 };
 
 use indexmap::map::Iter as IndexMapIter;
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    BufferBindingType, ComputePipeline, ComputePipelineDescriptor, Device,
+    BufferBindingType, BufferSize, ComputePipeline, ComputePipelineDescriptor, Device,
     PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, ShaderModule,
     ShaderStages,
 };
@@ -24,8 +24,8 @@ use super::registry::{GpuSystemDescriptor, GpuSystemId};
 
 #[derive(Debug)]
 pub struct GpuSystemShader {
-    entity_entry: Option<BindGroupLayoutEntry>,
-    component_entries: IndexMap<GpuComponentId, Option<BindGroupLayoutEntry>>,
+    entity_entry: Option<GpuSystemShaderEntry>,
+    component_entries: IndexMap<GpuComponentId, Option<GpuSystemShaderEntry>>,
     additional_entries: Box<[BindGroupLayoutEntry]>,
     shader_module: ShaderModule,
     workgroup_size: Option<NonZeroU32>,
@@ -46,6 +46,9 @@ impl GpuSystemShader {
         C: IntoIterator<Item = GpuComponentId>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
+        const ENTITY_MIN_BINDING_SIZE: BufferSize =
+            BufferSize::new(size_of::<Entity>() as u64).expect("`Entity` cannot be ZST");
+
         let GpuSystemDescriptor {
             shader_module,
             entry_point,
@@ -55,7 +58,11 @@ impl GpuSystemShader {
             additional_bindings,
         } = descriptor;
 
-        let entity_entry = bind_entities.then(|| buffer_entry(0, false, ENTITY_MIN_BINDING_SIZE));
+        let entity_entry = bind_entities.then_some(GpuSystemShaderEntry {
+            binding_index: 0,
+            binding_access: GpuSystemStorageBufferAccess::ReadWrite,
+            min_binding_size: ENTITY_MIN_BINDING_SIZE,
+        });
 
         let component_ids = try_collect_component_ids(bind_components, IndexSet::<_>::insert)?;
         let component_entry = |index: usize, component_id: GpuComponentId| {
@@ -67,12 +74,16 @@ impl GpuSystemShader {
             let size_of_component = size_of_component
                 .try_into()
                 .expect("size of component should fit in `u64`");
-            let min_binding_size = NonZeroU64::new(size_of_component)?;
+            let min_binding_size = BufferSize::new(size_of_component)?;
 
             let binding_index = (index + usize::from(bind_entities))
                 .try_into()
                 .expect("count of bindings should fit in `u32`");
-            let component_entry = buffer_entry(binding_index, false, min_binding_size);
+            let component_entry = GpuSystemShaderEntry {
+                binding_index,
+                binding_access: GpuSystemStorageBufferAccess::ReadWrite,
+                min_binding_size,
+            };
             Some(component_entry)
         };
         let component_entries: IndexMap<_, _> = component_ids
@@ -87,6 +98,7 @@ impl GpuSystemShader {
         let bind_group_layout_entries = entity_entry
             .into_iter()
             .chain(component_entries.values().copied().flatten())
+            .map(BindGroupLayoutEntry::from)
             .chain(additional_entries.iter().copied())
             .collect::<Box<_>>();
         let bind_group_layout_desc = BindGroupLayoutDescriptor {
@@ -181,16 +193,58 @@ impl GpuSystemShader {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum GpuSystemStorageBufferAccess {
+    ReadOnly,
+    ReadWrite,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct GpuSystemShaderEntry {
+    pub binding_index: u32,
+    pub binding_access: GpuSystemStorageBufferAccess,
+    pub min_binding_size: BufferSize,
+}
+
+impl From<GpuSystemShaderEntry> for BindGroupLayoutEntry {
+    #[inline]
+    fn from(value: GpuSystemShaderEntry) -> Self {
+        let GpuSystemShaderEntry {
+            binding_index,
+            binding_access,
+            min_binding_size,
+        } = value;
+
+        let read_only = match binding_access {
+            GpuSystemStorageBufferAccess::ReadOnly => true,
+            GpuSystemStorageBufferAccess::ReadWrite => false,
+        };
+        BindGroupLayoutEntry {
+            binding: binding_index,
+            visibility: ShaderStages::COMPUTE,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only },
+                min_binding_size: Some(min_binding_size),
+                has_dynamic_offset: false,
+            },
+            count: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct GpuSystemShaderEntries<'a> {
-    pub entities: Option<&'a BindGroupLayoutEntry>,
+    pub entities: Option<&'a GpuSystemShaderEntry>,
     pub components: GpuSystemShaderComponentEntries<'a>,
     pub additional: &'a [BindGroupLayoutEntry],
 }
 
 #[derive(Clone)]
 pub struct GpuSystemShaderComponentEntries<'a> {
-    inner: IndexMapIter<'a, GpuComponentId, Option<BindGroupLayoutEntry>>,
+    inner: IndexMapIter<'a, GpuComponentId, Option<GpuSystemShaderEntry>>,
 }
 
 impl Debug for GpuSystemShaderComponentEntries<'_> {
@@ -200,7 +254,7 @@ impl Debug for GpuSystemShaderComponentEntries<'_> {
 }
 
 impl<'a> Iterator for GpuSystemShaderComponentEntries<'a> {
-    type Item = (GpuComponentId, Option<&'a BindGroupLayoutEntry>);
+    type Item = (GpuComponentId, Option<&'a GpuSystemShaderEntry>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -265,24 +319,3 @@ impl ExactSizeIterator for GpuSystemShaderComponentEntries<'_> {
 }
 
 impl FusedIterator for GpuSystemShaderComponentEntries<'_> {}
-
-const ENTITY_MIN_BINDING_SIZE: NonZeroU64 =
-    NonZeroU64::new(size_of::<Entity>() as u64).expect("size of `Entity` cannot be zero");
-
-#[inline]
-fn buffer_entry(
-    binding_index: u32,
-    read_only: bool,
-    min_binding_size: NonZeroU64,
-) -> BindGroupLayoutEntry {
-    BindGroupLayoutEntry {
-        binding: binding_index,
-        visibility: ShaderStages::COMPUTE,
-        ty: BindingType::Buffer {
-            ty: BufferBindingType::Storage { read_only },
-            min_binding_size: Some(min_binding_size),
-            has_dynamic_offset: false,
-        },
-        count: None,
-    }
-}

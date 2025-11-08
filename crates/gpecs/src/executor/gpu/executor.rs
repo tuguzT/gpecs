@@ -30,6 +30,7 @@ use super::{
             GpuSystemRegistry,
         },
         schedule::GpuSystemSchedule,
+        shader::GpuSystemShaderEntry,
     },
 };
 
@@ -600,16 +601,16 @@ fn upcast_bind_group_entry<'short, 'long: 'short>(
 
 #[inline]
 fn bind_group_entry<'a>(
-    entry: Option<&BindGroupLayoutEntry>,
+    entry: Option<&GpuSystemShaderEntry>,
     slice: Option<GpuArchetypeStorageSlice<'a>>,
 ) -> Option<BindGroupEntry<'a>> {
-    let binding = entry?.binding;
+    let binding = entry?.binding_index;
     let resource = unsafe { slice?.as_slice() }.into();
     Some(BindGroupEntry { binding, resource })
 }
 
 type ComponentEntriesSlicesOutputItem<'a> = (
-    Option<&'a BindGroupLayoutEntry>,
+    Option<&'a GpuSystemShaderEntry>,
     Option<GpuArchetypeStorageSlice<'a>>,
 );
 
@@ -619,7 +620,7 @@ fn component_entries_slices<'a, E, S>(
     slices: S,
 ) -> impl IntoIterator<Item = ComponentEntriesSlicesOutputItem<'a>>
 where
-    E: IntoIterator<Item = (GpuComponentId, Option<&'a BindGroupLayoutEntry>)>,
+    E: IntoIterator<Item = (GpuComponentId, Option<&'a GpuSystemShaderEntry>)>,
     S: IntoIterator<Item = (GpuComponentId, Option<GpuArchetypeStorageSlice<'a>>)>,
 {
     let mut slices: IndexMap<_, _> = slices.into_iter().collect();

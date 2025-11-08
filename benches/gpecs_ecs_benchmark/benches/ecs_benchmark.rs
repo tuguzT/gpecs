@@ -563,7 +563,10 @@ fn register_gpu_systems(
         entry_point: Some("update_position"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: false,
-        bind_components: [position_id, velocity_id],
+        bind_components: [
+            (position_id, GpuComponentAccess::ReadWrite),
+            (velocity_id, GpuComponentAccess::ReadOnly),
+        ],
         additional_bindings: [time_delta_uniform_buffer_entry],
     };
     let update_position_system = executor
@@ -580,7 +583,7 @@ fn register_gpu_systems(
         entry_point: Some("update_data"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: false,
-        bind_components: [data_id],
+        bind_components: [(data_id, GpuComponentAccess::ReadWrite)],
         additional_bindings: [time_delta_uniform_buffer_entry],
     };
     let update_data_system = executor
@@ -593,7 +596,11 @@ fn register_gpu_systems(
         entry_point: Some("update_components"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: false,
-        bind_components: [position_id, velocity_id, data_id],
+        bind_components: [
+            (position_id, GpuComponentAccess::ReadOnly),
+            (velocity_id, GpuComponentAccess::ReadWrite),
+            (data_id, GpuComponentAccess::ReadWrite),
+        ],
         additional_bindings: [],
     };
     let update_components_system = executor
@@ -606,7 +613,7 @@ fn register_gpu_systems(
         entry_point: Some("update_health"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: false,
-        bind_components: [health_id],
+        bind_components: [(health_id, GpuComponentAccess::ReadWrite)],
         additional_bindings: [],
     };
     let update_health_system = executor
@@ -619,7 +626,10 @@ fn register_gpu_systems(
         entry_point: Some("update_damage"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: false,
-        bind_components: [health_id, damage_id],
+        bind_components: [
+            (health_id, GpuComponentAccess::ReadWrite),
+            (damage_id, GpuComponentAccess::ReadOnly),
+        ],
         additional_bindings: [],
     };
     let update_damage_system = executor
@@ -632,7 +642,11 @@ fn register_gpu_systems(
         entry_point: Some("update_sprite"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: false,
-        bind_components: [sprite_id, player_id, health_id],
+        bind_components: [
+            (sprite_id, GpuComponentAccess::ReadWrite),
+            (player_id, GpuComponentAccess::ReadOnly),
+            (health_id, GpuComponentAccess::ReadOnly),
+        ],
         additional_bindings: [],
     };
     let update_sprite_system = executor
@@ -675,7 +689,10 @@ fn register_gpu_systems(
         entry_point: Some("render_sprite"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: false,
-        bind_components: [position_id, sprite_id],
+        bind_components: [
+            (position_id, GpuComponentAccess::ReadOnly),
+            (sprite_id, GpuComponentAccess::ReadOnly),
+        ],
         additional_bindings: [framebuffer_data_entry, framebuffer_desc_entry],
     };
     let render_sprite_system = executor

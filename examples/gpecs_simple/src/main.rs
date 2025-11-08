@@ -76,7 +76,7 @@ fn main() {
         entry_point: Some("update_entity_position"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: true,
-        bind_components: [position_gpu_id],
+        bind_components: [(position_gpu_id, GpuComponentAccess::ReadWrite)],
         additional_bindings: [],
     };
     let positions_gpu_system_id = executor
@@ -89,7 +89,7 @@ fn main() {
         entry_point: Some("update_entity_mass"),
         workgroup_size: 64.try_into().ok(),
         bind_entities: true,
-        bind_components: [mass_gpu_id],
+        bind_components: [(mass_gpu_id, GpuComponentAccess::ReadWrite)],
         additional_bindings: [],
     };
     let mass_gpu_system_id = executor

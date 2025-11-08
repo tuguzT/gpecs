@@ -67,6 +67,13 @@ impl GpuSystemInfo {
 pub const DEFAULT_WORKGROUP_SIZE: NonZeroU32 =
     NonZeroU32::new(64).expect("default workgroup size cannot be zero");
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum GpuComponentAccess {
+    ReadOnly,
+    ReadWrite,
+}
+
 pub struct GpuSystemDescriptor<'entry_point, Components, Bindings> {
     pub shader_module: ShaderModule,
     pub workgroup_size: Option<NonZeroU32>,
@@ -97,7 +104,7 @@ impl GpuSystemRegistry {
         descriptor: GpuSystemDescriptor<C, B>,
     ) -> Result<GpuSystemId, DuplicateComponentError>
     where
-        C: IntoIterator<Item = GpuComponentId>,
+        C: IntoIterator<Item = (GpuComponentId, GpuComponentAccess)>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
         let Self { systems } = self;

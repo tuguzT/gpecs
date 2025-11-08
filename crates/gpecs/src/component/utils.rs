@@ -4,48 +4,48 @@ use crate::{
 };
 
 #[inline]
-pub fn try_collect_component_ids<S, I, F>(
+pub fn try_collect_component_ids<S, I>(
     component_ids: I,
-    mut insert_fn: F,
+    mut insert_fn: impl FnMut(&mut S, I::Item) -> bool,
+    mut component_id_fn: impl FnMut(&I::Item) -> ComponentId,
 ) -> Result<S, DuplicateComponentError>
 where
     S: Default,
     I: IntoIterator,
-    I::Item: Into<ComponentId> + Copy,
-    F: FnMut(&mut S, I::Item) -> bool,
 {
     let mut set = S::default();
-    component_ids.into_iter().try_for_each(|component_id| {
-        let is_unique = insert_fn(&mut set, component_id);
+    component_ids.into_iter().try_for_each(|item| {
+        let component_id = component_id_fn(&item);
+        let is_unique = insert_fn(&mut set, item);
         is_unique
             .then(Default::default)
-            .ok_or_else(|| DuplicateComponentError::new(component_id.into()))
+            .ok_or_else(|| DuplicateComponentError::new(component_id))
     })?;
     Ok(set)
 }
 
 #[inline]
-pub fn try_collect_maybe_component_ids<S, I, T, F>(
+pub fn try_collect_maybe_component_ids<S, I, T>(
     component_ids: I,
-    mut insert_fn: F,
+    mut insert_fn: impl FnMut(&mut S, T) -> bool,
+    mut component_id_fn: impl FnMut(&T) -> ComponentId,
 ) -> Result<S, GetComponentsError>
 where
     S: Default,
     I: IntoIterator<Item = Option<T>>,
-    T: Into<ComponentId> + Copy,
-    F: FnMut(&mut S, T) -> bool,
 {
     let mut set = S::default();
     component_ids
         .into_iter()
-        .try_for_each::<_, Result<_, GetComponentsError>>(|component_id| {
-            let Some(component_id) = component_id else {
+        .try_for_each::<_, Result<_, GetComponentsError>>(|item| {
+            let Some(item) = item else {
                 return Err(ComponentNotRegisteredError.into());
             };
-            let is_unique = insert_fn(&mut set, component_id);
+            let component_id = component_id_fn(&item);
+            let is_unique = insert_fn(&mut set, item);
             is_unique
                 .then(Default::default)
-                .ok_or_else(|| DuplicateComponentError::new(component_id.into()).into())
+                .ok_or_else(|| DuplicateComponentError::new(component_id).into())
         })?;
     Ok(set)
 }

@@ -3,8 +3,8 @@ use std::{any::TypeId, num::NonZeroU32};
 use itertools::chain;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferDescriptor,
-    BufferUsages, CommandEncoder, ComputePass, ComputePassDescriptor, Device, Features, QUERY_SIZE,
-    QuerySet, QuerySetDescriptor, QueryType,
+    BufferSlice, BufferUsages, CommandEncoder, ComputePass, ComputePassDescriptor, Device,
+    Features, Label, QUERY_SIZE, QuerySet, QuerySetDescriptor, QueryType,
 };
 
 use crate::{
@@ -19,6 +19,7 @@ use super::{
         registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
         storage::{GpuArchetypeStorage, GpuArchetypeStorageSlice},
     },
+    buffer::BufferRegion,
     bundle::GpuBundle,
     component::{
         GpuComponent,
@@ -26,8 +27,8 @@ use super::{
     },
     system::{
         registry::{
-            DEFAULT_WORKGROUP_SIZE, GpuSystemDescriptor, GpuSystemId, GpuSystemInfo,
-            GpuSystemRegistry,
+            DEFAULT_WORKGROUP_SIZE, GpuComponentAccess, GpuSystemDescriptor, GpuSystemId,
+            GpuSystemInfo, GpuSystemRegistry,
         },
         schedule::GpuSystemSchedule,
         shader::GpuSystemShaderEntry,
@@ -206,7 +207,7 @@ impl<'context> GpuExecutor<'context> {
         descriptor: GpuSystemDescriptor<C, B>,
     ) -> Result<GpuSystemId, DuplicateComponentError>
     where
-        C: IntoIterator<Item = GpuComponentId>,
+        C: IntoIterator<Item = (GpuComponentId, GpuComponentAccess)>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
         let Self {
@@ -286,12 +287,6 @@ impl<'context> GpuExecutor<'context> {
         }
         let timestamp_query_resources = timestamp_query_resources.as_ref();
 
-        let compute_pass_desc = ComputePassDescriptor {
-            label: Some("`gpecs` executor compute pass"),
-            timestamp_writes: None,
-        };
-        let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
-
         let write_timestamp = |compute_pass: &mut ComputePass, query_index| {
             if let Some(timestamp_query_resources) = timestamp_query_resources {
                 let query_set = unsafe { timestamp_query_resources.query_set() };
@@ -305,31 +300,60 @@ impl<'context> GpuExecutor<'context> {
                 unreachable!("system {system_id:?} should exist");
             };
 
+            let copy_to_write_label = format!("`gpecs` copy to write buffers for {system_id:?}");
+            command_encoder.push_debug_group(&copy_to_write_label);
+            for (_, archetype_cache) in &system_cache.archetypes {
+                if let Some(entities_write_region) = &archetype_cache.entities_write_region {
+                    entities_write_region.copy_from_storage_to_write(command_encoder);
+                }
+                for (_, components_write_region) in &archetype_cache.component_write_regions {
+                    components_write_region.copy_from_storage_to_write(command_encoder);
+                }
+            }
+            command_encoder.pop_debug_group();
+
+            let compute_pass_label = format!("`gpecs` executor compute pass for {system_id:?}");
+            let compute_pass_desc = ComputePassDescriptor {
+                label: Some(&compute_pass_label),
+                timestamp_writes: None,
+            };
+            let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
+
             let shader = system_info.shader();
             for (&archetype_id, archetype_cache) in &system_cache.archetypes {
-                let ArchetypeCache { bind_group } = archetype_cache;
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
                     unreachable!("archetype {archetype_id:?} should exist");
                 };
 
-                let archetype_storage = archetype_info.storage();
-                let workgroup_size = shader.workgroup_size().unwrap_or(DEFAULT_WORKGROUP_SIZE);
-                let workgroup_count = workgroup_count(archetype_storage, workgroup_size);
-
                 compute_pass.set_pipeline(shader.compute_pipeline());
-                compute_pass.set_bind_group(0, bind_group, &[]);
+                compute_pass.set_bind_group(0, &archetype_cache.bind_group, &[]);
 
                 write_timestamp(&mut compute_pass, query_index);
                 query_index += 1;
 
+                let archetype_storage = archetype_info.storage();
+                let workgroup_size = shader.workgroup_size().unwrap_or(DEFAULT_WORKGROUP_SIZE);
+                let workgroup_count = workgroup_count(archetype_storage, workgroup_size);
                 compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
 
                 write_timestamp(&mut compute_pass, query_index);
             }
             query_index += 1;
-        }
 
-        drop(compute_pass);
+            drop(compute_pass);
+
+            let copy_back_label = format!("`gpecs` copy back to storage buffers for {system_id:?}");
+            command_encoder.push_debug_group(&copy_back_label);
+            for (_, archetype_cache) in &system_cache.archetypes {
+                if let Some(entities_write_region) = &archetype_cache.entities_write_region {
+                    entities_write_region.copy_from_write_to_storage(command_encoder);
+                }
+                for (_, components_write_region) in &archetype_cache.component_write_regions {
+                    components_write_region.copy_from_write_to_storage(command_encoder);
+                }
+            }
+            command_encoder.pop_debug_group();
+        }
 
         if let Some(timestamp_query_resources) = timestamp_query_resources {
             timestamp_query_resources.resolve(command_encoder);
@@ -544,6 +568,8 @@ struct SystemCache {
 #[derive(Debug)]
 struct ArchetypeCache {
     bind_group: BindGroup,
+    entities_write_region: Option<ArchetypeStorageWriteRegion>,
+    component_write_regions: IndexMap<GpuComponentId, ArchetypeStorageWriteRegion>,
 }
 
 impl ArchetypeCache {
@@ -569,11 +595,34 @@ impl ArchetypeCache {
         let slices = archetype_storage.slices();
         let shader_entries = shader.bind_group_layout_entries();
 
-        let entity_binding = bind_group_entry(shader_entries.entities, slices.entities);
+        let label =
+            || format!("`gpecs` {system_id:?} write buffer of entities for {archetype_id:?}");
+        let entities_write_region =
+            write_region(device, shader_entries.entities, slices.entities, label);
+
+        let label =
+            |id| format!("`gpecs` {system_id:?} write buffer of {id:?} for {archetype_id:?}");
+        let component_write_regions: IndexMap<_, _> =
+            component_entries_slices(shader_entries.components.clone(), slices.components.clone())
+                .into_iter()
+                .filter_map(|(component_id, entry, slice)| {
+                    let write_region = write_region(device, entry, slice, || label(component_id))?;
+                    Some((component_id, write_region))
+                })
+                .collect();
+
+        let entity_binding = bind_group_entry(
+            shader_entries.entities,
+            slices.entities,
+            entities_write_region.as_ref(),
+        );
         let component_bindings =
             component_entries_slices(shader_entries.components, slices.components)
                 .into_iter()
-                .filter_map(|(entry, slice)| bind_group_entry(entry, slice));
+                .filter_map(|(component_id, entry, slice)| {
+                    let write_region = component_write_regions.get(&component_id);
+                    bind_group_entry(entry, slice, write_region)
+                });
 
         let additional_bindings = additional_bindings.into_iter().map(upcast_bind_group_entry);
 
@@ -588,7 +637,78 @@ impl ArchetypeCache {
         };
         let bind_group = device.create_bind_group(&bind_group_desc);
 
-        Some(Self { bind_group })
+        Some(Self {
+            bind_group,
+            entities_write_region,
+            component_write_regions,
+        })
+    }
+}
+
+#[derive(Debug)]
+struct ArchetypeStorageWriteRegion {
+    storage_buffer_region: BufferRegion,
+    storage_buffer: Buffer,
+    write_buffer: Buffer,
+}
+
+impl ArchetypeStorageWriteRegion {
+    #[inline]
+    fn new(device: &Device, slice: &GpuArchetypeStorageSlice<'_>, label: Label<'_>) -> Self {
+        let slice = unsafe { slice.as_slice() };
+
+        let write_buffer_desc = BufferDescriptor {
+            label,
+            size: slice.size().into(),
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        };
+        let write_buffer = device.create_buffer(&write_buffer_desc);
+
+        Self {
+            storage_buffer_region: BufferRegion {
+                offset: slice.offset(),
+                size: slice.size(),
+            },
+            storage_buffer: slice.buffer().clone(),
+            write_buffer,
+        }
+    }
+
+    #[inline]
+    unsafe fn as_slice(&self) -> BufferSlice<'_> {
+        let Self {
+            storage_buffer_region,
+            write_buffer,
+            ..
+        } = self;
+
+        let size = storage_buffer_region.size.into();
+        write_buffer.slice(0..size)
+    }
+
+    #[inline]
+    fn copy_from_storage_to_write(&self, encoder: &mut CommandEncoder) {
+        let Self {
+            storage_buffer_region,
+            storage_buffer,
+            write_buffer,
+        } = self;
+
+        let BufferRegion { offset, size } = *storage_buffer_region;
+        encoder.copy_buffer_to_buffer(storage_buffer, offset, write_buffer, 0, size.get());
+    }
+
+    #[inline]
+    fn copy_from_write_to_storage(&self, encoder: &mut CommandEncoder) {
+        let Self {
+            storage_buffer_region,
+            storage_buffer,
+            write_buffer,
+        } = self;
+
+        let BufferRegion { offset, size } = *storage_buffer_region;
+        encoder.copy_buffer_to_buffer(write_buffer, 0, storage_buffer, offset, size.get());
     }
 }
 
@@ -600,16 +720,44 @@ fn upcast_bind_group_entry<'short, 'long: 'short>(
 }
 
 #[inline]
+fn write_region<L>(
+    device: &Device,
+    entry: Option<&GpuSystemShaderEntry>,
+    slice: Option<GpuArchetypeStorageSlice<'_>>,
+    f: impl FnOnce() -> L,
+) -> Option<ArchetypeStorageWriteRegion>
+where
+    L: AsRef<str>,
+{
+    let (entry, slice) = (entry?, slice?);
+    if entry.binding_access == GpuComponentAccess::ReadOnly {
+        return None;
+    }
+
+    let label = f();
+    let label = Some(label.as_ref());
+    Some(ArchetypeStorageWriteRegion::new(device, &slice, label))
+}
+
+#[inline]
 fn bind_group_entry<'a>(
     entry: Option<&GpuSystemShaderEntry>,
     slice: Option<GpuArchetypeStorageSlice<'a>>,
+    write_region: Option<&'a ArchetypeStorageWriteRegion>,
 ) -> Option<BindGroupEntry<'a>> {
-    let binding = entry?.binding_index;
-    let resource = unsafe { slice?.as_slice() }.into();
+    let (entry, slice) = (entry?, slice?);
+
+    let binding = entry.binding_index;
+    let resource = match write_region {
+        Some(region) => unsafe { region.as_slice() }.into(),
+        None => unsafe { slice.as_slice() }.into(),
+    };
+
     Some(BindGroupEntry { binding, resource })
 }
 
 type ComponentEntriesSlicesOutputItem<'a> = (
+    GpuComponentId,
     Option<&'a GpuSystemShaderEntry>,
     Option<GpuArchetypeStorageSlice<'a>>,
 );
@@ -628,6 +776,6 @@ where
         let Some(slice) = slices.swap_remove(&component_id) else {
             unreachable!("component {component_id:?} should exist");
         };
-        (entry, slice)
+        (component_id, entry, slice)
     })
 }

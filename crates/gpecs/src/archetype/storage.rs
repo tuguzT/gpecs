@@ -92,12 +92,16 @@ impl ArchetypeStorage {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids = try_collect_component_ids(component_ids, |map, component_id| {
-            let info = components
-                .get_component_info(component_id)
-                .unwrap_or_else(|| get_component_info_fail(component_id));
-            ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
-        })?;
+        let component_ids = try_collect_component_ids(
+            component_ids,
+            |map, component_id| {
+                let info = components
+                    .get_component_info(component_id)
+                    .unwrap_or_else(|| get_component_info_fail(component_id));
+                ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
+            },
+            Clone::clone,
+        )?;
 
         let context = component_ids
             .keys()
@@ -122,12 +126,16 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let component_ids = B::register_components(components);
-        let component_ids = try_collect_component_ids(component_ids, |map, component_id| {
-            let info = components
-                .get_component_info(component_id)
-                .unwrap_or_else(|| get_component_info_fail(component_id));
-            ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
-        })?;
+        let component_ids = try_collect_component_ids(
+            component_ids,
+            |map, component_id| {
+                let info = components
+                    .get_component_info(component_id)
+                    .unwrap_or_else(|| get_component_info_fail(component_id));
+                ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
+            },
+            Clone::clone,
+        )?;
 
         let context = ErasedSoaContext::of::<B>(B::CONTEXT);
         let erased_storage = ErasedStorage::with_context(context);
@@ -154,7 +162,8 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let component_ids = B::get_components(components);
-        let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
+        let component_ids =
+            try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?;
         self.components_compatibility_inner(component_ids)
     }
 
@@ -166,7 +175,8 @@ impl ArchetypeStorage {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?;
+        let component_ids =
+            try_collect_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?;
         self.components_compatibility_inner(component_ids)
     }
 
@@ -179,7 +189,8 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let component_ids = B::get_components(components);
-        let component_ids = try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert)?;
+        let component_ids =
+            try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?;
         self.components_compatibility_exact_inner(component_ids)
     }
 
@@ -191,7 +202,8 @@ impl ArchetypeStorage {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids = try_collect_component_ids(component_ids, IndexSet::<_>::insert)?;
+        let component_ids =
+            try_collect_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?;
         self.components_compatibility_exact_inner(component_ids)
     }
 

@@ -14,7 +14,7 @@ pub use crate::{
             archetype::registry::GpuArchetypeId,
             bundle::GpuBundle,
             component::{GpuComponent, registry::GpuComponentId},
-            system::registry::{GpuSystemDescriptor, GpuSystemId},
+            system::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId},
         },
     },
     world::registry::WorldId,

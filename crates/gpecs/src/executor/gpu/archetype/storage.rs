@@ -19,7 +19,7 @@ use crate::{
     archetype::storage::ArchetypeStorage,
     component::registry::ComponentRegistry,
     entity::Entity,
-    executor::gpu::component::registry::GpuComponentId,
+    executor::gpu::{buffer::BufferRegion, component::registry::GpuComponentId},
     hash::IndexMap,
     soa::field::{BufferOffset, CopiedFieldDescriptors, FieldDescriptor, repeat_layout},
 };
@@ -30,8 +30,8 @@ use super::registry::GpuArchetypeId;
 pub struct GpuArchetypeStorage {
     len: usize,
     storage_buffer: Buffer,
-    entities_region: Option<StorageBufferRegion>,
-    component_regions: IndexMap<GpuComponentId, Option<StorageBufferRegion>>,
+    entities_region: Option<BufferRegion>,
+    component_regions: IndexMap<GpuComponentId, Option<BufferRegion>>,
 }
 
 impl GpuArchetypeStorage {
@@ -52,7 +52,7 @@ impl GpuArchetypeStorage {
             .map_err(IntoBufferAddress)?
             .try_into()
             .ok()
-            .map(|size| StorageBufferRegion { size, offset: 0 });
+            .map(|size| BufferRegion { size, offset: 0 });
 
         let fields = erased_components
             .iter()
@@ -74,7 +74,7 @@ impl GpuArchetypeStorage {
                     .map_err(IntoBufferAddress)?
                     .try_into()
                     .ok()
-                    .map(|size| StorageBufferRegion { size, offset });
+                    .map(|size| BufferRegion { size, offset });
                 Ok((gpu_component_id, components_binding))
             })
             .collect::<Result<_, GpuArchetypeStorageError>>()?;
@@ -84,7 +84,7 @@ impl GpuArchetypeStorage {
         let storage_buffer_desc = BufferInitDescriptor {
             label: Some(&storage_buffer_label),
             contents: storage_buffer_contents.as_slice(),
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
         };
         let storage_buffer = gpu_device.create_buffer_init(&storage_buffer_desc);
 
@@ -188,7 +188,7 @@ pub struct GpuArchetypeStorageSlices<'a> {
 #[derive(Clone)]
 pub struct GpuArchetypeStorageComponentSlices<'a> {
     storage_buffer: &'a Buffer,
-    inner: IndexMapIter<'a, GpuComponentId, Option<StorageBufferRegion>>,
+    inner: IndexMapIter<'a, GpuComponentId, Option<BufferRegion>>,
 }
 
 impl Debug for GpuArchetypeStorageComponentSlices<'_> {
@@ -304,38 +304,19 @@ impl ExactSizeIterator for GpuArchetypeStorageComponentSlices<'_> {
 
 impl FusedIterator for GpuArchetypeStorageComponentSlices<'_> {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct StorageBufferRegion {
-    size: BufferSize,
-    offset: BufferAddress,
-}
-
-impl From<StorageBufferRegion> for Range<BufferAddress> {
-    #[inline]
-    fn from(region: StorageBufferRegion) -> Self {
-        let StorageBufferRegion { size, offset } = region;
-        let end = offset
-            .checked_add(size.into())
-            .expect("storage buffer region should be valid");
-        offset..end
-    }
-}
-
 #[inline]
 fn slice_from_region<'a>(
     storage_buffer: &'a Buffer,
-) -> impl FnOnce(StorageBufferRegion) -> GpuArchetypeStorageSlice<'a> + Copy {
+) -> impl FnOnce(BufferRegion) -> GpuArchetypeStorageSlice<'a> + Copy {
     |region| GpuArchetypeStorageSlice {
         slice: storage_buffer.slice(Range::from(region)),
     }
 }
 
 #[inline]
-fn assert_regions_do_not_overlap<I>(
-    entities_region: Option<StorageBufferRegion>,
-    component_regions: I,
-) where
-    I: IntoIterator<Item = Option<StorageBufferRegion>>,
+fn assert_regions_do_not_overlap<I>(entities_region: Option<BufferRegion>, component_regions: I)
+where
+    I: IntoIterator<Item = Option<BufferRegion>>,
     I::IntoIter: Clone,
 {
     let entities_region = entities_region.map(Range::from);

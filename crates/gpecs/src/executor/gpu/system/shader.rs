@@ -20,7 +20,7 @@ use crate::{
     hash::{IndexMap, IndexSet},
 };
 
-use super::registry::{GpuSystemDescriptor, GpuSystemId};
+use super::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId};
 
 #[derive(Debug)]
 pub struct GpuSystemShader {
@@ -43,7 +43,7 @@ impl GpuSystemShader {
         descriptor: GpuSystemDescriptor<C, B>,
     ) -> Result<Self, DuplicateComponentError>
     where
-        C: IntoIterator<Item = GpuComponentId>,
+        C: IntoIterator<Item = (GpuComponentId, GpuComponentAccess)>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
     {
         const ENTITY_MIN_BINDING_SIZE: BufferSize =
@@ -60,12 +60,16 @@ impl GpuSystemShader {
 
         let entity_entry = bind_entities.then_some(GpuSystemShaderEntry {
             binding_index: 0,
-            binding_access: GpuSystemStorageBufferAccess::ReadWrite,
+            binding_access: GpuComponentAccess::ReadOnly,
             min_binding_size: ENTITY_MIN_BINDING_SIZE,
         });
 
-        let component_ids = try_collect_component_ids(bind_components, IndexSet::<_>::insert)?;
-        let component_entry = |index: usize, component_id: GpuComponentId| {
+        let component_ids = try_collect_component_ids(
+            bind_components,
+            IndexSet::<_>::insert,
+            |&(component_id, _)| component_id.into(),
+        )?;
+        let component_entry = |index: usize, component_id: GpuComponentId, binding_access| {
             let Some(info) = components.get_component_info(component_id.into()) else {
                 unreachable!("component {component_id:?} should exist");
             };
@@ -81,7 +85,7 @@ impl GpuSystemShader {
                 .expect("count of bindings should fit in `u32`");
             let component_entry = GpuSystemShaderEntry {
                 binding_index,
-                binding_access: GpuSystemStorageBufferAccess::ReadWrite,
+                binding_access,
                 min_binding_size,
             };
             Some(component_entry)
@@ -89,7 +93,9 @@ impl GpuSystemShader {
         let component_entries: IndexMap<_, _> = component_ids
             .into_iter()
             .enumerate()
-            .map(|(index, component_id)| (component_id, component_entry(index, component_id)))
+            .map(|(index, (component_id, access))| {
+                (component_id, component_entry(index, component_id, access))
+            })
             .collect();
 
         let additional_entries: Box<_> = additional_bindings.into_iter().collect();
@@ -193,18 +199,11 @@ impl GpuSystemShader {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[non_exhaustive]
-pub enum GpuSystemStorageBufferAccess {
-    ReadOnly,
-    ReadWrite,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct GpuSystemShaderEntry {
     pub binding_index: u32,
-    pub binding_access: GpuSystemStorageBufferAccess,
+    pub binding_access: GpuComponentAccess,
     pub min_binding_size: BufferSize,
 }
 
@@ -218,8 +217,8 @@ impl From<GpuSystemShaderEntry> for BindGroupLayoutEntry {
         } = value;
 
         let read_only = match binding_access {
-            GpuSystemStorageBufferAccess::ReadOnly => true,
-            GpuSystemStorageBufferAccess::ReadWrite => false,
+            GpuComponentAccess::ReadOnly => true,
+            GpuComponentAccess::ReadWrite => false,
         };
         BindGroupLayoutEntry {
             binding: binding_index,

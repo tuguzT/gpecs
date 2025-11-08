@@ -12,7 +12,7 @@ use spirv_std::{glam::UVec3, spirv};
 pub fn update_damage(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] health: &mut [Health],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] damage: &mut [Damage],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] damage: &[Damage],
 ) {
     let index = id.x as usize;
     let health = &mut health[index];
@@ -44,7 +44,7 @@ pub fn update_health(
 #[spirv(compute(threads(64)))]
 pub fn update_components(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] position: &mut [Position],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] position: &[Position],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] velocity: &mut [Velocity],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] data: &mut [Data],
 ) {
@@ -59,7 +59,7 @@ pub fn update_components(
 pub fn update_position(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] position: &mut [Position],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] velocity: &mut [Velocity],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] velocity: &[Velocity],
     #[spirv(uniform, descriptor_set = 0, binding = 2)] dt: &TimeDelta,
 ) {
     let index = id.x as usize;
@@ -71,8 +71,8 @@ pub fn update_position(
 #[spirv(compute(threads(64)))]
 pub fn render_sprite(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] position: &mut [Position],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] sprite: &mut [Sprite],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] position: &[Position],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] sprite: &[Sprite],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] framebuffer_data: &mut [u32],
     #[spirv(uniform, descriptor_set = 0, binding = 3)] framebuffer_desc: &FramebufferDesc,
 ) {
@@ -89,8 +89,8 @@ pub fn render_sprite(
 pub fn update_sprite(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] sprite: &mut [Sprite],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] player: &mut [Player],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] health: &mut [Health],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] player: &[Player],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] health: &[Health],
 ) {
     let index = id.x as usize;
     let sprite = &mut sprite[index];

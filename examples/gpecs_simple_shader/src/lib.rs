@@ -12,7 +12,7 @@ use spirv_std::{
 #[spirv(compute(threads(64)))]
 pub fn update_entity_position(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &mut [Entity],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &[Entity],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] positions: &mut [Position],
 ) {
     let (entities,): <(_,) as Soa>::Slices<'_, '_> = (entities,);
@@ -31,7 +31,7 @@ pub fn update_entity_position(
 #[spirv(compute(threads(64)))]
 pub fn update_entity_mass(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &mut [Entity],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &[Entity],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] masses: &mut [Mass],
 ) {
     let (entities,): <(_,) as Soa>::Slices<'_, '_> = (entities,);

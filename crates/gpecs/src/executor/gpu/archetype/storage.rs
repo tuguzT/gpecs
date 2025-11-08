@@ -11,7 +11,7 @@ use bytemuck::must_cast_slice;
 use indexmap::map::Iter as IndexMapIter;
 use itertools::{Itertools, chain};
 use wgpu::{
-    Buffer, BufferAddress, BufferSize, BufferSlice, BufferUsages, Device,
+    Buffer, BufferAddress, BufferSize, BufferSlice, BufferUsages, COPY_BUFFER_ALIGNMENT, Device,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
@@ -52,7 +52,7 @@ impl GpuArchetypeStorage {
             .map_err(IntoBufferAddress)?
             .try_into()
             .ok()
-            .map(|size| StorageBufferRegion { offset: 0, size });
+            .map(|size| StorageBufferRegion { size, offset: 0 });
 
         let fields = erased_components
             .iter()
@@ -60,7 +60,7 @@ impl GpuArchetypeStorage {
         let offsets = storage_buffer_offsets(fields, len, gpu_device)?;
 
         let mut storage_buffer_contents = Vec::from(entities_bytes);
-        let component_regions = zip(&erased_components, offsets)
+        let component_regions: IndexMap<_, _> = zip(&erased_components, offsets)
             .map(|((&component_id, slice), offset)| {
                 let BufferOffset { offset, .. } = offset?;
                 let component_bytes = slice.buffer();
@@ -74,17 +74,16 @@ impl GpuArchetypeStorage {
                     .map_err(IntoBufferAddress)?
                     .try_into()
                     .ok()
-                    .map(|size| StorageBufferRegion { offset, size });
+                    .map(|size| StorageBufferRegion { size, offset });
                 Ok((gpu_component_id, components_binding))
             })
             .collect::<Result<_, GpuArchetypeStorageError>>()?;
-        assert_regions_do_not_overlap(entities_region, &component_regions);
+        assert_regions_do_not_overlap(entities_region, component_regions.values().copied());
 
-        let storage_buffer_contents = storage_buffer_contents.as_slice();
         let storage_buffer_label = format!("`gpecs` {archetype_id:?} storage buffer");
         let storage_buffer_desc = BufferInitDescriptor {
             label: Some(&storage_buffer_label),
-            contents: storage_buffer_contents,
+            contents: storage_buffer_contents.as_slice(),
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
         };
         let storage_buffer = gpu_device.create_buffer_init(&storage_buffer_desc);
@@ -109,20 +108,20 @@ impl GpuArchetypeStorage {
     }
 
     #[inline]
-    pub unsafe fn slices(&self) -> GpuArchetypeStorageSlices<'_> {
+    pub fn slices(&self) -> GpuArchetypeStorageSlices<'_> {
         let Self {
             storage_buffer,
-            entities_region: entities_binding,
-            component_regions: component_bindings,
+            entities_region,
+            component_regions,
             ..
         } = self;
 
         let to_slice = slice_from_region(storage_buffer);
         GpuArchetypeStorageSlices {
-            entities: entities_binding.map(to_slice),
+            entities: entities_region.map(to_slice),
             components: GpuArchetypeStorageComponentSlices {
                 storage_buffer,
-                inner: component_bindings.iter(),
+                inner: component_regions.iter(),
             },
         }
     }
@@ -137,8 +136,8 @@ pub enum GpuArchetypeStorageError {
 
 impl From<LayoutError> for GpuArchetypeStorageError {
     #[inline]
-    fn from(value: LayoutError) -> Self {
-        Self::Layout(value)
+    fn from(err: LayoutError) -> Self {
+        Self::Layout(err)
     }
 }
 
@@ -146,17 +145,43 @@ impl Display for GpuArchetypeStorageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Layout(err) => Display::fmt(err, f),
-            Self::FromBufferAddress(_) => write!(f, "couldn't convert `usize` to buffer address"),
-            Self::IntoBufferAddress(_) => write!(f, "couldn't convert buffer address to `usize`"),
+            Self::FromBufferAddress(_) => write!(f, "couldn't convert buffer address to `usize`"),
+            Self::IntoBufferAddress(_) => write!(f, "couldn't convert `usize` to buffer address"),
         }
     }
 }
 
 impl Error for GpuArchetypeStorageError {}
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GpuArchetypeStorageSlice<'a> {
+    slice: BufferSlice<'a>,
+}
+
+impl<'a> GpuArchetypeStorageSlice<'a> {
+    #[inline]
+    pub fn size(&self) -> BufferSize {
+        let Self { slice } = self;
+        slice.size()
+    }
+
+    #[inline]
+    pub fn offset(&self) -> BufferAddress {
+        let Self { slice } = self;
+        slice.offset()
+    }
+
+    #[inline]
+    pub unsafe fn as_slice(&self) -> BufferSlice<'a> {
+        let Self { slice } = *self;
+        slice
+    }
+}
+
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct GpuArchetypeStorageSlices<'a> {
-    pub entities: Option<BufferSlice<'a>>,
+    pub entities: Option<GpuArchetypeStorageSlice<'a>>,
     pub components: GpuArchetypeStorageComponentSlices<'a>,
 }
 
@@ -173,7 +198,7 @@ impl Debug for GpuArchetypeStorageComponentSlices<'_> {
 }
 
 impl<'a> Iterator for GpuArchetypeStorageComponentSlices<'a> {
-    type Item = (GpuComponentId, Option<BufferSlice<'a>>);
+    type Item = (GpuComponentId, Option<GpuArchetypeStorageSlice<'a>>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -279,18 +304,18 @@ impl ExactSizeIterator for GpuArchetypeStorageComponentSlices<'_> {
 
 impl FusedIterator for GpuArchetypeStorageComponentSlices<'_> {}
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct StorageBufferRegion {
-    offset: BufferAddress,
     size: BufferSize,
+    offset: BufferAddress,
 }
 
 impl From<StorageBufferRegion> for Range<BufferAddress> {
     #[inline]
     fn from(region: StorageBufferRegion) -> Self {
-        let StorageBufferRegion { offset, size } = region;
+        let StorageBufferRegion { size, offset } = region;
         let end = offset
-            .checked_add(size.get())
+            .checked_add(size.into())
             .expect("storage buffer region should be valid");
         offset..end
     }
@@ -299,22 +324,24 @@ impl From<StorageBufferRegion> for Range<BufferAddress> {
 #[inline]
 fn slice_from_region<'a>(
     storage_buffer: &'a Buffer,
-) -> impl FnOnce(StorageBufferRegion) -> BufferSlice<'a> + Copy {
-    |region| storage_buffer.slice(Range::from(region))
+) -> impl FnOnce(StorageBufferRegion) -> GpuArchetypeStorageSlice<'a> + Copy {
+    |region| GpuArchetypeStorageSlice {
+        slice: storage_buffer.slice(Range::from(region)),
+    }
 }
 
 #[inline]
-fn assert_regions_do_not_overlap<'a, I>(
+fn assert_regions_do_not_overlap<I>(
     entities_region: Option<StorageBufferRegion>,
     component_regions: I,
 ) where
-    I: IntoIterator<Item = (&'a GpuComponentId, &'a Option<StorageBufferRegion>)>,
+    I: IntoIterator<Item = Option<StorageBufferRegion>>,
     I::IntoIter: Clone,
 {
     let entities_region = entities_region.map(Range::from);
     let component_regions = component_regions
         .into_iter()
-        .filter_map(|(_, region)| region.map(Range::from));
+        .filter_map(|region| region.map(Range::from));
 
     chain(entities_region, component_regions)
         .tuple_combinations()
@@ -394,7 +421,7 @@ where
         } = *self;
 
         let desc = fields.next()?;
-        let item = try_create_buffer_offset(desc, layout, capacity, min_offset_align);
+        let item = storage_buffer_offset(desc, layout, capacity, min_offset_align);
         Some(item)
     }
 
@@ -425,7 +452,7 @@ where
 }
 
 #[inline]
-fn try_create_buffer_offset(
+fn storage_buffer_offset(
     field_descriptor: FieldDescriptor,
     layout: &mut Layout,
     capacity: usize,
@@ -452,13 +479,16 @@ fn storage_buffer_offsets<I>(
     device: &Device,
 ) -> Result<GpuArchetypeStorageBufferOffsets<I::IntoIter>, GpuArchetypeStorageError>
 where
-    I: IntoIterator<Item: AsRef<FieldDescriptor>>,
+    I: IntoIterator,
+    I::Item: AsRef<FieldDescriptor>,
 {
-    let layout = repeat_layout(Layout::new::<Entity>(), capacity)?;
+    const ENTITY_LAYOUT: Layout = Layout::new::<Entity>();
+
+    let layout = repeat_layout(ENTITY_LAYOUT, capacity)?;
     let fields = fields.into_iter().into();
-    let min_offset_align = device
-        .limits()
-        .min_storage_buffer_offset_alignment
+
+    let storage_offset_align = device.limits().min_storage_buffer_offset_alignment.into();
+    let min_offset_align = BufferAddress::max(storage_offset_align, COPY_BUFFER_ALIGNMENT)
         .try_into()
         .map_err(GpuArchetypeStorageError::FromBufferAddress)?;
 

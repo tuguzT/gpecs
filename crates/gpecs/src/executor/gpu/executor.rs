@@ -3,8 +3,8 @@ use std::{any::TypeId, num::NonZeroU32};
 use itertools::chain;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferDescriptor,
-    BufferSlice, BufferUsages, CommandEncoder, ComputePass, ComputePassDescriptor, Device,
-    Features, QUERY_SIZE, QuerySet, QuerySetDescriptor, QueryType,
+    BufferUsages, CommandEncoder, ComputePass, ComputePassDescriptor, Device, Features, QUERY_SIZE,
+    QuerySet, QuerySetDescriptor, QueryType,
 };
 
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
 use super::{
     archetype::{
         registry::{GpuArchetypeId, GpuArchetypeInfo, GpuArchetypeRegistry},
-        storage::GpuArchetypeStorage,
+        storage::{GpuArchetypeStorage, GpuArchetypeStorageSlice},
     },
     bundle::GpuBundle,
     component::{
@@ -565,7 +565,7 @@ impl ArchetypeCache {
         let shader = system_info.shader();
         let system_id = system_info.id();
 
-        let slices = unsafe { archetype_storage.slices() };
+        let slices = archetype_storage.slices();
         let shader_entries = shader.bind_group_layout_entries();
 
         let entity_binding = bind_group_entry(shader_entries.entities, slices.entities);
@@ -601,21 +601,26 @@ fn upcast_bind_group_entry<'short, 'long: 'short>(
 #[inline]
 fn bind_group_entry<'a>(
     entry: Option<&BindGroupLayoutEntry>,
-    slice: Option<BufferSlice<'a>>,
+    slice: Option<GpuArchetypeStorageSlice<'a>>,
 ) -> Option<BindGroupEntry<'a>> {
     let binding = entry?.binding;
-    let resource = slice?.into();
+    let resource = unsafe { slice?.as_slice() }.into();
     Some(BindGroupEntry { binding, resource })
 }
+
+type ComponentEntriesSlicesOutputItem<'a> = (
+    Option<&'a BindGroupLayoutEntry>,
+    Option<GpuArchetypeStorageSlice<'a>>,
+);
 
 #[inline]
 fn component_entries_slices<'a, E, S>(
     entries: E,
     slices: S,
-) -> impl IntoIterator<Item = (Option<&'a BindGroupLayoutEntry>, Option<BufferSlice<'a>>)>
+) -> impl IntoIterator<Item = ComponentEntriesSlicesOutputItem<'a>>
 where
     E: IntoIterator<Item = (GpuComponentId, Option<&'a BindGroupLayoutEntry>)>,
-    S: IntoIterator<Item = (GpuComponentId, Option<BufferSlice<'a>>)>,
+    S: IntoIterator<Item = (GpuComponentId, Option<GpuArchetypeStorageSlice<'a>>)>,
 {
     let mut slices: IndexMap<_, _> = slices.into_iter().collect();
     entries.into_iter().map(move |(component_id, entry)| {

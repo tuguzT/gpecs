@@ -559,6 +559,7 @@ fn register_gpu_systems(
         count: None,
     };
     let update_position_system_descriptor = GpuSystemDescriptor {
+        label: Some("update position"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_position"),
         workgroup_size: 64.try_into().ok(),
@@ -579,6 +580,7 @@ fn register_gpu_systems(
         ..time_delta_uniform_buffer_entry
     };
     let update_data_system_descriptor = GpuSystemDescriptor {
+        label: Some("update data"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_data"),
         workgroup_size: 64.try_into().ok(),
@@ -592,6 +594,7 @@ fn register_gpu_systems(
     executor.add_system(update_data_system);
 
     let update_components_system_descriptor = GpuSystemDescriptor {
+        label: Some("update components"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_components"),
         workgroup_size: 64.try_into().ok(),
@@ -609,6 +612,7 @@ fn register_gpu_systems(
     executor.add_system(update_components_system);
 
     let update_health_system_descriptor = GpuSystemDescriptor {
+        label: Some("update health"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_health"),
         workgroup_size: 64.try_into().ok(),
@@ -622,6 +626,7 @@ fn register_gpu_systems(
     executor.add_system(update_health_system);
 
     let update_damage_system_descriptor = GpuSystemDescriptor {
+        label: Some("update damage"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_damage"),
         workgroup_size: 64.try_into().ok(),
@@ -638,6 +643,7 @@ fn register_gpu_systems(
     executor.add_system(update_damage_system);
 
     let update_sprite_system_descriptor = GpuSystemDescriptor {
+        label: Some("update sprite"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_sprite"),
         workgroup_size: 64.try_into().ok(),
@@ -685,6 +691,7 @@ fn register_gpu_systems(
         count: None,
     };
     let render_sprite_system_descriptor = GpuSystemDescriptor {
+        label: Some("render sprite"),
         shader_module,
         entry_point: Some("render_sprite"),
         workgroup_size: 64.try_into().ok(),

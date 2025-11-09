@@ -72,6 +72,7 @@ fn main() {
 
     let position_gpu_id = executor.register_component::<Position>();
     let position_gpu_system_descriptor = GpuSystemDescriptor {
+        label: Some("update entity position"),
         shader_module: shader_module.clone(),
         entry_point: Some("update_entity_position"),
         workgroup_size: 64.try_into().ok(),
@@ -85,6 +86,7 @@ fn main() {
 
     let mass_gpu_id = executor.register_component::<Mass>();
     let mass_gpu_system_descriptor = GpuSystemDescriptor {
+        label: Some("update entity mass"),
         shader_module,
         entry_point: Some("update_entity_mass"),
         workgroup_size: 64.try_into().ok(),

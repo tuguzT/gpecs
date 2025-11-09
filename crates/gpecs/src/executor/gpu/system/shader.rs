@@ -7,7 +7,7 @@ use std::{
 use indexmap::map::Iter as IndexMapIter;
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    BufferBindingType, BufferSize, ComputePipeline, ComputePipelineDescriptor, Device,
+    BufferBindingType, BufferSize, ComputePipeline, ComputePipelineDescriptor, Device, Label,
     PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, ShaderModule,
     ShaderStages,
 };
@@ -24,6 +24,7 @@ use super::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId};
 
 #[derive(Debug)]
 pub struct GpuSystemShader {
+    label: Option<String>,
     entity_entry: Option<GpuSystemShaderEntry>,
     component_entries: IndexMap<GpuComponentId, Option<GpuSystemShaderEntry>>,
     additional_entries: Box<[BindGroupLayoutEntry]>,
@@ -50,6 +51,7 @@ impl GpuSystemShader {
             BufferSize::new(size_of::<Entity>() as u64).expect("`Entity` cannot be ZST");
 
         let GpuSystemDescriptor {
+            label,
             shader_module,
             entry_point,
             workgroup_size,
@@ -100,7 +102,10 @@ impl GpuSystemShader {
 
         let additional_entries: Box<_> = additional_bindings.into_iter().collect();
 
-        let bind_group_layout_label = format!("`gpecs` {system_id:?} bind group layout");
+        let bind_group_layout_label = match label {
+            Some(label) => format!("`gpecs` '{label}' {system_id:?} bind group layout"),
+            None => format!("`gpecs` {system_id:?} bind group layout"),
+        };
         let bind_group_layout_entries = entity_entry
             .into_iter()
             .chain(component_entries.values().copied().flatten())
@@ -113,7 +118,10 @@ impl GpuSystemShader {
         };
         let bind_group_layout = gpu_device.create_bind_group_layout(&bind_group_layout_desc);
 
-        let pipeline_layout_label = format!("`gpecs` {system_id:?} pipeline layout");
+        let pipeline_layout_label = match label {
+            Some(label) => format!("`gpecs` '{label}' {system_id:?} pipeline layout"),
+            None => format!("`gpecs` {system_id:?} pipeline layout"),
+        };
         let pipeline_layout_desc = PipelineLayoutDescriptor {
             label: Some(&pipeline_layout_label),
             bind_group_layouts: &[&bind_group_layout],
@@ -121,7 +129,10 @@ impl GpuSystemShader {
         };
         let pipeline_layout = gpu_device.create_pipeline_layout(&pipeline_layout_desc);
 
-        let compute_pipeline_label = format!("`gpecs` {system_id:?} compute pipeline");
+        let compute_pipeline_label = match label {
+            Some(label) => format!("`gpecs` '{label}' {system_id:?} compute pipeline"),
+            None => format!("`gpecs` {system_id:?} compute pipeline"),
+        };
         let compute_pipeline_desc = ComputePipelineDescriptor {
             label: Some(&compute_pipeline_label),
             layout: Some(&pipeline_layout),
@@ -133,6 +144,7 @@ impl GpuSystemShader {
         let compute_pipeline = gpu_device.create_compute_pipeline(&compute_pipeline_desc);
 
         Ok(Self {
+            label: label.map(Into::into),
             entity_entry,
             component_entries,
             additional_entries,
@@ -142,6 +154,12 @@ impl GpuSystemShader {
             pipeline_layout,
             compute_pipeline,
         })
+    }
+
+    #[inline]
+    pub fn label(&self) -> Label<'_> {
+        let Self { label, .. } = self;
+        label.as_deref()
     }
 
     #[inline]

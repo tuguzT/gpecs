@@ -298,15 +298,18 @@ impl<'context> GpuExecutor<'context> {
             let Some(system_info) = systems.get_system_info(system_id) else {
                 unreachable!("system {system_id:?} should exist");
             };
+            let shader = system_info.shader();
 
-            let compute_pass_label = format!("`gpecs` executor compute pass for {system_id:?}");
+            let compute_pass_label = match shader.label() {
+                Some(label) => format!("`gpecs` '{label}' {system_id:?} compute pass"),
+                None => format!("`gpecs` {system_id:?} compute pass"),
+            };
             let compute_pass_desc = ComputePassDescriptor {
                 label: Some(&compute_pass_label),
                 timestamp_writes: None,
             };
             let mut compute_pass = command_encoder.begin_compute_pass(&compute_pass_desc);
 
-            let shader = system_info.shader();
             for (&archetype_id, archetype_cache) in &system_cache.archetypes {
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
                     unreachable!("archetype {archetype_id:?} should exist");
@@ -574,7 +577,10 @@ impl ArchetypeCache {
 
         let additional_bindings = additional_bindings.into_iter().map(upcast_bind_group_entry);
 
-        let bind_group_label = format!("`gpecs` {system_id:?} bind group for {archetype_id:?}");
+        let bind_group_label = match shader.label() {
+            Some(label) => format!("`gpecs` '{label}' {system_id:?} {archetype_id:?} bind group"),
+            None => format!("`gpecs` {system_id:?} {archetype_id:?} bind group"),
+        };
         let bind_group_entries = chain(entity_binding, component_bindings)
             .chain(additional_bindings)
             .collect::<Box<_>>();

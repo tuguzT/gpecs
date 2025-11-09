@@ -5,7 +5,7 @@ use std::{
     ops::Range,
 };
 
-use wgpu::{BindGroupLayoutEntry, Device, ShaderModule};
+use wgpu::{BindGroupLayoutEntry, Device, Label, ShaderModule};
 
 use crate::{
     archetype::error::DuplicateComponentError, component::registry::ComponentRegistry,
@@ -74,10 +74,11 @@ pub enum GpuComponentAccess {
     ReadWrite,
 }
 
-pub struct GpuSystemDescriptor<'entry_point, Components, Bindings> {
+pub struct GpuSystemDescriptor<'a, Components, Bindings> {
+    pub label: Label<'a>,
     pub shader_module: ShaderModule,
     pub workgroup_size: Option<NonZeroU32>,
-    pub entry_point: Option<&'entry_point str>,
+    pub entry_point: Option<&'a str>,
     pub bind_entities: bool,
     pub bind_components: Components,
     pub additional_bindings: Bindings,

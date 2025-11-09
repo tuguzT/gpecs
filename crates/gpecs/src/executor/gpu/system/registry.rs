@@ -1,5 +1,5 @@
 use std::{
-    fmt::{self, Debug},
+    fmt::{self, Debug, Display},
     iter::FusedIterator,
     num::NonZeroU32,
     ops::Range,
@@ -35,6 +35,17 @@ impl From<GpuSystemId> for u32 {
     #[inline]
     fn from(id: GpuSystemId) -> Self {
         id.into_u32()
+    }
+}
+
+impl Display for GpuSystemId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(id) = self;
+
+        if !f.alternate() {
+            write!(f, "GPU ")?;
+        }
+        write!(f, "system {id}")
     }
 }
 

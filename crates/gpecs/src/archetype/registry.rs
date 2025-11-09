@@ -424,7 +424,7 @@ impl ArchetypeRegistry {
         };
 
         let Some(info) = Self::get_info(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         let Some(refs) = info.storage().get_bundle::<B>(components, entity)? else {
             let component_ids = B::get_components(components);
@@ -467,7 +467,7 @@ impl ArchetypeRegistry {
         };
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         let Some(refs) = info.storage.get_bundle_mut::<B>(components, entity)? else {
             let component_ids = B::get_components(components);
@@ -632,7 +632,7 @@ impl ArchetypeRegistry {
         let fields = into_erased_fields::<B>(components, B::CONTEXT, component_ids, value);
         fields.into_iter().for_each(|(component_id, field)| {
             if old_fields.insert(component_id, field).is_some() {
-                unreachable!("duplicated component {component_id:?}")
+                unreachable!("duplicated {component_id}")
             }
         });
 
@@ -700,7 +700,7 @@ impl ArchetypeRegistry {
                 return;
             };
             if fields_to_drop.insert(component_id, to_drop).is_some() {
-                unreachable!("duplicated component {component_id:?}")
+                unreachable!("duplicated {component_id}")
             }
         });
         unsafe { Self::drop_erased_in_place(components, fields_to_drop) }
@@ -775,7 +775,7 @@ impl ArchetypeRegistry {
             .copied()
             .map(|component_id| {
                 let Some(field) = old_fields.swap_remove(&component_id) else {
-                    unreachable!("component {component_id:?} should exist")
+                    unreachable!("{component_id} should exist")
                 };
                 (component_id, field)
             })
@@ -863,10 +863,10 @@ impl ArchetypeRegistry {
             return false;
         };
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         if !info.storage.destroy_in_place(entity) {
-            unreachable!("entity {entity:?} should exist in archetype {archetype_id:?}");
+            unreachable!("{entity} should exist in {archetype_id}");
         }
         true
     }
@@ -879,7 +879,7 @@ impl ArchetypeRegistry {
     {
         let fields = fields.into_iter().map(|(component_id, field)| {
             let Some(info) = components.get_component_info(component_id) else {
-                unreachable!("component {component_id:?} should exist")
+                unreachable!("{component_id} should exist")
             };
             (field, info.drop_fn())
         });
@@ -900,7 +900,7 @@ impl ArchetypeRegistry {
         };
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         let fields = info.storage.insert_erased(components, entity, fields);
         if let Some(fields) = fields {
@@ -920,10 +920,10 @@ impl ArchetypeRegistry {
         };
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         let Some(fields) = info.storage.remove_erased(components, entity) else {
-            unreachable!("{entity:?} should exist in archetype {archetype_id:?}")
+            unreachable!("{entity} should exist in {archetype_id}")
         };
         fields
     }
@@ -942,7 +942,7 @@ impl ArchetypeRegistry {
 
         let index = archetype_id_into_usize(archetype_id);
         let Some((key, _)) = archetypes.get_index(index) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         for &component_id in component_ids {
             if key.contains(&component_id) {
@@ -967,7 +967,7 @@ impl ArchetypeRegistry {
 
         let index = archetype_id_into_usize(archetype_id);
         let Some((key, _)) = archetypes.get_index(index) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         for &component_id in component_ids {
             if !key.contains(&component_id) {
@@ -987,10 +987,10 @@ impl ArchetypeRegistry {
         if let EntityArchetypeLocation::Known(archetype_id) = location {
             let archetype_id = archetype_id?;
             let Some(info) = Self::get_info(archetypes, archetype_id) else {
-                unreachable!("archetype {archetype_id:?} should exist")
+                unreachable!("{archetype_id} should exist")
             };
             if !info.storage().contains(entity) {
-                unreachable!("archetype {archetype_id:?} should contain entity {entity:?}");
+                unreachable!("{archetype_id} should contain {entity}");
             }
             return Some(archetype_id);
         }
@@ -1021,7 +1021,7 @@ impl ArchetypeRegistry {
         }
 
         let Some(info) = Self::get_info(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         let component_ids: Vec<_> = info
             .storage()
@@ -1054,7 +1054,7 @@ impl ArchetypeRegistry {
         }
 
         let Some(info) = Self::get_info(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         let archetype_component_ids = info.storage().component_ids();
         if archetype_component_ids.len() <= 1 {
@@ -1122,7 +1122,7 @@ where
     let node_attrs = |_, (index, &()): (NodeIndex<_>, _)| {
         let archetype_id = archetype_id_from_usize(index.index());
         let Some((_, info)) = archetypes.get_index(index.index()) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         let component_ids = info.storage().component_ids();
         format!(r#"shape=box label="{archetype_id:?}\n{component_ids:?}" "#)
@@ -1316,7 +1316,7 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
 
         let archetype_id = archetype_id_from_usize(index.index());
         let Some(info) = ArchetypeRegistry::get_info(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         Some(info)
     }
@@ -1410,7 +1410,7 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
 
         let archetype_id = archetype_id_from_usize(index.index());
         let Some(info) = ArchetypeRegistry::get_info(archetypes, archetype_id) else {
-            unreachable!("archetype {archetype_id:?} should exist")
+            unreachable!("{archetype_id} should exist")
         };
         Some(info)
     }
@@ -1828,7 +1828,7 @@ where
     ) -> BundlesIntoIterInner<'a, B> {
         let archetype_id = info.id();
         let Ok((entities, components)) = info.storage().bundles::<B>(components) else {
-            unreachable!("archetype {archetype_id:?} should be compatible with requested bundle")
+            unreachable!("{archetype_id} should be compatible with requested bundle")
         };
 
         let entities = entities.iter().copied();
@@ -2061,7 +2061,7 @@ where
     ) -> BundlesMutIntoIterInner<'a, B> {
         let archetype_id = info.id();
         let Ok((entities, components)) = info.storage.bundles_mut::<B>(components) else {
-            unreachable!("archetype {archetype_id:?} should be compatible with requested bundle")
+            unreachable!("{archetype_id} should be compatible with requested bundle")
         };
 
         let entities = entities.iter().copied();

@@ -26,7 +26,7 @@ impl DuplicateComponentError {
 impl Display for DuplicateComponentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { component_id } = *self;
-        write!(f, "duplicate component {component_id:?} were found")
+        write!(f, "duplicate {component_id} were found")
     }
 }
 
@@ -53,7 +53,7 @@ impl AlreadyHasComponentError {
 impl Display for AlreadyHasComponentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { component_id } = *self;
-        write!(f, "entity already has component {component_id:?}")
+        write!(f, "entity already has {component_id}")
     }
 }
 
@@ -176,7 +176,7 @@ impl MissingComponentError {
 impl Display for MissingComponentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { component_id } = *self;
-        write!(f, "component {component_id:?} is exclusive to this bundle")
+        write!(f, "{component_id} is exclusive to this bundle")
     }
 }
 

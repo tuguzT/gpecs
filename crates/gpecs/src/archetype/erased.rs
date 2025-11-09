@@ -22,7 +22,7 @@ pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
 #[track_caller]
 #[inline(never)]
 pub fn get_component_info_fail(component_id: ComponentId) -> ! {
-    panic!("info of component {component_id:?} should be present")
+    panic!("info of {component_id} should be present")
 }
 
 #[inline]
@@ -71,7 +71,7 @@ where
     #[track_caller]
     #[inline(never)]
     fn remove_field_fail(component_id: ComponentId) -> ! {
-        panic!("field of component {component_id:?} should be present")
+        panic!("field of {component_id} should be present")
     }
 
     let remove_field = move |(id, _)| {

@@ -37,7 +37,7 @@ impl EntityNotFoundError {
 impl Display for EntityNotFoundError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { entity } = self;
-        write!(f, "entity {entity} not found")
+        write!(f, "{entity} not found")
     }
 }
 

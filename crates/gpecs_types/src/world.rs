@@ -67,6 +67,13 @@ impl From<WorldId> for u32 {
     }
 }
 
+impl Display for WorldId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(id) = self;
+        write!(f, "world {id}")
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct WorldIdFromU32Error;

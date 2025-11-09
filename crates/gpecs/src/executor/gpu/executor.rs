@@ -296,13 +296,13 @@ impl<'context> GpuExecutor<'context> {
         let mut query_index = 0;
         for (&system_id, system_cache) in &schedule_cache.systems {
             let Some(system_info) = systems.get_system_info(system_id) else {
-                unreachable!("system {system_id:?} should exist");
+                unreachable!("{system_id} should exist");
             };
             let shader = system_info.shader();
 
             let compute_pass_label = match shader.label() {
-                Some(label) => format!("`gpecs` '{label}' {system_id:?} compute pass"),
-                None => format!("`gpecs` {system_id:?} compute pass"),
+                Some(label) => format!("`gpecs` {system_id:#} [{label}] compute pass"),
+                None => format!("`gpecs` {system_id:#} compute pass"),
             };
             let compute_pass_desc = ComputePassDescriptor {
                 label: Some(&compute_pass_label),
@@ -312,7 +312,7 @@ impl<'context> GpuExecutor<'context> {
 
             for (&archetype_id, archetype_cache) in &system_cache.archetypes {
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
-                    unreachable!("archetype {archetype_id:?} should exist");
+                    unreachable!("{archetype_id} should exist");
                 };
 
                 compute_pass.set_pipeline(shader.compute_pipeline());
@@ -491,7 +491,7 @@ impl ScheduleCache {
         let mut schedule_cache = ScheduleCache::default();
         for system_id in schedule {
             let Some(system_info) = systems.get_system_info(system_id) else {
-                unreachable!("system {system_id:?} should exist");
+                unreachable!("{system_id} should exist");
             };
 
             let shader = system_info.shader();
@@ -502,14 +502,14 @@ impl ScheduleCache {
             let Ok(compatible_archetypes) =
                 context.archetypes().compatible_archetypes(component_ids)
             else {
-                unreachable!("system {system_id:?} should have compatible archetypes");
+                unreachable!("{system_id} should have compatible archetypes");
             };
             for archetype_info in compatible_archetypes {
                 let Some(archetype_id) = archetypes.map_archetype_id(archetype_info.id()) else {
                     continue;
                 };
                 let Some(archetype_info) = archetypes.get_archetype_info(archetype_id) else {
-                    unreachable!("archetype {archetype_id:?} should exist");
+                    unreachable!("{archetype_id} should exist");
                 };
 
                 let additional_bindings = additional_bindings_cache
@@ -526,9 +526,7 @@ impl ScheduleCache {
                 let SystemCache { archetypes } =
                     schedule_cache.systems.entry(system_id).or_default();
                 if archetypes.insert(archetype_id, archetype_cache).is_some() {
-                    unreachable!(
-                        "archetype {archetype_id:?} cannot have multiple bind groups for system {system_id:?}"
-                    );
+                    unreachable!("{archetype_id} cannot have multiple bind groups for {system_id}");
                 }
             }
         }
@@ -578,8 +576,8 @@ impl ArchetypeCache {
         let additional_bindings = additional_bindings.into_iter().map(upcast_bind_group_entry);
 
         let bind_group_label = match shader.label() {
-            Some(label) => format!("`gpecs` '{label}' {system_id:?} {archetype_id:?} bind group"),
-            None => format!("`gpecs` {system_id:?} {archetype_id:?} bind group"),
+            Some(label) => format!("`gpecs` {system_id:#} [{label}] {archetype_id:#} bind group"),
+            None => format!("`gpecs` {system_id:#} {archetype_id:#} bind group"),
         };
         let bind_group_entries = chain(entity_binding, component_bindings)
             .chain(additional_bindings)
@@ -630,7 +628,7 @@ where
     let mut slices: IndexMap<_, _> = slices.into_iter().collect();
     entries.into_iter().map(move |(component_id, entry)| {
         let Some(slice) = slices.swap_remove(&component_id) else {
-            unreachable!("component {component_id:?} should exist");
+            unreachable!("{component_id} should exist");
         };
         (component_id, entry, slice)
     })

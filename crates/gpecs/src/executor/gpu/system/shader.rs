@@ -73,7 +73,7 @@ impl GpuSystemShader {
         )?;
         let component_entry = |index: usize, component_id: GpuComponentId, binding_access| {
             let Some(info) = components.get_component_info(component_id.into()) else {
-                unreachable!("component {component_id:?} should exist");
+                unreachable!("{component_id} should exist");
             };
 
             let size_of_component = info.descriptor().layout().size();
@@ -103,8 +103,8 @@ impl GpuSystemShader {
         let additional_entries: Box<_> = additional_bindings.into_iter().collect();
 
         let bind_group_layout_label = match label {
-            Some(label) => format!("`gpecs` '{label}' {system_id:?} bind group layout"),
-            None => format!("`gpecs` {system_id:?} bind group layout"),
+            Some(label) => format!("`gpecs` {system_id:#} [{label}] bind group layout"),
+            None => format!("`gpecs` {system_id:#} bind group layout"),
         };
         let bind_group_layout_entries = entity_entry
             .into_iter()
@@ -119,8 +119,8 @@ impl GpuSystemShader {
         let bind_group_layout = gpu_device.create_bind_group_layout(&bind_group_layout_desc);
 
         let pipeline_layout_label = match label {
-            Some(label) => format!("`gpecs` '{label}' {system_id:?} pipeline layout"),
-            None => format!("`gpecs` {system_id:?} pipeline layout"),
+            Some(label) => format!("`gpecs` {system_id:#} [{label}] pipeline layout"),
+            None => format!("`gpecs` {system_id:#} pipeline layout"),
         };
         let pipeline_layout_desc = PipelineLayoutDescriptor {
             label: Some(&pipeline_layout_label),
@@ -130,8 +130,8 @@ impl GpuSystemShader {
         let pipeline_layout = gpu_device.create_pipeline_layout(&pipeline_layout_desc);
 
         let compute_pipeline_label = match label {
-            Some(label) => format!("`gpecs` '{label}' {system_id:?} compute pipeline"),
-            None => format!("`gpecs` {system_id:?} compute pipeline"),
+            Some(label) => format!("`gpecs` {system_id:#} [{label}] compute pipeline"),
+            None => format!("`gpecs` {system_id:#} compute pipeline"),
         };
         let compute_pipeline_desc = ComputePipelineDescriptor {
             label: Some(&compute_pipeline_label),
@@ -144,7 +144,7 @@ impl GpuSystemShader {
         let compute_pipeline = gpu_device.create_compute_pipeline(&compute_pipeline_desc);
 
         Ok(Self {
-            label: label.map(Into::into),
+            label: label.map(ToOwned::to_owned),
             entity_entry,
             component_entries,
             additional_entries,

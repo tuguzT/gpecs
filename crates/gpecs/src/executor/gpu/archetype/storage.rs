@@ -36,7 +36,7 @@ impl GpuArchetypeStorage {
         let len = archetype_storage.len();
 
         let entities_contents = must_cast_slice(entities);
-        let entities_label = || format!("`gpecs` {archetype_id:?} storage buffer of entities");
+        let entities_label = || format!("`gpecs` {archetype_id:#} entities storage buffer");
         let entities_buffer = StorageBuffer::new(gpu_device, entities_contents, entities_label);
 
         let component_buffers = erased_components
@@ -44,7 +44,7 @@ impl GpuArchetypeStorage {
             .map(|(component_id, slice)| {
                 let component_id = unsafe { GpuComponentId::from_id(component_id) };
                 let components_label =
-                    || format!("`gpecs` {archetype_id:?} storage buffer of {component_id:?}");
+                    || format!("`gpecs` {archetype_id:#} {component_id:#} storage buffer");
                 let components_contents = slice.buffer();
                 let buffer = StorageBuffer::new(gpu_device, components_contents, components_label);
                 (component_id, buffer)
@@ -220,7 +220,7 @@ impl StorageBuffer {
         L: AsRef<str>,
     {
         let init_size = BufferAddress::try_from(contents.len())
-            .expect("byte data length should fit into `BufferAddress`")
+            .expect("contents size should fit into `BufferAddress`")
             .try_into()
             .ok()?;
 

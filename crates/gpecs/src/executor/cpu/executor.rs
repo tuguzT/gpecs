@@ -72,7 +72,7 @@ impl<'context> CpuExecutor<'context> {
 
         schedule.iter().for_each(|system_id| {
             let Some(info) = systems.get_system_info_mut(system_id) else {
-                unreachable!("system {system_id:?} should be present");
+                unreachable!("{system_id} should be present");
             };
             info.system_mut().run(context);
         });

@@ -1,4 +1,4 @@
-use core::fmt::{self, Debug};
+use core::fmt::{self, Debug, Display};
 
 use bytemuck::{Pod, Zeroable};
 
@@ -23,6 +23,13 @@ impl From<ComponentId> for u32 {
     #[inline]
     fn from(id: ComponentId) -> Self {
         id.into_u32()
+    }
+}
+
+impl Display for ComponentId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(id) = self;
+        write!(f, "component {id}")
     }
 }
 
@@ -73,5 +80,16 @@ impl Debug for GpuComponentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let id = &self.into_u32();
         f.debug_tuple("GpuComponentId").field(id).finish()
+    }
+}
+
+impl Display for GpuComponentId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(id) = self;
+
+        if !f.alternate() {
+            write!(f, "GPU ")?;
+        }
+        Display::fmt(id, f)
     }
 }

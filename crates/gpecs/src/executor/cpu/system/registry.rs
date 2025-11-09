@@ -1,5 +1,5 @@
 use std::{
-    fmt::{self, Debug},
+    fmt::{self, Debug, Display},
     iter::FusedIterator,
     ops::Range,
 };
@@ -27,6 +27,13 @@ impl From<SystemId> for u32 {
     #[inline]
     fn from(id: SystemId) -> Self {
         id.into_u32()
+    }
+}
+
+impl Display for SystemId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(id) = self;
+        write!(f, "system {id}")
     }
 }
 

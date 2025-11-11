@@ -16,6 +16,8 @@ use crate::{
     },
 };
 
+// TODO: convert this whole very unsafe code into some type which implements `Soa` trait & provides its guarantees
+
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
 
 #[cold]

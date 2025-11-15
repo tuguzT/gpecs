@@ -35,14 +35,14 @@ where
 
     /// Retrieves a reference of [field descriptors](Soa::FieldDescriptors).
     #[inline]
-    pub fn as_inner(&self) -> &T::FieldDescriptors<'context> {
+    pub fn as_inner(&self) -> &T::FieldDescriptors<'_> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
     /// Retrieves a mutable reference of [field descriptors](Soa::FieldDescriptors).
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut T::FieldDescriptors<'context> {
+    pub fn as_inner_mut(&mut self) -> &mut T::FieldDescriptors<'_> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }

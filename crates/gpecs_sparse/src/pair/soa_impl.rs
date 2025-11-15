@@ -530,7 +530,7 @@ impl<'context, 'a, K, V> SoaToOwned<'context, 'a> for KeyValueRefs<'context, 'a,
 where
     K: Clone,
     V: SoaWrite,
-    V::Refs<'context, 'a>: SoaToOwned<'context, 'a, Owned = V>,
+    for<'c, 'any> V::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = V>,
 {
     type Owned = KeyValuePair<K, V>;
 

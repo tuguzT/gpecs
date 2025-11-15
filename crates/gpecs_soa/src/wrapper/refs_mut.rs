@@ -38,7 +38,7 @@ where
     /// Retrieves a reference of [mutable references](Soa::RefsMut)
     /// to each field of [`Fields`](Soa::Fields) from self.
     #[inline]
-    pub fn as_inner(&self) -> &T::RefsMut<'context, 'a> {
+    pub fn as_inner(&self) -> &T::RefsMut<'_, '_> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
@@ -46,7 +46,7 @@ where
     /// Retrieves a mutable reference of [mutable references](Soa::RefsMut)
     /// to each field of [`Fields`](Soa::Fields) from self.
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut T::RefsMut<'context, 'a> {
+    pub fn as_inner_mut(&mut self) -> &mut T::RefsMut<'_, '_> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }

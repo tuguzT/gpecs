@@ -38,7 +38,7 @@ where
     /// Retrieves a reference of [slice pointers](Soa::SlicePtrs)
     /// to each field of [`Fields`](Soa::Fields) from self.
     #[inline]
-    pub fn as_inner(&self) -> &T::SlicePtrs<'context> {
+    pub fn as_inner(&self) -> &T::SlicePtrs<'_> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
@@ -46,7 +46,7 @@ where
     /// Retrieves a mutable reference of [slice pointers](Soa::SlicePtrs)
     /// to each field of [`Fields`](Soa::Fields) from self.
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut T::SlicePtrs<'context> {
+    pub fn as_inner_mut(&mut self) -> &mut T::SlicePtrs<'_> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }

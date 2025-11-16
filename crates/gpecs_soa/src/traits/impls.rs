@@ -497,6 +497,8 @@ impl<'a> SoaToOwned<'_, 'a> for &'a () {
     }
 }
 
+unsafe impl SoaTrustedFields for () {}
+
 // https://veykril.github.io/tlborm/decl-macros/building-blocks/counting.html#enum-counting
 #[macro_export]
 #[doc(hidden)]

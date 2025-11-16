@@ -12,7 +12,7 @@ use crate::{
         SoaSlicePtr, ptrs_from_buffer, ptrs_from_buffer_mut, slice_from_raw_parts,
         slice_from_raw_parts_mut,
     },
-    traits::{SoaToOwned, SoaTrustedFields},
+    traits::{Fields, MutPtrs, Ptrs, SoaContext, SoaToOwned, SoaTrustedFields},
 };
 
 use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, SoaSlices, SoaSlicesMut};
@@ -62,7 +62,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> T::Ptrs<'_> {
+    pub fn as_ptrs(&self) -> Ptrs<'_, T> {
         let ptr = self.as_ptr().cast_mut();
         let context = self.context();
         let capacity = self.capacity();
@@ -70,7 +70,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> T::MutPtrs<'_> {
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, T> {
         let ptr = self.as_mut_ptr();
         let context = self.context();
         let capacity = self.capacity();
@@ -89,7 +89,7 @@ where
         let context = self.context();
         let ptrs = self.as_ptrs();
 
-        let slices = T::slices_from_raw_parts(context, ptrs, len);
+        let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -106,7 +106,7 @@ where
         let context = unsafe { ptr::from_mut(self).context() };
         let ptrs = self.as_mut_ptrs();
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
         let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -166,7 +166,7 @@ where
     #[track_caller]
     pub fn copy_from_slice(&mut self, src: &Self)
     where
-        T::Fields: Copy,
+        Fields<T>: Copy,
     {
         let src = src.slices();
         self.slices_mut().copy_from_slices(&src);
@@ -416,7 +416,7 @@ where
 
         let (context, slices) = self.slices_mut().into_slices_with_context();
         let slices = T::slices_mut_as_slice_ptrs(context, slices);
-        unsafe { T::slices_drop_in_place(context, slices) }
+        unsafe { context.slices_drop_in_place(slices) }
     }
 }
 
@@ -475,16 +475,16 @@ where
 unsafe impl<T> Send for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
-    T::Fields: Send,
     T::Context: Send,
+    Fields<T>: Send,
 {
 }
 
 unsafe impl<T> Sync for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
-    T::Fields: Sync,
     T::Context: Sync,
+    Fields<T>: Sync,
 {
 }
 

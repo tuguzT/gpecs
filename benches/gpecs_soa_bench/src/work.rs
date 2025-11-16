@@ -2,7 +2,7 @@ use std::{array, hint::black_box, iter::Zip, slice};
 
 use gpecs_soa_erased::{
     erased::BoxedErasedSoa,
-    soa::{prelude::*, slice as soa_slice},
+    soa::{prelude::*, slice as soa_slice, traits::TupleContext},
 };
 use num_traits::ToPrimitive;
 
@@ -111,9 +111,10 @@ impl Work for Tiny {
     }
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_, '_>) -> Self::Output {
+        let context = TupleContext::default();
         let mut result = 0;
         for refs in iter {
-            let (i,) = unsafe { refs.into::<Self>(&()) }.unwrap();
+            let (i,) = unsafe { refs.into::<Self>(&context) }.unwrap();
             result += *i;
         }
         black_box(result)
@@ -184,9 +185,10 @@ impl Work for Small {
     }
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_, '_>) -> Self::Output {
+        let context = TupleContext::default();
         let mut result = 0.0;
         for refs in iter {
-            let (x, y, _) = unsafe { refs.into::<Self>(&()) }.unwrap();
+            let (x, y, _) = unsafe { refs.into::<Self>(&context) }.unwrap();
             result += *x + *y;
         }
         black_box(result)
@@ -262,9 +264,10 @@ impl Work for Big {
     }
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_, '_>) -> Self::Output {
+        let context = TupleContext::default();
         let mut result = 0;
         for (index, refs) in iter.enumerate() {
-            let (_, _, array, _, str) = unsafe { refs.into::<Self>(&()) }.unwrap();
+            let (_, _, array, _, str) = unsafe { refs.into::<Self>(&context) }.unwrap();
             result += index + array.iter().sum::<usize>() + str.len();
         }
         black_box(result)
@@ -356,9 +359,10 @@ impl Work for Large {
     }
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_, '_>) -> Self::Output {
+        let context = TupleContext::default();
         let mut result = 0;
         for refs in iter {
-            let (_, b, _, _, e, f, _, _, i, _) = unsafe { refs.into::<Self>(&()) }.unwrap();
+            let (_, b, _, _, e, f, _, _, i, _) = unsafe { refs.into::<Self>(&context) }.unwrap();
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
                 - i.iter().fold(u32::MAX, |acc, item| (acc - item) << 3);

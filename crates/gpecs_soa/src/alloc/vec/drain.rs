@@ -8,7 +8,7 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, SoaSlices, range},
-    traits::SoaRead,
+    traits::{Fields, SoaContext, SoaRead},
 };
 
 use super::{Soa, SoaVec};
@@ -85,16 +85,16 @@ where
 unsafe impl<T> Send for Drain<'_, T>
 where
     T: Soa + ?Sized,
-    T::Fields: Send,
     T::Context: Send,
+    Fields<T>: Send,
 {
 }
 
 unsafe impl<T> Sync for Drain<'_, T>
 where
     T: Soa + ?Sized,
-    T::Fields: Sync,
     T::Context: Sync,
+    Fields<T>: Sync,
 {
 }
 
@@ -210,9 +210,9 @@ where
                         let dst = source_vec.buffer.as_mut_ptrs();
                         let context = source_vec.context();
 
-                        let src = T::ptrs_add(context, src, tail);
-                        let dst = T::ptrs_add_mut(context, dst, start);
-                        T::ptrs_copy(context, src, dst, tail_len);
+                        let src = context.ptrs_add(src, tail);
+                        let dst = context.ptrs_add_mut(dst, start);
+                        context.ptrs_copy(src, dst, tail_len);
                     }
                     source_vec.set_len(start + tail_len);
                 }
@@ -263,14 +263,14 @@ where
             // a pointer with mutable provenance is necessary. Therefore we must reconstruct
             // it from the original vec but also avoid creating a &mut to the front since that could
             // invalidate raw pointers to it which some unsafe code might rely on.
-            let origin = T::ptrs_cast_const(context, vec_ptrs.clone());
+            let origin = context.ptrs_cast_const(vec_ptrs.clone());
 
-            let drop_offset = T::ptrs_offset_from(context, drop_ptrs, origin);
+            let drop_offset = context.ptrs_offset_from(drop_ptrs, origin);
             let drop_offset = usize::try_from(drop_offset).unwrap_unchecked();
 
-            let ptrs = T::ptrs_add_mut(context, vec_ptrs, drop_offset);
-            let to_drop = T::slices_from_raw_parts_mut(context, ptrs, drop_len);
-            T::slices_drop_in_place(context, to_drop);
+            let ptrs = context.ptrs_add_mut(vec_ptrs, drop_offset);
+            let to_drop = context.slice_mut_ptrs_from_raw_parts(ptrs, drop_len);
+            context.slices_drop_in_place(to_drop);
         }
     }
 }

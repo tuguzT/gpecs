@@ -12,7 +12,7 @@ use crate::{
     field::{ErasedFieldPtr, ErasedFieldRef},
     soa::{
         field::{FieldDescriptor, buffer_layout},
-        traits::Soa,
+        traits::{Soa, SoaContext},
     },
 };
 
@@ -112,7 +112,8 @@ where
         } = self;
         let descriptors = descriptors.as_ref();
 
-        let result = T::field_descriptors(context)
+        let result = context
+            .field_descriptors()
             .into_iter()
             .zip(&self)
             .try_fold(0, |len, (desc, slice)| {
@@ -128,8 +129,8 @@ where
         }
 
         unsafe {
-            let ptrs = T::ptrs_from_buffer(context, buffer, capacity);
-            let ptrs = T::ptrs_add(context, ptrs, offset);
+            let ptrs = context.ptrs_from_buffer(buffer, capacity);
+            let ptrs = context.ptrs_add(ptrs, offset);
             let refs = T::ptrs_to_refs(context, ptrs);
             Ok(refs)
         }

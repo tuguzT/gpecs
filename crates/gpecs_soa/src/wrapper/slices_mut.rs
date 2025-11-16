@@ -10,7 +10,7 @@ use core::{
 use crate::traits::Soa;
 
 /// Type wrapper for [mutable slices](Soa::SlicesMut)
-/// to each field of [`Fields`](Soa::Fields)
+/// to each field of [`Fields`](crate::traits::SoaContext::Fields)
 /// which is covariant over generic lifetimes.
 #[repr(transparent)]
 pub struct SlicesMut<'context, 'a, T>
@@ -26,7 +26,7 @@ where
     T: Soa + ?Sized,
 {
     /// Creates self from the [mutable slices](Soa::SlicesMut)
-    /// to each field of [`Fields`](Soa::Fields).
+    /// to each field of [`Fields`](crate::traits::SoaContext::Fields).
     #[inline]
     pub fn new(inner: T::SlicesMut<'context, 'a>) -> Self {
         Self {
@@ -36,7 +36,7 @@ where
     }
 
     /// Retrieves a reference of [mutable slices](Soa::SlicesMut)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// to each field of [`Fields`](crate::traits::SoaContext::Fields) from self.
     #[inline]
     pub fn as_inner(&self) -> &T::SlicesMut<'_, '_> {
         let Self { inner, .. } = self;
@@ -44,7 +44,7 @@ where
     }
 
     /// Retrieves a mutable reference of [mutable slices](Soa::SlicesMut)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// to each field of [`Fields`](crate::traits::SoaContext::Fields) from self.
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut T::SlicesMut<'_, '_> {
         let Self { inner, .. } = self;
@@ -52,7 +52,7 @@ where
     }
 
     /// Retrieves the [mutable slices](Soa::SlicesMut)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// to each field of [`Fields`](crate::traits::SoaContext::Fields) from self.
     #[inline]
     pub fn into_inner(self) -> T::SlicesMut<'context, 'a> {
         let Self { inner, .. } = self;

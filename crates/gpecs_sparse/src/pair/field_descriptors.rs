@@ -6,7 +6,7 @@ use core::{
 
 use crate::soa::{
     field::{CopiedFieldDescriptors, FieldDescriptor},
-    traits::Soa,
+    traits::{Soa, SoaContext},
     wrapper::FieldDescriptors,
 };
 
@@ -27,7 +27,7 @@ where
     pub fn new(context: &'context V::Context) -> Self {
         Self {
             key: FieldDescriptor::of::<K>(),
-            values: FieldDescriptors::new(V::field_descriptors(context)),
+            values: FieldDescriptors::new(context.field_descriptors()),
             phantom: PhantomData,
         }
     }
@@ -87,7 +87,7 @@ where
 
     type IntoIter = iter::Chain<
         iter::Once<FieldDescriptor>,
-        CopiedFieldDescriptors<<V::FieldDescriptors<'context> as IntoIterator>::IntoIter>,
+        CopiedFieldDescriptors<<FieldDescriptors<'context, V> as IntoIterator>::IntoIter>,
     >;
 
     fn into_iter(self) -> Self::IntoIter {

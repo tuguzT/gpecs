@@ -1,6 +1,9 @@
 use core::{
     alloc::{Layout, LayoutError},
     any::type_name,
+    cmp,
+    fmt::{self, Debug},
+    hash::{self, Hash},
     marker::PhantomData,
     ptr::{self, NonNull},
     slice,
@@ -8,7 +11,10 @@ use core::{
 
 use crate::{
     field::FieldDescriptor,
-    traits::{Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite},
+    traits::{
+        MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext, SoaRead, SoaToOwned,
+        SoaTrustedFields, SoaWrite,
+    },
 };
 
 #[inline]
@@ -24,11 +30,10 @@ pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
     );
 }
 
-unsafe impl Soa for () {
-    type Context = Self;
-    type Fields = Self;
+unsafe impl SoaContext for () {
+    type Fields = ();
 
-    type FieldDescriptors<'context> = [FieldDescriptor; 1];
+    type FieldDescriptors<'a> = [FieldDescriptor; 1];
 
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -38,21 +43,21 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn field_descriptors(_context: &Self::Context) -> Self::FieldDescriptors<'_> {
-        [FieldDescriptor::of::<Self>()]
+    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+        [FieldDescriptor::of::<()>()]
     }
 
     #[inline]
-    fn buffer_layout(_context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
-        Layout::array::<Self>(capacity)
+    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
+        Layout::array::<()>(capacity)
     }
 
     #[inline]
-    fn capacity_from(_context: &Self::Context, _buffer_layout: Layout) -> usize {
+    fn capacity_from(&self, _buffer_layout: Layout) -> usize {
         usize::MAX
     }
 
-    type Ptrs<'context> = *const Self;
+    type Ptrs<'a> = *const ();
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -60,20 +65,27 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn ptrs_dangling(_context: &Self::Context) -> Self::Ptrs<'_> {
+    fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
         ptr::dangling()
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer(
-        _context: &Self::Context,
-        buffer: *const u8,
-        _capacity: usize,
-    ) -> Self::Ptrs<'_> {
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, _capacity: usize) -> Self::Ptrs<'_> {
         buffer.cast()
     }
 
-    type MutPtrs<'context> = *mut Self;
+    #[inline]
+    #[expect(clippy::zst_offset, reason = "reference to other manual impls")]
+    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
+        unsafe { ptrs.add(offset) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_offset_from(&self, ptrs: Self::Ptrs<'_>, origin: Self::Ptrs<'_>) -> isize {
+        unsafe { ptrs.offset_from(origin) }
+    }
+
+    type MutPtrs<'a> = *mut ();
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -81,67 +93,28 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    fn ptrs_dangling_mut(_context: &Self::Context) -> Self::MutPtrs<'_> {
+    fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer_mut(
-        _context: &Self::Context,
-        buffer: *mut u8,
-        _capacity: usize,
-    ) -> Self::MutPtrs<'_> {
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, _capacity: usize) -> Self::MutPtrs<'_> {
         buffer.cast()
     }
 
     #[inline]
-    fn ptrs_cast_const<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-    ) -> Self::Ptrs<'context> {
-        ptrs.cast_const()
-    }
-
-    #[inline]
-    fn ptrs_cast_mut<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
-    ) -> Self::MutPtrs<'context> {
-        ptrs.cast_mut()
-    }
-
-    #[inline]
     #[expect(clippy::zst_offset, reason = "reference to other manual impls")]
-    unsafe fn ptrs_add<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
+    unsafe fn ptrs_add_mut<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
         offset: usize,
-    ) -> Self::Ptrs<'context> {
+    ) -> Self::MutPtrs<'a> {
         unsafe { ptrs.add(offset) }
-    }
-
-    #[inline]
-    #[expect(clippy::zst_offset, reason = "reference to other manual impls")]
-    unsafe fn ptrs_add_mut<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-        offset: usize,
-    ) -> Self::MutPtrs<'context> {
-        unsafe { ptrs.add(offset) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_offset_from(
-        _context: &Self::Context,
-        ptrs: Self::Ptrs<'_>,
-        origin: Self::Ptrs<'_>,
-    ) -> isize {
-        unsafe { ptrs.offset_from(origin) }
     }
 
     #[inline]
     unsafe fn ptrs_offset_from_mut(
-        _context: &Self::Context,
+        &self,
         ptrs: Self::MutPtrs<'_>,
         origin: Self::Ptrs<'_>,
     ) -> isize {
@@ -149,33 +122,33 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    unsafe fn ptrs_swap(_context: &Self::Context, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
+    fn ptrs_cast_const<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::Ptrs<'a> {
+        ptrs.cast_const()
+    }
+
+    #[inline]
+    fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a> {
+        ptrs.cast_mut()
+    }
+
+    #[inline]
+    unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
         unsafe { ptr::swap(a, b) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy(
-        _context: &Self::Context,
-        src: Self::Ptrs<'_>,
-        dst: Self::MutPtrs<'_>,
-        len: usize,
-    ) {
+    unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
         unsafe { ptr::copy(src, dst, len) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy_rev(
-        _context: &Self::Context,
-        src: Self::Ptrs<'_>,
-        dst: Self::MutPtrs<'_>,
-        len: usize,
-    ) {
+    unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
         unsafe { ptr::copy(src, dst, len) }
     }
 
     #[inline]
     unsafe fn ptrs_copy_nonoverlapping(
-        _context: &Self::Context,
+        &self,
         src: Self::Ptrs<'_>,
         dst: Self::MutPtrs<'_>,
         len: usize,
@@ -184,11 +157,11 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    unsafe fn ptrs_drop_in_place(_context: &Self::Context, ptrs: Self::MutPtrs<'_>) {
+    unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
         unsafe { ptr::drop_in_place(ptrs) }
     }
 
-    type NonNullPtrs<'context> = NonNull<Self>;
+    type NonNullPtrs<'a> = NonNull<()>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -198,20 +171,89 @@ unsafe impl Soa for () {
     }
 
     #[inline]
-    unsafe fn ptrs_to_nonnull<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-    ) -> Self::NonNullPtrs<'context> {
+    unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
         unsafe { NonNull::new_unchecked(ptrs) }
     }
 
     #[inline]
-    fn nonnull_to_ptrs<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::NonNullPtrs<'context>,
-    ) -> Self::MutPtrs<'context> {
+    fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
         ptrs.as_ptr()
     }
+
+    type SlicePtrs<'a> = *const [()];
+
+    #[inline]
+    fn upcast_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SlicePtrs<'long>,
+    ) -> Self::SlicePtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        ptrs: Self::Ptrs<'a>,
+        len: usize,
+    ) -> Self::SlicePtrs<'a> {
+        ptr::slice_from_raw_parts(ptrs, len)
+    }
+
+    #[inline]
+    fn slice_ptrs_len(&self, slices: &Self::SlicePtrs<'_>) -> usize {
+        slices.len()
+    }
+
+    #[inline]
+    fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a> {
+        slices.cast() // should be `slices.as_ptr()` but it's unstable
+    }
+
+    type SliceMutPtrs<'a> = *mut [()];
+
+    #[inline]
+    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+        from: SliceMutPtrs<'long, Self>,
+    ) -> SliceMutPtrs<'short, Self> {
+        from
+    }
+
+    #[inline]
+    fn slice_mut_ptrs_from_raw_parts<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceMutPtrs<'a> {
+        ptr::slice_from_raw_parts_mut(ptrs, len)
+    }
+
+    #[inline]
+    fn slice_mut_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
+        slices.len()
+    }
+
+    #[inline]
+    fn slice_mut_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+        slices.cast() // should be `slices.as_mut_ptr()` but it's unstable
+    }
+
+    #[inline]
+    fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a> {
+        slices.cast_const()
+    }
+
+    #[inline]
+    fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a> {
+        slices.cast_mut()
+    }
+
+    #[inline]
+    unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
+        unsafe { ptr::drop_in_place(slices) }
+    }
+}
+
+unsafe impl Soa for () {
+    type Context = ();
 
     type Refs<'context, 'a>
         = &'a Self
@@ -240,7 +282,7 @@ unsafe impl Soa for () {
     #[inline]
     unsafe fn ptrs_to_refs<'context, 'a>(
         _context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
+        ptrs: Ptrs<'context, Self>,
     ) -> Self::Refs<'context, 'a> {
         unsafe { &*ptrs }
     }
@@ -248,7 +290,7 @@ unsafe impl Soa for () {
     #[inline]
     unsafe fn ptrs_to_refs_mut<'context, 'a>(
         _context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
+        ptrs: MutPtrs<'context, Self>,
     ) -> Self::RefsMut<'context, 'a> {
         unsafe { &mut *ptrs }
     }
@@ -257,7 +299,7 @@ unsafe impl Soa for () {
     fn refs_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
         refs: Self::Refs<'context, 'a>,
-    ) -> Self::Ptrs<'context>
+    ) -> Ptrs<'context, Self>
     where
         Self: 'a,
     {
@@ -268,7 +310,7 @@ unsafe impl Soa for () {
     fn refs_mut_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
-    ) -> Self::MutPtrs<'context>
+    ) -> MutPtrs<'context, Self>
     where
         Self: 'a,
     {
@@ -302,84 +344,6 @@ unsafe impl Soa for () {
         value
     }
 
-    type SlicePtrs<'context> = *const [Self];
-
-    #[inline]
-    fn upcast_slice_ptrs<'short, 'long: 'short>(
-        from: Self::SlicePtrs<'long>,
-    ) -> Self::SlicePtrs<'short> {
-        from
-    }
-
-    type SliceMutPtrs<'context> = *mut [Self];
-
-    #[inline]
-    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
-        from: Self::SliceMutPtrs<'long>,
-    ) -> Self::SliceMutPtrs<'short> {
-        from
-    }
-
-    #[inline]
-    fn slices_from_raw_parts<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
-        len: usize,
-    ) -> Self::SlicePtrs<'context> {
-        ptr::slice_from_raw_parts(ptrs, len)
-    }
-
-    #[inline]
-    fn slices_from_raw_parts_mut<'context>(
-        _context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-        len: usize,
-    ) -> Self::SliceMutPtrs<'context> {
-        ptr::slice_from_raw_parts_mut(ptrs, len)
-    }
-
-    #[inline]
-    fn slice_ptrs_cast_const<'context>(
-        _context: &'context Self::Context,
-        slices: Self::SliceMutPtrs<'context>,
-    ) -> Self::SlicePtrs<'context> {
-        slices.cast_const()
-    }
-
-    #[inline]
-    fn slice_ptrs_cast_mut<'context>(
-        _context: &'context Self::Context,
-        slices: Self::SlicePtrs<'context>,
-    ) -> Self::SliceMutPtrs<'context> {
-        slices.cast_mut()
-    }
-
-    #[inline]
-    fn slice_ptrs_len(_context: &Self::Context, slices: &Self::SlicePtrs<'_>) -> usize {
-        slices.len()
-    }
-
-    #[inline]
-    fn slice_mut_ptrs_len(_context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
-        slices.len()
-    }
-
-    #[inline]
-    fn slice_ptrs_as_ptrs<'context>(
-        _context: &'context Self::Context,
-        slices: Self::SlicePtrs<'context>,
-    ) -> Self::Ptrs<'context> {
-        slices.cast() // should be `slices.as_ptr()` but it's unstable
-    }
-
-    #[inline]
-    fn slice_mut_ptrs_as_ptrs<'context>(
-        _context: &'context Self::Context,
-        slices: Self::SliceMutPtrs<'context>,
-    ) -> Self::MutPtrs<'context> {
-        slices.cast() // should be `slices.as_mut_ptr()` but it's unstable
-    }
-
     type Slices<'context, 'a>
         = &'a [Self]
     where
@@ -407,7 +371,7 @@ unsafe impl Soa for () {
     #[inline]
     unsafe fn slice_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::SlicePtrs<'context>,
+        slices: SlicePtrs<'context, Self>,
     ) -> Self::Slices<'context, 'a> {
         let data = Self::slice_ptrs_as_ptrs(context, slices);
         let len = Self::slice_ptrs_len(context, &slices);
@@ -417,7 +381,7 @@ unsafe impl Soa for () {
     #[inline]
     unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::SliceMutPtrs<'context>,
+        slices: SliceMutPtrs<'context, Self>,
     ) -> Self::SlicesMut<'context, 'a> {
         let data = Self::slice_mut_ptrs_as_ptrs(context, slices);
         let len = Self::slice_mut_ptrs_len(context, &slices);
@@ -444,7 +408,7 @@ unsafe impl Soa for () {
     fn slices_as_slice_ptrs<'context, 'a>(
         _context: &'context Self::Context,
         slices: Self::Slices<'context, 'a>,
-    ) -> Self::SlicePtrs<'context>
+    ) -> SlicePtrs<'context, Self>
     where
         Self: 'a,
     {
@@ -455,7 +419,7 @@ unsafe impl Soa for () {
     fn slices_mut_as_slice_ptrs<'context, 'a>(
         _context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
-    ) -> Self::SliceMutPtrs<'context>
+    ) -> SliceMutPtrs<'context, Self>
     where
         Self: 'a,
     {
@@ -474,7 +438,7 @@ unsafe impl Soa for () {
     fn slices_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
         slices: Self::Slices<'context, 'a>,
-    ) -> Self::Ptrs<'context>
+    ) -> Ptrs<'context, Self>
     where
         Self: 'a,
     {
@@ -485,29 +449,24 @@ unsafe impl Soa for () {
     fn slices_mut_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
-    ) -> Self::MutPtrs<'context>
+    ) -> MutPtrs<'context, Self>
     where
         Self: 'a,
     {
         slices.as_mut_ptr()
     }
-
-    #[inline]
-    unsafe fn slices_drop_in_place(_context: &Self::Context, slices: Self::SliceMutPtrs<'_>) {
-        unsafe { ptr::drop_in_place(slices) }
-    }
 }
 
 unsafe impl SoaRead for () {
     #[inline]
-    unsafe fn read(_context: &Self::Context, ptrs: Self::Ptrs<'_>) -> Self {
+    unsafe fn read(_context: &Self::Context, ptrs: Ptrs<'_, Self>) -> Self {
         unsafe { ptr::read(ptrs) }
     }
 }
 
 unsafe impl SoaWrite for () {
     #[inline]
-    unsafe fn write(_context: &Self::Context, ptrs: Self::MutPtrs<'_>, value: Self) {
+    unsafe fn write(_context: &Self::Context, ptrs: MutPtrs<'_, Self>, value: Self) {
         unsafe { ptr::write(ptrs, value) }
     }
 }
@@ -525,7 +484,7 @@ impl<'a> SoaToOwned<'_, 'a> for &'a () {
     unsafe fn clone_into_ptrs(
         &self,
         _context: &<Self::Owned as Soa>::Context,
-        _target: <Self::Owned as Soa>::MutPtrs<'_>,
+        _target: MutPtrs<'_, Self::Owned>,
     ) {
     }
 
@@ -557,8 +516,66 @@ macro_rules! count_idents {
 #[doc(hidden)]
 pub use count_idents;
 
-#[doc(hidden)]
-pub struct SoaTupleImplHelper<T>(PhantomData<T>);
+pub struct TupleContext<T>(PhantomData<fn() -> T>);
+
+impl<T> TupleContext<T> {
+    #[inline]
+    pub const fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<T> Debug for TupleContext<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("TupleContext").finish_non_exhaustive()
+    }
+}
+
+impl<T> Default for TupleContext<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> Clone for TupleContext<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for TupleContext<T> {}
+
+impl<T> PartialEq for TupleContext<T> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self(this) = self;
+        let Self(other) = other;
+        this == other
+    }
+}
+
+impl<T> Eq for TupleContext<T> {}
+
+impl<T> PartialOrd for TupleContext<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T> Ord for TupleContext<T> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let Self(this) = self;
+        let Self(other) = other;
+        this.cmp(other)
+    }
+}
+
+impl<T> Hash for TupleContext<T> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        let Self(this) = self;
+        this.hash(state);
+    }
+}
 
 #[inline]
 #[must_use]
@@ -592,11 +609,13 @@ pub const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize;
 
 macro_rules! soa_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
-        impl<$($types,)*> SoaTupleImplHelper<($($types,)*)> {
+        impl<$($types,)*> TupleContext<($($types,)*)> {
+            #[doc(hidden)]
             pub const PERMUTATION: [usize; count_idents!($($types,)*)] = {
                 let layouts = [$(Layout::new::<$types>(),)*];
                 layout_permutation(layouts)
             };
+            #[doc(hidden)]
             pub const FIELD_DESCRIPTORS: [FieldDescriptor; count_idents!($($types,)*)] = {
                 let permutation = Self::PERMUTATION;
                 let descriptors = [$(FieldDescriptor::of::<$types>(),)*];
@@ -604,11 +623,10 @@ macro_rules! soa_tuple_impl {
             };
         }
 
-        unsafe impl<$($types,)*> Soa for ($($types,)*) {
-            type Context = ();
-            type Fields = Self;
+        unsafe impl<$($types,)*> super::SoaContext for TupleContext<($($types,)*)> {
+            type Fields = ($($types,)*);
 
-            type FieldDescriptors<'context> = [FieldDescriptor; count_idents!($($types,)*)];
+            type FieldDescriptors<'a> = [FieldDescriptor; count_idents!($($types,)*)];
 
             #[inline]
             fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -618,13 +636,13 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn field_descriptors(_context: &Self::Context) -> Self::FieldDescriptors<'_> {
-                SoaTupleImplHelper::<($($types,)*)>::FIELD_DESCRIPTORS
+            fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+                Self::FIELD_DESCRIPTORS
             }
 
             #[inline]
-            fn buffer_layout(_context: &Self::Context, capacity: usize) -> Result<Layout, LayoutError> {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+            fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
+                let permutation = Self::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();
                 let regions = [$(Layout::array::<$types>(capacity)?,)*];
@@ -633,7 +651,7 @@ macro_rules! soa_tuple_impl {
                 Ok(layout)
             }
 
-            type Ptrs<'context> = ($(*const $types,)*);
+            type Ptrs<'a> = ($(*const $types,)*);
 
             #[inline]
             fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -641,18 +659,14 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_dangling(_context: &Self::Context) -> Self::Ptrs<'_> {
+            fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
                 let ptrs = ($(ptr::dangling::<$types>(),)*);
                 ptrs
             }
 
             #[inline]
-            unsafe fn ptrs_from_buffer(
-                _context: &Self::Context,
-                buffer: *const u8,
-                capacity: usize,
-            ) -> Self::Ptrs<'_> {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+            unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
+                let permutation = Self::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();
                 let mut offsets = [0; count_idents!($($types,)*)];
@@ -666,7 +680,20 @@ macro_rules! soa_tuple_impl {
                 ptrs
             }
 
-            type MutPtrs<'context> = ($(*mut $types,)*);
+            #[inline]
+            unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
+                let ptrs = unsafe { ($(ptrs.$indices.add(offset),)*) };
+                ptrs
+            }
+
+            #[inline]
+            unsafe fn ptrs_offset_from(&self, ptrs: Self::Ptrs<'_>, origin: Self::Ptrs<'_>) -> isize {
+                let offsets = unsafe { [$(ptrs.$indices.offset_from(origin.$indices),)*] };
+                assert!(offsets.iter().all(|offset| offsets[0].eq(offset)));
+                offsets[0]
+            }
+
+            type MutPtrs<'a> = ($(*mut $types,)*);
 
             #[inline]
             fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -674,18 +701,14 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_dangling_mut(_context: &Self::Context) -> Self::MutPtrs<'_> {
+            fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
                 let ptrs = ($(ptr::dangling_mut::<$types>(),)*);
                 ptrs
             }
 
             #[inline]
-            unsafe fn ptrs_from_buffer_mut(
-                _context: &Self::Context,
-                buffer: *mut u8,
-                capacity: usize,
-            ) -> Self::MutPtrs<'_> {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+            unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
+                let permutation = Self::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();
                 let mut offsets = [0; count_idents!($($types,)*)];
@@ -700,57 +723,18 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_cast_const<'context>(
-                _context: &'context Self::Context,
-                ptrs: Self::MutPtrs<'context>,
-            ) -> Self::Ptrs<'context> {
-                let ptrs = ($(ptrs.$indices.cast_const(),)*);
-                ptrs
-            }
-
-            #[inline]
-            fn ptrs_cast_mut<'context>(
-                _context: &'context Self::Context,
-                ptrs: Self::Ptrs<'context>,
-            ) -> Self::MutPtrs<'context> {
-                let ptrs = ($(ptrs.$indices.cast_mut(),)*);
-                ptrs
-            }
-
-            #[inline]
-            unsafe fn ptrs_add<'context>(
-                _context: &'context Self::Context,
-                ptrs: Self::Ptrs<'context>,
+            unsafe fn ptrs_add_mut<'a>(
+                &'a self,
+                ptrs: Self::MutPtrs<'a>,
                 offset: usize,
-            ) -> Self::Ptrs<'context> {
+            ) -> Self::MutPtrs<'a> {
                 let ptrs = unsafe { ($(ptrs.$indices.add(offset),)*) };
                 ptrs
-            }
-
-            #[inline]
-            unsafe fn ptrs_add_mut<'context>(
-                _context: &'context Self::Context,
-                ptrs: Self::MutPtrs<'context>,
-                offset: usize,
-            ) -> Self::MutPtrs<'context> {
-                let ptrs = unsafe { ($(ptrs.$indices.add(offset),)*) };
-                ptrs
-            }
-
-            #[inline]
-            unsafe fn ptrs_offset_from(
-                _context: &Self::Context,
-                ptrs: Self::Ptrs<'_>,
-                origin: Self::Ptrs<'_>,
-            ) -> isize {
-                let offsets = unsafe { [$(ptrs.$indices.offset_from(origin.$indices),)*] };
-                assert!(offsets.iter().all(|offset| offsets[0].eq(offset)));
-                offsets[0]
             }
 
             #[inline]
             unsafe fn ptrs_offset_from_mut(
-                _context: &Self::Context,
+                &self,
                 ptrs: Self::MutPtrs<'_>,
                 origin: Self::Ptrs<'_>,
             ) -> isize {
@@ -760,12 +744,20 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_swap(
-                _context: &Self::Context,
-                a: Self::MutPtrs<'_>,
-                b: Self::MutPtrs<'_>,
-            ) {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+            fn ptrs_cast_const<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::Ptrs<'a> {
+                let ptrs = ($(ptrs.$indices.cast_const(),)*);
+                ptrs
+            }
+
+            #[inline]
+            fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a> {
+                let ptrs = ($(ptrs.$indices.cast_mut(),)*);
+                ptrs
+            }
+
+            #[inline]
+            unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
+                let permutation = Self::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::swap(a.$indices, b.$indices) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -776,13 +768,8 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_copy(
-                _context: &Self::Context,
-                src: Self::Ptrs<'_>,
-                dst: Self::MutPtrs<'_>,
-                len: usize,
-            ) {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+            unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+                let permutation = Self::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -793,13 +780,8 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_copy_rev(
-                _context: &Self::Context,
-                src: Self::Ptrs<'_>,
-                dst: Self::MutPtrs<'_>,
-                len: usize,
-            ) {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+            unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+                let permutation = Self::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -811,7 +793,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_copy_nonoverlapping(
-                _context: &Self::Context,
+                &self,
                 src: Self::Ptrs<'_>,
                 dst: Self::MutPtrs<'_>,
                 len: usize,
@@ -821,11 +803,11 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_drop_in_place(_context: &Self::Context, ptrs: Self::MutPtrs<'_>) {
+            unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
                 unsafe { $(ptr::drop_in_place(ptrs.$indices);)* }
             }
 
-            type NonNullPtrs<'context> = ($(NonNull<$types>,)*);
+            type NonNullPtrs<'a> = ($(NonNull<$types>,)*);
 
             #[inline]
             fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -835,22 +817,101 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_to_nonnull<'context>(
-                _context: &'context Self::Context,
-                ptrs: Self::MutPtrs<'context>,
-            ) -> Self::NonNullPtrs<'context> {
+            unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
                 let ptrs = unsafe { ($(NonNull::new_unchecked(ptrs.$indices),)*) };
                 ptrs
             }
 
             #[inline]
-            fn nonnull_to_ptrs<'context>(
-                _context: &'context Self::Context,
-                ptrs: Self::NonNullPtrs<'context>,
-            ) -> Self::MutPtrs<'context> {
+            fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
                 let ptrs = ($(ptrs.$indices.as_ptr(),)*);
                 ptrs
             }
+
+            type SlicePtrs<'a> = ($(*const [$types],)*);
+
+            #[inline]
+            fn upcast_slice_ptrs<'short, 'long: 'short>(
+                from: Self::SlicePtrs<'long>,
+            ) -> Self::SlicePtrs<'short> {
+                from
+            }
+
+            #[inline]
+            fn slice_ptrs_from_raw_parts<'a>(
+                &'a self,
+                ptrs: Self::Ptrs<'a>,
+                len: usize,
+            ) -> Self::SlicePtrs<'a> {
+                let slices = ($(ptr::slice_from_raw_parts(ptrs.$indices, len),)*);
+                slices
+            }
+
+            #[inline]
+            fn slice_ptrs_len(&self, slices: &Self::SlicePtrs<'_>) -> usize {
+                let lens = [$(slices.$indices.len(),)*];
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
+                lens[0]
+            }
+
+            #[inline]
+            fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a> {
+                let slices = ($(slices.$indices.cast(),)*); // should be `slices.$indices.as_ptr()` but it's unstable
+                slices
+            }
+
+            type SliceMutPtrs<'a> = ($(*mut [$types],)*);
+
+            #[inline]
+            fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+                from: Self::SliceMutPtrs<'long>,
+            ) -> Self::SliceMutPtrs<'short> {
+                from
+            }
+
+            #[inline]
+            fn slice_mut_ptrs_from_raw_parts<'a>(
+                &'a self,
+                ptrs: Self::MutPtrs<'a>,
+                len: usize,
+            ) -> Self::SliceMutPtrs<'a> {
+                let slices = ($(ptr::slice_from_raw_parts_mut(ptrs.$indices, len),)*);
+                slices
+            }
+
+            #[inline]
+            fn slice_mut_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
+                let lens = [$(slices.$indices.len(),)*];
+                assert!(lens.iter().all(|len| lens[0].eq(len)));
+                lens[0]
+            }
+
+            #[inline]
+            fn slice_mut_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+                let slices = ($(slices.$indices.cast(),)*); // should be `slices.$indices.as_mut_ptr()` but it's unstable
+                slices
+            }
+
+            #[inline]
+            fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a> {
+                let slices = ($(slices.$indices.cast_const(),)*);
+                slices
+            }
+
+            #[inline]
+            fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a> {
+                let slices = ($(slices.$indices.cast_mut(),)*);
+                slices
+            }
+
+            #[inline]
+            unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
+                unsafe { $(ptr::drop_in_place(slices.$indices);)* }
+            }
+        }
+
+        unsafe impl<$($types,)*> Soa for ($($types,)*) {
+            type Context = TupleContext<($($types,)*)>;
 
             type Refs<'context, 'a>
                 = ($(&'a $types,)*)
@@ -879,7 +940,7 @@ macro_rules! soa_tuple_impl {
             #[inline]
             unsafe fn ptrs_to_refs<'context, 'a>(
                 _context: &'context Self::Context,
-                ptrs: Self::Ptrs<'context>,
+                ptrs: Ptrs<'context, Self>,
             ) -> Self::Refs<'context, 'a> {
                 let refs = unsafe { ($(&*ptrs.$indices,)*) };
                 refs
@@ -888,7 +949,7 @@ macro_rules! soa_tuple_impl {
             #[inline]
             unsafe fn ptrs_to_refs_mut<'context, 'a>(
                 _context: &'context Self::Context,
-                ptrs: Self::MutPtrs<'context>,
+                ptrs: MutPtrs<'context, Self>,
             ) -> Self::RefsMut<'context, 'a> {
                 let refs = unsafe { ($(&mut *ptrs.$indices,)*) };
                 refs
@@ -898,7 +959,7 @@ macro_rules! soa_tuple_impl {
             fn refs_as_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
                 refs: Self::Refs<'context, 'a>,
-            ) -> Self::Ptrs<'context>
+            ) -> Ptrs<'context, Self>
             where
                 Self: 'a,
             {
@@ -910,7 +971,7 @@ macro_rules! soa_tuple_impl {
             fn refs_mut_as_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
                 refs: Self::RefsMut<'context, 'a>,
-            ) -> Self::MutPtrs<'context>
+            ) -> MutPtrs<'context, Self>
             where
                 Self: 'a,
             {
@@ -948,94 +1009,6 @@ macro_rules! soa_tuple_impl {
                 refs
             }
 
-            type SlicePtrs<'context> = ($(*const [$types],)*);
-
-            #[inline]
-            fn upcast_slice_ptrs<'short, 'long: 'short>(
-                from: Self::SlicePtrs<'long>,
-            ) -> Self::SlicePtrs<'short> {
-                from
-            }
-
-            type SliceMutPtrs<'context> = ($(*mut [$types],)*);
-
-            #[inline]
-            fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
-                from: Self::SliceMutPtrs<'long>,
-            ) -> Self::SliceMutPtrs<'short> {
-                from
-            }
-
-            #[inline]
-            fn slices_from_raw_parts<'context>(
-                _context: &'context Self::Context,
-                ptrs: Self::Ptrs<'context>,
-                len: usize,
-            ) -> Self::SlicePtrs<'context> {
-                let slices = ($(ptr::slice_from_raw_parts(ptrs.$indices, len),)*);
-                slices
-            }
-
-            #[inline]
-            fn slices_from_raw_parts_mut<'context>(
-                _context: &'context Self::Context,
-                ptrs: Self::MutPtrs<'context>,
-                len: usize,
-            ) -> Self::SliceMutPtrs<'context> {
-                let slices = ($(ptr::slice_from_raw_parts_mut(ptrs.$indices, len),)*);
-                slices
-            }
-
-            #[inline]
-            fn slice_ptrs_cast_const<'context>(
-                _context: &'context Self::Context,
-                slices: Self::SliceMutPtrs<'context>,
-            ) -> Self::SlicePtrs<'context> {
-                let slices = ($(slices.$indices.cast_const(),)*);
-                slices
-            }
-
-            #[inline]
-            fn slice_ptrs_cast_mut<'context>(
-                _context: &'context Self::Context,
-                slices: Self::SlicePtrs<'context>,
-            ) -> Self::SliceMutPtrs<'context> {
-                let slices = ($(slices.$indices.cast_mut(),)*);
-                slices
-            }
-
-            #[inline]
-            fn slice_ptrs_len(_context: &Self::Context, slices: &Self::SlicePtrs<'_>) -> usize {
-                let lens = [$(slices.$indices.len(),)*];
-                assert!(lens.iter().all(|len| lens[0].eq(len)));
-                lens[0]
-            }
-
-            #[inline]
-            fn slice_mut_ptrs_len(_context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
-                let lens = [$(slices.$indices.len(),)*];
-                assert!(lens.iter().all(|len| lens[0].eq(len)));
-                lens[0]
-            }
-
-            #[inline]
-            fn slice_ptrs_as_ptrs<'context>(
-                _context: &'context Self::Context,
-                slices: Self::SlicePtrs<'context>,
-            ) -> Self::Ptrs<'context> {
-                let slices = ($(slices.$indices.cast(),)*); // should be `slices.$indices.as_ptr()` but it's unstable
-                slices
-            }
-
-            #[inline]
-            fn slice_mut_ptrs_as_ptrs<'context>(
-                _context: &'context Self::Context,
-                slices: Self::SliceMutPtrs<'context>,
-            ) -> Self::MutPtrs<'context> {
-                let slices = ($(slices.$indices.cast(),)*); // should be `slices.$indices.as_mut_ptr()` but it's unstable
-                slices
-            }
-
             type Slices<'context, 'a>
                 = ($(&'a [$types],)*)
             where
@@ -1063,10 +1036,10 @@ macro_rules! soa_tuple_impl {
             #[inline]
             unsafe fn slice_ptrs_to_slices<'context, 'a>(
                 context: &'context Self::Context,
-                slices: Self::SlicePtrs<'context>,
+                slices: SlicePtrs<'context, Self>,
             ) -> Self::Slices<'context, 'a> {
-                let data = Self::slice_ptrs_as_ptrs(context, slices);
-                let len = Self::slice_ptrs_len(context, &slices);
+                let data = context.slice_ptrs_as_ptrs(slices);
+                let len = context.slice_ptrs_len(&slices);
                 let slices = unsafe { ($(slice::from_raw_parts(data.$indices, len),)*) };
                 slices
             }
@@ -1074,10 +1047,10 @@ macro_rules! soa_tuple_impl {
             #[inline]
             unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
                 context: &'context Self::Context,
-                slices: Self::SliceMutPtrs<'context>,
+                slices: SliceMutPtrs<'context, Self>,
             ) -> Self::SlicesMut<'context, 'a> {
-                let data = Self::slice_mut_ptrs_as_ptrs(context, slices);
-                let len = Self::slice_mut_ptrs_len(context, &slices);
+                let data = context.slice_mut_ptrs_as_ptrs(slices);
+                let len = context.slice_mut_ptrs_len(&slices);
                 let slices = unsafe { ($(slice::from_raw_parts_mut(data.$indices, len),)*) };
                 slices
             }
@@ -1106,7 +1079,7 @@ macro_rules! soa_tuple_impl {
             fn slices_as_slice_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
                 slices: Self::Slices<'context, 'a>,
-            ) -> Self::SlicePtrs<'context>
+            ) -> SlicePtrs<'context, Self>
             where
                 Self: 'a,
             {
@@ -1118,7 +1091,7 @@ macro_rules! soa_tuple_impl {
             fn slices_mut_as_slice_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
                 slices: Self::SlicesMut<'context, 'a>,
-            ) -> Self::SliceMutPtrs<'context>
+            ) -> SliceMutPtrs<'context, Self>
             where
                 Self: 'a,
             {
@@ -1139,7 +1112,7 @@ macro_rules! soa_tuple_impl {
             fn slices_as_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
                 slices: Self::Slices<'context, 'a>,
-            ) -> Self::Ptrs<'context>
+            ) -> Ptrs<'context, Self>
             where
                 Self: 'a,
             {
@@ -1151,30 +1124,25 @@ macro_rules! soa_tuple_impl {
             fn slices_mut_as_ptrs<'context, 'a>(
                 _context: &'context Self::Context,
                 slices: Self::SlicesMut<'context, 'a>,
-            ) -> Self::MutPtrs<'context>
+            ) -> MutPtrs<'context, Self>
             where
                 Self: 'a,
             {
                 let slices = ($(slices.$indices.as_mut_ptr(),)*);
                 slices
             }
-
-            #[inline]
-            unsafe fn slices_drop_in_place(_context: &Self::Context, slices: Self::SliceMutPtrs<'_>) {
-                unsafe { $(ptr::drop_in_place(slices.$indices);)* }
-            }
         }
 
         unsafe impl<$($types,)*> SoaRead for ($($types,)*) {
             #[inline]
-            unsafe fn read(_context: &Self::Context, ptrs: Self::Ptrs<'_>) -> Self {
+            unsafe fn read(_context: &Self::Context, ptrs: Ptrs<'_, Self>) -> Self {
                 unsafe { ($(ptr::read(ptrs.$indices),)*) }
             }
         }
 
         unsafe impl<$($types,)*> SoaWrite for ($($types,)*) {
             #[inline]
-            unsafe fn write(_context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
+            unsafe fn write(_context: &Self::Context, dst: MutPtrs<'_ , Self>, value: Self) {
                 unsafe { $(ptr::write(dst.$indices, value.$indices);)* }
             }
         }

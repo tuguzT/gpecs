@@ -7,7 +7,10 @@ use core::{
 
 use crate::{
     pair::{KeyValueMutPtrs, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, KeyValueSlicesMut},
-    soa::{traits::Soa, wrapper::SliceMutPtrs},
+    soa::{
+        traits::{SliceMutPtrs, Soa, SoaContext},
+        wrapper::SliceMutPtrs as SliceMutPtrsWrapper,
+    },
 };
 
 pub struct KeyValueSliceMutPtrs<'context, K, V>
@@ -15,7 +18,7 @@ where
     V: Soa + ?Sized,
 {
     keys: *mut [K],
-    values: SliceMutPtrs<'context, V>,
+    values: SliceMutPtrsWrapper<'context, V>,
 }
 
 impl<'context, K, V> KeyValueSliceMutPtrs<'context, K, V>
@@ -28,18 +31,18 @@ where
     pub fn new(
         context: &'context V::Context,
         keys: *mut [K],
-        values: V::SliceMutPtrs<'context>,
+        values: SliceMutPtrs<'context, V>,
     ) -> Self {
         let keys_len = keys.len();
-        let values_len = V::slice_mut_ptrs_len(context, &values);
+        let values_len = context.slice_mut_ptrs_len(&values);
         assert_eq!(keys_len, values_len);
 
         unsafe { Self::new_unchecked(keys, values) }
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(keys: *mut [K], values: V::SliceMutPtrs<'context>) -> Self {
-        let values = SliceMutPtrs::new(values);
+    pub unsafe fn new_unchecked(keys: *mut [K], values: SliceMutPtrs<'context, V>) -> Self {
+        let values = SliceMutPtrsWrapper::new(values);
         Self { keys, values }
     }
 
@@ -52,13 +55,13 @@ where
         let KeyValueMutPtrs { key, value } = ptrs;
 
         let keys = ptr::slice_from_raw_parts_mut(key, len);
-        let values = V::slices_from_raw_parts_mut(context, value.into_inner(), len);
-        let values = SliceMutPtrs::new(values);
+        let values = context.slice_mut_ptrs_from_raw_parts(value.into_inner(), len);
+        let values = SliceMutPtrsWrapper::new(values);
         Self { keys, values }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (*mut [K], SliceMutPtrs<'context, V>) {
+    pub fn into_parts(self) -> (*mut [K], SliceMutPtrsWrapper<'context, V>) {
         let Self { keys, values } = self;
         (keys, values)
     }
@@ -66,7 +69,7 @@ where
     #[inline]
     pub fn len(&self, context: &V::Context) -> usize {
         let Self { values, .. } = self;
-        V::slice_mut_ptrs_len(context, values.as_inner())
+        context.slice_mut_ptrs_len(values.as_inner())
     }
 
     #[inline]
@@ -74,7 +77,7 @@ where
         let Self { keys, values } = self;
 
         let keys = keys.cast_const();
-        let values = V::slice_ptrs_cast_const(context, values.into_inner());
+        let values = context.slice_ptrs_cast_const(values.into_inner());
         unsafe { KeyValueSlicePtrs::new_unchecked(keys, values) }
     }
 
@@ -83,8 +86,8 @@ where
         let Self { keys, values } = self;
 
         let key = keys.cast_const().cast(); // should be `keys.as_ptr()` but it's unstable
-        let values = V::slice_ptrs_cast_const(context, values.into_inner());
-        let value = V::slice_ptrs_as_ptrs(context, values);
+        let values = context.slice_ptrs_cast_const(values.into_inner());
+        let value = context.slice_ptrs_as_ptrs(values);
         KeyValuePtrs::new(key, value)
     }
 
@@ -93,7 +96,7 @@ where
         let Self { keys, values } = self;
 
         let key = keys.cast(); // should be `keys.as_ptr()` but it's unstable
-        let value = V::slice_mut_ptrs_as_ptrs(context, values.into_inner());
+        let value = context.slice_mut_ptrs_as_ptrs(values.into_inner());
         KeyValueMutPtrs::new(key, value)
     }
 
@@ -105,7 +108,7 @@ where
         let Self { keys, values } = self;
 
         let keys = unsafe { &*keys };
-        let values = V::slice_ptrs_cast_const(context, values.into_inner());
+        let values = context.slice_ptrs_cast_const(values.into_inner());
         let values = unsafe { V::slice_ptrs_to_slices(context, values) };
         unsafe { KeyValueSlices::new_unchecked(keys, values) }
     }
@@ -128,13 +131,13 @@ where
 
         unsafe {
             ptr::drop_in_place(keys);
-            V::slices_drop_in_place(context, values.into_inner());
+            context.slices_drop_in_place(values.into_inner());
         }
     }
 }
 
 impl<'context, K, V> From<KeyValueSliceMutPtrs<'context, K, V>>
-    for (*mut [K], SliceMutPtrs<'context, V>)
+    for (*mut [K], SliceMutPtrsWrapper<'context, V>)
 where
     V: Soa + ?Sized,
 {
@@ -147,7 +150,7 @@ where
 impl<'context, K, V> Debug for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    SliceMutPtrs<'context, V>: Debug,
+    SliceMutPtrsWrapper<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -161,7 +164,7 @@ where
 impl<'context, K, V> PartialEq for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    SliceMutPtrs<'context, V>: PartialEq,
+    SliceMutPtrsWrapper<'context, V>: PartialEq,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
@@ -173,14 +176,14 @@ where
 impl<'context, K, V> Eq for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    SliceMutPtrs<'context, V>: Eq,
+    SliceMutPtrsWrapper<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    SliceMutPtrs<'context, V>: PartialOrd,
+    SliceMutPtrsWrapper<'context, V>: PartialOrd,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -196,7 +199,7 @@ where
 impl<'context, K, V> Ord for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    SliceMutPtrs<'context, V>: Ord,
+    SliceMutPtrsWrapper<'context, V>: Ord,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -212,7 +215,7 @@ where
 impl<'context, K, V> Hash for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    SliceMutPtrs<'context, V>: Hash,
+    SliceMutPtrsWrapper<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -236,6 +239,6 @@ where
 impl<'context, K, V> Copy for KeyValueSliceMutPtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    SliceMutPtrs<'context, V>: Copy,
+    SliceMutPtrsWrapper<'context, V>: Copy,
 {
 }

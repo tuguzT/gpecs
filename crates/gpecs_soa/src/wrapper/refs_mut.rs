@@ -10,7 +10,7 @@ use core::{
 use crate::traits::Soa;
 
 /// Type wrapper for [mutable references](Soa::RefsMut)
-/// to each field of [`Fields`](Soa::Fields)
+/// to each field of [`Fields`](crate::traits::SoaContext::Fields)
 /// which is covariant over generic lifetimes.
 #[repr(transparent)]
 pub struct RefsMut<'context, 'a, T>
@@ -26,7 +26,7 @@ where
     T: Soa + ?Sized,
 {
     /// Creates self from the [mutable references](Soa::RefsMut)
-    /// to each field of [`Fields`](Soa::Fields).
+    /// to each field of [`Fields`](crate::traits::SoaContext::Fields).
     #[inline]
     pub fn new(inner: T::RefsMut<'context, 'a>) -> Self {
         Self {
@@ -36,7 +36,7 @@ where
     }
 
     /// Retrieves a reference of [mutable references](Soa::RefsMut)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// to each field of [`Fields`](crate::traits::SoaContext::Fields) from self.
     #[inline]
     pub fn as_inner(&self) -> &T::RefsMut<'_, '_> {
         let Self { inner, .. } = self;
@@ -44,7 +44,7 @@ where
     }
 
     /// Retrieves a mutable reference of [mutable references](Soa::RefsMut)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// to each field of [`Fields`](crate::traits::SoaContext::Fields) from self.
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut T::RefsMut<'_, '_> {
         let Self { inner, .. } = self;
@@ -52,7 +52,7 @@ where
     }
 
     /// Retrieves the [mutable references](Soa::RefsMut)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// to each field of [`Fields`](crate::traits::SoaContext::Fields) from self.
     #[inline]
     pub fn into_inner(self) -> T::RefsMut<'context, 'a> {
         let Self { inner, .. } = self;

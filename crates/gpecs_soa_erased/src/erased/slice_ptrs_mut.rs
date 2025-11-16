@@ -12,7 +12,11 @@ use crate::{
     },
     error::{check_layout, check_len},
     field::{ErasedFieldMutPtr, ErasedFieldSliceMutPtr, field_slice_from_raw_parts_mut},
-    soa::{field::FieldDescriptor, slice::range, traits::Soa},
+    soa::{
+        field::FieldDescriptor,
+        slice::range,
+        traits::{SliceMutPtrs, Soa, SoaContext},
+    },
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -126,7 +130,7 @@ where
     pub unsafe fn into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::SliceMutPtrs<'_>, ErasedSoaIntoValueError<Self>>
+    ) -> Result<SliceMutPtrs<'_, T>, ErasedSoaIntoValueError<Self>>
     where
         T: Soa,
     {
@@ -139,7 +143,8 @@ where
         } = self;
         let descriptors = descriptors.as_ref();
 
-        let result = T::field_descriptors(context)
+        let result = context
+            .field_descriptors()
             .into_iter()
             .zip(&self)
             .try_fold(0, |len, (desc, slice)| {
@@ -154,12 +159,10 @@ where
             return Err(ErasedSoaIntoValueError::new(self, error));
         }
 
-        unsafe {
-            let ptrs = T::ptrs_from_buffer_mut(context, buffer, capacity);
-            let ptrs = T::ptrs_add_mut(context, ptrs, start);
-            let slices = T::slices_from_raw_parts_mut(context, ptrs, (start..end).len());
-            Ok(slices)
-        }
+        let ptrs = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
+        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, (start..end).len());
+        Ok(slices)
     }
 }
 

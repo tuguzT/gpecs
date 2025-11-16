@@ -8,7 +8,7 @@ mod impls;
 
 pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
     /// Order of component identifiers should be the same as
-    /// the order of corresponding [descriptors](crate::soa::traits::Soa::FieldDescriptors).
+    /// the order of corresponding [descriptors](crate::soa::traits::SoaContext::FieldDescriptors).
     type MaybeGpuComponentIds: IntoIterator<Item = Option<GpuComponentId>>;
 
     fn get_gpu_components(
@@ -17,7 +17,7 @@ pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
     ) -> Self::MaybeGpuComponentIds;
 
     /// Order of component identifiers should be the same as
-    /// the order of corresponding [descriptors](crate::soa::traits::Soa::FieldDescriptors).
+    /// the order of corresponding [descriptors](crate::soa::traits::SoaContext::FieldDescriptors).
     type GpuComponentIds: IntoIterator<Item = GpuComponentId>;
 
     fn register_gpu_components(

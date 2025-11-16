@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use gpecs_soa_erased::{
     erased::BoxedErasedSoa,
     field::{
@@ -12,7 +14,7 @@ use crate::{
     hash::IndexMap,
     soa::{
         field::FieldDescriptor,
-        traits::{Soa, SoaRead, SoaWrite},
+        traits::{Soa, SoaContext, SoaRead, SoaWrite},
     },
 };
 
@@ -50,9 +52,7 @@ where
     T: Soa,
     I: IntoIterator<Item = ComponentId>,
 {
-    component_ids
-        .into_iter()
-        .zip(T::field_descriptors(context))
+    zip(component_ids, context.field_descriptors())
         .inspect(|(id, desc)| validate_component(components, *id, desc))
         .map(|(id, _)| id)
 }
@@ -76,16 +76,13 @@ where
         panic!("field of {component_id} should be present")
     }
 
-    let remove_field = move |(id, _)| {
-        fields
-            .swap_remove(&id)
-            .unwrap_or_else(|| remove_field_fail(id))
-    };
-    component_ids
-        .into_iter()
-        .zip(T::field_descriptors(context))
+    zip(component_ids, context.field_descriptors())
         .inspect(|(id, desc)| validate_component(components, *id, desc))
-        .map(remove_field)
+        .map(move |(id, _)| {
+            fields
+                .swap_remove(&id)
+                .unwrap_or_else(|| remove_field_fail(id))
+        })
 }
 
 #[inline]
@@ -139,7 +136,7 @@ where
         .into_iter()
         .map(|(component_id, r#ref)| (component_id, r#ref.as_field_ptr().cast_mut()));
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
-    let ptrs = B::ptrs_cast_const(B::CONTEXT, ptrs);
+    let ptrs = B::CONTEXT.ptrs_cast_const(ptrs);
     unsafe { B::ptrs_to_refs(B::CONTEXT, ptrs) }
 }
 
@@ -171,8 +168,8 @@ where
         .into_iter()
         .map(|(component_id, slice)| (component_id, slice.as_field_ptr().cast_mut()));
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
-    let ptrs = B::ptrs_cast_const(B::CONTEXT, ptrs);
-    let slices = B::slices_from_raw_parts(B::CONTEXT, ptrs, len);
+    let ptrs = B::CONTEXT.ptrs_cast_const(ptrs);
+    let slices = B::CONTEXT.slice_ptrs_from_raw_parts(ptrs, len);
     unsafe { B::slice_ptrs_to_slices(B::CONTEXT, slices) }
 }
 
@@ -189,7 +186,7 @@ where
         .into_iter()
         .map(|(component_id, mut slice)| (component_id, slice.as_field_mut_ptr()));
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
-    let slices = B::slices_from_raw_parts_mut(B::CONTEXT, ptrs, len);
+    let slices = B::CONTEXT.slice_mut_ptrs_from_raw_parts(ptrs, len);
     unsafe { B::slice_mut_ptrs_to_slices(B::CONTEXT, slices) }
 }
 

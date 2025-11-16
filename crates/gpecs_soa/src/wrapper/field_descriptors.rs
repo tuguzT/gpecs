@@ -7,16 +7,16 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::Soa;
+use crate::traits::{FieldDescriptors as Inner, Soa, SoaContext};
 
-/// Type wrapper for [field descriptors](Soa::FieldDescriptors)
+/// Type wrapper for [field descriptors](SoaContext::FieldDescriptors)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct FieldDescriptors<'context, T>
 where
     T: Soa + ?Sized,
 {
-    inner: T::FieldDescriptors<'static>,
+    inner: Inner<'static, T>,
     phantom: PhantomData<&'context ()>,
 }
 
@@ -24,41 +24,41 @@ impl<'context, T> FieldDescriptors<'context, T>
 where
     T: Soa + ?Sized,
 {
-    /// Creates self from the [field descriptors](Soa::FieldDescriptors).
+    /// Creates self from the [field descriptors](SoaContext::FieldDescriptors).
     #[inline]
-    pub fn new(inner: T::FieldDescriptors<'context>) -> Self {
+    pub fn new(inner: Inner<'context, T>) -> Self {
         Self {
-            inner: unsafe { transmute::<T::FieldDescriptors<'_>, T::FieldDescriptors<'_>>(inner) },
+            inner: unsafe { transmute::<Inner<'_, T>, Inner<'_, T>>(inner) },
             phantom: PhantomData,
         }
     }
 
-    /// Retrieves a reference of [field descriptors](Soa::FieldDescriptors).
+    /// Retrieves a reference of [field descriptors](SoaContext::FieldDescriptors).
     #[inline]
-    pub fn as_inner(&self) -> &T::FieldDescriptors<'_> {
+    pub fn as_inner(&self) -> &Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [field descriptors](Soa::FieldDescriptors).
+    /// Retrieves a mutable reference of [field descriptors](SoaContext::FieldDescriptors).
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut T::FieldDescriptors<'_> {
+    pub fn as_inner_mut(&mut self) -> &mut Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [field descriptors](Soa::FieldDescriptors).
+    /// Retrieves the [field descriptors](SoaContext::FieldDescriptors).
     #[inline]
-    pub fn into_inner(self) -> T::FieldDescriptors<'context> {
+    pub fn into_inner(self) -> Inner<'context, T> {
         let Self { inner, .. } = self;
-        T::upcast_field_descriptors(inner)
+        T::Context::upcast_field_descriptors(inner)
     }
 }
 
 impl<T> Debug for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: Debug,
+    for<'any> Inner<'any, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -69,7 +69,7 @@ where
 impl<T> Default for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: Default,
+    for<'any> Inner<'any, T>: Default,
 {
     fn default() -> Self {
         Self {
@@ -82,7 +82,7 @@ where
 impl<T> Clone for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: Clone,
+    for<'any> Inner<'any, T>: Clone,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -94,14 +94,14 @@ where
 impl<T> Copy for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: Copy,
+    for<'any> Inner<'any, T>: Copy,
 {
 }
 
 impl<T> PartialEq for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: PartialEq,
+    for<'any> Inner<'any, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -112,14 +112,14 @@ where
 impl<T> Eq for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: Eq,
+    for<'any> Inner<'any, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: PartialOrd,
+    for<'any> Inner<'any, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -134,7 +134,7 @@ where
 impl<T> Ord for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: Ord,
+    for<'any> Inner<'any, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -149,7 +149,7 @@ where
 impl<T> Hash for FieldDescriptors<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::FieldDescriptors<'any>: Hash,
+    for<'any> Inner<'any, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;
@@ -162,8 +162,8 @@ impl<'context, T> IntoIterator for FieldDescriptors<'context, T>
 where
     T: Soa + ?Sized,
 {
-    type Item = <T::FieldDescriptors<'context> as IntoIterator>::Item;
-    type IntoIter = <T::FieldDescriptors<'context> as IntoIterator>::IntoIter;
+    type Item = <Inner<'context, T> as IntoIterator>::Item;
+    type IntoIter = <Inner<'context, T> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.into_inner().into_iter()

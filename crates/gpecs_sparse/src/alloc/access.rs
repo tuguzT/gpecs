@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::soa::{
-    traits::{Soa, SoaWrite},
+    traits::{Soa, SoaContext, SoaWrite},
     wrapper::{MutPtrs, RefsMut},
 };
 
@@ -143,7 +143,7 @@ pub unsafe fn drop_old_then_write<V>(
     let dst = match dst {
         Some(TryInsertAccess::ReadWrite(dst)) => {
             let dst = V::refs_mut_as_ptrs(context, dst.into_inner());
-            unsafe { V::ptrs_drop_in_place(context, dst.clone()) }
+            unsafe { context.ptrs_drop_in_place(dst.clone()) }
             dst
         }
         Some(TryInsertAccess::WriteOnly(dst)) => dst.into_inner(),

@@ -2,7 +2,7 @@ use gpecs_soa_erased::field::ErasedFieldMutPtr;
 
 use crate::{
     component::registry::{ComponentId, ComponentRegistry},
-    soa::traits::{Soa, SoaRead, SoaWrite},
+    soa::traits::{MutPtrs, Soa, SoaRead, SoaWrite},
 };
 
 mod impls;
@@ -15,18 +15,18 @@ pub unsafe trait Bundle: Soa + SoaRead + SoaWrite + 'static {
     const CONTEXT: &'static Self::Context;
 
     /// Order of component identifiers should be the same as
-    /// the order of corresponding [descriptors](Soa::FieldDescriptors).
+    /// the order of corresponding [descriptors](crate::soa::traits::SoaContext::FieldDescriptors).
     type MaybeComponentIds: IntoIterator<Item = Option<ComponentId>>;
 
     fn get_components(components: &ComponentRegistry) -> Self::MaybeComponentIds;
 
     /// Order of component identifiers should be the same as
-    /// the order of corresponding [descriptors](Soa::FieldDescriptors).
+    /// the order of corresponding [descriptors](crate::soa::traits::SoaContext::FieldDescriptors).
     type ComponentIds: IntoIterator<Item = ComponentId>;
 
     fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds;
 
-    unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> Self::MutPtrs<'static>
+    unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> MutPtrs<'static, Self>
     where
         I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>;
 }

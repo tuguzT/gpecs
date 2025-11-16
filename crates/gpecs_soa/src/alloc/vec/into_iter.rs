@@ -9,9 +9,9 @@ use crate::{
     alloc::raw_vec::RawSoaVec,
     layout::BufferData,
     ptr::BufferDataPtr,
-    traits::{Soa, SoaRead},
+    traits::{Fields, MutPtrs, NonNullPtrs, Ptrs, Soa, SoaContext, SoaRead},
     vec::SoaVec,
-    wrapper::NonNullPtrs,
+    wrapper::NonNullPtrs as NonNullPtrsWrapper,
 };
 
 pub struct IntoIter<T>
@@ -20,7 +20,7 @@ where
 {
     buffer: NonNull<BufferData<T>>,
     capacity: usize,
-    ptrs: NonNullPtrs<'static, T>,
+    ptrs: NonNullPtrsWrapper<'static, T>,
     start: usize,
     end: usize,
 }
@@ -35,12 +35,12 @@ where
 
         let buffer = vec.buffer.as_mut_ptr();
         let context = vec.context();
-        let ptrs = unsafe { T::ptrs_to_nonnull(context, vec.buffer.as_mut_ptrs()) };
-        let ptrs = unsafe { transmute::<T::NonNullPtrs<'_>, T::NonNullPtrs<'_>>(ptrs) };
+        let ptrs = unsafe { context.ptrs_to_nonnull(vec.buffer.as_mut_ptrs()) };
+        let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'_, T>>(ptrs) };
         Self {
             buffer: unsafe { NonNull::new_unchecked(buffer) },
             capacity: vec.capacity(),
-            ptrs: NonNullPtrs::new(ptrs),
+            ptrs: NonNullPtrsWrapper::new(ptrs),
             start: 0,
             end: vec.len(),
         }
@@ -73,14 +73,12 @@ where
     pub fn as_slices(&self) -> T::Slices<'_, '_> {
         let Self { start, .. } = *self;
         let context = self.context();
-        let ptrs = T::ptrs_cast_const(context, self.ptrs());
+        let ptrs = context.ptrs_cast_const(self.ptrs());
         let len = self.len();
 
-        unsafe {
-            let ptrs = T::ptrs_add(context, ptrs, start);
-            let slices = T::slices_from_raw_parts(context, ptrs, len);
-            T::slice_ptrs_to_slices(context, slices)
-        }
+        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
+        unsafe { T::slice_ptrs_to_slices(context, slices) }
     }
 
     #[inline]
@@ -90,60 +88,58 @@ where
         let ptrs = self.ptrs();
         let len = self.len();
 
-        unsafe {
-            let ptrs = T::ptrs_add_mut(context, ptrs, start);
-            let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
-            T::slice_mut_ptrs_to_slices(context, slices)
-        }
+        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        unsafe { T::slice_mut_ptrs_to_slices(context, slices) }
     }
 
     #[inline]
-    fn ptrs(&self) -> T::MutPtrs<'_> {
+    fn ptrs(&self) -> MutPtrs<'_, T> {
         let Self { ptrs, .. } = self;
         let context = self.context();
         let ptrs = ptrs.clone().into_inner();
-        T::nonnull_to_ptrs(context, ptrs)
+        context.nonnull_to_ptrs(ptrs)
     }
 
     #[inline]
     unsafe fn post_inc_start<'a>(
         start: &mut usize,
-        ptrs: T::Ptrs<'a>,
+        ptrs: Ptrs<'a, T>,
         context: &'a T::Context,
         offset: usize,
-    ) -> T::Ptrs<'a> {
+    ) -> Ptrs<'a, T> {
         let old_start = *start;
         *start += offset;
 
-        unsafe { T::ptrs_add(context, ptrs, old_start) }
+        unsafe { context.ptrs_add(ptrs, old_start) }
     }
 
     #[inline]
     unsafe fn pre_dec_end<'a>(
         end: &mut usize,
-        ptrs: T::Ptrs<'a>,
+        ptrs: Ptrs<'a, T>,
         context: &'a T::Context,
         offset: usize,
-    ) -> T::Ptrs<'a> {
+    ) -> Ptrs<'a, T> {
         *end -= offset;
 
-        unsafe { T::ptrs_add(context, ptrs, *end) }
+        unsafe { context.ptrs_add(ptrs, *end) }
     }
 }
 
 unsafe impl<T> Send for IntoIter<T>
 where
     T: Soa + ?Sized,
-    T::Fields: Send,
     T::Context: Send,
+    Fields<T>: Send,
 {
 }
 
 unsafe impl<T> Sync for IntoIter<T>
 where
     T: Soa + ?Sized,
-    T::Fields: Sync,
     T::Context: Sync,
+    Fields<T>: Sync,
 {
 }
 
@@ -223,7 +219,7 @@ where
 
         let slices = iter.as_mut_slices();
         let slices = T::slices_mut_as_slice_ptrs(context, slices);
-        unsafe { T::slices_drop_in_place(context, slices) }
+        unsafe { context.slices_drop_in_place(slices) }
         // now `guard` will be dropped and do the rest
     }
 }
@@ -250,7 +246,8 @@ where
         let context = unsafe { Self::context_of(buffer) };
 
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
+        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
 
         let item = unsafe { T::read(context, ptrs) };
@@ -287,7 +284,8 @@ where
         let context = unsafe { Self::context_of(buffer) };
 
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
+        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.ptrs_cast_const(ptrs);
         unsafe {
             Self::post_inc_start(start, ptrs, context, n);
         }
@@ -326,9 +324,9 @@ where
         loop {
             // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
             // the slice allocation
-            let ptrs = T::ptrs_cast_const(context, ptrs.clone());
+            let ptrs = context.ptrs_cast_const(ptrs.clone());
             let item = unsafe {
-                let ptrs = T::ptrs_add(context, ptrs, i);
+                let ptrs = context.ptrs_add(ptrs, i);
                 T::read(context, ptrs)
             };
             acc = f(acc, item);
@@ -466,7 +464,8 @@ where
         let context = unsafe { Self::context_of(buffer) };
 
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
+        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
 
         let item = unsafe { T::read(context, ptrs) };
@@ -489,7 +488,8 @@ where
         let context = unsafe { Self::context_of(buffer) };
 
         let ptrs = ptrs.clone().into_inner();
-        let ptrs = T::ptrs_cast_const(context, T::nonnull_to_ptrs(context, ptrs));
+        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.ptrs_cast_const(ptrs);
         unsafe {
             Self::pre_dec_end(end, ptrs, context, n);
         }

@@ -25,11 +25,11 @@ use crate::{
     item::{SparseItem, SparseItemKind},
     iter::{Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
-    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs},
+    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs, KeyValueRefs},
     soa::{
         mem::swap as soa_swap,
         slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
-        traits::Soa,
+        traits::{MutPtrs, Ptrs, Soa},
     },
 };
 
@@ -37,8 +37,8 @@ pub type SparseView<'c, 'a, T> = EpochSparseView<'c, 'a, usize, T>;
 
 pub struct EpochSparseView<'c, 'a, K, V>
 where
-    K: Key,
-    V: Soa + ?Sized,
+    K: Key + 'c,
+    V: Soa + ?Sized + 'c,
 {
     dense: SoaSlices<'c, 'a, KeyValuePair<K, V>>,
     sparse: &'a [SparseItem<K>],
@@ -130,7 +130,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> V::Ptrs<'_> {
+    pub fn as_ptrs(&self) -> Ptrs<'_, V> {
         let Self { dense, .. } = self;
 
         let KeyValuePtrs { value, .. } = dense.as_ptrs();
@@ -310,7 +310,9 @@ where
     K: Key,
     V: Soa + ?Sized,
 {
+    #[inline]
     fn from(context: &'c V::Context) -> Self {
+        let context = KeyValuePairContext::<K, V>::from_inner_ref(context);
         Self {
             dense: context.into(),
             sparse: Default::default(),
@@ -476,8 +478,8 @@ pub type SparseViewMut<'c, 'a, T> = EpochSparseViewMut<'c, 'a, usize, T>;
 
 pub struct EpochSparseViewMut<'c, 'a, K, V>
 where
-    K: Key,
-    V: Soa + ?Sized,
+    K: Key + 'c,
+    V: Soa + ?Sized + 'c,
 {
     dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
     sparse: &'a mut [SparseItem<K>],
@@ -584,7 +586,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> V::Ptrs<'_> {
+    pub fn as_ptrs(&self) -> Ptrs<'_, V> {
         let Self { dense, .. } = self;
 
         let KeyValuePtrs { value, .. } = dense.as_ptrs();
@@ -592,7 +594,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> V::MutPtrs<'_> {
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
         let Self { dense, .. } = self;
 
         let KeyValueMutPtrs { value, .. } = dense.as_mut_ptrs();
@@ -858,7 +860,7 @@ where
 
         let (context, slices) = dense.as_mut_slices_with_context();
         let (keys, values) = slices.into_parts();
-        let mut values = SoaSlicesMut::new(context, values.into_inner());
+        let mut values = SoaSlicesMut::<V>::new(context, values.into_inner());
 
         sort_keys(keys, values.iter(), sparse);
 
@@ -1141,7 +1143,9 @@ where
     K: Key,
     V: Soa + ?Sized,
 {
+    #[inline]
     fn from(context: &'c V::Context) -> Self {
+        let context = KeyValuePairContext::<K, V>::from_inner_ref(context);
         Self {
             dense: context.into(),
             sparse: Default::default(),

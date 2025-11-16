@@ -4,7 +4,11 @@ use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
     aligned_bytes::AlignedUninitByteSlice,
     erased::{BoxedErasedSoa, ErasedSoa},
-    soa::{field::FieldDescriptor, prelude::*, traits::SoaWrite},
+    soa::{
+        field::FieldDescriptor,
+        prelude::*,
+        traits::{SoaWrite, TupleContext},
+    },
 };
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
@@ -63,7 +67,7 @@ impl Push for Tiny {
     }
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
-        let context = &Default::default();
+        let context = &TupleContext::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -94,7 +98,7 @@ impl Push for Small {
     }
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
-        let context = &Default::default();
+        let context = &TupleContext::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -125,7 +129,7 @@ impl Push for Medium {
     }
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
-        let context = &Default::default();
+        let context = &TupleContext::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -159,7 +163,7 @@ impl Push for Big {
     }
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
-        let context = &Default::default();
+        let context = &TupleContext::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -198,7 +202,7 @@ impl Push for Large {
     }
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
-        let context = &Default::default();
+        let context = &TupleContext::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];

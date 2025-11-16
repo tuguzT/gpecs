@@ -22,7 +22,7 @@ type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
 fn value() {
     type Value = ((), String, u32, u16, u8);
 
-    let context = ();
+    let context = Default::default();
 
     let i1 = 1;
     let i2 = 2;
@@ -158,6 +158,7 @@ fn value() {
             .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),
     );
 
+    let context = Default::default();
     let value = unsafe { erased_value.into_value::<((), u32, u16, u8)>(&context) }
         .expect("all the fields should be valid");
     assert_eq!(value, ((), i1, i2, i3));

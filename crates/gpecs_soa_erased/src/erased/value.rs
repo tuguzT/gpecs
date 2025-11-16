@@ -23,7 +23,7 @@ use crate::{
     field::{ErasedField, error::ErasedFieldFromDescDataError},
     soa::{
         field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_layout, buffer_offsets},
-        traits::{SoaRead, SoaWrite},
+        traits::{SoaContext, SoaRead, SoaWrite},
     },
 };
 
@@ -92,7 +92,8 @@ where
         } = self;
         let descriptors = descriptors.as_ref();
 
-        let result = T::field_descriptors(context)
+        let result = context
+            .field_descriptors()
             .into_iter()
             .zip(descriptors)
             .try_fold(0, |len, (desc, self_desc)| {
@@ -107,7 +108,7 @@ where
             return Err(ErasedSoaIntoValueError::new(self, error));
         }
 
-        let layout = match T::buffer_layout(context, 1) {
+        let layout = match context.buffer_layout(1) {
             Ok(layout) => layout,
             Err(error) => return Err(ErasedSoaIntoValueError::new(self, error.into())),
         };
@@ -117,7 +118,7 @@ where
 
         let Self { bytes, .. } = self;
         let value = unsafe {
-            let src = T::ptrs_from_buffer(context, bytes.as_ptr(), 1);
+            let src = context.ptrs_from_buffer(bytes.as_ptr(), 1);
             T::read(context, src)
         };
         Ok(value)
@@ -190,17 +191,18 @@ where
     where
         T: SoaWrite,
     {
-        let descriptors = T::field_descriptors(context)
+        let descriptors = context
+            .field_descriptors()
             .into_iter()
             .map(|desc| *desc.as_ref())
             .collect();
 
-        let expected_layout = T::buffer_layout(context, 1)?;
+        let expected_layout = context.buffer_layout(1)?;
         let layout = bytes.layout();
         check_layout(layout, expected_layout)?;
 
         unsafe {
-            let dst = T::ptrs_from_buffer_mut(context, bytes.as_mut_ptr(), 1);
+            let dst = context.ptrs_from_buffer_mut(bytes.as_mut_ptr(), 1);
             T::write(context, dst, value);
         }
 
@@ -219,16 +221,17 @@ where
     where
         T: SoaWrite,
     {
-        let descriptors = T::field_descriptors(context)
+        let descriptors = context
+            .field_descriptors()
             .into_iter()
             .map(|desc| *desc.as_ref())
             .collect();
 
-        let layout = T::buffer_layout(context, 1)?;
+        let layout = context.buffer_layout(1)?;
         let mut bytes = B::from_layout(layout).map_err(ErasedSoaFromValueError::FromLayout)?;
 
         unsafe {
-            let dst = T::ptrs_from_buffer_mut(context, bytes.as_mut_ptr(), 1);
+            let dst = context.ptrs_from_buffer_mut(bytes.as_mut_ptr(), 1);
             T::write(context, dst, value);
         }
 

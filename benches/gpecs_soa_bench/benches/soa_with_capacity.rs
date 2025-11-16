@@ -5,8 +5,11 @@ use gpecs_soa_bench::{
     Big, Large, Medium, Small, Tiny, Zero, names::*, with_capacity::WithCapacity,
 };
 use gpecs_soa_erased::{
-    erased::{BoxedErasedSoa, ErasedSoaContext},
-    soa::{field::buffer_layout, traits::Soa},
+    erased::BoxedErasedSoa,
+    soa::{
+        field::buffer_layout,
+        traits::{Soa, SoaContext},
+    },
 };
 
 fn with_capacity<T>(c: &mut Criterion)
@@ -19,8 +22,8 @@ where
 
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
-        let context = ErasedSoaContext::of::<T>(&Default::default());
-        let fields = <BoxedErasedSoa as Soa>::field_descriptors(&context);
+        let context = <BoxedErasedSoa as Soa>::Context::of::<T>(&Default::default());
+        let fields = context.field_descriptors();
         let buffer_layout = buffer_layout(fields, capacity).unwrap();
         let bytes = buffer_layout.size();
         group
@@ -35,8 +38,8 @@ where
 
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
-        let context = Default::default();
-        let buffer_layout = buffer_layout(T::field_descriptors(&context), capacity).unwrap();
+        let context = T::Context::default();
+        let buffer_layout = buffer_layout(context.field_descriptors(), capacity).unwrap();
         let bytes = buffer_layout.size();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))
@@ -46,7 +49,8 @@ where
                 |b, &capacity| b.iter(|| T::soa_slf_with_capacity(capacity)),
             );
 
-        let bytes = T::field_descriptors(&context)
+        let bytes = context
+            .field_descriptors()
             .into_iter()
             .map(|desc| capacity * desc.as_ref().layout().size())
             .sum::<usize>();

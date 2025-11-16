@@ -6,8 +6,8 @@ use crate::{
         registry::{ComponentId, ComponentRegistry},
     },
     soa::{
-        identity::Identity,
-        traits::impls::{SoaTupleImplHelper, count_idents},
+        identity::{Identity, IdentityContext},
+        traits::{MutPtrs, TupleContext, impls::count_idents},
     },
 };
 
@@ -17,7 +17,7 @@ unsafe impl<T> Bundle for Identity<T>
 where
     T: Component,
 {
-    const CONTEXT: &'static Self::Context = &();
+    const CONTEXT: &'static Self::Context = &IdentityContext::<T>::new();
 
     type MaybeComponentIds = [Option<ComponentId>; 1];
 
@@ -36,7 +36,7 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> Self::MutPtrs<'static>
+    unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> MutPtrs<'static, Self>
     where
         I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
     {
@@ -56,13 +56,13 @@ macro_rules! bundle_tuple_impl {
         where
             $($types: Component,)*
         {
-            const CONTEXT: &'static Self::Context = &();
+            const CONTEXT: &'static Self::Context = &TupleContext::<($($types,)*)>::new();
 
             type MaybeComponentIds = [Option<ComponentId>; count_idents!($($types,)*)];
 
             #[inline]
             fn get_components(components: &ComponentRegistry) -> Self::MaybeComponentIds {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = Self::Context::PERMUTATION;
 
                 let component_ids = [$(components.component_id::<$types>(),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
@@ -73,7 +73,7 @@ macro_rules! bundle_tuple_impl {
 
             #[inline]
             fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds {
-                let permutation = SoaTupleImplHelper::<($($types,)*)>::PERMUTATION;
+                let permutation = Self::Context::PERMUTATION;
 
                 let component_ids = [$(components.register_component::<$types>(),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
@@ -81,7 +81,7 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_from_iter<Iter>(components: &ComponentRegistry, iter: Iter) -> Self::MutPtrs<'static>
+            unsafe fn ptrs_from_iter<Iter>(components: &ComponentRegistry, iter: Iter) -> MutPtrs<'static, Self>
             where
                 Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
             {

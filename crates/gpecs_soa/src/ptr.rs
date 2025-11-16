@@ -7,7 +7,7 @@ use core::{
 use crate::{
     layout::{BufferData, BufferPrefix, buffer_layout, is_zst, should_allocate},
     slice::SoaSlice,
-    traits::{Soa, SoaTrustedFields},
+    traits::{MutPtrs, Ptrs, Soa, SoaContext, SoaTrustedFields},
 };
 
 #[inline]
@@ -366,16 +366,16 @@ pub(crate) unsafe fn ptrs_from_buffer<T>(
     context: &T::Context,
     ptr: *const BufferData<T>,
     capacity: usize,
-) -> T::Ptrs<'_>
+) -> Ptrs<'_, T>
 where
     T: Soa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
-        return T::ptrs_dangling(context);
+        return context.ptrs_dangling();
     }
 
     let buffer = unsafe { ptr_to_data(context, ptr, capacity).unwrap_unchecked() };
-    unsafe { T::ptrs_from_buffer(context, buffer, capacity) }
+    unsafe { context.ptrs_from_buffer(buffer, capacity) }
 }
 
 #[inline]
@@ -383,16 +383,16 @@ pub(crate) unsafe fn ptrs_from_buffer_mut<T>(
     context: &T::Context,
     ptr: *mut BufferData<T>,
     capacity: usize,
-) -> T::MutPtrs<'_>
+) -> MutPtrs<'_, T>
 where
     T: Soa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
-        return T::ptrs_dangling_mut(context);
+        return context.ptrs_dangling_mut();
     }
 
     let buffer = unsafe { ptr_to_data_mut(context, ptr, capacity).unwrap_unchecked() };
-    unsafe { T::ptrs_from_buffer_mut(context, buffer, capacity) }
+    unsafe { context.ptrs_from_buffer_mut(buffer, capacity) }
 }
 
 unsafe fn ptr_to_data<T>(
@@ -403,7 +403,7 @@ unsafe fn ptr_to_data<T>(
 where
     T: Soa + ?Sized,
 {
-    let layout = T::buffer_layout(context, capacity)?;
+    let layout = context.buffer_layout(capacity)?;
     let prefix_layout = Layout::new::<BufferPrefix<T>>();
     let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
 
@@ -419,7 +419,7 @@ unsafe fn ptr_to_data_mut<T>(
 where
     T: Soa + ?Sized,
 {
-    let layout = T::buffer_layout(context, capacity)?;
+    let layout = context.buffer_layout(capacity)?;
     let prefix_layout = Layout::new::<BufferPrefix<T>>();
     let (_, offset_from_prefix) = prefix_layout.extend(layout)?;
 

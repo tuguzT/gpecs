@@ -13,7 +13,8 @@ fn context() {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn context_of() {
-    let context = ErasedSoaContext::<ArrayDescriptors<1>>::of::<()>(&());
+    let context = Default::default();
+    let context = ErasedSoaContext::<ArrayDescriptors<1>>::of::<()>(&context);
     let descriptors = [FieldDescriptor::of::<()>()];
     assert!(
         context
@@ -23,7 +24,8 @@ fn context_of() {
             .eq(descriptors.iter().map(FieldDescriptor::layout))
     );
 
-    let context = ErasedSoaContext::<ArrayDescriptors<3>>::of::<(u32, u16, u8)>(&());
+    let context = Default::default();
+    let context = ErasedSoaContext::<ArrayDescriptors<3>>::of::<(u32, u16, u8)>(&context);
     let descriptors = [
         FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<u16>(),

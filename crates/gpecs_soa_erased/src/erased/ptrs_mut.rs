@@ -11,7 +11,10 @@ use crate::{
     },
     error::{check_layout, check_len},
     field::ErasedFieldMutPtr,
-    soa::{field::FieldDescriptor, traits::Soa},
+    soa::{
+        field::FieldDescriptor,
+        traits::{MutPtrs, Soa, SoaContext},
+    },
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -129,7 +132,7 @@ where
     pub unsafe fn into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::MutPtrs<'_>, ErasedSoaIntoValueError<Self>>
+    ) -> Result<MutPtrs<'_, T>, ErasedSoaIntoValueError<Self>>
     where
         T: Soa,
     {
@@ -141,7 +144,8 @@ where
         } = self;
         let descriptors = descriptors.as_ref();
 
-        let result = T::field_descriptors(context)
+        let result = context
+            .field_descriptors()
             .into_iter()
             .zip(&self)
             .try_fold(0, |len, (desc, slice)| {
@@ -157,8 +161,8 @@ where
         }
 
         unsafe {
-            let ptrs = T::ptrs_from_buffer_mut(context, buffer, capacity);
-            let ptrs = T::ptrs_add_mut(context, ptrs, offset);
+            let ptrs = context.ptrs_from_buffer_mut(buffer, capacity);
+            let ptrs = context.ptrs_add_mut(ptrs, offset);
             Ok(ptrs)
         }
     }

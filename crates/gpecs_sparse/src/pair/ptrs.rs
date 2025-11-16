@@ -8,8 +8,8 @@ use core::{
 use crate::{
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValueRefs},
     soa::{
-        traits::{Soa, SoaRead},
-        wrapper::Ptrs,
+        traits::{Ptrs, Soa, SoaContext, SoaRead},
+        wrapper::Ptrs as PtrsWrapper,
     },
 };
 
@@ -18,7 +18,7 @@ where
     V: Soa + ?Sized,
 {
     pub key: *const K,
-    pub value: Ptrs<'context, V>,
+    pub value: PtrsWrapper<'context, V>,
 }
 
 impl<'context, K, V> KeyValuePtrs<'context, K, V>
@@ -26,15 +26,15 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub fn new(key: *const K, value: V::Ptrs<'context>) -> Self {
-        let value = Ptrs::new(value);
+    pub fn new(key: *const K, value: Ptrs<'context, V>) -> Self {
+        let value = PtrsWrapper::new(value);
         Self { key, value }
     }
 
     #[inline]
     pub fn dangling(context: &'context V::Context) -> Self {
         let key = ptr::dangling();
-        let value = V::ptrs_dangling(context);
+        let value = context.ptrs_dangling();
         Self::new(key, value)
     }
 
@@ -43,7 +43,7 @@ where
         let Self { key, value } = self;
 
         let key = key.cast_mut();
-        let value = V::ptrs_cast_mut(context, value.into_inner());
+        let value = context.ptrs_cast_mut(value.into_inner());
         KeyValueMutPtrs::new(key, value)
     }
 
@@ -53,7 +53,7 @@ where
         let Self { key, value } = self;
 
         let key = unsafe { key.add(offset) };
-        let value = unsafe { V::ptrs_add(context, value.into_inner(), offset) };
+        let value = unsafe { context.ptrs_add(value.into_inner(), offset) };
         Self::new(key, value)
     }
 
@@ -65,9 +65,11 @@ where
             value: origin_value,
         } = origin;
 
+        let value = value.into_inner();
+        let origin_value = origin_value.into_inner();
+
         let key_offset = unsafe { key.offset_from(origin_key) };
-        let values_offset =
-            unsafe { V::ptrs_offset_from(context, value.into_inner(), origin_value.into_inner()) };
+        let values_offset = unsafe { context.ptrs_offset_from(value, origin_value) };
         assert_eq!(key_offset, values_offset);
 
         key_offset
@@ -100,18 +102,18 @@ where
     }
 }
 
-impl<'context, K, V> From<(*const K, Ptrs<'context, V>)> for KeyValuePtrs<'context, K, V>
+impl<'context, K, V> From<(*const K, PtrsWrapper<'context, V>)> for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (*const K, Ptrs<'context, V>)) -> Self {
+    fn from(value: (*const K, PtrsWrapper<'context, V>)) -> Self {
         let (key, value) = value;
         Self { key, value }
     }
 }
 
-impl<'context, K, V> From<KeyValuePtrs<'context, K, V>> for (*const K, Ptrs<'context, V>)
+impl<'context, K, V> From<KeyValuePtrs<'context, K, V>> for (*const K, PtrsWrapper<'context, V>)
 where
     V: Soa + ?Sized,
 {
@@ -125,7 +127,7 @@ where
 impl<'context, K, V> Debug for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    Ptrs<'context, V>: Debug,
+    PtrsWrapper<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -139,7 +141,7 @@ where
 impl<'context, K, V> PartialEq for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    Ptrs<'context, V>: PartialEq,
+    PtrsWrapper<'context, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -150,14 +152,14 @@ where
 impl<'context, K, V> Eq for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    Ptrs<'context, V>: Eq,
+    PtrsWrapper<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    Ptrs<'context, V>: PartialOrd,
+    PtrsWrapper<'context, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -172,7 +174,7 @@ where
 impl<'context, K, V> Ord for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    Ptrs<'context, V>: Ord,
+    PtrsWrapper<'context, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -187,7 +189,7 @@ where
 impl<'context, K, V> Hash for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    Ptrs<'context, V>: Hash,
+    PtrsWrapper<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -210,6 +212,6 @@ where
 impl<'context, K, V> Copy for KeyValuePtrs<'context, K, V>
 where
     V: Soa + ?Sized,
-    Ptrs<'context, V>: Copy,
+    PtrsWrapper<'context, V>: Copy,
 {
 }

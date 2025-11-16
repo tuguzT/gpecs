@@ -19,11 +19,11 @@ use crate::{
     item::{SparseItem, SparseItemKind},
     iter::{Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, Values, ValuesMut},
     key::{Epoch, Key},
-    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePtrs, KeyValueRefs},
+    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs, KeyValueRefs},
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
-        traits::{Soa, SoaRead, SoaWrite},
+        traits::{MutPtrs, Ptrs, Soa, SoaContext, SoaRead, SoaWrite},
         vec::SoaVec,
     },
     view::{EpochSparseView, EpochSparseViewMut},
@@ -67,6 +67,7 @@ where
     #[inline]
     #[must_use]
     pub fn with_context(context: V::Context) -> Self {
+        let context = KeyValuePairContext::from_inner(context);
         Self {
             dense: SoaVec::with_context(context),
             sparse: Vec::new(),
@@ -88,6 +89,7 @@ where
     #[inline]
     #[must_use]
     pub fn with_context_and_capacity(context: V::Context, dense: usize, sparse: usize) -> Self {
+        let context = KeyValuePairContext::from_inner(context);
         Self {
             dense: SoaVec::with_context_and_capacity(context, dense),
             sparse: Vec::with_capacity(sparse),
@@ -264,7 +266,7 @@ where
 
         let (context, slices) = dense.slices().into_slices_with_context();
         let (_, values) = slices.into_parts();
-        SoaSlices::new(context, values.into_inner())
+        SoaSlices::new(context.as_inner(), values.into_inner())
     }
 
     #[inline]
@@ -273,11 +275,11 @@ where
 
         let (context, slices) = dense.slices_mut().into_slices_with_context();
         let (_, values) = slices.into_parts();
-        SoaSlicesMut::new(context, values.into_inner())
+        SoaSlicesMut::new(context.as_inner(), values.into_inner())
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> V::Ptrs<'_> {
+    pub fn as_ptrs(&self) -> Ptrs<'_, V> {
         let Self { dense, .. } = self;
 
         let KeyValuePtrs { value, .. } = dense.as_ptrs();
@@ -285,7 +287,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> V::MutPtrs<'_> {
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
         let Self { dense, .. } = self;
 
         let KeyValueMutPtrs { value, .. } = dense.as_mut_ptrs();
@@ -414,8 +416,9 @@ where
 
             self.remove_into(key, |context, src| {
                 let Some(value) = src else { return };
-                let value = V::ptrs_cast_mut(context, V::upcast_ptrs(value));
-                unsafe { V::ptrs_drop_in_place(context, value) }
+                let value = V::Context::upcast_ptrs(value);
+                let value = context.ptrs_cast_mut(value);
+                unsafe { context.ptrs_drop_in_place(value) }
             });
         }
         self.dense.truncate(dense_len);
@@ -426,8 +429,9 @@ where
 
             self.remove_into(key, |context, src| {
                 let Some(value) = src else { return };
-                let value = V::ptrs_cast_mut(context, V::upcast_ptrs(value));
-                unsafe { V::ptrs_drop_in_place(context, value) }
+                let value = V::Context::upcast_ptrs(value);
+                let value = context.ptrs_cast_mut(value);
+                unsafe { context.ptrs_drop_in_place(value) }
             });
         }
         self.sparse.truncate(sparse_len);
@@ -702,7 +706,7 @@ where
 
     pub fn swap_remove_into<F, R>(&mut self, key: K, f: F) -> R
     where
-        F: FnOnce(&V::Context, Option<V::Ptrs<'_>>) -> R,
+        F: FnOnce(&V::Context, Option<Ptrs<'_, V>>) -> R,
     {
         let Self { dense, sparse } = self;
         let context = dense.context();
@@ -742,7 +746,7 @@ where
 
     pub fn remove_into<F, R>(&mut self, key: K, f: F) -> R
     where
-        F: FnOnce(&V::Context, Option<V::Ptrs<'_>>) -> R,
+        F: FnOnce(&V::Context, Option<Ptrs<'_, V>>) -> R,
     {
         let Self { dense, sparse } = self;
         let context = dense.context();
@@ -781,7 +785,7 @@ where
 
     pub fn pop_into<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&V::Context, Option<(K, V::Ptrs<'_>)>) -> R,
+        F: FnOnce(&V::Context, Option<(K, Ptrs<'_, V>)>) -> R,
     {
         let Self { dense, sparse } = self;
 
@@ -881,7 +885,7 @@ where
     #[track_caller]
     pub fn push_from<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&V::Context, K, V::MutPtrs<'_>) -> R,
+        F: FnOnce(&V::Context, K, MutPtrs<'_, V>) -> R,
     {
         self.try_push_from(|context, dst| {
             let (key, dst) = dst.unwrap_or_else(|error| try_insert_failed(error));
@@ -891,7 +895,7 @@ where
 
     pub fn try_push_from<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&V::Context, Result<(K, V::MutPtrs<'_>), TryModifyErrorKind<K>>) -> R,
+        F: FnOnce(&V::Context, Result<(K, MutPtrs<'_, V>), TryModifyErrorKind<K>>) -> R,
     {
         let Self { dense, sparse } = self;
         let context = dense.context();

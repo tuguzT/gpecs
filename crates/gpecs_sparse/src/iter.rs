@@ -14,7 +14,8 @@ use crate::{
 #[repr(transparent)]
 pub struct Keys<'c, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    K: 'c,
+    V: Soa + ?Sized + 'c,
 {
     inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
 }
@@ -229,7 +230,8 @@ impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: Soa {}
 #[repr(transparent)]
 pub struct Values<'c, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    K: 'c,
+    V: Soa + ?Sized + 'c,
 {
     inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
 }
@@ -457,7 +459,8 @@ impl<K, V> FusedIterator for Values<'_, '_, K, V> where V: Soa {}
 #[repr(transparent)]
 pub struct ValuesMut<'c, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    K: 'c,
+    V: Soa + ?Sized + 'c,
 {
     inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>,
 }
@@ -679,7 +682,8 @@ impl<K, V> FusedIterator for ValuesMut<'_, '_, K, V> where V: Soa {}
 
 pub struct Iter<'c, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    K: 'c,
+    V: Soa + ?Sized + 'c,
 {
     inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
 }
@@ -852,7 +856,8 @@ impl<K, V> FusedIterator for Iter<'_, '_, K, V> where V: Soa {}
 
 pub struct IterMut<'c, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    K: 'c,
+    V: Soa + ?Sized + 'c,
 {
     inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>,
 }

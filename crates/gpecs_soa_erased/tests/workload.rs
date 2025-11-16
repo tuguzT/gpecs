@@ -12,7 +12,7 @@ fn new() {
     type Soa = (u8, u64, u16, ());
     type Vec = SoaVec<BoxedErasedSoa>;
 
-    let context = ();
+    let context = Default::default();
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [
@@ -121,7 +121,7 @@ fn with_capacity() {
     type Soa = (u8, u64, u16, ());
     type Vec = SoaVec<BoxedErasedSoa>;
 
-    let context = ();
+    let context = Default::default();
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [
@@ -232,7 +232,7 @@ fn one_item() {
     type Soa = (u8, u64, u16, ());
     type Vec = SoaVec<BoxedErasedSoa>;
 
-    let context = ();
+    let context = Default::default();
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [
@@ -431,7 +431,7 @@ fn three_items() {
     type Soa = (u8, String, u64, ());
     type Vec = SoaVec<BoxedErasedSoa>;
 
-    let context = ();
+    let context = Default::default();
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [

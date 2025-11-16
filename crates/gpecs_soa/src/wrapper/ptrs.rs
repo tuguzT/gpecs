@@ -7,17 +7,17 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::Soa;
+use crate::traits::{Ptrs as Inner, Soa, SoaContext};
 
-/// Type wrapper for [pointers](Soa::Ptrs)
-/// to each field of [`Fields`](Soa::Fields)
+/// Type wrapper for [pointers](SoaContext::Ptrs)
+/// to each field of [`Fields`](SoaContext::Fields)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct Ptrs<'context, T>
 where
     T: Soa + ?Sized,
 {
-    inner: T::Ptrs<'static>,
+    inner: Inner<'static, T>,
     phantom: PhantomData<&'context ()>,
 }
 
@@ -25,45 +25,45 @@ impl<'context, T> Ptrs<'context, T>
 where
     T: Soa + ?Sized,
 {
-    /// Creates self from the [pointers](Soa::Ptrs)
-    /// to each field of [`Fields`](Soa::Fields).
+    /// Creates self from the [pointers](SoaContext::Ptrs)
+    /// to each field of [`Fields`](SoaContext::Fields).
     #[inline]
-    pub fn new(inner: T::Ptrs<'context>) -> Self {
+    pub fn new(inner: Inner<'context, T>) -> Self {
         Self {
-            inner: unsafe { transmute::<T::Ptrs<'_>, T::Ptrs<'_>>(inner) },
+            inner: unsafe { transmute::<Inner<'_, T>, Inner<'_, T>>(inner) },
             phantom: PhantomData,
         }
     }
 
-    /// Retrieves a reference of [pointers](Soa::Ptrs)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// Retrieves a reference of [pointers](SoaContext::Ptrs)
+    /// to each field of [`Fields`](SoaContext::Fields) from self.
     #[inline]
-    pub fn as_inner(&self) -> &T::Ptrs<'_> {
+    pub fn as_inner(&self) -> &Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [pointers](Soa::Ptrs)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// Retrieves a mutable reference of [pointers](SoaContext::Ptrs)
+    /// to each field of [`Fields`](SoaContext::Fields) from self.
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut T::Ptrs<'_> {
+    pub fn as_inner_mut(&mut self) -> &mut Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [pointers](Soa::Ptrs)
-    /// to each field of [`Fields`](Soa::Fields) from self.
+    /// Retrieves the [pointers](SoaContext::Ptrs)
+    /// to each field of [`Fields`](SoaContext::Fields) from self.
     #[inline]
-    pub fn into_inner(self) -> T::Ptrs<'context> {
+    pub fn into_inner(self) -> Inner<'context, T> {
         let Self { inner, .. } = self;
-        T::upcast_ptrs(inner)
+        T::Context::upcast_ptrs(inner)
     }
 }
 
 impl<T> Debug for Ptrs<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: Debug,
+    for<'any> Inner<'any, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -74,7 +74,7 @@ where
 impl<T> Default for Ptrs<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: Default,
+    for<'any> Inner<'any, T>: Default,
 {
     fn default() -> Self {
         Self {
@@ -98,14 +98,14 @@ where
 impl<T> Copy for Ptrs<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: Copy,
+    for<'any> Inner<'any, T>: Copy,
 {
 }
 
 impl<T> PartialEq for Ptrs<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: PartialEq,
+    for<'any> Inner<'any, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -116,14 +116,14 @@ where
 impl<T> Eq for Ptrs<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: Eq,
+    for<'any> Inner<'any, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for Ptrs<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: PartialOrd,
+    for<'any> Inner<'any, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -138,7 +138,7 @@ where
 impl<T> Ord for Ptrs<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: Ord,
+    for<'any> Inner<'any, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -153,7 +153,7 @@ where
 impl<T> Hash for Ptrs<'_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: Hash,
+    for<'any> Inner<'any, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;

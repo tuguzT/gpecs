@@ -4,7 +4,7 @@ use crate::{
     aligned_bytes::{AlignedBytes, AlignedBytesFromLayout},
     soa::{
         field::FieldDescriptor,
-        traits::{Soa, SoaRead, SoaWrite},
+        traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext, SoaRead, SoaWrite},
     },
 };
 
@@ -15,15 +15,13 @@ use super::{
     soa_slice_from_raw_parts, soa_slice_from_raw_parts_mut,
 };
 
-unsafe impl<B, D> Soa for ErasedSoa<B, D>
+unsafe impl<D> SoaContext for ErasedSoaContext<D>
 where
-    B: AlignedBytes + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
-    type Context = ErasedSoaContext<D>;
     type Fields = ErasedSoaFields;
 
-    type FieldDescriptors<'context> = &'context [FieldDescriptor];
+    type FieldDescriptors<'a> = &'a [FieldDescriptor];
 
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -33,11 +31,11 @@ where
     }
 
     #[inline]
-    fn field_descriptors(context: &Self::Context) -> Self::FieldDescriptors<'_> {
-        context.field_descriptors()
+    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+        Self::field_descriptors(self)
     }
 
-    type Ptrs<'context> = ErasedSoaPtrs<&'context [FieldDescriptor]>;
+    type Ptrs<'a> = ErasedSoaPtrs<&'a [FieldDescriptor]>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -45,22 +43,35 @@ where
     }
 
     #[inline]
-    fn ptrs_dangling(context: &Self::Context) -> Self::Ptrs<'_> {
-        let descriptors = context.field_descriptors();
+    fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
+        let descriptors = self.field_descriptors();
         ErasedSoaPtrs::dangling(descriptors)
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer(
-        context: &Self::Context,
-        buffer: *const u8,
-        capacity: usize,
-    ) -> Self::Ptrs<'_> {
-        let descriptors = context.field_descriptors();
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
+        let descriptors = self.field_descriptors();
         unsafe { ErasedSoaPtrs::new(descriptors, buffer, capacity, 0) }
     }
 
-    type MutPtrs<'context> = ErasedSoaMutPtrs<&'context [FieldDescriptor]>;
+    #[inline]
+    unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
+
+        unsafe { ptrs.add(offset) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_offset_from(&self, ptrs: Self::Ptrs<'_>, origin: Self::Ptrs<'_>) -> isize {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
+        debug_assert_descriptors(descriptors, origin.field_descriptors());
+
+        unsafe { ptrs.offset_from(&origin) }
+    }
+
+    type MutPtrs<'a> = ErasedSoaMutPtrs<&'a [FieldDescriptor]>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -68,96 +79,61 @@ where
     }
 
     #[inline]
-    fn ptrs_dangling_mut(context: &Self::Context) -> Self::MutPtrs<'_> {
-        let descriptors = context.field_descriptors();
+    fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
+        let descriptors = self.field_descriptors();
         ErasedSoaMutPtrs::dangling(descriptors)
     }
 
     #[inline]
-    unsafe fn ptrs_from_buffer_mut(
-        context: &Self::Context,
-        buffer: *mut u8,
-        capacity: usize,
-    ) -> Self::MutPtrs<'_> {
-        let descriptors = context.field_descriptors();
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
+        let descriptors = self.field_descriptors();
         unsafe { ErasedSoaMutPtrs::new(descriptors, buffer, capacity, 0) }
     }
 
     #[inline]
-    fn ptrs_cast_const<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-    ) -> Self::Ptrs<'context> {
-        let descriptors = context.field_descriptors();
+    unsafe fn ptrs_add_mut<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
+        offset: usize,
+    ) -> Self::MutPtrs<'a> {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
+
+        unsafe { ptrs.add(offset) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_offset_from_mut(
+        &self,
+        ptrs: Self::MutPtrs<'_>,
+        origin: Self::Ptrs<'_>,
+    ) -> isize {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
+        debug_assert_descriptors(descriptors, origin.field_descriptors());
+
+        unsafe { ptrs.offset_from(&origin) }
+    }
+
+    #[inline]
+    fn ptrs_cast_const<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::Ptrs<'a> {
+        let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
         ptrs.cast_const()
     }
 
     #[inline]
-    fn ptrs_cast_mut<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
-    ) -> Self::MutPtrs<'context> {
-        let descriptors = context.field_descriptors();
+    fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a> {
+        let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
         ptrs.cast_mut()
     }
 
     #[inline]
-    unsafe fn ptrs_add<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
-        offset: usize,
-    ) -> Self::Ptrs<'context> {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
-
-        unsafe { ptrs.add(offset) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_add_mut<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-        offset: usize,
-    ) -> Self::MutPtrs<'context> {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
-
-        unsafe { ptrs.add(offset) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_offset_from(
-        context: &Self::Context,
-        ptrs: Self::Ptrs<'_>,
-        origin: Self::Ptrs<'_>,
-    ) -> isize {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
-        debug_assert_descriptors(descriptors, origin.field_descriptors());
-
-        unsafe { ptrs.offset_from(&origin) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_offset_from_mut(
-        context: &Self::Context,
-        ptrs: Self::MutPtrs<'_>,
-        origin: Self::Ptrs<'_>,
-    ) -> isize {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
-        debug_assert_descriptors(descriptors, origin.field_descriptors());
-
-        unsafe { ptrs.offset_from(&origin) }
-    }
-
-    #[inline]
-    unsafe fn ptrs_swap(context: &Self::Context, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
-        let descriptors = context.field_descriptors();
+    unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
+        let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, a.field_descriptors());
         debug_assert_descriptors(descriptors, b.field_descriptors());
 
@@ -165,13 +141,8 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_copy(
-        context: &Self::Context,
-        src: Self::Ptrs<'_>,
-        dst: Self::MutPtrs<'_>,
-        len: usize,
-    ) {
-        let descriptors = context.field_descriptors();
+    unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+        let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, src.field_descriptors());
         debug_assert_descriptors(descriptors, dst.field_descriptors());
 
@@ -179,13 +150,8 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_copy_rev(
-        context: &Self::Context,
-        src: Self::Ptrs<'_>,
-        dst: Self::MutPtrs<'_>,
-        len: usize,
-    ) {
-        let descriptors = context.field_descriptors();
+    unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+        let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, src.field_descriptors());
         debug_assert_descriptors(descriptors, dst.field_descriptors());
 
@@ -194,12 +160,12 @@ where
 
     #[inline]
     unsafe fn ptrs_copy_nonoverlapping(
-        context: &Self::Context,
+        &self,
         src: Self::Ptrs<'_>,
         dst: Self::MutPtrs<'_>,
         len: usize,
     ) {
-        let descriptors = context.field_descriptors();
+        let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, src.field_descriptors());
         debug_assert_descriptors(descriptors, dst.field_descriptors());
 
@@ -207,11 +173,11 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_drop_in_place(_: &Self::Context, _: Self::MutPtrs<'_>) {
+    unsafe fn ptrs_drop_in_place(&self, _: Self::MutPtrs<'_>) {
         // do nothing; it's safe to not drop anything
     }
 
-    type NonNullPtrs<'context> = ErasedSoaNonNullPtrs<&'context [FieldDescriptor]>;
+    type NonNullPtrs<'a> = ErasedSoaNonNullPtrs<&'a [FieldDescriptor]>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -221,11 +187,8 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_to_nonnull<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-    ) -> Self::NonNullPtrs<'context> {
-        let descriptors = context.field_descriptors();
+    unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
+        let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
         let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
@@ -234,17 +197,117 @@ where
     }
 
     #[inline]
-    fn nonnull_to_ptrs<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::NonNullPtrs<'context>,
-    ) -> Self::MutPtrs<'context> {
-        let descriptors = context.field_descriptors();
+    fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
+        let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
         let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = buffer.as_ptr();
         unsafe { ErasedSoaMutPtrs::new(descriptors, buffer, capacity, offset) }
     }
+
+    type SlicePtrs<'a> = ErasedSoaSlicePtrs<&'a [FieldDescriptor]>;
+
+    #[inline]
+    fn upcast_slice_ptrs<'short, 'long: 'short>(
+        from: Self::SlicePtrs<'long>,
+    ) -> Self::SlicePtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn slice_ptrs_from_raw_parts<'a>(
+        &'a self,
+        ptrs: Self::Ptrs<'a>,
+        len: usize,
+    ) -> Self::SlicePtrs<'a> {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
+
+        soa_slice_from_raw_parts(ptrs, len)
+    }
+
+    #[inline]
+    fn slice_ptrs_len(&self, slices: &Self::SlicePtrs<'_>) -> usize {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, slices.field_descriptors());
+
+        slices.len()
+    }
+
+    #[inline]
+    fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a> {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, slices.field_descriptors());
+
+        slices.into_ptrs()
+    }
+
+    type SliceMutPtrs<'a> = ErasedSoaSliceMutPtrs<&'a [FieldDescriptor]>;
+
+    #[inline]
+    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+        from: Self::SliceMutPtrs<'long>,
+    ) -> Self::SliceMutPtrs<'short> {
+        from
+    }
+
+    #[inline]
+    fn slice_mut_ptrs_from_raw_parts<'a>(
+        &'a self,
+        ptrs: Self::MutPtrs<'a>,
+        len: usize,
+    ) -> Self::SliceMutPtrs<'a> {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
+
+        soa_slice_from_raw_parts_mut(ptrs, len)
+    }
+
+    #[inline]
+    fn slice_mut_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, slices.field_descriptors());
+
+        slices.len()
+    }
+
+    #[inline]
+    fn slice_mut_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, slices.field_descriptors());
+
+        slices.into_mut_ptrs()
+    }
+
+    #[inline]
+    fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a> {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, slices.field_descriptors());
+
+        slices.cast_const()
+    }
+
+    #[inline]
+    fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a> {
+        let descriptors = self.field_descriptors();
+        debug_assert_descriptors(descriptors, slices.field_descriptors());
+
+        slices.cast_mut()
+    }
+
+    #[inline]
+    unsafe fn slices_drop_in_place(&self, _: Self::SliceMutPtrs<'_>) {
+        // do nothing; it's safe to not drop anything
+    }
+}
+
+unsafe impl<B, D> Soa for ErasedSoa<B, D>
+where
+    B: AlignedBytes + ?Sized,
+    D: AsRef<[FieldDescriptor]>,
+{
+    type Context = ErasedSoaContext<D>;
 
     type Refs<'context, 'a>
         = ErasedSoaRefs<'a, &'context [FieldDescriptor]>
@@ -279,7 +342,7 @@ where
     #[inline]
     unsafe fn ptrs_to_refs<'context, 'a>(
         context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
+        ptrs: Ptrs<'context, Self>,
     ) -> Self::Refs<'context, 'a>
     where
         Self: 'a,
@@ -293,7 +356,7 @@ where
     #[inline]
     unsafe fn ptrs_to_refs_mut<'context, 'a>(
         context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
+        ptrs: MutPtrs<'context, Self>,
     ) -> Self::RefsMut<'context, 'a>
     where
         Self: 'a,
@@ -308,7 +371,7 @@ where
     fn refs_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::Refs<'context, 'a>,
-    ) -> Self::Ptrs<'context>
+    ) -> Ptrs<'context, Self>
     where
         Self: 'a,
     {
@@ -322,7 +385,7 @@ where
     fn refs_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
-    ) -> Self::MutPtrs<'context>
+    ) -> MutPtrs<'context, Self>
     where
         Self: 'a,
     {
@@ -373,108 +436,6 @@ where
         value.as_refs_mut()
     }
 
-    type SlicePtrs<'context> = ErasedSoaSlicePtrs<&'context [FieldDescriptor]>;
-
-    #[inline]
-    fn upcast_slice_ptrs<'short, 'long: 'short>(
-        from: Self::SlicePtrs<'long>,
-    ) -> Self::SlicePtrs<'short> {
-        from
-    }
-
-    type SliceMutPtrs<'context> = ErasedSoaSliceMutPtrs<&'context [FieldDescriptor]>;
-
-    #[inline]
-    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
-        from: Self::SliceMutPtrs<'long>,
-    ) -> Self::SliceMutPtrs<'short> {
-        from
-    }
-
-    #[inline]
-    fn slices_from_raw_parts<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::Ptrs<'context>,
-        len: usize,
-    ) -> Self::SlicePtrs<'context> {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
-
-        soa_slice_from_raw_parts(ptrs, len)
-    }
-
-    #[inline]
-    fn slices_from_raw_parts_mut<'context>(
-        context: &'context Self::Context,
-        ptrs: Self::MutPtrs<'context>,
-        len: usize,
-    ) -> Self::SliceMutPtrs<'context> {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, ptrs.field_descriptors());
-
-        soa_slice_from_raw_parts_mut(ptrs, len)
-    }
-
-    #[inline]
-    fn slice_ptrs_cast_const<'context>(
-        context: &'context Self::Context,
-        slices: Self::SliceMutPtrs<'context>,
-    ) -> Self::SlicePtrs<'context> {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, slices.field_descriptors());
-
-        slices.cast_const()
-    }
-
-    #[inline]
-    fn slice_ptrs_cast_mut<'context>(
-        context: &'context Self::Context,
-        slices: Self::SlicePtrs<'context>,
-    ) -> Self::SliceMutPtrs<'context> {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, slices.field_descriptors());
-
-        slices.cast_mut()
-    }
-
-    #[inline]
-    fn slice_ptrs_len(context: &Self::Context, slices: &Self::SlicePtrs<'_>) -> usize {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, slices.field_descriptors());
-
-        slices.len()
-    }
-
-    #[inline]
-    fn slice_mut_ptrs_len(context: &Self::Context, slices: &Self::SliceMutPtrs<'_>) -> usize {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, slices.field_descriptors());
-
-        slices.len()
-    }
-
-    #[inline]
-    fn slice_ptrs_as_ptrs<'context>(
-        context: &'context Self::Context,
-        slices: Self::SlicePtrs<'context>,
-    ) -> Self::Ptrs<'context> {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, slices.field_descriptors());
-
-        slices.into_ptrs()
-    }
-
-    #[inline]
-    fn slice_mut_ptrs_as_ptrs<'context>(
-        context: &'context Self::Context,
-        slices: Self::SliceMutPtrs<'context>,
-    ) -> Self::MutPtrs<'context> {
-        let descriptors = context.field_descriptors();
-        debug_assert_descriptors(descriptors, slices.field_descriptors());
-
-        slices.into_mut_ptrs()
-    }
-
     type Slices<'context, 'a>
         = ErasedSoaSlices<'a, &'context [FieldDescriptor]>
     where
@@ -508,7 +469,7 @@ where
     #[inline]
     unsafe fn slice_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::SlicePtrs<'context>,
+        slices: SlicePtrs<'context, Self>,
     ) -> Self::Slices<'context, 'a>
     where
         Self: 'a,
@@ -522,7 +483,7 @@ where
     #[inline]
     unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
         context: &'context Self::Context,
-        slices: Self::SliceMutPtrs<'context>,
+        slices: SliceMutPtrs<'context, Self>,
     ) -> Self::SlicesMut<'context, 'a>
     where
         Self: 'a,
@@ -559,7 +520,7 @@ where
     fn slices_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, 'a>,
-    ) -> Self::SlicePtrs<'context>
+    ) -> SlicePtrs<'context, Self>
     where
         Self: 'a,
     {
@@ -573,7 +534,7 @@ where
     fn slices_mut_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
-    ) -> Self::SliceMutPtrs<'context>
+    ) -> SliceMutPtrs<'context, Self>
     where
         Self: 'a,
     {
@@ -602,7 +563,7 @@ where
     fn slices_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, 'a>,
-    ) -> Self::Ptrs<'context>
+    ) -> Ptrs<'context, Self>
     where
         Self: 'a,
     {
@@ -616,7 +577,7 @@ where
     fn slices_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
-    ) -> Self::MutPtrs<'context>
+    ) -> MutPtrs<'context, Self>
     where
         Self: 'a,
     {
@@ -624,11 +585,6 @@ where
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
         slices.into_mut_ptrs().into_mut_ptrs()
-    }
-
-    #[inline]
-    unsafe fn slices_drop_in_place(_: &Self::Context, _: Self::SliceMutPtrs<'_>) {
-        // do nothing; it's safe to not drop anything
     }
 }
 
@@ -638,7 +594,7 @@ where
     D: AsRef<[FieldDescriptor]> + Clone,
 {
     #[inline]
-    unsafe fn read(context: &Self::Context, src: Self::Ptrs<'_>) -> Self {
+    unsafe fn read(context: &Self::Context, src: Ptrs<'_, Self>) -> Self {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, src.field_descriptors());
 
@@ -657,7 +613,7 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
-    unsafe fn write(context: &Self::Context, dst: Self::MutPtrs<'_>, value: Self) {
+    unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self) {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, dst.field_descriptors());
         debug_assert_descriptors(descriptors, value.field_descriptors());

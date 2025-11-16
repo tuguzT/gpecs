@@ -3,17 +3,17 @@ use core::{
     mem::{ManuallyDrop, MaybeUninit, offset_of},
 };
 
-use crate::traits::Soa;
+use crate::traits::{Fields, Soa, SoaContext};
 
 /// Special type which is used to properly allocate a buffer in memory
 /// with respect to the size and alignment of
-/// [`Fields`](`Soa::Fields`) and [`Context`](`Soa::Context`) associated types of `T`.
+/// [`Fields`](`SoaContext::Fields`) and [`Context`](`Soa::Context`) associated types.
 pub union BufferData<T>
 where
     T: Soa + ?Sized,
 {
     _align: ManuallyDrop<BufferAlign<T>>,
-    _fields: ManuallyDrop<MaybeUninit<T::Fields>>,
+    _fields: ManuallyDrop<MaybeUninit<Fields<T>>>,
     _context: ManuallyDrop<MaybeUninit<T::Context>>,
 }
 
@@ -33,11 +33,12 @@ pub fn is_zst<T>(context: &T::Context) -> bool
 where
     T: Soa + ?Sized,
 {
-    let packed_size = T::field_descriptors(context)
+    let packed_size = context
+        .field_descriptors()
         .into_iter()
         .map(|desc| desc.as_ref().layout().size())
         .sum::<usize>();
-    size_of::<T::Fields>() == 0 || packed_size == 0
+    size_of::<Fields<T>>() == 0 || packed_size == 0
 }
 
 #[inline]
@@ -107,7 +108,7 @@ struct BufferAlign<T>
 where
     T: Soa + ?Sized,
 {
-    _fields: [T::Fields; 0],
+    _fields: [Fields<T>; 0],
     _context: [T::Context; 0],
     _len: [usize; 0],
     _capacity: [usize; 0],
@@ -151,7 +152,7 @@ where
         return Ok(Layout::new::<BufferPrefix<T>>());
     }
 
-    let layout = T::buffer_layout(context, capacity)?;
+    let layout = context.buffer_layout(capacity)?;
     let prefix_layout = Layout::new::<BufferPrefix<T>>();
     let (layout, _) = prefix_layout.extend(layout)?;
 
@@ -171,7 +172,7 @@ where
     let size = buffer_layout.size() - size_of_prefix;
     let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
         .expect("layout size should not exceed `isize::MAX`");
-    T::capacity_from(context, buffer_layout)
+    context.capacity_from(buffer_layout)
 }
 
 #[cfg(test)]

@@ -1,4 +1,7 @@
-use crate::soa::{field::FieldDescriptor, traits::Soa};
+use crate::soa::{
+    field::FieldDescriptor,
+    traits::{Soa, SoaContext},
+};
 
 #[cfg(feature = "alloc")]
 pub type BoxedErasedSoaContext = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>>;
@@ -41,8 +44,7 @@ where
     where
         T: Soa + ?Sized,
     {
-        let descriptors = T::field_descriptors(context);
-        descriptors.into_iter().collect()
+        context.field_descriptors().into_iter().collect()
     }
 }
 

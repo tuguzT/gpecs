@@ -13,8 +13,8 @@ use crate::{
         index::{IndexHelper, IndexHelperMut, SoaSliceIndex},
         iter::{Iter, IterMut},
     },
-    traits::{Soa, SoaToOwned},
-    wrapper::{MutPtrs, Ptrs},
+    traits::{Fields, MutPtrs, Ptrs, Soa, SoaContext, SoaToOwned},
+    wrapper::{MutPtrs as MutPtrsWrapper, Ptrs as PtrsWrapper},
 };
 
 pub struct SoaSlices<'c, 'a, T>
@@ -22,7 +22,7 @@ where
     T: Soa + ?Sized + 'a,
 {
     context: &'c T::Context,
-    ptrs: Ptrs<'c, T>,
+    ptrs: PtrsWrapper<'c, T>,
     len: usize,
     phantom: PhantomData<&'a ()>,
 }
@@ -36,8 +36,8 @@ where
         let slices = T::slices_as_slice_ptrs(context, slices);
         Self {
             context,
-            len: T::slice_ptrs_len(context, &slices),
-            ptrs: Ptrs::new(T::slice_ptrs_as_ptrs(context, slices)),
+            len: context.slice_ptrs_len(&slices),
+            ptrs: PtrsWrapper::new(context.slice_ptrs_as_ptrs(slices)),
             phantom: PhantomData,
         }
     }
@@ -70,7 +70,7 @@ where
         let Self { context, len, .. } = *self;
 
         let ptrs = self.as_ptrs();
-        let slices = T::slices_from_raw_parts(context, ptrs, len);
+        let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -87,19 +87,19 @@ where
             context, ptrs, len, ..
         } = self;
 
-        let slices = T::slices_from_raw_parts(context, ptrs.into_inner(), len);
+        let slices = context.slice_ptrs_from_raw_parts(ptrs.into_inner(), len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> T::Ptrs<'_> {
+    pub fn as_ptrs(&self) -> Ptrs<'_, T> {
         let Self { ptrs, .. } = self;
         ptrs.clone().into_inner()
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'c T::Context, T::Ptrs<'c>, usize) {
+    pub fn into_parts(self) -> (&'c T::Context, Ptrs<'c, T>, usize) {
         let Self {
             context, ptrs, len, ..
         } = self;
@@ -107,8 +107,8 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_parts(context: &'c T::Context, ptrs: T::Ptrs<'c>, len: usize) -> Self {
-        let ptrs = Ptrs::new(ptrs);
+    pub unsafe fn from_parts(context: &'c T::Context, ptrs: Ptrs<'c, T>, len: usize) -> Self {
+        let ptrs = PtrsWrapper::new(ptrs);
         Self {
             context,
             ptrs,
@@ -270,7 +270,7 @@ where
 {
     #[inline]
     fn from(context: &'c T::Context) -> Self {
-        let ptrs = T::ptrs_dangling(context);
+        let ptrs = context.ptrs_dangling();
         unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }
@@ -363,7 +363,7 @@ where
 impl<T> Copy for SoaSlices<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Ptrs<'any>: Copy,
+    for<'any> Ptrs<'any, T>: Copy,
 {
 }
 
@@ -410,16 +410,16 @@ where
 unsafe impl<T> Send for SoaSlices<'_, '_, T>
 where
     T: Soa + ?Sized,
-    T::Fields: Send,
     T::Context: Send,
+    Fields<T>: Send,
 {
 }
 
 unsafe impl<T> Sync for SoaSlices<'_, '_, T>
 where
     T: Soa + ?Sized,
-    T::Fields: Sync,
     T::Context: Sync,
+    Fields<T>: Sync,
 {
 }
 
@@ -428,7 +428,7 @@ where
     T: Soa + ?Sized + 'a,
 {
     context: &'c T::Context,
-    ptrs: MutPtrs<'c, T>,
+    ptrs: MutPtrsWrapper<'c, T>,
     len: usize,
     phantom: PhantomData<&'a ()>,
 }
@@ -442,8 +442,8 @@ where
         let slices = T::slices_mut_as_slice_ptrs(context, slices);
         Self {
             context,
-            len: T::slice_mut_ptrs_len(context, &slices),
-            ptrs: MutPtrs::new(T::slice_mut_ptrs_as_ptrs(context, slices)),
+            len: context.slice_mut_ptrs_len(&slices),
+            ptrs: MutPtrsWrapper::new(context.slice_mut_ptrs_as_ptrs(slices)),
             phantom: PhantomData,
         }
     }
@@ -476,7 +476,7 @@ where
         let Self { context, len, .. } = *self;
 
         let ptrs = self.as_ptrs();
-        let slices = T::slices_from_raw_parts(context, ptrs, len);
+        let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -492,7 +492,7 @@ where
         let Self { context, len, .. } = *self;
 
         let ptrs = self.as_mut_ptrs();
-        let slices = T::slices_from_raw_parts_mut(context, ptrs, len);
+        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
         let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         (context, slices)
     }
@@ -509,21 +509,21 @@ where
             context, ptrs, len, ..
         } = self;
 
-        let slices = T::slices_from_raw_parts_mut(context, ptrs.into_inner(), len);
+        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs.into_inner(), len);
         let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         (context, slices)
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> T::Ptrs<'_> {
+    pub fn as_ptrs(&self) -> Ptrs<'_, T> {
         let Self {
             context, ref ptrs, ..
         } = *self;
-        T::ptrs_cast_const(context, ptrs.clone().into_inner())
+        context.ptrs_cast_const(ptrs.clone().into_inner())
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> T::MutPtrs<'_> {
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, T> {
         let Self { ptrs, .. } = self;
         ptrs.clone().into_inner()
     }
@@ -545,7 +545,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'c T::Context, T::MutPtrs<'c>, usize) {
+    pub fn into_parts(self) -> (&'c T::Context, MutPtrs<'c, T>, usize) {
         let Self {
             context, ptrs, len, ..
         } = self;
@@ -553,8 +553,8 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_parts(context: &'c T::Context, ptrs: T::MutPtrs<'c>, len: usize) -> Self {
-        let ptrs = MutPtrs::new(ptrs);
+    pub unsafe fn from_parts(context: &'c T::Context, ptrs: MutPtrs<'c, T>, len: usize) -> Self {
+        let ptrs = MutPtrsWrapper::new(ptrs);
         Self {
             context,
             ptrs,
@@ -866,7 +866,7 @@ where
             unsafe {
                 let (context, dst) = self.get_unchecked_mut_with_context(index);
                 let src = T::ptrs_to_refs(context, src.get_unchecked(index));
-                T::ptrs_drop_in_place(context, dst.clone());
+                context.ptrs_drop_in_place(dst.clone());
                 src.clone_into_ptrs(context, dst);
             }
         }
@@ -876,7 +876,7 @@ where
     #[track_caller]
     pub fn copy_from_slices(&mut self, src: &SoaSlices<T>)
     where
-        T::Fields: Copy,
+        Fields<T>: Copy,
     {
         let len = self.len();
         if len != src.len() {
@@ -888,7 +888,7 @@ where
         // mutable references are exclusive.
         let Self { context, .. } = *self;
         let dst = self.as_mut_ptrs();
-        unsafe { T::ptrs_copy_nonoverlapping(context, src.as_ptrs(), dst, len) }
+        unsafe { context.ptrs_copy_nonoverlapping(src.as_ptrs(), dst, len) }
     }
 
     #[inline]
@@ -908,7 +908,7 @@ where
         unsafe {
             let a = SoaSliceIndex::<T>::get_unchecked_mut(a, context, slices.clone());
             let b = SoaSliceIndex::<T>::get_unchecked_mut(b, context, slices);
-            T::ptrs_swap(context, a, b);
+            context.ptrs_swap(a, b);
         }
     }
 
@@ -931,11 +931,11 @@ where
             let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_unstable_by(|&a, &b| {
                 let a = unsafe {
-                    let ptrs = T::ptrs_add(context, ptrs.clone(), a);
+                    let ptrs = context.ptrs_add(ptrs.clone(), a);
                     T::ptrs_to_refs(context, ptrs)
                 };
                 let b = unsafe {
-                    let ptrs = T::ptrs_add(context, ptrs.clone(), b);
+                    let ptrs = context.ptrs_add(ptrs.clone(), b);
                     T::ptrs_to_refs(context, ptrs)
                 };
                 compare(a, b)
@@ -953,7 +953,7 @@ where
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_unstable_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add(context, ptrs.clone(), index);
+                let ptrs = context.ptrs_add(ptrs.clone(), index);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
             });
@@ -1012,7 +1012,7 @@ where
     fn from(slices: SoaSlicesMut<'c, 'a, T>) -> Self {
         let (context, ptrs, len) = slices.into_parts();
 
-        let ptrs = T::ptrs_cast_const(context, ptrs);
+        let ptrs = context.ptrs_cast_const(ptrs);
         unsafe { Self::from_parts(context, ptrs, len) }
     }
 }
@@ -1023,7 +1023,7 @@ where
 {
     #[inline]
     fn from(context: &'c T::Context) -> Self {
-        let ptrs = T::ptrs_dangling_mut(context);
+        let ptrs = context.ptrs_dangling_mut();
         unsafe { Self::from_parts(context, ptrs, 0) }
     }
 }
@@ -1182,15 +1182,15 @@ where
 unsafe impl<T> Send for SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
-    T::Fields: Send,
     T::Context: Send,
+    Fields<T>: Send,
 {
 }
 
 unsafe impl<T> Sync for SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
-    T::Fields: Sync,
     T::Context: Sync,
+    Fields<T>: Sync,
 {
 }

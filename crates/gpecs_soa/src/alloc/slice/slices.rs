@@ -4,7 +4,7 @@ use core_alloc::boxed::Box;
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
     slice::{SoaSlices, SoaSlicesMut},
-    traits::{Soa, SoaToOwned},
+    traits::{Soa, SoaContext, SoaToOwned},
     vec::SoaVec,
 };
 
@@ -32,7 +32,7 @@ where
             for (index, refs) in self.iter().enumerate() {
                 set_len_on_drop.local_len = index;
 
-                let dst = unsafe { T::ptrs_add_mut(context, ptrs.clone(), index) };
+                let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
                 unsafe { refs.clone_into_ptrs(context, dst) }
             }
         }
@@ -96,11 +96,11 @@ where
             let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_by(|&a, &b| {
                 let a = unsafe {
-                    let ptrs = T::ptrs_add(context, ptrs.clone(), a);
+                    let ptrs = context.ptrs_add(ptrs.clone(), a);
                     T::ptrs_to_refs(context, ptrs)
                 };
                 let b = unsafe {
-                    let ptrs = T::ptrs_add(context, ptrs.clone(), b);
+                    let ptrs = context.ptrs_add(ptrs.clone(), b);
                     T::ptrs_to_refs(context, ptrs)
                 };
                 compare(a, b)
@@ -128,7 +128,7 @@ where
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_by_key(|&index| unsafe {
-                let ptrs = T::ptrs_add(context, ptrs.clone(), index);
+                let ptrs = context.ptrs_add(ptrs.clone(), index);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
             });
@@ -155,7 +155,7 @@ where
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = me.slices().into_parts();
             permutation.sort_by_cached_key(|&index| unsafe {
-                let ptrs = T::ptrs_add(context, ptrs.clone(), index);
+                let ptrs = context.ptrs_add(ptrs.clone(), index);
                 let refs = T::ptrs_to_refs(context, ptrs);
                 f(refs)
             });

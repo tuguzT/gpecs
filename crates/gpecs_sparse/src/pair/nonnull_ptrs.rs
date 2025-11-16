@@ -7,7 +7,10 @@ use core::{
 
 use crate::{
     pair::{KeyValueMutPtrs, KeyValuePtrs},
-    soa::{traits::Soa, wrapper::NonNullPtrs},
+    soa::{
+        traits::{Soa, SoaContext},
+        wrapper::NonNullPtrs,
+    },
 };
 
 pub struct KeyValueNonNullPtrs<'context, K, V>
@@ -30,7 +33,7 @@ where
         let KeyValueMutPtrs { key, value } = ptrs;
 
         let key = unsafe { NonNull::new_unchecked(key) };
-        let value = NonNullPtrs::new(unsafe { V::ptrs_to_nonnull(context, value.into_inner()) });
+        let value = NonNullPtrs::new(unsafe { context.ptrs_to_nonnull(value.into_inner()) });
         Self { key, value }
     }
 
@@ -39,8 +42,8 @@ where
         let Self { key, value } = self;
 
         let key = key.as_ptr().cast_const();
-        let value = V::nonnull_to_ptrs(context, value.into_inner());
-        let value = V::ptrs_cast_const(context, value);
+        let value = context.nonnull_to_ptrs(value.into_inner());
+        let value = context.ptrs_cast_const(value);
         KeyValuePtrs::new(key, value)
     }
 
@@ -49,7 +52,7 @@ where
         let Self { key, value } = self;
 
         let key = key.as_ptr();
-        let value = V::nonnull_to_ptrs(context, value.into_inner());
+        let value = context.nonnull_to_ptrs(value.into_inner());
         KeyValueMutPtrs::new(key, value)
     }
 }

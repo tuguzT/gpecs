@@ -15,7 +15,7 @@ use crate::{
     layout::{BufferData, buffer_layout, capacity_from, is_zst, should_allocate},
     ptr::{BufferDataPtr, BufferDataPtrMut, ptrs_from_buffer_mut, slice_from_raw_parts_mut},
     slice::SoaSlice,
-    traits::{Soa, SoaTrustedFields},
+    traits::{Fields, MutPtrs, NonNullPtrs, Soa, SoaContext, SoaTrustedFields},
 };
 
 use self::TryReserveErrorKind::{AllocError, CapacityOverflow};
@@ -114,7 +114,7 @@ where
 
         let buffer_layout = Layout::from_size_align(SIZE, align_of::<BufferData<T>>())
             .expect("layout size should not exceed `isize::MAX`");
-        match T::capacity_from(context, buffer_layout) {
+        match context.capacity_from(buffer_layout) {
             SIZE => 8,
             4.. => 4,
             _ => 1,
@@ -256,7 +256,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&self) -> T::MutPtrs<'_> {
+    pub fn as_mut_ptrs(&self) -> MutPtrs<'_, T> {
         let ptr = self.as_mut_ptr();
         let context = self.context();
         let capacity = self.capacity();
@@ -265,10 +265,10 @@ where
 
     #[inline]
     #[expect(dead_code)]
-    pub fn as_nonnull_ptrs(&self) -> T::NonNullPtrs<'_> {
+    pub fn as_nonnull_ptrs(&self) -> NonNullPtrs<'_, T> {
         let ptrs = self.as_mut_ptrs();
         let context = self.context();
-        unsafe { T::ptrs_to_nonnull(context, ptrs) }
+        unsafe { context.ptrs_to_nonnull(ptrs) }
     }
 
     #[inline]
@@ -470,16 +470,16 @@ where
 unsafe impl<T> Send for RawSoaVec<T>
 where
     T: Soa + ?Sized,
-    T::Fields: Send,
     T::Context: Send,
+    Fields<T>: Send,
 {
 }
 
 unsafe impl<T> Sync for RawSoaVec<T>
 where
     T: Soa + ?Sized,
-    T::Fields: Sync,
     T::Context: Sync,
+    Fields<T>: Sync,
 {
 }
 

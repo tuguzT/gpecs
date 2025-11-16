@@ -14,7 +14,7 @@ use crate::{
     soa::{
         field::{FieldDescriptor, buffer_layout},
         slice::range,
-        traits::Soa,
+        traits::{Soa, SoaContext},
     },
 };
 
@@ -126,7 +126,8 @@ where
         } = self;
         let descriptors = descriptors.as_ref();
 
-        let result = T::field_descriptors(context)
+        let result = context
+            .field_descriptors()
             .into_iter()
             .zip(&self)
             .try_fold(0, |len, (desc, slice)| {
@@ -141,13 +142,11 @@ where
             return Err(ErasedSoaIntoValueError::new(self, error));
         }
 
-        unsafe {
-            let ptrs = T::ptrs_from_buffer(context, buffer, capacity);
-            let ptrs = T::ptrs_add(context, ptrs, start);
-            let slices = T::slices_from_raw_parts(context, ptrs, (start..end).len());
-            let slices = T::slice_ptrs_to_slices(context, slices);
-            Ok(slices)
-        }
+        let ptrs = unsafe { context.ptrs_from_buffer(buffer, capacity) };
+        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        let slices = context.slice_ptrs_from_raw_parts(ptrs, (start..end).len());
+        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        Ok(slices)
     }
 }
 

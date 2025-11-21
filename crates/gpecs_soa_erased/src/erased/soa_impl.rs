@@ -19,8 +19,6 @@ unsafe impl<D> SoaContext for ErasedSoaContext<D>
 where
     D: AsRef<[FieldDescriptor]>,
 {
-    type Fields = ErasedSoaFields;
-
     type FieldDescriptors<'a> = &'a [FieldDescriptor];
 
     #[inline]
@@ -308,6 +306,8 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     type Context = ErasedSoaContext<D>;
+
+    type Fields = ErasedSoaFields;
 
     type Refs<'context, 'a>
         = ErasedSoaRefs<'a, &'context [FieldDescriptor]>

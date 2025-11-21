@@ -15,7 +15,7 @@ use crate::{
     layout::{BufferData, buffer_layout, capacity_from, is_zst, should_allocate},
     ptr::{BufferDataPtr, BufferDataPtrMut, ptrs_from_buffer_mut, slice_from_raw_parts_mut},
     slice::SoaSlice,
-    traits::{Fields, MutPtrs, NonNullPtrs, Soa, SoaContext, SoaTrustedFields},
+    traits::{MutPtrs, NonNullPtrs, Soa, SoaContext, SoaTrustedFields},
 };
 
 use self::TryReserveErrorKind::{AllocError, CapacityOverflow};
@@ -471,7 +471,7 @@ unsafe impl<T> Send for RawSoaVec<T>
 where
     T: Soa + ?Sized,
     T::Context: Send,
-    Fields<T>: Send,
+    T::Fields: Send,
 {
 }
 
@@ -479,7 +479,7 @@ unsafe impl<T> Sync for RawSoaVec<T>
 where
     T: Soa + ?Sized,
     T::Context: Sync,
-    Fields<T>: Sync,
+    T::Fields: Sync,
 {
 }
 

@@ -12,7 +12,7 @@ use crate::{
         SoaSlicePtr, ptrs_from_buffer, ptrs_from_buffer_mut, slice_from_raw_parts,
         slice_from_raw_parts_mut,
     },
-    traits::{Fields, MutPtrs, Ptrs, SoaContext, SoaToOwned, SoaTrustedFields},
+    traits::{MutPtrs, Ptrs, SoaContext, SoaToOwned, SoaTrustedFields},
 };
 
 use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, SoaSlices, SoaSlicesMut};
@@ -166,7 +166,7 @@ where
     #[track_caller]
     pub fn copy_from_slice(&mut self, src: &Self)
     where
-        Fields<T>: Copy,
+        T::Fields: Copy,
     {
         let src = src.slices();
         self.slices_mut().copy_from_slices(&src);
@@ -476,7 +476,7 @@ unsafe impl<T> Send for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
     T::Context: Send,
-    Fields<T>: Send,
+    T::Fields: Send,
 {
 }
 
@@ -484,7 +484,7 @@ unsafe impl<T> Sync for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
     T::Context: Sync,
-    Fields<T>: Sync,
+    T::Fields: Sync,
 {
 }
 

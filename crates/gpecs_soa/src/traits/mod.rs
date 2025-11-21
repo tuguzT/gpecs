@@ -8,19 +8,7 @@ pub use self::impls::TupleContext;
 pub mod impls;
 
 /// This trait is used to perform all memory operations & pointer arithmetics for [`SoA`](Soa) types.
-///
-/// Most of the time, this should be zero-sized type.
-/// This is true for all the [`SoA`](Soa) types with stored fields' size and alignment known at compile-time.
 pub unsafe trait SoaContext {
-    /// Special type containing all the fields which are stored inside of a buffer.
-    ///
-    /// This type is used to define implementations of [`Copy`], [`Send`], [`Sync`]
-    /// and other traits for [`SoA`](Soa) containers.
-    ///
-    /// Most of the time, this should be the same type which implements [`Soa`] trait.
-    /// This is true for such implementations which store all the fields of self.
-    type Fields;
-
     /// Non-empty collection of [descriptors](FieldDescriptor) for each stored field.
     ///
     /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
@@ -344,10 +332,6 @@ pub unsafe trait SoaContext {
     }
 }
 
-/// Alias for the [`Fields`](SoaContext::Fields) associated type
-/// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type Fields<T> = <<T as Soa>::Context as SoaContext>::Fields;
-
 /// Alias for the [`FieldDescriptors`](SoaContext::FieldDescriptors) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
 pub type FieldDescriptors<'a, T> = <<T as Soa>::Context as SoaContext>::FieldDescriptors<'a>;
@@ -376,16 +360,28 @@ pub type SliceMutPtrs<'a, T> = <<T as Soa>::Context as SoaContext>::SliceMutPtrs
 /// in the context of Structure of Arrays pattern.
 pub unsafe trait Soa {
     /// Type of [`SoA` context](SoaContext).
+    ///
+    /// Most of the time, this should be zero-sized type.
+    /// This is true for all the [`SoA`](Soa) types with stored fields' size and alignment known at compile-time.
     type Context: SoaContext;
 
-    /// Non-empty collection of references to each field of [`Fields`](SoaContext::Fields).
+    /// Special type containing all the fields which are stored inside of a buffer.
+    ///
+    /// This type is used to define implementations of [`Copy`], [`Send`], [`Sync`]
+    /// and other traits for [`SoA`](Soa) containers.
+    ///
+    /// Most of the time, this should be just `Self`.
+    /// This is true for such implementations which store all the fields of self.
+    type Fields;
+
+    /// Non-empty collection of references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
     type Refs<'context, 'a>
     where
         Self: 'a;
 
-    /// Restricts [references](Soa::Refs) to each field of [`Fields`](SoaContext::Fields)
+    /// Restricts [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over generic lifetimes.
     fn upcast_refs<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::Refs<'long, 'a_long>,
@@ -393,14 +389,14 @@ pub unsafe trait Soa {
     where
         Self: 'a_long;
 
-    /// Non-empty collection of mutable references to each field of [`Fields`](SoaContext::Fields).
+    /// Non-empty collection of mutable references to each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
     type RefsMut<'context, 'a>
     where
         Self: 'a;
 
-    /// Restricts [mutable references](Soa::RefsMut) to each field of [`Fields`](SoaContext::Fields)
+    /// Restricts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over generic lifetimes.
     fn upcast_refs_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::RefsMut<'long, 'a_long>,
@@ -408,7 +404,7 @@ pub unsafe trait Soa {
     where
         Self: 'a_long;
 
-    /// Converts [pointers](SoaContext::Ptrs) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [pointers](SoaContext::Ptrs) to each field of [`Fields`](Soa::Fields)
     /// to their [references](Soa::Refs) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
@@ -420,7 +416,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [mutable pointers](SoaContext::MutPtrs) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [mutable pointers](SoaContext::MutPtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable references](Soa::RefsMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
@@ -432,7 +428,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [references](Soa::Refs) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
     /// to their [pointers](SoaContext::Ptrs) by taking the pointer of each one of them.
     fn refs_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
@@ -441,7 +437,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable pointers](SoaContext::MutPtrs) by taking the pointer of each one of them.
     fn refs_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
@@ -450,7 +446,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
     /// to their [references](Soa::Refs) by explicitly converting each one of them via `&*` operator combination.
     fn refs_mut_as_refs<'context, 'a>(
         context: &'context Self::Context,
@@ -459,13 +455,13 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Retrieves [references](Soa::Refs) to each field of [`Fields`](SoaContext::Fields)
+    /// Retrieves [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
     /// from a given value reference by taking the reference of each one of them.
     fn value_as_refs<'a>(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a, 'a>
     where
         Self: 'a;
 
-    /// Retrieves [mutable references](Soa::RefsMut) to each field of [`Fields`](SoaContext::Fields)
+    /// Retrieves [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
     /// from a given mutable value reference by taking the mutable reference of each one of them.
     fn mut_value_as_refs<'a>(
         context: &'a Self::Context,
@@ -474,14 +470,14 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Non-empty collection of slices of each field of [`Fields`](SoaContext::Fields).
+    /// Non-empty collection of slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
     type Slices<'context, 'a>
     where
         Self: 'a;
 
-    /// Restricts [slices](Soa::Slices) to each field of [`Fields`](SoaContext::Fields)
+    /// Restricts [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over generic lifetimes.
     fn upcast_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::Slices<'long, 'a_long>,
@@ -489,14 +485,14 @@ pub unsafe trait Soa {
     where
         Self: 'a_long;
 
-    /// Non-empty collection of mutable slices of each field of [`Fields`](SoaContext::Fields).
+    /// Non-empty collection of mutable slices of each field of [`Fields`](Soa::Fields).
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
     type SlicesMut<'context, 'a>
     where
         Self: 'a;
 
-    /// Restricts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](SoaContext::Fields)
+    /// Restricts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
     /// to be covariant over generic lifetimes.
     fn upcast_slices_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::SlicesMut<'long, 'a_long>,
@@ -504,7 +500,7 @@ pub unsafe trait Soa {
     where
         Self: 'a_long;
 
-    /// Converts [slice pointers](SoaContext::SlicePtrs) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [slice pointers](SoaContext::SlicePtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [slices](Soa::Slices) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each slice pointer
@@ -516,7 +512,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [mutable slice pointers](SoaContext::SliceMutPtrs) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [mutable slice pointers](SoaContext::SliceMutPtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable slices](Soa::SlicesMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
@@ -528,7 +524,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Returns the number of elements in [slices](Soa::Slices) to each field of [`Fields`](SoaContext::Fields),
+    /// Returns the number of elements in [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields),
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the slices,
@@ -537,7 +533,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Returns the number of elements in [mutable slices](Soa::SlicesMut) to each field of [`Fields`](SoaContext::Fields),
+    /// Returns the number of elements in [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields),
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the mutable slices,
@@ -546,7 +542,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [slices](Soa::Slices) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields)
     /// to their [slice pointers](SoaContext::SlicePtrs) by taking the pointer of each one of them.
     fn slices_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
@@ -555,7 +551,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable slice pointers](SoaContext::SliceMutPtrs) by taking the pointer of each one of them.
     fn slices_mut_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
@@ -564,7 +560,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](SoaContext::Fields)
+    /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
     /// to their [slices](Soa::Slices) by explicitly converting each one of them via `&*` operator combination.
     fn slices_mut_as_slices<'context, 'a>(
         context: &'context Self::Context,
@@ -574,7 +570,7 @@ pub unsafe trait Soa {
         Self: 'a;
 
     /// Returns [pointers](SoaContext::Ptrs) to the slice's buffer
-    /// of each [slice](Soa::Slices) of [`Fields`](SoaContext::Fields).
+    /// of each [slice](Soa::Slices) of [`Fields`](Soa::Fields).
     fn slices_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, 'a>,
@@ -583,7 +579,7 @@ pub unsafe trait Soa {
         Self: 'a;
 
     /// Returns [mutable pointers](SoaContext::MutPtrs) to the slice's buffer
-    /// of each [mutable slice](Soa::SlicesMut) of [`Fields`](SoaContext::Fields).
+    /// of each [mutable slice](Soa::SlicesMut) of [`Fields`](Soa::Fields).
     fn slices_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
@@ -603,7 +599,7 @@ pub unsafe trait SoaRead: Soa + Sized {
 }
 
 pub unsafe trait SoaWrite: Soa + Sized {
-    /// Overwrites a memory [location](SoaContext::MutPtrs) of each field of [`Fields`](SoaContext::Fields)
+    /// Overwrites a memory [location](SoaContext::MutPtrs) of each field of [`Fields`](Soa::Fields)
     /// with the given value without reading or dropping the old value.
     ///
     /// All the safety requirements resulting from applying
@@ -623,11 +619,11 @@ pub trait SoaToOwned<'context, 'a> {
     type Owned: SoaWrite<Refs<'context, 'a> = Self> + 'a;
 
     /// Creates owned data from borrowed data,
-    /// usually by cloning each field of [`Fields`](SoaContext::Fields).
+    /// usually by cloning each field of [`Fields`](Soa::Fields).
     fn to_owned(&self, context: &<Self::Owned as Soa>::Context) -> Self::Owned;
 
     /// Uses borrowed data to replace owned data,
-    /// usually by cloning each field of [`Fields`](SoaContext::Fields).
+    /// usually by cloning each field of [`Fields`](Soa::Fields).
     ///
     /// This is borrow-generalized version of [`Clone::clone_from()`].
     fn clone_into(&self, context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
@@ -635,7 +631,7 @@ pub trait SoaToOwned<'context, 'a> {
     }
 
     /// Uses borrowed data to replace owned data located by `target` [pointers](SoaContext::MutPtrs),
-    /// usually by cloning each field of [`Fields`](SoaContext::Fields).
+    /// usually by cloning each field of [`Fields`](Soa::Fields).
     unsafe fn clone_into_ptrs(
         &self,
         context: &<Self::Owned as Soa>::Context,
@@ -646,7 +642,7 @@ pub trait SoaToOwned<'context, 'a> {
     }
 
     /// Uses borrowed data to replace owned data located by `target` [references](Soa::RefsMut),
-    /// usually by cloning each field of [`Fields`](SoaContext::Fields).
+    /// usually by cloning each field of [`Fields`](Soa::Fields).
     fn clone_into_refs<'c>(
         &self,
         context: &'c <Self::Owned as Soa>::Context,
@@ -658,11 +654,11 @@ pub trait SoaToOwned<'context, 'a> {
 }
 
 /// Marker trait which places additional safety requirements
-/// on the [`Fields`](SoaContext::Fields) associated type of [`Soa`] trait implementations.
+/// on the [`Fields`](Soa::Fields) associated type of [`Soa`] trait implementations.
 ///
 /// These safety requirements are:
 /// - sum of layouts' sizes of [`FieldDescriptors`](SoaContext::FieldDescriptors)
-///   should be less or equal to the size of [`Fields`](SoaContext::Fields)
+///   should be less or equal to the size of [`Fields`](Soa::Fields)
 /// - alignment of each layout of [`FieldDescriptors`](SoaContext::FieldDescriptors)
-///   should be less or equal to the alignment of [`Fields`](SoaContext::Fields)
+///   should be less or equal to the alignment of [`Fields`](Soa::Fields)
 pub unsafe trait SoaTrustedFields: Soa {}

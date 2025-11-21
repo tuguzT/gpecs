@@ -315,8 +315,6 @@ impl<T> Hash for IdentityContext<T> {
 }
 
 unsafe impl<T> SoaContext for IdentityContext<T> {
-    type Fields = Identity<T>;
-
     type FieldDescriptors<'a> = [FieldDescriptor; 1];
 
     #[inline]
@@ -543,6 +541,8 @@ unsafe impl<T> SoaContext for IdentityContext<T> {
 
 unsafe impl<T> Soa for Identity<T> {
     type Context = IdentityContext<T>;
+
+    type Fields = Identity<T>;
 
     type Refs<'context, 'a>
         = &'a Self

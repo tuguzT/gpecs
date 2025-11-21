@@ -31,8 +31,6 @@ pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
 }
 
 unsafe impl SoaContext for () {
-    type Fields = ();
-
     type FieldDescriptors<'a> = [FieldDescriptor; 1];
 
     #[inline]
@@ -254,6 +252,8 @@ unsafe impl SoaContext for () {
 
 unsafe impl Soa for () {
     type Context = ();
+
+    type Fields = ();
 
     type Refs<'context, 'a>
         = &'a Self
@@ -626,8 +626,6 @@ macro_rules! soa_tuple_impl {
         }
 
         unsafe impl<$($types,)*> super::SoaContext for TupleContext<($($types,)*)> {
-            type Fields = ($($types,)*);
-
             type FieldDescriptors<'a> = [FieldDescriptor; count_idents!($($types,)*)];
 
             #[inline]
@@ -914,6 +912,8 @@ macro_rules! soa_tuple_impl {
 
         unsafe impl<$($types,)*> Soa for ($($types,)*) {
             type Context = TupleContext<($($types,)*)>;
+
+            type Fields = ($($types,)*);
 
             type Refs<'context, 'a>
                 = ($(&'a $types,)*)

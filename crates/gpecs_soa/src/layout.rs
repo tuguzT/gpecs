@@ -3,17 +3,17 @@ use core::{
     mem::{ManuallyDrop, MaybeUninit, offset_of},
 };
 
-use crate::traits::{Fields, Soa, SoaContext};
+use crate::traits::{Soa, SoaContext};
 
 /// Special type which is used to properly allocate a buffer in memory
 /// with respect to the size and alignment of
-/// [`Fields`](`SoaContext::Fields`) and [`Context`](`Soa::Context`) associated types.
+/// [`Fields`](`Soa::Fields`) and [`Context`](`Soa::Context`) associated types.
 pub union BufferData<T>
 where
     T: Soa + ?Sized,
 {
     _align: ManuallyDrop<BufferAlign<T>>,
-    _fields: ManuallyDrop<MaybeUninit<Fields<T>>>,
+    _fields: ManuallyDrop<MaybeUninit<T::Fields>>,
     _context: ManuallyDrop<MaybeUninit<T::Context>>,
 }
 
@@ -38,7 +38,7 @@ where
         .into_iter()
         .map(|desc| desc.as_ref().layout().size())
         .sum::<usize>();
-    size_of::<Fields<T>>() == 0 || packed_size == 0
+    size_of::<T::Fields>() == 0 || packed_size == 0
 }
 
 #[inline]
@@ -108,7 +108,7 @@ struct BufferAlign<T>
 where
     T: Soa + ?Sized,
 {
-    _fields: [Fields<T>; 0],
+    _fields: [T::Fields; 0],
     _context: [T::Context; 0],
     _len: [usize; 0],
     _capacity: [usize; 0],

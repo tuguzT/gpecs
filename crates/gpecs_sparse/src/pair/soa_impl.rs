@@ -7,7 +7,7 @@ use crate::{
         KeyValueSlicePtrs, KeyValueSlices, KeyValueSlicesMut,
     },
     soa::traits::{
-        Fields, MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext, SoaRead, SoaToOwned,
+        MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext, SoaRead, SoaToOwned,
         SoaTrustedFields, SoaWrite,
     },
 };
@@ -16,8 +16,6 @@ unsafe impl<K, V> SoaContext for KeyValuePairContext<K, V>
 where
     V: Soa + ?Sized,
 {
-    type Fields = (K, Fields<V>);
-
     type FieldDescriptors<'a> = KeyValueFieldDescriptors<'a, K, V>;
 
     #[inline]
@@ -264,6 +262,8 @@ where
     V: Soa + ?Sized,
 {
     type Context = KeyValuePairContext<K, V>;
+
+    type Fields = (K, V::Fields);
 
     type Refs<'context, 'a>
         = KeyValueRefs<'context, 'a, K, V>

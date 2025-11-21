@@ -9,7 +9,7 @@ use crate::{
     alloc::raw_vec::RawSoaVec,
     layout::BufferData,
     ptr::BufferDataPtr,
-    traits::{Fields, MutPtrs, NonNullPtrs, Ptrs, Soa, SoaContext, SoaRead},
+    traits::{MutPtrs, NonNullPtrs, Ptrs, Soa, SoaContext, SoaRead},
     vec::SoaVec,
     wrapper::NonNullPtrs as NonNullPtrsWrapper,
 };
@@ -131,7 +131,7 @@ unsafe impl<T> Send for IntoIter<T>
 where
     T: Soa + ?Sized,
     T::Context: Send,
-    Fields<T>: Send,
+    T::Fields: Send,
 {
 }
 
@@ -139,7 +139,7 @@ unsafe impl<T> Sync for IntoIter<T>
 where
     T: Soa + ?Sized,
     T::Context: Sync,
-    Fields<T>: Sync,
+    T::Fields: Sync,
 {
 }
 

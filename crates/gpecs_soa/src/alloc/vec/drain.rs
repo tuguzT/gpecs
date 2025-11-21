@@ -8,7 +8,7 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, SoaSlices, range},
-    traits::{Fields, SoaContext, SoaRead},
+    traits::{SoaContext, SoaRead},
 };
 
 use super::{Soa, SoaVec};
@@ -86,7 +86,7 @@ unsafe impl<T> Send for Drain<'_, T>
 where
     T: Soa + ?Sized,
     T::Context: Send,
-    Fields<T>: Send,
+    T::Fields: Send,
 {
 }
 
@@ -94,7 +94,7 @@ unsafe impl<T> Sync for Drain<'_, T>
 where
     T: Soa + ?Sized,
     T::Context: Sync,
-    Fields<T>: Sync,
+    T::Fields: Sync,
 {
 }
 

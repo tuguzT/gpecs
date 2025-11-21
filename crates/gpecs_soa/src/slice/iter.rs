@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    traits::{Fields, MutPtrs, Ptrs, Soa, SoaContext},
+    traits::{MutPtrs, Ptrs, Soa, SoaContext},
     wrapper::NonNullPtrs,
 };
 
@@ -105,7 +105,7 @@ unsafe impl<T> Send for Iter<'_, '_, T>
 where
     T: Soa + ?Sized,
     T::Context: Send,
-    Fields<T>: Send,
+    T::Fields: Send,
 {
 }
 
@@ -113,7 +113,7 @@ unsafe impl<T> Sync for Iter<'_, '_, T>
 where
     T: Soa + ?Sized,
     T::Context: Sync,
-    Fields<T>: Sync,
+    T::Fields: Sync,
 {
 }
 
@@ -547,7 +547,7 @@ unsafe impl<T> Send for IterMut<'_, '_, T>
 where
     T: Soa + ?Sized,
     T::Context: Send,
-    Fields<T>: Send,
+    T::Fields: Send,
 {
 }
 
@@ -555,7 +555,7 @@ unsafe impl<T> Sync for IterMut<'_, '_, T>
 where
     T: Soa + ?Sized,
     T::Context: Sync,
-    Fields<T>: Sync,
+    T::Fields: Sync,
 {
 }
 

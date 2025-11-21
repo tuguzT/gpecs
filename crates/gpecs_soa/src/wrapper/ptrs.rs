@@ -10,7 +10,6 @@ use core::{
 use crate::traits::{Ptrs as Inner, Soa, SoaContext};
 
 /// Type wrapper for [pointers](SoaContext::Ptrs)
-/// to each field of [`Fields`](SoaContext::Fields)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct Ptrs<'context, T>
@@ -25,8 +24,7 @@ impl<'context, T> Ptrs<'context, T>
 where
     T: Soa + ?Sized,
 {
-    /// Creates self from the [pointers](SoaContext::Ptrs)
-    /// to each field of [`Fields`](SoaContext::Fields).
+    /// Creates self from the [pointers](SoaContext::Ptrs).
     #[inline]
     pub fn new(inner: Inner<'context, T>) -> Self {
         Self {
@@ -35,24 +33,21 @@ where
         }
     }
 
-    /// Retrieves a reference of [pointers](SoaContext::Ptrs)
-    /// to each field of [`Fields`](SoaContext::Fields) from self.
+    /// Retrieves a reference of [pointers](SoaContext::Ptrs).
     #[inline]
     pub fn as_inner(&self) -> &Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [pointers](SoaContext::Ptrs)
-    /// to each field of [`Fields`](SoaContext::Fields) from self.
+    /// Retrieves a mutable reference of [pointers](SoaContext::Ptrs).
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [pointers](SoaContext::Ptrs)
-    /// to each field of [`Fields`](SoaContext::Fields) from self.
+    /// Retrieves the [pointers](SoaContext::Ptrs).
     #[inline]
     pub fn into_inner(self) -> Inner<'context, T> {
         let Self { inner, .. } = self;

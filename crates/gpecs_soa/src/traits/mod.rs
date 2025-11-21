@@ -289,7 +289,7 @@ pub unsafe trait SoaContext {
     /// Unlike [field descriptors](SoaContext::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
-    type SliceMutPtrs<'context>: Clone;
+    type SliceMutPtrs<'a>: Clone;
 
     /// Restricts [mutable slice pointers](SoaContext::SliceMutPtrs) to each stored field
     /// to be covariant over generic lifetime.
@@ -366,11 +366,11 @@ pub type NonNullPtrs<'a, T> = <<T as Soa>::Context as SoaContext>::NonNullPtrs<'
 
 /// Alias for the [`SlicePtrs`](SoaContext::SlicePtrs) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type SlicePtrs<'context, T> = <<T as Soa>::Context as SoaContext>::SlicePtrs<'context>;
+pub type SlicePtrs<'a, T> = <<T as Soa>::Context as SoaContext>::SlicePtrs<'a>;
 
 /// Alias for the [`SliceMutPtrs`](SoaContext::SliceMutPtrs) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type SliceMutPtrs<'context, T> = <<T as Soa>::Context as SoaContext>::SliceMutPtrs<'context>;
+pub type SliceMutPtrs<'a, T> = <<T as Soa>::Context as SoaContext>::SliceMutPtrs<'a>;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays pattern.

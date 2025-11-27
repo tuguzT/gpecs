@@ -3,7 +3,7 @@ use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
     slice::{Iter, IterMut, SoaSlice},
-    traits::{SoaRead, SoaToOwned, SoaTrustedFields},
+    traits::{SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite},
     vec::{IntoIter, SoaVec},
 };
 
@@ -18,15 +18,6 @@ where
         let capacity = self.capacity();
         let ptr = Box::into_raw(self).cast();
         unsafe { SoaVec::from_raw_parts(ptr, len, capacity) }
-    }
-
-    #[inline]
-    pub fn to_vec(&self) -> SoaVec<T>
-    where
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-        T::Context: Clone,
-    {
-        self.slices().to_vec()
     }
 
     #[inline]
@@ -130,9 +121,23 @@ where
     }
 }
 
+impl<T> SoaSlice<T>
+where
+    T: SoaTrustedFields + SoaWrite,
+{
+    #[inline]
+    pub fn to_vec(&self) -> SoaVec<T>
+    where
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
+        T::Context: Clone,
+    {
+        self.slices().to_vec()
+    }
+}
+
 impl<T> ToOwned for SoaSlice<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + SoaWrite,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {

@@ -481,14 +481,6 @@ impl<'a> SoaToOwned<'_, 'a> for &'a () {
     fn clone_into(&self, _context: &<Self::Owned as Soa>::Context, _target: &mut Self::Owned) {}
 
     #[inline]
-    unsafe fn clone_into_ptrs(
-        &self,
-        _context: &<Self::Owned as Soa>::Context,
-        _target: MutPtrs<'_, Self::Owned>,
-    ) {
-    }
-
-    #[inline]
     fn clone_into_refs<'context>(
         &self,
         _context: &'context <Self::Owned as Soa>::Context,

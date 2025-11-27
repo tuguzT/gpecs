@@ -616,7 +616,7 @@ pub unsafe trait SoaWrite: Soa + Sized {
 /// [`ToOwned`]: https://doc.rust-lang.org/stable/alloc/borrow/trait.ToOwned.html
 pub trait SoaToOwned<'context, 'a> {
     /// The resulting type after obtaining ownership.
-    type Owned: SoaWrite<Refs<'context, 'a> = Self> + 'a;
+    type Owned: Soa<Refs<'context, 'a> = Self> + 'a;
 
     /// Creates owned data from borrowed data,
     /// usually by cloning each field of [`Fields`](Soa::Fields).
@@ -630,27 +630,13 @@ pub trait SoaToOwned<'context, 'a> {
         *target = self.to_owned(context);
     }
 
-    /// Uses borrowed data to replace owned data located by `target` [pointers](SoaContext::MutPtrs),
-    /// usually by cloning each field of [`Fields`](Soa::Fields).
-    unsafe fn clone_into_ptrs(
-        &self,
-        context: &<Self::Owned as Soa>::Context,
-        target: MutPtrs<'_, Self::Owned>,
-    ) {
-        let owned = self.to_owned(context);
-        unsafe { <Self::Owned as SoaWrite>::write(context, target, owned) }
-    }
-
     /// Uses borrowed data to replace owned data located by `target` [references](Soa::RefsMut),
     /// usually by cloning each field of [`Fields`](Soa::Fields).
     fn clone_into_refs<'c>(
         &self,
         context: &'c <Self::Owned as Soa>::Context,
         target: <Self::Owned as Soa>::RefsMut<'c, '_>,
-    ) {
-        let target = <Self::Owned as Soa>::refs_mut_as_ptrs(context, target);
-        unsafe { self.clone_into_ptrs(context, target) }
-    }
+    );
 }
 
 /// Marker trait which places additional safety requirements

@@ -503,6 +503,7 @@ where
 {
     type Owned = KeyValuePair<K, V>;
 
+    #[inline]
     fn to_owned(&self, context: &<Self::Owned as Soa>::Context) -> Self::Owned {
         let Self { key, value } = self;
 
@@ -511,14 +512,36 @@ where
         KeyValuePair { key, value }
     }
 
+    #[inline]
     fn clone_into(&self, context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
         let Self { key, value } = self;
+        let value = value.as_inner();
+
         let KeyValuePair {
             key: target_key,
             value: target_value,
         } = target;
 
         target_key.clone_from(key);
-        SoaToOwned::clone_into(value.as_inner(), context, target_value);
+        value.clone_into(context, target_value);
+    }
+
+    #[inline]
+    fn clone_into_refs<'c>(
+        &self,
+        context: &'c <Self::Owned as Soa>::Context,
+        target: <Self::Owned as Soa>::RefsMut<'c, '_>,
+    ) {
+        let Self { key, value } = self;
+        let value = value.as_inner();
+
+        let KeyValueRefsMut {
+            key: target_key,
+            value: target_value,
+        } = target;
+        let target_value = target_value.into_inner();
+
+        target_key.clone_from(key);
+        value.clone_into_refs(context, target_value);
     }
 }

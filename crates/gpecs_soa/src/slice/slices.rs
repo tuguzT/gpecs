@@ -13,7 +13,7 @@ use crate::{
         index::{IndexHelper, IndexHelperMut, SoaSliceIndex},
         iter::{Iter, IterMut},
     },
-    traits::{MutPtrs, Ptrs, Soa, SoaContext, SoaToOwned},
+    traits::{MutPtrs, Ptrs, Soa, SoaContext, SoaToOwned, SoaWrite},
     wrapper::{MutPtrs as MutPtrsWrapper, Ptrs as PtrsWrapper},
 };
 
@@ -853,27 +853,6 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn clone_from_slices(&mut self, src: &SoaSlices<T>)
-    where
-        for<'ca, 'any> T::Refs<'ca, 'any>: SoaToOwned<'ca, 'any, Owned = T>,
-    {
-        let len = self.len();
-        if len != src.len() {
-            len_mismatch_fail(len, src.len());
-        }
-
-        for index in 0..len {
-            unsafe {
-                let (context, dst) = self.get_unchecked_mut_with_context(index);
-                let src = T::ptrs_to_refs(context, src.get_unchecked(index));
-                context.ptrs_drop_in_place(dst.clone());
-                src.clone_into_ptrs(context, dst);
-            }
-        }
-    }
-
-    #[inline]
-    #[track_caller]
     pub fn copy_from_slices(&mut self, src: &SoaSlices<T>)
     where
         T::Fields: Copy,
@@ -993,6 +972,31 @@ where
             }
             permutation[src] = dst;
             self.swap(src, dst);
+        }
+    }
+}
+
+impl<T> SoaSlicesMut<'_, '_, T>
+where
+    T: SoaWrite,
+{
+    #[inline]
+    #[track_caller]
+    pub fn clone_from_slices(&mut self, src: &SoaSlices<T>)
+    where
+        for<'c, 'a> T::Refs<'c, 'a>: SoaToOwned<'c, 'a, Owned = T>,
+    {
+        let len = self.len();
+        if len != src.len() {
+            len_mismatch_fail(len, src.len());
+        }
+
+        for index in 0..len {
+            let (context, dst) = unsafe { self.get_unchecked_mut_with_context(index) };
+            unsafe { context.ptrs_drop_in_place(dst.clone()) }
+
+            let src = unsafe { T::ptrs_to_refs(context, src.get_unchecked(index)) };
+            unsafe { T::write(context, dst, src.to_owned(context)) }
         }
     }
 }

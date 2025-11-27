@@ -4,13 +4,13 @@ use core_alloc::boxed::Box;
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
     slice::{SoaSlices, SoaSlicesMut},
-    traits::{Soa, SoaContext, SoaToOwned},
+    traits::{Soa, SoaContext, SoaToOwned, SoaWrite},
     vec::SoaVec,
 };
 
 impl<T> SoaSlices<'_, '_, T>
 where
-    T: Soa + ?Sized,
+    T: SoaWrite,
 {
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
@@ -33,7 +33,7 @@ where
                 set_len_on_drop.local_len = index;
 
                 let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
-                unsafe { refs.clone_into_ptrs(context, dst) }
+                unsafe { T::write(context, dst, refs.to_owned(context)) }
             }
         }
 
@@ -50,15 +50,6 @@ impl<T> SoaSlicesMut<'_, '_, T>
 where
     T: Soa + ?Sized,
 {
-    #[inline]
-    pub fn to_vec(&self) -> SoaVec<T>
-    where
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-        T::Context: Clone,
-    {
-        self.slices().to_vec()
-    }
-
     #[inline]
     pub fn sort(&mut self)
     where
@@ -188,6 +179,20 @@ where
     {
         let permutation = alloc_permutation(self.len());
         self.sort_unstable_with_permutation_by_key(permutation, f);
+    }
+}
+
+impl<T> SoaSlicesMut<'_, '_, T>
+where
+    T: SoaWrite,
+{
+    #[inline]
+    pub fn to_vec(&self) -> SoaVec<T>
+    where
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
+        T::Context: Clone,
+    {
+        self.slices().to_vec()
     }
 }
 

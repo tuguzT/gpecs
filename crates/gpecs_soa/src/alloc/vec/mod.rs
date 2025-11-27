@@ -496,33 +496,6 @@ where
         drop(g);
     }
 
-    #[track_caller]
-    pub fn extend_from_within<R>(&mut self, src: R)
-    where
-        R: RangeBounds<usize>,
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-    {
-        let range = range(src, ..self.len());
-        self.reserve(range.len());
-
-        let mut set_len_on_drop = SetLenOnDrop {
-            local_len: self.len(),
-            vec: self,
-        };
-
-        let context = set_len_on_drop.vec.context();
-        for index in range {
-            let slices = set_len_on_drop.vec.slices();
-            let refs = unsafe { T::ptrs_to_refs(context, slices.get_unchecked(index)) };
-            unsafe {
-                let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
-                let dst = context.ptrs_add_mut(ptrs, set_len_on_drop.local_len);
-                refs.clone_into_ptrs(context, dst);
-            }
-            set_len_on_drop.local_len += 1;
-        }
-    }
-
     #[inline]
     pub fn iter(&self) -> Iter<'_, '_, T> {
         self.slices().into_iter()
@@ -753,6 +726,38 @@ where
 
 impl<T> SoaVec<T>
 where
+    T: SoaWrite,
+{
+    #[track_caller]
+    pub fn extend_from_within<R>(&mut self, src: R)
+    where
+        R: RangeBounds<usize>,
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
+    {
+        let range = range(src, ..self.len());
+        self.reserve(range.len());
+
+        let mut set_len_on_drop = SetLenOnDrop {
+            local_len: self.len(),
+            vec: self,
+        };
+
+        let context = set_len_on_drop.vec.context();
+        for index in range {
+            let slices = set_len_on_drop.vec.slices();
+            let refs = unsafe { T::ptrs_to_refs(context, slices.get_unchecked(index)) };
+            unsafe {
+                let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
+                let dst = context.ptrs_add_mut(ptrs, set_len_on_drop.local_len);
+                T::write(context, dst, refs.to_owned(context));
+            }
+            set_len_on_drop.local_len += 1;
+        }
+    }
+}
+
+impl<T> SoaVec<T>
+where
     T: SoaRead,
 {
     #[inline]
@@ -819,7 +824,12 @@ where
         let len = me.len;
         unsafe { buffer.into_box(len) }
     }
+}
 
+impl<T> SoaVec<T>
+where
+    T: SoaTrustedFields + SoaWrite,
+{
     #[track_caller]
     pub fn extend_from_slice<'other>(&mut self, other: &'other SoaSlice<T>)
     where
@@ -837,7 +847,7 @@ where
             unsafe {
                 let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
                 let dst = context.ptrs_add_mut(ptrs, set_len_on_drop.local_len);
-                refs.clone_into_ptrs(context, dst);
+                T::write(context, dst, refs.to_owned(context));
             }
             set_len_on_drop.local_len += 1;
         }
@@ -960,7 +970,7 @@ where
 
 impl<T> Clone for SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: SoaWrite,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {
@@ -1078,7 +1088,7 @@ where
 
 impl<T> From<&SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + SoaWrite,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
@@ -1090,7 +1100,7 @@ where
 
 impl<T> From<&mut SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + SoaWrite,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {

@@ -12,7 +12,7 @@ use crate::{
         SoaSlicePtr, ptrs_from_buffer, ptrs_from_buffer_mut, slice_from_raw_parts,
         slice_from_raw_parts_mut,
     },
-    traits::{MutPtrs, Ptrs, SoaContext, SoaToOwned, SoaTrustedFields},
+    traits::{MutPtrs, Ptrs, SoaContext, SoaToOwned, SoaTrustedFields, SoaWrite},
 };
 
 use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, SoaSlices, SoaSlicesMut};
@@ -150,16 +150,6 @@ where
     {
         let mut iter = self.into_iter();
         iter.any(move |item| item.eq(&value))
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn clone_from_slice(&mut self, src: &Self)
-    where
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-    {
-        let src = src.slices();
-        self.slices_mut().clone_from_slices(&src);
     }
 
     #[inline]
@@ -316,6 +306,21 @@ where
     {
         self.slices_mut()
             .sort_unstable_with_permutation_by_key(permutation, f);
+    }
+}
+
+impl<T> SoaSlice<T>
+where
+    T: SoaTrustedFields + SoaWrite,
+{
+    #[inline]
+    #[track_caller]
+    pub fn clone_from_slice(&mut self, src: &Self)
+    where
+        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
+    {
+        let src = src.slices();
+        self.slices_mut().clone_from_slices(&src);
     }
 }
 

@@ -36,9 +36,9 @@ gpecs_soa_erased = { path = "crates/gpecs_soa_erased", default-features = false 
 gpecs_types = { path = "crates/gpecs_types" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
-cargo-gpu = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "09829681cbe3866b6d1fc2ee0eae83aa77855b3e" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "2232fcb7b5f44415a573ba5ed3b2619f12559294" }
-indexmap = { version = "2.11", default-features = false }
+cargo-gpu = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "bf24eb6060e0c7b0013eceddd23b5d7cee68f4cc" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "d4dd2e2151fd5588580756f5c03847cc7d1dce7f" }
+indexmap = { version = "2.12", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }
 arrayvec = { version = "0.7", default-features = false }
@@ -47,7 +47,7 @@ num-traits = { version = "0.2", default-features = false }
 rspirv = { version = "0.12", default-features = false }
 criterion = { version = "0.7", features = ["html_reports"] }
 pollster = { version = "0.4", default-features = false }
-bytemuck = { version = "1.23", default-features = false }
+bytemuck = { version = "1.24", default-features = false }
 const_format = { version = "0.2", default-features = false }
 log = { version = "0.4", default-features = false }
 glam = { version = "0.30", default-features = false }

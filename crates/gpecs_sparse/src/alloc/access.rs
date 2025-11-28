@@ -138,7 +138,7 @@ pub unsafe fn drop_old_then_write<V>(
     dst: Option<TryInsertAccess<V>>,
     value: V,
 ) where
-    V: SoaWrite,
+    V: Soa + SoaWrite,
 {
     let dst = match dst {
         Some(TryInsertAccess::ReadWrite(dst)) => {

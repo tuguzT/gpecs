@@ -8,14 +8,14 @@ use core::{
 use crate::{
     pair::{KeyValueMutPtrs, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, KeyValueSlicesMut},
     soa::{
-        traits::{RawSoaContext, SliceMutPtrs, Soa},
+        traits::{RawSoa, RawSoaContext, SliceMutPtrs, Soa},
         wrapper::SliceMutPtrs as SliceMutPtrsWrapper,
     },
 };
 
 pub struct KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     keys: *mut [K],
     values: SliceMutPtrsWrapper<'context, V>,
@@ -23,7 +23,7 @@ where
 
 impl<'context, K, V> KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -101,6 +101,21 @@ where
     }
 
     #[inline]
+    pub unsafe fn drop_in_place(self, context: &V::Context) {
+        let Self { keys, values } = self;
+
+        unsafe {
+            ptr::drop_in_place(keys);
+            context.slices_drop_in_place(values.into_inner());
+        }
+    }
+}
+
+impl<'context, K, V> KeyValueSliceMutPtrs<'context, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
     pub unsafe fn deref<'a>(
         self,
         context: &'context V::Context,
@@ -124,22 +139,12 @@ where
         let values = unsafe { V::slice_mut_ptrs_to_slices(context, values.into_inner()) };
         unsafe { KeyValueSlicesMut::new_unchecked(keys, values) }
     }
-
-    #[inline]
-    pub unsafe fn drop_in_place(self, context: &V::Context) {
-        let Self { keys, values } = self;
-
-        unsafe {
-            ptr::drop_in_place(keys);
-            context.slices_drop_in_place(values.into_inner());
-        }
-    }
 }
 
 impl<'context, K, V> From<KeyValueSliceMutPtrs<'context, K, V>>
     for (*mut [K], SliceMutPtrsWrapper<'context, V>)
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueSliceMutPtrs<'context, K, V>) -> Self {
@@ -149,7 +154,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SliceMutPtrsWrapper<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -163,7 +168,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SliceMutPtrsWrapper<'context, V>: PartialEq,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
@@ -175,14 +180,14 @@ where
 
 impl<'context, K, V> Eq for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SliceMutPtrsWrapper<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SliceMutPtrsWrapper<'context, V>: PartialOrd,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
@@ -198,7 +203,7 @@ where
 
 impl<'context, K, V> Ord for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SliceMutPtrsWrapper<'context, V>: Ord,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
@@ -214,7 +219,7 @@ where
 
 impl<'context, K, V> Hash for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SliceMutPtrsWrapper<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -226,7 +231,7 @@ where
 
 impl<K, V> Clone for KeyValueSliceMutPtrs<'_, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -238,7 +243,7 @@ where
 
 impl<'context, K, V> Copy for KeyValueSliceMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SliceMutPtrsWrapper<'context, V>: Copy,
 {
 }

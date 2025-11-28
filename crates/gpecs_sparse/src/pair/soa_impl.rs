@@ -7,14 +7,14 @@ use crate::{
         KeyValueSlicePtrs, KeyValueSlices, KeyValueSlicesMut,
     },
     soa::traits::{
-        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
         SoaTrustedFields, SoaWrite,
     },
 };
 
 unsafe impl<K, V> RawSoaContext for KeyValuePairContext<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     type FieldDescriptors<'a> = KeyValueFieldDescriptors<'a, K, V>;
 
@@ -257,14 +257,18 @@ where
     }
 }
 
+unsafe impl<K, V> RawSoa for KeyValuePair<K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    type Context = KeyValuePairContext<K, V>;
+    type Fields = (K, V::Fields);
+}
+
 unsafe impl<K, V> Soa for KeyValuePair<K, V>
 where
     V: Soa + ?Sized,
 {
-    type Context = KeyValuePairContext<K, V>;
-
-    type Fields = (K, V::Fields);
-
     type Refs<'context, 'a>
         = KeyValueRefs<'context, 'a, K, V>
     where
@@ -498,13 +502,13 @@ unsafe impl<K, V> SoaTrustedFields for KeyValuePair<K, V> where V: SoaTrustedFie
 impl<'context, 'a, K, V> SoaToOwned<'context, 'a> for KeyValueRefs<'context, 'a, K, V>
 where
     K: Clone,
-    V: SoaWrite,
+    V: Soa + SoaWrite,
     for<'c, 'any> V::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = V>,
 {
     type Owned = KeyValuePair<K, V>;
 
     #[inline]
-    fn to_owned(&self, context: &<Self::Owned as Soa>::Context) -> Self::Owned {
+    fn to_owned(&self, context: &<Self::Owned as RawSoa>::Context) -> Self::Owned {
         let Self { key, value } = self;
 
         let key = (*key).clone();
@@ -513,7 +517,7 @@ where
     }
 
     #[inline]
-    fn clone_into(&self, context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
+    fn clone_into(&self, context: &<Self::Owned as RawSoa>::Context, target: &mut Self::Owned) {
         let Self { key, value } = self;
         let value = value.as_inner();
 
@@ -529,7 +533,7 @@ where
     #[inline]
     fn clone_into_refs<'c>(
         &self,
-        context: &'c <Self::Owned as Soa>::Context,
+        context: &'c <Self::Owned as RawSoa>::Context,
         target: <Self::Owned as Soa>::RefsMut<'c, '_>,
     ) {
         let Self { key, value } = self;

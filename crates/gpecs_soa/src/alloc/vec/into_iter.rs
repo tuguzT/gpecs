@@ -227,7 +227,7 @@ where
 #[expect(clippy::while_let_on_iterator)]
 impl<T> Iterator for IntoIter<T>
 where
-    T: SoaRead,
+    T: Soa + SoaRead,
 {
     type Item = T;
 
@@ -447,7 +447,7 @@ where
 
 impl<T> DoubleEndedIterator for IntoIter<T>
 where
-    T: SoaRead,
+    T: Soa + SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -499,7 +499,7 @@ where
 
 impl<T> ExactSizeIterator for IntoIter<T>
 where
-    T: SoaRead,
+    T: Soa + SoaRead,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -507,4 +507,4 @@ where
     }
 }
 
-impl<T> FusedIterator for IntoIter<T> where T: SoaRead {}
+impl<T> FusedIterator for IntoIter<T> where T: Soa + SoaRead {}

@@ -4,7 +4,9 @@ use crate::{
     aligned_bytes::{AlignedBytes, AlignedBytesFromLayout},
     soa::{
         field::FieldDescriptor,
-        traits::{MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaWrite},
+        traits::{
+            MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaWrite,
+        },
     },
 };
 
@@ -300,15 +302,20 @@ where
     }
 }
 
+unsafe impl<B, D> RawSoa for ErasedSoa<B, D>
+where
+    B: ?Sized,
+    D: AsRef<[FieldDescriptor]>,
+{
+    type Context = ErasedSoaContext<D>;
+    type Fields = ErasedSoaFields;
+}
+
 unsafe impl<B, D> Soa for ErasedSoa<B, D>
 where
     B: AlignedBytes + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
-    type Context = ErasedSoaContext<D>;
-
-    type Fields = ErasedSoaFields;
-
     type Refs<'context, 'a>
         = ErasedSoaRefs<'a, &'context [FieldDescriptor]>
     where

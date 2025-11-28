@@ -726,7 +726,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaWrite,
+    T: Soa + SoaWrite,
 {
     #[track_caller]
     pub fn extend_from_within<R>(&mut self, src: R)
@@ -758,7 +758,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaRead,
+    T: Soa + SoaRead,
 {
     #[inline]
     pub fn swap_remove(&mut self, index: usize) -> T {
@@ -778,7 +778,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaWrite,
+    T: Soa + SoaWrite,
 {
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
@@ -797,7 +797,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: Soa + SoaTrustedFields + ?Sized,
 {
     #[inline]
     pub fn as_slice(&self) -> &SoaSlice<T>
@@ -828,7 +828,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaTrustedFields + SoaWrite,
+    T: Soa + SoaTrustedFields + SoaWrite,
 {
     #[track_caller]
     pub fn extend_from_slice<'other>(&mut self, other: &'other SoaSlice<T>)
@@ -888,7 +888,7 @@ where
 
 impl<T> AsRef<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: Soa + SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &SoaSlice<T> {
@@ -908,7 +908,7 @@ where
 
 impl<T> AsMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: Soa + SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut SoaSlice<T> {
@@ -918,7 +918,7 @@ where
 
 impl<T> Borrow<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: Soa + SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn borrow(&self) -> &SoaSlice<T> {
@@ -928,7 +928,7 @@ where
 
 impl<T> BorrowMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: Soa + SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn borrow_mut(&mut self) -> &mut SoaSlice<T> {
@@ -970,7 +970,7 @@ where
 
 impl<T> Clone for SoaVec<T>
 where
-    T: SoaWrite,
+    T: Soa + SoaWrite,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {
@@ -988,7 +988,7 @@ where
 
 impl<T> Deref for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: Soa + SoaTrustedFields + ?Sized,
 {
     type Target = SoaSlice<T>;
 
@@ -1003,7 +1003,7 @@ where
 
 impl<T> DerefMut for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: Soa + SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -1042,7 +1042,7 @@ where
 
 impl<T> Extend<T> for SoaVec<T>
 where
-    T: SoaWrite,
+    T: Soa + SoaWrite,
 {
     #[inline]
     #[track_caller]
@@ -1078,7 +1078,7 @@ where
 
 impl<T> From<Box<SoaSlice<T>>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: Soa + SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn from(value: Box<SoaSlice<T>>) -> Self {
@@ -1088,7 +1088,7 @@ where
 
 impl<T> From<&SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + SoaWrite,
+    T: Soa + SoaTrustedFields + SoaWrite,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
@@ -1100,7 +1100,7 @@ where
 
 impl<T> From<&mut SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + SoaWrite,
+    T: Soa + SoaTrustedFields + SoaWrite,
     T::Context: Clone,
     for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
@@ -1138,7 +1138,7 @@ where
 
 impl<T> IntoIterator for SoaVec<T>
 where
-    T: SoaRead,
+    T: Soa + SoaRead,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;
@@ -1151,7 +1151,7 @@ where
 
 impl<T> FromIterator<T> for SoaVec<T>
 where
-    T: SoaWrite,
+    T: Soa + SoaWrite,
     T::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {

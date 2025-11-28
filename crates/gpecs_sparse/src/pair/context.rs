@@ -4,12 +4,12 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::soa::traits::Soa;
+use crate::soa::traits::RawSoa;
 
 #[repr(transparent)]
 pub struct KeyValuePairContext<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     context: V::Context,
     phantom: PhantomData<fn() -> K>,
@@ -17,7 +17,7 @@ where
 
 impl<K, V> KeyValuePairContext<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     pub const fn from_inner(context: V::Context) -> Self {
@@ -60,7 +60,7 @@ where
 
 impl<K, V> Default for KeyValuePairContext<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     V::Context: Default,
 {
     #[inline]
@@ -72,7 +72,7 @@ where
 
 impl<K, V> Deref for KeyValuePairContext<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     type Target = V::Context;
 
@@ -84,7 +84,7 @@ where
 
 impl<K, V> DerefMut for KeyValuePairContext<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {

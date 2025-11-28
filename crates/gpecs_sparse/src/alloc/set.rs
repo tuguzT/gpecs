@@ -930,7 +930,7 @@ where
 impl<K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     #[inline]
     pub fn swap_remove(&mut self, key: K) -> Option<V> {
@@ -963,7 +963,7 @@ where
 impl<K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: SoaWrite,
+    V: Soa + SoaWrite,
 {
     #[inline]
     #[track_caller]
@@ -987,7 +987,7 @@ where
 impl<K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: SoaRead + SoaWrite,
+    V: Soa + SoaRead + SoaWrite,
 {
     #[inline]
     #[track_caller]
@@ -1238,7 +1238,7 @@ where
 impl<K, V> IntoIterator for EpochSparseSet<K, V>
 where
     K: Key,
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     type Item = (K, V);
 
@@ -1254,7 +1254,7 @@ where
 impl<K, V> FromIterator<KeyValuePair<K, V>> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: Soa + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = KeyValuePair<K, V>>>(iter: I) -> Self {
@@ -1278,7 +1278,7 @@ where
 impl<K, V> FromIterator<(K, V)> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: Soa + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
@@ -1289,7 +1289,7 @@ where
 impl<K, V> FromIterator<V> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: Soa + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
@@ -1314,7 +1314,7 @@ where
 impl<K, V> Extend<KeyValuePair<K, V>> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: Soa + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = KeyValuePair<K, V>>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
@@ -1333,7 +1333,7 @@ where
 impl<K, V> Extend<(K, V)> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: Soa + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         self.extend(iter.into_iter().map(KeyValuePair::from));
@@ -1343,7 +1343,7 @@ where
 impl<K, V> Extend<V> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: Soa + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
         // I could have used `push` here, but it would search for a vacant sparse item

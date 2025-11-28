@@ -121,7 +121,7 @@ where
 
 impl<T> Iterator for Drain<'_, T>
 where
-    T: SoaRead,
+    T: Soa + SoaRead,
 {
     type Item = T;
 
@@ -146,7 +146,7 @@ where
 
 impl<T> DoubleEndedIterator for Drain<'_, T>
 where
-    T: SoaRead,
+    T: Soa + SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -163,7 +163,7 @@ where
 
 impl<T> ExactSizeIterator for Drain<'_, T>
 where
-    T: SoaRead,
+    T: Soa + SoaRead,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -172,7 +172,7 @@ where
     }
 }
 
-impl<T> FusedIterator for Drain<'_, T> where T: SoaRead {}
+impl<T> FusedIterator for Drain<'_, T> where T: Soa + SoaRead {}
 
 impl<T> Drop for Drain<'_, T>
 where

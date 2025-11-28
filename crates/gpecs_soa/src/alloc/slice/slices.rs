@@ -10,7 +10,7 @@ use crate::{
 
 impl<T> SoaSlices<'_, '_, T>
 where
-    T: SoaWrite,
+    T: Soa + SoaWrite,
 {
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>
@@ -184,7 +184,7 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: SoaWrite,
+    T: Soa + SoaWrite,
 {
     #[inline]
     pub fn to_vec(&self) -> SoaVec<T>

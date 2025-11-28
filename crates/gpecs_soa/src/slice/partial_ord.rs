@@ -1,14 +1,14 @@
 use crate::{
     slice::{SoaSlice, SoaSlices, SoaSlicesMut},
-    traits::{Soa, SoaTrustedFields},
+    traits::SoaTrustedFields,
 };
 
 // Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
 macro_rules! partial_ord_impl {
-    ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
+    ([$($vars:tt)*] $lhs:ty, $rhs:ty where $ty:ty: $( $bound:ident)?) => {
         impl<T, $($vars)*> PartialOrd<$rhs> for $lhs
         where
-            $($ty: $bound,)?
+            $ty: $crate::traits::Soa $(+ $bound)?,
             T: ?Sized,
             for<'_c, '_a> T::Slices<'_c, '_a>: PartialOrd,
         {
@@ -24,14 +24,14 @@ macro_rules! partial_ord_impl {
 
 pub(crate) use partial_ord_impl;
 
-partial_ord_impl! { [] SoaSlices<'_, '_, T>, Self where T: Soa }
-partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaSlicesMut<'_, '_, T> where T: Soa }
+partial_ord_impl! { [] SoaSlices<'_, '_, T>, Self where T: }
+partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaSlicesMut<'_, '_, T> where T: }
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaSlice<T> where T: SoaTrustedFields }
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, &SoaSlice<T> where T: SoaTrustedFields }
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, &mut SoaSlice<T> where T: SoaTrustedFields }
 
-partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, Self where T: Soa }
-partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlices<'_, '_, T> where T: Soa }
+partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, Self where T: }
+partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlices<'_, '_, T> where T: }
 partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlice<T> where T: SoaTrustedFields }
 partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, &SoaSlice<T> where T: SoaTrustedFields }
 partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, &mut SoaSlice<T> where T: SoaTrustedFields }

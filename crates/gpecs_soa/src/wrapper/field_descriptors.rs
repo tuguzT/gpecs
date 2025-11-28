@@ -7,14 +7,14 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{FieldDescriptors as Inner, RawSoaContext, Soa};
+use crate::traits::{FieldDescriptors as Inner, RawSoa, RawSoaContext};
 
 /// Type wrapper for [field descriptors](RawSoaContext::FieldDescriptors)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct FieldDescriptors<'context, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     inner: Inner<'static, T>,
     phantom: PhantomData<&'context ()>,
@@ -22,7 +22,7 @@ where
 
 impl<'context, T> FieldDescriptors<'context, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     /// Creates self from the [field descriptors](RawSoaContext::FieldDescriptors).
     #[inline]
@@ -57,7 +57,7 @@ where
 
 impl<T> Debug for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -68,7 +68,7 @@ where
 
 impl<T> Default for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Default,
 {
     fn default() -> Self {
@@ -81,7 +81,7 @@ where
 
 impl<T> Clone for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Clone,
 {
     fn clone(&self) -> Self {
@@ -93,14 +93,14 @@ where
 
 impl<T> Copy for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Copy,
 {
 }
 
 impl<T> PartialEq for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -111,14 +111,14 @@ where
 
 impl<T> Eq for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -133,7 +133,7 @@ where
 
 impl<T> Ord for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -148,7 +148,7 @@ where
 
 impl<T> Hash for FieldDescriptors<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -160,7 +160,7 @@ where
 
 impl<'context, T> IntoIterator for FieldDescriptors<'context, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     type Item = <Inner<'context, T> as IntoIterator>::Item;
     type IntoIter = <Inner<'context, T> as IntoIterator>::IntoIter;

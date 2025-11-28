@@ -8,14 +8,14 @@ use core::{
 use crate::{
     pair::{KeyValuePtrs, KeyValueSliceMutPtrs, KeyValueSlices},
     soa::{
-        traits::{RawSoaContext, SlicePtrs, Soa},
+        traits::{RawSoa, RawSoaContext, SlicePtrs, Soa},
         wrapper::SlicePtrs as SlicePtrsWrapper,
     },
 };
 
 pub struct KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     keys: *const [K],
     values: SlicePtrsWrapper<'context, V>,
@@ -23,7 +23,7 @@ where
 
 impl<'context, K, V> KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -89,7 +89,12 @@ where
         let value = context.slice_ptrs_as_ptrs(values.into_inner());
         KeyValuePtrs::new(key, value)
     }
+}
 
+impl<'context, K, V> KeyValueSlicePtrs<'context, K, V>
+where
+    V: Soa + ?Sized,
+{
     #[inline]
     pub unsafe fn deref<'a>(
         self,
@@ -106,7 +111,7 @@ where
 impl<'context, K, V> From<KeyValueSlicePtrs<'context, K, V>>
     for (*const [K], SlicePtrsWrapper<'context, V>)
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueSlicePtrs<'context, K, V>) -> Self {
@@ -116,7 +121,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SlicePtrsWrapper<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -130,7 +135,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SlicePtrsWrapper<'context, V>: PartialEq,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
@@ -142,14 +147,14 @@ where
 
 impl<'context, K, V> Eq for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SlicePtrsWrapper<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SlicePtrsWrapper<'context, V>: PartialOrd,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
@@ -165,7 +170,7 @@ where
 
 impl<'context, K, V> Ord for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SlicePtrsWrapper<'context, V>: Ord,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
@@ -181,7 +186,7 @@ where
 
 impl<'context, K, V> Hash for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SlicePtrsWrapper<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -193,7 +198,7 @@ where
 
 impl<K, V> Clone for KeyValueSlicePtrs<'_, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -205,7 +210,7 @@ where
 
 impl<'context, K, V> Copy for KeyValueSlicePtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SlicePtrsWrapper<'context, V>: Copy,
 {
 }

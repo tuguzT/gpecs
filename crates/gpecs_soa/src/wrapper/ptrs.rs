@@ -7,14 +7,14 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{Ptrs as Inner, RawSoaContext, Soa};
+use crate::traits::{Ptrs as Inner, RawSoa, RawSoaContext};
 
 /// Type wrapper for [pointers](RawSoaContext::Ptrs)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct Ptrs<'context, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     inner: Inner<'static, T>,
     phantom: PhantomData<&'context ()>,
@@ -22,7 +22,7 @@ where
 
 impl<'context, T> Ptrs<'context, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     /// Creates self from the [pointers](RawSoaContext::Ptrs).
     #[inline]
@@ -57,7 +57,7 @@ where
 
 impl<T> Debug for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -68,7 +68,7 @@ where
 
 impl<T> Default for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Default,
 {
     fn default() -> Self {
@@ -81,7 +81,7 @@ where
 
 impl<T> Clone for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -92,14 +92,14 @@ where
 
 impl<T> Copy for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Copy,
 {
 }
 
 impl<T> PartialEq for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -110,14 +110,14 @@ where
 
 impl<T> Eq for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -132,7 +132,7 @@ where
 
 impl<T> Ord for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -147,7 +147,7 @@ where
 
 impl<T> Hash for Ptrs<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     for<'any> Inner<'any, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

@@ -92,7 +92,7 @@ where
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
 where
     K: Key + 'a,
-    V: SoaRead,
+    V: Soa + SoaRead,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -115,7 +115,7 @@ where
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
 where
     K: Key + 'a,
-    V: SoaRead + SoaWrite,
+    V: Soa + SoaRead + SoaWrite,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -212,7 +212,7 @@ where
 impl<'a, K, V, C> VacantEntry<'a, K, V, C>
 where
     K: Key + 'a,
-    V: SoaRead + SoaWrite,
+    V: Soa + SoaRead + SoaWrite,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -448,7 +448,9 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::Soa
+                + $crate::soa::traits::SoaRead
+                + $crate::soa::traits::SoaWrite,
         {
             #[inline]
             pub fn or_insert(self, default: V) -> V::RefsMut<'a, 'a> {
@@ -576,7 +578,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaRead,
+            V: $crate::soa::traits::Soa + $crate::soa::traits::SoaRead,
         {
             #[inline]
             pub fn remove(self) -> V {
@@ -594,7 +596,9 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::Soa
+                + $crate::soa::traits::SoaRead
+                + $crate::soa::traits::SoaWrite,
         {
             #[inline]
             pub fn insert(&mut self, value: V) -> V {
@@ -664,7 +668,9 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::Soa
+                + $crate::soa::traits::SoaRead
+                + $crate::soa::traits::SoaWrite,
         {
             #[inline]
             pub fn insert(self, value: V) -> V::RefsMut<'a, 'a> {

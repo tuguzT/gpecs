@@ -257,7 +257,7 @@ where
 
 impl<K, V> Iterator for IntoValues<K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     type Item = V;
 
@@ -295,7 +295,7 @@ where
 
 impl<K, V> DoubleEndedIterator for IntoValues<K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -306,7 +306,7 @@ where
 
 impl<K, V> ExactSizeIterator for IntoValues<K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -314,7 +314,7 @@ where
     }
 }
 
-impl<K, V> FusedIterator for IntoValues<K, V> where V: SoaRead {}
+impl<K, V> FusedIterator for IntoValues<K, V> where V: Soa + SoaRead {}
 
 pub struct IntoIter<K, V>
 where
@@ -445,7 +445,7 @@ where
 
 impl<K, V> Iterator for IntoIter<K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     type Item = (K, V);
 
@@ -473,7 +473,7 @@ where
 
 impl<K, V> DoubleEndedIterator for IntoIter<K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -484,7 +484,7 @@ where
 
 impl<K, V> ExactSizeIterator for IntoIter<K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -492,7 +492,7 @@ where
     }
 }
 
-impl<K, V> FusedIterator for IntoIter<K, V> where V: SoaRead {}
+impl<K, V> FusedIterator for IntoIter<K, V> where V: Soa + SoaRead {}
 
 pub struct Drain<'a, K, V>
 where
@@ -556,7 +556,7 @@ where
 
 impl<K, V> Iterator for Drain<'_, K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     type Item = (K, V);
 
@@ -575,7 +575,7 @@ where
 
 impl<K, V> DoubleEndedIterator for Drain<'_, K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -586,7 +586,7 @@ where
 
 impl<K, V> ExactSizeIterator for Drain<'_, K, V>
 where
-    V: SoaRead,
+    V: Soa + SoaRead,
 {
     fn len(&self) -> usize {
         let Self { inner } = self;
@@ -594,4 +594,4 @@ where
     }
 }
 
-impl<K, V> FusedIterator for Drain<'_, K, V> where V: SoaRead {}
+impl<K, V> FusedIterator for Drain<'_, K, V> where V: Soa + SoaRead {}

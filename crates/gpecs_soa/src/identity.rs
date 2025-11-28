@@ -13,7 +13,7 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
         SoaTrustedFields, SoaWrite, impls::debug_assert_ptr_is_aligned,
     },
 };
@@ -539,11 +539,12 @@ unsafe impl<T> RawSoaContext for IdentityContext<T> {
     }
 }
 
-unsafe impl<T> Soa for Identity<T> {
+unsafe impl<T> RawSoa for Identity<T> {
     type Context = IdentityContext<T>;
-
     type Fields = Identity<T>;
+}
 
+unsafe impl<T> Soa for Identity<T> {
     type Refs<'context, 'a>
         = &'a Self
     where
@@ -767,19 +768,19 @@ where
     type Owned = Identity<T>;
 
     #[inline]
-    fn to_owned(&self, _context: &<Self::Owned as Soa>::Context) -> Self::Owned {
+    fn to_owned(&self, _context: &<Self::Owned as RawSoa>::Context) -> Self::Owned {
         (*self).clone()
     }
 
     #[inline]
-    fn clone_into(&self, _context: &<Self::Owned as Soa>::Context, target: &mut Self::Owned) {
+    fn clone_into(&self, _context: &<Self::Owned as RawSoa>::Context, target: &mut Self::Owned) {
         target.clone_from(self);
     }
 
     #[inline]
     fn clone_into_refs<'context>(
         &self,
-        _context: &'context <Self::Owned as Soa>::Context,
+        _context: &'context <Self::Owned as RawSoa>::Context,
         target: <Self::Owned as Soa>::RefsMut<'context, '_>,
     ) {
         target.clone_from(self);

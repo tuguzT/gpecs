@@ -3,7 +3,7 @@ use crate::traits::{RawSoaContext, Soa, SoaRead, SoaWrite};
 /// Version of [`core::mem::replace()`] but for [`Soa`] references.
 pub fn replace<T>(context: &T::Context, dest: T::RefsMut<'_, '_>, src: T) -> T
 where
-    T: SoaRead + SoaWrite,
+    T: Soa + SoaRead + SoaWrite,
 {
     let dest = T::refs_mut_as_ptrs(context, T::upcast_refs_mut(dest));
 

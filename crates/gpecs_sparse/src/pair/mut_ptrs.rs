@@ -8,14 +8,14 @@ use core::{
 use crate::{
     pair::{KeyValuePair, KeyValuePtrs, KeyValueRefs, KeyValueRefsMut},
     soa::{
-        traits::{MutPtrs, RawSoaContext, Soa, SoaWrite},
+        traits::{MutPtrs, RawSoa, RawSoaContext, Soa, SoaWrite},
         wrapper::MutPtrs as MutPtrsWrapper,
     },
 };
 
 pub struct KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     pub key: *mut K,
     pub value: MutPtrsWrapper<'context, V>,
@@ -23,7 +23,7 @@ where
 
 impl<'context, K, V> KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     pub fn new(key: *mut K, value: MutPtrs<'context, V>) -> Self {
@@ -164,7 +164,12 @@ where
             context.ptrs_drop_in_place(value.into_inner());
         }
     }
+}
 
+impl<'context, K, V> KeyValueMutPtrs<'context, K, V>
+where
+    V: Soa + ?Sized,
+{
     #[inline]
     pub unsafe fn deref<'a>(
         self,
@@ -212,7 +217,7 @@ where
 
 impl<'context, K, V> From<(*mut K, MutPtrsWrapper<'context, V>)> for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(value: (*mut K, MutPtrsWrapper<'context, V>)) -> Self {
@@ -223,7 +228,7 @@ where
 
 impl<'context, K, V> From<KeyValueMutPtrs<'context, K, V>> for (*mut K, MutPtrsWrapper<'context, V>)
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueMutPtrs<'context, K, V>) -> Self {
@@ -234,7 +239,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     MutPtrsWrapper<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -248,7 +253,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     MutPtrsWrapper<'context, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -259,14 +264,14 @@ where
 
 impl<'context, K, V> Eq for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     MutPtrsWrapper<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     MutPtrsWrapper<'context, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -281,7 +286,7 @@ where
 
 impl<'context, K, V> Ord for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     MutPtrsWrapper<'context, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -296,7 +301,7 @@ where
 
 impl<'context, K, V> Hash for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     MutPtrsWrapper<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -308,7 +313,7 @@ where
 
 impl<K, V> Clone for KeyValueMutPtrs<'_, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -320,7 +325,7 @@ where
 
 impl<'context, K, V> Copy for KeyValueMutPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     MutPtrsWrapper<'context, V>: Copy,
 {
 }

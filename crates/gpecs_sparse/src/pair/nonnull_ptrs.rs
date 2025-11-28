@@ -8,14 +8,14 @@ use core::{
 use crate::{
     pair::{KeyValueMutPtrs, KeyValuePtrs},
     soa::{
-        traits::{RawSoaContext, Soa},
+        traits::{RawSoa, RawSoaContext},
         wrapper::NonNullPtrs,
     },
 };
 
 pub struct KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     pub key: NonNull<K>,
     pub value: NonNullPtrs<'context, V>,
@@ -23,7 +23,7 @@ where
 
 impl<'context, K, V> KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     pub unsafe fn new_unchecked(
@@ -60,7 +60,7 @@ where
 impl<'context, K, V> From<(NonNull<K>, NonNullPtrs<'context, V>)>
     for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(value: (NonNull<K>, NonNullPtrs<'context, V>)) -> Self {
@@ -72,7 +72,7 @@ where
 impl<'context, K, V> From<KeyValueNonNullPtrs<'context, K, V>>
     for (NonNull<K>, NonNullPtrs<'context, V>)
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueNonNullPtrs<'context, K, V>) -> Self {
@@ -83,7 +83,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     NonNullPtrs<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -97,7 +97,7 @@ where
 
 impl<'context, K, V> PartialEq for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     NonNullPtrs<'context, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -108,14 +108,14 @@ where
 
 impl<'context, K, V> Eq for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     NonNullPtrs<'context, V>: Eq,
 {
 }
 
 impl<'context, K, V> PartialOrd for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     NonNullPtrs<'context, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -130,7 +130,7 @@ where
 
 impl<'context, K, V> Ord for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     NonNullPtrs<'context, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -145,7 +145,7 @@ where
 
 impl<'context, K, V> Hash for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     NonNullPtrs<'context, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -157,7 +157,7 @@ where
 
 impl<K, V> Clone for KeyValueNonNullPtrs<'_, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -169,7 +169,7 @@ where
 
 impl<'context, K, V> Copy for KeyValueNonNullPtrs<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     NonNullPtrs<'context, V>: Copy,
 {
 }

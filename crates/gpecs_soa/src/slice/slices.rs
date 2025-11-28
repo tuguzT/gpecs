@@ -978,7 +978,7 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: SoaWrite,
+    T: Soa + SoaWrite,
 {
     #[inline]
     #[track_caller]

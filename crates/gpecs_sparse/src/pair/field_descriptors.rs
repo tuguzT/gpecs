@@ -6,13 +6,13 @@ use core::{
 
 use crate::soa::{
     field::{CopiedFieldDescriptors, FieldDescriptor},
-    traits::{RawSoaContext, Soa},
+    traits::{RawSoa, RawSoaContext},
     wrapper::FieldDescriptors,
 };
 
 pub struct KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     key: FieldDescriptor,
     values: FieldDescriptors<'context, V>,
@@ -21,7 +21,7 @@ where
 
 impl<'context, K, V> KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     pub fn new(context: &'context V::Context) -> Self {
@@ -41,7 +41,7 @@ where
 
 impl<'context, K, V> Debug for KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     FieldDescriptors<'context, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -55,7 +55,7 @@ where
 
 impl<'context, K, V> Clone for KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     FieldDescriptors<'context, V>: Clone,
 {
     fn clone(&self) -> Self {
@@ -74,14 +74,14 @@ where
 
 impl<'context, K, V> Copy for KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     FieldDescriptors<'context, V>: Copy,
 {
 }
 
 impl<'context, K, V> IntoIterator for KeyValueFieldDescriptors<'context, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     type Item = FieldDescriptor;
 

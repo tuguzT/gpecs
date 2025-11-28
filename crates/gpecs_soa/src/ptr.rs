@@ -7,7 +7,7 @@ use core::{
 use crate::{
     layout::{BufferData, BufferPrefix, buffer_layout, is_zst, should_allocate},
     slice::SoaSlice,
-    traits::{MutPtrs, Ptrs, Soa, SoaContext, SoaTrustedFields},
+    traits::{MutPtrs, Ptrs, RawSoaContext, Soa, SoaTrustedFields},
 };
 
 #[inline]

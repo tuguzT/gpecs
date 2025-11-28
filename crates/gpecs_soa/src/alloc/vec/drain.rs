@@ -8,7 +8,7 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, SoaSlices, range},
-    traits::{SoaContext, SoaRead},
+    traits::{RawSoaContext, SoaRead},
 };
 
 use super::{Soa, SoaVec};

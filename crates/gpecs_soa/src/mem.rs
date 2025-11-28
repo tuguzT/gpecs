@@ -1,4 +1,4 @@
-use crate::traits::{Soa, SoaContext, SoaRead, SoaWrite};
+use crate::traits::{RawSoaContext, Soa, SoaRead, SoaWrite};
 
 /// Version of [`core::mem::replace()`] but for [`Soa`] references.
 pub fn replace<T>(context: &T::Context, dest: T::RefsMut<'_, '_>, src: T) -> T

@@ -8,7 +8,7 @@ use gpecs_soa_erased::{
     erased::BoxedErasedSoa,
     soa::{
         field::buffer_layout,
-        traits::{Soa, SoaContext},
+        traits::{RawSoaContext, Soa},
     },
 };
 

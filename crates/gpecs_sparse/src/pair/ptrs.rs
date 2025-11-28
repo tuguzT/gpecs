@@ -8,7 +8,7 @@ use core::{
 use crate::{
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValueRefs},
     soa::{
-        traits::{Ptrs, Soa, SoaContext, SoaRead},
+        traits::{Ptrs, RawSoaContext, Soa, SoaRead},
         wrapper::Ptrs as PtrsWrapper,
     },
 };

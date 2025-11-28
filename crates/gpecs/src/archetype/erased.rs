@@ -14,7 +14,7 @@ use crate::{
     hash::IndexMap,
     soa::{
         field::FieldDescriptor,
-        traits::{Soa, SoaContext, SoaRead, SoaWrite},
+        traits::{RawSoaContext, Soa, SoaRead, SoaWrite},
     },
 };
 

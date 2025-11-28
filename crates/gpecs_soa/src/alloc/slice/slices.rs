@@ -4,7 +4,7 @@ use core_alloc::boxed::Box;
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
     slice::{SoaSlices, SoaSlicesMut},
-    traits::{Soa, SoaContext, SoaToOwned, SoaWrite},
+    traits::{RawSoaContext, Soa, SoaToOwned, SoaWrite},
     vec::SoaVec,
 };
 

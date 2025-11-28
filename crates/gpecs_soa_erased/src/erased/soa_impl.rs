@@ -4,7 +4,7 @@ use crate::{
     aligned_bytes::{AlignedBytes, AlignedBytesFromLayout},
     soa::{
         field::FieldDescriptor,
-        traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext, SoaRead, SoaWrite},
+        traits::{MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaWrite},
     },
 };
 
@@ -15,7 +15,7 @@ use super::{
     soa_slice_from_raw_parts, soa_slice_from_raw_parts_mut,
 };
 
-unsafe impl<D> SoaContext for ErasedSoaContext<D>
+unsafe impl<D> RawSoaContext for ErasedSoaContext<D>
 where
     D: AsRef<[FieldDescriptor]>,
 {

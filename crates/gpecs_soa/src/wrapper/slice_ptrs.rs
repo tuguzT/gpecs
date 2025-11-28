@@ -7,9 +7,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{SlicePtrs as Inner, Soa, SoaContext};
+use crate::traits::{RawSoaContext, SlicePtrs as Inner, Soa};
 
-/// Type wrapper for [slice pointers](SoaContext::SlicePtrs)
+/// Type wrapper for [slice pointers](RawSoaContext::SlicePtrs)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct SlicePtrs<'context, T>
@@ -24,7 +24,7 @@ impl<'context, T> SlicePtrs<'context, T>
 where
     T: Soa + ?Sized,
 {
-    /// Creates self from the [slice pointers](SoaContext::SlicePtrs).
+    /// Creates self from the [slice pointers](RawSoaContext::SlicePtrs).
     #[inline]
     pub fn new(inner: Inner<'context, T>) -> Self {
         Self {
@@ -33,21 +33,21 @@ where
         }
     }
 
-    /// Retrieves a reference of [slice pointers](SoaContext::SlicePtrs).
+    /// Retrieves a reference of [slice pointers](RawSoaContext::SlicePtrs).
     #[inline]
     pub fn as_inner(&self) -> &Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [slice pointers](SoaContext::SlicePtrs).
+    /// Retrieves a mutable reference of [slice pointers](RawSoaContext::SlicePtrs).
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [slice pointers](SoaContext::SlicePtrs).
+    /// Retrieves the [slice pointers](RawSoaContext::SlicePtrs).
     #[inline]
     pub fn into_inner(self) -> Inner<'context, T> {
         let Self { inner, .. } = self;

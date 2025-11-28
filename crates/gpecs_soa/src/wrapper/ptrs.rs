@@ -7,9 +7,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{Ptrs as Inner, Soa, SoaContext};
+use crate::traits::{Ptrs as Inner, RawSoaContext, Soa};
 
-/// Type wrapper for [pointers](SoaContext::Ptrs)
+/// Type wrapper for [pointers](RawSoaContext::Ptrs)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct Ptrs<'context, T>
@@ -24,7 +24,7 @@ impl<'context, T> Ptrs<'context, T>
 where
     T: Soa + ?Sized,
 {
-    /// Creates self from the [pointers](SoaContext::Ptrs).
+    /// Creates self from the [pointers](RawSoaContext::Ptrs).
     #[inline]
     pub fn new(inner: Inner<'context, T>) -> Self {
         Self {
@@ -33,21 +33,21 @@ where
         }
     }
 
-    /// Retrieves a reference of [pointers](SoaContext::Ptrs).
+    /// Retrieves a reference of [pointers](RawSoaContext::Ptrs).
     #[inline]
     pub fn as_inner(&self) -> &Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [pointers](SoaContext::Ptrs).
+    /// Retrieves a mutable reference of [pointers](RawSoaContext::Ptrs).
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [pointers](SoaContext::Ptrs).
+    /// Retrieves the [pointers](RawSoaContext::Ptrs).
     #[inline]
     pub fn into_inner(self) -> Inner<'context, T> {
         let Self { inner, .. } = self;

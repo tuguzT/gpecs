@@ -7,9 +7,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{FieldDescriptors as Inner, Soa, SoaContext};
+use crate::traits::{FieldDescriptors as Inner, RawSoaContext, Soa};
 
-/// Type wrapper for [field descriptors](SoaContext::FieldDescriptors)
+/// Type wrapper for [field descriptors](RawSoaContext::FieldDescriptors)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct FieldDescriptors<'context, T>
@@ -24,7 +24,7 @@ impl<'context, T> FieldDescriptors<'context, T>
 where
     T: Soa + ?Sized,
 {
-    /// Creates self from the [field descriptors](SoaContext::FieldDescriptors).
+    /// Creates self from the [field descriptors](RawSoaContext::FieldDescriptors).
     #[inline]
     pub fn new(inner: Inner<'context, T>) -> Self {
         Self {
@@ -33,21 +33,21 @@ where
         }
     }
 
-    /// Retrieves a reference of [field descriptors](SoaContext::FieldDescriptors).
+    /// Retrieves a reference of [field descriptors](RawSoaContext::FieldDescriptors).
     #[inline]
     pub fn as_inner(&self) -> &Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [field descriptors](SoaContext::FieldDescriptors).
+    /// Retrieves a mutable reference of [field descriptors](RawSoaContext::FieldDescriptors).
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [field descriptors](SoaContext::FieldDescriptors).
+    /// Retrieves the [field descriptors](RawSoaContext::FieldDescriptors).
     #[inline]
     pub fn into_inner(self) -> Inner<'context, T> {
         let Self { inner, .. } = self;

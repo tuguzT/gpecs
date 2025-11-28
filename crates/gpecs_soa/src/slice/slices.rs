@@ -13,7 +13,7 @@ use crate::{
         index::{IndexHelper, IndexHelperMut, SoaSliceIndex},
         iter::{Iter, IterMut},
     },
-    traits::{MutPtrs, Ptrs, Soa, SoaContext, SoaToOwned, SoaWrite},
+    traits::{MutPtrs, Ptrs, RawSoaContext, Soa, SoaToOwned, SoaWrite},
     wrapper::{MutPtrs as MutPtrsWrapper, Ptrs as PtrsWrapper},
 };
 

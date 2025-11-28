@@ -11,7 +11,7 @@ use crate::{
     field::ErasedFieldNonNullPtr,
     soa::{
         field::FieldDescriptor,
-        traits::{NonNullPtrs, Soa, SoaContext},
+        traits::{NonNullPtrs, RawSoaContext, Soa},
     },
 };
 

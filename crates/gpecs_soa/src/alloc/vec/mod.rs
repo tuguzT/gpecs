@@ -18,7 +18,7 @@ use crate::{
         IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSlices, SoaSlicesMut,
         from_raw_parts, from_raw_parts_mut, range,
     },
-    traits::{MutPtrs, Ptrs, Soa, SoaContext, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite},
+    traits::{MutPtrs, Ptrs, RawSoaContext, Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite},
 };
 
 use super::{raw_vec::RawSoaVec, set_len_on_drop::SetLenOnDrop};

@@ -13,7 +13,7 @@ use crate::{
     field::ErasedFieldPtr,
     soa::{
         field::FieldDescriptor,
-        traits::{Ptrs, Soa, SoaContext},
+        traits::{Ptrs, RawSoaContext, Soa},
     },
 };
 

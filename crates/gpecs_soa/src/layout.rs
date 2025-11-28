@@ -3,7 +3,7 @@ use core::{
     mem::{ManuallyDrop, MaybeUninit, offset_of},
 };
 
-use crate::traits::{Soa, SoaContext};
+use crate::traits::{RawSoaContext, Soa};
 
 /// Special type which is used to properly allocate a buffer in memory
 /// with respect to the size and alignment of

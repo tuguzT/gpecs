@@ -23,7 +23,7 @@ use crate::{
     field::{ErasedField, error::ErasedFieldFromDescDataError},
     soa::{
         field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_layout, buffer_offsets},
-        traits::{SoaContext, SoaRead, SoaWrite},
+        traits::{RawSoaContext, SoaRead, SoaWrite},
     },
 };
 

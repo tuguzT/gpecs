@@ -8,19 +8,19 @@ pub use self::impls::TupleContext;
 pub mod impls;
 
 /// This trait is used to perform all memory operations & pointer arithmetics for [`SoA`](Soa) types.
-pub unsafe trait SoaContext {
+pub unsafe trait RawSoaContext {
     /// Non-empty collection of [descriptors](FieldDescriptor) for each stored field.
     ///
     /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
     type FieldDescriptors<'a>: IntoIterator<Item: AsRef<FieldDescriptor>>;
 
-    /// Restricts [field descriptors](SoaContext::FieldDescriptors)
+    /// Restricts [field descriptors](RawSoaContext::FieldDescriptors)
     /// to be covariant over generic lifetime.
     fn upcast_field_descriptors<'short, 'long: 'short>(
         from: Self::FieldDescriptors<'long>,
     ) -> Self::FieldDescriptors<'short>;
 
-    /// Returns [field descriptors](SoaContext::FieldDescriptors) for each stored field.
+    /// Returns [field descriptors](RawSoaContext::FieldDescriptors) for each stored field.
     fn field_descriptors(&self) -> Self::FieldDescriptors<'_>;
 
     /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
@@ -55,19 +55,19 @@ pub unsafe trait SoaContext {
 
     /// Non-empty collection of pointers to each stored field.
     ///
-    /// Unlike [field descriptors](SoaContext::FieldDescriptors),
+    /// Unlike [field descriptors](RawSoaContext::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type Ptrs<'a>: Clone;
 
-    /// Restricts [pointers](SoaContext::Ptrs) to each stored field
+    /// Restricts [pointers](RawSoaContext::Ptrs) to each stored field
     /// to be covariant over generic lifetime.
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short>;
 
-    /// Returns dangling [pointers](SoaContext::Ptrs) to each stored field.
+    /// Returns dangling [pointers](RawSoaContext::Ptrs) to each stored field.
     fn ptrs_dangling(&self) -> Self::Ptrs<'_>;
 
-    /// Creates [pointers](SoaContext::Ptrs) to each stored field
+    /// Creates [pointers](RawSoaContext::Ptrs) to each stored field
     /// from a given buffer with given capacity.
     ///
     /// Implementations of this method should not account for a [`Context`](Soa::Context),
@@ -76,10 +76,10 @@ pub unsafe trait SoaContext {
     /// # Safety
     ///
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
-    /// must be the same as the one returned by [`buffer_layout()`](SoaContext::buffer_layout) method.
+    /// must be the same as the one returned by [`buffer_layout()`](RawSoaContext::buffer_layout) method.
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_>;
 
-    /// Adds an unsigned offset to each [pointer](SoaContext::Ptrs) of each stored field.
+    /// Adds an unsigned offset to each [pointer](RawSoaContext::Ptrs) of each stored field.
     ///
     /// All the safety requirements resulting from applying [`pointer::add()`] method to each pointer
     /// should be satisfied to be safe to call this method.
@@ -87,7 +87,7 @@ pub unsafe trait SoaContext {
     /// [`pointer::add()`]: https://doc.rust-lang.org/stable/core/primitive.pointer.html#method.add
     unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a>;
 
-    /// Calculates the distance between two [pointers](SoaContext::Ptrs)
+    /// Calculates the distance between two [pointers](RawSoaContext::Ptrs)
     /// to each stored field within the same allocation.
     ///
     /// All the safety requirements resulting from applying [`pointer::offset_from()`] method to each pointer
@@ -101,19 +101,19 @@ pub unsafe trait SoaContext {
 
     /// Non-empty collection of mutable pointers to each stored field.
     ///
-    /// Unlike [field descriptors](SoaContext::FieldDescriptors),
+    /// Unlike [field descriptors](RawSoaContext::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type MutPtrs<'a>: Clone;
 
-    /// Restricts [mutable pointers](SoaContext::MutPtrs) to each stored field
+    /// Restricts [mutable pointers](RawSoaContext::MutPtrs) to each stored field
     /// to be covariant over generic lifetime.
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short>;
 
-    /// Returns mutable dangling [pointers](SoaContext::MutPtrs) to each stored field.
+    /// Returns mutable dangling [pointers](RawSoaContext::MutPtrs) to each stored field.
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_>;
 
-    /// Creates [mutable pointers](SoaContext::MutPtrs) to each stored field
+    /// Creates [mutable pointers](RawSoaContext::MutPtrs) to each stored field
     /// from a given buffer with given capacity.
     ///
     /// Implementations of this method should not account for a [`Context`](Soa::Context),
@@ -122,10 +122,10 @@ pub unsafe trait SoaContext {
     /// # Safety
     ///
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
-    /// must be the same as the one returned by [`buffer_layout()`](SoaContext::buffer_layout) method.
+    /// must be the same as the one returned by [`buffer_layout()`](RawSoaContext::buffer_layout) method.
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
 
-    /// Adds an unsigned offset to each [mutable pointer](SoaContext::MutPtrs) of each stored field.
+    /// Adds an unsigned offset to each [mutable pointer](RawSoaContext::MutPtrs) of each stored field.
     ///
     /// All the safety requirements resulting from applying [`pointer::add()`] method to each pointer
     /// should be satisfied to be safe to call this method.
@@ -137,7 +137,7 @@ pub unsafe trait SoaContext {
         offset: usize,
     ) -> Self::MutPtrs<'a>;
 
-    /// Calculates the distance between two [mutable pointers](SoaContext::MutPtrs)
+    /// Calculates the distance between two [mutable pointers](RawSoaContext::MutPtrs)
     /// to each stored field within the same allocation.
     ///
     /// All the safety requirements resulting from applying [`pointer::offset_from()`] method to each pointer
@@ -150,15 +150,15 @@ pub unsafe trait SoaContext {
     unsafe fn ptrs_offset_from_mut(&self, ptrs: Self::MutPtrs<'_>, origin: Self::Ptrs<'_>)
     -> isize;
 
-    /// Converts [pointers](SoaContext::Ptrs) of each stored field
-    /// to the [mutable ones](SoaContext::MutPtrs).
+    /// Converts [pointers](RawSoaContext::Ptrs) of each stored field
+    /// to the [mutable ones](RawSoaContext::MutPtrs).
     fn ptrs_cast_const<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::Ptrs<'a>;
 
-    /// Converts [mutable pointers](SoaContext::MutPtrs) of each stored field
-    /// to the [const ones](SoaContext::Ptrs).
+    /// Converts [mutable pointers](RawSoaContext::MutPtrs) of each stored field
+    /// to the [const ones](RawSoaContext::Ptrs).
     fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a>;
 
-    /// Swaps the values at two [mutable locations](SoaContext::MutPtrs) of the stored fields
+    /// Swaps the values at two [mutable locations](RawSoaContext::MutPtrs) of the stored fields
     /// sequentially in the same order as they are stored in the buffer,
     /// without deinitializing either.
     ///
@@ -167,36 +167,36 @@ pub unsafe trait SoaContext {
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>);
 
-    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaContext::Ptrs) to [dst](SoaContext::MutPtrs)
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in the same order as they are stored in the buffer.
     /// The source and destination may overlap.
     ///
     /// If the source and destination will never overlap,
-    /// [`ptrs_copy_nonoverlapping()`](SoaContext::ptrs_copy_nonoverlapping) can be used instead.
+    /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::copy()`](core::ptr::copy) method to each pointer
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize);
 
-    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaContext::Ptrs) to [dst](SoaContext::MutPtrs)
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in the *reverse* order as they are stored in the buffer.
     /// The source and destination may overlap.
     ///
     /// If the source and destination will never overlap,
-    /// [`ptrs_copy_nonoverlapping()`](SoaContext::ptrs_copy_nonoverlapping) can be used instead.
+    /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::copy()`](core::ptr::copy) method to each pointer
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize);
 
-    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](SoaContext::Ptrs) to [dst](SoaContext::MutPtrs)
+    /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in unspecified order.
     /// The source and destination must not overlap.
     ///
     /// For regions of memory which might overlap, use
-    /// [`ptrs_copy()`](SoaContext::ptrs_copy) or [`ptrs_copy_rev()`](SoaContext::ptrs_copy_rev) instead.
+    /// [`ptrs_copy()`](RawSoaContext::ptrs_copy) or [`ptrs_copy_rev()`](RawSoaContext::ptrs_copy_rev) instead.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::copy_nonoverlapping()`](core::ptr::copy_nonoverlapping) method to each pointer
@@ -221,38 +221,38 @@ pub unsafe trait SoaContext {
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type NonNullPtrs<'a>: Clone;
 
-    /// Restricts [non-null pointers](SoaContext::NonNullPtrs) to each stored field
+    /// Restricts [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field
     /// to be covariant over generic lifetime.
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
         from: Self::NonNullPtrs<'long>,
     ) -> Self::NonNullPtrs<'short>;
 
-    /// Creates [non-null pointers](SoaContext::NonNullPtrs) to each stored field.
+    /// Creates [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field.
     ///
     /// All the safety requirements resulting from applying
     /// [`NonNull::new_unchecked()`](core::ptr::NonNull::new_unchecked) method to each pointer
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a>;
 
-    /// Acquires the underlying [pointers](SoaContext::MutPtrs) from [non-null pointers](SoaContext::NonNullPtrs)
+    /// Acquires the underlying [pointers](RawSoaContext::MutPtrs) from [non-null pointers](RawSoaContext::NonNullPtrs)
     /// to each stored field.
     fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a>;
 
     /// Non-empty collection of slice pointers to each stored field.
     ///
-    /// Unlike [field descriptors](SoaContext::FieldDescriptors),
+    /// Unlike [field descriptors](RawSoaContext::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type SlicePtrs<'a>: Clone;
 
-    /// Restricts [slice pointers](SoaContext::SlicePtrs) to each stored field
+    /// Restricts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
     /// to be covariant over generic lifetime.
     fn upcast_slice_ptrs<'short, 'long: 'short>(
         from: Self::SlicePtrs<'long>,
     ) -> Self::SlicePtrs<'short>;
 
-    /// Forms [slice pointers](SoaContext::SlicePtrs) to each stored field
-    /// from [pointers](SoaContext::Ptrs) to each field and a length.
+    /// Forms [slice pointers](RawSoaContext::SlicePtrs) to each stored field
+    /// from [pointers](RawSoaContext::Ptrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
     fn slice_ptrs_from_raw_parts<'a>(
@@ -261,32 +261,32 @@ pub unsafe trait SoaContext {
         len: usize,
     ) -> Self::SlicePtrs<'a>;
 
-    /// Returns the number of elements in slices to each [slice pointer](SoaContext::SlicePtrs) of stored fields,
+    /// Returns the number of elements in slices to each [slice pointer](RawSoaContext::SlicePtrs) of stored fields,
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the slice pointers,
     /// or else this method could panic.
     fn slice_ptrs_len(&self, slices: &Self::SlicePtrs<'_>) -> usize;
 
-    /// Returns [pointers](SoaContext::Ptrs) to the slice's buffer
-    /// of each [slice pointer](SoaContext::SlicePtrs) of stored fields.
+    /// Returns [pointers](RawSoaContext::Ptrs) to the slice's buffer
+    /// of each [slice pointer](RawSoaContext::SlicePtrs) of stored fields.
     fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a>;
 
     /// Non-empty collection of mutable slice pointers to each stored field.
     ///
-    /// Unlike [field descriptors](SoaContext::FieldDescriptors),
+    /// Unlike [field descriptors](RawSoaContext::FieldDescriptors),
     /// order of such pointers **may not** resemble their order inside of a buffer in memory.
     /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type SliceMutPtrs<'a>: Clone;
 
-    /// Restricts [mutable slice pointers](SoaContext::SliceMutPtrs) to each stored field
+    /// Restricts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
     /// to be covariant over generic lifetime.
     fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short>;
 
-    /// Forms [mutable slice pointers](SoaContext::SliceMutPtrs) to each stored field
-    /// from [mutable pointers](SoaContext::MutPtrs) to each field and a length.
+    /// Forms [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
+    /// from [mutable pointers](RawSoaContext::MutPtrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
     fn slice_mut_ptrs_from_raw_parts<'a>(
@@ -295,26 +295,26 @@ pub unsafe trait SoaContext {
         len: usize,
     ) -> Self::SliceMutPtrs<'a>;
 
-    /// Returns the number of elements in slices to each [mutable slice pointer](SoaContext::SliceMutPtrs) of stored fields,
+    /// Returns the number of elements in slices to each [mutable slice pointer](RawSoaContext::SliceMutPtrs) of stored fields,
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the mutable slice pointers,
     /// or else this method could panic.
     fn slice_mut_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize;
 
-    /// Returns [mutable pointers](SoaContext::MutPtrs) to the slice's buffer
-    /// of each [mutable slice pointer](SoaContext::SliceMutPtrs) of stored fields.
+    /// Returns [mutable pointers](RawSoaContext::MutPtrs) to the slice's buffer
+    /// of each [mutable slice pointer](RawSoaContext::SliceMutPtrs) of stored fields.
     fn slice_mut_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a>;
 
-    /// Converts [slice pointers](SoaContext::SlicePtrs) of each field of stored fields
-    /// to the [mutable ones](SoaContext::SliceMutPtrs).
+    /// Converts [slice pointers](RawSoaContext::SlicePtrs) of each field of stored fields
+    /// to the [mutable ones](RawSoaContext::SliceMutPtrs).
     fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a>;
 
-    /// Converts [mutable slice pointers](SoaContext::SliceMutPtrs) of each field of stored fields
-    /// to the [const ones](SoaContext::SlicePtrs).
+    /// Converts [mutable slice pointers](RawSoaContext::SliceMutPtrs) of each field of stored fields
+    /// to the [const ones](RawSoaContext::SlicePtrs).
     fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a>;
 
-    /// Executes the destructors (if any) for the each [slice](SoaContext::SliceMutPtrs) of stored fields.
+    /// Executes the destructors (if any) for the each [slice](RawSoaContext::SliceMutPtrs) of stored fields.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each slice pointer
@@ -332,38 +332,38 @@ pub unsafe trait SoaContext {
     }
 }
 
-/// Alias for the [`FieldDescriptors`](SoaContext::FieldDescriptors) associated type
+/// Alias for the [`FieldDescriptors`](RawSoaContext::FieldDescriptors) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type FieldDescriptors<'a, T> = <<T as Soa>::Context as SoaContext>::FieldDescriptors<'a>;
+pub type FieldDescriptors<'a, T> = <<T as Soa>::Context as RawSoaContext>::FieldDescriptors<'a>;
 
-/// Alias for the [`Ptrs`](SoaContext::Ptrs) associated type
+/// Alias for the [`Ptrs`](RawSoaContext::Ptrs) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type Ptrs<'a, T> = <<T as Soa>::Context as SoaContext>::Ptrs<'a>;
+pub type Ptrs<'a, T> = <<T as Soa>::Context as RawSoaContext>::Ptrs<'a>;
 
-/// Alias for the [`MutPtrs`](SoaContext::MutPtrs) associated type
+/// Alias for the [`MutPtrs`](RawSoaContext::MutPtrs) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type MutPtrs<'a, T> = <<T as Soa>::Context as SoaContext>::MutPtrs<'a>;
+pub type MutPtrs<'a, T> = <<T as Soa>::Context as RawSoaContext>::MutPtrs<'a>;
 
-/// Alias for the [`NonNullPtrs`](SoaContext::NonNullPtrs) associated type
+/// Alias for the [`NonNullPtrs`](RawSoaContext::NonNullPtrs) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type NonNullPtrs<'a, T> = <<T as Soa>::Context as SoaContext>::NonNullPtrs<'a>;
+pub type NonNullPtrs<'a, T> = <<T as Soa>::Context as RawSoaContext>::NonNullPtrs<'a>;
 
-/// Alias for the [`SlicePtrs`](SoaContext::SlicePtrs) associated type
+/// Alias for the [`SlicePtrs`](RawSoaContext::SlicePtrs) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type SlicePtrs<'a, T> = <<T as Soa>::Context as SoaContext>::SlicePtrs<'a>;
+pub type SlicePtrs<'a, T> = <<T as Soa>::Context as RawSoaContext>::SlicePtrs<'a>;
 
-/// Alias for the [`SliceMutPtrs`](SoaContext::SliceMutPtrs) associated type
+/// Alias for the [`SliceMutPtrs`](RawSoaContext::SliceMutPtrs) associated type
 /// of the [`Context`](Soa::Context) associated type of a given [`SoA`](Soa) type.
-pub type SliceMutPtrs<'a, T> = <<T as Soa>::Context as SoaContext>::SliceMutPtrs<'a>;
+pub type SliceMutPtrs<'a, T> = <<T as Soa>::Context as RawSoaContext>::SliceMutPtrs<'a>;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays pattern.
 pub unsafe trait Soa {
-    /// Type of [`SoA` context](SoaContext).
+    /// Type of [`SoA` context](RawSoaContext).
     ///
     /// Most of the time, this should be zero-sized type.
     /// This is true for all the [`SoA`](Soa) types with stored fields' size and alignment known at compile-time.
-    type Context: SoaContext;
+    type Context: RawSoaContext;
 
     /// Special type containing all the fields which are stored inside of a buffer.
     ///
@@ -404,7 +404,7 @@ pub unsafe trait Soa {
     where
         Self: 'a_long;
 
-    /// Converts [pointers](SoaContext::Ptrs) to each field of [`Fields`](Soa::Fields)
+    /// Converts [pointers](RawSoaContext::Ptrs) to each field of [`Fields`](Soa::Fields)
     /// to their [references](Soa::Refs) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
@@ -416,7 +416,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [mutable pointers](SoaContext::MutPtrs) to each field of [`Fields`](Soa::Fields)
+    /// Converts [mutable pointers](RawSoaContext::MutPtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable references](Soa::RefsMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
@@ -429,7 +429,7 @@ pub unsafe trait Soa {
         Self: 'a;
 
     /// Converts [references](Soa::Refs) to each field of [`Fields`](Soa::Fields)
-    /// to their [pointers](SoaContext::Ptrs) by taking the pointer of each one of them.
+    /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
     fn refs_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::Refs<'context, 'a>,
@@ -438,7 +438,7 @@ pub unsafe trait Soa {
         Self: 'a;
 
     /// Converts [mutable references](Soa::RefsMut) to each field of [`Fields`](Soa::Fields)
-    /// to their [mutable pointers](SoaContext::MutPtrs) by taking the pointer of each one of them.
+    /// to their [mutable pointers](RawSoaContext::MutPtrs) by taking the pointer of each one of them.
     fn refs_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         refs: Self::RefsMut<'context, 'a>,
@@ -500,7 +500,7 @@ pub unsafe trait Soa {
     where
         Self: 'a_long;
 
-    /// Converts [slice pointers](SoaContext::SlicePtrs) to each field of [`Fields`](Soa::Fields)
+    /// Converts [slice pointers](RawSoaContext::SlicePtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [slices](Soa::Slices) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each slice pointer
@@ -512,7 +512,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Converts [mutable slice pointers](SoaContext::SliceMutPtrs) to each field of [`Fields`](Soa::Fields)
+    /// Converts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each field of [`Fields`](Soa::Fields)
     /// to their [mutable slices](Soa::SlicesMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
@@ -543,7 +543,7 @@ pub unsafe trait Soa {
         Self: 'a;
 
     /// Converts [slices](Soa::Slices) to each field of [`Fields`](Soa::Fields)
-    /// to their [slice pointers](SoaContext::SlicePtrs) by taking the pointer of each one of them.
+    /// to their [slice pointers](RawSoaContext::SlicePtrs) by taking the pointer of each one of them.
     fn slices_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::Slices<'context, 'a>,
@@ -552,7 +552,7 @@ pub unsafe trait Soa {
         Self: 'a;
 
     /// Converts [mutable slices](Soa::SlicesMut) to each field of [`Fields`](Soa::Fields)
-    /// to their [mutable slice pointers](SoaContext::SliceMutPtrs) by taking the pointer of each one of them.
+    /// to their [mutable slice pointers](RawSoaContext::SliceMutPtrs) by taking the pointer of each one of them.
     fn slices_mut_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
@@ -569,7 +569,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Returns [pointers](SoaContext::Ptrs) to the slice's buffer
+    /// Returns [pointers](RawSoaContext::Ptrs) to the slice's buffer
     /// of each [slice](Soa::Slices) of [`Fields`](Soa::Fields).
     fn slices_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
@@ -578,7 +578,7 @@ pub unsafe trait Soa {
     where
         Self: 'a;
 
-    /// Returns [mutable pointers](SoaContext::MutPtrs) to the slice's buffer
+    /// Returns [mutable pointers](RawSoaContext::MutPtrs) to the slice's buffer
     /// of each [mutable slice](Soa::SlicesMut) of [`Fields`](Soa::Fields).
     fn slices_mut_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
@@ -589,7 +589,7 @@ pub unsafe trait Soa {
 }
 
 pub unsafe trait SoaRead: Soa + Sized {
-    /// Constructs the value from reading each field to which [src](SoaContext::Ptrs) points without moving them.
+    /// Constructs the value from reading each field to which [src](RawSoaContext::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.
     ///
     /// All the safety requirements resulting from applying
@@ -599,7 +599,7 @@ pub unsafe trait SoaRead: Soa + Sized {
 }
 
 pub unsafe trait SoaWrite: Soa + Sized {
-    /// Overwrites a memory [location](SoaContext::MutPtrs) of each field of [`Fields`](Soa::Fields)
+    /// Overwrites a memory [location](RawSoaContext::MutPtrs) of each field of [`Fields`](Soa::Fields)
     /// with the given value without reading or dropping the old value.
     ///
     /// All the safety requirements resulting from applying
@@ -643,8 +643,8 @@ pub trait SoaToOwned<'context, 'a> {
 /// on the [`Fields`](Soa::Fields) associated type of [`Soa`] trait implementations.
 ///
 /// These safety requirements are:
-/// - sum of layouts' sizes of [`FieldDescriptors`](SoaContext::FieldDescriptors)
+/// - sum of layouts' sizes of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
 ///   should be less or equal to the size of [`Fields`](Soa::Fields)
-/// - alignment of each layout of [`FieldDescriptors`](SoaContext::FieldDescriptors)
+/// - alignment of each layout of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
 ///   should be less or equal to the alignment of [`Fields`](Soa::Fields)
 pub unsafe trait SoaTrustedFields: Soa {}

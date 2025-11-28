@@ -6,7 +6,7 @@ use core::{
 
 use crate::soa::{
     field::{CopiedFieldDescriptors, FieldDescriptor},
-    traits::{Soa, SoaContext},
+    traits::{RawSoaContext, Soa},
     wrapper::FieldDescriptors,
 };
 

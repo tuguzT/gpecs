@@ -14,7 +14,7 @@ use crate::{
     soa::{
         field::{FieldDescriptor, buffer_layout},
         slice::range,
-        traits::{Soa, SoaContext},
+        traits::{RawSoaContext, Soa},
     },
 };
 

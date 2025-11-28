@@ -9,7 +9,7 @@ use crate::{
     alloc::raw_vec::RawSoaVec,
     layout::BufferData,
     ptr::BufferDataPtr,
-    traits::{MutPtrs, NonNullPtrs, Ptrs, Soa, SoaContext, SoaRead},
+    traits::{MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, Soa, SoaRead},
     vec::SoaVec,
     wrapper::NonNullPtrs as NonNullPtrsWrapper,
 };

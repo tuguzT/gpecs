@@ -23,7 +23,7 @@ use crate::{
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
-        traits::{MutPtrs, Ptrs, Soa, SoaContext, SoaRead, SoaWrite},
+        traits::{MutPtrs, Ptrs, RawSoaContext, Soa, SoaRead, SoaWrite},
         vec::SoaVec,
     },
     view::{EpochSparseView, EpochSparseViewMut},

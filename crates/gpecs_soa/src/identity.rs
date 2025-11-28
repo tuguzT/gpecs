@@ -13,7 +13,7 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext, SoaRead, SoaToOwned,
+        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
         SoaTrustedFields, SoaWrite, impls::debug_assert_ptr_is_aligned,
     },
 };
@@ -314,7 +314,7 @@ impl<T> Hash for IdentityContext<T> {
     }
 }
 
-unsafe impl<T> SoaContext for IdentityContext<T> {
+unsafe impl<T> RawSoaContext for IdentityContext<T> {
     type FieldDescriptors<'a> = [FieldDescriptor; 1];
 
     #[inline]

@@ -12,7 +12,7 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext, SoaRead, SoaToOwned,
+        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
         SoaTrustedFields, SoaWrite,
     },
 };
@@ -30,7 +30,7 @@ pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
     );
 }
 
-unsafe impl SoaContext for () {
+unsafe impl RawSoaContext for () {
     type FieldDescriptors<'a> = [FieldDescriptor; 1];
 
     #[inline]
@@ -617,7 +617,7 @@ macro_rules! soa_tuple_impl {
             };
         }
 
-        unsafe impl<$($types,)*> super::SoaContext for TupleContext<($($types,)*)> {
+        unsafe impl<$($types,)*> super::RawSoaContext for TupleContext<($($types,)*)> {
             type FieldDescriptors<'a> = [FieldDescriptor; count_idents!($($types,)*)];
 
             #[inline]

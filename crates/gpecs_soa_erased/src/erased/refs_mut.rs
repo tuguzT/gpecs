@@ -12,7 +12,7 @@ use crate::{
     field::{ErasedFieldMutPtr, ErasedFieldRefMut},
     soa::{
         field::{FieldDescriptor, buffer_layout},
-        traits::{Soa, SoaContext},
+        traits::{RawSoaContext, Soa},
     },
 };
 

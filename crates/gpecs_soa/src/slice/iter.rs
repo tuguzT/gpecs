@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-    traits::{MutPtrs, Ptrs, Soa, SoaContext},
+    traits::{MutPtrs, Ptrs, RawSoaContext, Soa},
     wrapper::NonNullPtrs,
 };
 

@@ -12,7 +12,7 @@ use crate::{
         SoaSlicePtr, ptrs_from_buffer, ptrs_from_buffer_mut, slice_from_raw_parts,
         slice_from_raw_parts_mut,
     },
-    traits::{MutPtrs, Ptrs, SoaContext, SoaToOwned, SoaTrustedFields, SoaWrite},
+    traits::{MutPtrs, Ptrs, RawSoaContext, SoaToOwned, SoaTrustedFields, SoaWrite},
 };
 
 use super::{IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceIndex, SoaSlices, SoaSlicesMut};

@@ -15,7 +15,7 @@ use crate::{
     layout::{BufferData, buffer_layout, capacity_from, is_zst, should_allocate},
     ptr::{BufferDataPtr, BufferDataPtrMut, ptrs_from_buffer_mut, slice_from_raw_parts_mut},
     slice::SoaSlice,
-    traits::{MutPtrs, NonNullPtrs, Soa, SoaContext, SoaTrustedFields},
+    traits::{MutPtrs, NonNullPtrs, RawSoaContext, Soa, SoaTrustedFields},
 };
 
 use self::TryReserveErrorKind::{AllocError, CapacityOverflow};

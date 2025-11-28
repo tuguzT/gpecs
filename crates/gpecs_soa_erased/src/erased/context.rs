@@ -1,6 +1,6 @@
 use crate::soa::{
     field::FieldDescriptor,
-    traits::{Soa, SoaContext},
+    traits::{RawSoaContext, Soa},
 };
 
 #[cfg(feature = "alloc")]

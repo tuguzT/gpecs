@@ -5,7 +5,7 @@ use crate::{
         slice_end_index_len_fail, slice_end_index_overflow_fail, slice_index_order_fail,
         slice_index_usize_fail, slice_start_index_len_fail, slice_start_index_overflow_fail,
     },
-    traits::{MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext},
+    traits::{MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa},
 };
 
 pub unsafe trait SoaSliceIndex<T>: private_slice_index::Sealed

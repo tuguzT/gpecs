@@ -7,12 +7,12 @@ use crate::{
         KeyValueSlicePtrs, KeyValueSlices, KeyValueSlicesMut,
     },
     soa::traits::{
-        MutPtrs, Ptrs, SliceMutPtrs, SlicePtrs, Soa, SoaContext, SoaRead, SoaToOwned,
+        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
         SoaTrustedFields, SoaWrite,
     },
 };
 
-unsafe impl<K, V> SoaContext for KeyValuePairContext<K, V>
+unsafe impl<K, V> RawSoaContext for KeyValuePairContext<K, V>
 where
     V: Soa + ?Sized,
 {

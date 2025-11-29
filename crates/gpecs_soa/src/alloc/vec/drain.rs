@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     layout::is_zst,
-    slice::{Iter, SoaSlices, range},
+    slice::{Iter, range},
     traits::{RawSoaContext, SoaRead},
 };
 
@@ -55,7 +55,6 @@ where
             // index before setting length, otherwise range is invalid
             let context = vec.as_ref().context();
             let slices = vec.as_ref().slices().into_index(range);
-            let slices = SoaSlices::new(context, slices);
 
             // set self.vec length's to start, to be safe in case Drain is leaked
             vec.as_mut().set_len(start);
@@ -63,7 +62,7 @@ where
             Self {
                 tail_start: end,
                 tail_len: len - end,
-                iter: Iter::new(slices),
+                iter: Iter::new(context, slices),
                 vec,
             }
         }

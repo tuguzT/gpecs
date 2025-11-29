@@ -9,8 +9,6 @@ use crate::{
     wrapper::NonNullPtrs,
 };
 
-use super::{SoaSlices, SoaSlicesMut};
-
 pub struct Iter<'c, 'a, T>
 where
     T: Soa + ?Sized + 'a,
@@ -27,8 +25,9 @@ where
     T: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(slices: SoaSlices<'c, 'a, T>) -> Self {
-        let (context, ptrs, len) = slices.into_parts();
+    pub(crate) fn new(context: &'c T::Context, slices: T::Slices<'c, 'a>) -> Self {
+        let len = T::slices_len(context, &slices);
+        let ptrs = T::slices_as_ptrs(context, slices);
         let ptrs = context.ptrs_cast_mut(ptrs);
         let ptrs = unsafe { context.ptrs_to_nonnull(ptrs) };
         Self {
@@ -456,8 +455,9 @@ where
     T: Soa + ?Sized,
 {
     #[inline]
-    pub(super) fn new(slices: SoaSlicesMut<'c, 'a, T>) -> Self {
-        let (context, ptrs, len) = slices.into_parts();
+    pub(super) fn new(context: &'c T::Context, slices: T::SlicesMut<'c, 'a>) -> Self {
+        let len = T::slices_mut_len(context, &slices);
+        let ptrs = T::slices_mut_as_ptrs(context, slices);
         let ptrs = unsafe { context.ptrs_to_nonnull(ptrs) };
         Self {
             context,

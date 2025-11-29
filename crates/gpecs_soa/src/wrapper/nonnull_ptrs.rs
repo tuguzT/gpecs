@@ -7,7 +7,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{NonNullPtrs as Inner, RawSoa, RawSoaContext};
+use crate::traits::{RawSoa, RawSoaContext};
+
+type Inner<'a, T> = crate::traits::NonNullPtrs<'a, T>;
 
 /// Type wrapper for [non-null pointers](RawSoaContext::NonNullPtrs)
 /// which is covariant over generic lifetime.

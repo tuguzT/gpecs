@@ -4,7 +4,7 @@ use crate::{
         GpuComponent,
         registry::{GpuComponentId, GpuComponentRegistry},
     },
-    soa::{identity::Identity, traits::impls::count_idents},
+    soa::{count_idents, identity::Identity},
 };
 
 use super::GpuBundle;

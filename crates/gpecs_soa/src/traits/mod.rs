@@ -4,10 +4,9 @@ use core::alloc::{Layout, LayoutError};
 
 use crate::field::{FieldDescriptor, buffer_layout};
 
-pub use self::impls::TupleContext;
+pub use self::impls::*;
 
-#[doc(hidden)]
-pub mod impls;
+mod impls;
 
 /// This trait is used to perform all memory operations & pointer arithmetics for [SoA](RawSoa) types.
 pub unsafe trait RawSoaContext {
@@ -335,27 +334,27 @@ pub unsafe trait RawSoaContext {
 }
 
 /// Alias for the [`FieldDescriptors`](RawSoaContext::FieldDescriptors) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [`SoA`](RawSoa) type.
+/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
 pub type FieldDescriptors<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::FieldDescriptors<'a>;
 
 /// Alias for the [`Ptrs`](RawSoaContext::Ptrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [`SoA`](RawSoa) type.
+/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
 pub type Ptrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::Ptrs<'a>;
 
 /// Alias for the [`MutPtrs`](RawSoaContext::MutPtrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [`SoA`](RawSoa) type.
+/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
 pub type MutPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::MutPtrs<'a>;
 
 /// Alias for the [`NonNullPtrs`](RawSoaContext::NonNullPtrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [`SoA`](RawSoa) type.
+/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
 pub type NonNullPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::NonNullPtrs<'a>;
 
 /// Alias for the [`SlicePtrs`](RawSoaContext::SlicePtrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [`SoA`](RawSoa) type.
+/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
 pub type SlicePtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::SlicePtrs<'a>;
 
 /// Alias for the [`SliceMutPtrs`](RawSoaContext::SliceMutPtrs) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [`SoA`](RawSoa) type.
+/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
 pub type SliceMutPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::SliceMutPtrs<'a>;
 
 /// The main trait of the [crate] which defines behavior of this type
@@ -377,6 +376,18 @@ pub unsafe trait RawSoa {
     type Fields;
 }
 
+/// Marker trait which places additional safety requirements
+/// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
+///
+/// These safety requirements are:
+/// - sum of layouts' sizes of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
+///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
+/// - alignment of each layout of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
+///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
+pub unsafe trait SoaTrustedFields: RawSoa {}
+
+/// An extension of [SoA](RawSoa) type which allows to read `Self`
+/// from [pointers](RawSoaContext::Ptrs) to each stored field.
 pub unsafe trait SoaRead: RawSoa + Sized {
     /// Constructs the value from reading each field to which [src](RawSoaContext::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.
@@ -387,6 +398,8 @@ pub unsafe trait SoaRead: RawSoa + Sized {
     unsafe fn read(context: &Self::Context, src: Ptrs<'_, Self>) -> Self;
 }
 
+/// An extension of [SoA](RawSoa) type which allows to write given value of `Self`
+/// into [mutable pointers](RawSoaContext::Ptrs) to each stored field.
 pub unsafe trait SoaWrite: RawSoa + Sized {
     /// Overwrites a memory [location](RawSoaContext::MutPtrs) of each stored field
     /// with the given value without reading or dropping the old value.
@@ -397,6 +410,8 @@ pub unsafe trait SoaWrite: RawSoa + Sized {
     unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self);
 }
 
+/// An extension of [SoA](RawSoa) type which allows to access
+/// each stored field by their reference types.
 pub unsafe trait Soa: RawSoa {
     /// Non-empty collection of references to each stored field.
     ///
@@ -642,13 +657,3 @@ pub trait SoaToOwned<'context, 'a> {
         target: <Self::Owned as Soa>::RefsMut<'c, '_>,
     );
 }
-
-/// Marker trait which places additional safety requirements
-/// on the [`Fields`](RawSoa::Fields) associated type of [`Soa`] trait implementations.
-///
-/// These safety requirements are:
-/// - sum of layouts' sizes of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
-///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
-/// - alignment of each layout of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
-///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
-pub unsafe trait SoaTrustedFields: RawSoa {}

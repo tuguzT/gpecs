@@ -7,7 +7,7 @@ use crate::{
     },
     soa::{
         identity::{Identity, IdentityContext},
-        traits::{MutPtrs, TupleContext, impls::count_idents},
+        traits::{MutPtrs, TupleContext, count_idents},
     },
 };
 

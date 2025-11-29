@@ -7,7 +7,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{Ptrs as Inner, RawSoa, RawSoaContext};
+use crate::traits::{RawSoa, RawSoaContext};
+
+type Inner<'a, T> = crate::traits::Ptrs<'a, T>;
 
 /// Type wrapper for [pointers](RawSoaContext::Ptrs)
 /// which is covariant over generic lifetime.

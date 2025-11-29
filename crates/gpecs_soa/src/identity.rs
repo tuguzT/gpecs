@@ -14,7 +14,7 @@ use crate::{
     field::FieldDescriptor,
     traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
-        SoaTrustedFields, SoaWrite, impls::debug_assert_ptr_is_aligned,
+        SoaTrustedFields, SoaWrite, debug_assert_ptr_is_aligned,
     },
 };
 

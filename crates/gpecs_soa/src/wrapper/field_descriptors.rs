@@ -7,7 +7,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{FieldDescriptors as Inner, RawSoa, RawSoaContext};
+use crate::traits::{RawSoa, RawSoaContext};
+
+type Inner<'a, T> = crate::traits::FieldDescriptors<'a, T>;
 
 /// Type wrapper for [field descriptors](RawSoaContext::FieldDescriptors)
 /// which is covariant over generic lifetime.

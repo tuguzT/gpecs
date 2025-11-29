@@ -7,7 +7,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{RawSoa, RawSoaContext, SlicePtrs as Inner};
+use crate::traits::{RawSoa, RawSoaContext};
+
+type Inner<'a, T> = crate::traits::SlicePtrs<'a, T>;
 
 /// Type wrapper for [slice pointers](RawSoaContext::SlicePtrs)
 /// which is covariant over generic lifetime.

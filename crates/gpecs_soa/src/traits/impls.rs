@@ -19,6 +19,7 @@ use crate::{
 
 #[inline]
 #[track_caller]
+#[doc(hidden)]
 pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
     debug_assert!(
         ptr.is_aligned(),
@@ -511,6 +512,7 @@ macro_rules! count_idents {
 #[doc(hidden)]
 pub use count_idents;
 
+/// Type of SoA [context](RawSoaContext) for [tuples](prim@tuple).
 pub struct TupleContext<T>(PhantomData<fn() -> T>);
 
 impl<T> TupleContext<T> {

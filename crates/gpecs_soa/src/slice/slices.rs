@@ -10,7 +10,7 @@ use crate::{
     layout::is_zst,
     slice::{
         assert::slice_index_usize_fail,
-        index::{IndexHelper, IndexHelperMut, SoaSliceIndex},
+        index::{IndexHelper, IndexHelperMut, SoaSlicePtrsIndex, SoaSlicesIndex},
         iter::{Iter, IterMut},
     },
     traits::{MutPtrs, Ptrs, RawSoaContext, Soa, SoaToOwned, SoaWrite},
@@ -120,7 +120,7 @@ where
     #[inline]
     pub fn get<I>(&self, index: I) -> Option<I::Refs<'_, '_>>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.get_with_context(index);
         refs
@@ -129,7 +129,7 @@ where
     #[inline]
     pub fn get_with_context<I>(&self, index: I) -> (&T::Context, Option<I::Refs<'_, '_>>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_slices_with_context();
         (context, index.get(context, slices))
@@ -138,7 +138,7 @@ where
     #[inline]
     pub fn into_get<I>(self, index: I) -> Option<I::Refs<'c, 'a>>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.into_get_with_context(index);
         refs
@@ -147,7 +147,7 @@ where
     #[inline]
     pub fn into_get_with_context<I>(self, index: I) -> (&'c T::Context, Option<I::Refs<'c, 'a>>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.get(context, slices))
@@ -156,7 +156,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs<'_>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, ptrs) = unsafe { self.get_unchecked_with_context(index) };
         ptrs
@@ -165,7 +165,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked_with_context<I>(&self, index: I) -> (&T::Context, I::Ptrs<'_>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_slices_with_context();
         let slices = T::slices_as_slice_ptrs(context, slices);
@@ -176,7 +176,7 @@ where
     #[inline]
     pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'c>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, ptrs) = unsafe { self.into_get_unchecked_with_context(index) };
         ptrs
@@ -188,7 +188,7 @@ where
         index: I,
     ) -> (&'c T::Context, I::Ptrs<'c>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         let slices = T::slices_as_slice_ptrs(context, slices);
@@ -200,7 +200,7 @@ where
     #[track_caller]
     pub fn index<I>(&self, index: I) -> I::Refs<'_, '_>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.index_with_context(index);
         refs
@@ -210,7 +210,7 @@ where
     #[track_caller]
     pub fn index_with_context<I>(&self, index: I) -> (&T::Context, I::Refs<'_, '_>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_slices_with_context();
         (context, index.index(context, slices))
@@ -220,7 +220,7 @@ where
     #[track_caller]
     pub fn into_index<I>(self, index: I) -> I::Refs<'c, 'a>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.into_index_with_context(index);
         refs
@@ -230,7 +230,7 @@ where
     #[track_caller]
     pub fn into_index_with_context<I>(self, index: I) -> (&'c T::Context, I::Refs<'c, 'a>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.index(context, slices))
@@ -566,7 +566,7 @@ where
     #[inline]
     pub fn get<I>(&self, index: I) -> Option<I::Refs<'_, '_>>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.get_with_context(index);
         refs
@@ -575,7 +575,7 @@ where
     #[inline]
     pub fn get_with_context<I>(&self, index: I) -> (&T::Context, Option<I::Refs<'_, '_>>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_slices_with_context();
         (context, index.get(context, slices))
@@ -584,7 +584,7 @@ where
     #[inline]
     pub fn into_get<I>(self, index: I) -> Option<I::Refs<'c, 'a>>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.into_get_with_context(index);
         refs
@@ -593,7 +593,7 @@ where
     #[inline]
     pub fn into_get_with_context<I>(self, index: I) -> (&'c T::Context, Option<I::Refs<'c, 'a>>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         let slices = T::slices_mut_as_slices(context, slices);
@@ -603,7 +603,7 @@ where
     #[inline]
     pub fn get_mut<I>(&mut self, index: I) -> Option<I::RefsMut<'_, '_>>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.get_mut_with_context(index);
         refs
@@ -612,7 +612,7 @@ where
     #[inline]
     pub fn get_mut_with_context<I>(&mut self, index: I) -> (&T::Context, Option<I::RefsMut<'_, '_>>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_mut_slices_with_context();
         (context, index.get_mut(context, slices))
@@ -621,7 +621,7 @@ where
     #[inline]
     pub fn into_get_mut<I>(self, index: I) -> Option<I::RefsMut<'c, 'a>>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.into_get_mut_with_context(index);
         refs
@@ -633,7 +633,7 @@ where
         index: I,
     ) -> (&'c T::Context, Option<I::RefsMut<'c, 'a>>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.get_mut(context, slices))
@@ -642,7 +642,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked<I>(&self, index: I) -> I::Ptrs<'_>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, ptrs) = unsafe { self.get_unchecked_with_context(index) };
         ptrs
@@ -651,7 +651,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked_with_context<I>(&self, index: I) -> (&T::Context, I::Ptrs<'_>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_slices_with_context();
         let slices = T::slices_as_slice_ptrs(context, slices);
@@ -662,7 +662,7 @@ where
     #[inline]
     pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'c>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, ptrs) = unsafe { self.into_get_unchecked_with_context(index) };
         ptrs
@@ -674,7 +674,7 @@ where
         index: I,
     ) -> (&'c T::Context, I::Ptrs<'c>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         let slices = T::slices_mut_as_slices(context, slices);
@@ -686,7 +686,7 @@ where
     #[inline]
     pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> I::MutPtrs<'_>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, ptrs) = unsafe { self.get_unchecked_mut_with_context(index) };
         ptrs
@@ -698,7 +698,7 @@ where
         index: I,
     ) -> (&T::Context, I::MutPtrs<'_>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_mut_slices_with_context();
         let slices = T::slices_mut_as_slice_ptrs(context, slices);
@@ -709,7 +709,7 @@ where
     #[inline]
     pub unsafe fn into_get_unchecked_mut<I>(self, index: I) -> I::MutPtrs<'c>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, ptrs) = unsafe { self.into_get_unchecked_mut_with_context(index) };
         ptrs
@@ -721,7 +721,7 @@ where
         index: I,
     ) -> (&'c T::Context, I::MutPtrs<'c>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         let slices = T::slices_mut_as_slice_ptrs(context, slices);
@@ -733,7 +733,7 @@ where
     #[track_caller]
     pub fn index<I>(&self, index: I) -> I::Refs<'_, '_>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.index_with_context(index);
         refs
@@ -743,7 +743,7 @@ where
     #[track_caller]
     pub fn index_with_context<I>(&self, index: I) -> (&T::Context, I::Refs<'_, '_>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_slices_with_context();
         (context, index.index(context, slices))
@@ -753,7 +753,7 @@ where
     #[track_caller]
     pub fn into_index<I>(self, index: I) -> I::Refs<'c, 'a>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.into_index_with_context(index);
         refs
@@ -763,7 +763,7 @@ where
     #[track_caller]
     pub fn into_index_with_context<I>(self, index: I) -> (&'c T::Context, I::Refs<'c, 'a>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         let slices = T::slices_mut_as_slices(context, slices);
@@ -774,7 +774,7 @@ where
     #[track_caller]
     pub fn index_mut<I>(&mut self, index: I) -> I::RefsMut<'_, '_>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.index_mut_with_context(index);
         refs
@@ -784,7 +784,7 @@ where
     #[track_caller]
     pub fn index_mut_with_context<I>(&mut self, index: I) -> (&T::Context, I::RefsMut<'_, '_>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.as_mut_slices_with_context();
         (context, index.index_mut(context, slices))
@@ -794,7 +794,7 @@ where
     #[track_caller]
     pub fn into_index_mut<I>(self, index: I) -> I::RefsMut<'c, 'a>
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (_, refs) = self.into_index_mut_with_context(index);
         refs
@@ -804,7 +804,7 @@ where
     #[track_caller]
     pub fn into_index_mut_with_context<I>(self, index: I) -> (&'c T::Context, I::RefsMut<'c, 'a>)
     where
-        I: SoaSliceIndex<T>,
+        I: SoaSlicesIndex<T>,
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.index_mut(context, slices))
@@ -885,8 +885,8 @@ where
         let (context, slices) = self.as_mut_slices_with_context();
         let slices = T::slices_mut_as_slice_ptrs(context, slices);
         unsafe {
-            let a = SoaSliceIndex::<T>::get_unchecked_mut(a, context, slices.clone());
-            let b = SoaSliceIndex::<T>::get_unchecked_mut(b, context, slices);
+            let a = SoaSlicePtrsIndex::<T>::get_unchecked_mut(a, context, slices.clone());
+            let b = SoaSlicePtrsIndex::<T>::get_unchecked_mut(b, context, slices);
             context.ptrs_swap(a, b);
         }
     }

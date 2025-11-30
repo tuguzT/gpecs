@@ -59,6 +59,12 @@ where
     }
 
     #[inline]
+    pub unsafe fn deref<'a>(self) -> SoaSlices<'c, 'a, T> {
+        let (context, ptrs, len) = self.into_parts();
+        unsafe { SoaSlices::from_parts(context, ptrs, len) }
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { len, .. } = *self;
         len
@@ -364,8 +370,47 @@ where
 
     #[inline]
     pub fn as_ptrs(&self) -> Ptrs<'_, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
         let Self { ptrs, .. } = self;
-        ptrs.as_ptrs()
+        ptrs.as_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> SlicePtrs<'_, T> {
+        let (_, ptrs) = self.as_slice_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
+        let Self { ptrs, .. } = self;
+        ptrs.as_slice_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn slice_ptrs(&self) -> SoaSlicePtrs<'_, T> {
+        let Self { ptrs, .. } = self;
+        ptrs.clone()
+    }
+
+    #[inline]
+    pub fn into_slice_ptrs(self) -> SoaSlicePtrs<'c, T> {
+        let Self { ptrs, .. } = self;
+        ptrs
+    }
+
+    #[inline]
+    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
+        let Self { ptrs, .. } = self;
+
+        let len = ptrs.len();
+        let (context, ptrs) = ptrs.as_ptrs_with_context();
+        unsafe { SoaSlices::from_parts(context, ptrs, len) }
     }
 
     #[inline]
@@ -380,15 +425,6 @@ where
             ptrs: unsafe { SoaSlicePtrs::from_parts(context, ptrs, len) },
             phantom: PhantomData,
         }
-    }
-
-    #[inline]
-    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
-        let Self { ptrs, .. } = self;
-
-        let len = ptrs.len();
-        let (context, ptrs) = ptrs.as_ptrs_with_context();
-        unsafe { SoaSlices::from_parts(context, ptrs, len) }
     }
 
     #[inline]
@@ -584,8 +620,7 @@ where
 {
     #[inline]
     fn from(slices: SoaSlices<'c, '_, T>) -> Self {
-        let SoaSlices { ptrs, .. } = slices;
-        ptrs
+        slices.into_slice_ptrs()
     }
 }
 
@@ -763,6 +798,19 @@ where
         let (context, ptrs, len) = self.into_parts();
         let ptrs = context.ptrs_cast_const(ptrs);
         unsafe { SoaSlicePtrs::from_parts(context, ptrs, len) }
+    }
+
+    #[inline]
+    pub unsafe fn deref<'a>(self) -> SoaSlices<'c, 'a, T> {
+        let (context, ptrs, len) = self.into_parts();
+        let ptrs = context.ptrs_cast_const(ptrs);
+        unsafe { SoaSlices::from_parts(context, ptrs, len) }
+    }
+
+    #[inline]
+    pub unsafe fn deref_mut<'a>(self) -> SoaSlicesMut<'c, 'a, T> {
+        let (context, ptrs, len) = self.into_parts();
+        unsafe { SoaSlicesMut::from_parts(context, ptrs, len) }
     }
 
     #[inline]
@@ -1183,14 +1231,74 @@ where
 
     #[inline]
     pub fn as_ptrs(&self) -> Ptrs<'_, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
         let Self { ptrs, .. } = self;
-        ptrs.as_ptrs()
+        ptrs.as_ptrs_with_context()
     }
 
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, T> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&T::Context, MutPtrs<'_, T>) {
         let Self { ptrs, .. } = self;
-        ptrs.as_mut_ptrs()
+        ptrs.as_mut_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> SlicePtrs<'_, T> {
+        let (_, ptrs) = self.as_slice_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
+        let Self { ptrs, .. } = self;
+        ptrs.as_slice_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
+        let (_, ptrs) = self.as_slice_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
+        let Self { ptrs, .. } = self;
+        ptrs.as_slice_mut_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn slice_ptrs(&self) -> SoaSlicePtrs<'_, T> {
+        let Self { ptrs, .. } = self;
+        ptrs.clone().cast_const()
+    }
+
+    #[inline]
+    pub fn into_slice_ptrs(self) -> SoaSlicePtrs<'c, T> {
+        let Self { ptrs, .. } = self;
+        ptrs.cast_const()
+    }
+
+    #[inline]
+    pub fn slice_mut_ptrs(&mut self) -> SoaSliceMutPtrs<'_, T> {
+        let Self { ptrs, .. } = self;
+        ptrs.clone()
+    }
+
+    #[inline]
+    pub fn into_slice_mut_ptrs(self) -> SoaSliceMutPtrs<'c, T> {
+        let Self { ptrs, .. } = self;
+        ptrs
     }
 
     #[inline]
@@ -1726,8 +1834,7 @@ where
 {
     #[inline]
     fn from(slices: SoaSlicesMut<'c, '_, T>) -> Self {
-        let SoaSlicesMut { ptrs, .. } = slices;
-        ptrs.cast_const()
+        slices.into_slice_ptrs()
     }
 }
 
@@ -1737,8 +1844,7 @@ where
 {
     #[inline]
     fn from(slices: SoaSlicesMut<'c, '_, T>) -> Self {
-        let SoaSlicesMut { ptrs, .. } = slices;
-        ptrs
+        slices.into_slice_mut_ptrs()
     }
 }
 
@@ -1749,7 +1855,6 @@ where
     #[inline]
     fn from(slices: SoaSlicesMut<'c, 'a, T>) -> Self {
         let (context, ptrs, len) = slices.into_parts();
-
         let ptrs = context.ptrs_cast_const(ptrs);
         unsafe { Self::from_parts(context, ptrs, len) }
     }

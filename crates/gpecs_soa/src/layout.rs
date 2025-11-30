@@ -7,7 +7,7 @@ use crate::traits::{RawSoa, RawSoaContext};
 
 /// Special type which is used to properly allocate a buffer in memory
 /// with respect to the size and alignment of
-/// [`Fields`](`RawSoa::Fields`) and [`Context`](`RawSoa::Context`) associated types.
+/// [`Fields`](RawSoa::Fields) and [`Context`](RawSoa::Context) associated types.
 pub union BufferData<T>
 where
     T: RawSoa + ?Sized,

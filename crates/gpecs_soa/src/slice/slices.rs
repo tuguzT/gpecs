@@ -11,7 +11,7 @@ use crate::{
     slice::{
         assert::slice_index_usize_fail,
         index::{IndexHelper, IndexHelperMut, SoaSlicePtrsIndex, SoaSlicesIndex},
-        iter::{Iter, IterMut},
+        iter::{Iter, IterMut, RawIter},
     },
     traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaToOwned, SoaWrite,
@@ -185,6 +185,24 @@ where
         let ptrs = unsafe { index.get_unchecked(context, slices) };
         (context, ptrs)
     }
+
+    #[inline]
+    pub fn iter(&self) -> RawIter<'_, T> {
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+        let (context, slices) = self.as_slice_ptrs_with_context();
+        (context, RawIter::new(context, slices))
+    }
+
+    #[inline]
+    pub fn into_iter_with_context(self) -> (&'c T::Context, RawIter<'c, T>) {
+        let (context, slices) = self.into_slice_ptrs_with_context();
+        (context, RawIter::new(context, slices))
+    }
 }
 
 impl<'c, T> From<&'c T::Context> for SoaSlicePtrs<'c, T>
@@ -201,21 +219,11 @@ where
 impl<T> Debug for SoaSlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    T::Context: Debug,
-    for<'any> Ptrs<'any, T>: Debug,
+    for<'any> SlicePtrs<'any, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            context,
-            ref ptrs,
-            ref len,
-        } = *self;
-
-        f.debug_struct("SoaSlicePtrs")
-            .field("len", len)
-            .field("context", context)
-            .field("ptrs", ptrs)
-            .finish()
+        let slices = self.as_slice_ptrs();
+        f.debug_tuple("SoaSlicePtrs").field(&slices).finish()
     }
 }
 
@@ -323,6 +331,33 @@ where
     }
 }
 
+impl<'r, T> IntoIterator for &'r SoaSlicePtrs<'_, T>
+where
+    T: RawSoa + ?Sized,
+{
+    type Item = Ptrs<'r, T>;
+    type IntoIter = RawIter<'r, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'c, T> IntoIterator for SoaSlicePtrs<'c, T>
+where
+    T: RawSoa + ?Sized,
+{
+    type Item = Ptrs<'c, T>;
+    type IntoIter = RawIter<'c, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let (_, iter) = self.into_iter_with_context();
+        iter
+    }
+}
+
 unsafe impl<T> Send for SoaSlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
@@ -347,7 +382,7 @@ where
     phantom: PhantomData<&'a ()>,
 }
 
-impl<'c, T> SoaSlices<'c, '_, T>
+impl<'c, 'a, T> SoaSlices<'c, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -464,6 +499,31 @@ where
     {
         let Self { ptrs, .. } = self;
         unsafe { ptrs.into_get_unchecked_with_context(index) }
+    }
+
+    #[inline]
+    #[expect(clippy::iter_not_returning_iterator)]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+        let Self { ptrs, .. } = self;
+
+        let (context, iter) = ptrs.iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_iter_with_context(self) -> (&'c T::Context, Iter<'c, 'a, T>) {
+        let Self { ptrs, .. } = self;
+
+        let (context, iter) = ptrs.into_iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 }
 
@@ -587,24 +647,6 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, '_, T> {
-        let (_, iter) = self.iter_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
-        let (context, slices) = self.as_slices_with_context();
-        (context, Iter::new(context, slices))
-    }
-
-    #[inline]
-    pub fn into_iter_with_context(self) -> (&'c T::Context, Iter<'c, 'a, T>) {
-        let (context, slices) = self.into_slices_with_context();
-        (context, Iter::new(context, slices))
-    }
-
-    #[inline]
     pub fn contains<'me, V>(&'me self, value: V) -> bool
     where
         T::Refs<'me, 'me>: PartialEq<V>,
@@ -706,10 +748,9 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self { ref ptrs, phantom } = *self;
-        Self {
-            ptrs: ptrs.clone(),
-            phantom,
-        }
+
+        let ptrs = ptrs.clone();
+        Self { ptrs, phantom }
     }
 }
 
@@ -1062,21 +1103,11 @@ where
 impl<T> Debug for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    T::Context: Debug,
-    for<'any> MutPtrs<'any, T>: Debug,
+    for<'any> SlicePtrs<'any, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            context,
-            ref ptrs,
-            ref len,
-        } = *self;
-
-        f.debug_struct("SoaSliceMutPtrs")
-            .field("len", len)
-            .field("context", context)
-            .field("ptrs", ptrs)
-            .finish()
+        let slices = self.as_slice_ptrs();
+        f.debug_tuple("SoaSliceMutPtrs").field(&slices).finish()
     }
 }
 

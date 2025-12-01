@@ -200,6 +200,30 @@ where
     }
 
     #[inline]
+    #[expect(clippy::iter_not_returning_iterator)]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+        self.slices().into_iter_with_context()
+    }
+
+    #[inline]
+    #[expect(clippy::iter_not_returning_iterator)]
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
+        let (_, iter) = self.iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
+        self.slices_mut().into_iter_with_context()
+    }
+
+    #[inline]
     #[track_caller]
     pub fn swap(&mut self, a: usize, b: usize) {
         self.slices_mut().swap(a, b);
@@ -234,26 +258,6 @@ where
         let (context, slices) = self.as_slice_mut_ptrs_with_context();
         let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         (context, slices)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> Iter<'_, '_, T> {
-        self.slices().into_iter()
-    }
-
-    #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
-        self.slices().into_iter_with_context()
-    }
-
-    #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
-        self.slices_mut().into_iter()
-    }
-
-    #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
-        self.slices_mut().into_iter_with_context()
     }
 
     #[inline]

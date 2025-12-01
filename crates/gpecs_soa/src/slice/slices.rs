@@ -11,7 +11,7 @@ use crate::{
     slice::{
         assert::slice_index_usize_fail,
         index::{IndexHelper, IndexHelperMut, SoaSlicePtrsIndex, SoaSlicesIndex},
-        iter::{Iter, IterMut, RawIter},
+        iter::{Iter, IterMut, RawIter, RawIterMut},
     },
     traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaToOwned, SoaWrite,
@@ -1087,6 +1087,36 @@ where
         let ptrs = unsafe { index.get_unchecked_mut(context, slices) };
         (context, ptrs)
     }
+
+    #[inline]
+    pub fn iter(&self) -> RawIter<'_, T> {
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+        let (context, slices) = self.as_slice_ptrs_with_context();
+        (context, RawIter::new(context, slices))
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> RawIterMut<'_, T> {
+        let (_, iter) = self.iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
+        let (context, slices) = self.as_slice_mut_ptrs_with_context();
+        (context, RawIterMut::new(context, slices))
+    }
+
+    #[inline]
+    pub fn into_iter_with_context(self) -> (&'c T::Context, RawIterMut<'c, T>) {
+        let (context, slices) = self.into_slice_mut_ptrs_with_context();
+        (context, RawIterMut::new(context, slices))
+    }
 }
 
 impl<'c, T> From<&'c T::Context> for SoaSliceMutPtrs<'c, T>
@@ -1215,6 +1245,46 @@ where
     }
 }
 
+impl<'r, T> IntoIterator for &'r SoaSliceMutPtrs<'_, T>
+where
+    T: RawSoa + ?Sized,
+{
+    type Item = Ptrs<'r, T>;
+    type IntoIter = RawIter<'r, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'r, T> IntoIterator for &'r mut SoaSliceMutPtrs<'_, T>
+where
+    T: RawSoa + ?Sized,
+{
+    type Item = MutPtrs<'r, T>;
+    type IntoIter = RawIterMut<'r, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl<'c, T> IntoIterator for SoaSliceMutPtrs<'c, T>
+where
+    T: RawSoa + ?Sized,
+{
+    type Item = MutPtrs<'c, T>;
+    type IntoIter = RawIterMut<'c, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let (_, iter) = self.into_iter_with_context();
+        iter
+    }
+}
+
 unsafe impl<T> Send for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
@@ -1239,7 +1309,7 @@ where
     phantom: PhantomData<&'a ()>,
 }
 
-impl<'c, T> SoaSlicesMut<'c, '_, T>
+impl<'c, 'a, T> SoaSlicesMut<'c, 'a, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -1443,6 +1513,47 @@ where
     {
         let Self { ptrs, .. } = self;
         unsafe { ptrs.into_get_unchecked_mut_with_context(index) }
+    }
+
+    #[inline]
+    #[expect(clippy::iter_not_returning_iterator)]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+        let Self { ptrs, .. } = self;
+
+        let (context, iter) = ptrs.iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
+    }
+
+    #[inline]
+    #[expect(clippy::iter_not_returning_iterator)]
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
+        let (_, iter) = self.iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
+        let Self { ptrs, .. } = self;
+
+        let (context, iter) = ptrs.iter_mut_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_iter_with_context(self) -> (&'c T::Context, IterMut<'c, 'a, T>) {
+        let Self { ptrs, .. } = self;
+
+        let (context, iter) = ptrs.into_iter_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
     }
 
     #[inline]
@@ -1701,36 +1812,6 @@ where
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.index_mut(context, slices))
-    }
-
-    #[inline]
-    pub fn iter(&self) -> Iter<'_, '_, T> {
-        let (_, iter) = self.iter_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
-        let (context, slices) = self.as_slices_with_context();
-        (context, Iter::new(context, slices))
-    }
-
-    #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
-        let (_, iter) = self.iter_mut_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
-        let (context, slices) = self.as_mut_slices_with_context();
-        (context, IterMut::new(context, slices))
-    }
-
-    #[inline]
-    pub fn into_iter_with_context(self) -> (&'c T::Context, IterMut<'c, 'a, T>) {
-        let (context, slices) = self.into_slices_with_context();
-        (context, IterMut::new(context, slices))
     }
 
     #[inline]

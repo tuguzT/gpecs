@@ -628,32 +628,29 @@ pub unsafe trait Soa: RawSoa {
 }
 
 /// A generalization of [`Clone`] to borrowed data
-/// specifically for the [`Soa`] trait.
+/// specifically for [SoA](Soa) type.
 ///
 /// This trait is analogous to [`ToOwned`] trait from the standard library.
 ///
 /// [`ToOwned`]: https://doc.rust-lang.org/stable/alloc/borrow/trait.ToOwned.html
-pub trait SoaToOwned<'context, 'a> {
-    /// The resulting type after obtaining ownership.
-    type Owned: Soa<Refs<'context, 'a> = Self> + 'a;
-
+pub trait SoaToOwned: Soa + Sized {
     /// Creates owned data from borrowed data,
     /// usually by cloning each stored field.
-    fn to_owned(&self, context: &<Self::Owned as RawSoa>::Context) -> Self::Owned;
+    fn to_owned(context: &Self::Context, refs: Self::Refs<'_, '_>) -> Self;
 
     /// Uses borrowed data to replace owned data,
     /// usually by cloning each stored field.
     ///
     /// This is borrow-generalized version of [`Clone::clone_from()`].
-    fn clone_into(&self, context: &<Self::Owned as RawSoa>::Context, target: &mut Self::Owned) {
-        *target = self.to_owned(context);
+    fn clone_into(context: &Self::Context, refs: Self::Refs<'_, '_>, target: &mut Self) {
+        *target = Self::to_owned(context, refs);
     }
 
     /// Uses borrowed data to replace owned data located by `target` [references](Soa::RefsMut),
     /// usually by cloning each stored field.
-    fn clone_into_refs<'c>(
-        &self,
-        context: &'c <Self::Owned as RawSoa>::Context,
-        target: <Self::Owned as Soa>::RefsMut<'c, '_>,
+    fn clone_into_refs(
+        context: &Self::Context,
+        src: Self::Refs<'_, '_>,
+        dst: Self::RefsMut<'_, '_>,
     );
 }

@@ -473,20 +473,18 @@ unsafe impl SoaWrite for () {
     }
 }
 
-impl<'a> SoaToOwned<'_, 'a> for &'a () {
-    type Owned = ();
+impl SoaToOwned for () {
+    #[inline]
+    fn to_owned(_context: &Self::Context, _refs: Self::Refs<'_, '_>) -> Self {}
 
     #[inline]
-    fn to_owned(&self, _context: &<Self::Owned as RawSoa>::Context) -> Self::Owned {}
+    fn clone_into(_context: &Self::Context, _refs: Self::Refs<'_, '_>, _target: &mut Self) {}
 
     #[inline]
-    fn clone_into(&self, _context: &<Self::Owned as RawSoa>::Context, _target: &mut Self::Owned) {}
-
-    #[inline]
-    fn clone_into_refs<'context>(
-        &self,
-        _context: &'context <Self::Owned as RawSoa>::Context,
-        _target: <Self::Owned as Soa>::RefsMut<'context, '_>,
+    fn clone_into_refs(
+        _context: &Self::Context,
+        _src: Self::Refs<'_, '_>,
+        _dst: Self::RefsMut<'_, '_>,
     ) {
     }
 }
@@ -1145,30 +1143,28 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        impl<'a, $($types,)*> SoaToOwned<'_, 'a> for ($(&'a $types,)*)
+        impl<$($types,)*> SoaToOwned for ($($types,)*)
         where
             $($types: Clone,)*
         {
-            type Owned = ($($types,)*);
-
             #[inline]
-            fn to_owned(&self, _context: &<Self::Owned as RawSoa>::Context) -> Self::Owned {
-                let owned = ($(self.$indices.clone(),)*);
+            fn to_owned(_context: &Self::Context, refs: Self::Refs<'_, '_>) -> Self {
+                let owned = ($(refs.$indices.clone(),)*);
                 owned
             }
 
             #[inline]
-            fn clone_into(&self, _context: &<Self::Owned as RawSoa>::Context, target: &mut Self::Owned) {
-                $(target.$indices.clone_from(self.$indices);)*
+            fn clone_into(_context: &Self::Context, refs: Self::Refs<'_, '_>, target: &mut Self) {
+                $(target.$indices.clone_from(refs.$indices);)*
             }
 
             #[inline]
-            fn clone_into_refs<'context>(
-                &self,
-                _context: &'context <Self::Owned as RawSoa>::Context,
-                target: <Self::Owned as Soa>::RefsMut<'context, '_>,
+            fn clone_into_refs(
+                _context: &Self::Context,
+                src: Self::Refs<'_, '_>,
+                dst: Self::RefsMut<'_, '_>,
             ) {
-                $(target.$indices.clone_from(self.$indices);)*
+                $(dst.$indices.clone_from(src.$indices);)*
             }
         }
 

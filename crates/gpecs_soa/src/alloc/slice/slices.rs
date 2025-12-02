@@ -10,14 +10,11 @@ use crate::{
 
 impl<T> SoaSlices<'_, '_, T>
 where
-    T: Soa + SoaWrite,
+    T: SoaToOwned + SoaWrite,
+    T::Context: Clone,
 {
     #[inline]
-    pub fn to_vec(&self) -> SoaVec<T>
-    where
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-        T::Context: Clone,
-    {
+    pub fn to_vec(&self) -> SoaVec<T> {
         let len = self.len();
         let context = self.context().clone();
         let mut vec = SoaVec::<T>::with_context_and_capacity(context, len);
@@ -33,7 +30,7 @@ where
                 set_len_on_drop.local_len = index;
 
                 let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
-                unsafe { T::write(context, dst, refs.to_owned(context)) }
+                unsafe { T::write(context, dst, T::to_owned(context, refs)) }
             }
         }
 
@@ -184,14 +181,11 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: Soa + SoaWrite,
+    T: SoaToOwned + SoaWrite,
+    T::Context: Clone,
 {
     #[inline]
-    pub fn to_vec(&self) -> SoaVec<T>
-    where
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-        T::Context: Clone,
-    {
+    pub fn to_vec(&self) -> SoaVec<T> {
         self.slices().to_vec()
     }
 }

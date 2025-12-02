@@ -123,23 +123,19 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: Soa + SoaTrustedFields + SoaWrite,
+    T: SoaTrustedFields + SoaToOwned + SoaWrite,
+    T::Context: Clone,
 {
     #[inline]
-    pub fn to_vec(&self) -> SoaVec<T>
-    where
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-        T::Context: Clone,
-    {
+    pub fn to_vec(&self) -> SoaVec<T> {
         self.slices().to_vec()
     }
 }
 
 impl<T> ToOwned for SoaSlice<T>
 where
-    T: Soa + SoaTrustedFields + SoaWrite,
+    T: SoaTrustedFields + SoaToOwned + SoaWrite,
     T::Context: Clone,
-    for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {
     type Owned = SoaVec<T>;
 

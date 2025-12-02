@@ -1910,14 +1910,11 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: Soa + SoaWrite,
+    T: SoaToOwned + SoaWrite,
 {
     #[inline]
     #[track_caller]
-    pub fn clone_from_slices(&mut self, src: &SoaSlices<T>)
-    where
-        for<'c, 'a> T::Refs<'c, 'a>: SoaToOwned<'c, 'a, Owned = T>,
-    {
+    pub fn clone_from_slices(&mut self, src: &SoaSlices<T>) {
         let len = self.len();
         if len != src.len() {
             len_mismatch_fail(len, src.len());
@@ -1927,8 +1924,8 @@ where
             let (context, dst) = unsafe { self.get_unchecked_mut_with_context(index) };
             unsafe { context.ptrs_drop_in_place(dst.clone()) }
 
-            let src = unsafe { T::ptrs_to_refs(context, src.get_unchecked(index)) };
-            unsafe { T::write(context, dst, src.to_owned(context)) }
+            let refs = unsafe { T::ptrs_to_refs(context, src.get_unchecked(index)) };
+            unsafe { T::write(context, dst, T::to_owned(context, refs)) }
         }
     }
 }

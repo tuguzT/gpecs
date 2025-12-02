@@ -761,29 +761,27 @@ unsafe impl<T> SoaWrite for Identity<T> {
     }
 }
 
-impl<'a, T> SoaToOwned<'_, 'a> for &'a Identity<T>
+impl<T> SoaToOwned for Identity<T>
 where
     T: Clone,
 {
-    type Owned = Identity<T>;
-
     #[inline]
-    fn to_owned(&self, _context: &<Self::Owned as RawSoa>::Context) -> Self::Owned {
-        (*self).clone()
+    fn to_owned(_context: &Self::Context, refs: Self::Refs<'_, '_>) -> Self {
+        refs.clone()
     }
 
     #[inline]
-    fn clone_into(&self, _context: &<Self::Owned as RawSoa>::Context, target: &mut Self::Owned) {
-        target.clone_from(self);
+    fn clone_into(_context: &Self::Context, refs: Self::Refs<'_, '_>, target: &mut Self) {
+        target.clone_from(refs);
     }
 
     #[inline]
-    fn clone_into_refs<'context>(
-        &self,
-        _context: &'context <Self::Owned as RawSoa>::Context,
-        target: <Self::Owned as Soa>::RefsMut<'context, '_>,
+    fn clone_into_refs(
+        _context: &Self::Context,
+        src: Self::Refs<'_, '_>,
+        dst: Self::RefsMut<'_, '_>,
     ) {
-        target.clone_from(self);
+        dst.clone_from(src);
     }
 }
 

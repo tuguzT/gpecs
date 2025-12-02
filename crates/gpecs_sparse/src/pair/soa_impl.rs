@@ -499,27 +499,24 @@ where
 
 unsafe impl<K, V> SoaTrustedFields for KeyValuePair<K, V> where V: SoaTrustedFields {}
 
-impl<'context, 'a, K, V> SoaToOwned<'context, 'a> for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> SoaToOwned for KeyValuePair<K, V>
 where
     K: Clone,
-    V: Soa + SoaWrite,
-    for<'c, 'any> V::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = V>,
+    V: SoaToOwned,
 {
-    type Owned = KeyValuePair<K, V>;
-
     #[inline]
-    fn to_owned(&self, context: &<Self::Owned as RawSoa>::Context) -> Self::Owned {
-        let Self { key, value } = self;
+    fn to_owned(context: &Self::Context, refs: Self::Refs<'_, '_>) -> Self {
+        let KeyValueRefs { key, value } = refs;
 
         let key = (*key).clone();
-        let value = SoaToOwned::to_owned(value.as_inner(), context);
-        KeyValuePair { key, value }
+        let value = V::to_owned(context, value.into_inner());
+        Self { key, value }
     }
 
     #[inline]
-    fn clone_into(&self, context: &<Self::Owned as RawSoa>::Context, target: &mut Self::Owned) {
-        let Self { key, value } = self;
-        let value = value.as_inner();
+    fn clone_into(context: &Self::Context, refs: Self::Refs<'_, '_>, target: &mut Self) {
+        let KeyValueRefs { key, value } = refs;
+        let value = value.into_inner();
 
         let KeyValuePair {
             key: target_key,
@@ -527,25 +524,25 @@ where
         } = target;
 
         target_key.clone_from(key);
-        value.clone_into(context, target_value);
+        V::clone_into(context, value, target_value);
     }
 
     #[inline]
-    fn clone_into_refs<'c>(
-        &self,
-        context: &'c <Self::Owned as RawSoa>::Context,
-        target: <Self::Owned as Soa>::RefsMut<'c, '_>,
+    fn clone_into_refs(
+        context: &Self::Context,
+        src: Self::Refs<'_, '_>,
+        dst: Self::RefsMut<'_, '_>,
     ) {
-        let Self { key, value } = self;
-        let value = value.as_inner();
+        let KeyValueRefs { key, value } = src;
+        let value = value.into_inner();
 
         let KeyValueRefsMut {
             key: target_key,
             value: target_value,
-        } = target;
+        } = dst;
         let target_value = target_value.into_inner();
 
         target_key.clone_from(key);
-        value.clone_into_refs(context, target_value);
+        V::clone_into_refs(context, value, target_value);
     }
 }

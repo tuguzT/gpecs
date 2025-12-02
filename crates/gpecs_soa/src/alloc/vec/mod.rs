@@ -726,13 +726,12 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: Soa + SoaWrite,
+    T: SoaToOwned + SoaWrite,
 {
     #[track_caller]
     pub fn extend_from_within<R>(&mut self, src: R)
     where
         R: RangeBounds<usize>,
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
     {
         let range = range(src, ..self.len());
         self.reserve(range.len());
@@ -749,7 +748,7 @@ where
             unsafe {
                 let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
                 let dst = context.ptrs_add_mut(ptrs, set_len_on_drop.local_len);
-                T::write(context, dst, refs.to_owned(context));
+                T::write(context, dst, T::to_owned(context, refs));
             }
             set_len_on_drop.local_len += 1;
         }
@@ -828,13 +827,10 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + SoaWrite,
+    T: SoaTrustedFields + SoaToOwned + SoaWrite,
 {
     #[track_caller]
-    pub fn extend_from_slice<'other>(&mut self, other: &'other SoaSlice<T>)
-    where
-        T::Refs<'other, 'other>: SoaToOwned<'other, 'other, Owned = T>,
-    {
+    pub fn extend_from_slice(&mut self, other: &SoaSlice<T>) {
         self.reserve(other.len());
 
         let mut set_len_on_drop = SetLenOnDrop {
@@ -847,7 +843,7 @@ where
             unsafe {
                 let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
                 let dst = context.ptrs_add_mut(ptrs, set_len_on_drop.local_len);
-                T::write(context, dst, refs.to_owned(context));
+                T::write(context, dst, T::to_owned(context, refs));
             }
             set_len_on_drop.local_len += 1;
         }
@@ -970,9 +966,8 @@ where
 
 impl<T> Clone for SoaVec<T>
 where
-    T: Soa + SoaWrite,
+    T: SoaToOwned + SoaWrite,
     T::Context: Clone,
-    for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T> + 'any,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1088,9 +1083,8 @@ where
 
 impl<T> From<&SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + SoaWrite,
+    T: SoaTrustedFields + SoaToOwned + SoaWrite,
     T::Context: Clone,
-    for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
     #[inline]
     fn from(value: &SoaSlice<T>) -> Self {
@@ -1100,9 +1094,8 @@ where
 
 impl<T> From<&mut SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + SoaWrite,
+    T: SoaTrustedFields + SoaToOwned + SoaWrite,
     T::Context: Clone,
-    for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
 {
     #[inline]
     fn from(value: &mut SoaSlice<T>) -> Self {

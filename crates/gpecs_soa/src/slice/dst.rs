@@ -375,14 +375,11 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: Soa + SoaTrustedFields + SoaWrite,
+    T: SoaTrustedFields + SoaToOwned + SoaWrite,
 {
     #[inline]
     #[track_caller]
-    pub fn clone_from_slice(&mut self, src: &Self)
-    where
-        for<'c, 'any> T::Refs<'c, 'any>: SoaToOwned<'c, 'any, Owned = T>,
-    {
+    pub fn clone_from_slice(&mut self, src: &Self) {
         let src = src.slices();
         self.slices_mut().clone_from_slices(&src);
     }

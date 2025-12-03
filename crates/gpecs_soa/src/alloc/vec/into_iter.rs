@@ -9,43 +9,28 @@ use crate::{
     alloc::raw_vec::RawSoaVec,
     layout::BufferData,
     ptr::BufferDataPtr,
-    traits::{MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, Soa, SoaRead},
+    traits::{
+        MutPtrs, NonNullPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead,
+    },
     vec::SoaVec,
     wrapper::NonNullPtrs as NonNullPtrsWrapper,
 };
 
 pub struct IntoIter<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
+    ptrs: NonNullPtrsWrapper<'static, T>,
     buffer: NonNull<BufferData<T>>,
     capacity: usize,
-    ptrs: NonNullPtrsWrapper<'static, T>,
     start: usize,
     end: usize,
 }
 
 impl<T> IntoIter<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
-    #[inline]
-    pub(super) fn new(vec: SoaVec<T>) -> Self {
-        let vec = ManuallyDrop::new(vec);
-
-        let buffer = vec.buffer.as_mut_ptr();
-        let context = vec.context();
-        let ptrs = unsafe { context.ptrs_to_nonnull(vec.buffer.as_mut_ptrs()) };
-        let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'_, T>>(ptrs) };
-        Self {
-            buffer: unsafe { NonNull::new_unchecked(buffer) },
-            capacity: vec.capacity(),
-            ptrs: NonNullPtrsWrapper::new(ptrs),
-            start: 0,
-            end: vec.len(),
-        }
-    }
-
     #[inline]
     pub fn len(&self) -> usize {
         let Self { start, end, .. } = *self;
@@ -64,41 +49,103 @@ where
     }
 
     #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'_, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
+        let Self {
+            ref ptrs,
+            buffer,
+            start,
+            ..
+        } = *self;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, T> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&T::Context, MutPtrs<'_, T>) {
+        let Self {
+            ref ptrs,
+            buffer,
+            start,
+            ..
+        } = *self;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> SlicePtrs<'_, T> {
+        let (_, slices) = self.as_slice_ptrs_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
+        let Self {
+            ref ptrs,
+            buffer,
+            start,
+            ..
+        } = *self;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let len = self.len();
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
+        (context, slices)
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
+        let (_, slices) = self.as_slice_mut_ptrs_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
+        let Self {
+            ref ptrs,
+            buffer,
+            start,
+            ..
+        } = *self;
+        let context = unsafe { Self::context_of(buffer) };
+
+        let len = self.len();
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = context.nonnull_to_ptrs(ptrs);
+        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        (context, slices)
+    }
+
+    #[inline]
     unsafe fn context_of<'a>(buffer: NonNull<BufferData<T>>) -> &'a T::Context {
         let buffer = buffer.as_ptr();
         unsafe { buffer.context() }
-    }
-
-    #[inline]
-    pub fn as_slices(&self) -> T::Slices<'_, '_> {
-        let Self { start, .. } = *self;
-        let context = self.context();
-        let ptrs = context.ptrs_cast_const(self.ptrs());
-        let len = self.len();
-
-        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
-        let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
-        unsafe { T::slice_ptrs_to_slices(context, slices) }
-    }
-
-    #[inline]
-    pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_, '_> {
-        let Self { start, .. } = *self;
-        let context = self.context();
-        let ptrs = self.ptrs();
-        let len = self.len();
-
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
-        unsafe { T::slice_mut_ptrs_to_slices(context, slices) }
-    }
-
-    #[inline]
-    fn ptrs(&self) -> MutPtrs<'_, T> {
-        let Self { ptrs, .. } = self;
-        let context = self.context();
-        let ptrs = ptrs.clone().into_inner();
-        context.nonnull_to_ptrs(ptrs)
     }
 
     #[inline]
@@ -110,7 +157,6 @@ where
     ) -> Ptrs<'a, T> {
         let old_start = *start;
         *start += offset;
-
         unsafe { context.ptrs_add(ptrs, old_start) }
     }
 
@@ -122,14 +168,59 @@ where
         offset: usize,
     ) -> Ptrs<'a, T> {
         *end -= offset;
-
         unsafe { context.ptrs_add(ptrs, *end) }
+    }
+}
+
+impl<T> IntoIter<T>
+where
+    T: Soa + ?Sized,
+{
+    #[inline]
+    pub(super) fn new(vec: SoaVec<T>) -> Self {
+        let vec = ManuallyDrop::new(vec);
+
+        let ptrs = unsafe { vec.context().ptrs_to_nonnull(vec.buffer.as_mut_ptrs()) };
+        let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'_, T>>(ptrs) };
+        Self {
+            ptrs: NonNullPtrsWrapper::new(ptrs),
+            buffer: unsafe { NonNull::new_unchecked(vec.buffer.as_mut_ptr()) },
+            capacity: vec.capacity(),
+            start: 0,
+            end: vec.len(),
+        }
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> T::Slices<'_, '_> {
+        let (_, slices) = self.as_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_, '_>) {
+        let (context, slices) = self.as_slice_ptrs_with_context();
+        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        (context, slices)
+    }
+
+    #[inline]
+    pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_, '_> {
+        let (_, slices) = self.as_mut_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_mut_slices_with_context(&mut self) -> (&T::Context, T::SlicesMut<'_, '_>) {
+        let (context, slices) = self.as_slice_mut_ptrs_with_context();
+        let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
+        (context, slices)
     }
 }
 
 unsafe impl<T> Send for IntoIter<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     T::Context: Send,
     T::Fields: Send,
 {
@@ -137,7 +228,7 @@ where
 
 unsafe impl<T> Sync for IntoIter<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {
@@ -179,16 +270,16 @@ where
 
 impl<T> Drop for IntoIter<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     fn drop(&mut self) {
         struct DropGuard<'a, T>(&'a mut IntoIter<T>)
         where
-            T: Soa + ?Sized;
+            T: RawSoa + ?Sized;
 
         impl<T> Drop for DropGuard<'_, T>
         where
-            T: Soa + ?Sized,
+            T: RawSoa + ?Sized,
         {
             fn drop(&mut self) {
                 let Self(iter) = self;
@@ -217,8 +308,7 @@ where
         let Self { buffer, .. } = **iter;
         let context = unsafe { Self::context_of(buffer) };
 
-        let slices = iter.as_mut_slices();
-        let slices = T::slices_mut_as_slice_ptrs(context, slices);
+        let slices = iter.as_slice_mut_ptrs();
         unsafe { context.slices_drop_in_place(slices) }
         // now `guard` will be dropped and do the rest
     }
@@ -227,7 +317,7 @@ where
 #[expect(clippy::while_let_on_iterator)]
 impl<T> Iterator for IntoIter<T>
 where
-    T: Soa + SoaRead,
+    T: SoaRead,
 {
     type Item = T;
 
@@ -316,25 +406,29 @@ where
         // - bumps an index instead of a pointer since the latter case inhibits
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
-        let len = self.len();
-        let ptrs = self.ptrs();
+        let Self {
+            ref ptrs,
+            start,
+            end,
+            ..
+        } = self;
         let context = self.context();
         let mut acc = init;
-        let mut i = 0;
+        let mut i = start;
         loop {
-            // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
+            // SAFETY: the loop iterates `i in start..end`, which always is in bounds of
             // the slice allocation
-            let ptrs = context.ptrs_cast_const(ptrs.clone());
-            let item = unsafe {
-                let ptrs = context.ptrs_add(ptrs, i);
-                T::read(context, ptrs)
-            };
+            let ptrs = ptrs.clone().into_inner();
+            let ptrs = context.nonnull_to_ptrs(ptrs);
+            let ptrs = context.ptrs_cast_const(ptrs);
+            let ptrs = unsafe { context.ptrs_add(ptrs, i) };
+            let item = unsafe { T::read(context, ptrs) };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
             // slice had that length, in which case we'll break out of the loop
             // after the increment
             i = unsafe { i.unchecked_add(1) };
-            if i == len {
+            if i == end {
                 break;
             }
         }
@@ -447,7 +541,7 @@ where
 
 impl<T> DoubleEndedIterator for IntoIter<T>
 where
-    T: Soa + SoaRead,
+    T: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -499,7 +593,7 @@ where
 
 impl<T> ExactSizeIterator for IntoIter<T>
 where
-    T: Soa + SoaRead,
+    T: SoaRead,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -507,4 +601,4 @@ where
     }
 }
 
-impl<T> FusedIterator for IntoIter<T> where T: Soa + SoaRead {}
+impl<T> FusedIterator for IntoIter<T> where T: SoaRead {}

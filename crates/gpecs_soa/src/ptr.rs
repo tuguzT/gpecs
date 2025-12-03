@@ -184,14 +184,14 @@ pub trait BufferDataPtr<T>: Copy + private::Sealed
 where
     T: RawSoa + ?Sized,
 {
-    fn ptr_to_context(self) -> *const T::Context;
+    unsafe fn ptr_to_context(self) -> *const T::Context;
     unsafe fn ptr_to_len(self) -> *const usize;
     unsafe fn ptr_to_capacity(self) -> *const usize;
     unsafe fn ptr_to_data(self) -> *const u8;
 
     #[inline]
     unsafe fn context<'a>(self) -> &'a T::Context {
-        let context = self.ptr_to_context();
+        let context = unsafe { self.ptr_to_context() };
         let context = unsafe { NonNull::new_unchecked(context.cast_mut()) };
         unsafe { context.as_ref() }
     }
@@ -219,7 +219,7 @@ where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    fn ptr_to_context(self) -> *const T::Context {
+    unsafe fn ptr_to_context(self) -> *const T::Context {
         self.cast()
     }
 
@@ -249,7 +249,7 @@ pub trait BufferDataPtrMut<T>: BufferDataPtr<T>
 where
     T: RawSoa + ?Sized,
 {
-    fn ptr_to_context_mut(self) -> *mut T::Context;
+    unsafe fn ptr_to_context_mut(self) -> *mut T::Context;
     unsafe fn ptr_to_len_mut(self) -> *mut usize;
     unsafe fn ptr_to_capacity_mut(self) -> *mut usize;
     unsafe fn ptr_to_data_mut(self) -> *mut u8;
@@ -260,8 +260,8 @@ where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    fn ptr_to_context(self) -> *const T::Context {
-        self.cast_const().ptr_to_context()
+    unsafe fn ptr_to_context(self) -> *const T::Context {
+        unsafe { self.cast_const().ptr_to_context() }
     }
 
     #[inline]
@@ -285,7 +285,7 @@ where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    fn ptr_to_context_mut(self) -> *mut T::Context {
+    unsafe fn ptr_to_context_mut(self) -> *mut T::Context {
         self.cast()
     }
 

@@ -382,7 +382,7 @@ where
     phantom: PhantomData<&'a ()>,
 }
 
-impl<'c, 'a, T> SoaSlices<'c, 'a, T>
+impl<'c, T> SoaSlices<'c, '_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -502,28 +502,27 @@ where
     }
 
     #[inline]
-    #[expect(clippy::iter_not_returning_iterator)]
-    pub fn iter(&self) -> Iter<'_, '_, T> {
-        let (_, iter) = self.iter_with_context();
+    pub fn raw_iter(&self) -> RawIter<'_, T> {
+        let (_, iter) = self.raw_iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+    pub fn raw_iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
         let Self { ptrs, .. } = self;
-
-        let (context, iter) = ptrs.iter_with_context();
-        let iter = unsafe { iter.deref() };
-        (context, iter)
+        ptrs.iter_with_context()
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'c T::Context, Iter<'c, 'a, T>) {
-        let Self { ptrs, .. } = self;
+    pub fn into_raw_iter(self) -> RawIter<'c, T> {
+        let (_, iter) = self.into_raw_iter_with_context();
+        iter
+    }
 
-        let (context, iter) = ptrs.into_iter_with_context();
-        let iter = unsafe { iter.deref() };
-        (context, iter)
+    #[inline]
+    pub fn into_raw_iter_with_context(self) -> (&'c T::Context, RawIter<'c, T>) {
+        let Self { ptrs, .. } = self;
+        ptrs.into_iter_with_context()
     }
 }
 
@@ -644,6 +643,26 @@ where
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.index(context, slices))
+    }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+        let (context, iter) = self.raw_iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_iter_with_context(self) -> (&'c T::Context, Iter<'c, 'a, T>) {
+        let (context, iter) = self.into_raw_iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
@@ -1309,7 +1328,7 @@ where
     phantom: PhantomData<&'a ()>,
 }
 
-impl<'c, 'a, T> SoaSlicesMut<'c, 'a, T>
+impl<'c, T> SoaSlicesMut<'c, '_, T>
 where
     T: RawSoa + ?Sized,
 {
@@ -1516,44 +1535,51 @@ where
     }
 
     #[inline]
-    #[expect(clippy::iter_not_returning_iterator)]
-    pub fn iter(&self) -> Iter<'_, '_, T> {
-        let (_, iter) = self.iter_with_context();
+    pub fn raw_iter(&self) -> RawIter<'_, T> {
+        let (_, iter) = self.raw_iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+    pub fn raw_iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
         let Self { ptrs, .. } = self;
-
-        let (context, iter) = ptrs.iter_with_context();
-        let iter = unsafe { iter.deref() };
-        (context, iter)
+        ptrs.iter_with_context()
     }
 
     #[inline]
-    #[expect(clippy::iter_not_returning_iterator)]
-    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
-        let (_, iter) = self.iter_mut_with_context();
+    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, T> {
+        let (_, iter) = self.raw_iter_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
+    pub fn raw_iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
         let Self { ptrs, .. } = self;
-
-        let (context, iter) = ptrs.iter_mut_with_context();
-        let iter = unsafe { iter.deref_mut() };
-        (context, iter)
+        ptrs.iter_mut_with_context()
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'c T::Context, IterMut<'c, 'a, T>) {
-        let Self { ptrs, .. } = self;
+    pub fn into_raw_iter(self) -> RawIter<'c, T> {
+        let (_, iter) = self.into_raw_iter_with_context();
+        iter
+    }
 
-        let (context, iter) = ptrs.into_iter_with_context();
-        let iter = unsafe { iter.deref_mut() };
-        (context, iter)
+    #[inline]
+    pub fn into_raw_iter_with_context(self) -> (&'c T::Context, RawIter<'c, T>) {
+        let (context, iter) = self.into_raw_iter_mut_with_context();
+        (context, iter.cast_const())
+    }
+
+    #[inline]
+    pub fn into_raw_iter_mut(self) -> RawIterMut<'c, T> {
+        let (_, iter) = self.into_raw_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_iter_mut_with_context(self) -> (&'c T::Context, RawIterMut<'c, T>) {
+        let Self { ptrs, .. } = self;
+        ptrs.into_iter_with_context()
     }
 
     #[inline]
@@ -1812,6 +1838,39 @@ where
     {
         let (context, slices) = self.into_slices_with_context();
         (context, index.index_mut(context, slices))
+    }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+        let (context, iter) = self.raw_iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
+        let (_, iter) = self.iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
+        let (context, iter) = self.raw_iter_mut_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_iter_with_context(self) -> (&'c T::Context, IterMut<'c, 'a, T>) {
+        let (context, iter) = self.into_raw_iter_mut_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
     }
 
     #[inline]

@@ -19,8 +19,8 @@ use crate::{
 };
 
 use super::{
-    IndexHelper, IndexHelperMut, Iter, IterMut, SoaSliceMutPtrs, SoaSlicePtrs, SoaSlicePtrsIndex,
-    SoaSlices, SoaSlicesIndex, SoaSlicesMut,
+    IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSliceMutPtrs, SoaSlicePtrs,
+    SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex, SoaSlicesMut,
 };
 
 #[repr(transparent)]
@@ -200,27 +200,25 @@ where
     }
 
     #[inline]
-    #[expect(clippy::iter_not_returning_iterator)]
-    pub fn iter(&self) -> Iter<'_, '_, T> {
-        let (_, iter) = self.iter_with_context();
+    pub fn raw_iter(&self) -> RawIter<'_, T> {
+        let (_, iter) = self.raw_iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
-        self.slices().into_iter_with_context()
+    pub fn raw_iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+        self.slices().into_raw_iter_with_context()
     }
 
     #[inline]
-    #[expect(clippy::iter_not_returning_iterator)]
-    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
-        let (_, iter) = self.iter_mut_with_context();
+    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, T> {
+        let (_, iter) = self.raw_iter_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
-        self.slices_mut().into_iter_with_context()
+    pub fn raw_iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
+        self.slices_mut().into_raw_iter_mut_with_context()
     }
 
     #[inline]
@@ -258,15 +256,6 @@ where
         let (context, slices) = self.as_slice_mut_ptrs_with_context();
         let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         (context, slices)
-    }
-
-    #[inline]
-    pub fn contains<'me, V>(&'me self, value: V) -> bool
-    where
-        T::Refs<'me, 'me>: PartialEq<V>,
-    {
-        let mut iter = self.into_iter();
-        iter.any(move |item| item.eq(&value))
     }
 
     #[inline]
@@ -339,6 +328,37 @@ where
         I: SoaSlicesIndex<T>,
     {
         self.slices_mut().into_index_mut_with_context(index)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, T> {
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+        self.slices().into_iter_with_context()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
+        let (_, iter) = self.iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
+        self.slices_mut().into_iter_with_context()
+    }
+
+    #[inline]
+    pub fn contains<'me, V>(&'me self, value: V) -> bool
+    where
+        T::Refs<'me, 'me>: PartialEq<V>,
+    {
+        let mut iter = self.into_iter();
+        iter.any(move |item| item.eq(&value))
     }
 
     #[inline]

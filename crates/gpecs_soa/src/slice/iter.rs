@@ -53,6 +53,46 @@ where
     }
 
     #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self {
+            ref ptrs,
+            context,
+            start,
+            ..
+        } = *self;
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.into_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self {
+            ptrs,
+            context,
+            start,
+            ..
+        } = self;
+
+        let ptrs = ptrs.into_inner();
+        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
     pub fn as_slice_ptrs(&self) -> SlicePtrs<'c, T> {
         let (_, slices) = self.as_slice_ptrs_with_context();
         slices
@@ -266,13 +306,15 @@ where
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
         let Self {
-            context, ref ptrs, ..
+            ref ptrs,
+            context,
+            start,
+            end,
         } = self;
         let mut acc = init;
-        let mut i = 0;
-        let len = RawIter::len(&self);
+        let mut i = start;
         loop {
-            // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
+            // SAFETY: the loop iterates `i in start..end`, which always is in bounds of
             // the slice allocation
             let ptrs = ptrs.clone().into_inner();
             let item = unsafe { context.ptrs_add(ptrs, i) };
@@ -281,7 +323,7 @@ where
             // slice had that length, in which case we'll break out of the loop
             // after the increment
             i = unsafe { i.unchecked_add(1) };
-            if i == len {
+            if i == end {
                 break;
             }
         }
@@ -500,6 +542,30 @@ where
     }
 
     #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self { inner, .. } = self;
+        inner.as_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.into_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self { inner, .. } = self;
+        inner.into_ptrs_with_context()
+    }
+
+    #[inline]
     pub fn as_slice_ptrs(&self) -> SlicePtrs<'c, T> {
         let (_, slices) = self.as_slice_ptrs_with_context();
         slices
@@ -696,6 +762,88 @@ where
     pub fn context(&self) -> &'c T::Context {
         let Self { context, .. } = *self;
         context
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self {
+            ref ptrs,
+            context,
+            start,
+            ..
+        } = *self;
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.into_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self {
+            ptrs,
+            context,
+            start,
+            ..
+        } = self;
+
+        let ptrs = ptrs.into_inner();
+        let ptrs = context.ptrs_cast_const(ptrs);
+        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'c, T> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&'c T::Context, MutPtrs<'c, T>) {
+        let Self {
+            ref ptrs,
+            context,
+            start,
+            ..
+        } = *self;
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> MutPtrs<'c, T> {
+        let (_, ptrs) = self.into_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs_with_context(self) -> (&'c T::Context, MutPtrs<'c, T>) {
+        let Self {
+            ptrs,
+            context,
+            start,
+            ..
+        } = self;
+
+        let ptrs = ptrs.into_inner();
+        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        (context, ptrs)
     }
 
     #[inline]
@@ -963,13 +1111,15 @@ where
         //   some optimizations, see #111603
         // - avoids Option wrapping/matching
         let Self {
-            context, ref ptrs, ..
+            ref ptrs,
+            context,
+            start,
+            end,
         } = self;
         let mut acc = init;
-        let mut i = 0;
-        let len = RawIterMut::len(&self);
+        let mut i = start;
         loop {
-            // SAFETY: the loop iterates `i in 0..len`, which always is in bounds of
+            // SAFETY: the loop iterates `i in start..end`, which always is in bounds of
             // the slice allocation
             let ptrs = ptrs.clone().into_inner();
             let item = unsafe { context.ptrs_add_mut(ptrs, i) };
@@ -978,7 +1128,7 @@ where
             // slice had that length, in which case we'll break out of the loop
             // after the increment
             i = unsafe { i.unchecked_add(1) };
-            if i == len {
+            if i == end {
                 break;
             }
         }
@@ -1194,6 +1344,54 @@ where
     pub fn context(&self) -> &'c T::Context {
         let Self { inner, .. } = self;
         inner.context()
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self { inner, .. } = self;
+        inner.as_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.into_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self { inner, .. } = self;
+        inner.into_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'c, T> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&'c T::Context, MutPtrs<'c, T>) {
+        let Self { inner, .. } = self;
+        inner.as_mut_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> MutPtrs<'c, T> {
+        let (_, ptrs) = self.into_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs_with_context(self) -> (&'c T::Context, MutPtrs<'c, T>) {
+        let Self { inner, .. } = self;
+        inner.into_mut_ptrs_with_context()
     }
 
     #[inline]

@@ -49,22 +49,21 @@ where
         let len = vec.len();
         let range @ Range { start, end } = self::range(range, ..len);
 
+        let mut vec = NonNull::from_mut(vec);
+        // index before setting length, otherwise range is invalid
+        let (context, slices) = unsafe { vec.as_ref() }
+            .slices()
+            .into_index_with_context(range);
         unsafe {
-            let mut vec = NonNull::from(vec);
-
-            // index before setting length, otherwise range is invalid
-            let context = vec.as_ref().context();
-            let slices = vec.as_ref().slices().into_index(range);
-
             // set self.vec length's to start, to be safe in case Drain is leaked
             vec.as_mut().set_len(start);
+        }
 
-            Self {
-                tail_start: end,
-                tail_len: len - end,
-                iter: Iter::new(context, slices),
-                vec,
-            }
+        Self {
+            tail_start: end,
+            tail_len: len - end,
+            iter: Iter::new(context, slices),
+            vec,
         }
     }
 
@@ -128,9 +127,8 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        let context = NonNull::from_ref(iter.context());
-        let context = unsafe { context.as_ref() };
         iter.next().map(|refs| {
+            let context = iter.context();
             let src = T::refs_as_ptrs(context, refs);
             unsafe { T::read(context, src) }
         })
@@ -151,9 +149,8 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        let context = NonNull::from_ref(iter.context());
-        let context = unsafe { context.as_ref() };
         iter.next_back().map(|refs| {
+            let context = iter.context();
             let src = T::refs_as_ptrs(context, refs);
             unsafe { T::read(context, src) }
         })
@@ -199,21 +196,23 @@ where
                 if tail_len == 0 {
                     return;
                 }
-                unsafe {
-                    let source_vec = vec.as_mut();
-                    // memory-move back untouched tail, update to new length
-                    let start = source_vec.len();
-                    let tail = tail_start;
-                    if tail != start {
-                        let src = source_vec.as_ptrs();
-                        let dst = source_vec.buffer.as_mut_ptrs();
-                        let context = source_vec.context();
 
-                        let src = context.ptrs_add(src, tail);
-                        let dst = context.ptrs_add_mut(dst, start);
+                // memory-move back untouched tail, update to new length
+                let vec = unsafe { vec.as_mut() };
+                let start = vec.len();
+                let tail = tail_start;
+                if tail != start {
+                    let (context, ptrs) = vec.as_mut_ptrs_with_context();
+
+                    let src = context.ptrs_cast_const(ptrs.clone());
+                    let src = unsafe { context.ptrs_add(src, tail) };
+                    let dst = unsafe { context.ptrs_add_mut(ptrs, start) };
+                    unsafe {
                         context.ptrs_copy(src, dst, tail_len);
                     }
-                    source_vec.set_len(start + tail_len);
+                }
+                unsafe {
+                    vec.set_len(start + tail_len);
                 }
             }
         }
@@ -230,40 +229,35 @@ where
         if is_zst::<T>(context) {
             // ZSTs have no identity, so we don't need to move them around, we only need to drop the correct amount.
             // this can be achieved by manipulating the Vec length instead of moving values out from `iter`.
+            let vec = unsafe { vec.as_mut() };
+            let old_len = vec.len();
             unsafe {
-                let vec = vec.as_mut();
-                let old_len = vec.len();
                 vec.set_len(old_len + drop_len + tail_len);
                 vec.truncate(old_len + tail_len);
             }
-
             return;
         }
 
         // ensure elements are moved back into their appropriate places, even when drop_in_place panics
         let guard = DropGuard(self);
-
         if drop_len == 0 {
             return;
         }
 
+        // as_ptrs() must only be called when iter.len() is > 0 because
+        // it also gets touched by vec::Splice which may turn it into a dangling pointer
+        // which would make it and the vec pointer point to different allocations which would
+        // lead to invalid pointer arithmetic below.
+        let drop_ptrs = guard.0.iter.as_ptrs();
+
+        // drop_ptrs comes from an Iter which only gives us slices but for drop_in_place
+        // a pointer with mutable provenance is necessary. Therefore we must reconstruct
+        // it from the original vec but also avoid creating a &mut to the front since that could
+        // invalidate raw pointers to it which some unsafe code might rely on.
+        let (context, vec_ptrs) = unsafe { vec.as_mut() }.as_mut_ptrs_with_context();
+        let origin = context.ptrs_cast_const(vec_ptrs.clone());
+
         unsafe {
-            let vec_ptrs = vec.as_mut().as_mut_ptrs();
-            let context = vec.as_ref().context();
-
-            // as_ptrs() must only be called when iter.len() is > 0 because
-            // it also gets touched by vec::Splice which may turn it into a dangling pointer
-            // which would make it and the vec pointer point to different allocations which would
-            // lead to invalid pointer arithmetic below.
-            let slices = guard.0.iter.as_slices();
-            let drop_ptrs = T::slices_as_ptrs(context, slices);
-
-            // drop_ptrs comes from an Iter which only gives us slices but for drop_in_place
-            // a pointer with mutable provenance is necessary. Therefore we must reconstruct
-            // it from the original vec but also avoid creating a &mut to the front since that could
-            // invalidate raw pointers to it which some unsafe code might rely on.
-            let origin = context.ptrs_cast_const(vec_ptrs.clone());
-
             let drop_offset = context.ptrs_offset_from(drop_ptrs, origin);
             let drop_offset = usize::try_from(drop_offset).unwrap_unchecked();
 

@@ -178,13 +178,16 @@ where
 {
     #[inline]
     pub(super) fn new(vec: SoaVec<T>) -> Self {
-        let vec = ManuallyDrop::new(vec);
+        let mut vec = ManuallyDrop::new(vec);
 
-        let ptrs = unsafe { vec.context().ptrs_to_nonnull(vec.buffer.as_mut_ptrs()) };
+        let buffer = vec.as_mut_ptr();
+        let (context, ptrs) = vec.as_mut_ptrs_with_context();
+
+        let ptrs = unsafe { context.ptrs_to_nonnull(ptrs) };
         let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'_, T>>(ptrs) };
         Self {
             ptrs: NonNullPtrsWrapper::new(ptrs),
-            buffer: unsafe { NonNull::new_unchecked(vec.buffer.as_mut_ptr()) },
+            buffer: unsafe { NonNull::new_unchecked(buffer) },
             capacity: vec.capacity(),
             start: 0,
             end: vec.len(),

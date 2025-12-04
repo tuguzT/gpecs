@@ -25,11 +25,11 @@ where
                 local_len: 0,
             };
 
-            let (context, ptrs, _) = set_len_on_drop.vec.slices_mut().into_parts();
+            let (context, dst, _) = set_len_on_drop.vec.slices_mut().into_parts();
             for (index, refs) in self.iter().enumerate() {
                 set_len_on_drop.local_len = index;
 
-                let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
+                let dst = unsafe { context.ptrs_add_mut(dst.clone(), index) };
                 unsafe { T::write(context, dst, T::to_owned(context, refs)) }
             }
         }

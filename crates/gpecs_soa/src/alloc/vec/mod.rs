@@ -15,8 +15,9 @@ use crate::{
     layout::{BufferData, buffer_layout, capacity_from, should_allocate},
     ptr::{BufferDataPtrMut, ptrs_from_buffer, ptrs_from_buffer_mut},
     slice::{
-        IndexHelper, IndexHelperMut, Iter, IterMut, SoaSlice, SoaSliceMutPtrs, SoaSlicePtrs,
-        SoaSlices, SoaSlicesMut, from_raw_parts, from_raw_parts_mut, range,
+        IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSlice, SoaSliceMutPtrs,
+        SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesMut, from_raw_parts,
+        from_raw_parts_mut, range,
     },
     traits::{
         MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
@@ -135,6 +136,113 @@ where
     pub fn context(&self) -> &T::Context {
         let Self { buffer, .. } = self;
         buffer.context()
+    }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const BufferData<T> {
+        let Self { buffer, .. } = self;
+        buffer.as_mut_ptr().cast_const()
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
+        let Self { buffer, .. } = self;
+        buffer.as_mut_ptr()
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'_, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
+        let Self { buffer, .. } = self;
+
+        let context = buffer.context();
+        let ptrs = buffer.as_mut_ptrs();
+        let ptrs = context.ptrs_cast_const(ptrs);
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, T> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&T::Context, MutPtrs<'_, T>) {
+        let Self { buffer, .. } = self;
+
+        let context = buffer.context();
+        let ptrs = buffer.as_mut_ptrs();
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> SlicePtrs<'_, T> {
+        let (_, slices) = self.as_slice_ptrs_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
+        let len = self.len();
+        let (context, ptrs) = self.as_ptrs_with_context();
+
+        let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
+        (context, slices)
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
+        let (_, slices) = self.as_slice_mut_ptrs_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
+        let len = self.len();
+        let (context, ptrs) = self.as_mut_ptrs_with_context();
+
+        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        (context, slices)
+    }
+
+    #[inline]
+    pub fn slice_ptrs(&self) -> SoaSlicePtrs<'_, T> {
+        let (context, slices) = self.as_slice_ptrs_with_context();
+        SoaSlicePtrs::new(context, slices)
+    }
+
+    #[inline]
+    pub fn slice_mut_ptrs(&mut self) -> SoaSliceMutPtrs<'_, T> {
+        let (context, slices) = self.as_slice_mut_ptrs_with_context();
+        SoaSliceMutPtrs::new(context, slices)
+    }
+
+    #[inline]
+    pub unsafe fn set_len(&mut self, new_len: usize) {
+        debug_assert!(new_len <= self.capacity());
+
+        self.len = new_len;
+        self.set_len_in_buffer(new_len);
+    }
+
+    #[inline]
+    fn set_len_in_buffer(&mut self, new_len: usize) {
+        let context = self.context();
+        let capacity = self.capacity();
+        if !should_allocate::<T>(context, capacity) {
+            return;
+        }
+
+        unsafe {
+            let len = self.as_mut_ptr().ptr_to_len_mut();
+            ptr::write(len, new_len);
+        }
     }
 
     #[inline]
@@ -277,76 +385,37 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const BufferData<T> {
-        let Self { buffer, .. } = self;
-        buffer.as_mut_ptr().cast_const()
-    }
-
-    #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut BufferData<T> {
-        let Self { buffer, .. } = self;
-        buffer.as_mut_ptr()
-    }
-
-    #[inline]
-    pub fn as_ptrs(&self) -> Ptrs<'_, T> {
-        let (_, ptrs) = self.as_ptrs_with_context();
-        ptrs
-    }
-
-    #[inline]
-    pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
-        let Self { buffer, .. } = self;
-
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
-        let ptrs = context.ptrs_cast_const(ptrs);
-        (context, ptrs)
-    }
-
-    #[inline]
-    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, T> {
-        let (_, ptrs) = self.as_mut_ptrs_with_context();
-        ptrs
-    }
-
-    #[inline]
-    pub fn as_mut_ptrs_with_context(&mut self) -> (&T::Context, MutPtrs<'_, T>) {
-        let Self { buffer, .. } = self;
-
-        let context = buffer.context();
-        let ptrs = buffer.as_mut_ptrs();
-        (context, ptrs)
-    }
-
-    #[inline]
-    pub fn as_slice_ptrs(&self) -> SlicePtrs<'_, T> {
-        let (_, slices) = self.as_slice_ptrs_with_context();
-        slices
-    }
-
-    #[inline]
-    pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
+    pub fn clear(&mut self) {
         let len = self.len();
-        let (context, ptrs) = self.as_ptrs_with_context();
+        unsafe {
+            self.set_len(0);
+        }
 
-        let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
-        (context, slices)
-    }
-
-    #[inline]
-    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
-        let (_, slices) = self.as_slice_mut_ptrs_with_context();
-        slices
-    }
-
-    #[inline]
-    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
-        let len = self.len();
         let (context, ptrs) = self.as_mut_ptrs_with_context();
-
         let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
-        (context, slices)
+        unsafe { context.slices_drop_in_place(slices) }
+    }
+
+    #[inline]
+    pub fn raw_iter(&self) -> RawIter<'_, T> {
+        let (_, iter) = self.raw_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_iter_with_context(&self) -> (&T::Context, RawIter<'_, T>) {
+        self.slice_ptrs().into_iter_with_context()
+    }
+
+    #[inline]
+    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, T> {
+        let (_, iter) = self.raw_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
+        self.slice_mut_ptrs().into_iter_with_context()
     }
 
     #[inline]
@@ -376,18 +445,6 @@ where
     }
 
     #[inline]
-    pub fn slice_ptrs(&self) -> SoaSlicePtrs<'_, T> {
-        let (context, slices) = self.as_slice_ptrs_with_context();
-        SoaSlicePtrs::new(context, slices)
-    }
-
-    #[inline]
-    pub fn slice_mut_ptrs(&mut self) -> SoaSliceMutPtrs<'_, T> {
-        let (context, slices) = self.as_slice_mut_ptrs_with_context();
-        SoaSliceMutPtrs::new(context, slices)
-    }
-
-    #[inline]
     pub fn slices(&self) -> SoaSlices<'_, '_, T> {
         unsafe { self.slice_ptrs().deref() }
     }
@@ -395,28 +452,6 @@ where
     #[inline]
     pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
         unsafe { self.slice_mut_ptrs().deref_mut() }
-    }
-
-    #[inline]
-    pub unsafe fn set_len(&mut self, new_len: usize) {
-        debug_assert!(new_len <= self.capacity());
-
-        self.len = new_len;
-        self.set_len_in_buffer(new_len);
-    }
-
-    #[inline]
-    fn set_len_in_buffer(&mut self, new_len: usize) {
-        let context = self.context();
-        let capacity = self.capacity();
-        if !should_allocate::<T>(context, capacity) {
-            return;
-        }
-
-        unsafe {
-            let len = self.as_mut_ptr().ptr_to_len_mut();
-            ptr::write(len, new_len);
-        }
     }
 
     #[inline]
@@ -557,12 +592,28 @@ where
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, '_, T> {
-        self.slices().into_iter()
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+        let (context, iter) = self.raw_iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
-        self.slices_mut().into_iter()
+        let (_, iter) = self.iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
+        let (context, iter) = self.raw_iter_mut_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
     }
 
     #[inline]
@@ -572,18 +623,6 @@ where
         R: RangeBounds<usize>,
     {
         Drain::new(self, range)
-    }
-
-    #[inline]
-    pub fn clear(&mut self) {
-        let len = self.len();
-        unsafe {
-            self.set_len(0);
-        }
-
-        let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
-        unsafe { context.slices_drop_in_place(slices) }
     }
 
     pub fn swap_remove_into<F, R>(&mut self, index: usize, f: F) -> R
@@ -799,13 +838,15 @@ where
             vec: self,
         };
 
-        let context = set_len_on_drop.vec.context();
-        for index in range {
-            let slices = set_len_on_drop.vec.slices();
-            let refs = unsafe { T::ptrs_to_refs(context, slices.get_unchecked(index)) };
+        let (context, slices) = set_len_on_drop.vec.as_slice_mut_ptrs_with_context();
+        let dst = context.slice_mut_ptrs_as_ptrs(slices.clone());
+
+        let slices = context.slice_ptrs_cast_const(slices);
+        let slices = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked(range, context, slices) };
+        for src in RawIter::<T>::new(context, slices) {
             unsafe {
-                let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
-                let dst = context.ptrs_add_mut(ptrs, set_len_on_drop.local_len);
+                let refs = T::ptrs_to_refs(context, src);
+                let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
                 T::write(context, dst, T::to_owned(context, refs));
             }
             set_len_on_drop.local_len += 1;
@@ -896,11 +937,14 @@ where
             vec: self,
         };
 
-        let context = set_len_on_drop.vec.context();
-        for refs in other {
+        let (context, slices) = set_len_on_drop.vec.as_slice_mut_ptrs_with_context();
+        let dst = context.slice_mut_ptrs_as_ptrs(slices.clone());
+
+        let slices = context.slice_ptrs_cast_const(slices);
+        for src in RawIter::<T>::new(context, slices) {
             unsafe {
-                let ptrs = set_len_on_drop.vec.buffer.as_mut_ptrs();
-                let dst = context.ptrs_add_mut(ptrs, set_len_on_drop.local_len);
+                let refs = T::ptrs_to_refs(context, src);
+                let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
                 T::write(context, dst, T::to_owned(context, refs));
             }
             set_len_on_drop.local_len += 1;
@@ -1115,13 +1159,14 @@ where
                 self.reserve(lower.saturating_add(1));
             }
 
-            let ptrs = self.buffer.as_mut_ptrs();
-            let context = self.context();
+            let (context, ptrs) = self.as_mut_ptrs_with_context();
             unsafe {
                 let dst = context.ptrs_add_mut(ptrs, len);
                 T::write(context, dst, element);
-                // Since next() executes user code which can panic we have to bump the length
-                // after each step.
+            }
+
+            unsafe {
+                // Since next() executes user code which can panic we have to bump the length after each step.
                 // NB can't overflow since we would have had to alloc the address space
                 self.set_len(len + 1);
             }
@@ -1212,26 +1257,25 @@ where
         // vector being full in the few subsequent loop iterations.
         // So we get better branch prediction.
         let mut iter = iter.into_iter();
-        let mut vector = match iter.next() {
-            None => return Self::new(),
-            Some(element) => {
-                let (lower, _) = iter.size_hint();
-                let context = Default::default();
-                let initial_capacity = cmp::max(
-                    RawSoaVec::<T>::min_non_zero_cap(&context),
-                    lower.saturating_add(1),
-                );
-                let mut vector = Self::with_context_and_capacity(context, initial_capacity);
-                unsafe {
-                    // SAFETY: We requested capacity at least 1
-                    let dst = vector.buffer.as_mut_ptrs();
-                    let context = vector.context();
-                    T::write(context, dst, element);
-                    vector.set_len(1);
-                }
-                vector
-            }
+        let Some(first) = iter.next() else {
+            return Self::new();
         };
+
+        let (lower, _) = iter.size_hint();
+        let context = Default::default();
+        let initial_capacity = cmp::max(
+            RawSoaVec::<T>::min_non_zero_cap(&context),
+            lower.saturating_add(1),
+        );
+
+        let mut vector = Self::with_context_and_capacity(context, initial_capacity);
+        let (context, dst) = vector.as_mut_ptrs_with_context();
+        unsafe {
+            // SAFETY: We requested capacity at least 1
+            T::write(context, dst, first);
+            vector.set_len(1);
+        }
+
         vector.extend(iter);
         vector
     }
@@ -1242,13 +1286,11 @@ where
     T: Soa + ?Sized,
 {
     fn drop(&mut self) {
-        let len = self.len();
-        if len == 0 {
+        if self.is_empty() {
             return;
         }
 
-        let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        let (context, slices) = self.as_slice_mut_ptrs_with_context();
         unsafe { context.slices_drop_in_place(slices) }
     }
 }

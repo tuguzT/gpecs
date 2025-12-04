@@ -705,7 +705,7 @@ fn three_items() {
         vec.push((4, "5".to_owned(), 6, ()));
         vec.push((7, "8".to_owned(), 9, ()));
     }
-    vec.retain_mut(|(x, _, _, _)| {
+    vec.retain_mut(|_, (x, _, _, _)| {
         if *x <= 3 {
             *x += 1;
             true
@@ -952,7 +952,7 @@ fn three_items_zst() {
     };
 
     let mut idx = 0;
-    vec.retain(|_| {
+    vec.retain(|_, _| {
         let current = idx;
         idx += 1;
         current % 2 == 0

@@ -3,7 +3,7 @@ use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
     slice::{Iter, IterMut, SoaSlice},
-    traits::{Soa, SoaRead, SoaToOwned, SoaTrustedFields, SoaWrite},
+    traits::{Soa, SoaCloneToUninit, SoaRead, SoaTrustedFields},
     vec::{IntoIter, SoaVec},
 };
 
@@ -123,7 +123,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: SoaTrustedFields + SoaToOwned + SoaWrite,
+    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -134,7 +134,7 @@ where
 
 impl<T> ToOwned for SoaSlice<T>
 where
-    T: SoaTrustedFields + SoaToOwned + SoaWrite,
+    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     type Owned = SoaVec<T>;

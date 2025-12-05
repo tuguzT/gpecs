@@ -4,13 +4,13 @@ use core_alloc::boxed::Box;
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
     slice::{SoaSlices, SoaSlicesMut},
-    traits::{RawSoaContext, Soa, SoaToOwned, SoaWrite},
+    traits::{RawSoaContext, Soa, SoaCloneToUninit},
     vec::SoaVec,
 };
 
 impl<T> SoaSlices<'_, '_, T>
 where
-    T: SoaToOwned + SoaWrite,
+    T: Soa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -26,11 +26,11 @@ where
             };
 
             let (context, dst, _) = set_len_on_drop.vec.slices_mut().into_parts();
-            for (index, refs) in self.iter().enumerate() {
+            for (index, src) in self.raw_iter().enumerate() {
                 set_len_on_drop.local_len = index;
 
                 let dst = unsafe { context.ptrs_add_mut(dst.clone(), index) };
-                unsafe { T::write(context, dst, T::to_owned(context, refs)) }
+                unsafe { T::clone_to_uninit(context, src, dst) }
             }
         }
 
@@ -181,7 +181,7 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: SoaToOwned + SoaWrite,
+    T: Soa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]

@@ -8,7 +8,7 @@ use core::{
 use crate::{
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValueRefs},
     soa::{
-        traits::{Ptrs, RawSoa, RawSoaContext, Soa, SoaRead},
+        traits::{Ptrs, RawSoa, RawSoaContext, Soa, SoaCloneToUninit, SoaRead},
         wrapper::Ptrs as PtrsWrapper,
     },
 };
@@ -73,6 +73,29 @@ where
         assert_eq!(key_offset, values_offset);
 
         key_offset
+    }
+}
+
+impl<K, V> KeyValuePtrs<'_, K, V>
+where
+    K: Clone,
+    V: SoaCloneToUninit + ?Sized,
+{
+    #[inline]
+    pub unsafe fn clone_to_uninit(self, context: &V::Context, dst: KeyValueMutPtrs<'_, K, V>) {
+        let Self { key, value } = self;
+        let value = value.into_inner();
+
+        let KeyValueMutPtrs {
+            key: dst_key,
+            value: dst_value,
+        } = dst;
+        let dst_value = dst_value.into_inner();
+
+        unsafe {
+            dst_key.write((&*key).clone());
+            V::clone_to_uninit(context, value, dst_value);
+        }
     }
 }
 

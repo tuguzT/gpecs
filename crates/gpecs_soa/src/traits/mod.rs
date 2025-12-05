@@ -386,6 +386,15 @@ pub unsafe trait RawSoa {
 ///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
 pub unsafe trait SoaTrustedFields: RawSoa {}
 
+/// A generalization of [`Clone`] specifically for [SoA](RawSoa) type.
+///
+/// This trait is analogous to the unstable [`CloneToUninit`](core::clone::CloneToUninit) trait.
+pub unsafe trait SoaCloneToUninit: RawSoa {
+    /// Performs copy-assignment of each stored field from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs).
+    /// Before this function is called, src must point to initialized memory and dst may point to uninitialized memory.
+    unsafe fn clone_to_uninit(context: &Self::Context, src: Ptrs<'_, Self>, dst: MutPtrs<'_, Self>);
+}
+
 /// An extension of [SoA](RawSoa) type which allows to read `Self`
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
 pub unsafe trait SoaRead: RawSoa + Sized {
@@ -625,32 +634,4 @@ pub unsafe trait Soa: RawSoa {
     ) -> MutPtrs<'context, Self>
     where
         Self: 'a;
-}
-
-/// A generalization of [`Clone`] to borrowed data
-/// specifically for [SoA](Soa) type.
-///
-/// This trait is analogous to [`ToOwned`] trait from the standard library.
-///
-/// [`ToOwned`]: https://doc.rust-lang.org/stable/alloc/borrow/trait.ToOwned.html
-pub trait SoaToOwned: Soa + Sized {
-    /// Creates owned data from borrowed data,
-    /// usually by cloning each stored field.
-    fn to_owned(context: &Self::Context, refs: Self::Refs<'_, '_>) -> Self;
-
-    /// Uses borrowed data to replace owned data,
-    /// usually by cloning each stored field.
-    ///
-    /// This is borrow-generalized version of [`Clone::clone_from()`].
-    fn clone_into(context: &Self::Context, refs: Self::Refs<'_, '_>, target: &mut Self) {
-        *target = Self::to_owned(context, refs);
-    }
-
-    /// Uses borrowed data to replace owned data located by `target` [references](Soa::RefsMut),
-    /// usually by cloning each stored field.
-    fn clone_into_refs(
-        context: &Self::Context,
-        src: Self::Refs<'_, '_>,
-        dst: Self::RefsMut<'_, '_>,
-    );
 }

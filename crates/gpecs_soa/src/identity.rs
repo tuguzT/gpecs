@@ -13,8 +13,8 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
-        SoaTrustedFields, SoaWrite, debug_assert_ptr_is_aligned,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
+        SoaRead, SoaTrustedFields, SoaWrite, debug_assert_ptr_is_aligned,
     },
 };
 
@@ -761,27 +761,18 @@ unsafe impl<T> SoaWrite for Identity<T> {
     }
 }
 
-impl<T> SoaToOwned for Identity<T>
+unsafe impl<T> SoaCloneToUninit for Identity<T>
 where
     T: Clone,
 {
     #[inline]
-    fn to_owned(_context: &Self::Context, refs: Self::Refs<'_, '_>) -> Self {
-        refs.clone()
-    }
-
-    #[inline]
-    fn clone_into(_context: &Self::Context, refs: Self::Refs<'_, '_>, target: &mut Self) {
-        target.clone_from(refs);
-    }
-
-    #[inline]
-    fn clone_into_refs(
+    unsafe fn clone_to_uninit(
         _context: &Self::Context,
-        src: Self::Refs<'_, '_>,
-        dst: Self::RefsMut<'_, '_>,
+        src: Ptrs<'_, Self>,
+        dst: MutPtrs<'_, Self>,
     ) {
-        dst.clone_from(src);
+        let src = unsafe { &*src }.clone();
+        unsafe { ptr::write(dst, src) }
     }
 }
 

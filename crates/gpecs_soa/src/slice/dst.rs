@@ -13,8 +13,8 @@ use crate::{
         slice_from_raw_parts_mut,
     },
     traits::{
-        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaToOwned, SoaTrustedFields,
-        SoaWrite,
+        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
+        SoaTrustedFields,
     },
 };
 
@@ -395,7 +395,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: SoaTrustedFields + SoaToOwned + SoaWrite,
+    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
 {
     #[inline]
     #[track_caller]

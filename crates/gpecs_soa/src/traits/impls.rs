@@ -12,8 +12,8 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
-        SoaTrustedFields, SoaWrite,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
+        SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
 
@@ -473,18 +473,12 @@ unsafe impl SoaWrite for () {
     }
 }
 
-impl SoaToOwned for () {
+unsafe impl SoaCloneToUninit for () {
     #[inline]
-    fn to_owned(_context: &Self::Context, _refs: Self::Refs<'_, '_>) -> Self {}
-
-    #[inline]
-    fn clone_into(_context: &Self::Context, _refs: Self::Refs<'_, '_>, _target: &mut Self) {}
-
-    #[inline]
-    fn clone_into_refs(
+    unsafe fn clone_to_uninit(
         _context: &Self::Context,
-        _src: Self::Refs<'_, '_>,
-        _dst: Self::RefsMut<'_, '_>,
+        _src: Ptrs<'_, Self>,
+        _dst: MutPtrs<'_, Self>,
     ) {
     }
 }
@@ -1143,28 +1137,18 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        impl<$($types,)*> SoaToOwned for ($($types,)*)
+        unsafe impl<$($types,)*> SoaCloneToUninit for ($($types,)*)
         where
             $($types: Clone,)*
         {
             #[inline]
-            fn to_owned(_context: &Self::Context, refs: Self::Refs<'_, '_>) -> Self {
-                let owned = ($(refs.$indices.clone(),)*);
-                owned
-            }
-
-            #[inline]
-            fn clone_into(_context: &Self::Context, refs: Self::Refs<'_, '_>, target: &mut Self) {
-                $(target.$indices.clone_from(refs.$indices);)*
-            }
-
-            #[inline]
-            fn clone_into_refs(
+            unsafe fn clone_to_uninit(
                 _context: &Self::Context,
-                src: Self::Refs<'_, '_>,
-                dst: Self::RefsMut<'_, '_>,
+                src: Ptrs<'_, Self>,
+                dst: MutPtrs<'_, Self>,
             ) {
-                $(dst.$indices.clone_from(src.$indices);)*
+                let src = unsafe { ($(&*src.$indices,)*) };
+                unsafe { $(ptr::write(dst.$indices, src.$indices.clone());)* }
             }
         }
 

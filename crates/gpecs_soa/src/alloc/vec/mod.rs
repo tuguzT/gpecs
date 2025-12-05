@@ -20,7 +20,7 @@ use crate::{
         from_raw_parts_mut, range,
     },
     traits::{
-        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
+        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit, SoaRead,
         SoaTrustedFields, SoaWrite,
     },
 };
@@ -822,7 +822,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaToOwned + SoaWrite,
+    T: Soa + SoaCloneToUninit + ?Sized,
 {
     #[track_caller]
     pub fn extend_from_within<R>(&mut self, src: R)
@@ -845,9 +845,8 @@ where
         let slices = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked(range, context, slices) };
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
-                let refs = T::ptrs_to_refs(context, src);
                 let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
-                T::write(context, dst, T::to_owned(context, refs));
+                T::clone_to_uninit(context, src, dst);
             }
             set_len_on_drop.local_len += 1;
         }
@@ -926,7 +925,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaTrustedFields + SoaToOwned + SoaWrite,
+    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
 {
     #[track_caller]
     pub fn extend_from_slice(&mut self, other: &SoaSlice<T>) {
@@ -943,9 +942,8 @@ where
         let slices = context.slice_ptrs_cast_const(slices);
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
-                let refs = T::ptrs_to_refs(context, src);
                 let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
-                T::write(context, dst, T::to_owned(context, refs));
+                T::clone_to_uninit(context, src, dst);
             }
             set_len_on_drop.local_len += 1;
         }
@@ -1068,7 +1066,7 @@ where
 
 impl<T> Clone for SoaVec<T>
 where
-    T: SoaToOwned + SoaWrite,
+    T: Soa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -1186,7 +1184,7 @@ where
 
 impl<T> From<&SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + SoaToOwned + SoaWrite,
+    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -1197,7 +1195,7 @@ where
 
 impl<T> From<&mut SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + SoaToOwned + SoaWrite,
+    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]

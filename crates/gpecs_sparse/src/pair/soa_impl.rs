@@ -7,8 +7,8 @@ use crate::{
         KeyValueSlicePtrs, KeyValueSlices, KeyValueSlicesMut,
     },
     soa::traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead, SoaToOwned,
-        SoaTrustedFields, SoaWrite,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
+        SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
 
@@ -499,50 +499,17 @@ where
 
 unsafe impl<K, V> SoaTrustedFields for KeyValuePair<K, V> where V: SoaTrustedFields {}
 
-impl<K, V> SoaToOwned for KeyValuePair<K, V>
+unsafe impl<K, V> SoaCloneToUninit for KeyValuePair<K, V>
 where
     K: Clone,
-    V: SoaToOwned,
+    V: SoaCloneToUninit + ?Sized,
 {
     #[inline]
-    fn to_owned(context: &Self::Context, refs: Self::Refs<'_, '_>) -> Self {
-        let KeyValueRefs { key, value } = refs;
-
-        let key = (*key).clone();
-        let value = V::to_owned(context, value.into_inner());
-        Self { key, value }
-    }
-
-    #[inline]
-    fn clone_into(context: &Self::Context, refs: Self::Refs<'_, '_>, target: &mut Self) {
-        let KeyValueRefs { key, value } = refs;
-        let value = value.into_inner();
-
-        let KeyValuePair {
-            key: target_key,
-            value: target_value,
-        } = target;
-
-        target_key.clone_from(key);
-        V::clone_into(context, value, target_value);
-    }
-
-    #[inline]
-    fn clone_into_refs(
+    unsafe fn clone_to_uninit(
         context: &Self::Context,
-        src: Self::Refs<'_, '_>,
-        dst: Self::RefsMut<'_, '_>,
+        src: Ptrs<'_, Self>,
+        dst: MutPtrs<'_, Self>,
     ) {
-        let KeyValueRefs { key, value } = src;
-        let value = value.into_inner();
-
-        let KeyValueRefsMut {
-            key: target_key,
-            value: target_value,
-        } = dst;
-        let target_value = target_value.into_inner();
-
-        target_key.clone_from(key);
-        V::clone_into_refs(context, value, target_value);
+        unsafe { src.clone_to_uninit(context, dst) }
     }
 }

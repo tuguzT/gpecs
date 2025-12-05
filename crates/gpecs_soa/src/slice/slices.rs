@@ -14,7 +14,7 @@ use crate::{
         iter::{Iter, IterMut, RawIter, RawIterMut},
     },
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaToOwned, SoaWrite,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
     },
     wrapper::{MutPtrs as MutPtrsWrapper, Ptrs as PtrsWrapper},
 };
@@ -1969,7 +1969,7 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: SoaToOwned + SoaWrite,
+    T: SoaCloneToUninit + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -1983,8 +1983,8 @@ where
             let (context, dst) = unsafe { self.get_unchecked_mut_with_context(index) };
             unsafe { context.ptrs_drop_in_place(dst.clone()) }
 
-            let refs = unsafe { T::ptrs_to_refs(context, src.get_unchecked(index)) };
-            unsafe { T::write(context, dst, T::to_owned(context, refs)) }
+            let src = unsafe { src.get_unchecked(index) };
+            unsafe { T::clone_to_uninit(context, src, dst) }
         }
     }
 }

@@ -953,6 +953,106 @@ where
         let iter = unsafe { iter.deref_mut() };
         (context, iter)
     }
+
+    #[inline]
+    pub fn sort_with_permutation<P>(&mut self, permutation: P)
+    where
+        P: AsMut<[usize]>,
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+    {
+        self.slices_mut().sort_with_permutation(permutation);
+    }
+
+    #[inline]
+    pub fn sort(&mut self)
+    where
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+    {
+        self.slices_mut().sort();
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, compare: F)
+    where
+        P: AsMut<[usize]>,
+        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+    {
+        self.slices_mut()
+            .sort_with_permutation_by(permutation, compare);
+    }
+
+    #[inline]
+    pub fn sort_by<F>(&mut self, compare: F)
+    where
+        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+    {
+        self.slices_mut().sort_by(compare);
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by_key<P, K, F>(&mut self, permutation: P, f: F)
+    where
+        P: AsMut<[usize]>,
+        F: FnMut(T::Refs<'_, '_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut()
+            .sort_with_permutation_by_key(permutation, f);
+    }
+
+    #[inline]
+    pub fn sort_by_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(T::Refs<'_, '_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut().sort_by_key(f);
+    }
+
+    #[inline]
+    pub fn sort_with_permutation_by_cached_key<P, K, F>(&mut self, permutation: P, f: F)
+    where
+        P: AsMut<[usize]>,
+        F: FnMut(T::Refs<'_, '_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut()
+            .sort_with_permutation_by_cached_key(permutation, f);
+    }
+
+    #[inline]
+    pub fn sort_by_cached_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(T::Refs<'_, '_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut().sort_by_cached_key(f);
+    }
+
+    #[inline]
+    pub fn sort_unstable(&mut self)
+    where
+        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+    {
+        self.slices_mut().sort_unstable();
+    }
+
+    #[inline]
+    pub fn sort_unstable_by<F>(&mut self, compare: F)
+    where
+        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+    {
+        self.slices_mut().sort_unstable_by(compare);
+    }
+
+    #[inline]
+    pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(T::Refs<'_, '_>) -> K,
+        K: Ord,
+    {
+        self.slices_mut().sort_unstable_by_key(f);
+    }
 }
 
 impl<T> Debug for SoaVec<T>

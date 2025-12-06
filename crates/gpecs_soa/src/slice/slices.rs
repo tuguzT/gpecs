@@ -1623,6 +1623,42 @@ where
             context.ptrs_swap(a, b);
         }
     }
+
+    pub(crate) fn sort_impl<P, F>(&mut self, mut permutation: P, f: F)
+    where
+        P: AsMut<[usize]>,
+        F: FnOnce(&mut Self, &mut [usize]),
+    {
+        #[inline(never)]
+        #[cold]
+        #[track_caller]
+        fn permutation_len_fail(permutation_len: usize, len: usize) -> ! {
+            panic!("permutation must be at least {len} long, but its length is {permutation_len}")
+        }
+
+        let len = self.len();
+        let permutation = permutation.as_mut();
+        if permutation.len() < len {
+            permutation_len_fail(permutation.len(), len);
+        }
+
+        let context = self.context();
+        if is_zst::<T>(context) || len < 2 {
+            return;
+        }
+
+        f(self, permutation);
+
+        // were taken from `sort_by_cached_key()` method of slice primitive
+        for src in 0..len {
+            let mut dst = permutation[src];
+            while dst < src {
+                dst = permutation[dst];
+            }
+            permutation[src] = dst;
+            self.swap(src, dst);
+        }
+    }
 }
 
 impl<'c, 'a, T> SoaSlicesMut<'c, 'a, T>
@@ -1888,14 +1924,18 @@ where
         P: AsMut<[usize]>,
         for<'ca, 'any> T::Refs<'ca, 'any>: Ord,
     {
-        self.sort_unstable_with_permutation_by(permutation, |a, b| Ord::cmp(&a, &b));
+        self.sort_unstable_with_permutation_by(permutation, |a, b| {
+            let a = T::upcast_refs(a);
+            let b = T::upcast_refs(b);
+            Ord::cmp(&a, &b)
+        });
     }
 
     #[inline]
     pub fn sort_unstable_with_permutation_by<P, F>(&mut self, permutation: P, mut compare: F)
     where
         P: AsMut<[usize]>,
-        for<'ca, 'any> F: FnMut(T::Refs<'ca, 'any>, T::Refs<'ca, 'any>) -> cmp::Ordering,
+        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
     {
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = me.slices().into_parts();
@@ -1928,42 +1968,6 @@ where
                 f(refs)
             });
         });
-    }
-
-    pub(crate) fn sort_impl<P, F>(&mut self, mut permutation: P, f: F)
-    where
-        P: AsMut<[usize]>,
-        F: FnOnce(&mut Self, &mut [usize]),
-    {
-        #[inline(never)]
-        #[cold]
-        #[track_caller]
-        fn permutation_len_fail(permutation_len: usize, len: usize) -> ! {
-            panic!("permutation must be at least {len} long, but its length is {permutation_len}")
-        }
-
-        let len = self.len();
-        let permutation = permutation.as_mut();
-        if permutation.len() < len {
-            permutation_len_fail(permutation.len(), len);
-        }
-
-        let context = self.context();
-        if is_zst::<T>(context) || len < 2 {
-            return;
-        }
-
-        f(self, permutation);
-
-        // were taken from `sort_by_cached_key()` method of slice primitive
-        for src in 0..len {
-            let mut dst = permutation[src];
-            while dst < src {
-                dst = permutation[dst];
-            }
-            permutation[src] = dst;
-            self.swap(src, dst);
-        }
     }
 }
 

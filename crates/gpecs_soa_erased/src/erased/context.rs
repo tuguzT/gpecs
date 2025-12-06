@@ -1,6 +1,6 @@
 use crate::soa::{
     field::FieldDescriptor,
-    traits::{RawSoaContext, Soa},
+    traits::{RawSoa, RawSoaContext},
 };
 
 #[cfg(feature = "alloc")]
@@ -42,7 +42,7 @@ where
     #[inline]
     pub fn of<T>(context: &T::Context) -> Self
     where
-        T: Soa + ?Sized,
+        T: RawSoa + ?Sized,
     {
         context.field_descriptors().into_iter().collect()
     }

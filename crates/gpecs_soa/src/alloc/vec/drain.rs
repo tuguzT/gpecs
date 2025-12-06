@@ -8,14 +8,14 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, range},
-    traits::{RawSoaContext, SoaRead},
+    traits::{RawSoa, RawSoaContext, Soa, SoaRead},
 };
 
-use super::{Soa, SoaVec};
+use super::SoaVec;
 
 pub struct Drain<'a, T>
 where
-    T: Soa + ?Sized + 'a,
+    T: RawSoa + ?Sized + 'a,
 {
     /// Index of tail to preserve
     tail_start: usize,
@@ -28,7 +28,7 @@ where
 
 impl<'a, T> Drain<'a, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -51,9 +51,8 @@ where
 
         let mut vec = NonNull::from_mut(vec);
         // index before setting length, otherwise range is invalid
-        let (context, slices) = unsafe { vec.as_ref() }
-            .slices()
-            .into_index_with_context(range);
+        let slices = unsafe { vec.as_ref() }.slice_ptrs();
+        let (context, slices) = unsafe { slices.into_get_unchecked_with_context(range) };
         unsafe {
             // set self.vec length's to start, to be safe in case Drain is leaked
             vec.as_mut().set_len(start);
@@ -62,7 +61,7 @@ where
         Self {
             tail_start: end,
             tail_len: len - end,
-            iter: Iter::new(context, slices),
+            iter: unsafe { Iter::from_parts(context, slices) },
             vec,
         }
     }
@@ -72,17 +71,28 @@ where
         let Self { iter, .. } = self;
         iter.context()
     }
+}
 
+impl<T> Drain<'_, T>
+where
+    T: Soa + ?Sized,
+{
     #[inline]
     pub fn as_slices(&self) -> T::Slices<'_, '_> {
+        let (_, iter) = self.as_slices_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_, '_>) {
         let Self { iter, .. } = self;
-        iter.as_slices()
+        iter.as_slices_with_context()
     }
 }
 
 unsafe impl<T> Send for Drain<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     T::Context: Send,
     T::Fields: Send,
 {
@@ -90,7 +100,7 @@ where
 
 unsafe impl<T> Sync for Drain<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {
@@ -119,7 +129,7 @@ where
 
 impl<T> Iterator for Drain<'_, T>
 where
-    T: Soa + SoaRead,
+    T: SoaRead,
 {
     type Item = T;
 
@@ -127,9 +137,8 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        iter.next().map(|refs| {
+        iter.as_raw_iter_mut().next().map(|src| {
             let context = iter.context();
-            let src = T::refs_as_ptrs(context, refs);
             unsafe { T::read(context, src) }
         })
     }
@@ -137,21 +146,20 @@ where
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let Self { iter, .. } = self;
-        iter.size_hint()
+        iter.as_raw_iter().size_hint()
     }
 }
 
 impl<T> DoubleEndedIterator for Drain<'_, T>
 where
-    T: Soa + SoaRead,
+    T: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        iter.next_back().map(|refs| {
+        iter.as_raw_iter_mut().next_back().map(|src| {
             let context = iter.context();
-            let src = T::refs_as_ptrs(context, refs);
             unsafe { T::read(context, src) }
         })
     }
@@ -159,7 +167,7 @@ where
 
 impl<T> ExactSizeIterator for Drain<'_, T>
 where
-    T: Soa + SoaRead,
+    T: SoaRead,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -168,21 +176,21 @@ where
     }
 }
 
-impl<T> FusedIterator for Drain<'_, T> where T: Soa + SoaRead {}
+impl<T> FusedIterator for Drain<'_, T> where T: SoaRead {}
 
 impl<T> Drop for Drain<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     fn drop(&mut self) {
         /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
         struct DropGuard<'r, 'a, T>(&'r mut Drain<'a, T>)
         where
-            T: Soa + ?Sized;
+            T: RawSoa + ?Sized;
 
         impl<T> Drop for DropGuard<'_, '_, T>
         where
-            T: Soa + ?Sized,
+            T: RawSoa + ?Sized,
         {
             fn drop(&mut self) {
                 let Self(drain) = self;

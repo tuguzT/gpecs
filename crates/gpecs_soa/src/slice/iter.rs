@@ -590,6 +590,18 @@ where
     }
 
     #[inline]
+    pub fn as_raw_iter(&self) -> &RawIter<'c, T> {
+        let Self { inner, .. } = self;
+        inner
+    }
+
+    #[inline]
+    pub fn as_raw_iter_mut(&mut self) -> &mut RawIter<'c, T> {
+        let Self { inner, .. } = self;
+        inner
+    }
+
+    #[inline]
     pub fn into_raw_iter(self) -> RawIter<'c, T> {
         let Self { inner, .. } = self;
         inner
@@ -1443,9 +1455,15 @@ where
     }
 
     #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'c, T> {
+    pub fn as_raw_iter(&self) -> &RawIterMut<'c, T> {
         let Self { inner, .. } = self;
-        inner.cast_const()
+        inner
+    }
+
+    #[inline]
+    pub fn as_raw_iter_mut(&mut self) -> &mut RawIterMut<'c, T> {
+        let Self { inner, .. } = self;
+        inner
     }
 
     #[inline]

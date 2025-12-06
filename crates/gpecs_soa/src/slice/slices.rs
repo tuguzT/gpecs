@@ -1998,7 +1998,7 @@ fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
 
 impl<'c, T> From<SoaSlicesMut<'c, '_, T>> for SoaSlicePtrs<'c, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn from(slices: SoaSlicesMut<'c, '_, T>) -> Self {
@@ -2008,7 +2008,7 @@ where
 
 impl<'c, T> From<SoaSlicesMut<'c, '_, T>> for SoaSliceMutPtrs<'c, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn from(slices: SoaSlicesMut<'c, '_, T>) -> Self {
@@ -2018,7 +2018,7 @@ where
 
 impl<'c, 'a, T> From<SoaSlicesMut<'c, 'a, T>> for SoaSlices<'c, 'a, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn from(slices: SoaSlicesMut<'c, 'a, T>) -> Self {
@@ -2030,7 +2030,7 @@ where
 
 impl<'c, T> From<&'c T::Context> for SoaSlicesMut<'c, '_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn from(context: &'c T::Context) -> Self {
@@ -2052,7 +2052,7 @@ where
 
 impl<T> AsRef<Self> for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -2073,7 +2073,7 @@ where
 
 impl<T> AsMut<Self> for SoaSlicesMut<'_, '_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {

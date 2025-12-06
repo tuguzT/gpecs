@@ -20,8 +20,8 @@ use crate::{
         from_raw_parts_mut, range,
     },
     traits::{
-        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit, SoaRead,
-        SoaTrustedFields, SoaWrite,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
+        SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
 
@@ -36,7 +36,7 @@ mod partial_ord;
 
 pub struct SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     buffer: RawSoaVec<T>,
     len: usize,
@@ -44,7 +44,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     #[must_use]
@@ -419,6 +419,354 @@ where
     }
 
     #[inline]
+    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
+        unsafe { self.slice_ptrs().deref() }
+    }
+
+    #[inline]
+    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
+        unsafe { self.slice_mut_ptrs().deref_mut() }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn drain<R>(&mut self, range: R) -> Drain<'_, T>
+    where
+        R: RangeBounds<usize>,
+    {
+        Drain::new(self, range)
+    }
+
+    pub fn swap_remove_into<F, R>(&mut self, index: usize, f: F) -> R
+    where
+        F: FnOnce(&T::Context, Ptrs<'_, T>) -> R,
+    {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed(index: usize, len: usize) -> ! {
+            panic!("swap_remove index (which is {index}) should be < len (which is {len})")
+        }
+
+        let len = self.len();
+        if index >= len {
+            assert_failed(index, len);
+        }
+
+        let (context, ptrs) = self.as_mut_ptrs_with_context();
+        let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
+
+        let ptrs_into = context.ptrs_cast_const(dst.clone());
+        let result = f(context, ptrs_into);
+
+        unsafe {
+            let src = context.ptrs_cast_const(ptrs);
+            let src = context.ptrs_add(src, len - 1);
+            context.ptrs_copy(src, dst, 1);
+        }
+
+        unsafe {
+            self.set_len(len - 1);
+        }
+
+        result
+    }
+
+    pub fn remove_into<F, R>(&mut self, index: usize, f: F) -> R
+    where
+        F: FnOnce(&T::Context, Ptrs<'_, T>) -> R,
+    {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed(index: usize, len: usize) -> ! {
+            panic!("removal index (which is {index}) should be < len (which is {len})");
+        }
+
+        let len = self.len();
+        if index >= len {
+            assert_failed(index, len);
+        }
+
+        let (context, ptrs) = self.as_mut_ptrs_with_context();
+        let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
+
+        let ptrs_into = context.ptrs_cast_const(dst.clone());
+        let result = f(context, ptrs_into);
+
+        unsafe {
+            let src = context.ptrs_cast_const(dst.clone());
+            let src = context.ptrs_add(src, 1);
+            context.ptrs_copy(src, dst, len - index - 1);
+        }
+
+        unsafe {
+            self.set_len(len - 1);
+        }
+
+        result
+    }
+
+    pub fn pop_into<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&T::Context, Option<Ptrs<'_, T>>) -> R,
+    {
+        let len = self.len();
+        if len == 0 {
+            return f(self.context(), None);
+        }
+
+        let (context, ptrs) = self.as_ptrs_with_context();
+        let ptrs_into = unsafe { context.ptrs_add(ptrs, len - 1) };
+        let result = f(context, Some(ptrs_into));
+
+        unsafe {
+            self.set_len(len - 1);
+        }
+
+        result
+    }
+
+    pub fn insert_from<F, R>(&mut self, index: usize, f: F) -> R
+    where
+        F: FnOnce(&T::Context, MutPtrs<'_, T>) -> R,
+    {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed(index: usize, len: usize) -> ! {
+            panic!("insertion index (which is {index}) should be <= len (which is {len})");
+        }
+
+        let len = self.len();
+        if index > len {
+            assert_failed(index, len);
+        }
+
+        let capacity = self.capacity();
+        if len == capacity {
+            self.buffer.grow_one();
+
+            match capacity {
+                0 => self.set_len_in_buffer(0),
+                _ => self.move_right(capacity),
+            }
+        }
+
+        if index < len {
+            let (context, ptrs) = self.as_mut_ptrs_with_context();
+            let ptrs = unsafe { context.ptrs_add_mut(ptrs, index) };
+
+            let src = context.ptrs_cast_const(ptrs.clone());
+            let dst = unsafe { context.ptrs_add_mut(ptrs, 1) };
+            unsafe { context.ptrs_copy(src, dst, len - index) }
+        }
+
+        #[expect(clippy::items_after_statements)]
+        struct CopyBackGuard<'a, T>
+        where
+            T: RawSoa + ?Sized,
+        {
+            v: &'a mut SoaVec<T>,
+            index: usize,
+        }
+
+        #[expect(clippy::items_after_statements)]
+        impl<T> Drop for CopyBackGuard<'_, T>
+        where
+            T: RawSoa + ?Sized,
+        {
+            fn drop(&mut self) {
+                let Self { ref mut v, index } = *self;
+                let len = v.len();
+
+                let (context, ptrs) = v.as_mut_ptrs_with_context();
+                let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
+
+                if index < len {
+                    let src = context.ptrs_cast_const(dst.clone());
+                    let src = unsafe { context.ptrs_add(src, 1) };
+                    unsafe { context.ptrs_copy_rev(src, dst, len - index) }
+                }
+            }
+        }
+
+        let guard = CopyBackGuard { v: self, index };
+        let (context, ptrs) = guard.v.as_mut_ptrs_with_context();
+
+        let ptrs_from = unsafe { context.ptrs_add_mut(ptrs, index) };
+        let result = f(context, ptrs_from);
+
+        unsafe {
+            guard.v.set_len(len + 1);
+        }
+        forget(guard);
+
+        result
+    }
+
+    pub fn push_from<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&T::Context, MutPtrs<'_, T>) -> R,
+    {
+        let len = self.len();
+        let capacity = self.capacity();
+        if len == capacity {
+            self.buffer.grow_one();
+
+            match capacity {
+                0 => self.set_len_in_buffer(0),
+                _ => self.move_right(capacity),
+            }
+        }
+
+        let (context, ptrs) = self.as_mut_ptrs_with_context();
+        let ptrs_from = unsafe { context.ptrs_add_mut(ptrs, len) };
+        let result = f(context, ptrs_from);
+
+        unsafe {
+            self.set_len(len + 1);
+        }
+
+        result
+    }
+}
+
+impl<T> SoaVec<T>
+where
+    T: SoaCloneToUninit + ?Sized,
+{
+    #[track_caller]
+    pub fn extend_from_within<R>(&mut self, src: R)
+    where
+        R: RangeBounds<usize>,
+    {
+        let local_len = self.len();
+        let range = range(src, ..local_len);
+        self.reserve(range.len());
+
+        let mut set_len_on_drop = SetLenOnDrop {
+            local_len,
+            vec: self,
+        };
+
+        let (context, slices) = set_len_on_drop.vec.as_slice_mut_ptrs_with_context();
+        let dst = context.slice_mut_ptrs_as_ptrs(slices.clone());
+
+        let slices = context.slice_ptrs_cast_const(slices);
+        let slices = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked(range, context, slices) };
+        for src in RawIter::<T>::new(context, slices) {
+            unsafe {
+                let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
+                T::clone_to_uninit(context, src, dst);
+            }
+            set_len_on_drop.local_len += 1;
+        }
+    }
+}
+
+impl<T> SoaVec<T>
+where
+    T: SoaTrustedFields + ?Sized,
+{
+    #[inline]
+    pub fn as_slice(&self) -> &SoaSlice<T>
+    where
+        T: SoaTrustedFields,
+    {
+        self
+    }
+
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T>
+    where
+        T: SoaTrustedFields,
+    {
+        self
+    }
+
+    #[must_use]
+    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T>> {
+        self.shrink_to_fit();
+        let me = ManuallyDrop::new(self);
+
+        let buffer = unsafe { ptr::read(addr_of!(me.buffer)) };
+        let len = me.len;
+        unsafe { buffer.into_box(len) }
+    }
+}
+
+impl<T> SoaVec<T>
+where
+    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
+{
+    #[track_caller]
+    pub fn extend_from_slice(&mut self, other: &SoaSlice<T>) {
+        self.reserve(other.len());
+
+        let mut set_len_on_drop = SetLenOnDrop {
+            local_len: self.len(),
+            vec: self,
+        };
+
+        let (context, slices) = set_len_on_drop.vec.as_slice_mut_ptrs_with_context();
+        let dst = context.slice_mut_ptrs_as_ptrs(slices.clone());
+
+        let slices = context.slice_ptrs_cast_const(slices);
+        for src in RawIter::<T>::new(context, slices) {
+            unsafe {
+                let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
+                T::clone_to_uninit(context, src, dst);
+            }
+            set_len_on_drop.local_len += 1;
+        }
+    }
+}
+
+impl<T> SoaVec<T>
+where
+    T: SoaRead,
+{
+    #[inline]
+    pub fn swap_remove(&mut self, index: usize) -> T {
+        self.swap_remove_into(index, |context, src| unsafe { T::read(context, src) })
+    }
+
+    #[inline]
+    pub fn remove(&mut self, index: usize) -> T {
+        self.remove_into(index, |context, src| unsafe { T::read(context, src) })
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> Option<T> {
+        self.pop_into(|context, src| unsafe { T::read(context, src?).into() })
+    }
+}
+
+impl<T> SoaVec<T>
+where
+    T: SoaWrite,
+{
+    #[inline]
+    pub fn insert(&mut self, index: usize, value: T) {
+        self.insert_from(index, |context, dst| unsafe {
+            T::write(context, dst, value);
+        });
+    }
+
+    #[inline]
+    pub fn push(&mut self, value: T) {
+        self.push_from(|context, dst| unsafe {
+            T::write(context, dst, value);
+        });
+    }
+}
+
+impl<T> SoaVec<T>
+where
+    T: Soa + ?Sized,
+{
+    #[inline]
     pub fn as_slices(&self) -> T::Slices<'_, '_> {
         let (_, slices) = self.as_slices_with_context();
         slices
@@ -442,16 +790,6 @@ where
         let (context, slices) = self.as_slice_mut_ptrs_with_context();
         let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
         (context, slices)
-    }
-
-    #[inline]
-    pub fn slices(&self) -> SoaSlices<'_, '_, T> {
-        unsafe { self.slice_ptrs().deref() }
-    }
-
-    #[inline]
-    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        unsafe { self.slice_mut_ptrs().deref_mut() }
     }
 
     #[inline]
@@ -615,339 +953,6 @@ where
         let iter = unsafe { iter.deref_mut() };
         (context, iter)
     }
-
-    #[inline]
-    #[track_caller]
-    pub fn drain<R>(&mut self, range: R) -> Drain<'_, T>
-    where
-        R: RangeBounds<usize>,
-    {
-        Drain::new(self, range)
-    }
-
-    pub fn swap_remove_into<F, R>(&mut self, index: usize, f: F) -> R
-    where
-        F: FnOnce(&T::Context, Ptrs<'_, T>) -> R,
-    {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("swap_remove index (which is {index}) should be < len (which is {len})")
-        }
-
-        let len = self.len();
-        if index >= len {
-            assert_failed(index, len);
-        }
-
-        let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
-
-        let ptrs_into = context.ptrs_cast_const(dst.clone());
-        let result = f(context, ptrs_into);
-
-        unsafe {
-            let src = context.ptrs_cast_const(ptrs);
-            let src = context.ptrs_add(src, len - 1);
-            context.ptrs_copy(src, dst, 1);
-        }
-
-        unsafe {
-            self.set_len(len - 1);
-        }
-
-        result
-    }
-
-    pub fn remove_into<F, R>(&mut self, index: usize, f: F) -> R
-    where
-        F: FnOnce(&T::Context, Ptrs<'_, T>) -> R,
-    {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("removal index (which is {index}) should be < len (which is {len})");
-        }
-
-        let len = self.len();
-        if index >= len {
-            assert_failed(index, len);
-        }
-
-        let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
-
-        let ptrs_into = context.ptrs_cast_const(dst.clone());
-        let result = f(context, ptrs_into);
-
-        unsafe {
-            let src = context.ptrs_cast_const(dst.clone());
-            let src = context.ptrs_add(src, 1);
-            context.ptrs_copy(src, dst, len - index - 1);
-        }
-
-        unsafe {
-            self.set_len(len - 1);
-        }
-
-        result
-    }
-
-    pub fn pop_into<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce(&T::Context, Option<Ptrs<'_, T>>) -> R,
-    {
-        let len = self.len();
-        if len == 0 {
-            return f(self.context(), None);
-        }
-
-        let (context, ptrs) = self.as_ptrs_with_context();
-        let ptrs_into = unsafe { context.ptrs_add(ptrs, len - 1) };
-        let result = f(context, Some(ptrs_into));
-
-        unsafe {
-            self.set_len(len - 1);
-        }
-
-        result
-    }
-
-    pub fn insert_from<F, R>(&mut self, index: usize, f: F) -> R
-    where
-        F: FnOnce(&T::Context, MutPtrs<'_, T>) -> R,
-    {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("insertion index (which is {index}) should be <= len (which is {len})");
-        }
-
-        let len = self.len();
-        if index > len {
-            assert_failed(index, len);
-        }
-
-        let capacity = self.capacity();
-        if len == capacity {
-            self.buffer.grow_one();
-
-            match capacity {
-                0 => self.set_len_in_buffer(0),
-                _ => self.move_right(capacity),
-            }
-        }
-
-        if index < len {
-            let (context, ptrs) = self.as_mut_ptrs_with_context();
-            let ptrs = unsafe { context.ptrs_add_mut(ptrs, index) };
-
-            let src = context.ptrs_cast_const(ptrs.clone());
-            let dst = unsafe { context.ptrs_add_mut(ptrs, 1) };
-            unsafe { context.ptrs_copy(src, dst, len - index) }
-        }
-
-        #[expect(clippy::items_after_statements)]
-        struct CopyBackGuard<'a, T>
-        where
-            T: Soa + ?Sized,
-        {
-            v: &'a mut SoaVec<T>,
-            index: usize,
-        }
-
-        #[expect(clippy::items_after_statements)]
-        impl<T> Drop for CopyBackGuard<'_, T>
-        where
-            T: Soa + ?Sized,
-        {
-            fn drop(&mut self) {
-                let Self { ref mut v, index } = *self;
-                let len = v.len();
-
-                let (context, ptrs) = v.as_mut_ptrs_with_context();
-                let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
-
-                if index < len {
-                    let src = context.ptrs_cast_const(dst.clone());
-                    let src = unsafe { context.ptrs_add(src, 1) };
-                    unsafe { context.ptrs_copy_rev(src, dst, len - index) }
-                }
-            }
-        }
-
-        let guard = CopyBackGuard { v: self, index };
-        let (context, ptrs) = guard.v.as_mut_ptrs_with_context();
-
-        let ptrs_from = unsafe { context.ptrs_add_mut(ptrs, index) };
-        let result = f(context, ptrs_from);
-
-        unsafe {
-            guard.v.set_len(len + 1);
-        }
-        forget(guard);
-
-        result
-    }
-
-    pub fn push_from<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce(&T::Context, MutPtrs<'_, T>) -> R,
-    {
-        let len = self.len();
-        let capacity = self.capacity();
-        if len == capacity {
-            self.buffer.grow_one();
-
-            match capacity {
-                0 => self.set_len_in_buffer(0),
-                _ => self.move_right(capacity),
-            }
-        }
-
-        let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let ptrs_from = unsafe { context.ptrs_add_mut(ptrs, len) };
-        let result = f(context, ptrs_from);
-
-        unsafe {
-            self.set_len(len + 1);
-        }
-
-        result
-    }
-}
-
-impl<T> SoaVec<T>
-where
-    T: Soa + SoaCloneToUninit + ?Sized,
-{
-    #[track_caller]
-    pub fn extend_from_within<R>(&mut self, src: R)
-    where
-        R: RangeBounds<usize>,
-    {
-        let local_len = self.len();
-        let range = range(src, ..local_len);
-        self.reserve(range.len());
-
-        let mut set_len_on_drop = SetLenOnDrop {
-            local_len,
-            vec: self,
-        };
-
-        let (context, slices) = set_len_on_drop.vec.as_slice_mut_ptrs_with_context();
-        let dst = context.slice_mut_ptrs_as_ptrs(slices.clone());
-
-        let slices = context.slice_ptrs_cast_const(slices);
-        let slices = unsafe { SoaSlicePtrsIndex::<T>::get_unchecked(range, context, slices) };
-        for src in RawIter::<T>::new(context, slices) {
-            unsafe {
-                let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
-                T::clone_to_uninit(context, src, dst);
-            }
-            set_len_on_drop.local_len += 1;
-        }
-    }
-}
-
-impl<T> SoaVec<T>
-where
-    T: Soa + SoaRead,
-{
-    #[inline]
-    pub fn swap_remove(&mut self, index: usize) -> T {
-        self.swap_remove_into(index, |context, src| unsafe { T::read(context, src) })
-    }
-
-    #[inline]
-    pub fn remove(&mut self, index: usize) -> T {
-        self.remove_into(index, |context, src| unsafe { T::read(context, src) })
-    }
-
-    #[inline]
-    pub fn pop(&mut self) -> Option<T> {
-        self.pop_into(|context, src| unsafe { T::read(context, src?).into() })
-    }
-}
-
-impl<T> SoaVec<T>
-where
-    T: Soa + SoaWrite,
-{
-    #[inline]
-    pub fn insert(&mut self, index: usize, value: T) {
-        self.insert_from(index, |context, dst| unsafe {
-            T::write(context, dst, value);
-        });
-    }
-
-    #[inline]
-    pub fn push(&mut self, value: T) {
-        self.push_from(|context, dst| unsafe {
-            T::write(context, dst, value);
-        });
-    }
-}
-
-impl<T> SoaVec<T>
-where
-    T: Soa + SoaTrustedFields + ?Sized,
-{
-    #[inline]
-    pub fn as_slice(&self) -> &SoaSlice<T>
-    where
-        T: SoaTrustedFields,
-    {
-        self
-    }
-
-    #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T>
-    where
-        T: SoaTrustedFields,
-    {
-        self
-    }
-
-    #[must_use]
-    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T>> {
-        self.shrink_to_fit();
-        let me = ManuallyDrop::new(self);
-
-        let buffer = unsafe { ptr::read(addr_of!(me.buffer)) };
-        let len = me.len;
-        unsafe { buffer.into_box(len) }
-    }
-}
-
-impl<T> SoaVec<T>
-where
-    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
-{
-    #[track_caller]
-    pub fn extend_from_slice(&mut self, other: &SoaSlice<T>) {
-        self.reserve(other.len());
-
-        let mut set_len_on_drop = SetLenOnDrop {
-            local_len: self.len(),
-            vec: self,
-        };
-
-        let (context, slices) = set_len_on_drop.vec.as_slice_mut_ptrs_with_context();
-        let dst = context.slice_mut_ptrs_as_ptrs(slices.clone());
-
-        let slices = context.slice_ptrs_cast_const(slices);
-        for src in RawIter::<T>::new(context, slices) {
-            unsafe {
-                let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
-                T::clone_to_uninit(context, src, dst);
-            }
-            set_len_on_drop.local_len += 1;
-        }
-    }
 }
 
 impl<T> Debug for SoaVec<T>
@@ -963,7 +968,7 @@ where
 
 impl<T> Default for SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
     T::Context: Default,
 {
     #[inline]
@@ -974,7 +979,7 @@ where
 
 impl<T> AsRef<Self> for SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -984,7 +989,7 @@ where
 
 impl<T> AsRef<SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &SoaSlice<T> {
@@ -994,7 +999,7 @@ where
 
 impl<T> AsMut<Self> for SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -1004,7 +1009,7 @@ where
 
 impl<T> AsMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut SoaSlice<T> {
@@ -1014,7 +1019,7 @@ where
 
 impl<T> Borrow<SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn borrow(&self) -> &SoaSlice<T> {
@@ -1024,7 +1029,7 @@ where
 
 impl<T> BorrowMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn borrow_mut(&mut self) -> &mut SoaSlice<T> {
@@ -1059,14 +1064,14 @@ where
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let slices = self.slices();
+        let slices = self.as_slices();
         Hash::hash(&slices, state);
     }
 }
 
 impl<T> Clone for SoaVec<T>
 where
-    T: Soa + SoaCloneToUninit + ?Sized,
+    T: SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -1083,7 +1088,7 @@ where
 
 impl<T> Deref for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
 {
     type Target = SoaSlice<T>;
 
@@ -1098,7 +1103,7 @@ where
 
 impl<T> DerefMut for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -1137,7 +1142,7 @@ where
 
 impl<T> Extend<T> for SoaVec<T>
 where
-    T: Soa + SoaWrite,
+    T: SoaWrite,
 {
     #[inline]
     #[track_caller]
@@ -1174,7 +1179,7 @@ where
 
 impl<T> From<Box<SoaSlice<T>>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     fn from(value: Box<SoaSlice<T>>) -> Self {
@@ -1184,7 +1189,7 @@ where
 
 impl<T> From<&SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -1195,7 +1200,7 @@ where
 
 impl<T> From<&mut SoaSlice<T>> for SoaVec<T>
 where
-    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -1232,7 +1237,7 @@ where
 
 impl<T> IntoIterator for SoaVec<T>
 where
-    T: Soa + SoaRead,
+    T: SoaRead,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;
@@ -1245,7 +1250,7 @@ where
 
 impl<T> FromIterator<T> for SoaVec<T>
 where
-    T: Soa + SoaWrite,
+    T: SoaWrite,
     T::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
@@ -1281,7 +1286,7 @@ where
 
 impl<T> Drop for SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     fn drop(&mut self) {
         if self.is_empty() {
@@ -1296,7 +1301,7 @@ where
 #[inline]
 fn actual_capacity<T>(context: &T::Context, capacity: usize) -> usize
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     let buffer_layout =
         buffer_layout::<T>(context, capacity).expect("layout size should not exceed `isize::MAX`");

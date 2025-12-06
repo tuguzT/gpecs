@@ -1,10 +1,10 @@
-use crate::traits::Soa;
+use crate::traits::RawSoa;
 
 use super::vec::SoaVec;
 
 pub struct SetLenOnDrop<'a, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     pub vec: &'a mut SoaVec<T>,
     pub local_len: usize,
@@ -12,7 +12,7 @@ where
 
 impl<T> Drop for SetLenOnDrop<'_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn drop(&mut self) {

@@ -9,7 +9,7 @@ use crate::{
 
 impl<T> SoaSlice<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
 {
     #[inline]
     #[must_use]
@@ -19,7 +19,12 @@ where
         let ptr = Box::into_raw(self).cast();
         unsafe { SoaVec::from_raw_parts(ptr, len, capacity) }
     }
+}
 
+impl<T> SoaSlice<T>
+where
+    T: Soa + SoaTrustedFields + ?Sized,
+{
     #[inline]
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
@@ -123,7 +128,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -134,7 +139,7 @@ where
 
 impl<T> ToOwned for SoaSlice<T>
 where
-    T: Soa + SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     type Owned = SoaVec<T>;
@@ -182,7 +187,7 @@ where
 
 impl<T> IntoIterator for Box<SoaSlice<T>>
 where
-    T: Soa + SoaTrustedFields + SoaRead,
+    T: SoaTrustedFields + SoaRead,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;

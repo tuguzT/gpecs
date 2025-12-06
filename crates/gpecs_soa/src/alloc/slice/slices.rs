@@ -10,7 +10,7 @@ use crate::{
 
 impl<T> SoaSlices<'_, '_, T>
 where
-    T: Soa + SoaCloneToUninit + ?Sized,
+    T: SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -181,7 +181,7 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: Soa + SoaCloneToUninit + ?Sized,
+    T: SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]

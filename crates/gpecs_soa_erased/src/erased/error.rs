@@ -9,6 +9,108 @@ use crate::{
     error::{LayoutMismatchError, LenMismatchError},
 };
 
+#[derive(Clone)]
+pub struct InsufficientLenError {
+    expected: usize,
+    actual: usize,
+}
+
+impl InsufficientLenError {
+    #[inline]
+    #[track_caller]
+    pub fn new(expected: usize, actual: usize) -> Self {
+        assert!(
+            actual < expected,
+            "actual length should be smaller than expected length",
+        );
+        Self { expected, actual }
+    }
+
+    #[inline]
+    pub fn expected(&self) -> usize {
+        let Self { expected, .. } = *self;
+        expected
+    }
+
+    #[inline]
+    pub fn actual(&self) -> usize {
+        let Self { actual, .. } = *self;
+        actual
+    }
+}
+
+impl Debug for InsufficientLenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+
+        let Self { expected, actual } = self;
+        f.debug_struct("InsufficientLenError")
+            .field("expected", expected)
+            .field("actual", actual)
+            .finish()
+    }
+}
+
+impl Display for InsufficientLenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { expected, actual } = self;
+        write!(
+            f,
+            "expected length to be larger than {expected}, but got {actual}"
+        )
+    }
+}
+
+impl Error for InsufficientLenError {}
+
+#[inline]
+pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), InsufficientLenError> {
+    if len < expected {
+        return Err(InsufficientLenError::new(expected, len));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub enum ErasedSoaPtrsError {
+    InvalidLayout(LayoutError),
+    InsufficientLen(InsufficientLenError),
+}
+
+impl From<LayoutError> for ErasedSoaPtrsError {
+    #[inline]
+    fn from(value: LayoutError) -> Self {
+        Self::InvalidLayout(value)
+    }
+}
+
+impl From<InsufficientLenError> for ErasedSoaPtrsError {
+    #[inline]
+    fn from(value: InsufficientLenError) -> Self {
+        Self::InsufficientLen(value)
+    }
+}
+
+impl Display for ErasedSoaPtrsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::InsufficientLen(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for ErasedSoaPtrsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidLayout(error) => Some(error),
+            Self::InsufficientLen(error) => Some(error),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum IterOrFieldLenMismatchError {
     IterLenMismatch(LenMismatchError),

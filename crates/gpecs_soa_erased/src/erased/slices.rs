@@ -1,5 +1,4 @@
 use core::{
-    alloc::LayoutError,
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
@@ -8,7 +7,10 @@ use core::{
 };
 
 use crate::{
-    erased::{ErasedSoaSlicePtrs, error::ErasedSoaIntoValueError},
+    erased::{
+        ErasedSoaSlicePtrs,
+        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_sufficient_len},
+    },
     error::{check_layout, check_len},
     field::{ErasedFieldPtr, ErasedFieldSlice, field_slice_from_raw_parts},
     soa::{
@@ -18,6 +20,7 @@ use crate::{
     },
 };
 
+// TODO: replace `start` & `end` with just a `len`?
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedSoaSlices<'a, D>
 where
@@ -84,24 +87,19 @@ impl<'a, D> ErasedSoaSlices<'a, D>
 where
     D: AsRef<[FieldDescriptor]>,
 {
+    // TODO: check capacity & range
     #[inline]
-    #[track_caller]
     pub fn new<R>(
         descriptors: D,
         buffer: &'a [u8],
         capacity: usize,
         range: R,
-    ) -> Result<Self, LayoutError>
+    ) -> Result<Self, ErasedSoaPtrsError>
     where
         R: RangeBounds<usize>,
     {
         let layout = buffer_layout(descriptors.as_ref(), capacity)?;
-        assert!(
-            buffer.len() >= layout.size(),
-            "buffer length ({buffer_len}) should be equal to or larger than expected layout size ({layout_size})",
-            buffer_len = buffer.len(),
-            layout_size = layout.size(),
-        );
+        check_sufficient_len(buffer.len(), layout.size())?;
 
         let buffer = buffer.as_ptr();
         let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, range) };

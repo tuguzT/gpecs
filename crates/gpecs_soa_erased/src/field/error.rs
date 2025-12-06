@@ -170,7 +170,7 @@ impl Debug for ErasedFieldPtrError {
         }
         match self {
             Self::NotAligned(error) => f.debug_tuple("NotAligned").field(error).finish(),
-            Self::LenMismatch(error) => f.debug_tuple("BufferLen").field(error).finish(),
+            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
         }
     }
 }

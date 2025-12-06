@@ -1,5 +1,4 @@
 use core::{
-    alloc::LayoutError,
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
@@ -7,7 +6,10 @@ use core::{
 };
 
 use crate::{
-    erased::{ErasedSoaPtrs, ErasedSoaPtrsIter, error::ErasedSoaIntoValueError},
+    erased::{
+        ErasedSoaPtrs, ErasedSoaPtrsIter,
+        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError},
+    },
     field::ErasedFieldRef,
     soa::{field::FieldDescriptor, traits::Soa},
 };
@@ -59,13 +61,12 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
-    #[track_caller]
     pub fn new(
         descriptors: D,
         buffer: &'a [u8],
         capacity: usize,
         offset: usize,
-    ) -> Result<Self, LayoutError> {
+    ) -> Result<Self, ErasedSoaPtrsError> {
         let ptrs = ErasedSoaPtrs::new(descriptors, buffer, capacity, offset)?;
         let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)

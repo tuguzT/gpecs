@@ -1,5 +1,4 @@
 use core::{
-    alloc::LayoutError,
     fmt::{self, Debug},
     iter::FusedIterator,
     ptr, slice,
@@ -7,8 +6,9 @@ use core::{
 
 use crate::{
     erased::{
-        ErasedSoaMutPtrs, ErasedSoaRefs, assert::debug_assert_descriptors,
-        error::ErasedSoaIntoValueError,
+        ErasedSoaMutPtrs, ErasedSoaRefs,
+        assert::debug_assert_descriptors,
+        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_sufficient_len},
     },
     error::{check_layout, check_len},
     field::ErasedFieldPtr,
@@ -95,20 +95,16 @@ impl<D> ErasedSoaPtrs<D>
 where
     D: AsRef<[FieldDescriptor]>,
 {
+    // TODO: check capacity & offset
     #[inline]
     pub fn new(
         descriptors: D,
         buffer: *const [u8],
         capacity: usize,
         offset: usize,
-    ) -> Result<Self, LayoutError> {
+    ) -> Result<Self, ErasedSoaPtrsError> {
         let layout = buffer_layout(descriptors.as_ref(), capacity)?;
-        assert!(
-            buffer.len() >= layout.size(),
-            "buffer length ({buffer_len}) should be equal to or larger than expected layout size ({layout_size})",
-            buffer_len = buffer.len(),
-            layout_size = layout.size(),
-        );
+        check_sufficient_len(buffer.len(), layout.size())?;
 
         let ptr = buffer.cast();
         let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) };

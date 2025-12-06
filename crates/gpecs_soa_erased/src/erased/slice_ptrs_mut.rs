@@ -68,7 +68,7 @@ impl<D> ErasedSoaSliceMutPtrs<D> {
             start,
             ..
         } = self;
-        unsafe { ErasedSoaPtrs::new(descriptors, buffer, capacity, start) }
+        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, start) }
     }
 
     #[inline]
@@ -80,7 +80,7 @@ impl<D> ErasedSoaSliceMutPtrs<D> {
             start,
             ..
         } = self;
-        unsafe { ErasedSoaMutPtrs::new(descriptors, buffer, capacity, start) }
+        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, start) }
     }
 
     #[inline]

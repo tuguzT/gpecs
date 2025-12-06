@@ -1,4 +1,5 @@
 use core::{
+    alloc::LayoutError,
     fmt::{self, Debug},
     iter::FusedIterator,
     ptr, slice,
@@ -12,7 +13,7 @@ use crate::{
     error::{check_layout, check_len},
     field::ErasedFieldMutPtr,
     soa::{
-        field::FieldDescriptor,
+        field::{FieldDescriptor, buffer_layout},
         traits::{MutPtrs, RawSoa, RawSoaContext},
     },
 };
@@ -30,7 +31,12 @@ where
 
 impl<D> ErasedSoaMutPtrs<D> {
     #[inline]
-    pub unsafe fn new(descriptors: D, ptr: *mut u8, capacity: usize, offset: usize) -> Self {
+    pub unsafe fn new_unchecked(
+        descriptors: D,
+        ptr: *mut u8,
+        capacity: usize,
+        offset: usize,
+    ) -> Self {
         Self {
             ptr,
             capacity,
@@ -60,7 +66,7 @@ impl<D> ErasedSoaMutPtrs<D> {
         } = self;
 
         let ptr = ptr.cast_const();
-        unsafe { ErasedSoaPtrs::new(descriptors, ptr, capacity, offset) }
+        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 
     #[inline]
@@ -100,6 +106,26 @@ impl<D> ErasedSoaMutPtrs<D>
 where
     D: AsRef<[FieldDescriptor]>,
 {
+    #[inline]
+    pub fn new(
+        descriptors: D,
+        buffer: *mut [u8],
+        capacity: usize,
+        offset: usize,
+    ) -> Result<Self, LayoutError> {
+        let layout = buffer_layout(descriptors.as_ref(), capacity)?;
+        assert!(
+            buffer.len() >= layout.size(),
+            "buffer length ({buffer_len}) should be equal to or larger than expected layout size ({layout_size})",
+            buffer_len = buffer.len(),
+            layout_size = layout.size(),
+        );
+
+        let ptr = buffer.cast();
+        let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) };
+        Ok(me)
+    }
+
     #[inline]
     pub fn dangling(descriptors: D) -> Self {
         let addr = descriptors
@@ -401,6 +427,23 @@ where
     pub fn field_descriptors(&self) -> &[FieldDescriptor] {
         let Self { descriptors, .. } = self;
         descriptors.as_ref()
+    }
+
+    #[inline]
+    pub fn field_descriptors_iter(&self) -> ErasedSoaMutPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+        let Self {
+            ref descriptors,
+            ptr,
+            capacity,
+            offset,
+        } = *self;
+
+        ErasedSoaMutPtrsIter {
+            descriptors: descriptors.as_ref().iter(),
+            ptr,
+            capacity,
+            offset,
+        }
     }
 }
 

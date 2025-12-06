@@ -114,7 +114,7 @@ impl Work for Tiny {
         let context = TupleContext::default();
         let mut result = 0;
         for refs in iter {
-            let (i,) = unsafe { refs.into::<Self>(&context) }.unwrap();
+            let (i,) = unsafe { refs.try_into::<Self>(&context) }.unwrap();
             result += *i;
         }
         black_box(result)
@@ -188,7 +188,7 @@ impl Work for Small {
         let context = TupleContext::default();
         let mut result = 0.0;
         for refs in iter {
-            let (x, y, _) = unsafe { refs.into::<Self>(&context) }.unwrap();
+            let (x, y, _) = unsafe { refs.try_into::<Self>(&context) }.unwrap();
             result += *x + *y;
         }
         black_box(result)
@@ -267,7 +267,7 @@ impl Work for Big {
         let context = TupleContext::default();
         let mut result = 0;
         for (index, refs) in iter.enumerate() {
-            let (_, _, array, _, str) = unsafe { refs.into::<Self>(&context) }.unwrap();
+            let (_, _, array, _, str) = unsafe { refs.try_into::<Self>(&context) }.unwrap();
             result += index + array.iter().sum::<usize>() + str.len();
         }
         black_box(result)
@@ -362,7 +362,8 @@ impl Work for Large {
         let context = TupleContext::default();
         let mut result = 0;
         for refs in iter {
-            let (_, b, _, _, e, f, _, _, i, _) = unsafe { refs.into::<Self>(&context) }.unwrap();
+            let (_, b, _, _, e, f, _, _, i, _) =
+                unsafe { refs.try_into::<Self>(&context) }.unwrap();
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
                 - i.iter().fold(u32::MAX, |acc, item| (acc - item) << 3);

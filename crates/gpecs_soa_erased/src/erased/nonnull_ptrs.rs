@@ -1,4 +1,5 @@
 use core::{
+    alloc::LayoutError,
     fmt::{self, Debug},
     iter::FusedIterator,
     ptr::{self, NonNull},
@@ -10,7 +11,7 @@ use crate::{
     error::{check_layout, check_len},
     field::ErasedFieldNonNullPtr,
     soa::{
-        field::FieldDescriptor,
+        field::{FieldDescriptor, buffer_layout},
         traits::{NonNullPtrs, RawSoa, RawSoaContext},
     },
 };
@@ -28,7 +29,12 @@ where
 
 impl<D> ErasedSoaNonNullPtrs<D> {
     #[inline]
-    pub unsafe fn new(descriptors: D, ptr: NonNull<u8>, capacity: usize, offset: usize) -> Self {
+    pub unsafe fn new_unchecked(
+        descriptors: D,
+        ptr: NonNull<u8>,
+        capacity: usize,
+        offset: usize,
+    ) -> Self {
         Self {
             ptr,
             capacity,
@@ -63,6 +69,26 @@ impl<D> ErasedSoaNonNullPtrs<D>
 where
     D: AsRef<[FieldDescriptor]>,
 {
+    #[inline]
+    pub fn new(
+        descriptors: D,
+        buffer: NonNull<[u8]>,
+        capacity: usize,
+        offset: usize,
+    ) -> Result<Self, LayoutError> {
+        let layout = buffer_layout(descriptors.as_ref(), capacity)?;
+        assert!(
+            buffer.len() >= layout.size(),
+            "buffer length ({buffer_len}) should be equal to or larger than expected layout size ({layout_size})",
+            buffer_len = buffer.len(),
+            layout_size = layout.size(),
+        );
+
+        let ptr = buffer.cast();
+        let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) };
+        Ok(me)
+    }
+
     #[inline]
     pub fn dangling(descriptors: D) -> Self {
         let addr = descriptors
@@ -354,13 +380,11 @@ where
         let Self { descriptors, .. } = self;
         descriptors.as_ref()
     }
-}
 
-impl<D> Debug for ErasedSoaNonNullPtrsIter<D>
-where
-    D: AsRef<[FieldDescriptor]> + ?Sized,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    #[inline]
+    pub fn field_descriptors_iter(
+        &self,
+    ) -> ErasedSoaNonNullPtrsIter<slice::Iter<'_, FieldDescriptor>> {
         let Self {
             ref descriptors,
             ptr,
@@ -368,12 +392,21 @@ where
             offset,
         } = *self;
 
-        let entries = ErasedSoaNonNullPtrsIter {
+        ErasedSoaNonNullPtrsIter {
             descriptors: descriptors.as_ref().iter(),
             ptr,
             capacity,
             offset,
-        };
+        }
+    }
+}
+
+impl<D> Debug for ErasedSoaNonNullPtrsIter<D>
+where
+    D: AsRef<[FieldDescriptor]> + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries = self.field_descriptors_iter();
         f.debug_list().entries(entries).finish()
     }
 }

@@ -51,7 +51,7 @@ where
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
         let descriptors = self.field_descriptors();
-        unsafe { ErasedSoaPtrs::new(descriptors, buffer, capacity, 0) }
+        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 
     #[inline]
@@ -87,7 +87,7 @@ where
     #[inline]
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
         let descriptors = self.field_descriptors();
-        unsafe { ErasedSoaMutPtrs::new(descriptors, buffer, capacity, 0) }
+        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 
     #[inline]
@@ -193,7 +193,7 @@ where
 
         let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        unsafe { ErasedSoaNonNullPtrs::new(descriptors, buffer, capacity, offset) }
+        unsafe { ErasedSoaNonNullPtrs::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 
     #[inline]
@@ -203,7 +203,7 @@ where
 
         let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = buffer.as_ptr();
-        unsafe { ErasedSoaMutPtrs::new(descriptors, buffer, capacity, offset) }
+        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 
     type SlicePtrs<'a> = ErasedSoaSlicePtrs<&'a [FieldDescriptor]>;

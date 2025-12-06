@@ -260,7 +260,7 @@ fn one_item() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&u8, &u64, &u16, &())),
     );
 
@@ -293,7 +293,7 @@ fn one_item() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&u8, &u64, &u16, &())),
     );
 
@@ -311,7 +311,7 @@ fn one_item() {
     assert_eq!(iter.len(), 1);
     assert_eq!(
         iter.next_back()
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&u8, &u64, &u16, &())),
     );
     assert!(iter.next().is_none());
@@ -363,7 +363,7 @@ fn one_item_zst() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
@@ -386,7 +386,7 @@ fn one_item_zst() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
@@ -399,7 +399,7 @@ fn one_item_zst() {
     assert_eq!(iter.len(), 1);
     assert_eq!(
         iter.next_back()
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert!(iter.next().is_none());
@@ -462,19 +462,19 @@ fn three_items() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(1)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(2)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
 
@@ -542,24 +542,24 @@ fn three_items() {
     assert_eq!(
         slices
             .get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&4, &"5".to_owned(), &6, &())),
     );
     assert_eq!(
         slices
             .get(1)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&7, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
         slices
             .get(2)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&1, &"2".to_owned(), &3, &())),
     );
 
     for refs in &mut vec {
-        let (t, _, _, _) = unsafe { refs.into::<Soa>(&context) }.unwrap();
+        let (t, _, _, _) = unsafe { refs.try_into::<Soa>(&context) }.unwrap();
         *t += 1;
     }
 
@@ -568,21 +568,21 @@ fn three_items() {
 
     assert_eq!(
         iter.next()
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&5, &"5".to_owned(), &6, &())),
     );
     assert_eq!(iter.len(), 2);
 
     assert_eq!(
         iter.next_back()
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
     assert_eq!(iter.len(), 1);
 
     assert_eq!(
         iter.next()
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(iter.len(), 0);
@@ -602,31 +602,31 @@ fn three_items() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&5, &"5".to_owned(), &6, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(1)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(2)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(3)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(4)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
 
@@ -743,7 +743,7 @@ fn three_items() {
     // erased vec does not do it automatically
     for index in (0..vec.len()).rev() {
         let refs = vec.slices_mut().into_index_mut(index);
-        let (x, _, _, _) = unsafe { refs.into::<Soa>(&context) }.unwrap();
+        let (x, _, _, _) = unsafe { refs.try_into::<Soa>(&context) }.unwrap();
         if *x <= 3 {
             *x += 1;
         } else {
@@ -809,19 +809,19 @@ fn three_items_zst() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(1)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(2)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
@@ -864,24 +864,24 @@ fn three_items_zst() {
     assert_eq!(
         slices
             .get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         slices
             .get(1)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         slices
             .get(2)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
     for refs in &mut vec {
-        let () = unsafe { refs.into::<Soa>(&context) }.unwrap();
+        let () = unsafe { refs.try_into::<Soa>(&context) }.unwrap();
     }
 
     let mut iter = vec.slices().into_iter();
@@ -889,21 +889,21 @@ fn three_items_zst() {
 
     assert_eq!(
         iter.next()
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(iter.len(), 2);
 
     assert_eq!(
         iter.next_back()
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(iter.len(), 1);
 
     assert_eq!(
         iter.next()
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(iter.len(), 0);
@@ -923,31 +923,31 @@ fn three_items_zst() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(1)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(2)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(3)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(4)
-            .map(|refs| unsafe { refs.into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 

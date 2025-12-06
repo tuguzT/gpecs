@@ -306,6 +306,15 @@ impl<T> ErasedSoaIntoValueError<T> {
     pub(crate) fn new(value: T, reason: ErasedSoaIntoValueErrorKind) -> Self {
         Self { reason, value }
     }
+
+    #[inline]
+    pub fn map_value<U, F>(self, f: F) -> ErasedSoaIntoValueError<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let Self { reason, value } = self;
+        ErasedSoaIntoValueError::new(f(value), reason)
+    }
 }
 
 impl<T> Display for ErasedSoaIntoValueError<T>

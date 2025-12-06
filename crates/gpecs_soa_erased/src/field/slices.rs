@@ -1,23 +1,19 @@
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
-    ptr::{self},
-    slice,
+    ptr, slice,
 };
 
-use crate::{error::check_align, soa::field::FieldDescriptor};
+use crate::soa::field::FieldDescriptor;
 
 use super::{
     ErasedFieldPtr, ErasedFieldSlicePtr,
-    assert::{check_into_layout, check_slice_buffer_len},
     error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
 };
 
 #[derive(Clone, Copy)]
 pub struct ErasedFieldSlice<'a> {
-    desc: FieldDescriptor,
-    ptr: *const u8,
-    len: usize,
+    inner: ErasedFieldSlicePtr,
     phantom: PhantomData<&'a [u8]>,
 }
 
@@ -29,67 +25,48 @@ impl<'a> ErasedFieldSlice<'a> {
         buffer: &'a [u8],
         len: usize,
     ) -> Result<Self, ErasedFieldSlicePtrError> {
-        let ptr = buffer.as_ptr();
-        check_align(buffer.as_ptr(), desc.layout())?;
-        check_slice_buffer_len(buffer.len(), desc.layout().size(), len)?;
-
-        Ok(Self {
-            desc,
-            ptr,
-            len,
-            phantom: PhantomData,
-        })
+        let ptr = ErasedFieldSlicePtr::new(desc, buffer, len)?;
+        let me = unsafe { Self::from_field_slice_ptr(ptr) };
+        Ok(me)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [u8], len: usize) -> Self {
-        if cfg!(debug_assertions) {
-            return Self::new(desc, buffer, len).expect("incorrect inputs");
-        }
+        let ptr = unsafe { ErasedFieldSlicePtr::new_unchecked(desc, buffer, len) };
+        unsafe { Self::from_field_slice_ptr(ptr) }
+    }
 
-        let ptr = buffer.as_ptr();
+    #[inline]
+    pub unsafe fn from_field_slice_ptr(ptr: ErasedFieldSlicePtr) -> Self {
         Self {
-            desc,
-            ptr,
-            len,
+            inner: ptr,
             phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn from<T>(ptr: &'a [T]) -> Self {
-        let len = ptr.len();
-        let desc = FieldDescriptor::of::<T>();
-        let data = ptr.as_ptr().cast();
-        let buffer = unsafe { slice::from_raw_parts(data, desc.layout().size() * len) };
-        unsafe { Self::new_unchecked(desc, buffer, len) }
-    }
-
-    #[inline]
-    pub unsafe fn into<T>(self) -> Result<&'a [T], ErasedFieldIntoValueError<Self>> {
-        let Self { desc, .. } = self;
-        let me = check_into_layout::<T, _>(desc.layout(), self)?;
-        let Self { ptr, len, .. } = me;
-
-        let data = ptr.cast();
-        Ok(unsafe { slice::from_raw_parts(data, len) })
+    pub unsafe fn try_into<T>(self) -> Result<&'a [T], ErasedFieldIntoValueError<Self>> {
+        let Self { inner, .. } = self;
+        let into_self = |ptr| unsafe { Self::from_field_slice_ptr(ptr) };
+        let buffer = <*const [T]>::try_from(inner).map_err(|err| err.map_value(into_self))?;
+        let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
+        Ok(slice)
     }
 
     #[inline]
     pub unsafe fn cast<T>(&self) -> Result<&[T], ErasedFieldIntoValueError<&Self>> {
-        let Self { desc, .. } = *self;
-        let me = check_into_layout::<T, _>(desc.layout(), self)?;
-        let Self { ptr, len, .. } = *me;
-
-        let data = ptr.cast();
-        Ok(unsafe { slice::from_raw_parts(data, len) })
+        let Self { inner, .. } = *self;
+        let into_self = |_| self;
+        let buffer = <*const [T]>::try_from(inner).map_err(|err| err.map_value(into_self))?;
+        let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
+        Ok(slice)
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        let Self { len, .. } = *self;
-        len
+        let Self { inner, .. } = self;
+        inner.len()
     }
 
     #[inline]
@@ -99,34 +76,33 @@ impl<'a> ErasedFieldSlice<'a> {
 
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
-        desc
+        let Self { inner, .. } = self;
+        inner.descriptor()
     }
 
     #[inline]
     pub fn buffer(&self) -> &[u8] {
-        let Self { desc, ptr, len, .. } = *self;
-        unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) }
+        let Self { inner, .. } = self;
+        let buffer = inner.buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
-        let Self { ptr, .. } = *self;
-        ptr
+        let Self { inner, .. } = self;
+        inner.as_ptr()
     }
 
     #[inline]
     pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr {
-        let Self { desc, ptr, len, .. } = *self;
-        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
-        unsafe { ErasedFieldSlicePtr::new_unchecked(desc, buffer, len) }
+        let Self { inner, .. } = *self;
+        inner
     }
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
-        let Self { desc, ptr, .. } = *self;
-        let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
-        unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
+        let Self { inner, .. } = self;
+        inner.as_field_ptr()
     }
 
     #[inline]
@@ -137,16 +113,18 @@ impl<'a> ErasedFieldSlice<'a> {
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, &'a [u8], usize) {
-        let Self { desc, ptr, len, .. } = self;
-        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
+        let Self { inner, .. } = self;
+        let (desc, buffer, len) = inner.into_parts();
+        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
         (desc, buffer, len)
     }
 }
 
 impl Debug for ErasedFieldSlice<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { desc, len, .. } = self;
+        let desc = &self.descriptor();
         let buffer = &self.buffer();
+        let len = &self.len();
         f.debug_struct("ErasedFieldSlice")
             .field("desc", desc)
             .field("buffer", buffer)
@@ -159,5 +137,13 @@ impl AsRef<[u8]> for ErasedFieldSlice<'_> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
         self.buffer()
+    }
+}
+
+impl<'a, T> From<&'a [T]> for ErasedFieldSlice<'a> {
+    #[inline]
+    fn from(slice: &'a [T]) -> Self {
+        let ptr = ptr::from_ref(slice).into();
+        unsafe { Self::from_field_slice_ptr(ptr) }
     }
 }

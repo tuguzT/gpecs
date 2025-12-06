@@ -20,22 +20,22 @@ impl<'a> ErasedFieldRefMut<'a> {
     #[inline]
     #[track_caller]
     pub fn new(desc: FieldDescriptor, buffer: &'a mut [u8]) -> Result<Self, ErasedFieldPtrError> {
-        let field_mut_ptr = ErasedFieldMutPtr::new(desc, buffer)?;
-        let me = unsafe { Self::from_field_mut_ptr(field_mut_ptr) };
+        let ptr = ErasedFieldMutPtr::new(desc, buffer)?;
+        let me = unsafe { Self::from_field_mut_ptr(ptr) };
         Ok(me)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a mut [u8]) -> Self {
-        let field_mut_ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
-        unsafe { Self::from_field_mut_ptr(field_mut_ptr) }
+        let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
+        unsafe { Self::from_field_mut_ptr(ptr) }
     }
 
     #[inline]
-    pub unsafe fn from_field_mut_ptr(field_mut_ptr: ErasedFieldMutPtr) -> Self {
+    pub unsafe fn from_field_mut_ptr(ptr: ErasedFieldMutPtr) -> Self {
         Self {
-            inner: field_mut_ptr,
+            inner: ptr,
             phantom: PhantomData,
         }
     }
@@ -43,7 +43,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     #[inline]
     pub unsafe fn try_into<T>(self) -> Result<&'a mut T, ErasedFieldIntoValueError<Self>> {
         let Self { inner, .. } = self;
-        let into_self = |field_ptr| unsafe { Self::from_field_mut_ptr(field_ptr) };
+        let into_self = |ptr| unsafe { Self::from_field_mut_ptr(ptr) };
         let ptr = <*mut T>::try_from(inner).map_err(|err| err.map_value(into_self))?;
         let r#ref = unsafe { ptr.as_mut().unwrap_unchecked() };
         Ok(r#ref)
@@ -154,15 +154,15 @@ impl AsMut<[u8]> for ErasedFieldRefMut<'_> {
 impl<'a, T> From<&'a mut T> for ErasedFieldRefMut<'a> {
     #[inline]
     fn from(r#ref: &'a mut T) -> Self {
-        let field_ptr = ptr::from_mut(r#ref).into();
-        unsafe { Self::from_field_mut_ptr(field_ptr) }
+        let ptr = ptr::from_mut(r#ref).into();
+        unsafe { Self::from_field_mut_ptr(ptr) }
     }
 }
 
 impl<'a> From<ErasedFieldRefMut<'a>> for ErasedFieldRef<'a> {
     #[inline]
     fn from(value: ErasedFieldRefMut<'a>) -> Self {
-        let field_ptr = value.as_field_ptr();
-        unsafe { ErasedFieldRef::from_field_ptr(field_ptr) }
+        let ptr = value.as_field_ptr();
+        unsafe { ErasedFieldRef::from_field_ptr(ptr) }
     }
 }

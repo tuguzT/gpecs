@@ -21,22 +21,22 @@ impl<'a> ErasedFieldRef<'a> {
     #[inline]
     #[track_caller]
     pub fn new(desc: FieldDescriptor, buffer: &'a [u8]) -> Result<Self, ErasedFieldPtrError> {
-        let field_ptr = ErasedFieldPtr::new(desc, buffer)?;
-        let me = unsafe { Self::from_field_ptr(field_ptr) };
+        let ptr = ErasedFieldPtr::new(desc, buffer)?;
+        let me = unsafe { Self::from_field_ptr(ptr) };
         Ok(me)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [u8]) -> Self {
-        let field_ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
-        unsafe { Self::from_field_ptr(field_ptr) }
+        let ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
+        unsafe { Self::from_field_ptr(ptr) }
     }
 
     #[inline]
-    pub unsafe fn from_field_ptr(field_ptr: ErasedFieldPtr) -> Self {
+    pub unsafe fn from_field_ptr(ptr: ErasedFieldPtr) -> Self {
         Self {
-            inner: field_ptr,
+            inner: ptr,
             phantom: PhantomData,
         }
     }
@@ -44,7 +44,7 @@ impl<'a> ErasedFieldRef<'a> {
     #[inline]
     pub unsafe fn try_into<T>(self) -> Result<&'a T, ErasedFieldIntoValueError<Self>> {
         let Self { inner, .. } = self;
-        let into_self = |field_ptr| unsafe { Self::from_field_ptr(field_ptr) };
+        let into_self = |ptr| unsafe { Self::from_field_ptr(ptr) };
         let ptr = <*const T>::try_from(inner).map_err(|err| err.map_value(into_self))?;
         let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
         Ok(r#ref)
@@ -120,7 +120,7 @@ impl AsRef<[u8]> for ErasedFieldRef<'_> {
 impl<'a, T> From<&'a T> for ErasedFieldRef<'a> {
     #[inline]
     fn from(r#ref: &'a T) -> Self {
-        let field_ptr = ptr::from_ref(r#ref).into();
-        unsafe { Self::from_field_ptr(field_ptr) }
+        let ptr = ptr::from_ref(r#ref).into();
+        unsafe { Self::from_field_ptr(ptr) }
     }
 }

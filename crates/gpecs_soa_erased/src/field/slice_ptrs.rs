@@ -1,7 +1,6 @@
 use core::{
     fmt::Debug,
     ptr::{self},
-    slice,
 };
 
 use crate::{error::check_align, soa::field::FieldDescriptor};
@@ -46,21 +45,6 @@ impl ErasedFieldSlicePtr {
     }
 
     #[inline]
-    pub fn from<T>(ptr: *const [T]) -> Self {
-        let len = ptr.len();
-        let desc = FieldDescriptor::of::<T>();
-        let buffer = ptr::slice_from_raw_parts(ptr.cast(), desc.layout().size() * len);
-        unsafe { Self::new_unchecked(desc, buffer, len) }
-    }
-
-    #[inline]
-    pub fn into<T>(self) -> Result<*const [T], ErasedFieldIntoValueError<Self>> {
-        let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
-        let Self { ptr, len, .. } = me;
-        Ok(ptr::slice_from_raw_parts(ptr.cast(), len))
-    }
-
-    #[inline]
     pub fn cast_mut(self) -> ErasedFieldSliceMutPtr {
         let Self { desc, ptr, len } = self;
         let buffer = ptr::slice_from_raw_parts_mut(ptr.cast_mut(), desc.layout().size() * len);
@@ -69,9 +53,7 @@ impl ErasedFieldSlicePtr {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedFieldSlice<'a> {
-        let Self { desc, ptr, len } = self;
-        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size() * len) };
-        unsafe { ErasedFieldSlice::new_unchecked(desc, buffer, len) }
+        unsafe { ErasedFieldSlice::from_field_slice_ptr(self) }
     }
 
     #[inline]
@@ -115,6 +97,30 @@ impl ErasedFieldSlicePtr {
         let Self { desc, ptr, len } = self;
         let buffer = ptr::slice_from_raw_parts(ptr, len * desc.layout().size());
         (desc, buffer, len)
+    }
+}
+
+impl<T> From<*const [T]> for ErasedFieldSlicePtr {
+    #[inline]
+    fn from(ptr: *const [T]) -> Self {
+        let len = ptr.len();
+        let desc = FieldDescriptor::of::<T>();
+        let buffer = ptr::slice_from_raw_parts(ptr.cast(), desc.layout().size() * len);
+        unsafe { Self::new_unchecked(desc, buffer, len) }
+    }
+}
+
+impl<T> TryFrom<ErasedFieldSlicePtr> for *const [T] {
+    type Error = ErasedFieldIntoValueError<ErasedFieldSlicePtr>;
+
+    #[inline]
+    fn try_from(value: ErasedFieldSlicePtr) -> Result<Self, Self::Error> {
+        let ErasedFieldSlicePtr { desc, .. } = value;
+        let value = check_into_layout::<T, _>(desc.layout(), value)?;
+
+        let ErasedFieldSlicePtr { ptr, len, .. } = value;
+        let slice = ptr::slice_from_raw_parts(ptr.cast(), len);
+        Ok(slice)
     }
 }
 

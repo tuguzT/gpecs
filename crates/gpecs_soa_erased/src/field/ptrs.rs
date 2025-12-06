@@ -1,4 +1,4 @@
-use core::{ptr, slice};
+use core::ptr;
 
 use crate::{
     error::{check_align, check_layout, check_len},
@@ -47,20 +47,6 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
-    pub fn from<T>(ptr: *const T) -> Self {
-        let desc = FieldDescriptor::of::<T>();
-        let buffer = ptr::slice_from_raw_parts(ptr.cast(), desc.layout().size());
-        unsafe { Self::new_unchecked(desc, buffer) }
-    }
-
-    #[inline]
-    pub fn into<T>(self) -> Result<*const T, ErasedFieldIntoValueError<Self>> {
-        let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
-        let Self { ptr, .. } = me;
-        Ok(ptr.cast())
-    }
-
-    #[inline]
     pub fn cast_mut(self) -> ErasedFieldMutPtr {
         let Self { desc, ptr } = self;
         let buffer = ptr::slice_from_raw_parts_mut(ptr.cast_mut(), desc.layout().size());
@@ -72,9 +58,9 @@ impl ErasedFieldPtr {
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { desc, ptr } = self;
 
-        let data = unsafe { ptr.add(count * desc.layout().size()) };
-        let len = desc.layout().size();
-        let buffer = ptr::slice_from_raw_parts(data, len);
+        let size = desc.layout().size();
+        let data = unsafe { ptr.add(count * size) };
+        let buffer = ptr::slice_from_raw_parts(data, size);
         unsafe { Self::new_unchecked(desc, buffer) }
     }
 
@@ -97,9 +83,7 @@ impl ErasedFieldPtr {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
-        let Self { desc, ptr } = self;
-        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size()) };
-        unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
+        unsafe { ErasedFieldRef::from_field_ptr(self) }
     }
 
     #[inline]
@@ -121,15 +105,31 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
-    pub fn into_ptr(self) -> *const u8 {
-        let Self { ptr, .. } = self;
-        ptr
-    }
-
-    #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, *const [u8]) {
         let Self { desc, ptr } = self;
         let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
         (desc, buffer)
+    }
+}
+
+impl<T> From<*const T> for ErasedFieldPtr {
+    #[inline]
+    fn from(ptr: *const T) -> Self {
+        let desc = FieldDescriptor::of::<T>();
+        let buffer = ptr::slice_from_raw_parts(ptr.cast(), desc.layout().size());
+        unsafe { Self::new_unchecked(desc, buffer) }
+    }
+}
+
+impl<T> TryFrom<ErasedFieldPtr> for *const T {
+    type Error = ErasedFieldIntoValueError<ErasedFieldPtr>;
+
+    #[inline]
+    fn try_from(value: ErasedFieldPtr) -> Result<Self, Self::Error> {
+        let ErasedFieldPtr { desc, .. } = value;
+        let value = check_into_layout::<T, _>(desc.layout(), value)?;
+
+        let ptr = value.as_ptr().cast();
+        Ok(ptr)
     }
 }

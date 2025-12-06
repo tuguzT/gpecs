@@ -47,28 +47,13 @@ impl ErasedFieldNonNullPtr {
     }
 
     #[inline]
-    pub fn from<T>(ptr: NonNull<T>) -> Self {
-        let desc = FieldDescriptor::of::<T>();
-        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
-        let buffer = unsafe { NonNull::new_unchecked(ptr) };
-        unsafe { Self::new_unchecked(desc, buffer) }
-    }
-
-    #[inline]
-    pub fn into<T>(self) -> Result<NonNull<T>, ErasedFieldIntoValueError<Self>> {
-        let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
-        let Self { ptr, .. } = me;
-        Ok(ptr.cast())
-    }
-
-    #[inline]
     #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { desc, ptr } = self;
 
-        let data = unsafe { ptr.add(count * desc.layout().size()) };
-        let len = desc.layout().size();
-        let buffer = ptr::slice_from_raw_parts_mut(data.as_ptr(), len);
+        let size = desc.layout().size();
+        let data = unsafe { ptr.add(count * size) };
+        let buffer = ptr::slice_from_raw_parts_mut(data.as_ptr(), size);
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
         unsafe { Self::new_unchecked(desc, buffer) }
     }
@@ -153,5 +138,28 @@ impl ErasedFieldNonNullPtr {
         let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
         let buffer = unsafe { NonNull::new_unchecked(ptr) };
         (desc, buffer)
+    }
+}
+
+impl<T> From<NonNull<T>> for ErasedFieldNonNullPtr {
+    #[inline]
+    fn from(ptr: NonNull<T>) -> Self {
+        let desc = FieldDescriptor::of::<T>();
+        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
+        let buffer = unsafe { NonNull::new_unchecked(ptr) };
+        unsafe { Self::new_unchecked(desc, buffer) }
+    }
+}
+
+impl<T> TryFrom<ErasedFieldNonNullPtr> for NonNull<T> {
+    type Error = ErasedFieldIntoValueError<ErasedFieldNonNullPtr>;
+
+    #[inline]
+    fn try_from(value: ErasedFieldNonNullPtr) -> Result<Self, Self::Error> {
+        let ErasedFieldNonNullPtr { desc, .. } = value;
+        let value = check_into_layout::<T, _>(desc.layout(), value)?;
+
+        let ptr = value.as_ptr().cast();
+        Ok(ptr)
     }
 }

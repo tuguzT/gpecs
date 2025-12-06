@@ -112,6 +112,15 @@ impl<T> ErasedFieldIntoValueError<T> {
     pub(super) fn new(value: T, reason: LayoutMismatchError) -> Self {
         Self { reason, value }
     }
+
+    #[inline]
+    pub fn map_value<U, F>(self, f: F) -> ErasedFieldIntoValueError<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let Self { reason, value } = self;
+        ErasedFieldIntoValueError::new(f(value), reason)
+    }
 }
 
 impl<T> Display for ErasedFieldIntoValueError<T>

@@ -4,20 +4,15 @@ use core::{
     ptr, slice,
 };
 
-use crate::{
-    error::{check_align, check_len},
-    soa::field::FieldDescriptor,
-};
+use crate::soa::field::FieldDescriptor;
 
 use super::{
     ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
-    assert::check_into_layout,
     error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
 };
 
 pub struct ErasedFieldRefMut<'a> {
-    desc: FieldDescriptor,
-    ptr: *mut u8,
+    inner: ErasedFieldMutPtr,
     phantom: PhantomData<&'a mut [u8]>,
 }
 
@@ -25,109 +20,95 @@ impl<'a> ErasedFieldRefMut<'a> {
     #[inline]
     #[track_caller]
     pub fn new(desc: FieldDescriptor, buffer: &'a mut [u8]) -> Result<Self, ErasedFieldPtrError> {
-        let ptr = buffer.as_mut_ptr();
-        check_len(buffer.len(), desc.layout().size())?;
-        check_align(ptr, desc.layout())?;
-
-        Ok(Self {
-            desc,
-            ptr,
-            phantom: PhantomData,
-        })
+        let field_mut_ptr = ErasedFieldMutPtr::new(desc, buffer)?;
+        let me = unsafe { Self::from_field_mut_ptr(field_mut_ptr) };
+        Ok(me)
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a mut [u8]) -> Self {
-        if cfg!(debug_assertions) {
-            return Self::new(desc, buffer).expect("incorrect inputs");
-        }
+        let field_mut_ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
+        unsafe { Self::from_field_mut_ptr(field_mut_ptr) }
+    }
 
-        let ptr = buffer.as_mut_ptr();
+    #[inline]
+    pub unsafe fn from_field_mut_ptr(field_mut_ptr: ErasedFieldMutPtr) -> Self {
         Self {
-            desc,
-            ptr,
+            inner: field_mut_ptr,
             phantom: PhantomData,
         }
     }
 
     #[inline]
-    pub fn from<T>(r#ref: &'a mut T) -> Self {
-        let desc = FieldDescriptor::of::<T>();
-        let data = ptr::from_mut(r#ref).cast();
-        let buffer = unsafe { slice::from_raw_parts_mut(data, desc.layout().size()) };
-        unsafe { Self::new_unchecked(desc, buffer) }
-    }
-
-    #[inline]
-    pub unsafe fn into<T>(self) -> Result<&'a mut T, ErasedFieldIntoValueError<Self>> {
-        let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
-        let Self { ptr, .. } = me;
-
-        let ptr = ptr.cast();
-        Ok(unsafe { &mut *ptr })
+    pub unsafe fn try_into<T>(self) -> Result<&'a mut T, ErasedFieldIntoValueError<Self>> {
+        let Self { inner, .. } = self;
+        let into_self = |field_ptr| unsafe { Self::from_field_mut_ptr(field_ptr) };
+        let ptr = <*mut T>::try_from(inner).map_err(|err| err.map_value(into_self))?;
+        let r#ref = unsafe { ptr.as_mut().unwrap_unchecked() };
+        Ok(r#ref)
     }
 
     #[inline]
     pub unsafe fn cast<T>(&self) -> Result<&T, ErasedFieldIntoValueError<&Self>> {
-        let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
-        let Self { ptr, .. } = *me;
-
-        let ptr = ptr.cast();
-        Ok(unsafe { &*ptr })
+        let Self { inner, .. } = *self;
+        let into_self = |_| self;
+        let ptr = <*mut T>::try_from(inner).map_err(|err| err.map_value(into_self))?;
+        let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
+        Ok(r#ref)
     }
 
     #[inline]
     pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, ErasedFieldIntoValueError<&mut Self>> {
-        let me = check_into_layout::<T, _>(self.desc.layout(), self)?;
-        let Self { ptr, .. } = *me;
-
-        let ptr = ptr.cast();
-        Ok(unsafe { &mut *ptr })
+        let Self { inner, .. } = *self;
+        let into_self = |_| self;
+        let ptr = <*mut T>::try_from(inner).map_err(|err| err.map_value(into_self))?;
+        let r#ref = unsafe { ptr.as_mut().unwrap_unchecked() };
+        Ok(r#ref)
     }
 
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
-        desc
+        let Self { inner, .. } = self;
+        inner.descriptor()
     }
 
     #[inline]
     pub fn buffer(&self) -> &[u8] {
-        let Self { desc, ptr, .. } = *self;
-        unsafe { slice::from_raw_parts(ptr, desc.layout().size()) }
+        let Self { inner, .. } = self;
+        let buffer = inner.buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
-        let Self { ptr, .. } = *self;
-        ptr
+        let Self { inner, .. } = self;
+        inner.as_ptr().cast_const()
     }
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
-        let Self { desc, ptr, .. } = *self;
-        let buffer = unsafe { slice::from_raw_parts(ptr, desc.layout().size()) };
-        unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
+        let Self { inner, .. } = *self;
+        inner.cast_const()
     }
 
     #[inline]
     pub fn buffer_mut(&mut self) -> &mut [u8] {
-        let Self { desc, ptr, .. } = *self;
-        unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size()) }
+        let Self { inner, .. } = self;
+        let buffer = inner.buffer();
+        unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        let Self { ptr, .. } = *self;
-        ptr
+        let Self { inner, .. } = self;
+        inner.as_ptr()
     }
 
     #[inline]
     pub fn as_field_mut_ptr(&mut self) -> ErasedFieldMutPtr {
-        let Self { desc, ptr, .. } = *self;
-        let buffer = unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size()) };
-        unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
+        let Self { inner, .. } = *self;
+        inner
     }
 
     #[inline]
@@ -138,15 +119,16 @@ impl<'a> ErasedFieldRefMut<'a> {
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, &'a mut [u8]) {
-        let Self { desc, ptr, .. } = self;
-        let buffer = unsafe { slice::from_raw_parts_mut(ptr, desc.layout().size()) };
+        let Self { inner, .. } = self;
+        let (desc, buffer) = inner.into_parts();
+        let buffer = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
         (desc, buffer)
     }
 }
 
 impl Debug for ErasedFieldRefMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { desc, .. } = self;
+        let desc = &self.descriptor();
         let buffer = &self.buffer();
         f.debug_struct("ErasedFieldRefMut")
             .field("desc", desc)
@@ -169,9 +151,18 @@ impl AsMut<[u8]> for ErasedFieldRefMut<'_> {
     }
 }
 
+impl<'a, T> From<&'a mut T> for ErasedFieldRefMut<'a> {
+    #[inline]
+    fn from(r#ref: &'a mut T) -> Self {
+        let field_ptr = ptr::from_mut(r#ref).into();
+        unsafe { Self::from_field_mut_ptr(field_ptr) }
+    }
+}
+
 impl<'a> From<ErasedFieldRefMut<'a>> for ErasedFieldRef<'a> {
+    #[inline]
     fn from(value: ErasedFieldRefMut<'a>) -> Self {
-        let (desc, buffer) = value.into_parts();
-        unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
+        let field_ptr = value.as_field_ptr();
+        unsafe { ErasedFieldRef::from_field_ptr(field_ptr) }
     }
 }

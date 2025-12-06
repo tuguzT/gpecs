@@ -46,7 +46,7 @@ where
                 .find(|(id, _)| *id == component_id)
                 .unwrap_unchecked()
         };
-        unsafe { ptr.into().unwrap_unchecked() }
+        unsafe { ptr.try_into().unwrap_unchecked() }
     }
 }
 
@@ -91,7 +91,7 @@ macro_rules! bundle_tuple_impl {
                 for (id, ptr) in iter {
                     $(
                         if id == component_ids[$indices] {
-                            ptrs.$indices = Some(unsafe { ptr.into().unwrap_unchecked() });
+                            ptrs.$indices = Some(unsafe { ptr.try_into().unwrap_unchecked() });
                         }
                     )*
                 }

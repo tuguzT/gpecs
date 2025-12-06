@@ -61,7 +61,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(0).unwrap();
     assert_eq!(
-        unsafe { field_ref.into::<()>() }.expect("layouts should match"),
+        unsafe { field_ref.try_into::<()>() }.expect("layouts should match"),
         &(),
     );
     assert_eq!(
@@ -71,7 +71,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(1).unwrap();
     assert_eq!(
-        unsafe { field_ref.into::<u8>() }.expect("layouts should match"),
+        unsafe { field_ref.try_into::<u8>() }.expect("layouts should match"),
         &i3,
     );
     assert_eq!(
@@ -81,7 +81,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(2).unwrap();
     assert_eq!(
-        unsafe { field_ref.into::<u16>() }.expect("layouts should match"),
+        unsafe { field_ref.try_into::<u16>() }.expect("layouts should match"),
         &i2,
     );
     assert_eq!(
@@ -91,7 +91,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(3).unwrap();
     assert_eq!(
-        unsafe { field_ref.into::<u32>() }.expect("layouts should match"),
+        unsafe { field_ref.try_into::<u32>() }.expect("layouts should match"),
         &i1,
     );
     assert_eq!(
@@ -101,7 +101,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(4).unwrap();
     assert_eq!(
-        unsafe { field_ref.into::<String>() }.expect("layouts should match"),
+        unsafe { field_ref.try_into::<String>() }.expect("layouts should match"),
         &str,
     );
 

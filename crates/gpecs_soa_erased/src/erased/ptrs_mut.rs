@@ -435,7 +435,7 @@ where
         let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, ptr_buffer) };
 
         let item = unsafe { ptr.add(offset) };
-        *buffer = unsafe { ptr.add(capacity) }.as_ptr();
+        *buffer = unsafe { ptr.add(capacity) }.as_mut_ptr();
 
         if let [desc, ..] = descriptors.as_ref() {
             *buffer = unsafe { buffer.add(buffer.align_offset(desc.layout().align())) };

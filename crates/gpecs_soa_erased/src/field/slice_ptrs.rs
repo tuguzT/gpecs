@@ -57,37 +57,37 @@ impl ErasedFieldSlicePtr {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        let Self { len, .. } = *self;
+    pub fn len(self) -> usize {
+        let Self { len, .. } = self;
         len
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.len() == 0
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
+    pub fn descriptor(self) -> FieldDescriptor {
+        let Self { desc, .. } = self;
         desc
     }
 
     #[inline]
-    pub fn buffer(&self) -> *const [u8] {
-        let Self { desc, ptr, len } = *self;
+    pub fn as_buffer(self) -> *const [u8] {
+        let Self { desc, ptr, len } = self;
         ptr::slice_from_raw_parts(ptr, len * desc.layout().size())
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
-        let Self { ptr, .. } = *self;
+    pub fn as_ptr(self) -> *const u8 {
+        let Self { ptr, .. } = self;
         ptr
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
-        let Self { desc, ptr, .. } = *self;
+    pub fn as_field_ptr(self) -> ErasedFieldPtr {
+        let Self { desc, ptr, .. } = self;
         let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
         unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
     }

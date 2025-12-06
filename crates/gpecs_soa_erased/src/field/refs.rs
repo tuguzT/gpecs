@@ -66,9 +66,9 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
-    pub fn buffer(&self) -> &[u8] {
+    pub fn as_buffer(&self) -> &[u8] {
         let Self { inner, .. } = self;
-        let buffer = inner.buffer();
+        let buffer = inner.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
@@ -102,7 +102,7 @@ impl<'a> ErasedFieldRef<'a> {
 impl Debug for ErasedFieldRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &self.buffer();
+        let buffer = &self.as_buffer();
         f.debug_struct("ErasedFieldRef")
             .field("desc", desc)
             .field("buffer", buffer)
@@ -113,7 +113,7 @@ impl Debug for ErasedFieldRef<'_> {
 impl AsRef<[u8]> for ErasedFieldRef<'_> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
-        self.buffer()
+        self.as_buffer()
     }
 }
 

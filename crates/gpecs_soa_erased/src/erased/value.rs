@@ -336,7 +336,7 @@ where
         let data = unsafe { bytes.as_ptr().add(offset) };
         let data = unsafe { slice::from_raw_parts(data, len) };
 
-        let item = ErasedField::from_desc_data(field_descriptor, data);
+        let item = ErasedField::try_from_desc_data(field_descriptor, data);
         Some(item)
     }
 }

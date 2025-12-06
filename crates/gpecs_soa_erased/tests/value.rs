@@ -141,7 +141,7 @@ fn value() {
         .expect("allocation of small byte array should succeed");
     let field: BoxedErasedField = fields.pop().expect("string field should exist");
     assert_eq!(
-        unsafe { field.into_value::<String>() }.expect("layouts should match"),
+        unsafe { field.try_into::<String>() }.expect("layouts should match"),
         str,
     );
 

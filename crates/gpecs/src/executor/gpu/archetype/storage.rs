@@ -45,7 +45,7 @@ impl GpuArchetypeStorage {
                 let component_id = unsafe { GpuComponentId::from_id(component_id) };
                 let components_label =
                     || format!("`gpecs` {archetype_id:#} {component_id:#} storage buffer");
-                let components_contents = slice.buffer();
+                let components_contents = slice.as_buffer();
                 let buffer = StorageBuffer::new(gpu_device, components_contents, components_label);
                 (component_id, buffer)
             })

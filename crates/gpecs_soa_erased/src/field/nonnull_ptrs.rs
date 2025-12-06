@@ -98,7 +98,7 @@ impl ErasedFieldNonNullPtr {
         let src = from.as_ptr();
         let dst = self.as_ptr();
         let count = count * desc.layout().size();
-        unsafe { ptr::copy(src.as_ptr(), dst.as_ptr().cast(), count) }
+        unsafe { ptr::copy(src.as_ptr(), dst.as_ptr(), count) }
     }
 
     #[inline]
@@ -114,28 +114,28 @@ impl ErasedFieldNonNullPtr {
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
+    pub fn descriptor(self) -> FieldDescriptor {
+        let Self { desc, .. } = self;
         desc
     }
 
     #[inline]
-    pub fn buffer(&self) -> NonNull<[u8]> {
-        let Self { ptr, desc } = *self;
-        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
+    pub fn as_buffer(self) -> NonNull<[u8]> {
+        let Self { desc, ptr } = self;
+        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), desc.layout().size());
         unsafe { NonNull::new_unchecked(ptr) }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> NonNull<u8> {
-        let Self { ptr: buffer, .. } = self;
-        buffer.cast()
+    pub fn as_ptr(self) -> NonNull<u8> {
+        let Self { ptr, .. } = self;
+        ptr
     }
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, NonNull<[u8]>) {
         let Self { desc, ptr } = self;
-        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), desc.layout().size());
+        let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), desc.layout().size());
         let buffer = unsafe { NonNull::new_unchecked(ptr) };
         (desc, buffer)
     }

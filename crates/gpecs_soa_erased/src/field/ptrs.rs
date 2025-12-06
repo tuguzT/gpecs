@@ -87,20 +87,20 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
+    pub fn descriptor(self) -> FieldDescriptor {
+        let Self { desc, .. } = self;
         desc
     }
 
     #[inline]
-    pub fn buffer(&self) -> *const [u8] {
-        let Self { desc, ptr } = *self;
+    pub fn as_buffer(self) -> *const [u8] {
+        let Self { desc, ptr } = self;
         ptr::slice_from_raw_parts(ptr, desc.layout().size())
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
-        let Self { ptr, .. } = *self;
+    pub fn as_ptr(self) -> *const u8 {
+        let Self { ptr, .. } = self;
         ptr
     }
 

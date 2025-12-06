@@ -74,16 +74,16 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub fn buffer(&self) -> &[u8] {
+    pub fn as_buffer(&self) -> &[u8] {
         let Self { inner, .. } = self;
-        let buffer = inner.buffer();
+        let buffer = inner.as_mut_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
         let Self { inner, .. } = self;
-        inner.as_ptr().cast_const()
+        inner.as_mut_ptr().cast_const()
     }
 
     #[inline]
@@ -93,16 +93,16 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub fn buffer_mut(&mut self) -> &mut [u8] {
+    pub fn as_mut_buffer(&mut self) -> &mut [u8] {
         let Self { inner, .. } = self;
-        let buffer = inner.buffer();
+        let buffer = inner.as_mut_buffer();
         unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { inner, .. } = self;
-        inner.as_ptr()
+        inner.as_mut_ptr()
     }
 
     #[inline]
@@ -129,7 +129,7 @@ impl<'a> ErasedFieldRefMut<'a> {
 impl Debug for ErasedFieldRefMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &self.buffer();
+        let buffer = &self.as_buffer();
         f.debug_struct("ErasedFieldRefMut")
             .field("desc", desc)
             .field("buffer", buffer)
@@ -140,14 +140,14 @@ impl Debug for ErasedFieldRefMut<'_> {
 impl AsRef<[u8]> for ErasedFieldRefMut<'_> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
-        self.buffer()
+        self.as_buffer()
     }
 }
 
 impl AsMut<[u8]> for ErasedFieldRefMut<'_> {
     #[inline]
     fn as_mut(&mut self) -> &mut [u8] {
-        self.buffer_mut()
+        self.as_mut_buffer()
     }
 }
 

@@ -372,7 +372,7 @@ where
             let data = ptr.add(start);
             field_slice_from_raw_parts_mut(data, (start..end).len()).deref_mut()
         };
-        *buffer = unsafe { ptr.add(capacity) }.as_ptr();
+        *buffer = unsafe { ptr.add(capacity) }.as_mut_ptr();
 
         if let [desc, ..] = descriptors.as_ref() {
             *buffer = unsafe { buffer.add(buffer.align_offset(desc.layout().align())) };

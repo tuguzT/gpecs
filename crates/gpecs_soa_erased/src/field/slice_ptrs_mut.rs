@@ -7,7 +7,7 @@ use core::{
 use crate::{error::check_align, soa::field::FieldDescriptor};
 
 use super::{
-    ErasedFieldMutPtr, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSlicePtr,
+    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSlicePtr,
     assert::{check_into_layout, check_slice_buffer_len},
     error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
 };
@@ -67,37 +67,56 @@ impl ErasedFieldSliceMutPtr {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        let Self { len, .. } = *self;
+    pub fn len(self) -> usize {
+        let Self { len, .. } = self;
         len
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.len() == 0
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
+    pub fn descriptor(self) -> FieldDescriptor {
+        let Self { desc, .. } = self;
         desc
     }
 
     #[inline]
-    pub fn buffer(&self) -> *mut [u8] {
-        let Self { desc, ptr, len } = *self;
+    pub fn as_buffer(self) -> *const [u8] {
+        let Self { desc, ptr, len } = self;
+        ptr::slice_from_raw_parts(ptr.cast_const(), desc.layout().size() * len)
+    }
+
+    #[inline]
+    pub fn as_mut_buffer(self) -> *mut [u8] {
+        let Self { desc, ptr, len } = self;
         ptr::slice_from_raw_parts_mut(ptr, desc.layout().size() * len)
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *mut u8 {
-        let Self { ptr, .. } = *self;
+    pub fn as_ptr(self) -> *const u8 {
+        let Self { ptr, .. } = self;
+        ptr.cast_const()
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(self) -> *mut u8 {
+        let Self { ptr, .. } = self;
         ptr
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldMutPtr {
-        let Self { desc, ptr, .. } = *self;
+    pub fn as_field_ptr(self) -> ErasedFieldPtr {
+        let Self { desc, ptr, .. } = self;
+        let buffer = ptr::slice_from_raw_parts(ptr.cast_const(), desc.layout().size());
+        unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
+    }
+
+    #[inline]
+    pub fn as_field_mut_ptr(self) -> ErasedFieldMutPtr {
+        let Self { desc, ptr, .. } = self;
         let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size());
         unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
     }

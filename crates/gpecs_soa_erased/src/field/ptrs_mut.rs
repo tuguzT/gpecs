@@ -87,8 +87,8 @@ impl ErasedFieldMutPtr {
         let Self { desc, .. } = self;
         check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let a = self.as_ptr();
-        let b = with.as_ptr();
+        let a = self.as_mut_ptr();
+        let b = with.as_mut_ptr();
         let count = desc.layout().size();
         for i in 0..count {
             unsafe { ptr::swap(a.add(i), b.add(i)) }
@@ -102,7 +102,7 @@ impl ErasedFieldMutPtr {
         check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let src = from.as_ptr();
-        let dst = self.as_ptr();
+        let dst = self.as_mut_ptr();
         let count = count * desc.layout().size();
         unsafe { ptr::copy(src, dst, count) }
     }
@@ -114,7 +114,7 @@ impl ErasedFieldMutPtr {
         check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let src = from.as_ptr();
-        let dst = self.as_ptr();
+        let dst = self.as_mut_ptr();
         let count = count * desc.layout().size();
         unsafe { ptr::copy_nonoverlapping(src, dst, count) }
     }
@@ -130,20 +130,32 @@ impl ErasedFieldMutPtr {
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { desc, .. } = *self;
+    pub fn descriptor(self) -> FieldDescriptor {
+        let Self { desc, .. } = self;
         desc
     }
 
     #[inline]
-    pub fn buffer(&self) -> *mut [u8] {
-        let Self { desc, ptr } = *self;
+    pub fn as_buffer(self) -> *const [u8] {
+        let Self { desc, ptr } = self;
+        ptr::slice_from_raw_parts(ptr.cast_const(), desc.layout().size())
+    }
+
+    #[inline]
+    pub fn as_mut_buffer(self) -> *mut [u8] {
+        let Self { desc, ptr } = self;
         ptr::slice_from_raw_parts_mut(ptr, desc.layout().size())
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *mut u8 {
-        let Self { ptr, .. } = *self;
+    pub fn as_ptr(self) -> *const u8 {
+        let Self { ptr, .. } = self;
+        ptr.cast_const()
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(self) -> *mut u8 {
+        let Self { ptr, .. } = self;
         ptr
     }
 
@@ -172,7 +184,7 @@ impl<T> TryFrom<ErasedFieldMutPtr> for *mut T {
         let ErasedFieldMutPtr { desc, .. } = value;
         let value = check_into_layout::<T, _>(desc.layout(), value)?;
 
-        let ptr = value.as_ptr().cast();
+        let ptr = value.as_mut_ptr().cast();
         Ok(ptr)
     }
 }

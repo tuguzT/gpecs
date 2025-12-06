@@ -37,7 +37,7 @@ where
     B: AlignedBytes,
 {
     #[inline]
-    pub fn from_bytes_desc_data<T>(
+    pub fn try_from_bytes_desc_data<T>(
         mut bytes: B,
         desc: FieldDescriptor,
         data: T,
@@ -70,14 +70,14 @@ where
     }
 
     #[inline]
-    pub fn from_bytes_value<T>(
+    pub fn try_from_bytes_value<T>(
         bytes: B,
         value: T,
     ) -> Result<Self, ErasedFieldFromBytesError<(B, T)>> {
         let desc = FieldDescriptor::of::<T>();
         let data = ptr::from_ref(&value).cast();
         let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-        match Self::from_bytes_desc_data(bytes, desc, data) {
+        match Self::try_from_bytes_desc_data(bytes, desc, data) {
             Ok(me) => {
                 forget(value);
                 Ok(me)
@@ -91,7 +91,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn into_value<T>(self) -> Result<T, ErasedFieldIntoValueError<Self>> {
+    pub unsafe fn try_into<T>(self) -> Result<T, ErasedFieldIntoValueError<Self>> {
         let desc = self.descriptor();
         let me = check_into_layout::<T, _>(desc.layout(), self)?;
         let Self { bytes } = me;
@@ -120,7 +120,7 @@ where
     B: AlignedBytesFromLayout,
 {
     #[inline]
-    pub fn from_desc_data<T>(
+    pub fn try_from_desc_data<T>(
         desc: FieldDescriptor,
         data: T,
     ) -> Result<Self, ErasedFieldFromDescDataError<B>>
@@ -140,11 +140,11 @@ where
     }
 
     #[inline]
-    pub fn from_value<T>(value: T) -> Result<Self, ErasedFieldFromValueError<B, T>> {
+    pub fn try_from<T>(value: T) -> Result<Self, ErasedFieldFromValueError<B, T>> {
         let desc = FieldDescriptor::of::<T>();
         let data = ptr::from_ref(&value).cast();
         let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-        match Self::from_desc_data(desc, data) {
+        match Self::try_from_desc_data(desc, data) {
             Ok(me) => {
                 forget(value);
                 Ok(me)

@@ -13,7 +13,7 @@ use crate::{
     field::ErasedFieldPtr,
     soa::{
         field::FieldDescriptor,
-        traits::{Ptrs, RawSoaContext, Soa},
+        traits::{Ptrs, RawSoa, RawSoaContext},
     },
 };
 
@@ -22,7 +22,7 @@ pub struct ErasedSoaPtrs<D>
 where
     D: ?Sized,
 {
-    buffer: *const u8,
+    ptr: *const u8,
     capacity: usize,
     offset: usize,
     descriptors: D,
@@ -30,9 +30,9 @@ where
 
 impl<D> ErasedSoaPtrs<D> {
     #[inline]
-    pub unsafe fn new(descriptors: D, buffer: *const u8, capacity: usize, offset: usize) -> Self {
+    pub unsafe fn new(descriptors: D, ptr: *const u8, capacity: usize, offset: usize) -> Self {
         Self {
-            buffer,
+            ptr,
             capacity,
             offset,
             descriptors,
@@ -43,24 +43,24 @@ impl<D> ErasedSoaPtrs<D> {
     pub fn into_parts(self) -> (D, *const u8, usize, usize) {
         let Self {
             descriptors,
-            buffer,
+            ptr,
             capacity,
             offset,
         } = self;
-        (descriptors, buffer, capacity, offset)
+        (descriptors, ptr, capacity, offset)
     }
 
     #[inline]
     pub fn cast_mut(self) -> ErasedSoaMutPtrs<D> {
         let Self {
             descriptors,
-            buffer,
+            ptr,
             capacity,
             offset,
         } = self;
 
-        let buffer = buffer.cast_mut();
-        unsafe { ErasedSoaMutPtrs::new(descriptors, buffer, capacity, offset) }
+        let ptr = ptr.cast_mut();
+        unsafe { ErasedSoaMutPtrs::new(descriptors, ptr, capacity, offset) }
     }
 
     #[inline]
@@ -77,11 +77,11 @@ impl<D> ErasedSoaPtrs<D> {
     pub unsafe fn deref<'a>(self) -> ErasedSoaRefs<'a, D> {
         let Self {
             descriptors,
-            buffer,
+            ptr,
             capacity,
             offset,
         } = self;
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, capacity, offset) }
+        unsafe { ErasedSoaRefs::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 }
 
@@ -97,7 +97,7 @@ where
             .map(|desc| desc.layout().align())
             .max()
             .unwrap_or(1);
-        let buffer = ptr::without_provenance(addr);
+        let ptr = ptr::without_provenance(addr);
 
         let packed_size = descriptors
             .as_ref()
@@ -111,23 +111,23 @@ where
 
         Self {
             descriptors,
-            buffer,
+            ptr,
             capacity,
             offset: 0,
         }
     }
 
     #[inline]
-    pub unsafe fn into<T>(
+    pub unsafe fn try_into<T>(
         self,
         context: &T::Context,
     ) -> Result<Ptrs<'_, T>, ErasedSoaIntoValueError<Self>>
     where
-        T: Soa,
+        T: RawSoa,
     {
         let Self {
             ref descriptors,
-            buffer,
+            ptr,
             capacity,
             offset,
         } = self;
@@ -150,7 +150,7 @@ where
         }
 
         unsafe {
-            let ptrs = context.ptrs_from_buffer(buffer, capacity);
+            let ptrs = context.ptrs_from_buffer(ptr, capacity);
             let ptrs = context.ptrs_add(ptrs, offset);
             Ok(ptrs)
         }
@@ -162,9 +162,9 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn buffer(&self) -> *const u8 {
-        let Self { buffer, .. } = *self;
-        buffer
+    pub fn as_ptr(&self) -> *const u8 {
+        let Self { ptr, .. } = *self;
+        ptr
     }
 
     #[inline]
@@ -194,16 +194,16 @@ where
     #[track_caller]
     pub unsafe fn offset_from<A>(&self, origin: &ErasedSoaPtrs<A>) -> isize
     where
-        A: AsRef<[FieldDescriptor]>,
+        A: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self {
             ref descriptors,
-            buffer,
+            ptr,
             capacity,
             offset,
         } = *self;
 
-        assert_eq!(buffer, origin.buffer);
+        assert_eq!(ptr, origin.ptr);
         assert_eq!(capacity, origin.capacity);
         debug_assert_descriptors(descriptors.as_ref(), origin.field_descriptors());
 
@@ -214,14 +214,14 @@ where
     pub fn iter(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>> {
         let Self {
             ref descriptors,
-            buffer,
+            ptr,
             capacity,
             offset,
         } = *self;
 
         ErasedSoaPtrsIter {
             descriptors: descriptors.as_ref().iter(),
-            buffer,
+            ptr,
             capacity,
             offset,
         }
@@ -254,14 +254,14 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let Self {
             descriptors,
-            buffer,
+            ptr,
             capacity,
             offset,
         } = self;
 
         ErasedSoaPtrsIter {
             descriptors: descriptors.into_iter(),
-            buffer,
+            ptr,
             capacity,
             offset,
         }
@@ -273,7 +273,7 @@ pub struct ErasedSoaPtrsIter<D>
 where
     D: ?Sized,
 {
-    buffer: *const u8,
+    ptr: *const u8,
     capacity: usize,
     offset: usize,
     descriptors: D,
@@ -284,9 +284,9 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn buffer(&self) -> *const u8 {
-        let Self { buffer, .. } = *self;
-        buffer
+    pub fn as_ptr(&self) -> *const u8 {
+        let Self { ptr, .. } = *self;
+        ptr
     }
 
     #[inline]
@@ -320,14 +320,14 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             ref descriptors,
-            buffer,
+            ptr,
             capacity,
             offset,
         } = *self;
 
         let entries = ErasedSoaPtrsIter {
             descriptors: descriptors.as_ref().iter(),
-            buffer,
+            ptr,
             capacity,
             offset,
         };
@@ -346,20 +346,20 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self {
             ref mut descriptors,
-            ref mut buffer,
+            ref mut ptr,
             capacity,
             offset,
         } = *self;
 
         let &desc = descriptors.next()?.as_ref();
-        let ptr_buffer = ptr::slice_from_raw_parts(*buffer, desc.layout().size());
-        let ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, ptr_buffer) };
+        let buffer = ptr::slice_from_raw_parts(*ptr, desc.layout().size());
+        let field_ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
 
-        let item = unsafe { ptr.add(offset) };
-        *buffer = unsafe { ptr.add(capacity) }.as_ptr();
+        let item = unsafe { field_ptr.add(offset) };
+        *ptr = unsafe { field_ptr.add(capacity) }.as_ptr();
 
         if let [desc, ..] = descriptors.as_ref() {
-            *buffer = unsafe { buffer.add(buffer.align_offset(desc.layout().align())) };
+            *ptr = unsafe { ptr.add(ptr.align_offset(desc.layout().align())) };
         }
         Some(item)
     }

@@ -83,7 +83,7 @@ impl ErasedFieldPtr {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
-        unsafe { ErasedFieldRef::from_field_ptr(self) }
+        unsafe { ErasedFieldRef::from_ptr(self) }
     }
 
     #[inline]

@@ -121,12 +121,12 @@ impl ErasedFieldMutPtr {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
-        unsafe { ErasedFieldRef::from_field_ptr(self.cast_const()) }
+        unsafe { ErasedFieldRef::from_ptr(self.cast_const()) }
     }
 
     #[inline]
     pub unsafe fn deref_mut<'a>(self) -> ErasedFieldRefMut<'a> {
-        unsafe { ErasedFieldRefMut::from_field_mut_ptr(self) }
+        unsafe { ErasedFieldRefMut::from_ptr(self) }
     }
 
     #[inline]

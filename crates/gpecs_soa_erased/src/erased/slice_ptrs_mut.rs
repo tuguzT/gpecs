@@ -7,11 +7,12 @@ use core::{
 use crate::{
     erased::{
         ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlices,
-        ErasedSoaSlicesMut, error::ErasedSoaIntoValueError,
+        ErasedSoaSlicesMut,
+        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_sufficient_len},
     },
     field::{ErasedFieldSliceMutPtr, field_slice_from_raw_parts_mut},
     soa::{
-        field::FieldDescriptor,
+        field::{FieldDescriptor, buffer_layout},
         traits::{RawSoa, RawSoaContext, SliceMutPtrs},
     },
 };
@@ -87,6 +88,23 @@ impl<D> ErasedSoaSliceMutPtrs<D>
 where
     D: AsRef<[FieldDescriptor]>,
 {
+    // TODO: check offset & len to be smaller than capacity
+    #[inline]
+    pub fn new(
+        descriptors: D,
+        buffer: *mut [u8],
+        capacity: usize,
+        offset: usize,
+        len: usize,
+    ) -> Result<Self, ErasedSoaPtrsError> {
+        let layout = buffer_layout(descriptors.as_ref(), capacity)?;
+        check_sufficient_len(buffer.len(), layout.size())?;
+
+        let ptr = buffer.cast();
+        let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset, len) };
+        Ok(me)
+    }
+
     #[inline]
     pub unsafe fn try_into<T>(
         self,

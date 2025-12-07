@@ -8,7 +8,7 @@ use core::{
 use crate::{
     erased::{
         ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter,
-        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError},
+        error::{ErasedSoaIntoValueError, ErasedSoaSlicePtrsError},
     },
     field::ErasedFieldSlice,
     soa::{field::FieldDescriptor, traits::Soa},
@@ -69,7 +69,7 @@ where
         capacity: usize,
         offset: usize,
         len: usize,
-    ) -> Result<Self, ErasedSoaPtrsError> {
+    ) -> Result<Self, ErasedSoaSlicePtrsError> {
         let ptrs = ErasedSoaSlicePtrs::new(descriptors, buffer, capacity, offset, len)?;
         let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)

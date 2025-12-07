@@ -58,7 +58,7 @@ impl Display for InsufficientLenError {
         let Self { expected, actual } = self;
         write!(
             f,
-            "expected length to be larger than {expected}, but got {actual}"
+            "expected length to be greater than {expected}, but got {actual}"
         )
     }
 }
@@ -83,7 +83,7 @@ impl InvalidOffsetError {
     #[inline]
     #[track_caller]
     pub fn new(offset: usize, capacity: usize) -> Self {
-        assert!(offset > capacity, "offset should be larger than capacity");
+        assert!(offset > capacity, "offset should be greater than capacity");
         Self { offset, capacity }
     }
 
@@ -178,6 +178,152 @@ impl Error for ErasedSoaPtrsError {
             Self::InvalidLayout(error) => Some(error),
             Self::InsufficientLen(error) => Some(error),
             Self::InvalidOffset(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct InvalidOffsetLenError {
+    offset: usize,
+    len: usize,
+    capacity: usize,
+}
+
+impl InvalidOffsetLenError {
+    #[inline]
+    pub fn new(offset: usize, len: usize, capacity: usize) -> Self {
+        assert!(
+            offset + len > capacity,
+            "offset + len should be greater than capacity",
+        );
+        Self {
+            offset,
+            len,
+            capacity,
+        }
+    }
+
+    #[inline]
+    pub fn offset(&self) -> usize {
+        let Self { offset, .. } = *self;
+        offset
+    }
+
+    #[inline]
+    #[expect(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        let Self { len, .. } = *self;
+        len
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
+    }
+}
+
+impl Debug for InvalidOffsetLenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+
+        let Self {
+            offset,
+            len,
+            capacity,
+        } = self;
+        f.debug_struct("InvalidOffsetLenError")
+            .field("offset", offset)
+            .field("len", len)
+            .field("capacity", capacity)
+            .finish()
+    }
+}
+
+impl Display for InvalidOffsetLenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            offset,
+            len,
+            capacity,
+        } = self;
+        write!(
+            f,
+            "expected offset + len to be smaller than or equal to capacity {capacity}, but got {offset} + {len}",
+        )
+    }
+}
+
+impl Error for InvalidOffsetLenError {}
+
+#[inline]
+pub fn check_offset_len(
+    offset: usize,
+    len: usize,
+    capacity: usize,
+) -> Result<(), InvalidOffsetLenError> {
+    if offset + len > capacity {
+        return Err(InvalidOffsetLenError::new(offset, len, capacity));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub enum ErasedSoaSlicePtrsError {
+    InvalidLayout(LayoutError),
+    InsufficientLen(InsufficientLenError),
+    InvalidOffset(InvalidOffsetError),
+    InvalidOffsetLen(InvalidOffsetLenError),
+}
+
+impl From<LayoutError> for ErasedSoaSlicePtrsError {
+    #[inline]
+    fn from(value: LayoutError) -> Self {
+        Self::InvalidLayout(value)
+    }
+}
+
+impl From<InsufficientLenError> for ErasedSoaSlicePtrsError {
+    #[inline]
+    fn from(value: InsufficientLenError) -> Self {
+        Self::InsufficientLen(value)
+    }
+}
+
+impl From<InvalidOffsetError> for ErasedSoaSlicePtrsError {
+    #[inline]
+    fn from(value: InvalidOffsetError) -> Self {
+        Self::InvalidOffset(value)
+    }
+}
+
+impl From<InvalidOffsetLenError> for ErasedSoaSlicePtrsError {
+    #[inline]
+    fn from(value: InvalidOffsetLenError) -> Self {
+        Self::InvalidOffsetLen(value)
+    }
+}
+
+impl Display for ErasedSoaSlicePtrsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::InsufficientLen(error) => Display::fmt(error, f),
+            Self::InvalidOffset(error) => Display::fmt(error, f),
+            Self::InvalidOffsetLen(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for ErasedSoaSlicePtrsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidLayout(error) => Some(error),
+            Self::InsufficientLen(error) => Some(error),
+            Self::InvalidOffset(error) => Some(error),
+            Self::InvalidOffsetLen(error) => Some(error),
         }
     }
 }

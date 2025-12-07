@@ -8,7 +8,10 @@ use crate::{
     erased::{
         ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaPtrs, ErasedSoaSlicePtrs, ErasedSoaSlices,
         ErasedSoaSlicesMut,
-        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset, check_sufficient_len},
+        error::{
+            ErasedSoaIntoValueError, ErasedSoaSlicePtrsError, check_offset, check_offset_len,
+            check_sufficient_len,
+        },
     },
     field::{ErasedFieldSliceMutPtr, field_slice_from_raw_parts_mut},
     soa::{
@@ -88,7 +91,6 @@ impl<D> ErasedSoaSliceMutPtrs<D>
 where
     D: AsRef<[FieldDescriptor]>,
 {
-    // TODO: check offset + len to be smaller than capacity
     #[inline]
     pub fn new(
         descriptors: D,
@@ -96,10 +98,11 @@ where
         capacity: usize,
         offset: usize,
         len: usize,
-    ) -> Result<Self, ErasedSoaPtrsError> {
+    ) -> Result<Self, ErasedSoaSlicePtrsError> {
         let layout = buffer_layout(descriptors.as_ref(), capacity)?;
         check_sufficient_len(buffer.len(), layout.size())?;
         check_offset(offset, capacity)?;
+        check_offset_len(offset, len, capacity)?;
 
         let ptr = buffer.cast();
         let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset, len) };

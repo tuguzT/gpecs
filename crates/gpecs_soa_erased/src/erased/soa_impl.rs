@@ -191,9 +191,9 @@ where
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
-        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
-        let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        unsafe { ErasedSoaNonNullPtrs::new_unchecked(descriptors, buffer, capacity, offset) }
+        let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
+        let ptr = unsafe { NonNull::new_unchecked(ptr) };
+        unsafe { ErasedSoaNonNullPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 
     #[inline]
@@ -201,9 +201,9 @@ where
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
-        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
-        let buffer = buffer.as_ptr();
-        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, offset) }
+        let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
+        let ptr = ptr.as_ptr();
+        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 
     type SlicePtrs<'a> = ErasedSoaSlicePtrs<&'a [FieldDescriptor]>;
@@ -413,9 +413,9 @@ where
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, refs.field_descriptors());
 
-        let (descriptors, buffer, capacity, offset) = refs.into_parts();
-        let buffer = buffer.cast_const();
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, capacity, offset) }
+        let (descriptors, ptr, capacity, offset) = refs.into_parts();
+        let ptr = ptr.cast_const();
+        unsafe { ErasedSoaRefs::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 
     #[inline]
@@ -561,9 +561,9 @@ where
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
-        let (descriptors, buffer, capacity, offset, len) = slices.into_parts();
-        let buffer = buffer.cast_const();
-        unsafe { ErasedSoaSlices::new_unchecked(descriptors, buffer, capacity, offset, len) }
+        let (descriptors, ptr, capacity, offset, len) = slices.into_parts();
+        let ptr = ptr.cast_const();
+        unsafe { ErasedSoaSlices::new_unchecked(descriptors, ptr, capacity, offset, len) }
     }
 
     #[inline]

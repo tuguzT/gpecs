@@ -20,7 +20,7 @@ where
     D: ?Sized,
 {
     phantom: PhantomData<&'a [u8]>,
-    inner: ErasedSoaPtrs<D>,
+    ptrs: ErasedSoaPtrs<D>,
 }
 
 impl<D> ErasedSoaRefs<'_, D> {
@@ -38,21 +38,21 @@ impl<D> ErasedSoaRefs<'_, D> {
     #[inline]
     pub unsafe fn from_ptrs(ptrs: ErasedSoaPtrs<D>) -> Self {
         Self {
-            inner: ptrs,
+            ptrs,
             phantom: PhantomData,
         }
     }
 
     #[inline]
     pub fn into_parts(self) -> (D, *const u8, usize, usize) {
-        let Self { inner, .. } = self;
-        inner.into_parts()
+        let Self { ptrs, .. } = self;
+        ptrs.into_parts()
     }
 
     #[inline]
     pub fn into_ptrs(self) -> ErasedSoaPtrs<D> {
-        let Self { inner, .. } = self;
-        inner
+        let Self { ptrs, .. } = self;
+        ptrs
     }
 }
 
@@ -80,8 +80,8 @@ where
     where
         T: Soa,
     {
-        let Self { inner, .. } = self;
-        let result = unsafe { inner.try_into::<T>(context) };
+        let Self { ptrs, .. } = self;
+        let result = unsafe { ptrs.try_into::<T>(context) };
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let ptrs = result.map_err(|err| err.map_value(into_self))?;
         let refs = unsafe { T::ptrs_to_refs(context, ptrs) };
@@ -95,20 +95,20 @@ where
 {
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
-        let Self { inner, .. } = self;
-        inner.as_ptr()
+        let Self { ptrs, .. } = self;
+        ptrs.as_ptr()
     }
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.capacity()
+        let Self { ptrs, .. } = self;
+        ptrs.capacity()
     }
 
     #[inline]
     pub fn offset(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.offset()
+        let Self { ptrs, .. } = self;
+        ptrs.offset()
     }
 }
 
@@ -118,15 +118,15 @@ where
 {
     #[inline]
     pub fn field_descriptors(&self) -> &[FieldDescriptor] {
-        let Self { inner, .. } = self;
-        inner.field_descriptors()
+        let Self { ptrs, .. } = self;
+        ptrs.field_descriptors()
     }
 
     #[inline]
     pub fn iter(&self) -> ErasedSoaRefsIter<'_, slice::Iter<'_, FieldDescriptor>> {
-        let Self { inner, .. } = self;
+        let Self { ptrs, .. } = self;
         ErasedSoaRefsIter {
-            inner: inner.iter(),
+            ptrs: ptrs.iter(),
             phantom: PhantomData,
         }
     }
@@ -156,9 +156,9 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self { inner, phantom } = self;
+        let Self { ptrs, phantom } = self;
         ErasedSoaRefsIter {
-            inner: inner.into_iter(),
+            ptrs: ptrs.into_iter(),
             phantom,
         }
     }
@@ -170,7 +170,7 @@ where
     D: ?Sized,
 {
     phantom: PhantomData<&'a [u8]>,
-    inner: ErasedSoaPtrsIter<D>,
+    ptrs: ErasedSoaPtrsIter<D>,
 }
 
 impl<D> ErasedSoaRefsIter<'_, D>
@@ -179,20 +179,20 @@ where
 {
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
-        let Self { inner, .. } = self;
-        inner.as_ptr()
+        let Self { ptrs, .. } = self;
+        ptrs.as_ptr()
     }
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.capacity()
+        let Self { ptrs, .. } = self;
+        ptrs.capacity()
     }
 
     #[inline]
     pub fn offset(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.offset()
+        let Self { ptrs, .. } = self;
+        ptrs.offset()
     }
 }
 
@@ -202,17 +202,17 @@ where
 {
     #[inline]
     pub fn field_descriptors(&self) -> &[FieldDescriptor] {
-        let Self { inner, .. } = self;
-        inner.field_descriptors()
+        let Self { ptrs, .. } = self;
+        ptrs.field_descriptors()
     }
 
     #[inline]
     pub fn field_descriptors_iter(
         &self,
     ) -> ErasedSoaRefsIter<'_, slice::Iter<'_, FieldDescriptor>> {
-        let Self { inner, .. } = self;
+        let Self { ptrs, .. } = self;
         ErasedSoaRefsIter {
-            inner: inner.field_descriptors_iter(),
+            ptrs: ptrs.field_descriptors_iter(),
             phantom: PhantomData,
         }
     }
@@ -237,16 +237,16 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { inner, .. } = self;
+        let Self { ptrs, .. } = self;
 
-        let item = unsafe { inner.next()?.deref() };
+        let item = unsafe { ptrs.next()?.deref() };
         Some(item)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { inner, .. } = self;
-        inner.size_hint()
+        let Self { ptrs, .. } = self;
+        ptrs.size_hint()
     }
 }
 
@@ -257,8 +257,8 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.len()
+        let Self { ptrs, .. } = self;
+        ptrs.len()
     }
 }
 

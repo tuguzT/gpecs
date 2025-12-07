@@ -13,7 +13,7 @@ use super::{
 
 #[derive(Clone, Copy)]
 pub struct ErasedFieldRef<'a> {
-    inner: ErasedFieldPtr,
+    ptr: ErasedFieldPtr,
     phantom: PhantomData<&'a [u8]>,
 }
 
@@ -36,52 +36,52 @@ impl<'a> ErasedFieldRef<'a> {
     #[inline]
     pub unsafe fn from_field_ptr(ptr: ErasedFieldPtr) -> Self {
         Self {
-            inner: ptr,
+            ptr,
             phantom: PhantomData,
         }
     }
 
     #[inline]
     pub unsafe fn try_into<T>(self) -> Result<&'a T, ErasedFieldIntoValueError<Self>> {
-        let Self { inner, .. } = self;
+        let Self { ptr, .. } = self;
         let into_self = |ptr| unsafe { Self::from_field_ptr(ptr) };
-        let ptr = <*const T>::try_from(inner).map_err(|err| err.map_value(into_self))?;
+        let ptr = <*const T>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
         Ok(r#ref)
     }
 
     #[inline]
     pub unsafe fn cast<T>(&self) -> Result<&T, ErasedFieldIntoValueError<&Self>> {
-        let Self { inner, .. } = *self;
+        let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let ptr = <*const T>::try_from(inner).map_err(|err| err.map_value(into_self))?;
+        let ptr = <*const T>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
         Ok(r#ref)
     }
 
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { inner, .. } = self;
-        inner.descriptor()
+        let Self { ptr, .. } = self;
+        ptr.descriptor()
     }
 
     #[inline]
     pub fn as_buffer(&self) -> &[u8] {
-        let Self { inner, .. } = self;
-        let buffer = inner.as_buffer();
+        let Self { ptr, .. } = self;
+        let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
-        let Self { inner, .. } = self;
-        inner.as_ptr()
+        let Self { ptr, .. } = self;
+        ptr.as_ptr()
     }
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr {
-        let Self { inner, .. } = *self;
-        inner
+        let Self { ptr, .. } = *self;
+        ptr
     }
 
     #[inline]
@@ -92,8 +92,8 @@ impl<'a> ErasedFieldRef<'a> {
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, &'a [u8]) {
-        let Self { inner, .. } = self;
-        let (desc, buffer) = inner.into_parts();
+        let Self { ptr, .. } = self;
+        let (desc, buffer) = ptr.into_parts();
         let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
         (desc, buffer)
     }

@@ -8,7 +8,7 @@ use crate::{
     erased::{
         ErasedSoaPtrs, ErasedSoaPtrsIter, ErasedSoaRefs, ErasedSoaRefsMut,
         assert::debug_assert_descriptors,
-        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_sufficient_len},
+        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset, check_sufficient_len},
     },
     error::{check_layout, check_len},
     field::ErasedFieldMutPtr,
@@ -106,7 +106,6 @@ impl<D> ErasedSoaMutPtrs<D>
 where
     D: AsRef<[FieldDescriptor]>,
 {
-    // TODO: check capacity & offset
     #[inline]
     pub fn new(
         descriptors: D,
@@ -116,6 +115,7 @@ where
     ) -> Result<Self, ErasedSoaPtrsError> {
         let layout = buffer_layout(descriptors.as_ref(), capacity)?;
         check_sufficient_len(buffer.len(), layout.size())?;
+        check_offset(offset, capacity)?;
 
         let ptr = buffer.cast();
         let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) };

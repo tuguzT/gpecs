@@ -73,10 +73,72 @@ pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), Insuffici
     Ok(())
 }
 
+#[derive(Clone)]
+pub struct InvalidOffsetError {
+    offset: usize,
+    capacity: usize,
+}
+
+impl InvalidOffsetError {
+    #[inline]
+    #[track_caller]
+    pub fn new(offset: usize, capacity: usize) -> Self {
+        assert!(offset > capacity, "offset should be larger than capacity");
+        Self { offset, capacity }
+    }
+
+    #[inline]
+    pub fn offset(&self) -> usize {
+        let Self { offset, .. } = *self;
+        offset
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
+    }
+}
+
+impl Debug for InvalidOffsetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+
+        let Self { offset, capacity } = self;
+        f.debug_struct("InvalidOffsetError")
+            .field("offset", offset)
+            .field("capacity", capacity)
+            .finish()
+    }
+}
+
+impl Display for InvalidOffsetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { offset, capacity } = self;
+        write!(
+            f,
+            "expected offset to be smaller than or equal to capacity {capacity}, but got {offset}"
+        )
+    }
+}
+
+impl Error for InvalidOffsetError {}
+
+#[inline]
+pub fn check_offset(offset: usize, capacity: usize) -> Result<(), InvalidOffsetError> {
+    if offset > capacity {
+        return Err(InvalidOffsetError::new(offset, capacity));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub enum ErasedSoaPtrsError {
     InvalidLayout(LayoutError),
     InsufficientLen(InsufficientLenError),
+    InvalidOffset(InvalidOffsetError),
 }
 
 impl From<LayoutError> for ErasedSoaPtrsError {
@@ -93,11 +155,19 @@ impl From<InsufficientLenError> for ErasedSoaPtrsError {
     }
 }
 
+impl From<InvalidOffsetError> for ErasedSoaPtrsError {
+    #[inline]
+    fn from(value: InvalidOffsetError) -> Self {
+        Self::InvalidOffset(value)
+    }
+}
+
 impl Display for ErasedSoaPtrsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidLayout(error) => Display::fmt(error, f),
             Self::InsufficientLen(error) => Display::fmt(error, f),
+            Self::InvalidOffset(error) => Display::fmt(error, f),
         }
     }
 }
@@ -107,6 +177,7 @@ impl Error for ErasedSoaPtrsError {
         match self {
             Self::InvalidLayout(error) => Some(error),
             Self::InsufficientLen(error) => Some(error),
+            Self::InvalidOffset(error) => Some(error),
         }
     }
 }

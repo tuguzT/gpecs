@@ -21,7 +21,7 @@ pub trait Push: SoaVecs<Context: Default> + SoaWrite {
 
     fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa>, value: Self) {
         let context = Default::default();
-        let value = ErasedSoa::from_value(&context, black_box(value)).unwrap();
+        let value = ErasedSoa::try_from(&context, black_box(value)).unwrap();
         vec.push(value);
     }
 
@@ -50,7 +50,8 @@ impl Push for Zero {
         let bytes = [MaybeUninit::<u8>::zeroed(); size_of::<Self>() * 2];
         let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<1>>::from_bytes_value(bytes, context, value).unwrap();
+            ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, context, value)
+                .unwrap();
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
@@ -79,7 +80,8 @@ impl Push for Tiny {
 
         let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<1>>::from_bytes_value(bytes, context, value).unwrap();
+            ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, context, value)
+                .unwrap();
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
@@ -110,7 +112,8 @@ impl Push for Small {
 
         let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<3>>::from_bytes_value(bytes, context, value).unwrap();
+            ErasedSoa::<_, ArrayDescriptors<3>>::try_from_bytes_value(bytes, context, value)
+                .unwrap();
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
@@ -141,7 +144,8 @@ impl Push for Medium {
 
         let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<3>>::from_bytes_value(bytes, context, value).unwrap();
+            ErasedSoa::<_, ArrayDescriptors<3>>::try_from_bytes_value(bytes, context, value)
+                .unwrap();
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
@@ -175,7 +179,8 @@ impl Push for Big {
 
         let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<5>>::from_bytes_value(bytes, context, value).unwrap();
+            ErasedSoa::<_, ArrayDescriptors<5>>::try_from_bytes_value(bytes, context, value)
+                .unwrap();
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
@@ -214,7 +219,8 @@ impl Push for Large {
 
         let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<10>>::from_bytes_value(bytes, context, value).unwrap();
+            ErasedSoa::<_, ArrayDescriptors<10>>::try_from_bytes_value(bytes, context, value)
+                .unwrap();
 
         vec.push_from(|_, dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();

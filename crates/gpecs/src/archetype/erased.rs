@@ -99,9 +99,9 @@ where
         reorder_fields::<T, _, _>(components, context, component_ids, fields)
             .map(ErasedField::into_parts)
             .unzip();
-    let erased_value = BoxedErasedSoa::from_fields_descriptors(fields, descriptors.into())
+    let erased_value = BoxedErasedSoa::try_from_fields_descriptors(fields, descriptors.into())
         .expect("all the fields should be valid");
-    unsafe { erased_value.into_value::<T>(context) }.expect("all the fields should be valid")
+    unsafe { erased_value.try_into::<T>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]
@@ -114,7 +114,7 @@ pub fn into_erased_fields<T>(
 where
     T: Soa + SoaWrite,
 {
-    let erased_value = BoxedErasedSoa::from_value(context, value)
+    let erased_value = BoxedErasedSoa::try_from(context, value)
         .unwrap()
         .into_fields()
         .collect::<Result<Box<[_]>, _>>()

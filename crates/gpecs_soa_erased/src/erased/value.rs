@@ -59,7 +59,7 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
-    pub fn from_bytes_fields_descriptors<I, F>(
+    pub fn try_from_bytes_fields_descriptors<I, F>(
         mut bytes: B,
         fields: I,
         descriptors: D,
@@ -79,7 +79,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn into_value<T>(
+    pub unsafe fn try_into<T>(
         self,
         context: &T::Context,
     ) -> Result<T, ErasedSoaIntoValueError<Self>>
@@ -158,7 +158,7 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
-    pub fn from_fields_descriptors<I, F>(
+    pub fn try_from_fields_descriptors<I, F>(
         fields: I,
         descriptors: D,
     ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<B>>
@@ -183,7 +183,7 @@ where
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn from_bytes_value<T>(
+    pub fn try_from_bytes_value<T>(
         mut bytes: B,
         context: &T::Context,
         value: T,
@@ -217,7 +217,7 @@ where
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn from_value<T>(context: &T::Context, value: T) -> Result<Self, ErasedSoaFromValueError<B>>
+    pub fn try_from<T>(context: &T::Context, value: T) -> Result<Self, ErasedSoaFromValueError<B>>
     where
         T: SoaWrite,
     {

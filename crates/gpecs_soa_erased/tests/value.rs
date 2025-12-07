@@ -39,7 +39,7 @@ fn value() {
 
     let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Value>()).unwrap();
     let erased_value =
-        ErasedSoa::<_, ArrayDescriptors<5>>::from_bytes_value(bytes, &context, value).unwrap();
+        ErasedSoa::<_, ArrayDescriptors<5>>::try_from_bytes_value(bytes, &context, value).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -147,9 +147,11 @@ fn value() {
 
     let (descriptors, fields): (ArrayDescriptors<4>, ArrayVec<_, 4>) =
         fields.into_iter().map(ErasedField::into_parts).unzip();
-    let erased_value =
-        ErasedSoa::<AlignedUninitBoxedByteSlice, _>::from_fields_descriptors(fields, descriptors)
-            .expect("all the fields should be valid");
+    let erased_value = ErasedSoa::<AlignedUninitBoxedByteSlice, _>::try_from_fields_descriptors(
+        fields,
+        descriptors,
+    )
+    .expect("all the fields should be valid");
     assert!(
         erased_value
             .as_refs()
@@ -159,7 +161,7 @@ fn value() {
     );
 
     let context = Default::default();
-    let value = unsafe { erased_value.into_value::<((), u32, u16, u8)>(&context) }
+    let value = unsafe { erased_value.try_into::<((), u32, u16, u8)>(&context) }
         .expect("all the fields should be valid");
     assert_eq!(value, ((), i1, i2, i3));
 }
@@ -172,7 +174,7 @@ fn value_zst() {
     let bytes = [MaybeUninit::zeroed(); size_of::<()>() * 2];
     let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<()>()).unwrap();
     let erased_value =
-        ErasedSoa::<_, ArrayDescriptors<1>>::from_bytes_value(bytes, &context, value).unwrap();
+        ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, &context, value).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     assert!(
@@ -195,6 +197,6 @@ fn value_zst() {
     );
 
     let value =
-        unsafe { erased_value.into_value::<()>(&context) }.expect("all the fields should be valid");
+        unsafe { erased_value.try_into::<()>(&context) }.expect("all the fields should be valid");
     assert_eq!(value, ());
 }

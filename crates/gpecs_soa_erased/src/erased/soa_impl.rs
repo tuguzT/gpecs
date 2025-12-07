@@ -609,7 +609,7 @@ where
             .into_iter()
             .map(|src| unsafe { src.deref().into_buffer() });
         let descriptors = context.clone().into_field_descriptors();
-        Self::from_fields_descriptors(fields, descriptors)
+        Self::try_from_fields_descriptors(fields, descriptors)
             .expect("length of fields should be equal to the length of descriptors")
     }
 }

@@ -87,9 +87,11 @@ where
         T: Soa,
     {
         let Self { ptrs, .. } = self;
+
         let result = unsafe { ptrs.try_into::<T>(context) };
         let into_self = |ptrs| unsafe { Self::from_mut_ptrs(ptrs) };
         let ptrs = result.map_err(|err| err.map_value(into_self))?;
+
         let refs = unsafe { T::ptrs_to_refs_mut(context, ptrs) };
         Ok(refs)
     }

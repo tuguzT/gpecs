@@ -38,7 +38,7 @@ fn new() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -46,7 +46,7 @@ fn new() {
     assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -59,7 +59,7 @@ fn new() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        unsafe { into_iter.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { into_iter.as_slices().try_into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 }
@@ -90,7 +90,7 @@ fn new_zst() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -98,7 +98,7 @@ fn new_zst() {
     assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -111,7 +111,7 @@ fn new_zst() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        unsafe { into_iter.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { into_iter.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 }
@@ -148,7 +148,7 @@ fn with_capacity() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -156,7 +156,7 @@ fn with_capacity() {
     assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -169,7 +169,7 @@ fn with_capacity() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        unsafe { into_iter.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { into_iter.as_slices().try_into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 }
@@ -201,7 +201,7 @@ fn with_capacity_zst() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -209,7 +209,7 @@ fn with_capacity_zst() {
     assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -222,7 +222,7 @@ fn with_capacity_zst() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        unsafe { into_iter.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { into_iter.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 }
@@ -270,7 +270,7 @@ fn one_item() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -282,7 +282,7 @@ fn one_item() {
     let slices = vec.slices();
     assert_eq!(slices.len(), 1);
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -298,7 +298,7 @@ fn one_item() {
     );
 
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -325,7 +325,7 @@ fn one_item() {
     assert_eq!(value, (u8, u64, u16, ()));
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -373,14 +373,14 @@ fn one_item_zst() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [()].as_slice(),
     );
 
     let slices = vec.slices();
     assert_eq!(slices.len(), 1);
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [()].as_slice(),
     );
     assert_eq!(
@@ -391,7 +391,7 @@ fn one_item_zst() {
     );
 
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [()].as_slice(),
     );
 
@@ -413,7 +413,7 @@ fn one_item_zst() {
     assert_eq!(value, ());
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -479,7 +479,7 @@ fn three_items() {
     );
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         (
             [0; 3].as_slice(),
             ["0".to_owned(), "0".to_owned(), "0".to_owned()].as_slice(),
@@ -512,7 +512,7 @@ fn three_items() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         (
             [4, 7, 1].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
@@ -530,7 +530,7 @@ fn three_items() {
     assert_eq!(slices.len(), 3);
 
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         (
             [4, 7, 1].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
@@ -756,7 +756,7 @@ fn three_items() {
     assert!(vec.capacity() >= (1 + 2 * 10));
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         (
             [2].as_slice(),
             ["2".to_owned()].as_slice(),
@@ -826,7 +826,7 @@ fn three_items_zst() {
     );
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 
@@ -844,7 +844,7 @@ fn three_items_zst() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 
@@ -857,7 +857,7 @@ fn three_items_zst() {
     assert_eq!(slices.len(), 3);
 
     assert_eq!(
-        unsafe { slices.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 
@@ -1057,7 +1057,7 @@ fn three_items_zst() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        unsafe { vec.as_slices().into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 

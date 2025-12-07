@@ -13,8 +13,8 @@ use crate::{
 use super::{
     ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs, ErasedSoaNonNullPtrs,
     ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut, ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs,
-    ErasedSoaSlices, ErasedSoaSlicesMut, assert::debug_assert_descriptors,
-    soa_slice_from_raw_parts, soa_slice_from_raw_parts_mut,
+    ErasedSoaSlices, ErasedSoaSlicesMut, assert::debug_assert_descriptors, slice_from_raw_parts,
+    slice_from_raw_parts_mut,
 };
 
 unsafe impl<D> RawSoaContext for ErasedSoaContext<D>
@@ -224,7 +224,7 @@ where
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
-        soa_slice_from_raw_parts(ptrs, len)
+        slice_from_raw_parts(ptrs, len)
     }
 
     #[inline]
@@ -261,7 +261,7 @@ where
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
-        soa_slice_from_raw_parts_mut(ptrs, len)
+        slice_from_raw_parts_mut(ptrs, len)
     }
 
     #[inline]
@@ -561,9 +561,9 @@ where
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
-        let (descriptors, buffer, capacity, range) = slices.into_parts();
+        let (descriptors, buffer, capacity, offset, len) = slices.into_parts();
         let buffer = buffer.cast_const();
-        unsafe { ErasedSoaSlices::new_unchecked(descriptors, buffer, capacity, range) }
+        unsafe { ErasedSoaSlices::new_unchecked(descriptors, buffer, capacity, offset, len) }
     }
 
     #[inline]

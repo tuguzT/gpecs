@@ -11,7 +11,7 @@ use crate::{
         error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset, check_sufficient_len},
     },
     error::{check_layout, check_len},
-    field::ErasedFieldMutPtr,
+    field::{ErasedFieldMutPtr, ErasedFieldPtr},
     soa::{
         field::{FieldDescriptor, buffer_layout},
         traits::{MutPtrs, RawSoa, RawSoaContext},
@@ -251,11 +251,11 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap<A>(&self, with: &ErasedSoaMutPtrs<A>)
+    pub unsafe fn swap<A>(&mut self, with: &mut ErasedSoaMutPtrs<A>)
     where
         A: AsRef<[FieldDescriptor]> + ?Sized,
     {
-        let Self { descriptors, .. } = self;
+        let Self { descriptors, .. } = &self;
         debug_assert_descriptors(descriptors.as_ref(), with.field_descriptors());
 
         itertools::zip_eq(self, with).for_each(|(this, with)| unsafe { this.swap(with) });
@@ -263,11 +263,11 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from<A>(&self, from: &ErasedSoaPtrs<A>, count: usize)
+    pub unsafe fn copy_from<A>(&mut self, from: &ErasedSoaPtrs<A>, count: usize)
     where
         A: AsRef<[FieldDescriptor]> + ?Sized,
     {
-        let Self { descriptors, .. } = self;
+        let Self { descriptors, .. } = &self;
         debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self, from)
@@ -276,11 +276,11 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_rev<A>(&self, from: &ErasedSoaPtrs<A>, count: usize)
+    pub unsafe fn copy_from_rev<A>(&mut self, from: &ErasedSoaPtrs<A>, count: usize)
     where
         A: AsRef<[FieldDescriptor]> + ?Sized,
     {
-        let Self { descriptors, .. } = self;
+        let Self { descriptors, .. } = &self;
         debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         #[inline]
@@ -306,11 +306,11 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_nonoverlapping<A>(&self, from: &ErasedSoaPtrs<A>, count: usize)
+    pub unsafe fn copy_from_nonoverlapping<A>(&mut self, from: &ErasedSoaPtrs<A>, count: usize)
     where
         A: AsRef<[FieldDescriptor]> + ?Sized,
     {
-        let Self { descriptors, .. } = self;
+        let Self { descriptors, .. } = &self;
         debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self, from)
@@ -318,7 +318,7 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedSoaMutPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+    pub fn iter(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>> {
         let Self {
             ref descriptors,
             ptr,
@@ -326,16 +326,38 @@ where
             offset,
         } = *self;
 
-        ErasedSoaMutPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
+        let descriptors = descriptors.as_ref().iter();
+        unsafe { ErasedSoaPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> ErasedSoaMutPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+        let Self {
+            ref descriptors,
             ptr,
             capacity,
             offset,
-        }
+        } = *self;
+
+        let descriptors = descriptors.as_ref().iter();
+        unsafe { ErasedSoaMutPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 }
 
 impl<'a, D> IntoIterator for &'a ErasedSoaMutPtrs<D>
+where
+    D: AsRef<[FieldDescriptor]> + ?Sized,
+{
+    type Item = ErasedFieldPtr;
+    type IntoIter = ErasedSoaPtrsIter<slice::Iter<'a, FieldDescriptor>>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, D> IntoIterator for &'a mut ErasedSoaMutPtrs<D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
@@ -344,7 +366,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        self.iter_mut()
     }
 }
 
@@ -366,12 +388,8 @@ where
             offset,
         } = self;
 
-        ErasedSoaMutPtrsIter {
-            descriptors: descriptors.into_iter(),
-            ptr,
-            capacity,
-            offset,
-        }
+        let descriptors = descriptors.into_iter();
+        unsafe { ErasedSoaMutPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 }
 
@@ -384,6 +402,23 @@ where
     capacity: usize,
     offset: usize,
     descriptors: D,
+}
+
+impl<D> ErasedSoaMutPtrsIter<D> {
+    #[inline]
+    pub(super) unsafe fn new_unchecked(
+        descriptors: D,
+        ptr: *mut u8,
+        capacity: usize,
+        offset: usize,
+    ) -> Self {
+        Self {
+            ptr,
+            capacity,
+            offset,
+            descriptors,
+        }
+    }
 }
 
 impl<D> ErasedSoaMutPtrsIter<D>
@@ -426,7 +461,7 @@ where
     }
 
     #[inline]
-    pub fn field_descriptors_iter(&self) -> ErasedSoaMutPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+    pub(super) fn debug_entries(&self) -> ErasedSoaMutPtrsIter<slice::Iter<'_, FieldDescriptor>> {
         let Self {
             ref descriptors,
             ptr,
@@ -434,12 +469,8 @@ where
             offset,
         } = *self;
 
-        ErasedSoaMutPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
-            ptr,
-            capacity,
-            offset,
-        }
+        let descriptors = descriptors.as_ref().iter();
+        unsafe { ErasedSoaMutPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 }
 
@@ -448,19 +479,7 @@ where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            ref descriptors,
-            ptr,
-            capacity,
-            offset,
-        } = *self;
-
-        let entries = ErasedSoaMutPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
-            ptr,
-            capacity,
-            offset,
-        };
+        let entries = self.debug_entries();
         f.debug_list().entries(entries).finish()
     }
 }

@@ -7,10 +7,10 @@ use core::{
 
 use crate::{
     erased::{
-        ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter, ErasedSoaSlicePtrs,
+        ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter, ErasedSoaSlicePtrs, ErasedSoaSlicesIter,
         error::{ErasedSoaIntoValueError, ErasedSoaSlicePtrsError},
     },
-    field::ErasedFieldSliceMut,
+    field::{ErasedFieldSlice, ErasedFieldSliceMut},
     soa::{field::FieldDescriptor, traits::Soa},
 };
 
@@ -152,16 +152,36 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedSoaSlicesMutIter<'_, slice::Iter<'_, FieldDescriptor>> {
+    pub fn iter(&self) -> ErasedSoaSlicesIter<'_, slice::Iter<'_, FieldDescriptor>> {
         let Self { ptrs, .. } = self;
-        ErasedSoaSlicesMutIter {
-            ptrs: ptrs.iter(),
-            phantom: PhantomData,
-        }
+
+        let ptrs = ptrs.iter();
+        unsafe { ErasedSoaSlicesIter::from_ptrs(ptrs) }
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> ErasedSoaSlicesMutIter<'_, slice::Iter<'_, FieldDescriptor>> {
+        let Self { ptrs, .. } = self;
+
+        let ptrs = ptrs.iter_mut();
+        unsafe { ErasedSoaSlicesMutIter::from_ptrs(ptrs) }
     }
 }
 
 impl<'a, D> IntoIterator for &'a ErasedSoaSlicesMut<'_, D>
+where
+    D: AsRef<[FieldDescriptor]> + ?Sized,
+{
+    type Item = ErasedFieldSlice<'a>;
+    type IntoIter = ErasedSoaSlicesIter<'a, slice::Iter<'a, FieldDescriptor>>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, D> IntoIterator for &'a mut ErasedSoaSlicesMut<'_, D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
@@ -170,7 +190,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        self.iter_mut()
     }
 }
 
@@ -185,11 +205,10 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self { ptrs, phantom } = self;
-        ErasedSoaSlicesMutIter {
-            ptrs: ptrs.into_iter(),
-            phantom,
-        }
+        let Self { ptrs, .. } = self;
+
+        let ptrs = ptrs.into_iter();
+        unsafe { ErasedSoaSlicesMutIter::from_ptrs(ptrs) }
     }
 }
 
@@ -200,6 +219,16 @@ where
 {
     phantom: PhantomData<&'a mut [u8]>,
     ptrs: ErasedSoaSliceMutPtrsIter<D>,
+}
+
+impl<D> ErasedSoaSlicesMutIter<'_, D> {
+    #[inline]
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaSliceMutPtrsIter<D>) -> Self {
+        Self {
+            ptrs,
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<D> ErasedSoaSlicesMutIter<'_, D>
@@ -242,14 +271,13 @@ where
     }
 
     #[inline]
-    pub fn field_descriptors_iter(
+    pub(super) fn debug_entries(
         &self,
     ) -> ErasedSoaSlicesMutIter<'_, slice::Iter<'_, FieldDescriptor>> {
         let Self { ptrs, .. } = self;
-        ErasedSoaSlicesMutIter {
-            ptrs: ptrs.field_descriptors_iter(),
-            phantom: PhantomData,
-        }
+
+        let ptrs = ptrs.debug_entries();
+        unsafe { ErasedSoaSlicesMutIter::from_ptrs(ptrs) }
     }
 }
 
@@ -258,7 +286,7 @@ where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.field_descriptors_iter();
+        let entries = self.debug_entries();
         f.debug_list().entries(entries).finish()
     }
 }

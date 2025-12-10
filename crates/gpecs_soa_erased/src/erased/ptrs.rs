@@ -241,12 +241,8 @@ where
             offset,
         } = *self;
 
-        ErasedSoaPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
-            ptr,
-            capacity,
-            offset,
-        }
+        let descriptors = descriptors.as_ref().iter();
+        unsafe { ErasedSoaPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 }
 
@@ -281,12 +277,8 @@ where
             offset,
         } = self;
 
-        ErasedSoaPtrsIter {
-            descriptors: descriptors.into_iter(),
-            ptr,
-            capacity,
-            offset,
-        }
+        let descriptors = descriptors.into_iter();
+        unsafe { ErasedSoaPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 }
 
@@ -299,6 +291,23 @@ where
     capacity: usize,
     offset: usize,
     descriptors: D,
+}
+
+impl<D> ErasedSoaPtrsIter<D> {
+    #[inline]
+    pub(super) unsafe fn new_unchecked(
+        descriptors: D,
+        ptr: *const u8,
+        capacity: usize,
+        offset: usize,
+    ) -> Self {
+        Self {
+            ptr,
+            capacity,
+            offset,
+            descriptors,
+        }
+    }
 }
 
 impl<D> ErasedSoaPtrsIter<D>
@@ -335,7 +344,7 @@ where
     }
 
     #[inline]
-    pub fn field_descriptors_iter(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+    pub(super) fn debug_entries(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>> {
         let Self {
             ref descriptors,
             ptr,
@@ -343,12 +352,8 @@ where
             offset,
         } = *self;
 
-        ErasedSoaPtrsIter {
-            descriptors: descriptors.as_ref().iter(),
-            ptr,
-            capacity,
-            offset,
-        }
+        let descriptors = descriptors.as_ref().iter();
+        unsafe { ErasedSoaPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 }
 
@@ -357,7 +362,7 @@ where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.field_descriptors_iter();
+        let entries = self.debug_entries();
         f.debug_list().entries(entries).finish()
     }
 }

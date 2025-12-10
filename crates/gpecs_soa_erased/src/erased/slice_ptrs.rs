@@ -161,10 +161,9 @@ where
     #[inline]
     pub fn iter(&self) -> ErasedSoaSlicePtrsIter<slice::Iter<'_, FieldDescriptor>> {
         let Self { ref ptrs, len } = *self;
-        ErasedSoaSlicePtrsIter {
-            ptrs: ptrs.iter(),
-            len,
-        }
+
+        let ptrs = ptrs.iter();
+        unsafe { ErasedSoaSlicePtrsIter::new_unchecked(ptrs, len) }
     }
 }
 
@@ -193,15 +192,14 @@ where
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { ptrs, len } = self;
-        ErasedSoaSlicePtrsIter {
-            ptrs: ptrs.into_iter(),
-            len,
-        }
+
+        let ptrs = ptrs.into_iter();
+        unsafe { ErasedSoaSlicePtrsIter::new_unchecked(ptrs, len) }
     }
 }
 
 #[inline]
-pub fn slice_from_raw_parts<D>(data: ErasedSoaPtrs<D>, len: usize) -> ErasedSoaSlicePtrs<D> {
+pub unsafe fn slice_from_raw_parts<D>(data: ErasedSoaPtrs<D>, len: usize) -> ErasedSoaSlicePtrs<D> {
     unsafe { ErasedSoaSlicePtrs::from_ptrs(data, len) }
 }
 
@@ -212,6 +210,13 @@ where
 {
     len: usize,
     ptrs: ErasedSoaPtrsIter<D>,
+}
+
+impl<D> ErasedSoaSlicePtrsIter<D> {
+    #[inline]
+    pub(super) unsafe fn new_unchecked(ptrs: ErasedSoaPtrsIter<D>, len: usize) -> Self {
+        Self { len, ptrs }
+    }
 }
 
 impl<D> ErasedSoaSlicePtrsIter<D>
@@ -248,14 +253,11 @@ where
     }
 
     #[inline]
-    pub fn field_descriptors_iter(
-        &self,
-    ) -> ErasedSoaSlicePtrsIter<slice::Iter<'_, FieldDescriptor>> {
+    pub(super) fn debug_entries(&self) -> ErasedSoaSlicePtrsIter<slice::Iter<'_, FieldDescriptor>> {
         let Self { ref ptrs, len } = *self;
-        ErasedSoaSlicePtrsIter {
-            ptrs: ptrs.field_descriptors_iter(),
-            len,
-        }
+
+        let ptrs = ptrs.debug_entries();
+        unsafe { ErasedSoaSlicePtrsIter::new_unchecked(ptrs, len) }
     }
 }
 
@@ -264,7 +266,7 @@ where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.field_descriptors_iter();
+        let entries = self.debug_entries();
         f.debug_list().entries(entries).finish()
     }
 }

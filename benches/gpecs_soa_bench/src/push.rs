@@ -53,7 +53,7 @@ impl Push for Zero {
             ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
 
-        vec.push_from(|_, dst| unsafe {
+        vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
@@ -83,7 +83,7 @@ impl Push for Tiny {
             ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
 
-        vec.push_from(|_, dst| unsafe {
+        vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
@@ -115,7 +115,7 @@ impl Push for Small {
             ErasedSoa::<_, ArrayDescriptors<3>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
 
-        vec.push_from(|_, dst| unsafe {
+        vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
@@ -147,7 +147,7 @@ impl Push for Medium {
             ErasedSoa::<_, ArrayDescriptors<3>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
 
-        vec.push_from(|_, dst| unsafe {
+        vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
@@ -182,7 +182,7 @@ impl Push for Big {
             ErasedSoa::<_, ArrayDescriptors<5>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
 
-        vec.push_from(|_, dst| unsafe {
+        vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
@@ -222,7 +222,7 @@ impl Push for Large {
             ErasedSoa::<_, ArrayDescriptors<10>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
 
-        vec.push_from(|_, dst| unsafe {
+        vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_refs().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });

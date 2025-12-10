@@ -132,16 +132,16 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
+    unsafe fn ptrs_swap(&self, mut a: Self::MutPtrs<'_>, mut b: Self::MutPtrs<'_>) {
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, a.field_descriptors());
         debug_assert_descriptors(descriptors, b.field_descriptors());
 
-        unsafe { a.swap(&b) }
+        unsafe { a.swap(&mut b) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+    unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, mut dst: Self::MutPtrs<'_>, len: usize) {
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, src.field_descriptors());
         debug_assert_descriptors(descriptors, dst.field_descriptors());
@@ -150,7 +150,7 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+    unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, mut dst: Self::MutPtrs<'_>, len: usize) {
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, src.field_descriptors());
         debug_assert_descriptors(descriptors, dst.field_descriptors());
@@ -162,7 +162,7 @@ where
     unsafe fn ptrs_copy_nonoverlapping(
         &self,
         src: Self::Ptrs<'_>,
-        dst: Self::MutPtrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
         len: usize,
     ) {
         let descriptors = self.field_descriptors();
@@ -224,7 +224,7 @@ where
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
-        slice_from_raw_parts(ptrs, len)
+        unsafe { slice_from_raw_parts(ptrs, len) }
     }
 
     #[inline]
@@ -261,7 +261,7 @@ where
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
-        slice_from_raw_parts_mut(ptrs, len)
+        unsafe { slice_from_raw_parts_mut(ptrs, len) }
     }
 
     #[inline]

@@ -785,13 +785,14 @@ impl ErasedStorageExt for ErasedStorage {
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
         let values = values.into_inner();
+        let values_len = values.len();
 
         let entities = must_cast_slice(entities);
         let component_ids = component_ids.keys().copied();
         let fields = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
             .zip(values)
             .collect();
-        if entities.len() != values.len() {
+        if entities.len() != values_len {
             unreachable!("count of entities should match count of components")
         }
         (entities, fields)
@@ -807,13 +808,14 @@ impl ErasedStorageExt for ErasedStorage {
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
         let values = values.into_inner();
+        let values_len = values.len();
 
         let entities = must_cast_slice(entities);
         let component_ids = component_ids.keys().copied();
         let fields = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
             .zip(values)
             .collect();
-        if entities.len() != values.len() {
+        if entities.len() != values_len {
             unreachable!("count of entities should match count of components")
         }
         (entities, fields)

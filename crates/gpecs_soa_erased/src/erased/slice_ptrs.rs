@@ -282,7 +282,8 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ref mut ptrs, len } = *self;
 
-        let item = field_slice_from_raw_parts(ptrs.next()?, len);
+        let data = ptrs.next()?;
+        let item = unsafe { field_slice_from_raw_parts(data, len) };
         Some(item)
     }
 

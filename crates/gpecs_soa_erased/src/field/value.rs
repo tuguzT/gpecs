@@ -7,20 +7,20 @@ use core::{
 use crate::{
     aligned_bytes::{AlignedBytes, AlignedBytesFromLayout, AlignedInitBytes},
     error::{LenMismatchError, check_layout, check_len},
+    field::{
+        ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
+        assert::check_into_layout,
+        error::{
+            ErasedFieldFromBytesError, ErasedFieldFromDescDataError, ErasedFieldFromValueError,
+            ErasedFieldIntoValueError,
+        },
+    },
+    fmt::DebugBytesUpperHex,
     soa::field::FieldDescriptor,
 };
 
 #[cfg(feature = "alloc")]
 use crate::aligned_bytes::AlignedUninitBoxedByteSlice;
-
-use super::{
-    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
-    assert::check_into_layout,
-    error::{
-        ErasedFieldFromBytesError, ErasedFieldFromDescDataError, ErasedFieldFromValueError,
-        ErasedFieldIntoValueError,
-    },
-};
 
 #[cfg(feature = "alloc")]
 pub type BoxedErasedField = ErasedField<AlignedUninitBoxedByteSlice>;
@@ -247,7 +247,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let data = &self.as_slice();
+        let data = &DebugBytesUpperHex(self.as_slice());
         f.debug_struct("ErasedField")
             .field("desc", desc)
             .field("data", data)

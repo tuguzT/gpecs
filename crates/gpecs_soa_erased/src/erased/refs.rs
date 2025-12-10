@@ -14,7 +14,7 @@ use crate::{
     soa::{field::FieldDescriptor, traits::Soa},
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ErasedSoaRefs<'a, D>
 where
     D: ?Sized,
@@ -130,6 +130,18 @@ where
 
         let ptrs = ptrs.iter();
         unsafe { ErasedSoaRefsIter::from_ptrs(ptrs) }
+    }
+}
+
+impl<D> Debug for ErasedSoaRefs<'_, D>
+where
+    D: Debug + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { ptrs, .. } = self;
+        f.debug_struct("ErasedSoaRefs")
+            .field("ptrs", &ptrs)
+            .finish()
     }
 }
 

@@ -4,11 +4,13 @@ use core::{
     ptr, slice,
 };
 
-use crate::soa::field::FieldDescriptor;
-
-use super::{
-    ErasedFieldPtr, ErasedFieldSlicePtr,
-    error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+use crate::{
+    field::{
+        ErasedFieldPtr, ErasedFieldSlicePtr,
+        error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+    },
+    fmt::DebugBytesUpperHex,
+    soa::field::FieldDescriptor,
 };
 
 #[derive(Clone, Copy)]
@@ -123,7 +125,7 @@ impl<'a> ErasedFieldSlice<'a> {
 impl Debug for ErasedFieldSlice<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &self.as_buffer();
+        let buffer = &DebugBytesUpperHex(self.as_buffer());
         let len = &self.len();
         f.debug_struct("ErasedFieldSlice")
             .field("desc", desc)

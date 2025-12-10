@@ -1,8 +1,9 @@
 use core::alloc::Layout;
 
-use crate::error::check_layout;
-
-use super::error::{ErasedFieldIntoValueError, SliceLenMismatchError};
+use crate::{
+    error::check_layout,
+    field::error::{ErasedFieldIntoValueError, SliceLenMismatchError},
+};
 
 #[inline]
 pub fn check_slice_buffer_len(

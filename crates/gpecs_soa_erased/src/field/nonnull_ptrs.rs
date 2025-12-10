@@ -1,16 +1,18 @@
-use core::ptr::{self, NonNull};
+use core::{
+    fmt::{self, Debug},
+    ptr::{self, NonNull},
+};
 
 use crate::{
     error::{check_align, check_layout, check_len},
+    field::{
+        assert::check_into_layout,
+        error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
+    },
     soa::field::FieldDescriptor,
 };
 
-use super::{
-    assert::check_into_layout,
-    error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
-};
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ErasedFieldNonNullPtr {
     desc: FieldDescriptor,
     ptr: NonNull<u8>,
@@ -138,6 +140,18 @@ impl ErasedFieldNonNullPtr {
         let ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), desc.layout().size());
         let buffer = unsafe { NonNull::new_unchecked(ptr) };
         (desc, buffer)
+    }
+}
+
+#[expect(clippy::missing_fields_in_debug, reason = "buffer instead of ptr")]
+impl Debug for ErasedFieldNonNullPtr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let desc = &self.desc;
+        let buffer = &self.as_buffer();
+        f.debug_struct("ErasedFieldNonNullPtr")
+            .field("desc", desc)
+            .field("buffer", buffer)
+            .finish()
     }
 }
 

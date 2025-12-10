@@ -4,11 +4,13 @@ use core::{
     ptr, slice,
 };
 
-use crate::soa::field::FieldDescriptor;
-
-use super::{
-    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
-    error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
+use crate::{
+    field::{
+        ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
+        error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
+    },
+    fmt::DebugBytesUpperHex,
+    soa::field::FieldDescriptor,
 };
 
 pub struct ErasedFieldRefMut<'a> {
@@ -129,7 +131,7 @@ impl<'a> ErasedFieldRefMut<'a> {
 impl Debug for ErasedFieldRefMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &self.as_buffer();
+        let buffer = &DebugBytesUpperHex(self.as_buffer());
         f.debug_struct("ErasedFieldRefMut")
             .field("desc", desc)
             .field("buffer", buffer)

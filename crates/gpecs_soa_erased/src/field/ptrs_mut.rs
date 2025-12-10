@@ -1,17 +1,19 @@
-use core::ptr;
+use core::{
+    fmt::{self, Debug},
+    ptr,
+};
 
 use crate::{
     error::{check_align, check_layout, check_len},
+    field::{
+        ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
+        assert::check_into_layout,
+        error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
+    },
     soa::field::FieldDescriptor,
 };
 
-use super::{
-    ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
-    assert::check_into_layout,
-    error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
-};
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ErasedFieldMutPtr {
     desc: FieldDescriptor,
     ptr: *mut u8,
@@ -164,6 +166,18 @@ impl ErasedFieldMutPtr {
         let Self { desc, ptr } = self;
         let buffer = ptr::slice_from_raw_parts_mut(ptr, desc.layout().size());
         (desc, buffer)
+    }
+}
+
+#[expect(clippy::missing_fields_in_debug, reason = "buffer instead of ptr")]
+impl Debug for ErasedFieldMutPtr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let desc = &self.desc;
+        let buffer = &self.as_buffer();
+        f.debug_struct("ErasedFieldMutPtr")
+            .field("desc", desc)
+            .field("buffer", buffer)
+            .finish()
     }
 }
 

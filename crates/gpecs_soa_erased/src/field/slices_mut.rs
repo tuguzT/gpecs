@@ -1,16 +1,17 @@
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
-    ptr::{self},
-    slice,
+    ptr, slice,
 };
 
-use crate::soa::field::FieldDescriptor;
-
-use super::{
-    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMutPtr,
-    ErasedFieldSlicePtr,
-    error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+use crate::{
+    field::{
+        ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMutPtr,
+        ErasedFieldSlicePtr,
+        error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+    },
+    fmt::DebugBytesUpperHex,
+    soa::field::FieldDescriptor,
 };
 
 pub struct ErasedFieldSliceMut<'a> {
@@ -158,7 +159,7 @@ impl<'a> ErasedFieldSliceMut<'a> {
 impl Debug for ErasedFieldSliceMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &self.as_buffer();
+        let buffer = &DebugBytesUpperHex(self.as_buffer());
         let len = &self.len();
         f.debug_struct("ErasedFieldSliceMut")
             .field("desc", desc)

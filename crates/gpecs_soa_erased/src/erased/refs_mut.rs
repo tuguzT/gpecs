@@ -14,7 +14,6 @@ use crate::{
     soa::{field::FieldDescriptor, traits::Soa},
 };
 
-#[derive(Debug, Clone, Copy)]
 pub struct ErasedSoaRefsMut<'a, D>
 where
     D: ?Sized,
@@ -150,6 +149,18 @@ where
 
         let ptrs = ptrs.iter_mut();
         unsafe { ErasedSoaRefsMutIter::from_ptrs(ptrs) }
+    }
+}
+
+impl<D> Debug for ErasedSoaRefsMut<'_, D>
+where
+    D: Debug + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { ptrs, .. } = self;
+        f.debug_struct("ErasedSoaRefsMut")
+            .field("ptrs", &ptrs)
+            .finish()
     }
 }
 

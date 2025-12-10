@@ -11,3 +11,5 @@ pub mod aligned_bytes;
 pub mod erased;
 pub mod error;
 pub mod field;
+
+mod fmt;

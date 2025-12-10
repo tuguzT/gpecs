@@ -1,14 +1,20 @@
-use core::{fmt::Debug, ptr};
-
-use crate::{error::check_align, soa::field::FieldDescriptor};
-
-use super::{
-    ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSlicePtr,
-    assert::{check_into_layout, check_slice_buffer_len},
-    error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+use core::{
+    fmt::{self, Debug},
+    ptr,
 };
 
-#[derive(Debug, Clone, Copy)]
+use crate::{
+    error::check_align,
+    field::{
+        ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMut,
+        ErasedFieldSlicePtr,
+        assert::{check_into_layout, check_slice_buffer_len},
+        error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+    },
+    soa::field::FieldDescriptor,
+};
+
+#[derive(Clone, Copy)]
 pub struct ErasedFieldSliceMutPtr {
     ptr: ErasedFieldMutPtr,
     len: usize,
@@ -124,6 +130,23 @@ impl ErasedFieldSliceMutPtr {
     }
 }
 
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "buffer & len instead of ptr"
+)]
+impl Debug for ErasedFieldSliceMutPtr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let desc = &self.descriptor();
+        let buffer = &self.as_buffer();
+        let len = &self.len;
+        f.debug_struct("ErasedFieldSliceMutPtr")
+            .field("desc", desc)
+            .field("buffer", buffer)
+            .field("len", len)
+            .finish()
+    }
+}
+
 impl<T> From<*mut [T]> for ErasedFieldSliceMutPtr {
     #[inline]
     fn from(ptr: *mut [T]) -> Self {
@@ -149,7 +172,7 @@ impl<T> TryFrom<ErasedFieldSliceMutPtr> for *mut [T] {
 }
 
 #[inline]
-pub fn field_slice_from_raw_parts_mut(
+pub unsafe fn field_slice_from_raw_parts_mut(
     data: ErasedFieldMutPtr,
     len: usize,
 ) -> ErasedFieldSliceMutPtr {

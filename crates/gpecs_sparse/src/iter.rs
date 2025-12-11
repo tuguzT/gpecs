@@ -1,57 +1,90 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    marker::PhantomData,
+    slice,
 };
 
 #[cfg(feature = "alloc")]
 pub use crate::alloc::iter::{Drain, IntoIter, IntoKeys, IntoValues};
 
 use crate::{
-    pair::{KeyValuePair, KeyValueRefs, KeyValueRefsMut},
-    soa::{slice, traits::Soa},
+    pair::{KeyValuePair, KeyValuePtrs, KeyValueRefs, KeyValueRefsMut},
+    soa::{
+        self,
+        traits::{RawSoa, Soa},
+    },
 };
 
 #[repr(transparent)]
-pub struct Keys<'c, 'a, K, V>
+pub struct RawKeys<'c, K, V>
 where
     K: 'c,
-    V: Soa + ?Sized + 'c,
+    V: RawSoa + ?Sized + 'c,
 {
-    inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
+    inner: soa::slice::RawIter<'c, KeyValuePair<K, V>>,
 }
 
-impl<'c, 'a, K, V> Keys<'c, 'a, K, V>
+impl<'c, K, V> RawKeys<'c, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn new(inner: soa::slice::RawIter<'c, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &'a [K] {
-        let Self { inner } = self;
+    pub unsafe fn deref<'a>(self) -> Keys<'c, 'a, K, V> {
+        unsafe { Keys::from_inner(self) }
+    }
 
-        let (keys, _) = inner.as_slices().into_parts();
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn context(&self) -> &'c V::Context {
+        let Self { inner } = self;
+        inner.context()
+    }
+
+    #[inline]
+    pub fn as_slice_ptr(&self) -> *const [K] {
+        let (_, keys) = self.as_slice_ptr_with_context();
         keys
     }
-}
 
-impl<K, V> Debug for Keys<'_, '_, K, V>
-where
-    K: Debug,
-    V: Soa + ?Sized,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let keys = &self.as_slice();
-        f.debug_tuple("Keys").field(keys).finish()
+    #[inline]
+    pub fn as_slice_ptr_with_context(&self) -> (&'c V::Context, *const [K]) {
+        let Self { inner } = self;
+
+        let (context, slices) = inner.as_slice_ptrs_with_context();
+        let (keys, _) = slices.into_parts();
+        (context, keys)
     }
 }
 
-impl<K, V> Clone for Keys<'_, '_, K, V>
+impl<K, V> Debug for RawKeys<'_, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let keys = &self.as_slice_ptr();
+        f.debug_tuple("RawKeys").field(keys).finish()
+    }
+}
+
+impl<K, V> Clone for RawKeys<'_, K, V>
+where
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -62,9 +95,143 @@ where
     }
 }
 
+impl<K, V> Iterator for RawKeys<'_, K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    type Item = *const K;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next().map(|KeyValuePtrs { key, .. }| key)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { inner } = self;
+        inner.size_hint()
+    }
+}
+
+impl<K, V> DoubleEndedIterator for RawKeys<'_, K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next_back().map(|KeyValuePtrs { key, .. }| key)
+    }
+}
+
+impl<K, V> ExactSizeIterator for RawKeys<'_, K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+}
+
+impl<K, V> FusedIterator for RawKeys<'_, K, V> where V: RawSoa + ?Sized {}
+
+#[repr(transparent)]
+pub struct Keys<'c, 'a, K, V>
+where
+    K: 'a,
+    V: RawSoa + ?Sized + 'c,
+{
+    inner: RawKeys<'c, K, V>,
+    phantom: PhantomData<&'a ()>,
+}
+
+impl<'c, 'a, K, V> Keys<'c, 'a, K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    #[inline]
+    pub(crate) fn new(inner: soa::slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
+        let inner = RawKeys::new(inner.into_raw_iter());
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
+    unsafe fn from_inner(inner: RawKeys<'c, K, V>) -> Self {
+        Self {
+            inner,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
+        let Self { inner, .. } = self;
+        inner
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { inner, .. } = self;
+        inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn context(&self) -> &'c V::Context {
+        let Self { inner, .. } = self;
+        inner.context()
+    }
+
+    #[inline]
+    pub fn as_slice(&self) -> &'a [K] {
+        let (_, keys) = self.as_slice_with_context();
+        keys
+    }
+
+    #[inline]
+    pub fn as_slice_with_context(&self) -> (&'c V::Context, &'a [K]) {
+        let Self { inner, .. } = self;
+
+        let (context, keys) = inner.as_slice_ptr_with_context();
+        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+}
+
+impl<K, V> Debug for Keys<'_, '_, K, V>
+where
+    K: Debug,
+    V: RawSoa + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let keys = &self.as_slice();
+        f.debug_tuple("Keys").field(keys).finish()
+    }
+}
+
+impl<K, V> Clone for Keys<'_, '_, K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self { ref inner, phantom } = *self;
+
+        let inner = inner.clone();
+        Self { inner, phantom }
+    }
+}
+
 impl<K, V> AsRef<[K]> for Keys<'_, '_, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &[K] {
@@ -74,158 +241,46 @@ where
 
 impl<'a, K, V> Iterator for Keys<'_, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     type Item = &'a K;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.next().map(|KeyValueRefs { key, .. }| key)
+        let Self { inner, .. } = self;
+        inner.next().map(|key| unsafe { &*key })
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { inner: keys } = self;
-        keys.size_hint()
-    }
-
-    #[inline]
-    fn count(self) -> usize
-    where
-        Self: Sized,
-    {
-        let Self { inner: keys } = self;
-        keys.count()
-    }
-
-    #[inline]
-    fn last(self) -> Option<Self::Item>
-    where
-        Self: Sized,
-    {
-        let Self { inner } = self;
-        inner.last().map(|KeyValueRefs { key, .. }| key)
-    }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.nth(n).map(|KeyValueRefs { key, .. }| key)
-    }
-
-    #[inline]
-    fn for_each<F>(self, mut f: F)
-    where
-        Self: Sized,
-        F: FnMut(Self::Item),
-    {
-        let Self { inner } = self;
-        inner.for_each(|KeyValueRefs { key, .. }| f(key));
-    }
-
-    #[inline]
-    fn fold<B, F>(self, init: B, mut f: F) -> B
-    where
-        Self: Sized,
-        F: FnMut(B, Self::Item) -> B,
-    {
-        let Self { inner } = self;
-        inner.fold(init, |acc, KeyValueRefs { key, .. }| f(acc, key))
-    }
-
-    #[inline]
-    fn all<F>(&mut self, mut f: F) -> bool
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> bool,
-    {
-        let Self { inner } = self;
-        inner.all(|KeyValueRefs { key, .. }| f(key))
-    }
-
-    #[inline]
-    fn any<F>(&mut self, mut f: F) -> bool
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> bool,
-    {
-        let Self { inner } = self;
-        inner.any(|KeyValueRefs { key, .. }| f(key))
-    }
-
-    #[inline]
-    fn find<P>(&mut self, mut predicate: P) -> Option<Self::Item>
-    where
-        Self: Sized,
-        P: FnMut(&Self::Item) -> bool,
-    {
-        let Self { inner } = self;
-        inner
-            .find(|KeyValueRefs { key, .. }| predicate(key))
-            .map(|KeyValueRefs { key, .. }| key)
-    }
-
-    #[inline]
-    fn find_map<B, F>(&mut self, mut f: F) -> Option<B>
-    where
-        Self: Sized,
-        F: FnMut(Self::Item) -> Option<B>,
-    {
-        let Self { inner } = self;
-        inner.find_map(|KeyValueRefs { key, .. }| f(key))
-    }
-
-    #[inline]
-    fn position<P>(&mut self, mut predicate: P) -> Option<usize>
-    where
-        Self: Sized,
-        P: FnMut(Self::Item) -> bool,
-    {
-        let Self { inner } = self;
-        inner.position(|KeyValueRefs { key, .. }| predicate(key))
-    }
-
-    #[inline]
-    fn rposition<P>(&mut self, mut predicate: P) -> Option<usize>
-    where
-        Self: Sized,
-        P: FnMut(Self::Item) -> bool,
-    {
-        let Self { inner } = self;
-        inner.rposition(|KeyValueRefs { key, .. }| predicate(key))
+        let Self { inner, .. } = self;
+        inner.size_hint()
     }
 }
 
 impl<K, V> DoubleEndedIterator for Keys<'_, '_, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.next_back().map(|KeyValueRefs { key, .. }| key)
-    }
-
-    #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.nth_back(n).map(|KeyValueRefs { key, .. }| key)
+        let Self { inner, .. } = self;
+        inner.next_back().map(|key| unsafe { &*key })
     }
 }
 
 impl<K, V> ExactSizeIterator for Keys<'_, '_, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { inner } = self;
+        let Self { inner, .. } = self;
         inner.len()
     }
 }
 
-impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: Soa {}
+impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: RawSoa {}
 
 #[repr(transparent)]
 pub struct Values<'c, 'a, K, V>
@@ -233,7 +288,7 @@ where
     K: 'c,
     V: Soa + ?Sized + 'c,
 {
-    inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
+    inner: soa::slice::Iter<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> Values<'c, 'a, K, V>
@@ -241,7 +296,7 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn new(inner: soa::slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -462,7 +517,7 @@ where
     K: 'c,
     V: Soa + ?Sized + 'c,
 {
-    inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>,
+    inner: soa::slice::IterMut<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> ValuesMut<'c, 'a, K, V>
@@ -470,7 +525,7 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn new(inner: soa::slice::IterMut<'c, 'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -685,7 +740,7 @@ where
     K: 'c,
     V: Soa + ?Sized + 'c,
 {
-    inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>,
+    inner: soa::slice::Iter<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> Iter<'c, 'a, K, V>
@@ -693,7 +748,7 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn new(inner: soa::slice::Iter<'c, 'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -859,7 +914,7 @@ where
     K: 'c,
     V: Soa + ?Sized + 'c,
 {
-    inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>,
+    inner: soa::slice::IterMut<'c, 'a, KeyValuePair<K, V>>,
 }
 
 impl<'c, 'a, K, V> IterMut<'c, 'a, K, V>
@@ -867,7 +922,7 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: slice::IterMut<'c, 'a, KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn new(inner: soa::slice::IterMut<'c, 'a, KeyValuePair<K, V>>) -> Self {
         Self { inner }
     }
 

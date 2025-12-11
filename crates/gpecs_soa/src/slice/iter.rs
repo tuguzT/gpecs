@@ -674,7 +674,7 @@ where
 
 impl<T> Clone for Iter<'_, '_, T>
 where
-    T: Soa + ?Sized,
+    T: RawSoa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {

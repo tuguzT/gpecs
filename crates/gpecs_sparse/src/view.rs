@@ -23,7 +23,7 @@ use crate::{
         TooLargeSparseIndexError, TooSmallSparseIndexError,
     },
     item::{SparseItem, SparseItemKind},
-    iter::{Iter, IterMut, Keys, Values, ValuesMut},
+    iter::{Iter, IterMut, Keys, RawKeys, Values, ValuesMut},
     key::{Epoch, Key},
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs, KeyValueRefs},
     soa::{
@@ -223,6 +223,13 @@ where
 
         let (keys, _) = dense.as_slices().into_parts();
         sparse_contains_key(keys, sparse, key)
+    }
+
+    #[inline]
+    pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.raw_iter();
+        RawKeys::new(inner)
     }
 
     #[inline]
@@ -994,6 +1001,13 @@ where
 
         let (keys, _) = dense.as_slices().into_parts();
         sparse_contains_key(keys, sparse, key)
+    }
+
+    #[inline]
+    pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.raw_iter();
+        RawKeys::new(inner)
     }
 
     #[inline]

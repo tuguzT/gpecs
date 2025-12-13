@@ -9,7 +9,7 @@ use crate::{
     pair::{KeyValueMutPtrs, KeyValuePtrs, KeyValueSlicePtrs, KeyValueSlices, KeyValueSlicesMut},
     soa::{
         traits::{RawSoa, RawSoaContext, SliceMutPtrs, Soa},
-        wrapper::SliceMutPtrs as SliceMutPtrsWrapper,
+        wrapper,
     },
 };
 
@@ -18,7 +18,7 @@ where
     V: RawSoa + ?Sized,
 {
     keys: *mut [K],
-    values: SliceMutPtrsWrapper<'context, V>,
+    values: wrapper::SliceMutPtrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValueSliceMutPtrs<'context, K, V>
@@ -42,7 +42,7 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: *mut [K], values: SliceMutPtrs<'context, V>) -> Self {
-        let values = SliceMutPtrsWrapper::new(values);
+        let values = wrapper::SliceMutPtrs::new(values);
         Self { keys, values }
     }
 
@@ -56,14 +56,13 @@ where
 
         let keys = ptr::slice_from_raw_parts_mut(key, len);
         let values = context.slice_mut_ptrs_from_raw_parts(value.into_inner(), len);
-        let values = SliceMutPtrsWrapper::new(values);
-        Self { keys, values }
+        unsafe { Self::new_unchecked(keys, values) }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (*mut [K], SliceMutPtrsWrapper<'context, V>) {
+    pub fn into_parts(self) -> (*mut [K], SliceMutPtrs<'context, V>) {
         let Self { keys, values } = self;
-        (keys, values)
+        (keys, values.into_inner())
     }
 
     #[inline]
@@ -142,7 +141,7 @@ where
 }
 
 impl<'context, K, V> From<KeyValueSliceMutPtrs<'context, K, V>>
-    for (*mut [K], SliceMutPtrsWrapper<'context, V>)
+    for (*mut [K], SliceMutPtrs<'context, V>)
 where
     V: RawSoa + ?Sized,
 {
@@ -152,10 +151,10 @@ where
     }
 }
 
-impl<'context, K, V> Debug for KeyValueSliceMutPtrs<'context, K, V>
+impl<K, V> Debug for KeyValueSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SliceMutPtrsWrapper<'context, V>: Debug,
+    for<'c> SliceMutPtrs<'c, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -166,10 +165,10 @@ where
     }
 }
 
-impl<'context, K, V> PartialEq for KeyValueSliceMutPtrs<'context, K, V>
+impl<K, V> PartialEq for KeyValueSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SliceMutPtrsWrapper<'context, V>: PartialEq,
+    for<'c> SliceMutPtrs<'c, V>: PartialEq,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
@@ -178,17 +177,17 @@ where
     }
 }
 
-impl<'context, K, V> Eq for KeyValueSliceMutPtrs<'context, K, V>
+impl<K, V> Eq for KeyValueSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SliceMutPtrsWrapper<'context, V>: Eq,
+    for<'c> SliceMutPtrs<'c, V>: Eq,
 {
 }
 
-impl<'context, K, V> PartialOrd for KeyValueSliceMutPtrs<'context, K, V>
+impl<K, V> PartialOrd for KeyValueSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SliceMutPtrsWrapper<'context, V>: PartialOrd,
+    for<'c> SliceMutPtrs<'c, V>: PartialOrd,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -201,10 +200,10 @@ where
     }
 }
 
-impl<'context, K, V> Ord for KeyValueSliceMutPtrs<'context, K, V>
+impl<K, V> Ord for KeyValueSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SliceMutPtrsWrapper<'context, V>: Ord,
+    for<'c> SliceMutPtrs<'c, V>: Ord,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -217,10 +216,10 @@ where
     }
 }
 
-impl<'context, K, V> Hash for KeyValueSliceMutPtrs<'context, K, V>
+impl<K, V> Hash for KeyValueSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SliceMutPtrsWrapper<'context, V>: Hash,
+    for<'c> SliceMutPtrs<'c, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -241,9 +240,9 @@ where
     }
 }
 
-impl<'context, K, V> Copy for KeyValueSliceMutPtrs<'context, K, V>
+impl<K, V> Copy for KeyValueSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SliceMutPtrsWrapper<'context, V>: Copy,
+    for<'c> SliceMutPtrs<'c, V>: Copy,
 {
 }

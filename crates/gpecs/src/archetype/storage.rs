@@ -784,7 +784,6 @@ impl ErasedStorageExt for ErasedStorage {
         let (dense, _) = Self::as_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
-        let values = values.into_inner();
         let values_len = values.len();
 
         let entities = must_cast_slice(entities);
@@ -807,7 +806,6 @@ impl ErasedStorageExt for ErasedStorage {
         let (dense, _) = Self::as_mut_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
-        let values = values.into_inner();
         let values_len = values.len();
 
         let entities = must_cast_slice(entities);

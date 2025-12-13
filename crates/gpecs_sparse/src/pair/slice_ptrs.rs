@@ -9,7 +9,7 @@ use crate::{
     pair::{KeyValuePtrs, KeyValueSliceMutPtrs, KeyValueSlices},
     soa::{
         traits::{RawSoa, RawSoaContext, SlicePtrs, Soa},
-        wrapper::SlicePtrs as SlicePtrsWrapper,
+        wrapper,
     },
 };
 
@@ -18,7 +18,7 @@ where
     V: RawSoa + ?Sized,
 {
     keys: *const [K],
-    values: SlicePtrsWrapper<'context, V>,
+    values: wrapper::SlicePtrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValueSlicePtrs<'context, K, V>
@@ -42,7 +42,7 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: *const [K], values: SlicePtrs<'context, V>) -> Self {
-        let values = SlicePtrsWrapper::new(values);
+        let values = wrapper::SlicePtrs::new(values);
         Self { keys, values }
     }
 
@@ -56,14 +56,13 @@ where
 
         let keys = ptr::slice_from_raw_parts(key, len);
         let values = context.slice_ptrs_from_raw_parts(value.into_inner(), len);
-        let values = SlicePtrsWrapper::new(values);
-        Self { keys, values }
+        unsafe { Self::new_unchecked(keys, values) }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (*const [K], SlicePtrsWrapper<'context, V>) {
+    pub fn into_parts(self) -> (*const [K], SlicePtrs<'context, V>) {
         let Self { keys, values } = self;
-        (keys, values)
+        (keys, values.into_inner())
     }
 
     #[inline]
@@ -109,7 +108,7 @@ where
 }
 
 impl<'context, K, V> From<KeyValueSlicePtrs<'context, K, V>>
-    for (*const [K], SlicePtrsWrapper<'context, V>)
+    for (*const [K], SlicePtrs<'context, V>)
 where
     V: RawSoa + ?Sized,
 {
@@ -119,10 +118,10 @@ where
     }
 }
 
-impl<'context, K, V> Debug for KeyValueSlicePtrs<'context, K, V>
+impl<K, V> Debug for KeyValueSlicePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SlicePtrsWrapper<'context, V>: Debug,
+    for<'c> SlicePtrs<'c, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -133,10 +132,10 @@ where
     }
 }
 
-impl<'context, K, V> PartialEq for KeyValueSlicePtrs<'context, K, V>
+impl<K, V> PartialEq for KeyValueSlicePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SlicePtrsWrapper<'context, V>: PartialEq,
+    for<'c> SlicePtrs<'c, V>: PartialEq,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
@@ -145,17 +144,17 @@ where
     }
 }
 
-impl<'context, K, V> Eq for KeyValueSlicePtrs<'context, K, V>
+impl<K, V> Eq for KeyValueSlicePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SlicePtrsWrapper<'context, V>: Eq,
+    for<'c> SlicePtrs<'c, V>: Eq,
 {
 }
 
-impl<'context, K, V> PartialOrd for KeyValueSlicePtrs<'context, K, V>
+impl<K, V> PartialOrd for KeyValueSlicePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SlicePtrsWrapper<'context, V>: PartialOrd,
+    for<'c> SlicePtrs<'c, V>: PartialOrd,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -168,10 +167,10 @@ where
     }
 }
 
-impl<'context, K, V> Ord for KeyValueSlicePtrs<'context, K, V>
+impl<K, V> Ord for KeyValueSlicePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SlicePtrsWrapper<'context, V>: Ord,
+    for<'c> SlicePtrs<'c, V>: Ord,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -184,10 +183,10 @@ where
     }
 }
 
-impl<'context, K, V> Hash for KeyValueSlicePtrs<'context, K, V>
+impl<K, V> Hash for KeyValueSlicePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SlicePtrsWrapper<'context, V>: Hash,
+    for<'c> SlicePtrs<'c, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -208,9 +207,9 @@ where
     }
 }
 
-impl<'context, K, V> Copy for KeyValueSlicePtrs<'context, K, V>
+impl<K, V> Copy for KeyValueSlicePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    SlicePtrsWrapper<'context, V>: Copy,
+    for<'c> SlicePtrs<'c, V>: Copy,
 {
 }

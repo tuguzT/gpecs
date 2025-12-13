@@ -362,14 +362,14 @@ pub struct Iter<'c, 'a, Meta> {
 impl<'a, Meta> Iter<'_, 'a, Meta> {
     #[inline]
     pub fn entities(&self) -> &'a [Entity] {
-        let Self { inner } = self;
-        inner.as_keys_slice()
+        let (entities, _) = self.as_slices();
+        entities
     }
 
     #[inline]
     pub fn metas(&self) -> &'a [Meta] {
-        let Self { inner } = self;
-        inner.as_values_slice().as_inner()
+        let (_, metas) = self.as_slices();
+        metas
     }
 
     #[inline]
@@ -490,26 +490,26 @@ pub struct IterMut<'c, 'a, Meta> {
 impl<'a, Meta> IterMut<'_, 'a, Meta> {
     #[inline]
     pub fn into_entities(self) -> &'a [Entity] {
-        let Self { inner } = self;
-        inner.into_keys_slice()
+        let (entities, _) = self.into_slices();
+        entities
     }
 
     #[inline]
     pub fn entities(&self) -> &[Entity] {
-        let Self { inner } = self;
-        inner.as_keys_slice()
+        let (entities, _) = self.as_slices();
+        entities
     }
 
     #[inline]
     pub fn into_metas(self) -> &'a mut [Meta] {
-        let Self { inner } = self;
-        inner.into_values_slice().as_inner_mut()
+        let (_, metas) = self.into_slices();
+        metas
     }
 
     #[inline]
     pub fn metas(&self) -> &[Meta] {
-        let Self { inner } = self;
-        inner.as_values_slice().as_inner()
+        let (_, metas) = self.as_slices();
+        metas
     }
 
     #[inline]

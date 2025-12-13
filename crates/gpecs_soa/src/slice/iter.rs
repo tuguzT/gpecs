@@ -6,14 +6,14 @@ use core::{
 
 use crate::{
     traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa},
-    wrapper::{MutPtrs as MutPtrsWrapper, Ptrs as PtrsWrapper},
+    wrapper,
 };
 
 pub struct RawIter<'c, T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: PtrsWrapper<'c, T>,
+    ptrs: wrapper::Ptrs<'c, T>,
     context: &'c T::Context,
     start: usize,
     end: usize,
@@ -28,7 +28,7 @@ where
         let len = context.slice_ptrs_len(&slices);
         let ptrs = context.slice_ptrs_as_ptrs(slices);
         Self {
-            ptrs: PtrsWrapper::new(ptrs),
+            ptrs: wrapper::Ptrs::new(ptrs),
             context,
             start: 0,
             end: len,
@@ -181,12 +181,8 @@ where
     #[inline]
     fn from(context: &'c T::Context) -> Self {
         let ptrs = context.ptrs_dangling();
-        Self {
-            context,
-            ptrs: PtrsWrapper::new(ptrs),
-            start: 0,
-            end: 0,
-        }
+        let slices = context.slice_ptrs_from_raw_parts(ptrs, 0);
+        Self::new(context, slices)
     }
 }
 
@@ -737,7 +733,7 @@ pub struct RawIterMut<'c, T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: MutPtrsWrapper<'c, T>,
+    ptrs: wrapper::MutPtrs<'c, T>,
     context: &'c T::Context,
     start: usize,
     end: usize,
@@ -752,7 +748,7 @@ where
         let len = context.slice_mut_ptrs_len(&slices);
         let ptrs = context.slice_mut_ptrs_as_ptrs(slices);
         Self {
-            ptrs: MutPtrsWrapper::new(ptrs),
+            ptrs: wrapper::MutPtrs::new(ptrs),
             context,
             start: 0,
             end: len,
@@ -998,12 +994,8 @@ where
     #[inline]
     fn from(context: &'c T::Context) -> Self {
         let ptrs = context.ptrs_dangling_mut();
-        Self {
-            context,
-            ptrs: MutPtrsWrapper::new(ptrs),
-            start: 0,
-            end: 0,
-        }
+        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, 0);
+        Self::new(context, slices)
     }
 }
 

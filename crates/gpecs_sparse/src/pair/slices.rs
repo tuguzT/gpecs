@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     pair::{KeyValuePtrs, KeyValueSlicePtrs},
-    soa::{traits::Soa, wrapper::Slices},
+    soa::{traits::Soa, wrapper},
 };
 
 pub struct KeyValueSlices<'context, 'a, K, V>
@@ -15,7 +15,7 @@ where
     V: Soa + ?Sized + 'a,
 {
     keys: &'a [K],
-    values: Slices<'context, 'a, V>,
+    values: wrapper::Slices<'context, 'a, V>,
 }
 
 impl<'context, 'a, K, V> KeyValueSlices<'context, 'a, K, V>
@@ -38,7 +38,7 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: &'a [K], values: V::Slices<'context, 'a>) -> Self {
-        let values = Slices::new(values);
+        let values = wrapper::Slices::new(values);
         Self { keys, values }
     }
 
@@ -49,9 +49,9 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a [K], Slices<'context, 'a, V>) {
+    pub fn into_parts(self) -> (&'a [K], V::Slices<'context, 'a>) {
         let Self { keys, values } = self;
-        (keys, values)
+        (keys, values.into_inner())
     }
 
     #[inline]
@@ -77,7 +77,7 @@ where
 }
 
 impl<'context, 'a, K, V> From<KeyValueSlices<'context, 'a, K, V>>
-    for (&'a [K], Slices<'context, 'a, V>)
+    for (&'a [K], V::Slices<'context, 'a>)
 where
     V: Soa + ?Sized,
 {
@@ -87,11 +87,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Debug for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> Debug for KeyValueSlices<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: Debug,
+    for<'c, 'a> V::Slices<'c, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -102,25 +102,24 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Default for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> Default for KeyValueSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: Default,
+    for<'c, 'a> V::Slices<'c, 'a>: Default,
 {
     #[inline]
     fn default() -> Self {
-        Self {
-            keys: Default::default(),
-            values: Slices::default(),
-        }
+        let keys = Default::default();
+        let values = V::Slices::default();
+        unsafe { Self::new_unchecked(keys, values) }
     }
 }
 
-impl<'context, 'a, K, V> PartialEq for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> PartialEq for KeyValueSlices<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: PartialEq,
+    for<'c, 'a> V::Slices<'c, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
@@ -128,19 +127,19 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Eq for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> Eq for KeyValueSlices<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: Eq,
+    for<'c, 'a> V::Slices<'c, 'a>: Eq,
 {
 }
 
-impl<'context, 'a, K, V> PartialOrd for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> PartialOrd for KeyValueSlices<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: PartialOrd,
+    for<'c, 'a> V::Slices<'c, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
@@ -152,11 +151,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Ord for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> Ord for KeyValueSlices<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: Ord,
+    for<'c, 'a> V::Slices<'c, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
@@ -168,11 +167,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Hash for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> Hash for KeyValueSlices<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: Hash,
+    for<'c, 'a> V::Slices<'c, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -181,10 +180,10 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Clone for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> Clone for KeyValueSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: Clone,
+    for<'c, 'a> V::Slices<'c, 'a>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -194,9 +193,9 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Copy for KeyValueSlices<'context, 'a, K, V>
+impl<K, V> Copy for KeyValueSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    Slices<'context, 'a, V>: Copy,
+    for<'c, 'a> V::Slices<'c, 'a>: Copy,
 {
 }

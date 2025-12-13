@@ -5,56 +5,48 @@ use core::{
 };
 
 use crate::soa::{
-    traits::{RawSoaContext, Soa, SoaWrite},
-    wrapper::{MutPtrs, RefsMut},
+    traits::{MutPtrs, RawSoaContext, Soa, SoaWrite},
+    wrapper,
 };
 
 pub enum TryInsertAccess<'context, 'a, T>
 where
     T: Soa + ?Sized + 'a,
 {
-    ReadWrite(RefsMut<'context, 'a, T>),
-    WriteOnly(MutPtrs<'context, T>),
+    ReadWrite(wrapper::RefsMut<'context, 'a, T>),
+    WriteOnly(wrapper::MutPtrs<'context, T>),
 }
 
-impl<'context, T> TryInsertAccess<'context, '_, T>
+impl<'context, 'a, T> TryInsertAccess<'context, 'a, T>
 where
     T: Soa + ?Sized,
 {
     #[inline]
+    pub fn read_write(refs: T::RefsMut<'context, 'a>) -> Self {
+        let refs = wrapper::RefsMut::new(refs);
+        Self::ReadWrite(refs)
+    }
+
+    #[inline]
+    pub fn write_only(ptrs: MutPtrs<'context, T>) -> Self {
+        let ptrs = wrapper::MutPtrs::new(ptrs);
+        Self::WriteOnly(ptrs)
+    }
+
+    #[inline]
     pub fn into_ptrs(self, context: &'context T::Context) -> MutPtrs<'context, T> {
         match self {
-            Self::ReadWrite(refs) => MutPtrs::new(T::refs_mut_as_ptrs(context, refs.into_inner())),
-            Self::WriteOnly(ptrs) => ptrs,
+            Self::ReadWrite(refs) => T::refs_mut_as_ptrs(context, refs.into_inner()),
+            Self::WriteOnly(ptrs) => ptrs.into_inner(),
         }
     }
 }
 
-impl<'context, 'a, T> From<RefsMut<'context, 'a, T>> for TryInsertAccess<'context, 'a, T>
+impl<T> Debug for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-{
-    #[inline]
-    fn from(refs: RefsMut<'context, 'a, T>) -> Self {
-        Self::ReadWrite(refs)
-    }
-}
-
-impl<'context, T> From<MutPtrs<'context, T>> for TryInsertAccess<'context, '_, T>
-where
-    T: Soa + ?Sized,
-{
-    #[inline]
-    fn from(ptrs: MutPtrs<'context, T>) -> Self {
-        Self::WriteOnly(ptrs)
-    }
-}
-
-impl<'context, 'a, T> Debug for TryInsertAccess<'context, 'a, T>
-where
-    T: Soa + ?Sized,
-    RefsMut<'context, 'a, T>: Debug,
-    MutPtrs<'context, T>: Debug,
+    for<'c, 'a> T::RefsMut<'c, 'a>: Debug,
+    for<'c> MutPtrs<'c, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -64,11 +56,11 @@ where
     }
 }
 
-impl<'context, 'a, T> PartialEq for TryInsertAccess<'context, 'a, T>
+impl<T> PartialEq for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    RefsMut<'context, 'a, T>: PartialEq,
-    MutPtrs<'context, T>: PartialEq,
+    for<'c, 'a> T::RefsMut<'c, 'a>: PartialEq,
+    for<'c> MutPtrs<'c, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -79,19 +71,19 @@ where
     }
 }
 
-impl<'context, 'a, T> Eq for TryInsertAccess<'context, 'a, T>
+impl<T> Eq for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    RefsMut<'context, 'a, T>: Eq,
-    MutPtrs<'context, T>: Eq,
+    for<'c, 'a> T::RefsMut<'c, 'a>: Eq,
+    for<'c> MutPtrs<'c, T>: Eq,
 {
 }
 
-impl<'context, 'a, T> PartialOrd for TryInsertAccess<'context, 'a, T>
+impl<T> PartialOrd for TryInsertAccess<'_, '_, T>
 where
-    T: Soa + ?Sized + 'a,
-    RefsMut<'context, 'a, T>: PartialOrd,
-    MutPtrs<'context, T>: PartialOrd,
+    T: Soa + ?Sized,
+    for<'c, 'a> T::RefsMut<'c, 'a>: PartialOrd,
+    for<'c> MutPtrs<'c, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match (self, other) {
@@ -103,11 +95,11 @@ where
     }
 }
 
-impl<'context, 'a, T> Ord for TryInsertAccess<'context, 'a, T>
+impl<T> Ord for TryInsertAccess<'_, '_, T>
 where
-    T: Soa + ?Sized + 'a,
-    RefsMut<'context, 'a, T>: Ord,
-    MutPtrs<'context, T>: Ord,
+    T: Soa + ?Sized,
+    for<'c, 'a> T::RefsMut<'c, 'a>: Ord,
+    for<'c> MutPtrs<'c, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match (self, other) {
@@ -119,11 +111,11 @@ where
     }
 }
 
-impl<'context, 'a, T> Hash for TryInsertAccess<'context, 'a, T>
+impl<T> Hash for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    RefsMut<'context, 'a, T>: Hash,
-    MutPtrs<'context, T>: Hash,
+    for<'c, 'a> T::RefsMut<'c, 'a>: Hash,
+    for<'c> MutPtrs<'c, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {

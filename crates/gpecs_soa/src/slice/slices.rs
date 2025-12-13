@@ -16,14 +16,14 @@ use crate::{
     traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
     },
-    wrapper::{MutPtrs as MutPtrsWrapper, Ptrs as PtrsWrapper},
+    wrapper,
 };
 
 pub struct SoaSlicePtrs<'c, T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: PtrsWrapper<'c, T>,
+    ptrs: wrapper::Ptrs<'c, T>,
     context: &'c T::Context,
     len: usize,
 }
@@ -41,7 +41,7 @@ where
 
     #[inline]
     pub unsafe fn from_parts(context: &'c T::Context, ptrs: Ptrs<'c, T>, len: usize) -> Self {
-        let ptrs = PtrsWrapper::new(ptrs);
+        let ptrs = wrapper::Ptrs::new(ptrs);
         Self { ptrs, context, len }
     }
 
@@ -825,7 +825,7 @@ pub struct SoaSliceMutPtrs<'c, T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: MutPtrsWrapper<'c, T>,
+    ptrs: wrapper::MutPtrs<'c, T>,
     context: &'c T::Context,
     len: usize,
 }
@@ -843,7 +843,7 @@ where
 
     #[inline]
     pub unsafe fn from_parts(context: &'c T::Context, ptrs: MutPtrs<'c, T>, len: usize) -> Self {
-        let ptrs = MutPtrsWrapper::new(ptrs);
+        let ptrs = wrapper::MutPtrs::new(ptrs);
         Self { ptrs, context, len }
     }
 

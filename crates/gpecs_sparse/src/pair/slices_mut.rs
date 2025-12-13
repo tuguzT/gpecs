@@ -9,7 +9,7 @@ use crate::{
     pair::{
         KeyValueMutPtrs, KeyValuePtrs, KeyValueSliceMutPtrs, KeyValueSlicePtrs, KeyValueSlices,
     },
-    soa::{traits::Soa, wrapper::SlicesMut},
+    soa::{traits::Soa, wrapper},
 };
 
 pub struct KeyValueSlicesMut<'context, 'a, K, V>
@@ -17,7 +17,7 @@ where
     V: Soa + ?Sized + 'a,
 {
     keys: &'a mut [K],
-    values: SlicesMut<'context, 'a, V>,
+    values: wrapper::SlicesMut<'context, 'a, V>,
 }
 
 impl<'context, 'a, K, V> KeyValueSlicesMut<'context, 'a, K, V>
@@ -40,7 +40,7 @@ where
 
     #[inline]
     pub unsafe fn new_unchecked(keys: &'a mut [K], values: V::SlicesMut<'context, 'a>) -> Self {
-        let values = SlicesMut::new(values);
+        let values = wrapper::SlicesMut::new(values);
         Self { keys, values }
     }
 
@@ -51,9 +51,9 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a mut [K], SlicesMut<'context, 'a, V>) {
+    pub fn into_parts(self) -> (&'a mut [K], V::SlicesMut<'context, 'a>) {
         let Self { keys, values } = self;
-        (keys, values)
+        (keys, values.into_inner())
     }
 
     #[inline]
@@ -111,7 +111,7 @@ where
 }
 
 impl<'context, 'a, K, V> From<KeyValueSlicesMut<'context, 'a, K, V>>
-    for (&'a mut [K], SlicesMut<'context, 'a, V>)
+    for (&'a mut [K], V::SlicesMut<'context, 'a>)
 where
     V: Soa + ?Sized,
 {
@@ -121,11 +121,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Debug for KeyValueSlicesMut<'context, 'a, K, V>
+impl<K, V> Debug for KeyValueSlicesMut<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    SlicesMut<'context, 'a, V>: Debug,
+    for<'c, 'a> V::SlicesMut<'c, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -136,25 +136,24 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Default for KeyValueSlicesMut<'context, 'a, K, V>
+impl<K, V> Default for KeyValueSlicesMut<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    SlicesMut<'context, 'a, V>: Default,
+    for<'c, 'a> V::SlicesMut<'c, 'a>: Default,
 {
     #[inline]
     fn default() -> Self {
-        Self {
-            keys: Default::default(),
-            values: SlicesMut::default(),
-        }
+        let keys = Default::default();
+        let values = V::SlicesMut::default();
+        unsafe { Self::new_unchecked(keys, values) }
     }
 }
 
-impl<'context, 'a, K, V> PartialEq for KeyValueSlicesMut<'context, 'a, K, V>
+impl<K, V> PartialEq for KeyValueSlicesMut<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
-    SlicesMut<'context, 'a, V>: PartialEq,
+    for<'c, 'a> V::SlicesMut<'c, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
@@ -162,19 +161,19 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Eq for KeyValueSlicesMut<'context, 'a, K, V>
+impl<K, V> Eq for KeyValueSlicesMut<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
-    SlicesMut<'context, 'a, V>: Eq,
+    for<'c, 'a> V::SlicesMut<'c, 'a>: Eq,
 {
 }
 
-impl<'context, 'a, K, V> PartialOrd for KeyValueSlicesMut<'context, 'a, K, V>
+impl<K, V> PartialOrd for KeyValueSlicesMut<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
-    SlicesMut<'context, 'a, V>: PartialOrd,
+    for<'c, 'a> V::SlicesMut<'c, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
@@ -186,11 +185,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Ord for KeyValueSlicesMut<'context, 'a, K, V>
+impl<K, V> Ord for KeyValueSlicesMut<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
-    SlicesMut<'context, 'a, V>: Ord,
+    for<'c, 'a> V::SlicesMut<'c, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
@@ -202,11 +201,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Hash for KeyValueSlicesMut<'context, 'a, K, V>
+impl<K, V> Hash for KeyValueSlicesMut<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
-    SlicesMut<'context, 'a, V>: Hash,
+    for<'c, 'a> V::SlicesMut<'c, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;

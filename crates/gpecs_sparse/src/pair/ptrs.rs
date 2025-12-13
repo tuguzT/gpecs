@@ -9,7 +9,7 @@ use crate::{
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValueRefs},
     soa::{
         traits::{Ptrs, RawSoa, RawSoaContext, Soa, SoaCloneToUninit, SoaRead},
-        wrapper::Ptrs as PtrsWrapper,
+        wrapper,
     },
 };
 
@@ -18,7 +18,7 @@ where
     V: RawSoa + ?Sized,
 {
     pub key: *const K,
-    pub value: PtrsWrapper<'context, V>,
+    pub value: wrapper::Ptrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValuePtrs<'context, K, V>
@@ -27,7 +27,7 @@ where
 {
     #[inline]
     pub fn new(key: *const K, value: Ptrs<'context, V>) -> Self {
-        let value = PtrsWrapper::new(value);
+        let value = wrapper::Ptrs::new(value);
         Self { key, value }
     }
 
@@ -36,6 +36,12 @@ where
         let key = ptr::dangling();
         let value = context.ptrs_dangling();
         Self::new(key, value)
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (*const K, Ptrs<'context, V>) {
+        let Self { key, value } = self;
+        (key, value.into_inner())
     }
 
     #[inline]
@@ -130,32 +136,31 @@ where
     }
 }
 
-impl<'context, K, V> From<(*const K, PtrsWrapper<'context, V>)> for KeyValuePtrs<'context, K, V>
+impl<'context, K, V> From<(*const K, Ptrs<'context, V>)> for KeyValuePtrs<'context, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    fn from(value: (*const K, PtrsWrapper<'context, V>)) -> Self {
+    fn from(value: (*const K, Ptrs<'context, V>)) -> Self {
         let (key, value) = value;
-        Self { key, value }
+        Self::new(key, value)
     }
 }
 
-impl<'context, K, V> From<KeyValuePtrs<'context, K, V>> for (*const K, PtrsWrapper<'context, V>)
+impl<'context, K, V> From<KeyValuePtrs<'context, K, V>> for (*const K, Ptrs<'context, V>)
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValuePtrs<'context, K, V>) -> Self {
-        let KeyValuePtrs { key, value } = value;
-        (key, value)
+        value.into_parts()
     }
 }
 
-impl<'context, K, V> Debug for KeyValuePtrs<'context, K, V>
+impl<K, V> Debug for KeyValuePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    PtrsWrapper<'context, V>: Debug,
+    for<'c> Ptrs<'c, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -166,10 +171,10 @@ where
     }
 }
 
-impl<'context, K, V> PartialEq for KeyValuePtrs<'context, K, V>
+impl<K, V> PartialEq for KeyValuePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    PtrsWrapper<'context, V>: PartialEq,
+    for<'c> Ptrs<'c, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -177,17 +182,17 @@ where
     }
 }
 
-impl<'context, K, V> Eq for KeyValuePtrs<'context, K, V>
+impl<K, V> Eq for KeyValuePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    PtrsWrapper<'context, V>: Eq,
+    for<'c> Ptrs<'c, V>: Eq,
 {
 }
 
-impl<'context, K, V> PartialOrd for KeyValuePtrs<'context, K, V>
+impl<K, V> PartialOrd for KeyValuePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    PtrsWrapper<'context, V>: PartialOrd,
+    for<'c> Ptrs<'c, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -199,10 +204,10 @@ where
     }
 }
 
-impl<'context, K, V> Ord for KeyValuePtrs<'context, K, V>
+impl<K, V> Ord for KeyValuePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    PtrsWrapper<'context, V>: Ord,
+    for<'c> Ptrs<'c, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -214,10 +219,10 @@ where
     }
 }
 
-impl<'context, K, V> Hash for KeyValuePtrs<'context, K, V>
+impl<K, V> Hash for KeyValuePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    PtrsWrapper<'context, V>: Hash,
+    for<'c> Ptrs<'c, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -237,9 +242,9 @@ where
     }
 }
 
-impl<'context, K, V> Copy for KeyValuePtrs<'context, K, V>
+impl<K, V> Copy for KeyValuePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    PtrsWrapper<'context, V>: Copy,
+    for<'c> Ptrs<'c, V>: Copy,
 {
 }

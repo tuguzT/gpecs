@@ -111,7 +111,7 @@ where
 
         let (context, slices) = dense.as_slices_with_context();
         let (_, values) = slices.into_parts();
-        (context, values.into_inner())
+        (context, values)
     }
 
     #[inline]
@@ -126,7 +126,7 @@ where
 
         let (context, slices) = dense.into_slices_with_context();
         let (_, values) = slices.into_parts();
-        (context, values.into_inner())
+        (context, values)
     }
 
     #[inline]
@@ -559,7 +559,7 @@ where
 
         let (context, slices) = dense.as_slices_with_context();
         let (_, values) = slices.into_parts();
-        (context, values.into_inner())
+        (context, values)
     }
 
     #[inline]
@@ -574,7 +574,7 @@ where
 
         let (context, slices) = dense.as_mut_slices_with_context();
         let (_, values) = slices.into_parts();
-        (context, values.into_inner())
+        (context, values)
     }
 
     #[inline]
@@ -589,7 +589,7 @@ where
 
         let (context, slices) = dense.into_slices_with_context();
         let (_, values) = slices.into_parts();
-        (context, values.into_inner())
+        (context, values)
     }
 
     #[inline]
@@ -709,7 +709,7 @@ where
 
         let (context, slices) = dense.as_mut_slices_with_context();
         let (_, values) = slices.into_parts();
-        let dense = SoaSlicesMut::<V>::new(context, values.into_inner());
+        let dense = SoaSlicesMut::<V>::new(context, values);
 
         let first_index = unwrap_into_usize(first_key.sparse_index());
         let second_index = unwrap_into_usize(second_key.sparse_index());
@@ -867,7 +867,7 @@ where
 
         let (context, slices) = dense.as_mut_slices_with_context();
         let (keys, values) = slices.into_parts();
-        let mut values = SoaSlicesMut::<V>::new(context, values.into_inner());
+        let mut values = SoaSlicesMut::<V>::new(context, values);
 
         sort_keys(keys, values.iter(), sparse);
 

@@ -173,7 +173,8 @@ where
     #[inline]
     unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
         let context = self.as_inner();
-        unsafe { KeyValueNonNullPtrs::new_unchecked(context, ptrs) }
+        let (key, value) = ptrs.into_parts();
+        unsafe { KeyValueNonNullPtrs::new_unchecked(context, key, value) }
     }
 
     #[inline]
@@ -372,7 +373,7 @@ where
         from: Self::Slices<'long, 'a_long>,
     ) -> Self::Slices<'short, 'a_short> {
         let (keys, values) = from.into_parts();
-        let values = V::upcast_slices(values.into_inner());
+        let values = V::upcast_slices(values);
         unsafe { KeyValueSlices::new_unchecked(keys, values) }
     }
 
@@ -386,7 +387,7 @@ where
         from: Self::SlicesMut<'long, 'a_long>,
     ) -> Self::SlicesMut<'short, 'a_short> {
         let (keys, values) = from.into_parts();
-        let values = V::upcast_slices_mut(values.into_inner());
+        let values = V::upcast_slices_mut(values);
         unsafe { KeyValueSlicesMut::new_unchecked(keys, values) }
     }
 

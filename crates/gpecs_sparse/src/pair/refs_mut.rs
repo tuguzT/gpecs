@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     pair::{KeyValueMutPtrs, KeyValueRefs},
-    soa::{traits::Soa, wrapper::RefsMut},
+    soa::{traits::Soa, wrapper},
 };
 
 pub struct KeyValueRefsMut<'context, 'a, K, V>
@@ -15,7 +15,7 @@ where
     V: Soa + ?Sized + 'a,
 {
     pub key: &'a mut K,
-    pub value: RefsMut<'context, 'a, V>,
+    pub value: wrapper::RefsMut<'context, 'a, V>,
 }
 
 impl<'context, 'a, K, V> KeyValueRefsMut<'context, 'a, K, V>
@@ -24,8 +24,14 @@ where
 {
     #[inline]
     pub fn new(key: &'a mut K, value: V::RefsMut<'context, 'a>) -> Self {
-        let value = RefsMut::new(value);
+        let value = wrapper::RefsMut::new(value);
         Self { key, value }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (&'a mut K, V::RefsMut<'context, 'a>) {
+        let Self { key, value } = self;
+        (key, value.into_inner())
     }
 
     #[inline]
@@ -47,35 +53,34 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a mut K, RefsMut<'context, 'a, V>)>
+impl<'context, 'a, K, V> From<(&'a mut K, V::RefsMut<'context, 'a>)>
     for KeyValueRefsMut<'context, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (&'a mut K, RefsMut<'context, 'a, V>)) -> Self {
+    fn from(value: (&'a mut K, V::RefsMut<'context, 'a>)) -> Self {
         let (key, value) = value;
-        Self { key, value }
+        Self::new(key, value)
     }
 }
 
 impl<'context, 'a, K, V> From<KeyValueRefsMut<'context, 'a, K, V>>
-    for (&'a mut K, RefsMut<'context, 'a, V>)
+    for (&'a mut K, V::RefsMut<'context, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueRefsMut<'context, 'a, K, V>) -> Self {
-        let KeyValueRefsMut { key, value } = value;
-        (key, value)
+        value.into_parts()
     }
 }
 
-impl<'context, 'a, K, V> Debug for KeyValueRefsMut<'context, 'a, K, V>
+impl<K, V> Debug for KeyValueRefsMut<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    RefsMut<'context, 'a, V>: Debug,
+    for<'c, 'a> V::RefsMut<'c, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -86,11 +91,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> PartialEq for KeyValueRefsMut<'context, 'a, K, V>
+impl<K, V> PartialEq for KeyValueRefsMut<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
-    RefsMut<'context, 'a, V>: PartialEq,
+    for<'c, 'a> V::RefsMut<'c, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -98,19 +103,19 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Eq for KeyValueRefsMut<'context, 'a, K, V>
+impl<K, V> Eq for KeyValueRefsMut<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
-    RefsMut<'context, 'a, V>: Eq,
+    for<'c, 'a> V::RefsMut<'c, 'a>: Eq,
 {
 }
 
-impl<'context, 'a, K, V> PartialOrd for KeyValueRefsMut<'context, 'a, K, V>
+impl<K, V> PartialOrd for KeyValueRefsMut<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
-    RefsMut<'context, 'a, V>: PartialOrd,
+    for<'c, 'a> V::RefsMut<'c, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -122,11 +127,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Ord for KeyValueRefsMut<'context, 'a, K, V>
+impl<K, V> Ord for KeyValueRefsMut<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
-    RefsMut<'context, 'a, V>: Ord,
+    for<'c, 'a> V::RefsMut<'c, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -138,11 +143,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Hash for KeyValueRefsMut<'context, 'a, K, V>
+impl<K, V> Hash for KeyValueRefsMut<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
-    RefsMut<'context, 'a, V>: Hash,
+    for<'c, 'a> V::RefsMut<'c, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;

@@ -13,14 +13,14 @@ use crate::{
         MutPtrs, NonNullPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead,
     },
     vec::SoaVec,
-    wrapper::NonNullPtrs as NonNullPtrsWrapper,
+    wrapper,
 };
 
 pub struct IntoIter<T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: NonNullPtrsWrapper<'static, T>,
+    ptrs: wrapper::NonNullPtrs<'static, T>,
     buffer: NonNull<BufferData<T>>,
     capacity: usize,
     start: usize,
@@ -41,7 +41,7 @@ where
         let ptrs = unsafe { context.ptrs_to_nonnull(ptrs) };
         let ptrs = unsafe { transmute::<NonNullPtrs<'_, T>, NonNullPtrs<'_, T>>(ptrs) };
         Self {
-            ptrs: NonNullPtrsWrapper::new(ptrs),
+            ptrs: wrapper::NonNullPtrs::new(ptrs),
             buffer: unsafe { NonNull::new_unchecked(buffer) },
             capacity: vec.capacity(),
             start: 0,

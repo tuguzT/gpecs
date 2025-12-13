@@ -255,7 +255,7 @@ where
         let Self { dense, .. } = self;
 
         let (_, values) = dense.as_slices().into_parts();
-        values.into_inner()
+        values
     }
 
     #[inline]
@@ -263,7 +263,7 @@ where
         let Self { dense, .. } = self;
 
         let (_, values) = dense.as_mut_slices().into_parts();
-        values.into_inner()
+        values
     }
 
     #[inline]
@@ -272,7 +272,7 @@ where
 
         let (context, slices) = dense.slices().into_slices_with_context();
         let (_, values) = slices.into_parts();
-        SoaSlices::new(context.as_inner(), values.into_inner())
+        SoaSlices::new(context.as_inner(), values)
     }
 
     #[inline]
@@ -281,7 +281,7 @@ where
 
         let (context, slices) = dense.slices_mut().into_slices_with_context();
         let (_, values) = slices.into_parts();
-        SoaSlicesMut::new(context.as_inner(), values.into_inner())
+        SoaSlicesMut::new(context.as_inner(), values)
     }
 
     #[inline]
@@ -513,7 +513,7 @@ where
         let mut last = 0;
         for curr in 0..old_len {
             let (&mut key, value) = dense.slices_mut().into_index_mut(curr).into();
-            if !f(key, value.into_inner()) {
+            if !f(key, value) {
                 let sparse_index = unwrap_into_usize(key.sparse_index());
 
                 let next_vacant = unwrap_into_index(*sparse_vacant_head);
@@ -932,7 +932,7 @@ where
 
                     let dense_index = unwrap_into_usize(dense_index);
                     let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
-                    let result = f(context, Ok(Some(dense_value.into())));
+                    let result = f(context, Ok(Some(TryInsertAccess::read_write(dense_value))));
 
                     sparse_item.epoch = key.epoch();
                     *dense_key = key;
@@ -958,7 +958,7 @@ where
 
                     dense.push_from(|context, dst| {
                         let (key_ptr, value_ptrs) = dst.into();
-                        let result = f(context, Ok(Some(value_ptrs.into())));
+                        let result = f(context, Ok(Some(TryInsertAccess::write_only(value_ptrs))));
 
                         sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
                         unsafe { ptr::write(key_ptr, key) }
@@ -995,7 +995,7 @@ where
 
                 dense.push_from(|context, dst| {
                     let (key_ptr, value_ptrs) = dst.into();
-                    let result = f(context, Ok(Some(value_ptrs.into())));
+                    let result = f(context, Ok(Some(TryInsertAccess::write_only(value_ptrs))));
 
                     sparse[sparse_index] = SparseItem::occupied(dense_index, key.epoch());
                     unsafe { ptr::write(key_ptr, key) }
@@ -1064,7 +1064,7 @@ where
 
             return dense.push_from(|context, dst| {
                 let (key_ptr, value_ptrs) = dst.into();
-                let result = f(context, Ok((key, value_ptrs.into_inner())));
+                let result = f(context, Ok((key, value_ptrs)));
 
                 sparse_item.kind = sparse_item_kind;
                 *sparse_vacant_head = next_vacant;
@@ -1106,7 +1106,7 @@ where
         let new_sparse_vacant_head = dense.len() + 1;
         dense.push_from(|context, dst| {
             let (key_ptr, value_ptrs) = dst.into();
-            let result = f(context, Ok((key, value_ptrs.into_inner())));
+            let result = f(context, Ok((key, value_ptrs)));
 
             sparse.push(sparse_item);
             *sparse_vacant_head = new_sparse_vacant_head;

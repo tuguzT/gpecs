@@ -185,7 +185,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values.into_inner()
+        values
     }
 
     #[inline]
@@ -193,7 +193,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_mut_slices().into_parts();
-        values.into_inner()
+        values
     }
 }
 
@@ -353,7 +353,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values.into_inner()
+        values
     }
 
     #[inline]
@@ -361,7 +361,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_mut_slices().into_parts();
-        values.into_inner()
+        values
     }
 
     #[inline]
@@ -369,7 +369,7 @@ where
         let Self { inner } = self;
 
         let (keys, values) = inner.as_slices().into_parts();
-        (keys, values.into_inner())
+        (keys, values)
     }
 
     #[inline]
@@ -377,7 +377,7 @@ where
         let Self { inner } = self;
 
         let (keys, values) = inner.as_mut_slices().into_parts();
-        (keys, values.into_inner())
+        (keys, values)
     }
 }
 
@@ -523,7 +523,7 @@ where
         let Self { inner } = self;
 
         let (_, values) = inner.as_slices().into_parts();
-        values.into_inner()
+        values
     }
 }
 

@@ -16,7 +16,6 @@ use crate::{
     },
 };
 
-#[repr(transparent)]
 pub struct RawKeys<'c, K, V>
 where
     K: 'c,
@@ -131,14 +130,12 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { inner } = self;
-        inner.len()
+        RawKeys::len(self)
     }
 }
 
 impl<K, V> FusedIterator for RawKeys<'_, K, V> where V: RawSoa + ?Sized {}
 
-#[repr(transparent)]
 pub struct Keys<'c, 'a, K, V>
 where
     K: 'a,
@@ -275,14 +272,12 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.len()
+        Keys::len(self)
     }
 }
 
 impl<K, V> FusedIterator for Keys<'_, '_, K, V> where V: RawSoa {}
 
-#[repr(transparent)]
 pub struct Values<'c, 'a, K, V>
 where
     K: 'c,
@@ -301,11 +296,18 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> V::Slices<'c, 'a> {
+    pub fn as_slices(&self) -> V::Slices<'c, 'a> {
+        let (_, values) = self.as_slices_with_context();
+        values
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&'c V::Context, V::Slices<'c, 'a>) {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices().into_parts();
-        values.into_inner()
+        let (context, slices) = inner.as_slices_with_context();
+        let (_, values) = slices.into_parts();
+        (context, values)
     }
 }
 
@@ -315,7 +317,7 @@ where
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let values = &self.as_slice();
+        let values = &self.as_slices();
         f.debug_tuple("Values").field(values).finish()
     }
 }
@@ -340,7 +342,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_slice().into()
+        self.as_slices().into()
     }
 }
 
@@ -530,19 +532,33 @@ where
     }
 
     #[inline]
-    pub fn into_slice(self) -> V::SlicesMut<'c, 'a> {
-        let Self { inner } = self;
-
-        let (_, values) = inner.into_slices().into_parts();
-        values.into_inner()
+    pub fn into_slices(self) -> V::SlicesMut<'c, 'a> {
+        let (_, values) = self.into_slices_with_context();
+        values
     }
 
     #[inline]
-    pub fn as_slice(&self) -> V::Slices<'_, '_> {
+    pub fn into_slices_with_context(self) -> (&'c V::Context, V::SlicesMut<'c, 'a>) {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices().into_parts();
-        values.into_inner()
+        let (context, slices) = inner.into_slices_with_context();
+        let (_, values) = slices.into_parts();
+        (context, values)
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> V::Slices<'_, '_> {
+        let (_, values) = self.as_slices_with_context();
+        values
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
+        let Self { inner } = self;
+
+        let (context, slices) = inner.as_slices_with_context();
+        let (_, values) = slices.into_parts();
+        (context, values)
     }
 }
 
@@ -552,7 +568,7 @@ where
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let values = &self.as_slice();
+        let values = &self.as_slices();
         f.debug_tuple("ValuesMut").field(values).finish()
     }
 }
@@ -564,7 +580,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_slice().into()
+        self.as_slices().into()
     }
 }
 
@@ -753,27 +769,18 @@ where
     }
 
     #[inline]
-    pub fn as_keys_slice(&self) -> &'a [K] {
-        let Self { inner } = self;
-
-        let (keys, _) = inner.as_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub fn as_values_slice(&self) -> V::Slices<'c, 'a> {
-        let Self { inner } = self;
-
-        let (_, values) = inner.as_slices().into_parts();
-        values.into_inner()
-    }
-
-    #[inline]
     pub fn as_slices(&self) -> (&'a [K], V::Slices<'c, 'a>) {
+        let (_, keys, values) = self.as_slices_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&'c V::Context, &'a [K], V::Slices<'c, 'a>) {
         let Self { inner } = self;
 
-        let (keys, values) = inner.as_slices().into_parts();
-        (keys, values.into_inner())
+        let (context, slices) = inner.as_slices_with_context();
+        let (keys, values) = slices.into_parts();
+        (context, keys, values)
     }
 }
 
@@ -812,7 +819,8 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_values_slice().into()
+        let (_, values) = self.as_slices();
+        values.into()
     }
 }
 
@@ -927,51 +935,33 @@ where
     }
 
     #[inline]
-    pub fn into_keys_slice(self) -> &'a [K] {
-        let Self { inner } = self;
-
-        let (keys, _) = inner.into_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub fn as_keys_slice(&self) -> &[K] {
-        let Self { inner } = self;
-
-        let (keys, _) = inner.as_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub fn into_values_slice(self) -> V::SlicesMut<'c, 'a> {
-        let Self { inner } = self;
-
-        let (_, values) = inner.into_slices().into_parts();
-        values.into_inner()
-    }
-
-    #[inline]
-    pub fn as_values_slice(&self) -> V::Slices<'_, '_> {
-        let Self { inner } = self;
-
-        let (_, values) = inner.as_slices().into_parts();
-        values.into_inner()
-    }
-
-    #[inline]
     pub fn into_slices(self) -> (&'a [K], V::SlicesMut<'c, 'a>) {
+        let (_, keys, values) = self.into_slices_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn into_slices_with_context(self) -> (&'c V::Context, &'a [K], V::SlicesMut<'c, 'a>) {
         let Self { inner } = self;
 
-        let (keys, values) = inner.into_slices().into_parts();
-        (keys, values.into_inner())
+        let (context, slices) = inner.into_slices_with_context();
+        let (keys, values) = slices.into_parts();
+        (context, keys, values)
     }
 
     #[inline]
     pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
+        let (_, keys, values) = self.as_slices_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&V::Context, &[K], V::Slices<'_, '_>) {
         let Self { inner } = self;
 
-        let (keys, values) = inner.as_slices().into_parts();
-        (keys, values.into_inner())
+        let (context, slices) = inner.as_slices_with_context();
+        let (keys, values) = slices.into_parts();
+        (context, keys, values)
     }
 }
 
@@ -997,7 +987,8 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_values_slice().into()
+        let (_, values) = self.as_slices();
+        values.into()
     }
 }
 

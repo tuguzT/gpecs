@@ -79,7 +79,7 @@ where
     let (&dense_key, value) = unwrap_dense(dense, dense_index).into();
     check_equal_key(key, dense_key);
 
-    Some(value.into_inner())
+    Some(value)
 }
 
 #[cold]
@@ -128,7 +128,7 @@ where
     let (&mut dense_key, value) = unwrap_dense(dense, dense_index).into();
     check_equal_key(key, dense_key);
 
-    Some(value.into_inner())
+    Some(value)
 }
 
 #[inline]
@@ -164,7 +164,7 @@ where
     let (&dense_key, value) = unwrap_dense(dense, dense_index).into();
     check_compatible_key(K::new(sparse_index, sparse_item.epoch), dense_key);
 
-    Some((dense_key, value.into_inner()))
+    Some((dense_key, value))
 }
 
 pub fn sparse_get_mut_with_key<'context, 'a, K, V>(
@@ -183,7 +183,7 @@ where
     let (&mut dense_key, value) = unwrap_dense(dense, dense_index).into();
     check_compatible_key(K::new(sparse_index, sparse_item.epoch), dense_key);
 
-    Some((dense_key, value.into_inner()))
+    Some((dense_key, value))
 }
 
 pub fn sparse_get_epoch<K>(

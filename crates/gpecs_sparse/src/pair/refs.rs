@@ -7,7 +7,7 @@ use core::{
 
 use crate::{
     pair::KeyValuePtrs,
-    soa::{traits::Soa, wrapper::Refs},
+    soa::{traits::Soa, wrapper},
 };
 
 pub struct KeyValueRefs<'context, 'a, K, V>
@@ -15,7 +15,7 @@ where
     V: Soa + ?Sized + 'a,
 {
     pub key: &'a K,
-    pub value: Refs<'context, 'a, V>,
+    pub value: wrapper::Refs<'context, 'a, V>,
 }
 
 impl<'context, 'a, K, V> KeyValueRefs<'context, 'a, K, V>
@@ -24,8 +24,14 @@ where
 {
     #[inline]
     pub fn new(key: &'a K, value: V::Refs<'context, 'a>) -> Self {
-        let value = Refs::new(value);
+        let value = wrapper::Refs::new(value);
         Self { key, value }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (&'a K, V::Refs<'context, 'a>) {
+        let Self { key, value } = self;
+        (key, value.into_inner())
     }
 
     #[inline]
@@ -38,33 +44,32 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a K, Refs<'context, 'a, V>)> for KeyValueRefs<'context, 'a, K, V>
+impl<'context, 'a, K, V> From<(&'a K, V::Refs<'context, 'a>)> for KeyValueRefs<'context, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (&'a K, Refs<'context, 'a, V>)) -> Self {
+    fn from(value: (&'a K, V::Refs<'context, 'a>)) -> Self {
         let (key, value) = value;
-        Self { key, value }
+        Self::new(key, value)
     }
 }
 
-impl<'context, 'a, K, V> From<KeyValueRefs<'context, 'a, K, V>> for (&'a K, Refs<'context, 'a, V>)
+impl<'context, 'a, K, V> From<KeyValueRefs<'context, 'a, K, V>> for (&'a K, V::Refs<'context, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
     fn from(value: KeyValueRefs<'context, 'a, K, V>) -> Self {
-        let KeyValueRefs { key, value } = value;
-        (key, value)
+        value.into_parts()
     }
 }
 
-impl<'context, 'a, K, V> Debug for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> Debug for KeyValueRefs<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    Refs<'context, 'a, V>: Debug,
+    for<'c, 'a> V::Refs<'c, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -75,11 +80,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> PartialEq for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> PartialEq for KeyValueRefs<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
-    Refs<'context, 'a, V>: PartialEq,
+    for<'c, 'a> V::Refs<'c, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -87,19 +92,19 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Eq for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> Eq for KeyValueRefs<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
-    Refs<'context, 'a, V>: Eq,
+    for<'c, 'a> V::Refs<'c, 'a>: Eq,
 {
 }
 
-impl<'context, 'a, K, V> PartialOrd for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> PartialOrd for KeyValueRefs<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
-    Refs<'context, 'a, V>: PartialOrd,
+    for<'c, 'a> V::Refs<'c, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -111,11 +116,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Ord for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> Ord for KeyValueRefs<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
-    Refs<'context, 'a, V>: Ord,
+    for<'c, 'a> V::Refs<'c, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -127,11 +132,11 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Hash for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> Hash for KeyValueRefs<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
-    Refs<'context, 'a, V>: Hash,
+    for<'c, 'a> V::Refs<'c, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -140,10 +145,10 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Clone for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> Clone for KeyValueRefs<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    Refs<'context, 'a, V>: Clone,
+    for<'c, 'a> V::Refs<'c, 'a>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -153,9 +158,9 @@ where
     }
 }
 
-impl<'context, 'a, K, V> Copy for KeyValueRefs<'context, 'a, K, V>
+impl<K, V> Copy for KeyValueRefs<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    Refs<'context, 'a, V>: Copy,
+    for<'c, 'a> V::Refs<'c, 'a>: Copy,
 {
 }

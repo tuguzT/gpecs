@@ -8,8 +8,8 @@ use core::{
 use crate::{
     pair::{KeyValueMutPtrs, KeyValuePtrs},
     soa::{
-        traits::{RawSoa, RawSoaContext},
-        wrapper::NonNullPtrs,
+        traits::{MutPtrs, NonNullPtrs, RawSoa, RawSoaContext},
+        wrapper,
     },
 };
 
@@ -18,7 +18,7 @@ where
     V: RawSoa + ?Sized,
 {
     pub key: NonNull<K>,
-    pub value: NonNullPtrs<'context, V>,
+    pub value: wrapper::NonNullPtrs<'context, V>,
 }
 
 impl<'context, K, V> KeyValueNonNullPtrs<'context, K, V>
@@ -26,15 +26,26 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
+    pub fn new(key: NonNull<K>, value: NonNullPtrs<'context, V>) -> Self {
+        let value = wrapper::NonNullPtrs::new(value);
+        Self { key, value }
+    }
+
+    #[inline]
     pub unsafe fn new_unchecked(
         context: &'context V::Context,
-        ptrs: KeyValueMutPtrs<'context, K, V>,
+        key: *mut K,
+        value: MutPtrs<'context, V>,
     ) -> Self {
-        let KeyValueMutPtrs { key, value } = ptrs;
-
         let key = unsafe { NonNull::new_unchecked(key) };
-        let value = NonNullPtrs::new(unsafe { context.ptrs_to_nonnull(value.into_inner()) });
-        Self { key, value }
+        let value = unsafe { context.ptrs_to_nonnull(value) };
+        Self::new(key, value)
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (NonNull<K>, NonNullPtrs<'context, V>) {
+        let Self { key, value } = self;
+        (key, value.into_inner())
     }
 
     #[inline]
@@ -65,7 +76,7 @@ where
     #[inline]
     fn from(value: (NonNull<K>, NonNullPtrs<'context, V>)) -> Self {
         let (key, value) = value;
-        Self { key, value }
+        Self::new(key, value)
     }
 }
 
@@ -76,15 +87,14 @@ where
 {
     #[inline]
     fn from(value: KeyValueNonNullPtrs<'context, K, V>) -> Self {
-        let KeyValueNonNullPtrs { key, value } = value;
-        (key, value)
+        value.into_parts()
     }
 }
 
-impl<'context, K, V> Debug for KeyValueNonNullPtrs<'context, K, V>
+impl<K, V> Debug for KeyValueNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    NonNullPtrs<'context, V>: Debug,
+    for<'c> NonNullPtrs<'c, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -95,10 +105,10 @@ where
     }
 }
 
-impl<'context, K, V> PartialEq for KeyValueNonNullPtrs<'context, K, V>
+impl<K, V> PartialEq for KeyValueNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    NonNullPtrs<'context, V>: PartialEq,
+    for<'c> NonNullPtrs<'c, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -106,17 +116,17 @@ where
     }
 }
 
-impl<'context, K, V> Eq for KeyValueNonNullPtrs<'context, K, V>
+impl<K, V> Eq for KeyValueNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    NonNullPtrs<'context, V>: Eq,
+    for<'c> NonNullPtrs<'c, V>: Eq,
 {
 }
 
-impl<'context, K, V> PartialOrd for KeyValueNonNullPtrs<'context, K, V>
+impl<K, V> PartialOrd for KeyValueNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    NonNullPtrs<'context, V>: PartialOrd,
+    for<'c> NonNullPtrs<'c, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -128,10 +138,10 @@ where
     }
 }
 
-impl<'context, K, V> Ord for KeyValueNonNullPtrs<'context, K, V>
+impl<K, V> Ord for KeyValueNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    NonNullPtrs<'context, V>: Ord,
+    for<'c> NonNullPtrs<'c, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -143,10 +153,10 @@ where
     }
 }
 
-impl<'context, K, V> Hash for KeyValueNonNullPtrs<'context, K, V>
+impl<K, V> Hash for KeyValueNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    NonNullPtrs<'context, V>: Hash,
+    for<'c> NonNullPtrs<'c, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -167,9 +177,9 @@ where
     }
 }
 
-impl<'context, K, V> Copy for KeyValueNonNullPtrs<'context, K, V>
+impl<K, V> Copy for KeyValueNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    NonNullPtrs<'context, V>: Copy,
+    for<'c> NonNullPtrs<'c, V>: Copy,
 {
 }

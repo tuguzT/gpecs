@@ -419,6 +419,8 @@ pub unsafe trait SoaWrite: RawSoa + Sized {
     unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self);
 }
 
+// TODO: move reference types of SoA into new `SoaContext` trait (I want to remove noisy `where Self: 'a` bound and preserve upcast methods)
+
 /// An extension of [SoA](RawSoa) type which allows to access
 /// each stored field by their reference types.
 pub unsafe trait Soa: RawSoa {

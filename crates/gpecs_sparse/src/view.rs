@@ -38,6 +38,8 @@ use crate::{
 
 pub type SparseView<'c, 'a, T> = EpochSparseView<'c, 'a, usize, T>;
 
+// TODO: add support for raw SoA types
+
 pub struct EpochSparseView<'c, 'a, K, V>
 where
     K: Key + 'c,

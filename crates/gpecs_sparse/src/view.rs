@@ -230,69 +230,164 @@ where
 
     #[inline]
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
+        let (_, iter) = self.raw_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.raw_iter();
-        RawKeys::from_inner(inner)
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawKeys::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, '_, K, V> {
-        unsafe { self.raw_keys().deref() }
+        let (_, iter) = self.keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn keys_with_context(&self) -> (&V::Context, Keys<'_, '_, K, V>) {
+        let (context, iter) = self.raw_keys_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
+        let (_, iter) = self.into_raw_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_keys_with_context(self) -> (&'c V::Context, RawKeys<'c, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.into_raw_iter();
-        RawKeys::from_inner(inner)
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawKeys::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn into_keys(self) -> Keys<'c, 'a, K, V> {
-        unsafe { self.into_raw_keys().deref() }
+        let (_, iter) = self.into_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_keys_with_context(self) -> (&'c V::Context, Keys<'c, 'a, K, V>) {
+        let (context, iter) = self.into_raw_keys_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn raw_values(&self) -> RawValues<'_, K, V> {
+        let (_, iter) = self.raw_values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_values_with_context(&self) -> (&V::Context, RawValues<'_, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.raw_iter();
-        RawValues::from_inner(inner)
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawValues::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn values(&self) -> Values<'_, '_, K, V> {
-        unsafe { self.raw_values().deref() }
+        let (_, iter) = self.values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn values_with_context(&self) -> (&V::Context, Values<'_, '_, K, V>) {
+        let (context, iter) = self.raw_values_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn into_raw_values(self) -> RawValues<'c, K, V> {
+        let (_, iter) = self.into_raw_values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_values_with_context(self) -> (&'c V::Context, RawValues<'c, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.into_raw_iter();
-        RawValues::from_inner(inner)
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawValues::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn into_values(self) -> Values<'c, 'a, K, V> {
-        unsafe { self.into_raw_values().deref() }
+        let (_, iter) = self.into_values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_values_with_context(self) -> (&'c V::Context, Values<'c, 'a, K, V>) {
+        let (context, iter) = self.into_raw_values_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn raw_iter(&self) -> RawIter<'_, K, V> {
+        let (_, iter) = self.raw_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.raw_iter();
-        RawIter::from_inner(inner)
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawIter::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, '_, K, V> {
-        unsafe { self.raw_iter().deref() }
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&V::Context, Iter<'_, '_, K, V>) {
+        let (context, iter) = self.raw_iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn into_raw_iter(self) -> RawIter<'c, K, V> {
+        let (_, iter) = self.into_raw_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_iter_with_context(self) -> (&'c V::Context, RawIter<'c, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.into_raw_iter();
-        RawIter::from_inner(inner)
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawIter::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_iter_with_context(self) -> (&'c V::Context, Iter<'c, 'a, K, V>) {
+        let (context, iter) = self.into_raw_iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
@@ -517,7 +612,8 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        unsafe { self.into_raw_iter().deref() }
+        let (_, iter) = self.into_iter_with_context();
+        iter
     }
 }
 
@@ -1042,112 +1138,263 @@ where
 
     #[inline]
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
+        let (_, iter) = self.raw_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.raw_iter();
-        RawKeys::from_inner(inner)
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawKeys::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, '_, K, V> {
-        unsafe { self.raw_keys().deref() }
+        let (_, iter) = self.keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn keys_with_context(&self) -> (&V::Context, Keys<'_, '_, K, V>) {
+        let (context, iter) = self.raw_keys_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
+        let (_, iter) = self.into_raw_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_keys_with_context(self) -> (&'c V::Context, RawKeys<'c, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.into_raw_iter();
-        RawKeys::from_inner(inner)
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawKeys::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn into_keys(self) -> Keys<'c, 'a, K, V> {
-        unsafe { self.into_raw_keys().deref() }
+        let (_, iter) = self.into_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_keys_with_context(self) -> (&'c V::Context, Keys<'c, 'a, K, V>) {
+        let (context, iter) = self.into_raw_keys_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn raw_values(&self) -> RawValues<'_, K, V> {
+        let (_, iter) = self.raw_values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_values_with_context(&self) -> (&V::Context, RawValues<'_, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.raw_iter();
-        RawValues::from_inner(inner)
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawValues::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn values(&self) -> Values<'_, '_, K, V> {
-        unsafe { self.raw_values().deref() }
+        let (_, iter) = self.values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn values_with_context(&self) -> (&V::Context, Values<'_, '_, K, V>) {
+        let (context, iter) = self.raw_values_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn into_raw_values(self) -> RawValues<'c, K, V> {
+        let (_, iter) = self.into_raw_values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_values_with_context(self) -> (&'c V::Context, RawValues<'c, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.into_raw_iter();
-        RawValues::from_inner(inner)
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawValues::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn into_values(self) -> Values<'c, 'a, K, V> {
-        unsafe { self.into_raw_values().deref() }
+        let (_, iter) = self.into_values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_values_with_context(self) -> (&'c V::Context, Values<'c, 'a, K, V>) {
+        let (context, iter) = self.into_raw_values_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V> {
+        let (_, iter) = self.raw_values_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_values_mut_with_context(&mut self) -> (&V::Context, RawValuesMut<'_, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.raw_iter_mut();
-        RawValuesMut::from_inner(inner)
+
+        let (context, inner) = dense.raw_iter_mut_with_context();
+        let iter = RawValuesMut::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<'_, '_, K, V> {
-        unsafe { self.raw_values_mut().deref() }
+        let (_, iter) = self.values_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn values_mut_with_context(&mut self) -> (&V::Context, ValuesMut<'_, '_, K, V>) {
+        let (context, iter) = self.raw_values_mut_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
     }
 
     #[inline]
     pub fn into_raw_values_mut(self) -> RawValuesMut<'c, K, V> {
+        let (_, iter) = self.into_raw_values_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_values_mut_with_context(self) -> (&'c V::Context, RawValuesMut<'c, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.into_raw_iter_mut();
-        RawValuesMut::from_inner(inner)
+
+        let (context, inner) = dense.into_raw_iter_mut_with_context();
+        let iter = RawValuesMut::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn into_values_mut(self) -> ValuesMut<'c, 'a, K, V> {
-        unsafe { self.into_raw_values_mut().deref() }
+        let (_, iter) = self.into_values_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_values_mut_with_context(self) -> (&'c V::Context, ValuesMut<'c, 'a, K, V>) {
+        let (context, iter) = self.into_raw_values_mut_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
     }
 
     #[inline]
     pub fn raw_iter(&self) -> RawIter<'_, K, V> {
+        let (_, iter) = self.raw_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.raw_iter();
-        RawIter::from_inner(inner)
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawIter::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, '_, K, V> {
-        unsafe { self.raw_iter().deref() }
+        let (_, iter) = self.iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_with_context(&self) -> (&V::Context, Iter<'_, '_, K, V>) {
+        let (context, iter) = self.raw_iter_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
     }
 
     #[inline]
     pub fn into_raw_iter(self) -> RawIter<'c, K, V> {
+        let (_, iter) = self.into_raw_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_iter_with_context(self) -> (&'c V::Context, RawIter<'c, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.into_raw_iter();
-        RawIter::from_inner(inner)
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawIter::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V> {
+        let (_, iter) = self.raw_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_iter_mut_with_context(&mut self) -> (&V::Context, RawIterMut<'_, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.raw_iter_mut();
-        RawIterMut::from_inner(inner)
+
+        let (context, inner) = dense.raw_iter_mut_with_context();
+        let iter = RawIterMut::from_inner(inner);
+        (context, iter)
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, '_, K, V> {
-        unsafe { self.raw_iter_mut().deref() }
+        let (_, iter) = self.iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn iter_mut_with_context(&mut self) -> (&V::Context, IterMut<'_, '_, K, V>) {
+        let (context, iter) = self.raw_iter_mut_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
     }
 
     #[inline]
     pub fn into_raw_iter_mut(self) -> RawIterMut<'c, K, V> {
+        let (_, iter) = self.into_raw_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_iter_mut_with_context(self) -> (&'c V::Context, RawIterMut<'c, K, V>) {
         let Self { dense, .. } = self;
-        let inner = dense.into_raw_iter_mut();
-        RawIterMut::from_inner(inner)
+
+        let (context, inner) = dense.into_raw_iter_mut_with_context();
+        let iter = RawIterMut::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_iter_with_context(self) -> (&'c V::Context, IterMut<'c, 'a, K, V>) {
+        let (context, iter) = self.into_raw_iter_mut_with_context();
+        let iter = unsafe { iter.deref_mut() };
+        (context, iter)
     }
 
     #[inline]
@@ -1441,7 +1688,8 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        unsafe { self.into_raw_iter_mut().deref() }
+        let (_, iter) = self.into_iter_with_context();
+        iter
     }
 }
 

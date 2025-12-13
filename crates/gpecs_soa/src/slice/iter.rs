@@ -500,6 +500,7 @@ where
 {
 }
 
+#[repr(transparent)]
 pub struct Iter<'c, 'a, T>
 where
     T: RawSoa + ?Sized + 'a,
@@ -794,6 +795,26 @@ where
     }
 
     #[inline]
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'c, T> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&'c T::Context, MutPtrs<'c, T>) {
+        let Self {
+            ref ptrs,
+            context,
+            start,
+            ..
+        } = *self;
+
+        let ptrs = ptrs.clone().into_inner();
+        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        (context, ptrs)
+    }
+
+    #[inline]
     pub fn into_ptrs(self) -> Ptrs<'c, T> {
         let (_, ptrs) = self.into_ptrs_with_context();
         ptrs
@@ -811,26 +832,6 @@ where
         let ptrs = ptrs.into_inner();
         let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { context.ptrs_add(ptrs, start) };
-        (context, ptrs)
-    }
-
-    #[inline]
-    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'c, T> {
-        let (_, ptrs) = self.as_mut_ptrs_with_context();
-        ptrs
-    }
-
-    #[inline]
-    pub fn as_mut_ptrs_with_context(&mut self) -> (&'c T::Context, MutPtrs<'c, T>) {
-        let Self {
-            ref ptrs,
-            context,
-            start,
-            ..
-        } = *self;
-
-        let ptrs = ptrs.clone().into_inner();
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
         (context, ptrs)
     }
 
@@ -1313,6 +1314,7 @@ where
 {
 }
 
+#[repr(transparent)]
 pub struct IterMut<'c, 'a, T>
 where
     T: RawSoa + ?Sized + 'a,
@@ -1363,18 +1365,6 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> Ptrs<'c, T> {
-        let (_, ptrs) = self.into_ptrs_with_context();
-        ptrs
-    }
-
-    #[inline]
-    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
-        let Self { inner, .. } = self;
-        inner.into_ptrs_with_context()
-    }
-
-    #[inline]
     pub fn as_mut_ptrs(&mut self) -> MutPtrs<'c, T> {
         let (_, ptrs) = self.as_mut_ptrs_with_context();
         ptrs
@@ -1384,6 +1374,18 @@ where
     pub fn as_mut_ptrs_with_context(&mut self) -> (&'c T::Context, MutPtrs<'c, T>) {
         let Self { inner, .. } = self;
         inner.as_mut_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.into_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self { inner, .. } = self;
+        inner.into_ptrs_with_context()
     }
 
     #[inline]
@@ -1450,6 +1452,12 @@ where
     pub fn as_raw_iter(&self) -> &RawIterMut<'c, T> {
         let Self { inner, .. } = self;
         inner
+    }
+
+    #[inline]
+    pub fn into_raw_iter(self) -> RawIter<'c, T> {
+        let Self { inner, .. } = self;
+        inner.cast_const()
     }
 
     #[inline]

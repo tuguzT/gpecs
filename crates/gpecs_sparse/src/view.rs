@@ -23,7 +23,7 @@ use crate::{
         TooLargeSparseIndexError, TooSmallSparseIndexError,
     },
     item::{SparseItem, SparseItemKind},
-    iter::{Iter, IterMut, Keys, RawKeys, Values, ValuesMut},
+    iter::{Iter, IterMut, Keys, RawKeys, RawValues, RawValuesMut, Values, ValuesMut},
     key::{Epoch, Key},
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs, KeyValueRefs},
     soa::{
@@ -234,16 +234,43 @@ where
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, '_, K, V> {
+        unsafe { self.raw_keys().deref() }
+    }
+
+    #[inline]
+    pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.iter();
-        Keys::new(inner)
+        let inner = dense.into_raw_iter();
+        RawKeys::new(inner)
+    }
+
+    #[inline]
+    pub fn into_keys(self) -> Keys<'c, 'a, K, V> {
+        unsafe { self.into_raw_keys().deref() }
+    }
+
+    #[inline]
+    pub fn raw_values(&self) -> RawValues<'_, K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.raw_iter();
+        RawValues::new(inner)
     }
 
     #[inline]
     pub fn values(&self) -> Values<'_, '_, K, V> {
+        unsafe { self.raw_values().deref() }
+    }
+
+    #[inline]
+    pub fn into_raw_values(self) -> RawValues<'c, K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.iter();
-        Values::new(inner)
+        let inner = dense.into_raw_iter();
+        RawValues::new(inner)
+    }
+
+    #[inline]
+    pub fn into_values(self) -> Values<'c, 'a, K, V> {
+        unsafe { self.into_raw_values().deref() }
     }
 
     #[inline]
@@ -769,7 +796,7 @@ where
 
         let sparse_index = key.sparse_index();
         let sparse_item = sparse
-            .get_mut::<usize>(sparse_index.try_into().ok()?)
+            .get_mut(sparse_index.try_into().ok()?)
             .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
 
@@ -788,7 +815,7 @@ where
 
         let sparse_index = key.sparse_index();
         let sparse_item = sparse
-            .get_mut::<usize>(sparse_index.try_into().ok()?)
+            .get_mut(sparse_index.try_into().ok()?)
             .take_if(|item| item.epoch == key.epoch())?;
         let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
 
@@ -808,7 +835,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse)
+                unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse)
             });
         });
     }
@@ -826,13 +853,11 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by(|&lhs_key, &rhs_key| {
                 let lhs_index = lhs_key.sparse_index();
-                let lhs_value =
-                    unwrap_dense_from_sparse_index::<K, _>(lhs_index, values.clone(), sparse);
+                let lhs_value = unwrap_dense_from_sparse_index(lhs_index, values.clone(), sparse);
                 let lhs = (lhs_key, lhs_value);
 
                 let rhs_index = rhs_key.sparse_index();
-                let rhs_value =
-                    unwrap_dense_from_sparse_index::<K, _>(rhs_index, values.clone(), sparse);
+                let rhs_value = unwrap_dense_from_sparse_index(rhs_index, values.clone(), sparse);
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
@@ -849,8 +874,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_unstable_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value =
-                    unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse);
+                let value = unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse);
                 f((key, value))
             });
         });
@@ -1012,30 +1036,67 @@ where
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, '_, K, V> {
+        unsafe { self.raw_keys().deref() }
+    }
+
+    #[inline]
+    pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.iter();
-        Keys::new(inner)
+        let inner = dense.into_raw_iter();
+        RawKeys::new(inner)
+    }
+
+    #[inline]
+    pub fn into_keys(self) -> Keys<'c, 'a, K, V> {
+        unsafe { self.into_raw_keys().deref() }
+    }
+
+    #[inline]
+    pub fn raw_values(&self) -> RawValues<'_, K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.raw_iter();
+        RawValues::new(inner)
     }
 
     #[inline]
     pub fn values(&self) -> Values<'_, '_, K, V> {
+        unsafe { self.raw_values().deref() }
+    }
+
+    #[inline]
+    pub fn into_raw_values(self) -> RawValues<'c, K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.iter();
-        Values::new(inner)
+        let inner = dense.into_raw_iter();
+        RawValues::new(inner)
+    }
+
+    #[inline]
+    pub fn into_values(self) -> Values<'c, 'a, K, V> {
+        unsafe { self.into_raw_values().deref() }
+    }
+
+    #[inline]
+    pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.raw_iter_mut();
+        RawValuesMut::new(inner)
     }
 
     #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<'_, '_, K, V> {
+        unsafe { self.raw_values_mut().deref() }
+    }
+
+    #[inline]
+    pub fn into_raw_values_mut(self) -> RawValuesMut<'c, K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.iter_mut();
-        ValuesMut::new(inner)
+        let inner = dense.into_raw_iter_mut();
+        RawValuesMut::new(inner)
     }
 
     #[inline]
     pub fn into_values_mut(self) -> ValuesMut<'c, 'a, K, V> {
-        let Self { dense, .. } = self;
-        let inner = dense.into_iter();
-        ValuesMut::new(inner)
+        unsafe { self.into_raw_values_mut().deref() }
     }
 
     #[inline]
@@ -1369,7 +1430,7 @@ where
     K: Key,
     V: Soa + ?Sized,
 {
-    for (sparse_index, &SparseItem::<K> { kind, epoch }) in sparse.iter().enumerate() {
+    for (sparse_index, &SparseItem { kind, epoch }) in sparse.iter().enumerate() {
         let sparse_index = sparse_index
             .try_into()
             .map_err(TooSmallSparseIndexError::new)?;
@@ -1397,7 +1458,7 @@ where
             return Err(error.into());
         }
     }
-    for (dense_index, KeyValueRefs::<K, _> { key, .. }) in dense.iter().enumerate() {
+    for (dense_index, KeyValueRefs { key, .. }) in dense.iter().enumerate() {
         let sparse_index = key
             .sparse_index()
             .try_into()

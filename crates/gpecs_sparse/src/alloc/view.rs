@@ -17,7 +17,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
-                unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse)
+                unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse)
             });
         });
     }
@@ -35,13 +35,11 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by(|&lhs_key, &rhs_key| {
                 let lhs_index = lhs_key.sparse_index();
-                let lhs_value =
-                    unwrap_dense_from_sparse_index::<K, _>(lhs_index, values.clone(), sparse);
+                let lhs_value = unwrap_dense_from_sparse_index(lhs_index, values.clone(), sparse);
                 let lhs = (lhs_key, lhs_value);
 
                 let rhs_index = rhs_key.sparse_index();
-                let rhs_value =
-                    unwrap_dense_from_sparse_index::<K, _>(rhs_index, values.clone(), sparse);
+                let rhs_value = unwrap_dense_from_sparse_index(rhs_index, values.clone(), sparse);
                 let rhs = (rhs_key, rhs_value);
 
                 f(lhs, rhs)
@@ -58,8 +56,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value =
-                    unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse);
+                let value = unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse);
                 f((key, value))
             });
         });
@@ -74,8 +71,7 @@ where
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
                 let sparse_index = key.sparse_index();
-                let value =
-                    unwrap_dense_from_sparse_index::<K, _>(sparse_index, values.clone(), sparse);
+                let value = unwrap_dense_from_sparse_index(sparse_index, values.clone(), sparse);
                 f((key, value))
             });
         });

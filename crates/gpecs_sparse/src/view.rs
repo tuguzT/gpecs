@@ -23,7 +23,10 @@ use crate::{
         TooLargeSparseIndexError, TooSmallSparseIndexError,
     },
     item::{SparseItem, SparseItemKind},
-    iter::{Iter, IterMut, Keys, RawKeys, RawValues, RawValuesMut, Values, ValuesMut},
+    iter::{
+        Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys, RawValues, RawValuesMut, Values,
+        ValuesMut,
+    },
     key::{Epoch, Key},
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs, KeyValueRefs},
     soa::{
@@ -229,7 +232,7 @@ where
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.raw_iter();
-        RawKeys::new(inner)
+        RawKeys::from_inner(inner)
     }
 
     #[inline]
@@ -241,7 +244,7 @@ where
     pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.into_raw_iter();
-        RawKeys::new(inner)
+        RawKeys::from_inner(inner)
     }
 
     #[inline]
@@ -253,7 +256,7 @@ where
     pub fn raw_values(&self) -> RawValues<'_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.raw_iter();
-        RawValues::new(inner)
+        RawValues::from_inner(inner)
     }
 
     #[inline]
@@ -265,7 +268,7 @@ where
     pub fn into_raw_values(self) -> RawValues<'c, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.into_raw_iter();
-        RawValues::new(inner)
+        RawValues::from_inner(inner)
     }
 
     #[inline]
@@ -274,10 +277,22 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, '_, K, V> {
+    pub fn raw_iter(&self) -> RawIter<'_, K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.iter();
-        Iter::new(inner)
+        let inner = dense.raw_iter();
+        RawIter::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, K, V> {
+        unsafe { self.raw_iter().deref() }
+    }
+
+    #[inline]
+    pub fn into_raw_iter(self) -> RawIter<'c, K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.into_raw_iter();
+        RawIter::from_inner(inner)
     }
 
     #[inline]
@@ -502,9 +517,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self { dense, .. } = self;
-        let inner = dense.into_iter();
-        Iter::new(inner)
+        unsafe { self.into_raw_iter().deref() }
     }
 }
 
@@ -1031,7 +1044,7 @@ where
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.raw_iter();
-        RawKeys::new(inner)
+        RawKeys::from_inner(inner)
     }
 
     #[inline]
@@ -1043,7 +1056,7 @@ where
     pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.into_raw_iter();
-        RawKeys::new(inner)
+        RawKeys::from_inner(inner)
     }
 
     #[inline]
@@ -1055,7 +1068,7 @@ where
     pub fn raw_values(&self) -> RawValues<'_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.raw_iter();
-        RawValues::new(inner)
+        RawValues::from_inner(inner)
     }
 
     #[inline]
@@ -1067,7 +1080,7 @@ where
     pub fn into_raw_values(self) -> RawValues<'c, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.into_raw_iter();
-        RawValues::new(inner)
+        RawValues::from_inner(inner)
     }
 
     #[inline]
@@ -1079,7 +1092,7 @@ where
     pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.raw_iter_mut();
-        RawValuesMut::new(inner)
+        RawValuesMut::from_inner(inner)
     }
 
     #[inline]
@@ -1091,7 +1104,7 @@ where
     pub fn into_raw_values_mut(self) -> RawValuesMut<'c, K, V> {
         let Self { dense, .. } = self;
         let inner = dense.into_raw_iter_mut();
-        RawValuesMut::new(inner)
+        RawValuesMut::from_inner(inner)
     }
 
     #[inline]
@@ -1100,17 +1113,41 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, '_, K, V> {
+    pub fn raw_iter(&self) -> RawIter<'_, K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.iter();
-        Iter::new(inner)
+        let inner = dense.raw_iter();
+        RawIter::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, '_, K, V> {
+        unsafe { self.raw_iter().deref() }
+    }
+
+    #[inline]
+    pub fn into_raw_iter(self) -> RawIter<'c, K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.into_raw_iter();
+        RawIter::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V> {
+        let Self { dense, .. } = self;
+        let inner = dense.raw_iter_mut();
+        RawIterMut::from_inner(inner)
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, '_, K, V> {
+        unsafe { self.raw_iter_mut().deref() }
+    }
+
+    #[inline]
+    pub fn into_raw_iter_mut(self) -> RawIterMut<'c, K, V> {
         let Self { dense, .. } = self;
-        let inner = dense.iter_mut();
-        IterMut::new(inner)
+        let inner = dense.into_raw_iter_mut();
+        RawIterMut::from_inner(inner)
     }
 
     #[inline]
@@ -1404,9 +1441,7 @@ where
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self { dense, .. } = self;
-        let inner = dense.into_iter();
-        IterMut::new(inner)
+        unsafe { self.into_raw_iter_mut().deref() }
     }
 }
 

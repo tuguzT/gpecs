@@ -19,8 +19,8 @@ use crate::{
     },
     item::{SparseItem, SparseItemKind},
     iter::{
-        Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawKeys, RawValues,
-        RawValuesMut, Values, ValuesMut,
+        Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys,
+        RawValues, RawValuesMut, Values, ValuesMut,
     },
     key::{Epoch, Key},
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs, KeyValueRefs},
@@ -735,14 +735,14 @@ where
 
     #[inline]
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
-        let Self { dense, .. } = self;
-        let inner = dense.raw_iter();
-        RawKeys::new(inner)
+        let view = self.as_view();
+        view.into_raw_keys()
     }
 
     #[inline]
     pub fn keys(&self) -> Keys<'_, '_, K, V> {
-        unsafe { self.raw_keys().deref() }
+        let view = self.as_view();
+        view.into_keys()
     }
 
     #[inline]
@@ -757,32 +757,44 @@ where
 
     #[inline]
     pub fn raw_values(&self) -> RawValues<'_, K, V> {
-        let Self { dense, .. } = self;
-        let inner = dense.raw_iter();
-        RawValues::new(inner)
+        let view = self.as_view();
+        view.into_raw_values()
     }
 
     #[inline]
     pub fn values(&self) -> Values<'_, '_, K, V> {
-        unsafe { self.raw_values().deref() }
+        let view = self.as_view();
+        view.into_values()
     }
 
     #[inline]
     pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V> {
-        let Self { dense, .. } = self;
-        let inner = dense.raw_iter_mut();
-        RawValuesMut::new(inner)
+        let view_mut = self.as_mut_view();
+        view_mut.into_raw_values_mut()
     }
 
     #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<'_, '_, K, V> {
-        unsafe { self.raw_values_mut().deref() }
+        let view_mut = self.as_mut_view();
+        view_mut.into_values_mut()
+    }
+
+    #[inline]
+    pub fn raw_iter(&self) -> RawIter<'_, K, V> {
+        let view = self.as_view();
+        view.into_raw_iter()
     }
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, '_, K, V> {
         let view = self.as_view();
         view.into_iter()
+    }
+
+    #[inline]
+    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V> {
+        let view_mut = self.as_mut_view();
+        view_mut.into_raw_iter_mut()
     }
 
     #[inline]

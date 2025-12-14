@@ -1,4 +1,6 @@
 use core::{
+    cmp,
+    hash::{self, Hash},
     marker::PhantomData,
     ops::{Deref, DerefMut},
     ptr::NonNull,
@@ -67,6 +69,95 @@ where
     fn default() -> Self {
         let context = V::Context::default();
         Self::from_inner(context)
+    }
+}
+
+impl<K, V> Clone for KeyValuePairContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self {
+            ref context,
+            phantom,
+        } = *self;
+
+        Self {
+            context: context.clone(),
+            phantom,
+        }
+    }
+}
+
+impl<K, V> Copy for KeyValuePairContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: Copy,
+{
+}
+
+impl<K, V> PartialEq for KeyValuePairContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let Self { context, phantom } = self;
+        *context == other.context && *phantom == other.phantom
+    }
+}
+
+impl<K, V> Eq for KeyValuePairContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: Eq,
+{
+}
+
+impl<K, V> PartialOrd for KeyValuePairContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        let Self { context, phantom } = self;
+
+        match context.partial_cmp(&other.context) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<K, V> Ord for KeyValuePairContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let Self { context, phantom } = self;
+
+        match context.cmp(&other.context) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        phantom.cmp(&other.phantom)
+    }
+}
+
+impl<K, V> Hash for KeyValuePairContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        let Self { context, phantom } = self;
+
+        context.hash(state);
+        phantom.hash(state);
     }
 }
 

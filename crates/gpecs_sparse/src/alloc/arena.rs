@@ -30,7 +30,7 @@ use crate::{
         traits::{MutPtrs, Ptrs, RawSoaContext, Soa, SoaRead, SoaWrite},
         vec::SoaVec,
     },
-    view::{EpochSparseView, EpochSparseViewMut},
+    view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewPtr},
 };
 
 use super::{
@@ -367,9 +367,14 @@ where
     }
 
     #[inline]
-    pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V> {
+    pub fn as_view_ptr(&self) -> EpochSparseViewPtr<'_, K, V> {
         let Self { dense, sparse, .. } = self;
-        unsafe { EpochSparseView::new_unchecked(dense.slices(), sparse) }
+        unsafe { EpochSparseViewPtr::from_parts(dense.slice_ptrs(), sparse.as_slice()) }
+    }
+
+    #[inline]
+    pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V> {
+        unsafe { self.as_view_ptr().deref() }
     }
 
     #[inline]

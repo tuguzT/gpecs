@@ -416,6 +416,18 @@ where
     }
 
     #[inline]
+    pub fn into_ptrs(self) -> Ptrs<'c, T> {
+        let (_, ptrs) = self.into_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
+        let Self { ptrs, .. } = self;
+        ptrs.into_ptrs_with_context()
+    }
+
+    #[inline]
     pub fn as_slice_ptrs(&self) -> SlicePtrs<'_, T> {
         let (_, ptrs) = self.as_slice_ptrs_with_context();
         ptrs
@@ -425,6 +437,12 @@ where
     pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
         let Self { ptrs, .. } = self;
         ptrs.as_slice_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn into_slice_ptrs_with_context(self) -> (&'c T::Context, SlicePtrs<'c, T>) {
+        let Self { ptrs, .. } = self;
+        ptrs.into_slice_ptrs_with_context()
     }
 
     #[inline]

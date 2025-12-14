@@ -7,10 +7,7 @@ use core::{
 };
 
 use crate::{
-    algo::{
-        sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_mut, sparse_get_mut_with_key,
-        sparse_get_with_key, sparse_index, sparse_index_mut,
-    },
+    algo::{sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_with_key, sparse_index},
     assert::{
         check_compatible_key, check_equal_epoch, check_equal_key, unwrap_dense,
         unwrap_dense_from_sparse_index, unwrap_dense_index, unwrap_dense_index_mut,
@@ -30,7 +27,7 @@ use crate::{
     key::{Epoch, Key},
     pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs, KeyValueRefs},
     soa::{
-        mem::swap as soa_swap,
+        self,
         slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
         traits::{MutPtrs, Ptrs, Soa},
     },
@@ -185,8 +182,10 @@ where
     #[inline]
     pub fn get_with_context(&self, key: K) -> (&V::Context, Option<V::Refs<'_, '_>>) {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.iter_with_context();
-        (context, sparse_get(dense, sparse, key))
+        let refs = sparse_get(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
@@ -198,20 +197,46 @@ where
     #[inline]
     pub fn into_get_with_context(self, key: K) -> (&'c V::Context, Option<V::Refs<'c, 'a>>) {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.into_iter_with_context();
-        (context, sparse_get(dense, sparse, key))
+        let refs = sparse_get(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
     pub fn get_with_key(&self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'_, '_>)> {
+        let (_, pair) = self.get_with_key_with_context(sparse_index);
+        pair
+    }
+
+    #[inline]
+    pub fn get_with_key_with_context(
+        &self,
+        sparse_index: K::SparseIndex,
+    ) -> (&V::Context, Option<(K, V::Refs<'_, '_>)>) {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(dense, sparse, sparse_index)
+
+        let (context, dense) = dense.iter_with_context();
+        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
+        (context, pair)
     }
 
     #[inline]
     pub fn into_get_with_key(self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'c, 'a>)> {
+        let (_, pair) = self.into_get_with_key_with_context(sparse_index);
+        pair
+    }
+
+    #[inline]
+    pub fn into_get_with_key_with_context(
+        self,
+        sparse_index: K::SparseIndex,
+    ) -> (&'c V::Context, Option<(K, V::Refs<'c, 'a>)>) {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(dense, sparse, sparse_index)
+
+        let (context, dense) = dense.into_iter_with_context();
+        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
+        (context, pair)
     }
 
     #[inline]
@@ -409,8 +434,10 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.iter_with_context();
-        (context, sparse_index(dense, sparse, key))
+        let refs = sparse_index(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
@@ -430,8 +457,10 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.into_iter_with_context();
-        (context, sparse_index(dense, sparse, key))
+        let refs = sparse_index(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 }
 
@@ -869,7 +898,7 @@ where
         };
 
         let (first_value, second_value) = unwrap_dense_pair(dense, first_index, second_index);
-        soa_swap::<V>(context, first_value, second_value);
+        soa::mem::swap::<V>(context, first_value, second_value);
     }
 
     #[inline]
@@ -1048,8 +1077,10 @@ where
     #[inline]
     pub fn get_with_context(&self, key: K) -> (&V::Context, Option<V::Refs<'_, '_>>) {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.iter_with_context();
-        (context, sparse_get(dense, sparse, key))
+        let refs = sparse_get(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
@@ -1061,8 +1092,10 @@ where
     #[inline]
     pub fn into_get_with_context(self, key: K) -> (&'c V::Context, Option<V::Refs<'c, 'a>>) {
         let Self { dense, sparse } = self;
+
         let (context, dense) = SoaSlices::from(dense).into_iter_with_context();
-        (context, sparse_get(dense, sparse, key))
+        let refs = sparse_get(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
@@ -1074,8 +1107,10 @@ where
     #[inline]
     pub fn get_mut_with_context(&mut self, key: K) -> (&V::Context, Option<V::RefsMut<'_, '_>>) {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.iter_mut_with_context();
-        (context, sparse_get_mut(dense, sparse, key))
+        let refs = sparse_get(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
@@ -1087,21 +1122,47 @@ where
     #[inline]
     pub fn into_get_mut_with_context(self, key: K) -> (&'c V::Context, Option<V::RefsMut<'c, 'a>>) {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.into_iter_with_context();
-        (context, sparse_get_mut(dense, sparse, key))
+        let refs = sparse_get(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
     pub fn get_with_key(&self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'_, '_>)> {
+        let (_, pair) = self.get_with_key_with_context(sparse_index);
+        pair
+    }
+
+    #[inline]
+    pub fn get_with_key_with_context(
+        &self,
+        sparse_index: K::SparseIndex,
+    ) -> (&V::Context, Option<(K, V::Refs<'_, '_>)>) {
         let Self { dense, sparse } = self;
-        sparse_get_with_key(dense, sparse, sparse_index)
+
+        let (context, dense) = dense.iter_with_context();
+        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
+        (context, pair)
     }
 
     #[inline]
     pub fn into_get_with_key(self, sparse_index: K::SparseIndex) -> Option<(K, V::Refs<'c, 'a>)> {
+        let (_, pair) = self.into_get_with_key_with_context(sparse_index);
+        pair
+    }
+
+    #[inline]
+    pub fn into_get_with_key_with_context(
+        self,
+        sparse_index: K::SparseIndex,
+    ) -> (&'c V::Context, Option<(K, V::Refs<'c, 'a>)>) {
         let Self { dense, sparse } = self;
-        let dense = SoaSlices::from(dense);
-        sparse_get_with_key(dense, sparse, sparse_index)
+
+        let (context, dense) = dense.into_iter_with_context();
+        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index)
+            .map(|(key, value)| (key, V::refs_mut_as_refs(context, value)));
+        (context, pair)
     }
 
     #[inline]
@@ -1109,8 +1170,20 @@ where
         &mut self,
         sparse_index: K::SparseIndex,
     ) -> Option<(K, V::RefsMut<'_, '_>)> {
+        let (_, pair) = self.get_mut_with_key_with_context(sparse_index);
+        pair
+    }
+
+    #[inline]
+    pub fn get_mut_with_key_with_context(
+        &mut self,
+        sparse_index: K::SparseIndex,
+    ) -> (&V::Context, Option<(K, V::RefsMut<'_, '_>)>) {
         let Self { dense, sparse } = self;
-        sparse_get_mut_with_key(dense, sparse, sparse_index)
+
+        let (context, dense) = dense.iter_mut_with_context();
+        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
+        (context, pair)
     }
 
     #[inline]
@@ -1118,8 +1191,20 @@ where
         self,
         sparse_index: K::SparseIndex,
     ) -> Option<(K, V::RefsMut<'c, 'a>)> {
+        let (_, pair) = self.into_get_mut_with_key_with_context(sparse_index);
+        pair
+    }
+
+    #[inline]
+    pub fn into_get_mut_with_key_with_context(
+        self,
+        sparse_index: K::SparseIndex,
+    ) -> (&'c V::Context, Option<(K, V::RefsMut<'c, 'a>)>) {
         let Self { dense, sparse } = self;
-        sparse_get_mut_with_key(dense, sparse, sparse_index)
+
+        let (context, dense) = dense.into_iter_with_context();
+        let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
+        (context, pair)
     }
 
     #[inline]
@@ -1416,8 +1501,10 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.iter_with_context();
-        (context, sparse_index(dense, sparse, key))
+        let refs = sparse_index(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
@@ -1437,8 +1524,10 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
+
         let (context, dense) = SoaSlices::from(dense).into_iter_with_context();
-        (context, sparse_index(dense, sparse, key))
+        let refs = sparse_index(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
@@ -1458,8 +1547,10 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.iter_mut_with_context();
-        (context, sparse_index_mut(dense, sparse, key))
+        let refs = sparse_index(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 
     #[inline]
@@ -1478,8 +1569,10 @@ where
         K: Debug,
     {
         let Self { dense, sparse } = self;
+
         let (context, dense) = dense.into_iter_with_context();
-        (context, sparse_index_mut(dense, sparse, key))
+        let refs = sparse_index(dense.map(From::from), sparse, key);
+        (context, refs)
     }
 }
 

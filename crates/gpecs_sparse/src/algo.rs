@@ -1,4 +1,4 @@
-use core::{fmt::Debug, ops};
+use core::{borrow::Borrow, fmt::Debug, ops};
 
 use crate::{
     assert::{
@@ -7,8 +7,6 @@ use crate::{
     },
     item::{SparseItem, SparseItemKind},
     key::Key,
-    pair::{KeyValueRefs, KeyValueRefsMut},
-    soa::traits::Soa,
 };
 
 // https://stackoverflow.com/a/73428605/14928295
@@ -60,23 +58,31 @@ pub fn get_pair<T>(iter: impl IntoIterator<Item = T>, a: usize, b: usize) -> Opt
     Some(pair)
 }
 
-pub fn sparse_get<'context, 'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefs<'context, 'a, K, V>>,
-    sparse: &[SparseItem<K>],
-    key: K,
-) -> Option<V::Refs<'context, 'a>>
+#[inline]
+fn sparse_item_by_key<K>(sparse: &[SparseItem<K>], key: K) -> Option<&SparseItem<K>>
 where
-    K: Key + 'a,
-    V: Soa + ?Sized,
+    K: Key,
 {
-    let sparse_index: usize = key.sparse_index().try_into().ok()?;
+    let sparse_index = key.sparse_index().try_into().ok()?;
     let sparse_item = sparse
         .get(sparse_index)
         .take_if(|item| item.epoch == key.epoch())?;
-    let dense_index = sparse_item.dense_index()?;
-    let dense_index = unwrap_into_usize(*dense_index);
+    Some(sparse_item)
+}
 
-    let (&dense_key, value) = unwrap_dense(dense, dense_index).into();
+pub fn sparse_get<K, T>(
+    dense: impl IntoIterator<Item = (impl Borrow<K>, T)>,
+    sparse: &[SparseItem<K>],
+    key: K,
+) -> Option<T>
+where
+    K: Key,
+{
+    let sparse_item = sparse_item_by_key(sparse, key)?;
+    let dense_index = unwrap_into_usize(sparse_item.into_dense_index()?);
+
+    let (dense_key, value) = unwrap_dense(dense, dense_index);
+    let &dense_key = dense_key.borrow();
     check_equal_key(key, dense_key);
 
     Some(value)
@@ -94,14 +100,13 @@ where
 
 #[inline]
 #[track_caller]
-pub fn sparse_index<'context, 'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefs<'context, 'a, K, V>>,
+pub fn sparse_index<K, T>(
+    dense: impl IntoIterator<Item = (impl Borrow<K>, T)>,
     sparse: &[SparseItem<K>],
     key: K,
-) -> V::Refs<'context, 'a>
+) -> T
 where
-    K: Key + Debug + 'a,
-    V: Soa + ?Sized,
+    K: Key + Debug,
 {
     match sparse_get(dense, sparse, key) {
         Some(value) => value,
@@ -109,78 +114,29 @@ where
     }
 }
 
-pub fn sparse_get_mut<'context, 'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefsMut<'context, 'a, K, V>>,
-    sparse: &[SparseItem<K>],
-    key: K,
-) -> Option<V::RefsMut<'context, 'a>>
-where
-    K: Key + 'a,
-    V: Soa + ?Sized,
-{
-    let sparse_index: usize = key.sparse_index().try_into().ok()?;
-    let sparse_item = sparse
-        .get(sparse_index)
-        .take_if(|item| item.epoch == key.epoch())?;
-    let dense_index = sparse_item.dense_index()?;
-    let dense_index = unwrap_into_usize(*dense_index);
-
-    let (&mut dense_key, value) = unwrap_dense(dense, dense_index).into();
-    check_equal_key(key, dense_key);
-
-    Some(value)
-}
-
 #[inline]
-#[track_caller]
-pub fn sparse_index_mut<'context, 'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefsMut<'context, 'a, K, V>>,
-    sparse: &[SparseItem<K>],
-    key: K,
-) -> V::RefsMut<'context, 'a>
+fn sparse_item<K>(sparse: &[SparseItem<K>], sparse_index: K::SparseIndex) -> Option<&SparseItem<K>>
 where
-    K: Key + Debug + 'a,
-    V: Soa + ?Sized,
+    K: Key,
 {
-    match sparse_get_mut(dense, sparse, key) {
-        Some(value) => value,
-        None => sparse_index_failed(&key),
-    }
+    let sparse_index = sparse_index.try_into().ok()?;
+    let sparse_item = sparse.get(sparse_index)?;
+    Some(sparse_item)
 }
 
-pub fn sparse_get_with_key<'context, 'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefs<'context, 'a, K, V>>,
+pub fn sparse_get_with_key<K, T>(
+    dense: impl IntoIterator<Item = (impl Borrow<K>, T)>,
     sparse: &[SparseItem<K>],
     sparse_index: K::SparseIndex,
-) -> Option<(K, V::Refs<'context, 'a>)>
+) -> Option<(K, T)>
 where
-    K: Key + 'a,
-    V: Soa + ?Sized,
+    K: Key,
 {
-    let sparse_item = sparse.get::<usize>(sparse_index.try_into().ok()?)?;
-    let dense_index = sparse_item.dense_index()?;
-    let dense_index = unwrap_into_usize(*dense_index);
+    let sparse_item = sparse_item(sparse, sparse_index)?;
+    let dense_index = unwrap_into_usize(sparse_item.into_dense_index()?);
 
-    let (&dense_key, value) = unwrap_dense(dense, dense_index).into();
-    check_compatible_key(K::new(sparse_index, sparse_item.epoch), dense_key);
-
-    Some((dense_key, value))
-}
-
-pub fn sparse_get_mut_with_key<'context, 'a, K, V>(
-    dense: impl IntoIterator<Item = KeyValueRefsMut<'context, 'a, K, V>>,
-    sparse: &[SparseItem<K>],
-    sparse_index: K::SparseIndex,
-) -> Option<(K, V::RefsMut<'context, 'a>)>
-where
-    K: Key + 'a,
-    V: Soa + ?Sized,
-{
-    let sparse_item = sparse.get::<usize>(sparse_index.try_into().ok()?)?;
-    let dense_index = sparse_item.dense_index()?;
-    let dense_index = unwrap_into_usize(*dense_index);
-
-    let (&mut dense_key, value) = unwrap_dense(dense, dense_index).into();
+    let (dense_key, value) = unwrap_dense(dense, dense_index);
+    let &dense_key = dense_key.borrow();
     check_compatible_key(K::new(sparse_index, sparse_item.epoch), dense_key);
 
     Some((dense_key, value))
@@ -194,11 +150,12 @@ pub fn sparse_get_epoch<K>(
 where
     K: Key,
 {
-    let sparse_item = sparse.get::<usize>(sparse_index.try_into().ok()?)?;
+    let sparse_item = sparse_item(sparse, sparse_index)?;
     let epoch = sparse_item.epoch;
+
     if let Some(dense_index) = sparse_item.dense_index() {
         let dense_index = unwrap_into_usize(*dense_index);
-        let dense_key = *unwrap_dense(dense_keys, dense_index);
+        let &dense_key = unwrap_dense(dense_keys, dense_index);
         check_compatible_key(K::new(sparse_index, epoch), dense_key);
     }
 
@@ -209,16 +166,9 @@ pub fn sparse_contains_key<K>(dense_keys: &[K], sparse: &[SparseItem<K>], key: K
 where
     K: Key,
 {
-    let Ok(sparse_index) = key.sparse_index().try_into() else {
+    let Some(sparse_item) = sparse_item_by_key(sparse, key) else {
         return false;
     };
-    let Some(sparse_item) = sparse
-        .get::<usize>(sparse_index)
-        .take_if(|item| item.epoch == key.epoch())
-    else {
-        return false;
-    };
-
     let SparseItemKind::Occupied { dense_index } = sparse_item.kind else {
         return false;
     };

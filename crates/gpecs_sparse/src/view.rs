@@ -8,7 +8,10 @@ use core::{
 };
 
 use crate::{
-    algo::{sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_with_key, sparse_index},
+    algo::{
+        sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_unchecked,
+        sparse_get_with_key, sparse_index,
+    },
     assert::{
         check_compatible_key, check_equal_epoch, check_equal_key, unwrap_dense,
         unwrap_dense_from_sparse_index, unwrap_dense_index, unwrap_dense_index_mut,
@@ -380,7 +383,82 @@ where
         (context, sparse)
     }
 
-    // TODO: get_unchecked
+    #[inline]
+    pub unsafe fn get_unchecked(&self, key: K) -> Ptrs<'_, V> {
+        let (_, ptrs) = unsafe { self.get_unchecked_with_context(key) };
+        ptrs
+    }
+
+    #[inline]
+    pub unsafe fn get_unchecked_with_context(&self, key: K) -> (&V::Context, Ptrs<'_, V>) {
+        let Self { ref dense, sparse } = *self;
+
+        let (context, dense) = dense.iter_with_context();
+        let dense = dense.map(From::from);
+        let (_, value) = unsafe { sparse_get_unchecked(dense, sparse, key.sparse_index()) };
+        (context, value)
+    }
+
+    #[inline]
+    pub unsafe fn into_get_unchecked(self, key: K) -> Ptrs<'c, V> {
+        let (_, ptrs) = unsafe { self.into_get_unchecked_with_context(key) };
+        ptrs
+    }
+
+    #[inline]
+    pub unsafe fn into_get_unchecked_with_context(self, key: K) -> (&'c V::Context, Ptrs<'c, V>) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense.into_iter_with_context();
+        let dense = dense.map(From::from);
+        let (_, value) = unsafe { sparse_get_unchecked(dense, sparse, key.sparse_index()) };
+        (context, value)
+    }
+
+    #[inline]
+    pub unsafe fn get_with_key_unchecked(
+        &self,
+        sparse_index: K::SparseIndex,
+    ) -> (*const K, Ptrs<'_, V>) {
+        let (_, key, value) = unsafe { self.get_with_key_unchecked_with_context(sparse_index) };
+        (key, value)
+    }
+
+    #[inline]
+    pub unsafe fn get_with_key_unchecked_with_context(
+        &self,
+        sparse_index: K::SparseIndex,
+    ) -> (&V::Context, *const K, Ptrs<'_, V>) {
+        let Self { ref dense, sparse } = *self;
+
+        let (context, dense) = dense.iter_with_context();
+        let dense = dense.map(From::from);
+        let (key, value) = unsafe { sparse_get_unchecked(dense, sparse, sparse_index) };
+        (context, key, value)
+    }
+
+    #[inline]
+    pub unsafe fn into_get_with_key_unchecked(
+        self,
+        sparse_index: K::SparseIndex,
+    ) -> (*const K, Ptrs<'c, V>) {
+        let (_, key, value) =
+            unsafe { self.into_get_with_key_unchecked_with_context(sparse_index) };
+        (key, value)
+    }
+
+    #[inline]
+    pub unsafe fn into_get_with_key_unchecked_with_context(
+        self,
+        sparse_index: K::SparseIndex,
+    ) -> (&'c V::Context, *const K, Ptrs<'c, V>) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense.into_iter_with_context();
+        let dense = dense.map(From::from);
+        let (key, value) = unsafe { sparse_get_unchecked(dense, sparse, sparse_index) };
+        (context, key, value)
+    }
 
     #[inline]
     pub fn keys(&self) -> RawKeys<'_, K, V> {
@@ -966,7 +1044,66 @@ where
         (context, sparse)
     }
 
-    // TODO: get_unchecked
+    #[inline]
+    pub unsafe fn get_unchecked(&self, key: K) -> Ptrs<'_, V> {
+        let (_, ptrs) = unsafe { self.get_unchecked_with_context(key) };
+        ptrs
+    }
+
+    #[inline]
+    pub unsafe fn get_unchecked_with_context(&self, key: K) -> (&V::Context, Ptrs<'_, V>) {
+        let view_ptr = self.as_view_ptr();
+        unsafe { view_ptr.into_get_unchecked_with_context(key) }
+    }
+
+    #[inline]
+    pub unsafe fn into_get_unchecked(self, key: K) -> Ptrs<'c, V> {
+        let (_, ptrs) = unsafe { self.into_get_unchecked_with_context(key) };
+        ptrs
+    }
+
+    #[inline]
+    pub unsafe fn into_get_unchecked_with_context(self, key: K) -> (&'c V::Context, Ptrs<'c, V>) {
+        let view_ptr = self.into_view_ptr();
+        unsafe { view_ptr.into_get_unchecked_with_context(key) }
+    }
+
+    #[inline]
+    pub unsafe fn get_with_key_unchecked(
+        &self,
+        sparse_index: K::SparseIndex,
+    ) -> (*const K, Ptrs<'_, V>) {
+        let (_, key, value) = unsafe { self.get_with_key_unchecked_with_context(sparse_index) };
+        (key, value)
+    }
+
+    #[inline]
+    pub unsafe fn get_with_key_unchecked_with_context(
+        &self,
+        sparse_index: K::SparseIndex,
+    ) -> (&V::Context, *const K, Ptrs<'_, V>) {
+        let view_ptr = self.as_view_ptr();
+        unsafe { view_ptr.into_get_with_key_unchecked_with_context(sparse_index) }
+    }
+
+    #[inline]
+    pub unsafe fn into_get_with_key_unchecked(
+        self,
+        sparse_index: K::SparseIndex,
+    ) -> (*const K, Ptrs<'c, V>) {
+        let (_, key, value) =
+            unsafe { self.into_get_with_key_unchecked_with_context(sparse_index) };
+        (key, value)
+    }
+
+    #[inline]
+    pub unsafe fn into_get_with_key_unchecked_with_context(
+        self,
+        sparse_index: K::SparseIndex,
+    ) -> (&'c V::Context, *const K, Ptrs<'c, V>) {
+        let view_ptr = self.into_view_ptr();
+        unsafe { view_ptr.into_get_with_key_unchecked_with_context(sparse_index) }
+    }
 
     #[inline]
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {

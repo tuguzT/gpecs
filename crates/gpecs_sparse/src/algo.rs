@@ -59,6 +59,32 @@ pub fn get_pair<T>(iter: impl IntoIterator<Item = T>, a: usize, b: usize) -> Opt
 }
 
 #[inline]
+unsafe fn sparse_item_unchecked<K>(
+    sparse: *const [SparseItem<K>],
+    sparse_index: K::SparseIndex,
+) -> *const SparseItem<K>
+where
+    K: Key,
+{
+    let sparse_index = unsafe { sparse_index.try_into().unwrap_unchecked() };
+    unsafe { sparse.cast::<SparseItem<K>>().add(sparse_index) }
+}
+
+pub unsafe fn sparse_get_unchecked<K, T>(
+    dense: impl IntoIterator<Item = (*const K, T)>,
+    sparse: *const [SparseItem<K>],
+    sparse_index: K::SparseIndex,
+) -> (*const K, T)
+where
+    K: Key,
+{
+    let sparse_item = unsafe { sparse_item_unchecked(sparse, sparse_index).read() };
+    let dense_index = unsafe { sparse_item.into_dense_index().unwrap_unchecked() };
+    let dense_index = unsafe { dense_index.try_into().unwrap_unchecked() };
+    unsafe { dense.into_iter().nth(dense_index).unwrap_unchecked() }
+}
+
+#[inline]
 fn sparse_item_by_key<K>(sparse: &[SparseItem<K>], key: K) -> Option<&SparseItem<K>>
 where
     K: Key,

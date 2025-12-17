@@ -1,5 +1,6 @@
 use core::{
     alloc::{Layout, LayoutError},
+    any::type_name,
     mem::offset_of,
     ptr::{self, NonNull},
 };
@@ -425,4 +426,18 @@ where
 
     let buffer = unsafe { ptr.cast::<u8>().add(offset_from_prefix) };
     Ok(buffer)
+}
+
+#[inline]
+#[track_caller]
+#[doc(hidden)]
+pub fn assert_ptr_is_aligned<T>(ptr: *const T) {
+    debug_assert!(
+        ptr.is_aligned(),
+        "pointer {:p} of {} is not aligned to {} [its current align offset (in bytes) is {}]",
+        ptr,
+        type_name::<T>(),
+        align_of::<T>(),
+        ptr.cast::<u8>().align_offset(align_of::<T>()),
+    );
 }

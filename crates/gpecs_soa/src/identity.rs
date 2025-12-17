@@ -12,9 +12,10 @@ use core::{
 
 use crate::{
     field::FieldDescriptor,
+    ptr::assert_ptr_is_aligned,
     traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
-        SoaRead, SoaTrustedFields, SoaWrite, debug_assert_ptr_is_aligned,
+        SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
 
@@ -357,7 +358,7 @@ unsafe impl<T> RawSoaContext for IdentityContext<T> {
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, _capacity: usize) -> Self::Ptrs<'_> {
         let ptrs = buffer.cast();
-        debug_assert_ptr_is_aligned(ptrs);
+        assert_ptr_is_aligned(ptrs);
         ptrs
     }
 
@@ -386,7 +387,7 @@ unsafe impl<T> RawSoaContext for IdentityContext<T> {
     #[inline]
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, _capacity: usize) -> Self::MutPtrs<'_> {
         let ptrs = buffer.cast();
-        debug_assert_ptr_is_aligned(ptrs);
+        assert_ptr_is_aligned(ptrs);
         ptrs
     }
 

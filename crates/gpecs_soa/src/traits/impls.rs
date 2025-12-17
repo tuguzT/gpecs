@@ -1,6 +1,5 @@
 use core::{
     alloc::{Layout, LayoutError},
-    any::type_name,
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
@@ -11,25 +10,12 @@ use core::{
 
 use crate::{
     field::FieldDescriptor,
+    ptr::assert_ptr_is_aligned,
     traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
         SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
-
-#[inline]
-#[track_caller]
-#[doc(hidden)]
-pub fn debug_assert_ptr_is_aligned<T>(ptr: *const T) {
-    debug_assert!(
-        ptr.is_aligned(),
-        "pointer {:p} of {} is not aligned to {} [its current align offset (in bytes) is {}]",
-        ptr,
-        type_name::<T>(),
-        align_of::<T>(),
-        ptr.cast::<u8>().align_offset(align_of::<T>()),
-    );
-}
 
 unsafe impl RawSoaContext for () {
     type FieldDescriptors<'a> = [FieldDescriptor; 1];
@@ -663,7 +649,7 @@ macro_rules! soa_tuple_impl {
                 let _ = layout;
 
                 let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
-                $(debug_assert_ptr_is_aligned(ptrs.$indices);)*
+                $(assert_ptr_is_aligned(ptrs.$indices);)*
                 ptrs
             }
 
@@ -705,7 +691,7 @@ macro_rules! soa_tuple_impl {
                 let _ = layout;
 
                 let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
-                $(debug_assert_ptr_is_aligned(ptrs.$indices);)*
+                $(assert_ptr_is_aligned(ptrs.$indices);)*
                 ptrs
             }
 

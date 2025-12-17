@@ -4,9 +4,10 @@ use core::alloc::{Layout, LayoutError};
 
 use crate::field::{FieldDescriptor, buffer_layout};
 
-pub use self::impls::*;
+pub use self::tuple::*;
 
-mod impls;
+mod tuple;
+mod unit;
 
 /// This trait is used to perform all memory operations & pointer arithmetics for [SoA](RawSoa) types.
 pub unsafe trait RawSoaContext {

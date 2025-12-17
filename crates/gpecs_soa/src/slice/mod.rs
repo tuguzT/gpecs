@@ -5,7 +5,10 @@ pub use self::{
     iter_mut::IterMut,
     raw_iter::RawIter,
     raw_iter_mut::RawIterMut,
-    slices::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
+    slice_mut_ptrs::SoaSliceMutPtrs,
+    slice_ptrs::SoaSlicePtrs,
+    slices::SoaSlices,
+    slices_mut::SoaSlicesMut,
 };
 
 pub(crate) use self::{
@@ -23,4 +26,7 @@ mod partial_eq;
 mod partial_ord;
 mod raw_iter;
 mod raw_iter_mut;
+mod slice_mut_ptrs;
+mod slice_ptrs;
 mod slices;
+mod slices_mut;

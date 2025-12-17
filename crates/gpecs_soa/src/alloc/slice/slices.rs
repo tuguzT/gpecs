@@ -45,6 +45,17 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
+    T: SoaCloneToUninit + ?Sized,
+    T::Context: Clone,
+{
+    #[inline]
+    pub fn to_vec(&self) -> SoaVec<T> {
+        self.slices().to_vec()
+    }
+}
+
+impl<T> SoaSlicesMut<'_, '_, T>
+where
     T: Soa + ?Sized,
 {
     #[inline]
@@ -180,17 +191,6 @@ where
     {
         let permutation = alloc_permutation(self.len());
         self.sort_unstable_with_permutation_by_key(permutation, f);
-    }
-}
-
-impl<T> SoaSlicesMut<'_, '_, T>
-where
-    T: SoaCloneToUninit + ?Sized,
-    T::Context: Clone,
-{
-    #[inline]
-    pub fn to_vec(&self) -> SoaVec<T> {
-        self.slices().to_vec()
     }
 }
 

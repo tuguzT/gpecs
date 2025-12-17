@@ -1,7 +1,10 @@
 pub use self::{
     dst::{SoaSlice, from_raw_parts, from_raw_parts_mut},
     index::{SoaSlicePtrsIndex, SoaSlicesIndex, range},
-    iter::{Iter, IterMut, RawIter, RawIterMut},
+    iter::Iter,
+    iter_mut::IterMut,
+    raw_iter::RawIter,
+    raw_iter_mut::RawIterMut,
     slices::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
 };
 
@@ -15,6 +18,9 @@ mod assert;
 mod dst;
 mod index;
 mod iter;
+mod iter_mut;
 mod partial_eq;
 mod partial_ord;
+mod raw_iter;
+mod raw_iter_mut;
 mod slices;

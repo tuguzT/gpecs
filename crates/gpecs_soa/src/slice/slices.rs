@@ -9,9 +9,8 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{
-        assert::slice_index_usize_fail,
-        index::{IndexHelper, IndexHelperMut, SoaSlicePtrsIndex, SoaSlicesIndex},
-        iter::{Iter, IterMut, RawIter, RawIterMut},
+        IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSlicePtrsIndex,
+        SoaSlicesIndex, assert::slice_index_usize_fail,
     },
     traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,

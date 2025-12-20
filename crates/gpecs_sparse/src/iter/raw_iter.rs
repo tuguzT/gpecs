@@ -5,7 +5,7 @@ use core::{
 
 use crate::{
     iter::{Iter, RawIterMut},
-    pair::KeyValuePair,
+    pair::DenseItem,
     soa::{
         self,
         traits::{Ptrs, RawSoa, SlicePtrs},
@@ -18,7 +18,7 @@ where
     K: 'c,
     V: RawSoa + ?Sized + 'c,
 {
-    inner: soa::slice::RawIter<'c, KeyValuePair<K, V>>,
+    inner: soa::slice::RawIter<'c, DenseItem<K, V>>,
 }
 
 impl<'c, K, V> RawIter<'c, K, V>
@@ -26,12 +26,12 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(crate) fn from_inner(inner: soa::slice::RawIter<'c, KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn from_inner(inner: soa::slice::RawIter<'c, DenseItem<K, V>>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub(super) fn into_inner(self) -> soa::slice::RawIter<'c, KeyValuePair<K, V>> {
+    pub(super) fn into_inner(self) -> soa::slice::RawIter<'c, DenseItem<K, V>> {
         let Self { inner } = self;
         inner
     }

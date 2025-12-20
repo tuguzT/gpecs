@@ -7,7 +7,7 @@ use core::{
 use gpecs_soa::traits::SoaRead;
 
 use crate::{
-    pair::KeyValuePair,
+    pair::DenseItem,
     soa::{traits::Soa, vec},
 };
 
@@ -168,7 +168,7 @@ pub struct IntoValues<K, V>
 where
     V: Soa + ?Sized,
 {
-    inner: vec::IntoIter<KeyValuePair<K, V>>,
+    inner: vec::IntoIter<DenseItem<K, V>>,
 }
 
 impl<K, V> IntoValues<K, V>
@@ -176,7 +176,7 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: vec::IntoIter<KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn new(inner: vec::IntoIter<DenseItem<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -223,7 +223,7 @@ where
 impl<K, V> Clone for IntoValues<K, V>
 where
     V: Soa + ?Sized,
-    vec::IntoIter<KeyValuePair<K, V>>: Clone,
+    vec::IntoIter<DenseItem<K, V>>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -264,7 +264,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|KeyValuePair { value, .. }| value)
+        inner.next().map(|DenseItem { value, .. }| value)
     }
 
     #[inline]
@@ -289,7 +289,7 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.fold(init, |acc, KeyValuePair { value, .. }| f(acc, value))
+        inner.fold(init, |acc, DenseItem { value, .. }| f(acc, value))
     }
 }
 
@@ -300,7 +300,7 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|KeyValuePair { value, .. }| value)
+        inner.next_back().map(|DenseItem { value, .. }| value)
     }
 }
 
@@ -320,7 +320,7 @@ pub struct IntoIter<K, V>
 where
     V: Soa + ?Sized,
 {
-    inner: vec::IntoIter<KeyValuePair<K, V>>,
+    inner: vec::IntoIter<DenseItem<K, V>>,
 }
 
 impl<K, V> IntoIter<K, V>
@@ -328,7 +328,7 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: vec::IntoIter<KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn new(inner: vec::IntoIter<DenseItem<K, V>>) -> Self {
         Self { inner }
     }
 
@@ -411,7 +411,7 @@ where
 impl<K, V> Clone for IntoIter<K, V>
 where
     V: Soa + ?Sized,
-    vec::IntoIter<KeyValuePair<K, V>>: Clone,
+    vec::IntoIter<DenseItem<K, V>>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -498,7 +498,7 @@ pub struct Drain<'a, K, V>
 where
     V: Soa + ?Sized,
 {
-    inner: vec::Drain<'a, KeyValuePair<K, V>>,
+    inner: vec::Drain<'a, DenseItem<K, V>>,
 }
 
 impl<'a, K, V> Drain<'a, K, V>
@@ -506,7 +506,7 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: vec::Drain<'a, KeyValuePair<K, V>>) -> Self {
+    pub(crate) fn new(inner: vec::Drain<'a, DenseItem<K, V>>) -> Self {
         Self { inner }
     }
 

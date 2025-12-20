@@ -10,7 +10,7 @@ use core::{
 use crate::soa::traits::RawSoa;
 
 #[repr(transparent)]
-pub struct KeyValuePairContext<K, V>
+pub struct DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -18,7 +18,7 @@ where
     phantom: PhantomData<fn() -> K>,
 }
 
-impl<K, V> KeyValuePairContext<K, V>
+impl<K, V> DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -61,18 +61,18 @@ where
     }
 }
 
-impl<K, V> Debug for KeyValuePairContext<K, V>
+impl<K, V> Debug for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { context, .. } = self;
-        f.debug_tuple("KeyValuePairContext").field(context).finish()
+        f.debug_tuple("DenseContext").field(context).finish()
     }
 }
 
-impl<K, V> Default for KeyValuePairContext<K, V>
+impl<K, V> Default for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: Default,
@@ -84,7 +84,7 @@ where
     }
 }
 
-impl<K, V> Clone for KeyValuePairContext<K, V>
+impl<K, V> Clone for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: Clone,
@@ -103,14 +103,14 @@ where
     }
 }
 
-impl<K, V> Copy for KeyValuePairContext<K, V>
+impl<K, V> Copy for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: Copy,
 {
 }
 
-impl<K, V> PartialEq for KeyValuePairContext<K, V>
+impl<K, V> PartialEq for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: PartialEq,
@@ -121,14 +121,14 @@ where
     }
 }
 
-impl<K, V> Eq for KeyValuePairContext<K, V>
+impl<K, V> Eq for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: Eq,
 {
 }
 
-impl<K, V> PartialOrd for KeyValuePairContext<K, V>
+impl<K, V> PartialOrd for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: PartialOrd,
@@ -144,7 +144,7 @@ where
     }
 }
 
-impl<K, V> Ord for KeyValuePairContext<K, V>
+impl<K, V> Ord for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: Ord,
@@ -160,7 +160,7 @@ where
     }
 }
 
-impl<K, V> Hash for KeyValuePairContext<K, V>
+impl<K, V> Hash for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
     V::Context: Hash,
@@ -173,7 +173,7 @@ where
     }
 }
 
-impl<K, V> Deref for KeyValuePairContext<K, V>
+impl<K, V> Deref for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -185,7 +185,7 @@ where
     }
 }
 
-impl<K, V> DerefMut for KeyValuePairContext<K, V>
+impl<K, V> DerefMut for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
 {

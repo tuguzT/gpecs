@@ -22,7 +22,7 @@ use crate::{
         RawValues, RawValuesMut, Values, ValuesMut,
     },
     key::{Epoch, Key},
-    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs, KeyValueRefs},
+    pair::{DenseContext, DenseItem, DenseMutPtrs, DensePtrs, DenseRefs},
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},
@@ -46,7 +46,7 @@ where
     K: Key,
     V: Soa + ?Sized,
 {
-    dense: SoaVec<KeyValuePair<K, V>>,
+    dense: SoaVec<DenseItem<K, V>>,
     sparse: Vec<SparseItem<K>>,
 }
 
@@ -70,7 +70,7 @@ where
     #[inline]
     #[must_use]
     pub fn with_context(context: V::Context) -> Self {
-        let context = KeyValuePairContext::from_inner(context);
+        let context = DenseContext::from_inner(context);
         Self {
             dense: SoaVec::with_context(context),
             sparse: Vec::new(),
@@ -92,7 +92,7 @@ where
     #[inline]
     #[must_use]
     pub fn with_context_and_capacity(context: V::Context, dense: usize, sparse: usize) -> Self {
-        let context = KeyValuePairContext::from_inner(context);
+        let context = DenseContext::from_inner(context);
         Self {
             dense: SoaVec::with_context_and_capacity(context, dense),
             sparse: Vec::with_capacity(sparse),
@@ -285,7 +285,7 @@ where
     pub fn as_ptrs(&self) -> Ptrs<'_, V> {
         let Self { dense, .. } = self;
 
-        let KeyValuePtrs { value, .. } = dense.as_ptrs();
+        let DensePtrs { value, .. } = dense.as_ptrs();
         value.into_inner()
     }
 
@@ -293,7 +293,7 @@ where
     pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
         let Self { dense, .. } = self;
 
-        let KeyValueMutPtrs { value, .. } = dense.as_mut_ptrs();
+        let DenseMutPtrs { value, .. } = dense.as_mut_ptrs();
         value.into_inner()
     }
 
@@ -317,7 +317,7 @@ where
     pub fn as_keys_ptr(&self) -> *const K {
         let Self { dense, .. } = self;
 
-        let KeyValuePtrs { key, .. } = dense.as_ptrs();
+        let DensePtrs { key, .. } = dense.as_ptrs();
         key
     }
 
@@ -325,7 +325,7 @@ where
     pub unsafe fn as_keys_ptr_mut(&mut self) -> *mut K {
         let Self { dense, .. } = self;
 
-        let KeyValueMutPtrs { key, .. } = dense.as_mut_ptrs();
+        let DenseMutPtrs { key, .. } = dense.as_mut_ptrs();
         key
     }
 
@@ -379,7 +379,7 @@ where
 
     #[inline]
     #[must_use]
-    pub fn into_parts(self) -> (SoaVec<KeyValuePair<K, V>>, Vec<SparseItem<K>>) {
+    pub fn into_parts(self) -> (SoaVec<DenseItem<K, V>>, Vec<SparseItem<K>>) {
         let Self { dense, sparse } = self;
         (dense, sparse)
     }
@@ -387,7 +387,7 @@ where
     #[inline]
     #[track_caller]
     pub fn from_parts(
-        dense: SoaVec<KeyValuePair<K, V>>,
+        dense: SoaVec<DenseItem<K, V>>,
         sparse: Vec<SparseItem<K>>,
     ) -> Result<Self, FromPartsError<K>> {
         let _ = EpochSparseView::new(dense.slices(), sparse.as_slice())?;
@@ -449,7 +449,7 @@ where
     pub fn drain(&mut self) -> Drain<'_, K, V> {
         let Self { dense, sparse } = self;
 
-        for KeyValueRefs { key, .. } in dense.slices() {
+        for DenseRefs { key, .. } in dense.slices() {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
         }
@@ -655,7 +655,7 @@ where
     pub fn clear(&mut self) {
         let Self { dense, sparse } = self;
 
-        for KeyValueRefs { key, .. } in dense.slices() {
+        for DenseRefs { key, .. } in dense.slices() {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
         }
@@ -768,7 +768,7 @@ where
             f(context, Some(src.value.into_inner()))
         });
 
-        if let Some(KeyValueRefs { key, .. }) = dense.slices().into_get(dense_index_usize) {
+        if let Some(DenseRefs { key, .. }) = dense.slices().into_get(dense_index_usize) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             if let Some(swapped_dense_index) = sparse_item.dense_index_mut() {
@@ -808,7 +808,7 @@ where
             f(context, Some(src.value.into_inner()))
         });
 
-        for KeyValueRefs { key, .. } in dense.slices().into_iter().skip(dense_index) {
+        for DenseRefs { key, .. } in dense.slices().into_iter().skip(dense_index) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
@@ -826,7 +826,7 @@ where
         let Self { dense, sparse } = self;
 
         dense.pop_into(|context, src| {
-            let Some(KeyValuePtrs { key, value }) = src else {
+            let Some(DensePtrs { key, value }) = src else {
                 return f(context, None);
             };
             let key = unsafe { ptr::read(key) };
@@ -881,7 +881,7 @@ where
 
         if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
             let (context, dense) = dense.slices_mut().into_slices_with_context();
-            let dense = SoaSlicesMut::<KeyValuePair<K, V>>::new(context, dense);
+            let dense = SoaSlicesMut::<DenseItem<K, V>>::new(context, dense);
 
             let dense_index = unwrap_into_usize(dense_index);
             let (dense_key, dense_value) = unwrap_dense(dense, dense_index).into();
@@ -1054,7 +1054,7 @@ where
     K: Key,
     V: Soa + ?Sized,
     SparseItem<K>: Debug,
-    SoaVec<KeyValuePair<K, V>>: Debug,
+    SoaVec<DenseItem<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { dense, sparse } = self;
@@ -1080,7 +1080,7 @@ impl<K, V> PartialEq for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaVec<KeyValuePair<K, V>>: PartialEq,
+    SoaVec<DenseItem<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { dense, sparse } = self;
@@ -1092,7 +1092,7 @@ impl<K, V> Eq for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaVec<KeyValuePair<K, V>>: Eq,
+    SoaVec<DenseItem<K, V>>: Eq,
 {
 }
 
@@ -1100,7 +1100,7 @@ impl<K, V> PartialOrd for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaVec<KeyValuePair<K, V>>: PartialOrd,
+    SoaVec<DenseItem<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { dense, sparse } = self;
@@ -1117,7 +1117,7 @@ impl<K, V> Ord for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaVec<KeyValuePair<K, V>>: Ord,
+    SoaVec<DenseItem<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { dense, sparse } = self;
@@ -1135,7 +1135,7 @@ where
     K: Key,
     V: Soa + ?Sized,
     SparseItem<K>: Hash,
-    SoaVec<KeyValuePair<K, V>>: Hash,
+    SoaVec<DenseItem<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { dense, sparse } = self;
@@ -1149,7 +1149,7 @@ impl<K, V> Clone for EpochSparseSet<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaVec<KeyValuePair<K, V>>: Clone,
+    SoaVec<DenseItem<K, V>>: Clone,
 {
     fn clone(&self) -> Self {
         let Self { dense, sparse } = self;
@@ -1287,13 +1287,13 @@ where
     }
 }
 
-impl<K, V> FromIterator<KeyValuePair<K, V>> for EpochSparseSet<K, V>
+impl<K, V> FromIterator<DenseItem<K, V>> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
     V: Soa + SoaWrite,
     V::Context: Default,
 {
-    fn from_iter<I: IntoIterator<Item = KeyValuePair<K, V>>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = DenseItem<K, V>>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let iter_len = {
             let (lower, upper) = iter.size_hint();
@@ -1301,7 +1301,7 @@ where
         };
 
         let mut me = Self::with_capacity(iter_len, iter_len);
-        for KeyValuePair { key, value } in iter {
+        for DenseItem { key, value } in iter {
             me.insert_from(key, |context, dst| unsafe {
                 drop_old_then_write(context, dst, value);
             });
@@ -1318,7 +1318,7 @@ where
     V::Context: Default,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        iter.into_iter().map(KeyValuePair::from).collect()
+        iter.into_iter().map(DenseItem::from).collect()
     }
 }
 
@@ -1334,7 +1334,7 @@ where
             .enumerate()
             .map(|(sparse_index, value)| {
                 let key = K::new(sparse_index, Default::default());
-                KeyValuePair { key, value }
+                DenseItem { key, value }
             })
             .collect();
         let len = dense.len();
@@ -1347,14 +1347,14 @@ where
     }
 }
 
-impl<K, V> Extend<KeyValuePair<K, V>> for EpochSparseSet<K, V>
+impl<K, V> Extend<DenseItem<K, V>> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
     V: Soa + SoaWrite,
 {
-    fn extend<I: IntoIterator<Item = KeyValuePair<K, V>>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = DenseItem<K, V>>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
-        while let Some(KeyValuePair { key, value }) = iter.next() {
+        while let Some(DenseItem { key, value }) = iter.next() {
             if self.len() == self.capacity() {
                 let (lower, _) = iter.size_hint();
                 self.reserve(lower.saturating_add(1), 0);
@@ -1372,7 +1372,7 @@ where
     V: Soa + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
-        self.extend(iter.into_iter().map(KeyValuePair::from));
+        self.extend(iter.into_iter().map(DenseItem::from));
     }
 }
 

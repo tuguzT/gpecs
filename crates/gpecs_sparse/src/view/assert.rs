@@ -6,12 +6,12 @@ use crate::{
     },
     item::{SparseItem, SparseItemKind},
     key::Key,
-    pair::{KeyValuePair, KeyValueRefs},
+    pair::{DenseItem, DenseRefs},
     soa::{slice::SoaSlices, traits::Soa},
 };
 
 pub fn check_parts<K, V>(
-    dense: &SoaSlices<KeyValuePair<K, V>>,
+    dense: &SoaSlices<DenseItem<K, V>>,
     sparse: &[SparseItem<K>],
 ) -> Result<(), FromPartsError<K>>
 where
@@ -29,7 +29,7 @@ where
         let dense_index = dense_index
             .try_into()
             .map_err(TooLargeSparseIndexError::new)?;
-        let KeyValueRefs { key, .. } = dense
+        let DenseRefs { key, .. } = dense
             .get(dense_index)
             .ok_or_else(|| DenseIndexOutOfBoundsError::new(dense_index, dense.len()))?;
 
@@ -47,7 +47,7 @@ where
         }
     }
 
-    for (dense_index, KeyValueRefs { key, .. }) in dense.iter().enumerate() {
+    for (dense_index, DenseRefs { key, .. }) in dense.iter().enumerate() {
         let sparse_index = key
             .sparse_index()
             .try_into()

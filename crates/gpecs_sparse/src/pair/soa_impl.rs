@@ -2,9 +2,8 @@ use core::alloc::{Layout, LayoutError};
 
 use crate::{
     pair::{
-        KeyValueFieldDescriptors, KeyValueMutPtrs, KeyValueNonNullPtrs, KeyValuePair,
-        KeyValuePairContext, KeyValuePtrs, KeyValueRefs, KeyValueRefsMut, KeyValueSliceMutPtrs,
-        KeyValueSlicePtrs, KeyValueSlices, KeyValueSlicesMut,
+        DenseContext, DenseFieldDescriptors, DenseItem, DenseMutPtrs, DenseNonNullPtrs, DensePtrs,
+        DenseRefs, DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
     },
     soa::traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
@@ -12,11 +11,11 @@ use crate::{
     },
 };
 
-unsafe impl<K, V> RawSoaContext for KeyValuePairContext<K, V>
+unsafe impl<K, V> RawSoaContext for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
 {
-    type FieldDescriptors<'a> = KeyValueFieldDescriptors<'a, K, V>;
+    type FieldDescriptors<'a> = DenseFieldDescriptors<'a, K, V>;
 
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -28,7 +27,7 @@ where
     #[inline]
     fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
         let context = self.as_inner();
-        KeyValueFieldDescriptors::new(context)
+        DenseFieldDescriptors::new(context)
     }
 
     #[inline]
@@ -39,7 +38,7 @@ where
         Ok(buffer_layout)
     }
 
-    type Ptrs<'a> = KeyValuePtrs<'a, K, V>;
+    type Ptrs<'a> = DensePtrs<'a, K, V>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -49,7 +48,7 @@ where
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
         let context = self.as_inner();
-        KeyValuePtrs::dangling(context)
+        DensePtrs::dangling(context)
     }
 
     #[inline]
@@ -63,7 +62,7 @@ where
         let key = buffer.cast();
         let buffer = unsafe { buffer.add(offset) };
         let value = unsafe { context.ptrs_from_buffer(buffer, capacity) };
-        KeyValuePtrs::new(key, value)
+        DensePtrs::new(key, value)
     }
 
     #[inline]
@@ -76,7 +75,7 @@ where
         unsafe { ptrs.offset_from(self, origin) }
     }
 
-    type MutPtrs<'a> = KeyValueMutPtrs<'a, K, V>;
+    type MutPtrs<'a> = DenseMutPtrs<'a, K, V>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -86,7 +85,7 @@ where
     #[inline]
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
         let context = self.as_inner();
-        KeyValueMutPtrs::dangling(context)
+        DenseMutPtrs::dangling(context)
     }
 
     #[inline]
@@ -100,7 +99,7 @@ where
         let key = buffer.cast();
         let buffer = unsafe { buffer.add(offset) };
         let value = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
-        KeyValueMutPtrs::new(key, value)
+        DenseMutPtrs::new(key, value)
     }
 
     #[inline]
@@ -161,7 +160,7 @@ where
         unsafe { ptrs.drop_in_place(self) }
     }
 
-    type NonNullPtrs<'a> = KeyValueNonNullPtrs<'a, K, V>;
+    type NonNullPtrs<'a> = DenseNonNullPtrs<'a, K, V>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -174,7 +173,7 @@ where
     unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
         let context = self.as_inner();
         let (key, value) = ptrs.into_parts();
-        unsafe { KeyValueNonNullPtrs::new_unchecked(context, key, value) }
+        unsafe { DenseNonNullPtrs::new_unchecked(context, key, value) }
     }
 
     #[inline]
@@ -182,7 +181,7 @@ where
         ptrs.into_mut_ptrs(self)
     }
 
-    type SlicePtrs<'a> = KeyValueSlicePtrs<'a, K, V>;
+    type SlicePtrs<'a> = DenseSlicePtrs<'a, K, V>;
 
     #[inline]
     fn upcast_slice_ptrs<'short, 'long: 'short>(
@@ -198,7 +197,7 @@ where
         len: usize,
     ) -> Self::SlicePtrs<'a> {
         let context = self.as_inner();
-        KeyValueSlicePtrs::from_raw_parts(context, ptrs, len)
+        DenseSlicePtrs::from_raw_parts(context, ptrs, len)
     }
 
     #[inline]
@@ -212,7 +211,7 @@ where
         slices.into_ptrs(self)
     }
 
-    type SliceMutPtrs<'a> = KeyValueSliceMutPtrs<'a, K, V>;
+    type SliceMutPtrs<'a> = DenseSliceMutPtrs<'a, K, V>;
 
     #[inline]
     fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
@@ -228,7 +227,7 @@ where
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
         let context = self.as_inner();
-        KeyValueSliceMutPtrs::from_raw_parts(context, ptrs, len)
+        DenseSliceMutPtrs::from_raw_parts(context, ptrs, len)
     }
 
     #[inline]
@@ -258,20 +257,20 @@ where
     }
 }
 
-unsafe impl<K, V> RawSoa for KeyValuePair<K, V>
+unsafe impl<K, V> RawSoa for DenseItem<K, V>
 where
     V: RawSoa + ?Sized,
 {
-    type Context = KeyValuePairContext<K, V>;
+    type Context = DenseContext<K, V>;
     type Fields = (K, V::Fields);
 }
 
-unsafe impl<K, V> Soa for KeyValuePair<K, V>
+unsafe impl<K, V> Soa for DenseItem<K, V>
 where
     V: Soa + ?Sized,
 {
     type Refs<'context, 'a>
-        = KeyValueRefs<'context, 'a, K, V>
+        = DenseRefs<'context, 'a, K, V>
     where
         Self: 'a;
 
@@ -279,13 +278,13 @@ where
     fn upcast_refs<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::Refs<'long, 'a_long>,
     ) -> Self::Refs<'short, 'a_short> {
-        let KeyValueRefs { key, value } = from;
+        let DenseRefs { key, value } = from;
         let value = V::upcast_refs(value.into_inner());
-        KeyValueRefs::new(key, value)
+        DenseRefs::new(key, value)
     }
 
     type RefsMut<'context, 'a>
-        = KeyValueRefsMut<'context, 'a, K, V>
+        = DenseRefsMut<'context, 'a, K, V>
     where
         Self: 'a;
 
@@ -293,9 +292,9 @@ where
     fn upcast_refs_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::RefsMut<'long, 'a_long>,
     ) -> Self::RefsMut<'short, 'a_short> {
-        let KeyValueRefsMut { key, value } = from;
+        let DenseRefsMut { key, value } = from;
         let value = V::upcast_refs_mut(value.into_inner());
-        KeyValueRefsMut::new(key, value)
+        DenseRefsMut::new(key, value)
     }
 
     #[inline]
@@ -364,7 +363,7 @@ where
     }
 
     type Slices<'context, 'a>
-        = KeyValueSlices<'context, 'a, K, V>
+        = DenseSlices<'context, 'a, K, V>
     where
         Self: 'a;
 
@@ -374,11 +373,11 @@ where
     ) -> Self::Slices<'short, 'a_short> {
         let (keys, values) = from.into_parts();
         let values = V::upcast_slices(values);
-        unsafe { KeyValueSlices::new_unchecked(keys, values) }
+        unsafe { DenseSlices::new_unchecked(keys, values) }
     }
 
     type SlicesMut<'context, 'a>
-        = KeyValueSlicesMut<'context, 'a, K, V>
+        = DenseSlicesMut<'context, 'a, K, V>
     where
         Self: 'a;
 
@@ -388,7 +387,7 @@ where
     ) -> Self::SlicesMut<'short, 'a_short> {
         let (keys, values) = from.into_parts();
         let values = V::upcast_slices_mut(values);
-        unsafe { KeyValueSlicesMut::new_unchecked(keys, values) }
+        unsafe { DenseSlicesMut::new_unchecked(keys, values) }
     }
 
     #[inline]
@@ -478,7 +477,7 @@ where
     }
 }
 
-unsafe impl<K, V> SoaRead for KeyValuePair<K, V>
+unsafe impl<K, V> SoaRead for DenseItem<K, V>
 where
     V: SoaRead,
 {
@@ -488,7 +487,7 @@ where
     }
 }
 
-unsafe impl<K, V> SoaWrite for KeyValuePair<K, V>
+unsafe impl<K, V> SoaWrite for DenseItem<K, V>
 where
     V: SoaWrite,
 {
@@ -498,9 +497,9 @@ where
     }
 }
 
-unsafe impl<K, V> SoaTrustedFields for KeyValuePair<K, V> where V: SoaTrustedFields {}
+unsafe impl<K, V> SoaTrustedFields for DenseItem<K, V> where V: SoaTrustedFields {}
 
-unsafe impl<K, V> SoaCloneToUninit for KeyValuePair<K, V>
+unsafe impl<K, V> SoaCloneToUninit for DenseItem<K, V>
 where
     K: Clone,
     V: SoaCloneToUninit + ?Sized,

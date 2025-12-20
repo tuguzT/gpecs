@@ -10,7 +10,7 @@ use crate::soa::{
     wrapper,
 };
 
-pub struct KeyValueFieldDescriptors<'context, K, V>
+pub struct DenseFieldDescriptors<'context, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -19,7 +19,7 @@ where
     phantom: PhantomData<fn() -> K>,
 }
 
-impl<'context, K, V> KeyValueFieldDescriptors<'context, K, V>
+impl<'context, K, V> DenseFieldDescriptors<'context, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -39,21 +39,21 @@ where
     }
 }
 
-impl<K, V> Debug for KeyValueFieldDescriptors<'_, K, V>
+impl<K, V> Debug for DenseFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> FieldDescriptors<'c, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, values, .. } = self;
-        f.debug_struct("KeyValueFieldLayouts")
+        f.debug_struct("DenseFieldDescriptors")
             .field("key", key)
             .field("values", values)
             .finish()
     }
 }
 
-impl<K, V> Clone for KeyValueFieldDescriptors<'_, K, V>
+impl<K, V> Clone for DenseFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> FieldDescriptors<'c, V>: Clone,
@@ -72,14 +72,14 @@ where
     }
 }
 
-impl<K, V> Copy for KeyValueFieldDescriptors<'_, K, V>
+impl<K, V> Copy for DenseFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> FieldDescriptors<'c, V>: Copy,
 {
 }
 
-impl<'context, K, V> IntoIterator for KeyValueFieldDescriptors<'context, K, V>
+impl<'context, K, V> IntoIterator for DenseFieldDescriptors<'context, K, V>
 where
     V: RawSoa + ?Sized,
 {

@@ -6,13 +6,11 @@ use core::{
 };
 
 use crate::{
-    pair::{
-        KeyValueMutPtrs, KeyValuePtrs, KeyValueSliceMutPtrs, KeyValueSlicePtrs, KeyValueSlices,
-    },
+    pair::{DenseMutPtrs, DensePtrs, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices},
     soa::{traits::Soa, wrapper},
 };
 
-pub struct KeyValueSlicesMut<'context, 'a, K, V>
+pub struct DenseSlicesMut<'context, 'a, K, V>
 where
     V: Soa + ?Sized + 'a,
 {
@@ -20,7 +18,7 @@ where
     values: wrapper::SlicesMut<'context, 'a, V>,
 }
 
-impl<'context, 'a, K, V> KeyValueSlicesMut<'context, 'a, K, V>
+impl<'context, 'a, K, V> DenseSlicesMut<'context, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
@@ -57,71 +55,68 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(
-        self,
-        context: &'context V::Context,
-    ) -> KeyValueSlicePtrs<'context, K, V> {
+    pub fn into_slice_ptrs(self, context: &'context V::Context) -> DenseSlicePtrs<'context, K, V> {
         let Self { keys, values } = self;
 
         let keys = ptr::from_ref(keys);
         let values = V::slices_mut_as_slices(context, values.into_inner());
         let values = V::slices_as_slice_ptrs(context, values);
-        unsafe { KeyValueSlicePtrs::new_unchecked(keys, values) }
+        unsafe { DenseSlicePtrs::new_unchecked(keys, values) }
     }
 
     #[inline]
     pub fn into_slice_mut_ptrs(
         self,
         context: &'context V::Context,
-    ) -> KeyValueSliceMutPtrs<'context, K, V> {
+    ) -> DenseSliceMutPtrs<'context, K, V> {
         let Self { keys, values } = self;
 
         let keys = ptr::from_mut(keys);
         let values = V::slices_mut_as_slice_ptrs(context, values.into_inner());
-        unsafe { KeyValueSliceMutPtrs::new_unchecked(keys, values) }
+        unsafe { DenseSliceMutPtrs::new_unchecked(keys, values) }
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'context V::Context) -> DensePtrs<'context, K, V> {
         let Self { keys, values } = self;
 
         let key = keys.as_ptr();
         let values = V::slices_mut_as_slices(context, values.into_inner());
         let value = V::slices_as_ptrs(context, values);
-        KeyValuePtrs::new(key, value)
+        DensePtrs::new(key, value)
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
+    pub fn into_mut_ptrs(self, context: &'context V::Context) -> DenseMutPtrs<'context, K, V> {
         let Self { keys, values } = self;
 
         let key = keys.as_mut_ptr();
         let value = V::slices_mut_as_ptrs(context, values.into_inner());
-        KeyValueMutPtrs::new(key, value)
+        DenseMutPtrs::new(key, value)
     }
 
     #[inline]
-    pub fn into_slices(self, context: &'context V::Context) -> KeyValueSlices<'context, 'a, K, V> {
+    pub fn into_slices(self, context: &'context V::Context) -> DenseSlices<'context, 'a, K, V> {
         let Self { keys, values } = self;
 
         let keys = &*keys;
         let values = V::slices_mut_as_slices(context, values.into_inner());
-        unsafe { KeyValueSlices::new_unchecked(keys, values) }
+        unsafe { DenseSlices::new_unchecked(keys, values) }
     }
 }
 
-impl<'context, 'a, K, V> From<KeyValueSlicesMut<'context, 'a, K, V>>
+impl<'context, 'a, K, V> From<DenseSlicesMut<'context, 'a, K, V>>
     for (&'a mut [K], V::SlicesMut<'context, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: KeyValueSlicesMut<'context, 'a, K, V>) -> Self {
+    fn from(value: DenseSlicesMut<'context, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for KeyValueSlicesMut<'_, '_, K, V>
+impl<K, V> Debug for DenseSlicesMut<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
@@ -129,14 +124,14 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
-        f.debug_struct("KeyValueSlicesMut")
+        f.debug_struct("DenseSlicesMut")
             .field("keys", keys)
             .field("values", values)
             .finish()
     }
 }
 
-impl<K, V> Default for KeyValueSlicesMut<'_, '_, K, V>
+impl<K, V> Default for DenseSlicesMut<'_, '_, K, V>
 where
     V: Soa + ?Sized,
     for<'c, 'a> V::SlicesMut<'c, 'a>: Default,
@@ -149,7 +144,7 @@ where
     }
 }
 
-impl<K, V> PartialEq for KeyValueSlicesMut<'_, '_, K, V>
+impl<K, V> PartialEq for DenseSlicesMut<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
@@ -161,7 +156,7 @@ where
     }
 }
 
-impl<K, V> Eq for KeyValueSlicesMut<'_, '_, K, V>
+impl<K, V> Eq for DenseSlicesMut<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
@@ -169,7 +164,7 @@ where
 {
 }
 
-impl<K, V> PartialOrd for KeyValueSlicesMut<'_, '_, K, V>
+impl<K, V> PartialOrd for DenseSlicesMut<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
@@ -185,7 +180,7 @@ where
     }
 }
 
-impl<K, V> Ord for KeyValueSlicesMut<'_, '_, K, V>
+impl<K, V> Ord for DenseSlicesMut<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
@@ -201,7 +196,7 @@ where
     }
 }
 
-impl<K, V> Hash for KeyValueSlicesMut<'_, '_, K, V>
+impl<K, V> Hash for DenseSlicesMut<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,

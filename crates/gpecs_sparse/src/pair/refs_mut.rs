@@ -6,11 +6,11 @@ use core::{
 };
 
 use crate::{
-    pair::{KeyValueMutPtrs, KeyValueRefs},
+    pair::{DenseMutPtrs, DenseRefs},
     soa::{traits::Soa, wrapper},
 };
 
-pub struct KeyValueRefsMut<'context, 'a, K, V>
+pub struct DenseRefsMut<'context, 'a, K, V>
 where
     V: Soa + ?Sized + 'a,
 {
@@ -18,7 +18,7 @@ where
     pub value: wrapper::RefsMut<'context, 'a, V>,
 }
 
-impl<'context, 'a, K, V> KeyValueRefsMut<'context, 'a, K, V>
+impl<'context, 'a, K, V> DenseRefsMut<'context, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
@@ -35,26 +35,26 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'context V::Context) -> DenseMutPtrs<'context, K, V> {
         let Self { key, value } = self;
 
         let key = ptr::from_mut(key);
         let value = V::refs_mut_as_ptrs(context, value.into_inner());
-        KeyValueMutPtrs::new(key, value)
+        DenseMutPtrs::new(key, value)
     }
 
     #[inline]
-    pub fn into_refs(self, context: &'context V::Context) -> KeyValueRefs<'context, 'a, K, V> {
+    pub fn into_refs(self, context: &'context V::Context) -> DenseRefs<'context, 'a, K, V> {
         let Self { key, value } = self;
 
         let key = &*key;
         let value = V::refs_mut_as_refs(context, value.into_inner());
-        KeyValueRefs::new(key, value)
+        DenseRefs::new(key, value)
     }
 }
 
 impl<'context, 'a, K, V> From<(&'a mut K, V::RefsMut<'context, 'a>)>
-    for KeyValueRefsMut<'context, 'a, K, V>
+    for DenseRefsMut<'context, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
@@ -65,18 +65,18 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<KeyValueRefsMut<'context, 'a, K, V>>
+impl<'context, 'a, K, V> From<DenseRefsMut<'context, 'a, K, V>>
     for (&'a mut K, V::RefsMut<'context, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: KeyValueRefsMut<'context, 'a, K, V>) -> Self {
+    fn from(value: DenseRefsMut<'context, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for KeyValueRefsMut<'_, '_, K, V>
+impl<K, V> Debug for DenseRefsMut<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
@@ -84,14 +84,14 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
-        f.debug_struct("KeyValueRefsMut")
+        f.debug_struct("DenseRefsMut")
             .field("key", key)
             .field("value", value)
             .finish()
     }
 }
 
-impl<K, V> PartialEq for KeyValueRefsMut<'_, '_, K, V>
+impl<K, V> PartialEq for DenseRefsMut<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
@@ -103,7 +103,7 @@ where
     }
 }
 
-impl<K, V> Eq for KeyValueRefsMut<'_, '_, K, V>
+impl<K, V> Eq for DenseRefsMut<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
@@ -111,7 +111,7 @@ where
 {
 }
 
-impl<K, V> PartialOrd for KeyValueRefsMut<'_, '_, K, V>
+impl<K, V> PartialOrd for DenseRefsMut<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
@@ -127,7 +127,7 @@ where
     }
 }
 
-impl<K, V> Ord for KeyValueRefsMut<'_, '_, K, V>
+impl<K, V> Ord for DenseRefsMut<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
@@ -143,7 +143,7 @@ where
     }
 }
 
-impl<K, V> Hash for KeyValueRefsMut<'_, '_, K, V>
+impl<K, V> Hash for DenseRefsMut<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,

@@ -21,7 +21,7 @@ use crate::{
         ValuesMut,
     },
     key::{Epoch, Key},
-    pair::{KeyValueMutPtrs, KeyValuePair, KeyValuePairContext, KeyValuePtrs},
+    pair::{DenseContext, DenseItem, DenseMutPtrs, DensePtrs},
     soa::{
         self,
         slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
@@ -35,7 +35,7 @@ where
     K: Key + 'c + 'a,
     V: Soa + ?Sized + 'c + 'a,
 {
-    dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
+    dense: SoaSlicesMut<'c, 'a, DenseItem<K, V>>,
     sparse: &'a mut [SparseItem<K>],
 }
 
@@ -46,7 +46,7 @@ where
 {
     #[inline]
     pub fn new(
-        dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
+        dense: SoaSlicesMut<'c, 'a, DenseItem<K, V>>,
         sparse: &'a mut [SparseItem<K>],
     ) -> Result<Self, FromPartsError<K>> {
         check_parts(&dense.slices(), sparse)?;
@@ -57,7 +57,7 @@ where
 
     #[inline]
     pub unsafe fn from_parts(
-        dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
+        dense: SoaSlicesMut<'c, 'a, DenseItem<K, V>>,
         sparse: &'a mut [SparseItem<K>],
     ) -> Self {
         Self { dense, sparse }
@@ -67,7 +67,7 @@ where
     pub fn into_parts(
         self,
     ) -> (
-        SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
+        SoaSlicesMut<'c, 'a, DenseItem<K, V>>,
         &'a mut [SparseItem<K>],
     ) {
         let Self { dense, sparse } = self;
@@ -145,7 +145,7 @@ where
     pub fn as_ptrs(&self) -> Ptrs<'_, V> {
         let Self { dense, .. } = self;
 
-        let KeyValuePtrs { value, .. } = dense.as_ptrs();
+        let DensePtrs { value, .. } = dense.as_ptrs();
         value.into_inner()
     }
 
@@ -153,7 +153,7 @@ where
     pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
         let Self { dense, .. } = self;
 
-        let KeyValueMutPtrs { value, .. } = dense.as_mut_ptrs();
+        let DenseMutPtrs { value, .. } = dense.as_mut_ptrs();
         value.into_inner()
     }
 
@@ -193,7 +193,7 @@ where
     pub fn as_keys_ptr(&self) -> *const K {
         let Self { dense, .. } = self;
 
-        let KeyValuePtrs { key, .. } = dense.as_ptrs();
+        let DensePtrs { key, .. } = dense.as_ptrs();
         key
     }
 
@@ -201,7 +201,7 @@ where
     pub unsafe fn as_keys_ptr_mut(&mut self) -> *mut K {
         let Self { dense, .. } = self;
 
-        let KeyValueMutPtrs { key, .. } = dense.as_mut_ptrs();
+        let DenseMutPtrs { key, .. } = dense.as_mut_ptrs();
         key
     }
 
@@ -952,7 +952,7 @@ where
     K: Key,
     V: Soa + ?Sized,
     SparseItem<K>: Debug,
-    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Debug,
+    SoaSlicesMut<'c, 'a, DenseItem<K, V>>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { dense, sparse } = self;
@@ -970,7 +970,7 @@ where
 {
     #[inline]
     fn from(context: &'c V::Context) -> Self {
-        let context = KeyValuePairContext::<K, V>::from_inner_ref(context);
+        let context = DenseContext::<K, V>::from_inner_ref(context);
         Self {
             dense: context.into(),
             sparse: Default::default(),
@@ -982,7 +982,7 @@ impl<'c, 'a, K, V> PartialEq for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: PartialEq,
+    SoaSlicesMut<'c, 'a, DenseItem<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { dense, sparse } = self;
@@ -994,7 +994,7 @@ impl<'c, 'a, K, V> Eq for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Eq,
+    SoaSlicesMut<'c, 'a, DenseItem<K, V>>: Eq,
 {
 }
 
@@ -1002,7 +1002,7 @@ impl<'c, 'a, K, V> PartialOrd for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: PartialOrd,
+    SoaSlicesMut<'c, 'a, DenseItem<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { dense, sparse } = self;
@@ -1018,7 +1018,7 @@ impl<'c, 'a, K, V> Ord for EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Ord,
+    SoaSlicesMut<'c, 'a, DenseItem<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { dense, sparse } = self;
@@ -1035,7 +1035,7 @@ where
     K: Key,
     V: Soa + ?Sized,
     SparseItem<K>: Hash,
-    SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>: Hash,
+    SoaSlicesMut<'c, 'a, DenseItem<K, V>>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { dense, sparse } = self;

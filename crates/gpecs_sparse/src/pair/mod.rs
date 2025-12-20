@@ -1,9 +1,8 @@
 pub use self::{
-    context::KeyValuePairContext, field_descriptors::KeyValueFieldDescriptors,
-    mut_ptrs::KeyValueMutPtrs, nonnull_ptrs::KeyValueNonNullPtrs, ptrs::KeyValuePtrs,
-    refs::KeyValueRefs, refs_mut::KeyValueRefsMut, slice_mut_ptrs::KeyValueSliceMutPtrs,
-    slice_ptrs::KeyValueSlicePtrs, slices::KeyValueSlices, slices_mut::KeyValueSlicesMut,
-    value::KeyValuePair,
+    context::DenseContext, field_descriptors::DenseFieldDescriptors, mut_ptrs::DenseMutPtrs,
+    nonnull_ptrs::DenseNonNullPtrs, ptrs::DensePtrs, refs::DenseRefs, refs_mut::DenseRefsMut,
+    slice_mut_ptrs::DenseSliceMutPtrs, slice_ptrs::DenseSlicePtrs, slices::DenseSlices,
+    slices_mut::DenseSlicesMut, value::DenseItem,
 };
 
 mod context;

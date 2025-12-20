@@ -6,11 +6,11 @@ use core::{
 };
 
 use crate::{
-    pair::KeyValuePtrs,
+    pair::DensePtrs,
     soa::{traits::Soa, wrapper},
 };
 
-pub struct KeyValueRefs<'context, 'a, K, V>
+pub struct DenseRefs<'context, 'a, K, V>
 where
     V: Soa + ?Sized + 'a,
 {
@@ -18,7 +18,7 @@ where
     pub value: wrapper::Refs<'context, 'a, V>,
 }
 
-impl<'context, 'a, K, V> KeyValueRefs<'context, 'a, K, V>
+impl<'context, 'a, K, V> DenseRefs<'context, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
@@ -35,16 +35,16 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'context V::Context) -> DensePtrs<'context, K, V> {
         let Self { key, value } = self;
 
         let key = ptr::from_ref(key);
         let value = V::refs_as_ptrs(context, value.into_inner());
-        KeyValuePtrs::new(key, value)
+        DensePtrs::new(key, value)
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a K, V::Refs<'context, 'a>)> for KeyValueRefs<'context, 'a, K, V>
+impl<'context, 'a, K, V> From<(&'a K, V::Refs<'context, 'a>)> for DenseRefs<'context, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
@@ -55,17 +55,17 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<KeyValueRefs<'context, 'a, K, V>> for (&'a K, V::Refs<'context, 'a>)
+impl<'context, 'a, K, V> From<DenseRefs<'context, 'a, K, V>> for (&'a K, V::Refs<'context, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: KeyValueRefs<'context, 'a, K, V>) -> Self {
+    fn from(value: DenseRefs<'context, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for KeyValueRefs<'_, '_, K, V>
+impl<K, V> Debug for DenseRefs<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
@@ -73,14 +73,14 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
-        f.debug_struct("KeyValueRefs")
+        f.debug_struct("DenseRefs")
             .field("key", key)
             .field("value", value)
             .finish()
     }
 }
 
-impl<K, V> PartialEq for KeyValueRefs<'_, '_, K, V>
+impl<K, V> PartialEq for DenseRefs<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
@@ -92,7 +92,7 @@ where
     }
 }
 
-impl<K, V> Eq for KeyValueRefs<'_, '_, K, V>
+impl<K, V> Eq for DenseRefs<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
@@ -100,7 +100,7 @@ where
 {
 }
 
-impl<K, V> PartialOrd for KeyValueRefs<'_, '_, K, V>
+impl<K, V> PartialOrd for DenseRefs<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
@@ -116,7 +116,7 @@ where
     }
 }
 
-impl<K, V> Ord for KeyValueRefs<'_, '_, K, V>
+impl<K, V> Ord for DenseRefs<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
@@ -132,7 +132,7 @@ where
     }
 }
 
-impl<K, V> Hash for KeyValueRefs<'_, '_, K, V>
+impl<K, V> Hash for DenseRefs<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
@@ -145,7 +145,7 @@ where
     }
 }
 
-impl<K, V> Clone for KeyValueRefs<'_, '_, K, V>
+impl<K, V> Clone for DenseRefs<'_, '_, K, V>
 where
     V: Soa + ?Sized,
     for<'c, 'a> V::Refs<'c, 'a>: Clone,
@@ -158,7 +158,7 @@ where
     }
 }
 
-impl<K, V> Copy for KeyValueRefs<'_, '_, K, V>
+impl<K, V> Copy for DenseRefs<'_, '_, K, V>
 where
     V: Soa + ?Sized,
     for<'c, 'a> V::Refs<'c, 'a>: Copy,

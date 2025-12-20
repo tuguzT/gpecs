@@ -6,11 +6,11 @@ use core::{
 };
 
 use crate::{
-    pair::{KeyValuePtrs, KeyValueSlicePtrs},
+    pair::{DensePtrs, DenseSlicePtrs},
     soa::{traits::Soa, wrapper},
 };
 
-pub struct KeyValueSlices<'context, 'a, K, V>
+pub struct DenseSlices<'context, 'a, K, V>
 where
     V: Soa + ?Sized + 'a,
 {
@@ -18,7 +18,7 @@ where
     values: wrapper::Slices<'context, 'a, V>,
 }
 
-impl<'context, 'a, K, V> KeyValueSlices<'context, 'a, K, V>
+impl<'context, 'a, K, V> DenseSlices<'context, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
@@ -55,39 +55,36 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(
-        self,
-        context: &'context V::Context,
-    ) -> KeyValueSlicePtrs<'context, K, V> {
+    pub fn into_slice_ptrs(self, context: &'context V::Context) -> DenseSlicePtrs<'context, K, V> {
         let Self { keys, values } = self;
 
         let keys = ptr::from_ref(keys);
         let values = V::slices_as_slice_ptrs(context, values.into_inner());
-        unsafe { KeyValueSlicePtrs::new_unchecked(keys, values) }
+        unsafe { DenseSlicePtrs::new_unchecked(keys, values) }
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'context V::Context) -> DensePtrs<'context, K, V> {
         let Self { keys, values } = self;
 
         let key = keys.as_ptr();
         let value = V::slices_as_ptrs(context, values.into_inner());
-        KeyValuePtrs::new(key, value)
+        DensePtrs::new(key, value)
     }
 }
 
-impl<'context, 'a, K, V> From<KeyValueSlices<'context, 'a, K, V>>
+impl<'context, 'a, K, V> From<DenseSlices<'context, 'a, K, V>>
     for (&'a [K], V::Slices<'context, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: KeyValueSlices<'context, 'a, K, V>) -> Self {
+    fn from(value: DenseSlices<'context, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for KeyValueSlices<'_, '_, K, V>
+impl<K, V> Debug for DenseSlices<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
@@ -95,14 +92,14 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
-        f.debug_struct("KeyValueSlices")
+        f.debug_struct("DenseSlices")
             .field("keys", keys)
             .field("values", values)
             .finish()
     }
 }
 
-impl<K, V> Default for KeyValueSlices<'_, '_, K, V>
+impl<K, V> Default for DenseSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
     for<'c, 'a> V::Slices<'c, 'a>: Default,
@@ -115,7 +112,7 @@ where
     }
 }
 
-impl<K, V> PartialEq for KeyValueSlices<'_, '_, K, V>
+impl<K, V> PartialEq for DenseSlices<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
@@ -127,7 +124,7 @@ where
     }
 }
 
-impl<K, V> Eq for KeyValueSlices<'_, '_, K, V>
+impl<K, V> Eq for DenseSlices<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
@@ -135,7 +132,7 @@ where
 {
 }
 
-impl<K, V> PartialOrd for KeyValueSlices<'_, '_, K, V>
+impl<K, V> PartialOrd for DenseSlices<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
@@ -151,7 +148,7 @@ where
     }
 }
 
-impl<K, V> Ord for KeyValueSlices<'_, '_, K, V>
+impl<K, V> Ord for DenseSlices<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
@@ -167,7 +164,7 @@ where
     }
 }
 
-impl<K, V> Hash for KeyValueSlices<'_, '_, K, V>
+impl<K, V> Hash for DenseSlices<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
@@ -180,7 +177,7 @@ where
     }
 }
 
-impl<K, V> Clone for KeyValueSlices<'_, '_, K, V>
+impl<K, V> Clone for DenseSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
     for<'c, 'a> V::Slices<'c, 'a>: Clone,
@@ -193,7 +190,7 @@ where
     }
 }
 
-impl<K, V> Copy for KeyValueSlices<'_, '_, K, V>
+impl<K, V> Copy for DenseSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
     for<'c, 'a> V::Slices<'c, 'a>: Copy,

@@ -6,14 +6,14 @@ use core::{
 };
 
 use crate::{
-    pair::{KeyValueMutPtrs, KeyValuePtrs},
+    pair::{DenseMutPtrs, DensePtrs},
     soa::{
         traits::{MutPtrs, NonNullPtrs, RawSoa, RawSoaContext},
         wrapper,
     },
 };
 
-pub struct KeyValueNonNullPtrs<'context, K, V>
+pub struct DenseNonNullPtrs<'context, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -21,7 +21,7 @@ where
     pub value: wrapper::NonNullPtrs<'context, V>,
 }
 
-impl<'context, K, V> KeyValueNonNullPtrs<'context, K, V>
+impl<'context, K, V> DenseNonNullPtrs<'context, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -49,27 +49,27 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> KeyValuePtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'context V::Context) -> DensePtrs<'context, K, V> {
         let Self { key, value } = self;
 
         let key = key.as_ptr().cast_const();
         let value = context.nonnull_to_ptrs(value.into_inner());
         let value = context.ptrs_cast_const(value);
-        KeyValuePtrs::new(key, value)
+        DensePtrs::new(key, value)
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self, context: &'context V::Context) -> KeyValueMutPtrs<'context, K, V> {
+    pub fn into_mut_ptrs(self, context: &'context V::Context) -> DenseMutPtrs<'context, K, V> {
         let Self { key, value } = self;
 
         let key = key.as_ptr();
         let value = context.nonnull_to_ptrs(value.into_inner());
-        KeyValueMutPtrs::new(key, value)
+        DenseMutPtrs::new(key, value)
     }
 }
 
 impl<'context, K, V> From<(NonNull<K>, NonNullPtrs<'context, V>)>
-    for KeyValueNonNullPtrs<'context, K, V>
+    for DenseNonNullPtrs<'context, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -80,32 +80,32 @@ where
     }
 }
 
-impl<'context, K, V> From<KeyValueNonNullPtrs<'context, K, V>>
+impl<'context, K, V> From<DenseNonNullPtrs<'context, K, V>>
     for (NonNull<K>, NonNullPtrs<'context, V>)
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    fn from(value: KeyValueNonNullPtrs<'context, K, V>) -> Self {
+    fn from(value: DenseNonNullPtrs<'context, K, V>) -> Self {
         value.into_parts()
     }
 }
 
-impl<K, V> Debug for KeyValueNonNullPtrs<'_, K, V>
+impl<K, V> Debug for DenseNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> NonNullPtrs<'c, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
-        f.debug_struct("KeyValueNonNullPtrs")
+        f.debug_struct("DenseNonNullPtrs")
             .field("key", key)
             .field("value", value)
             .finish()
     }
 }
 
-impl<K, V> PartialEq for KeyValueNonNullPtrs<'_, K, V>
+impl<K, V> PartialEq for DenseNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> NonNullPtrs<'c, V>: PartialEq,
@@ -116,14 +116,14 @@ where
     }
 }
 
-impl<K, V> Eq for KeyValueNonNullPtrs<'_, K, V>
+impl<K, V> Eq for DenseNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> NonNullPtrs<'c, V>: Eq,
 {
 }
 
-impl<K, V> PartialOrd for KeyValueNonNullPtrs<'_, K, V>
+impl<K, V> PartialOrd for DenseNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> NonNullPtrs<'c, V>: PartialOrd,
@@ -138,7 +138,7 @@ where
     }
 }
 
-impl<K, V> Ord for KeyValueNonNullPtrs<'_, K, V>
+impl<K, V> Ord for DenseNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> NonNullPtrs<'c, V>: Ord,
@@ -153,7 +153,7 @@ where
     }
 }
 
-impl<K, V> Hash for KeyValueNonNullPtrs<'_, K, V>
+impl<K, V> Hash for DenseNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> NonNullPtrs<'c, V>: Hash,
@@ -165,7 +165,7 @@ where
     }
 }
 
-impl<K, V> Clone for KeyValueNonNullPtrs<'_, K, V>
+impl<K, V> Clone for DenseNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -177,7 +177,7 @@ where
     }
 }
 
-impl<K, V> Copy for KeyValueNonNullPtrs<'_, K, V>
+impl<K, V> Copy for DenseNonNullPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
     for<'c> NonNullPtrs<'c, V>: Copy,

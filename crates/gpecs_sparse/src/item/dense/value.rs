@@ -1,5 +1,5 @@
 use crate::{
-    pair::{DenseRefs, DenseRefsMut},
+    item::{DenseRefs, DenseRefsMut},
     soa::traits::Soa,
 };
 

@@ -15,13 +15,12 @@ use crate::{
         unwrap_sparse_items_pair_mut,
     },
     error::FromPartsError,
-    item::SparseItem,
+    item::{DenseContext, DenseItem, DenseMutPtrs, DensePtrs, SparseItem},
     iter::{
         Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys, RawValues, RawValuesMut, Values,
         ValuesMut,
     },
     key::{Epoch, Key},
-    pair::{DenseContext, DenseItem, DenseMutPtrs, DensePtrs},
     soa::{
         self,
         slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},

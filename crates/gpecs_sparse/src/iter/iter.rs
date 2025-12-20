@@ -6,8 +6,8 @@ use core::{
 };
 
 use crate::{
+    item::DenseItem,
     iter::RawIter,
-    pair::DenseItem,
     soa::{
         self,
         traits::{Ptrs, RawSoa, SlicePtrs, Soa},

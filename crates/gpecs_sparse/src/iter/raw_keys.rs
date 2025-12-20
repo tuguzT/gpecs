@@ -4,8 +4,8 @@ use core::{
 };
 
 use crate::{
+    item::DenseItem,
     iter::{Keys, RawIter},
-    pair::DenseItem,
     soa::{self, traits::RawSoa},
 };
 

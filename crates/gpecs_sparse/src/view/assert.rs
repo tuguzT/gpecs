@@ -4,9 +4,9 @@ use crate::{
         OccupiedSparseItemExpectedError, SparseIndexMismatchError, SparseIndexOutOfBoundsError,
         TooLargeSparseIndexError, TooSmallSparseIndexError,
     },
+    item::{DenseItem, DenseRefs},
     item::{SparseItem, SparseItemKind},
     key::Key,
-    pair::{DenseItem, DenseRefs},
     soa::{slice::SoaSlices, traits::Soa},
 };
 

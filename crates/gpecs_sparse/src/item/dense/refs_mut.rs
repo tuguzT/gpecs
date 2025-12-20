@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    pair::{DenseMutPtrs, DenseRefs},
+    item::{DenseMutPtrs, DenseRefs},
     soa::{traits::Soa, wrapper},
 };
 

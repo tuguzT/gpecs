@@ -7,7 +7,7 @@ use core::{
 use gpecs_soa::traits::SoaRead;
 
 use crate::{
-    pair::DenseItem,
+    item::DenseItem,
     soa::{traits::Soa, vec},
 };
 

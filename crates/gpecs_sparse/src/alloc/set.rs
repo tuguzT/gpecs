@@ -16,13 +16,14 @@ use crate::{
         FromPartsError, TooLargeSparseIndexError, TooSmallSparseIndexError, TryModifyError,
         TryModifyErrorKind, TryReserveError,
     },
-    item::{SparseItem, SparseItemKind},
+    item::{
+        DenseContext, DenseItem, DenseMutPtrs, DensePtrs, DenseRefs, SparseItem, SparseItemKind,
+    },
     iter::{
         Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys,
         RawValues, RawValuesMut, Values, ValuesMut,
     },
     key::{Epoch, Key},
-    pair::{DenseContext, DenseItem, DenseMutPtrs, DensePtrs, DenseRefs},
     soa::{
         mem::replace as soa_replace,
         slice::{SoaSlices, SoaSlicesMut},

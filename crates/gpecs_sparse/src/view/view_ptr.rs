@@ -7,10 +7,9 @@ use core::{
 
 use crate::{
     algo::sparse_get_unchecked,
-    item::SparseItem,
+    item::{DenseContext, DenseItem, DensePtrs, DenseSlicePtrs, SparseItem},
     iter::{RawIter, RawKeys, RawValues},
     key::Key,
-    pair::{DenseContext, DenseItem, DensePtrs, DenseSlicePtrs},
     soa::{
         slice::SoaSlicePtrs,
         traits::{Ptrs, RawSoa, SlicePtrs},

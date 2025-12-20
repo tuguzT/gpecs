@@ -1,7 +1,7 @@
 use core::alloc::{Layout, LayoutError};
 
 use crate::{
-    pair::{
+    item::{
         DenseContext, DenseFieldDescriptors, DenseItem, DenseMutPtrs, DenseNonNullPtrs, DensePtrs,
         DenseRefs, DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
     },

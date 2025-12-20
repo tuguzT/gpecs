@@ -11,10 +11,9 @@ use core::{
 use crate::{
     algo::{sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_with_key, sparse_index},
     error::FromPartsError,
-    item::SparseItem,
+    item::{DenseItem, DensePtrs, DenseSlicePtrs, SparseItem},
     iter::{Iter, Keys, RawIter, RawKeys, RawValues, Values},
     key::Key,
-    pair::{DenseItem, DensePtrs, DenseSlicePtrs},
     soa::{
         slice::SoaSlices,
         traits::{Ptrs, RawSoa, SlicePtrs, Soa},

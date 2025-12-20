@@ -14,7 +14,6 @@ pub mod error;
 pub mod item;
 pub mod iter;
 pub mod key;
-pub mod pair;
 pub mod prelude;
 pub mod view;
 

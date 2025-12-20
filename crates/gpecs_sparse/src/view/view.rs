@@ -5,7 +5,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     ops::Index,
-    ptr,
+    ptr, slice,
 };
 
 use crate::{
@@ -367,6 +367,58 @@ where
     }
 
     #[inline]
+    pub fn as_key_slice(&self) -> &[K] {
+        let (_, keys) = self.as_key_slice_with_context();
+        keys
+    }
+
+    #[inline]
+    pub fn as_key_slice_with_context(&self) -> (&V::Context, &[K]) {
+        let (context, keys) = self.as_key_slice_ptr_with_context();
+        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+
+    #[inline]
+    pub fn as_sparse_slice(&self) -> &[SparseItem<K>] {
+        let (_, sparse) = self.as_sparse_slice_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn as_sparse_slice_with_context(&self) -> (&V::Context, &[SparseItem<K>]) {
+        let (context, sparse) = self.as_sparse_slice_ptr_with_context();
+        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        (context, sparse)
+    }
+
+    #[inline]
+    pub fn into_key_slice(self) -> &'a [K] {
+        let (_, keys) = self.into_key_slice_with_context();
+        keys
+    }
+
+    #[inline]
+    pub fn into_key_slice_with_context(self) -> (&'c V::Context, &'a [K]) {
+        let (context, keys) = self.into_key_slice_ptr_with_context();
+        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+
+    #[inline]
+    pub fn into_sparse_slice(self) -> &'a [SparseItem<K>] {
+        let (_, sparse) = self.into_sparse_slice_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn into_sparse_slice_with_context(self) -> (&'c V::Context, &'a [SparseItem<K>]) {
+        let (context, sparse) = self.into_sparse_slice_ptr_with_context();
+        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        (context, sparse)
+    }
+
+    #[inline]
     pub unsafe fn get_unchecked(&self, key: K) -> Ptrs<'_, V> {
         let (_, ptrs) = unsafe { self.get_unchecked_with_context(key) };
         ptrs
@@ -564,20 +616,6 @@ where
         let (context, slices) = dense.into_slices_with_context();
         let (_, values) = slices.into_parts();
         (context, values)
-    }
-
-    #[inline]
-    pub fn as_keys_slice(&self) -> &'a [K] {
-        let Self { dense, .. } = self;
-
-        let (keys, _) = dense.clone().into_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub fn as_sparse_slice(&self) -> &'a [SparseItem<K>] {
-        let Self { sparse, .. } = self;
-        sparse
     }
 
     #[inline]

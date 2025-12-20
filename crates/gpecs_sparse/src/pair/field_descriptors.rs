@@ -6,8 +6,8 @@ use core::{
 
 use crate::soa::{
     field::{CopiedFieldDescriptors, FieldDescriptor},
-    traits::{RawSoa, RawSoaContext},
-    wrapper::FieldDescriptors,
+    traits::{FieldDescriptors, RawSoa, RawSoaContext},
+    wrapper,
 };
 
 pub struct KeyValueFieldDescriptors<'context, K, V>
@@ -15,7 +15,7 @@ where
     V: RawSoa + ?Sized,
 {
     key: FieldDescriptor,
-    values: FieldDescriptors<'context, V>,
+    values: wrapper::FieldDescriptors<'context, V>,
     phantom: PhantomData<fn() -> K>,
 }
 
@@ -27,7 +27,7 @@ where
     pub fn new(context: &'context V::Context) -> Self {
         Self {
             key: FieldDescriptor::of::<K>(),
-            values: FieldDescriptors::new(context.field_descriptors()),
+            values: wrapper::FieldDescriptors::new(context.field_descriptors()),
             phantom: PhantomData,
         }
     }
@@ -35,14 +35,14 @@ where
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, FieldDescriptors<'context, V>) {
         let Self { key, values, .. } = self;
-        (key, values)
+        (key, values.into_inner())
     }
 }
 
-impl<'context, K, V> Debug for KeyValueFieldDescriptors<'context, K, V>
+impl<K, V> Debug for KeyValueFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    FieldDescriptors<'context, V>: Debug,
+    for<'c> FieldDescriptors<'c, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, values, .. } = self;
@@ -53,10 +53,10 @@ where
     }
 }
 
-impl<'context, K, V> Clone for KeyValueFieldDescriptors<'context, K, V>
+impl<K, V> Clone for KeyValueFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    FieldDescriptors<'context, V>: Clone,
+    for<'c> FieldDescriptors<'c, V>: Clone,
 {
     fn clone(&self) -> Self {
         let Self {
@@ -72,10 +72,10 @@ where
     }
 }
 
-impl<'context, K, V> Copy for KeyValueFieldDescriptors<'context, K, V>
+impl<K, V> Copy for KeyValueFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    FieldDescriptors<'context, V>: Copy,
+    for<'c> FieldDescriptors<'c, V>: Copy,
 {
 }
 
@@ -90,6 +90,7 @@ where
         CopiedFieldDescriptors<<FieldDescriptors<'context, V> as IntoIterator>::IntoIter>,
     >;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { key, values, .. } = self;
 

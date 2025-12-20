@@ -39,12 +39,17 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked(
+    pub unsafe fn from_parts(
         dense: SoaSlices<'c, 'a, KeyValuePair<K, V>>,
         sparse: &'a [SparseItem<K>],
     ) -> Self {
         Self { dense, sparse }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (SoaSlices<'c, 'a, KeyValuePair<K, V>>, &'a [SparseItem<K>]) {
+        let Self { dense, sparse } = self;
+        (dense, sparse)
     }
 
     #[inline]
@@ -530,7 +535,7 @@ where
     ) -> Result<Self, FromPartsError<K>> {
         check_parts(&dense, sparse)?;
 
-        let me = unsafe { Self::new_unchecked(dense, sparse) };
+        let me = unsafe { Self::from_parts(dense, sparse) };
         Ok(me)
     }
 
@@ -578,12 +583,6 @@ where
     pub fn as_sparse_slice(&self) -> &'a [SparseItem<K>] {
         let Self { sparse, .. } = self;
         sparse
-    }
-
-    #[inline]
-    pub fn into_parts(self) -> (SoaSlices<'c, 'a, KeyValuePair<K, V>>, &'a [SparseItem<K>]) {
-        let Self { dense, sparse } = self;
-        (dense, sparse)
     }
 
     #[inline]

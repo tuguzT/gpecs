@@ -50,23 +50,28 @@ where
         sparse: &'a mut [SparseItem<K>],
     ) -> Result<Self, FromPartsError<K>> {
         check_parts(&dense.slices(), sparse)?;
-        Ok(Self { dense, sparse })
+
+        let me = unsafe { Self::from_parts(dense, sparse) };
+        Ok(me)
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked(
+    pub unsafe fn from_parts(
         dense: SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
         sparse: &'a mut [SparseItem<K>],
     ) -> Self {
-        if cfg!(debug_assertions) {
-            let Ok(view) = Self::new(dense, sparse) else {
-                panic!("incorrect inputs");
-            };
-            return view;
-        }
-
         Self { dense, sparse }
+    }
+
+    #[inline]
+    pub fn into_parts(
+        self,
+    ) -> (
+        SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
+        &'a mut [SparseItem<K>],
+    ) {
+        let Self { dense, sparse } = self;
+        (dense, sparse)
     }
 
     #[inline]
@@ -234,17 +239,6 @@ where
     pub unsafe fn as_sparse_ptr_mut(&mut self) -> *mut SparseItem<K> {
         let Self { sparse, .. } = self;
         sparse.as_mut_ptr()
-    }
-
-    #[inline]
-    pub fn into_parts(
-        self,
-    ) -> (
-        SoaSlicesMut<'c, 'a, KeyValuePair<K, V>>,
-        &'a mut [SparseItem<K>],
-    ) {
-        let Self { dense, sparse } = self;
-        (dense, sparse)
     }
 
     #[inline]
@@ -1173,6 +1167,6 @@ where
     #[inline]
     fn from(value: EpochSparseViewMut<'c, 'a, K, V>) -> Self {
         let EpochSparseViewMut { dense, sparse } = value;
-        unsafe { Self::new_unchecked(dense.into(), sparse) }
+        unsafe { Self::from_parts(dense.into(), sparse) }
     }
 }

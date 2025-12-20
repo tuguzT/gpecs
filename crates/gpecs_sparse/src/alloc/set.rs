@@ -374,7 +374,7 @@ where
     #[inline]
     pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V> {
         let Self { dense, sparse } = self;
-        unsafe { EpochSparseViewMut::new_unchecked(dense.slices_mut(), sparse) }
+        unsafe { EpochSparseViewMut::from_parts(dense.slices_mut(), sparse) }
     }
 
     #[inline]

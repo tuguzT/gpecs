@@ -54,7 +54,7 @@ where
 
         let dense = unsafe { dense.deref() };
         let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
-        unsafe { EpochSparseView::new_unchecked(dense, sparse) }
+        unsafe { EpochSparseView::from_parts(dense, sparse) }
     }
 
     #[inline]

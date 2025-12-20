@@ -1,5 +1,6 @@
 use core::{
     cmp,
+    fmt::{self, Debug},
     hash::{self, Hash},
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -57,6 +58,17 @@ where
     pub const fn as_inner_mut(&mut self) -> &mut V::Context {
         let Self { context, .. } = self;
         context
+    }
+}
+
+impl<K, V> Debug for KeyValuePairContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { context, .. } = self;
+        f.debug_tuple("KeyValuePairContext").field(context).finish()
     }
 }
 

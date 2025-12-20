@@ -233,8 +233,7 @@ where
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> Iter<'c, 'a, T> {
-        let (context, slices) = self.into_slice_ptrs_with_context();
-        unsafe { Iter::from_parts(context, slices) }
+        unsafe { self.cast_const().deref() }
     }
 
     #[inline]

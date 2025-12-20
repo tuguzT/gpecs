@@ -51,9 +51,7 @@ where
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> SoaSlices<'c, 'a, T> {
-        let (context, ptrs, len) = self.into_parts();
-        let ptrs = context.ptrs_cast_const(ptrs);
-        unsafe { SoaSlices::from_parts(context, ptrs, len) }
+        unsafe { self.cast_const().deref() }
     }
 
     #[inline]

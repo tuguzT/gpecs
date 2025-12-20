@@ -58,7 +58,7 @@ impl ErasedFieldSliceMutPtr {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedFieldSlice<'a> {
-        unsafe { ErasedFieldSlice::from_ptr(self.cast_const()) }
+        unsafe { self.cast_const().deref() }
     }
 
     #[inline]

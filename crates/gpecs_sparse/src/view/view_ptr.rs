@@ -14,7 +14,7 @@ use crate::{
         slice::SoaSlicePtrs,
         traits::{Ptrs, RawSoa, SlicePtrs},
     },
-    view::EpochSparseView,
+    view::{EpochSparseView, EpochSparseViewMutPtr},
 };
 
 pub struct EpochSparseViewPtr<'c, K, V>
@@ -45,7 +45,14 @@ where
         (dense, sparse)
     }
 
-    // TODO: cast_mut
+    #[inline]
+    pub fn cast_mut(self) -> EpochSparseViewMutPtr<'c, K, V> {
+        let Self { dense, sparse } = self;
+
+        let dense = dense.cast_mut();
+        let sparse = sparse.cast_mut();
+        unsafe { EpochSparseViewMutPtr::from_parts(dense, sparse) }
+    }
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> EpochSparseView<'c, 'a, K, V> {
@@ -92,7 +99,7 @@ where
 
     #[inline]
     pub fn as_ptrs_with_context(&self) -> (&V::Context, DensePtrs<'_, K, V>, *const SparseItem<K>) {
-        let Self { ref dense, sparse } = *self;
+        let Self { dense, sparse } = self;
 
         let (context, dense) = dense.as_ptrs_with_context();
         let sparse = sparse.cast();
@@ -525,7 +532,7 @@ where
     fn from(context: &'c V::Context) -> Self {
         let context = DenseContext::from_inner_ref(context);
         let dense = SoaSlicePtrs::from(context);
-        let sparse = ptr::from_ref(&[]);
+        let sparse = ptr::from_ref(Default::default());
         unsafe { Self::from_parts(dense, sparse) }
     }
 }

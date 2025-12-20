@@ -5,7 +5,7 @@ use core::{
 
 use crate::{
     item::DenseItem,
-    iter::{Iter, IterMut, RawIterMut, RawValues, Values, ValuesMut},
+    iter::{IterMut, RawIterMut, RawValues, Values, ValuesMut},
     soa::{
         self,
         traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs},
@@ -174,9 +174,7 @@ where
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> Values<'c, 'a, K, V> {
-        let inner = unsafe { self.into_inner().deref() };
-        let inner = Iter::from_inner(inner);
-        unsafe { Values::from_inner(inner) }
+        unsafe { self.cast_const().deref() }
     }
 
     #[inline]

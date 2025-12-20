@@ -4,6 +4,7 @@ use core::{
     hash::{self, Hash},
     mem::swap,
     ops::{Index, IndexMut},
+    ptr,
 };
 
 use crate::{
@@ -24,15 +25,17 @@ use crate::{
     soa::{
         self,
         slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
-        traits::{MutPtrs, Ptrs, Soa},
+        traits::{MutPtrs, Ptrs, RawSoa, Soa},
     },
-    view::{EpochSparseView, assert::check_parts},
+    view::{EpochSparseView, EpochSparseViewMutPtr, EpochSparseViewPtr, assert::check_parts},
 };
+
+// TODO: add support for raw SoA types
 
 pub struct EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key + 'c + 'a,
-    V: Soa + ?Sized + 'c + 'a,
+    V: RawSoa + ?Sized + 'c + 'a,
 {
     dense: SoaSlicesMut<'c, 'a, DenseItem<K, V>>,
     sparse: &'a mut [SparseItem<K>],
@@ -41,19 +44,8 @@ where
 impl<'c, 'a, K, V> EpochSparseViewMut<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
-    #[inline]
-    pub fn new(
-        dense: SoaSlicesMut<'c, 'a, DenseItem<K, V>>,
-        sparse: &'a mut [SparseItem<K>],
-    ) -> Result<Self, FromPartsError<K>> {
-        check_parts(&dense.slices(), sparse)?;
-
-        let me = unsafe { Self::from_parts(dense, sparse) };
-        Ok(me)
-    }
-
     #[inline]
     pub unsafe fn from_parts(
         dense: SoaSlicesMut<'c, 'a, DenseItem<K, V>>,
@@ -93,6 +85,69 @@ where
     #[inline]
     pub fn sparse_is_empty(&self) -> bool {
         self.sparse_len() == 0
+    }
+
+    #[inline]
+    pub fn as_view_ptr(&self) -> EpochSparseViewPtr<'_, K, V> {
+        let Self { dense, sparse } = self;
+
+        let dense = dense.slice_ptrs();
+        let sparse = ptr::from_ref(*sparse);
+        unsafe { EpochSparseViewPtr::from_parts(dense, sparse) }
+    }
+
+    #[inline]
+    pub fn into_view_ptr(self) -> EpochSparseViewPtr<'c, K, V> {
+        let Self { dense, sparse } = self;
+
+        let dense = dense.into_slice_ptrs();
+        let sparse = ptr::from_ref(sparse);
+        unsafe { EpochSparseViewPtr::from_parts(dense, sparse) }
+    }
+
+    #[inline]
+    pub fn as_view_mut_ptr(&mut self) -> EpochSparseViewMutPtr<'_, K, V> {
+        let Self { dense, sparse } = self;
+
+        let dense = dense.slice_mut_ptrs();
+        let sparse = ptr::from_mut(*sparse);
+        unsafe { EpochSparseViewMutPtr::from_parts(dense, sparse) }
+    }
+
+    #[inline]
+    pub fn into_view_mut_ptr(self) -> EpochSparseViewMutPtr<'c, K, V> {
+        let Self { dense, sparse } = self;
+
+        let dense = dense.into_slice_mut_ptrs();
+        let sparse = ptr::from_mut(sparse);
+        unsafe { EpochSparseViewMutPtr::from_parts(dense, sparse) }
+    }
+
+    #[inline]
+    pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V> {
+        unsafe { self.as_view_ptr().deref() }
+    }
+
+    #[inline]
+    pub fn as_view_mut(&mut self) -> EpochSparseViewMut<'_, '_, K, V> {
+        unsafe { self.as_view_mut_ptr().deref_mut() }
+    }
+}
+
+impl<'c, 'a, K, V> EpochSparseViewMut<'c, 'a, K, V>
+where
+    K: Key,
+    V: Soa + ?Sized,
+{
+    #[inline]
+    pub fn new(
+        dense: SoaSlicesMut<'c, 'a, DenseItem<K, V>>,
+        sparse: &'a mut [SparseItem<K>],
+    ) -> Result<Self, FromPartsError<K>> {
+        check_parts(&dense.slices(), sparse)?;
+
+        let me = unsafe { Self::from_parts(dense, sparse) };
+        Ok(me)
     }
 
     #[inline]

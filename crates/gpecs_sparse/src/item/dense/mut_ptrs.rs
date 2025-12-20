@@ -173,12 +173,7 @@ where
 {
     #[inline]
     pub unsafe fn deref<'a>(self, context: &'context V::Context) -> DenseRefs<'context, 'a, K, V> {
-        let Self { key, value } = self;
-
-        let key = unsafe { &*key };
-        let value = context.ptrs_cast_const(value.into_inner());
-        let value = unsafe { V::ptrs_to_refs(context, value) };
-        DenseRefs::new(key, value)
+        unsafe { self.cast_const(context).deref(context) }
     }
 
     #[inline]

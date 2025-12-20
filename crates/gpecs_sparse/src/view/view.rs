@@ -21,8 +21,6 @@ use crate::{
     view::{EpochSparseViewPtr, assert::check_parts},
 };
 
-// TODO: add support for raw SoA types
-
 pub struct EpochSparseView<'c, 'a, K, V>
 where
     K: Key + 'c + 'a,
@@ -75,10 +73,10 @@ where
 
     #[inline]
     pub fn as_view_ptr(&self) -> EpochSparseViewPtr<'_, K, V> {
-        let Self { ref dense, sparse } = *self;
+        let Self { dense, sparse } = self;
 
         let dense = dense.slice_ptrs();
-        let sparse = ptr::from_ref(sparse);
+        let sparse = ptr::from_ref(*sparse);
         unsafe { EpochSparseViewPtr::from_parts(dense, sparse) }
     }
 
@@ -92,7 +90,7 @@ where
     }
 
     #[inline]
-    pub fn view(&self) -> EpochSparseView<'_, '_, K, V> {
+    pub fn as_view(&self) -> EpochSparseView<'_, '_, K, V> {
         unsafe { self.as_view_ptr().deref() }
     }
 
@@ -573,7 +571,7 @@ where
 impl<'c, 'a, K, V> EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa + ?Sized, // TODO: replace with RawSoa to see which methods to move
+    V: Soa + ?Sized,
 {
     #[inline]
     pub fn new(

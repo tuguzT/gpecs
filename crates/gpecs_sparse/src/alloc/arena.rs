@@ -31,7 +31,7 @@ use crate::{
         traits::{MutPtrs, Ptrs, RawSoaContext, Soa, SoaRead, SoaWrite},
         vec::SoaVec,
     },
-    view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewPtr},
+    view::{EpochSparseView, EpochSparseViewMut, EpochSparseViewMutPtr, EpochSparseViewPtr},
 };
 
 use super::{
@@ -379,9 +379,14 @@ where
     }
 
     #[inline]
-    pub fn as_mut_view(&mut self) -> EpochSparseViewMut<'_, '_, K, V> {
+    pub fn as_view_mut_ptr(&mut self) -> EpochSparseViewMutPtr<'_, K, V> {
         let Self { dense, sparse, .. } = self;
-        unsafe { EpochSparseViewMut::from_parts(dense.slices_mut(), sparse) }
+        unsafe { EpochSparseViewMutPtr::from_parts(dense.slice_mut_ptrs(), sparse.as_mut_slice()) }
+    }
+
+    #[inline]
+    pub fn as_view_mut(&mut self) -> EpochSparseViewMut<'_, '_, K, V> {
+        unsafe { self.as_view_mut_ptr().deref_mut() }
     }
 
     #[inline]
@@ -440,25 +445,25 @@ where
 
     #[inline]
     pub fn swap(&mut self, first_key: K, second_key: K) {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.swap(first_key, second_key);
     }
 
     #[inline]
     pub fn swap_keys(&mut self, first_key: K, second_key: K) {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.swap_keys(first_key, second_key);
     }
 
     #[inline]
     pub fn invalidate_epoch(&mut self, key: K) -> Option<K> {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.invalidate_epoch(key)
     }
 
     #[inline]
     pub fn replace_key(&mut self, key: K) -> Option<K> {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.replace_key(key)
     }
 
@@ -549,13 +554,13 @@ where
     where
         for<'c, 'any> V::Refs<'c, 'any>: Ord,
     {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort();
     }
 
     #[inline]
     pub fn sort_keys(&mut self) {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort_keys();
     }
 
@@ -564,7 +569,7 @@ where
     where
         F: FnMut((K, V::Refs<'_, '_>), (K, V::Refs<'_, '_>)) -> cmp::Ordering,
     {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort_by(f);
     }
 
@@ -574,7 +579,7 @@ where
         F: FnMut((K, V::Refs<'_, '_>)) -> T,
         T: Ord,
     {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort_by_key(f);
     }
 
@@ -584,7 +589,7 @@ where
         F: FnMut((K, V::Refs<'_, '_>)) -> T,
         T: Ord,
     {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort_by_cached_key(f);
     }
 
@@ -593,13 +598,13 @@ where
     where
         for<'c, 'any> V::Refs<'c, 'any>: Ord,
     {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort_unstable();
     }
 
     #[inline]
     pub fn sort_keys_unstable(&mut self) {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort_keys_unstable();
     }
 
@@ -608,7 +613,7 @@ where
     where
         F: FnMut((K, V::Refs<'_, '_>), (K, V::Refs<'_, '_>)) -> cmp::Ordering,
     {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort_unstable_by(f);
     }
 
@@ -618,7 +623,7 @@ where
         F: FnMut((K, V::Refs<'_, '_>)) -> T,
         T: Ord,
     {
-        let mut view_mut = self.as_mut_view();
+        let mut view_mut = self.as_view_mut();
         view_mut.sort_unstable_by_key(f);
     }
 
@@ -630,7 +635,7 @@ where
 
     #[inline]
     pub fn get_mut(&mut self, key: K) -> Option<V::RefsMut<'_, '_>> {
-        let view_mut = self.as_mut_view();
+        let view_mut = self.as_view_mut();
         view_mut.into_get_mut(key)
     }
 
@@ -648,7 +653,7 @@ where
     where
         K: Debug,
     {
-        let view_mut = self.as_mut_view();
+        let view_mut = self.as_view_mut();
         view_mut.into_index_mut(key)
     }
 
@@ -663,7 +668,7 @@ where
         &mut self,
         sparse_index: K::SparseIndex,
     ) -> Option<(K, V::RefsMut<'_, '_>)> {
-        let view_mut = self.as_mut_view();
+        let view_mut = self.as_view_mut();
         view_mut.into_get_mut_with_key(sparse_index)
     }
 
@@ -775,13 +780,13 @@ where
 
     #[inline]
     pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V> {
-        let view_mut = self.as_mut_view();
+        let view_mut = self.as_view_mut();
         view_mut.into_raw_values_mut()
     }
 
     #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<'_, '_, K, V> {
-        let view_mut = self.as_mut_view();
+        let view_mut = self.as_view_mut();
         view_mut.into_values_mut()
     }
 
@@ -799,13 +804,13 @@ where
 
     #[inline]
     pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V> {
-        let view_mut = self.as_mut_view();
+        let view_mut = self.as_view_mut();
         view_mut.into_raw_iter_mut()
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, '_, K, V> {
-        let view_mut = self.as_mut_view();
+        let view_mut = self.as_view_mut();
         view_mut.into_iter()
     }
 

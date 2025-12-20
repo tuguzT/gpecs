@@ -187,8 +187,7 @@ where
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> Iter<'c, 'a, K, V> {
-        let inner = unsafe { self.into_inner().deref() };
-        Iter::from_inner(inner)
+        unsafe { self.cast_const().deref() }
     }
 
     #[inline]

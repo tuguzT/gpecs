@@ -119,12 +119,7 @@ where
         self,
         context: &'context V::Context,
     ) -> DenseSlices<'context, 'a, K, V> {
-        let Self { keys, values } = self;
-
-        let keys = unsafe { &*keys };
-        let values = context.slice_ptrs_cast_const(values.into_inner());
-        let values = unsafe { V::slice_ptrs_to_slices(context, values) };
-        unsafe { DenseSlices::new_unchecked(keys, values) }
+        unsafe { self.cast_const(context).deref(context) }
     }
 
     #[inline]

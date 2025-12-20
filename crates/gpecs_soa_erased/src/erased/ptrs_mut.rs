@@ -81,13 +81,7 @@ impl<D> ErasedSoaMutPtrs<D> {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedSoaRefs<'a, D> {
-        let Self {
-            descriptors,
-            ptr,
-            capacity,
-            offset,
-        } = self;
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { self.cast_const().deref() }
     }
 
     #[inline]

@@ -74,9 +74,7 @@ impl<D> ErasedSoaSliceMutPtrs<D> {
 
     #[inline]
     pub unsafe fn deref<'a>(self) -> ErasedSoaSlices<'a, D> {
-        let Self { ptrs, len } = self;
-        let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
-        unsafe { ErasedSoaSlices::new_unchecked(descriptors, ptr, capacity, offset, len) }
+        unsafe { self.cast_const().deref() }
     }
 
     #[inline]

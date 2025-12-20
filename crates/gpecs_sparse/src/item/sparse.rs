@@ -1,6 +1,11 @@
+use core::{
+    cmp,
+    fmt::{self, Debug},
+    hash::{self, Hash},
+};
+
 use crate::key::Key;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct SparseItem<K>
 where
     K: Key,
@@ -97,7 +102,88 @@ where
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+impl<K> Debug for SparseItem<K>
+where
+    K: Key,
+    K::SparseIndex: Debug,
+    K::Epoch: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { kind, epoch } = self;
+        f.debug_struct("SparseItem")
+            .field("kind", kind)
+            .field("epoch", epoch)
+            .finish()
+    }
+}
+
+#[expect(clippy::expl_impl_clone_on_copy)]
+impl<K> Clone for SparseItem<K>
+where
+    K: Key,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<K> Copy for SparseItem<K> where K: Key {}
+
+impl<K> PartialEq for SparseItem<K>
+where
+    K: Key,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        let Self { kind, epoch } = self;
+        *kind == other.kind && *epoch == other.epoch
+    }
+}
+
+impl<K> Eq for SparseItem<K> where K: Key {}
+
+impl<K> PartialOrd for SparseItem<K>
+where
+    K: Key,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<K> Ord for SparseItem<K>
+where
+    K: Key,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let Self { kind, epoch } = self;
+
+        match kind.cmp(&other.kind) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        epoch.cmp(&other.epoch)
+    }
+}
+
+impl<K> Hash for SparseItem<K>
+where
+    K: Key,
+    K::SparseIndex: Hash,
+    K::Epoch: Hash,
+{
+    #[inline]
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        let Self { kind, epoch } = self;
+        kind.hash(state);
+        epoch.hash(state);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SparseItemKind<I> {
     Occupied { dense_index: I },
     Vacant { next_vacant: I },

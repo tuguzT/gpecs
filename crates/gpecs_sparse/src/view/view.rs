@@ -11,7 +11,7 @@ use core::{
 use crate::{
     algo::{sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_with_key, sparse_index},
     error::FromPartsError,
-    item::{DenseItem, DensePtrs, DenseSlicePtrs, SparseItem},
+    item::{DenseItem, DensePtrs, DenseSlicePtrs, DenseSlices, SparseItem},
     iter::{Iter, Keys, RawIter, RawKeys, RawValues, Values},
     key::Key,
     soa::{
@@ -584,36 +584,90 @@ where
         Ok(me)
     }
 
-    // TODO: rename slice methods according to pointer ones
-
     #[inline]
-    pub fn as_slices(&self) -> V::Slices<'_, '_> {
-        let (_, slices) = self.as_slices_with_context();
-        slices
+    pub fn as_slices(&self) -> (DenseSlices<'_, '_, K, V>, &[SparseItem<K>]) {
+        let (_, dense, sparse) = self.as_slices_with_context();
+        (dense, sparse)
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
-        let Self { dense, .. } = self;
+    pub fn as_slices_with_context(
+        &self,
+    ) -> (&V::Context, DenseSlices<'_, '_, K, V>, &[SparseItem<K>]) {
+        let Self { dense, sparse } = self;
 
-        let (context, slices) = dense.as_slices_with_context();
-        let (_, values) = slices.into_parts();
-        (context, values)
+        let (context, dense) = dense.as_slices_with_context();
+        (context, dense, sparse)
     }
 
     #[inline]
-    pub fn into_slices(self) -> V::Slices<'c, 'a> {
-        let (_, slices) = self.into_slices_with_context();
-        slices
+    pub fn as_value_slices(&self) -> V::Slices<'_, '_> {
+        let (_, value) = self.as_value_slices_with_context();
+        value
     }
 
     #[inline]
-    pub fn into_slices_with_context(self) -> (&'c V::Context, V::Slices<'c, 'a>) {
-        let Self { dense, .. } = self;
+    pub fn as_value_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
+        let (context, dense) = self.as_dense_slices_with_context();
+        let (_, value) = dense.into_parts();
+        (context, value)
+    }
 
-        let (context, slices) = dense.into_slices_with_context();
-        let (_, values) = slices.into_parts();
-        (context, values)
+    #[inline]
+    pub fn as_dense_slices(&self) -> DenseSlices<'_, '_, K, V> {
+        let (_, dense) = self.as_dense_slices_with_context();
+        dense
+    }
+
+    #[inline]
+    pub fn as_dense_slices_with_context(&self) -> (&V::Context, DenseSlices<'_, '_, K, V>) {
+        let (context, dense, _) = self.as_slices_with_context();
+        (context, dense)
+    }
+
+    #[inline]
+    pub fn into_slices(self) -> (DenseSlices<'c, 'a, K, V>, &'a [SparseItem<K>]) {
+        let (_, dense, sparse) = self.into_slices_with_context();
+        (dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_slices_with_context(
+        self,
+    ) -> (
+        &'c V::Context,
+        DenseSlices<'c, 'a, K, V>,
+        &'a [SparseItem<K>],
+    ) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense.into_slices_with_context();
+        (context, dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_value_slices(self) -> V::Slices<'c, 'a> {
+        let (_, value) = self.into_value_slices_with_context();
+        value
+    }
+
+    #[inline]
+    pub fn into_value_slices_with_context(self) -> (&'c V::Context, V::Slices<'c, 'a>) {
+        let (context, dense) = self.into_dense_slices_with_context();
+        let (_, value) = dense.into_parts();
+        (context, value)
+    }
+
+    #[inline]
+    pub fn into_dense_slices(self) -> DenseSlices<'c, 'a, K, V> {
+        let (_, dense) = self.into_dense_slices_with_context();
+        dense
+    }
+
+    #[inline]
+    pub fn into_dense_slices_with_context(self) -> (&'c V::Context, DenseSlices<'c, 'a, K, V>) {
+        let (context, dense, _) = self.into_slices_with_context();
+        (context, dense)
     }
 
     #[inline]
@@ -954,7 +1008,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_slices().into()
+        self.as_value_slices().into()
     }
 }
 

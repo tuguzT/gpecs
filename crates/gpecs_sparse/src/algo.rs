@@ -71,10 +71,10 @@ where
 }
 
 pub unsafe fn sparse_get_unchecked<K, T>(
-    dense: impl IntoIterator<Item = (*const K, T)>,
+    dense: impl IntoIterator<Item = T>,
     sparse: *const [SparseItem<K>],
     sparse_index: K::SparseIndex,
-) -> (*const K, T)
+) -> T
 where
     K: Key,
 {

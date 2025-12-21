@@ -102,7 +102,7 @@ where
 
     #[inline]
     pub fn as_ptrs_with_context(&self) -> (&V::Context, DensePtrs<'_, K, V>, *const SparseItem<K>) {
-        let Self { ref dense, sparse } = *self;
+        let Self { dense, sparse } = self;
 
         let (context, dense) = dense.as_ptrs_with_context();
         let sparse = sparse.as_ptr();
@@ -240,8 +240,10 @@ where
         DenseSlicePtrs<'_, K, V>,
         *const [SparseItem<K>],
     ) {
-        let Self { ref dense, sparse } = *self;
+        let Self { dense, sparse } = self;
+
         let (context, dense) = dense.as_slice_ptrs_with_context();
+        let sparse = ptr::from_ref(*sparse);
         (context, dense, sparse)
     }
 

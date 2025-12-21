@@ -890,7 +890,7 @@ where
 impl<'c, K, V> From<&'c V::Context> for EpochSparseView<'c, '_, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(context: &'c V::Context) -> Self {
@@ -902,7 +902,7 @@ where
 impl<K, V> Clone for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -915,7 +915,7 @@ where
 impl<'c, 'a, K, V> Copy for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     SoaSlices<'c, 'a, DenseItem<K, V>>: Copy,
 {
 }
@@ -1015,7 +1015,7 @@ where
 impl<K, V> AsRef<Self> for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {

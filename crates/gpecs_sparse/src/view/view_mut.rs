@@ -16,7 +16,7 @@ use crate::{
         unwrap_sparse_items_pair_mut,
     },
     error::FromPartsError,
-    item::{DenseContext, DenseItem, DenseMutPtrs, DensePtrs, SparseItem},
+    item::{DenseItem, DenseMutPtrs, DensePtrs, SparseItem},
     iter::{
         Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys, RawValues, RawValuesMut, Values,
         ValuesMut,
@@ -1020,15 +1020,12 @@ where
 impl<'c, K, V> From<&'c V::Context> for EpochSparseViewMut<'c, '_, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(context: &'c V::Context) -> Self {
-        let context = DenseContext::<K, V>::from_inner_ref(context);
-        Self {
-            dense: context.into(),
-            sparse: Default::default(),
-        }
+        let view_mut_ptr = EpochSparseViewMutPtr::from(context);
+        unsafe { view_mut_ptr.deref_mut() }
     }
 }
 
@@ -1151,7 +1148,7 @@ where
 impl<K, V> AsRef<Self> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -1162,7 +1159,7 @@ where
 impl<K, V> AsMut<Self> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -1216,7 +1213,7 @@ where
 impl<'c, 'a, K, V> From<EpochSparseViewMut<'c, 'a, K, V>> for EpochSparseView<'c, 'a, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn from(value: EpochSparseViewMut<'c, 'a, K, V>) -> Self {

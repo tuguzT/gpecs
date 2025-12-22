@@ -4,7 +4,7 @@ use core::{
     hash::{self, Hash},
     mem::swap,
     ops::{Index, IndexMut},
-    ptr,
+    ptr, slice,
 };
 
 use crate::{
@@ -689,11 +689,265 @@ where
         (context, sparse)
     }
 
-    // TODO: add getters for key & sparse slices
+    #[inline]
+    pub fn as_key_slice(&self) -> &[K] {
+        let (_, keys) = self.as_key_slice_with_context();
+        keys
+    }
+
+    #[inline]
+    pub fn as_key_slice_with_context(&self) -> (&V::Context, &[K]) {
+        let (context, keys) = self.as_key_slice_ptr_with_context();
+        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+
+    #[inline]
+    pub unsafe fn as_key_slice_mut(&mut self) -> &mut [K] {
+        let (_, keys) = unsafe { self.as_key_slice_mut_with_context() };
+        keys
+    }
+
+    #[inline]
+    pub unsafe fn as_key_slice_mut_with_context(&mut self) -> (&V::Context, &mut [K]) {
+        let (context, keys) = self.as_key_slice_mut_ptr_with_context();
+        let keys = unsafe { slice::from_raw_parts_mut(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+
+    #[inline]
+    pub fn as_sparse_slice(&self) -> &[SparseItem<K>] {
+        let (_, sparse) = self.as_sparse_slice_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn as_sparse_slice_with_context(&self) -> (&V::Context, &[SparseItem<K>]) {
+        let (context, sparse) = self.as_sparse_slice_ptr_with_context();
+        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        (context, sparse)
+    }
+
+    #[inline]
+    pub unsafe fn as_sparse_slice_mut(&mut self) -> &mut [SparseItem<K>] {
+        let (_, sparse) = unsafe { self.as_sparse_slice_mut_with_context() };
+        sparse
+    }
+
+    #[inline]
+    pub unsafe fn as_sparse_slice_mut_with_context(
+        &mut self,
+    ) -> (&V::Context, &mut [SparseItem<K>]) {
+        let (context, sparse) = self.as_sparse_slice_mut_ptr_with_context();
+        let sparse = unsafe { slice::from_raw_parts_mut(sparse.cast(), sparse.len()) };
+        (context, sparse)
+    }
+
+    #[inline]
+    pub fn into_key_slice(self) -> &'a [K] {
+        let (_, keys) = self.into_key_slice_with_context();
+        keys
+    }
+
+    #[inline]
+    pub fn into_key_slice_with_context(self) -> (&'c V::Context, &'a [K]) {
+        let (context, keys) = self.into_key_slice_ptr_with_context();
+        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+
+    #[inline]
+    pub unsafe fn into_key_slice_mut(self) -> &'a mut [K] {
+        let (_, keys) = unsafe { self.into_key_slice_mut_with_context() };
+        keys
+    }
+
+    #[inline]
+    pub unsafe fn into_key_slice_mut_with_context(self) -> (&'c V::Context, &'a mut [K]) {
+        let (context, keys) = self.into_key_slice_mut_ptr_with_context();
+        let keys = unsafe { slice::from_raw_parts_mut(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+
+    #[inline]
+    pub fn into_sparse_slice(self) -> &'a [SparseItem<K>] {
+        let (_, sparse) = self.into_sparse_slice_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn into_sparse_slice_with_context(self) -> (&'c V::Context, &'a [SparseItem<K>]) {
+        let (context, sparse) = self.into_sparse_slice_ptr_with_context();
+        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
+        (context, sparse)
+    }
+
+    #[inline]
+    pub unsafe fn into_sparse_slice_mut(self) -> &'a mut [SparseItem<K>] {
+        let (_, sparse) = unsafe { self.into_sparse_slice_mut_with_context() };
+        sparse
+    }
+
+    #[inline]
+    pub unsafe fn into_sparse_slice_mut_with_context(
+        self,
+    ) -> (&'c V::Context, &'a mut [SparseItem<K>]) {
+        let (context, sparse) = self.into_sparse_slice_mut_ptr_with_context();
+        let sparse = unsafe { slice::from_raw_parts_mut(sparse.cast(), sparse.len()) };
+        (context, sparse)
+    }
 
     // TODO: add get_unchecked methods & their counterparts
 
-    // TODO: move raw iterators here
+    #[inline]
+    pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
+        let (_, iter) = self.raw_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawKeys::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
+        let (_, iter) = self.into_raw_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_keys_with_context(self) -> (&'c V::Context, RawKeys<'c, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawKeys::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn raw_values(&self) -> RawValues<'_, K, V> {
+        let (_, iter) = self.raw_values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_values_with_context(&self) -> (&V::Context, RawValues<'_, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawValues::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_raw_values(self) -> RawValues<'c, K, V> {
+        let (_, iter) = self.into_raw_values_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_values_with_context(self) -> (&'c V::Context, RawValues<'c, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawValues::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V> {
+        let (_, iter) = self.raw_values_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_values_mut_with_context(&mut self) -> (&V::Context, RawValuesMut<'_, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.raw_iter_mut_with_context();
+        let iter = RawValuesMut::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_raw_values_mut(self) -> RawValuesMut<'c, K, V> {
+        let (_, iter) = self.into_raw_values_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_values_mut_with_context(self) -> (&'c V::Context, RawValuesMut<'c, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.into_raw_iter_mut_with_context();
+        let iter = RawValuesMut::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn raw_iter(&self) -> RawIter<'_, K, V> {
+        let (_, iter) = self.raw_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.raw_iter_with_context();
+        let iter = RawIter::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_raw_iter(self) -> RawIter<'c, K, V> {
+        let (_, iter) = self.into_raw_iter_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_iter_with_context(self) -> (&'c V::Context, RawIter<'c, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.into_raw_iter_with_context();
+        let iter = RawIter::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V> {
+        let (_, iter) = self.raw_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn raw_iter_mut_with_context(&mut self) -> (&V::Context, RawIterMut<'_, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.raw_iter_mut_with_context();
+        let iter = RawIterMut::from_inner(inner);
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_raw_iter_mut(self) -> RawIterMut<'c, K, V> {
+        let (_, iter) = self.into_raw_iter_mut_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_raw_iter_mut_with_context(self) -> (&'c V::Context, RawIterMut<'c, K, V>) {
+        let Self { dense, .. } = self;
+
+        let (context, inner) = dense.into_raw_iter_mut_with_context();
+        let iter = RawIterMut::from_inner(inner);
+        (context, iter)
+    }
 }
 
 impl<'c, 'a, K, V> EpochSparseViewMut<'c, 'a, K, V>
@@ -755,62 +1009,6 @@ where
         let (context, slices) = dense.into_slices_with_context();
         let (_, values) = slices.into_parts();
         (context, values)
-    }
-
-    #[inline]
-    pub fn as_keys_slice(&self) -> &[K] {
-        let Self { dense, .. } = self;
-
-        let (keys, _) = dense.as_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub unsafe fn as_keys_slice_mut(&mut self) -> &mut [K] {
-        let Self { dense, .. } = self;
-
-        let (keys, _) = dense.as_mut_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub fn into_keys_slice(self) -> &'a [K] {
-        let Self { dense, .. } = self;
-
-        let (keys, _) = dense.into_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub unsafe fn into_keys_slice_mut(self) -> &'a mut [K] {
-        let Self { dense, .. } = self;
-
-        let (keys, _) = dense.into_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub fn as_sparse_slice(&self) -> &[SparseItem<K>] {
-        let Self { sparse, .. } = self;
-        sparse
-    }
-
-    #[inline]
-    pub unsafe fn as_sparse_slice_mut(&mut self) -> &mut [SparseItem<K>] {
-        let Self { sparse, .. } = self;
-        sparse
-    }
-
-    #[inline]
-    pub fn into_sparse_slice(self) -> &'a [SparseItem<K>] {
-        let Self { sparse, .. } = self;
-        sparse
-    }
-
-    #[inline]
-    pub unsafe fn into_sparse_slice_mut(self) -> &'a mut [SparseItem<K>] {
-        let Self { sparse, .. } = self;
-        sparse
     }
 
     #[inline]
@@ -1167,21 +1365,6 @@ where
     }
 
     #[inline]
-    pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
-        let (_, iter) = self.raw_keys_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn raw_keys_with_context(&self) -> (&V::Context, RawKeys<'_, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.raw_iter_with_context();
-        let iter = RawKeys::from_inner(inner);
-        (context, iter)
-    }
-
-    #[inline]
     pub fn keys(&self) -> Keys<'_, '_, K, V> {
         let (_, iter) = self.keys_with_context();
         iter
@@ -1191,21 +1374,6 @@ where
     pub fn keys_with_context(&self) -> (&V::Context, Keys<'_, '_, K, V>) {
         let (context, iter) = self.raw_keys_with_context();
         let iter = unsafe { iter.deref() };
-        (context, iter)
-    }
-
-    #[inline]
-    pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
-        let (_, iter) = self.into_raw_keys_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn into_raw_keys_with_context(self) -> (&'c V::Context, RawKeys<'c, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.into_raw_iter_with_context();
-        let iter = RawKeys::from_inner(inner);
         (context, iter)
     }
 
@@ -1223,21 +1391,6 @@ where
     }
 
     #[inline]
-    pub fn raw_values(&self) -> RawValues<'_, K, V> {
-        let (_, iter) = self.raw_values_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn raw_values_with_context(&self) -> (&V::Context, RawValues<'_, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.raw_iter_with_context();
-        let iter = RawValues::from_inner(inner);
-        (context, iter)
-    }
-
-    #[inline]
     pub fn values(&self) -> Values<'_, '_, K, V> {
         let (_, iter) = self.values_with_context();
         iter
@@ -1247,21 +1400,6 @@ where
     pub fn values_with_context(&self) -> (&V::Context, Values<'_, '_, K, V>) {
         let (context, iter) = self.raw_values_with_context();
         let iter = unsafe { iter.deref() };
-        (context, iter)
-    }
-
-    #[inline]
-    pub fn into_raw_values(self) -> RawValues<'c, K, V> {
-        let (_, iter) = self.into_raw_values_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn into_raw_values_with_context(self) -> (&'c V::Context, RawValues<'c, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.into_raw_iter_with_context();
-        let iter = RawValues::from_inner(inner);
         (context, iter)
     }
 
@@ -1279,21 +1417,6 @@ where
     }
 
     #[inline]
-    pub fn raw_values_mut(&mut self) -> RawValuesMut<'_, K, V> {
-        let (_, iter) = self.raw_values_mut_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn raw_values_mut_with_context(&mut self) -> (&V::Context, RawValuesMut<'_, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.raw_iter_mut_with_context();
-        let iter = RawValuesMut::from_inner(inner);
-        (context, iter)
-    }
-
-    #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<'_, '_, K, V> {
         let (_, iter) = self.values_mut_with_context();
         iter
@@ -1303,21 +1426,6 @@ where
     pub fn values_mut_with_context(&mut self) -> (&V::Context, ValuesMut<'_, '_, K, V>) {
         let (context, iter) = self.raw_values_mut_with_context();
         let iter = unsafe { iter.deref_mut() };
-        (context, iter)
-    }
-
-    #[inline]
-    pub fn into_raw_values_mut(self) -> RawValuesMut<'c, K, V> {
-        let (_, iter) = self.into_raw_values_mut_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn into_raw_values_mut_with_context(self) -> (&'c V::Context, RawValuesMut<'c, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.into_raw_iter_mut_with_context();
-        let iter = RawValuesMut::from_inner(inner);
         (context, iter)
     }
 
@@ -1335,21 +1443,6 @@ where
     }
 
     #[inline]
-    pub fn raw_iter(&self) -> RawIter<'_, K, V> {
-        let (_, iter) = self.raw_iter_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn raw_iter_with_context(&self) -> (&V::Context, RawIter<'_, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.raw_iter_with_context();
-        let iter = RawIter::from_inner(inner);
-        (context, iter)
-    }
-
-    #[inline]
     pub fn iter(&self) -> Iter<'_, '_, K, V> {
         let (_, iter) = self.iter_with_context();
         iter
@@ -1363,36 +1456,6 @@ where
     }
 
     #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'c, K, V> {
-        let (_, iter) = self.into_raw_iter_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn into_raw_iter_with_context(self) -> (&'c V::Context, RawIter<'c, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.into_raw_iter_with_context();
-        let iter = RawIter::from_inner(inner);
-        (context, iter)
-    }
-
-    #[inline]
-    pub fn raw_iter_mut(&mut self) -> RawIterMut<'_, K, V> {
-        let (_, iter) = self.raw_iter_mut_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn raw_iter_mut_with_context(&mut self) -> (&V::Context, RawIterMut<'_, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.raw_iter_mut_with_context();
-        let iter = RawIterMut::from_inner(inner);
-        (context, iter)
-    }
-
-    #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, '_, K, V> {
         let (_, iter) = self.iter_mut_with_context();
         iter
@@ -1402,21 +1465,6 @@ where
     pub fn iter_mut_with_context(&mut self) -> (&V::Context, IterMut<'_, '_, K, V>) {
         let (context, iter) = self.raw_iter_mut_with_context();
         let iter = unsafe { iter.deref_mut() };
-        (context, iter)
-    }
-
-    #[inline]
-    pub fn into_raw_iter_mut(self) -> RawIterMut<'c, K, V> {
-        let (_, iter) = self.into_raw_iter_mut_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn into_raw_iter_mut_with_context(self) -> (&'c V::Context, RawIterMut<'c, K, V>) {
-        let Self { dense, .. } = self;
-
-        let (context, inner) = dense.into_raw_iter_mut_with_context();
-        let iter = RawIterMut::from_inner(inner);
         (context, iter)
     }
 

@@ -16,7 +16,7 @@ use crate::{
         unwrap_sparse_items_pair_mut,
     },
     error::FromPartsError,
-    item::{DenseItem, DenseMutPtrs, DensePtrs, SparseItem},
+    item::{DenseItem, DenseMutPtrs, DensePtrs, DenseSliceMutPtrs, DenseSlicePtrs, SparseItem},
     iter::{
         Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys, RawValues, RawValuesMut, Values,
         ValuesMut,
@@ -25,7 +25,7 @@ use crate::{
     soa::{
         self,
         slice::{Iter as SoaIter, SoaSlices, SoaSlicesMut},
-        traits::{MutPtrs, Ptrs, RawSoa, Soa},
+        traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs, Soa},
     },
     view::{EpochSparseView, EpochSparseViewMutPtr, EpochSparseViewPtr, assert::check_parts},
 };
@@ -265,7 +265,435 @@ where
         (context, sparse)
     }
 
-    // TODO: add more pointer getters (copy them from view.rs + make their mutable counterparts)
+    #[inline]
+    pub fn into_ptrs(self) -> (DensePtrs<'c, K, V>, *const SparseItem<K>) {
+        let (_, dense, sparse) = self.into_ptrs_with_context();
+        (dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_ptrs_with_context(
+        self,
+    ) -> (&'c V::Context, DensePtrs<'c, K, V>, *const SparseItem<K>) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense.into_slice_ptrs().into_ptrs_with_context();
+        let sparse = sparse.as_ptr();
+        (context, dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> (DenseMutPtrs<'c, K, V>, *mut SparseItem<K>) {
+        let (_, dense, sparse) = self.into_mut_ptrs_with_context();
+        (dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs_with_context(
+        self,
+    ) -> (&'c V::Context, DenseMutPtrs<'c, K, V>, *mut SparseItem<K>) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense.into_slice_mut_ptrs().into_mut_ptrs_with_context();
+        let sparse = sparse.as_mut_ptr();
+        (context, dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_key_ptr(self) -> *const K {
+        let (_, key) = self.into_key_ptr_with_context();
+        key
+    }
+
+    #[inline]
+    pub fn into_key_ptr_with_context(self) -> (&'c V::Context, *const K) {
+        let (context, dense) = self.into_dense_ptrs_with_context();
+        let (key, _) = dense.into_parts();
+        (context, key)
+    }
+
+    #[inline]
+    pub fn into_key_mut_ptr(self) -> *mut K {
+        let (_, key) = self.into_key_mut_ptr_with_context();
+        key
+    }
+
+    #[inline]
+    pub fn into_key_mut_ptr_with_context(self) -> (&'c V::Context, *mut K) {
+        let (context, dense) = self.into_dense_mut_ptrs_with_context();
+        let (key, _) = dense.into_parts();
+        (context, key)
+    }
+
+    #[inline]
+    pub fn into_value_ptrs(self) -> Ptrs<'c, V> {
+        let (_, value) = self.into_value_ptrs_with_context();
+        value
+    }
+
+    #[inline]
+    pub fn into_value_ptrs_with_context(self) -> (&'c V::Context, Ptrs<'c, V>) {
+        let (context, dense) = self.into_dense_ptrs_with_context();
+        let (_, value) = dense.into_parts();
+        (context, value)
+    }
+
+    #[inline]
+    pub fn into_value_mut_ptrs(self) -> MutPtrs<'c, V> {
+        let (_, value) = self.into_value_mut_ptrs_with_context();
+        value
+    }
+
+    #[inline]
+    pub fn into_value_mut_ptrs_with_context(self) -> (&'c V::Context, MutPtrs<'c, V>) {
+        let (context, dense) = self.into_dense_mut_ptrs_with_context();
+        let (_, value) = dense.into_parts();
+        (context, value)
+    }
+
+    #[inline]
+    pub fn into_dense_ptrs(self) -> DensePtrs<'c, K, V> {
+        let (_, dense) = self.into_dense_ptrs_with_context();
+        dense
+    }
+
+    #[inline]
+    pub fn into_dense_ptrs_with_context(self) -> (&'c V::Context, DensePtrs<'c, K, V>) {
+        let (context, dense, _) = self.into_ptrs_with_context();
+        (context, dense)
+    }
+
+    #[inline]
+    pub fn into_dense_mut_ptrs(self) -> DenseMutPtrs<'c, K, V> {
+        let (_, dense) = self.into_dense_mut_ptrs_with_context();
+        dense
+    }
+
+    #[inline]
+    pub fn into_dense_mut_ptrs_with_context(self) -> (&'c V::Context, DenseMutPtrs<'c, K, V>) {
+        let (context, dense, _) = self.into_mut_ptrs_with_context();
+        (context, dense)
+    }
+
+    #[inline]
+    pub fn into_sparse_ptr(self) -> *const SparseItem<K> {
+        let (_, sparse) = self.into_sparse_ptr_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn into_sparse_ptr_with_context(self) -> (&'c V::Context, *const SparseItem<K>) {
+        let (context, _, sparse) = self.into_ptrs_with_context();
+        (context, sparse)
+    }
+
+    #[inline]
+    pub fn into_sparse_mut_ptr(self) -> *mut SparseItem<K> {
+        let (_, sparse) = self.into_sparse_mut_ptr_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn into_sparse_mut_ptr_with_context(self) -> (&'c V::Context, *mut SparseItem<K>) {
+        let (context, _, sparse) = self.into_mut_ptrs_with_context();
+        (context, sparse)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> (DenseSlicePtrs<'_, K, V>, *const [SparseItem<K>]) {
+        let (_, dense, sparse) = self.as_slice_ptrs_with_context();
+        (dense, sparse)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(
+        &self,
+    ) -> (
+        &V::Context,
+        DenseSlicePtrs<'_, K, V>,
+        *const [SparseItem<K>],
+    ) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense.as_slice_ptrs_with_context();
+        let sparse = ptr::from_ref(*sparse);
+        (context, dense, sparse)
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs(&mut self) -> (DenseSliceMutPtrs<'_, K, V>, *mut [SparseItem<K>]) {
+        let (_, dense, sparse) = self.as_slice_mut_ptrs_with_context();
+        (dense, sparse)
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs_with_context(
+        &mut self,
+    ) -> (
+        &V::Context,
+        DenseSliceMutPtrs<'_, K, V>,
+        *mut [SparseItem<K>],
+    ) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense.as_slice_mut_ptrs_with_context();
+        let sparse = ptr::from_mut(*sparse);
+        (context, dense, sparse)
+    }
+
+    #[inline]
+    pub fn as_key_slice_ptr(&self) -> *const [K] {
+        let (_, key) = self.as_key_slice_ptr_with_context();
+        key
+    }
+
+    #[inline]
+    pub fn as_key_slice_ptr_with_context(&self) -> (&V::Context, *const [K]) {
+        let (context, dense) = self.as_dense_slice_ptrs_with_context();
+        let (key, _) = dense.into_parts();
+        (context, key)
+    }
+
+    #[inline]
+    pub fn as_key_slice_mut_ptr(&mut self) -> *mut [K] {
+        let (_, key) = self.as_key_slice_mut_ptr_with_context();
+        key
+    }
+
+    #[inline]
+    pub fn as_key_slice_mut_ptr_with_context(&mut self) -> (&V::Context, *mut [K]) {
+        let (context, dense) = self.as_dense_slice_mut_ptrs_with_context();
+        let (key, _) = dense.into_parts();
+        (context, key)
+    }
+
+    #[inline]
+    pub fn as_value_slice_ptrs(&self) -> SlicePtrs<'_, V> {
+        let (_, value) = self.as_value_slice_ptrs_with_context();
+        value
+    }
+
+    #[inline]
+    pub fn as_value_slice_ptrs_with_context(&self) -> (&V::Context, SlicePtrs<'_, V>) {
+        let (context, dense) = self.as_dense_slice_ptrs_with_context();
+        let (_, value) = dense.into_parts();
+        (context, value)
+    }
+
+    #[inline]
+    pub fn as_value_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, V> {
+        let (_, value) = self.as_value_slice_mut_ptrs_with_context();
+        value
+    }
+
+    #[inline]
+    pub fn as_value_slice_mut_ptrs_with_context(&mut self) -> (&V::Context, SliceMutPtrs<'_, V>) {
+        let (context, dense) = self.as_dense_slice_mut_ptrs_with_context();
+        let (_, value) = dense.into_parts();
+        (context, value)
+    }
+
+    #[inline]
+    pub fn as_dense_slice_ptrs(&self) -> DenseSlicePtrs<'_, K, V> {
+        let (_, dense) = self.as_dense_slice_ptrs_with_context();
+        dense
+    }
+
+    #[inline]
+    pub fn as_dense_slice_ptrs_with_context(&self) -> (&V::Context, DenseSlicePtrs<'_, K, V>) {
+        let (context, dense, _) = self.as_slice_ptrs_with_context();
+        (context, dense)
+    }
+
+    #[inline]
+    pub fn as_dense_slice_mut_ptrs(&mut self) -> DenseSliceMutPtrs<'_, K, V> {
+        let (_, dense) = self.as_dense_slice_mut_ptrs_with_context();
+        dense
+    }
+
+    #[inline]
+    pub fn as_dense_slice_mut_ptrs_with_context(
+        &mut self,
+    ) -> (&V::Context, DenseSliceMutPtrs<'_, K, V>) {
+        let (context, dense, _) = self.as_slice_mut_ptrs_with_context();
+        (context, dense)
+    }
+
+    #[inline]
+    pub fn as_sparse_slice_ptr(&self) -> *const [SparseItem<K>] {
+        let (_, sparse) = self.as_sparse_slice_ptr_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn as_sparse_slice_ptr_with_context(&self) -> (&V::Context, *const [SparseItem<K>]) {
+        let (context, _, sparse) = self.as_slice_ptrs_with_context();
+        (context, sparse)
+    }
+
+    #[inline]
+    pub fn as_sparse_slice_mut_ptr(&mut self) -> *mut [SparseItem<K>] {
+        let (_, sparse) = self.as_sparse_slice_mut_ptr_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn as_sparse_slice_mut_ptr_with_context(&mut self) -> (&V::Context, *mut [SparseItem<K>]) {
+        let (context, _, sparse) = self.as_slice_mut_ptrs_with_context();
+        (context, sparse)
+    }
+
+    #[inline]
+    pub fn into_slice_ptrs(self) -> (DenseSlicePtrs<'c, K, V>, *const [SparseItem<K>]) {
+        let (_, dense, sparse) = self.into_slice_ptrs_with_context();
+        (dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_slice_ptrs_with_context(
+        self,
+    ) -> (
+        &'c V::Context,
+        DenseSlicePtrs<'c, K, V>,
+        *const [SparseItem<K>],
+    ) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense.into_slice_ptrs().into_slice_ptrs_with_context();
+        let sparse = ptr::from_ref(sparse);
+        (context, dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_slice_mut_ptrs(self) -> (DenseSliceMutPtrs<'c, K, V>, *mut [SparseItem<K>]) {
+        let (_, dense, sparse) = self.into_slice_mut_ptrs_with_context();
+        (dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_slice_mut_ptrs_with_context(
+        self,
+    ) -> (
+        &'c V::Context,
+        DenseSliceMutPtrs<'c, K, V>,
+        *mut [SparseItem<K>],
+    ) {
+        let Self { dense, sparse } = self;
+
+        let (context, dense) = dense
+            .into_slice_mut_ptrs()
+            .into_slice_mut_ptrs_with_context();
+        let sparse = ptr::from_mut(sparse);
+        (context, dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_key_slice_ptr(self) -> *const [K] {
+        let (_, key) = self.into_key_slice_ptr_with_context();
+        key
+    }
+
+    #[inline]
+    pub fn into_key_slice_ptr_with_context(self) -> (&'c V::Context, *const [K]) {
+        let (context, dense) = self.into_dense_slice_ptrs_with_context();
+        let (key, _) = dense.into_parts();
+        (context, key)
+    }
+
+    #[inline]
+    pub fn into_key_slice_mut_ptr(self) -> *mut [K] {
+        let (_, key) = self.into_key_slice_mut_ptr_with_context();
+        key
+    }
+
+    #[inline]
+    pub fn into_key_slice_mut_ptr_with_context(self) -> (&'c V::Context, *mut [K]) {
+        let (context, dense) = self.into_dense_slice_mut_ptrs_with_context();
+        let (key, _) = dense.into_parts();
+        (context, key)
+    }
+
+    #[inline]
+    pub fn into_value_slice_ptrs(self) -> SlicePtrs<'c, V> {
+        let (_, value) = self.into_value_slice_ptrs_with_context();
+        value
+    }
+
+    #[inline]
+    pub fn into_value_slice_ptrs_with_context(self) -> (&'c V::Context, SlicePtrs<'c, V>) {
+        let (context, dense) = self.into_dense_slice_ptrs_with_context();
+        let (_, value) = dense.into_parts();
+        (context, value)
+    }
+
+    #[inline]
+    pub fn into_value_slice_mut_ptrs(self) -> SliceMutPtrs<'c, V> {
+        let (_, value) = self.into_value_slice_mut_ptrs_with_context();
+        value
+    }
+
+    #[inline]
+    pub fn into_value_slice_mut_ptrs_with_context(self) -> (&'c V::Context, SliceMutPtrs<'c, V>) {
+        let (context, dense) = self.into_dense_slice_mut_ptrs_with_context();
+        let (_, value) = dense.into_parts();
+        (context, value)
+    }
+
+    #[inline]
+    pub fn into_dense_slice_ptrs(self) -> DenseSlicePtrs<'c, K, V> {
+        let (_, dense) = self.into_dense_slice_ptrs_with_context();
+        dense
+    }
+
+    #[inline]
+    pub fn into_dense_slice_ptrs_with_context(self) -> (&'c V::Context, DenseSlicePtrs<'c, K, V>) {
+        let (context, dense, _) = self.into_slice_ptrs_with_context();
+        (context, dense)
+    }
+
+    #[inline]
+    pub fn into_dense_slice_mut_ptrs(self) -> DenseSliceMutPtrs<'c, K, V> {
+        let (_, dense) = self.into_dense_slice_mut_ptrs_with_context();
+        dense
+    }
+
+    #[inline]
+    pub fn into_dense_slice_mut_ptrs_with_context(
+        self,
+    ) -> (&'c V::Context, DenseSliceMutPtrs<'c, K, V>) {
+        let (context, dense, _) = self.into_slice_mut_ptrs_with_context();
+        (context, dense)
+    }
+
+    #[inline]
+    pub fn into_sparse_slice_ptr(self) -> *const [SparseItem<K>] {
+        let (_, sparse) = self.into_sparse_slice_ptr_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn into_sparse_slice_ptr_with_context(self) -> (&'c V::Context, *const [SparseItem<K>]) {
+        let (context, _, sparse) = self.into_slice_ptrs_with_context();
+        (context, sparse)
+    }
+
+    #[inline]
+    pub fn into_sparse_slice_mut_ptr(self) -> *mut [SparseItem<K>] {
+        let (_, sparse) = self.into_sparse_slice_mut_ptr_with_context();
+        sparse
+    }
+
+    #[inline]
+    pub fn into_sparse_slice_mut_ptr_with_context(self) -> (&'c V::Context, *mut [SparseItem<K>]) {
+        let (context, _, sparse) = self.into_slice_mut_ptrs_with_context();
+        (context, sparse)
+    }
+
+    // TODO: add getters for key & sparse slices
+
+    // TODO: add get_unchecked methods & their counterparts
+
+    // TODO: move raw iterators here
 }
 
 impl<'c, 'a, K, V> EpochSparseViewMut<'c, 'a, K, V>
@@ -359,22 +787,6 @@ where
 
         let (keys, _) = dense.into_slices().into_parts();
         keys
-    }
-
-    #[inline]
-    pub fn as_keys_ptr(&self) -> *const K {
-        let Self { dense, .. } = self;
-
-        let DensePtrs { key, .. } = dense.as_ptrs();
-        key
-    }
-
-    #[inline]
-    pub unsafe fn as_keys_ptr_mut(&mut self) -> *mut K {
-        let Self { dense, .. } = self;
-
-        let DenseMutPtrs { key, .. } = dense.as_mut_ptrs();
-        key
     }
 
     #[inline]

@@ -1590,7 +1590,7 @@ where
         let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
 
         let (keys, _) = dense.as_mut_slices().into_parts();
-        let dense_key: &mut K = unwrap_dense(keys, dense_index);
+        let dense_key = unwrap_dense(keys, dense_index);
         check_equal_key(key, *dense_key);
 
         sparse_item.epoch = sparse_item.epoch.next();
@@ -1609,7 +1609,7 @@ where
         let dense_index = unwrap_into_usize(*sparse_item.dense_index()?);
 
         let (keys, _) = dense.as_mut_slices().into_parts();
-        let dense_key: &mut K = unwrap_dense(keys, dense_index);
+        let dense_key = unwrap_dense(keys, dense_index);
         check_compatible_key(key, *dense_key);
 
         *dense_key = key;

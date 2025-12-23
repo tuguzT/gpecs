@@ -116,6 +116,13 @@ where
     }
 
     #[inline]
+    pub fn into_context(self) -> T::Context {
+        let me = ManuallyDrop::new(self);
+        let buffer = unsafe { ptr::read(addr_of!(me.buffer)) };
+        buffer.into_context()
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { len, .. } = *self;
         len

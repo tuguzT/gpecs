@@ -208,6 +208,24 @@ where
     }
 
     #[inline]
+    unsafe fn dealloc(&mut self) -> T::Context {
+        let context = self.context();
+        // move context onto the stack to safely return it after buffer deallocation
+        let context = unsafe { ptr::read(context) };
+
+        if let Some((ptr, layout)) = self.current_memory(&context) {
+            unsafe { dealloc(ptr.as_ptr(), layout) }
+        }
+        context
+    }
+
+    #[inline]
+    pub fn into_context(self) -> T::Context {
+        let mut me = ManuallyDrop::new(self);
+        unsafe { me.dealloc() }
+    }
+
+    #[inline]
     #[must_use]
     pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>>
     where
@@ -455,15 +473,9 @@ impl<T> Drop for RawSoaVec<T>
 where
     T: RawSoa + ?Sized,
 {
+    #[inline]
     fn drop(&mut self) {
-        let context = self.context();
-        // Read context from the pointer to safely drop it on stack before buffer deallocation
-        let context = unsafe { ptr::read(context) };
-
-        let Some((ptr, layout)) = self.current_memory(&context) else {
-            return;
-        };
-        unsafe { dealloc(ptr.as_ptr(), layout) }
+        let _ = unsafe { self.dealloc() };
     }
 }
 

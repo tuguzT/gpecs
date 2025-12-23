@@ -75,7 +75,7 @@ fn empty_into_values() {
 
     let values = sparse_set.into_values();
     assert_eq!(values.len(), 0);
-    assert_eq!(values.as_slice(), &[]);
+    assert_eq!(values.as_slices(), &[]);
 }
 
 #[test]
@@ -109,7 +109,7 @@ fn empty_into_iter() {
 
     assert_eq!(into_iter.len(), 0);
     assert_eq!(into_iter.as_keys_slice(), &[]);
-    assert_eq!(into_iter.as_values_slice(), &[]);
+    assert_eq!(into_iter.as_value_slices(), &[]);
 }
 
 #[test]
@@ -469,7 +469,7 @@ fn one_item_into_values() {
 
     let values = sparse_set.into_values();
     assert_eq!(values.len(), 1);
-    assert_eq!(values.as_slice(), &[42.into()]);
+    assert_eq!(values.as_slices(), &[42.into()]);
 }
 
 #[test]
@@ -506,7 +506,7 @@ fn one_item_into_iter() {
     let into_iter = sparse_set.into_iter();
     assert_eq!(into_iter.len(), 1);
     assert_eq!(into_iter.as_keys_slice(), &[0]);
-    assert_eq!(into_iter.as_values_slice(), &[42.into()]);
+    assert_eq!(into_iter.as_value_slices(), &[42.into()]);
 }
 
 #[test]
@@ -1022,7 +1022,7 @@ fn three_items_into_values() {
 
     let values = sparse_set.into_values();
     assert_eq!(values.len(), 3);
-    assert_eq!(values.as_slice(), &[34.into(), 42.into(), 69.into()]);
+    assert_eq!(values.as_slices(), &[34.into(), 42.into(), 69.into()]);
 }
 
 #[test]
@@ -1066,7 +1066,7 @@ fn three_items_into_iter() {
     assert_eq!(into_iter.len(), 3);
     assert_eq!(into_iter.as_keys_slice(), &[2, 1, 5]);
     assert_eq!(
-        into_iter.as_values_slice(),
+        into_iter.as_value_slices(),
         &[34.into(), 42.into(), 69.into()],
     );
 }
@@ -1292,7 +1292,7 @@ fn five_items_drain() {
     let drain = sparse_set.drain();
     assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
     assert_eq!(
-        drain.as_values_slice(),
+        drain.as_value_slices(),
         &[34.into(), 42.into(), 69.into(), 228.into(), 666.into()],
     );
 

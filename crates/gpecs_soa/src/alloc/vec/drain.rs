@@ -8,7 +8,7 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, range},
-    traits::{RawSoa, RawSoaContext, Soa, SoaRead},
+    traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs, Soa, SoaRead},
 };
 
 use super::SoaVec;
@@ -67,9 +67,44 @@ where
     }
 
     #[inline]
+    pub fn len(&self) -> usize {
+        let Self { iter, .. } = self;
+        iter.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
     pub fn context(&self) -> &T::Context {
         let Self { iter, .. } = self;
         iter.context()
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'_, T> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&T::Context, Ptrs<'_, T>) {
+        let Self { iter, .. } = self;
+        iter.as_ptrs_with_context()
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> SlicePtrs<'_, T> {
+        let (_, ptrs) = self.as_slice_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
+        let Self { iter, .. } = self;
+        iter.as_slice_ptrs_with_context()
     }
 }
 
@@ -171,8 +206,7 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { iter, .. } = self;
-        iter.len()
+        Self::len(self)
     }
 }
 

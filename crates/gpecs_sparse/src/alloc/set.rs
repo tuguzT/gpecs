@@ -690,12 +690,9 @@ where
 
     #[inline]
     #[must_use]
-    #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
     pub fn into_keys(self) -> IntoKeys<K, V> {
         let Self { dense, .. } = self;
-        let (keys, _) = dense.as_slices().into_parts();
-        let inner = keys.to_vec().into_iter();
-        IntoKeys::new(inner)
+        IntoKeys::new(dense)
     }
 
     #[inline]

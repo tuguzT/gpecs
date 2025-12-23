@@ -1,54 +1,147 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    marker::PhantomData,
+    ptr, slice,
 };
-
-use gpecs_soa::traits::SoaRead;
 
 use crate::{
     item::DenseItem,
-    soa::{traits::Soa, vec},
+    soa::{
+        traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit, SoaRead},
+        vec,
+    },
 };
 
-#[repr(transparent)]
 pub struct IntoKeys<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
+    context: V::Context,
     inner: core_alloc::vec::IntoIter<K>,
-    phantom: PhantomData<fn() -> V>,
 }
 
 impl<K, V> IntoKeys<K, V>
 where
-    V: Soa + ?Sized,
+    K: Clone,
+    V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: core_alloc::vec::IntoIter<K>) -> Self {
-        Self {
-            inner,
-            phantom: PhantomData,
-        }
+    #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
+    pub(super) fn new(vec: vec::SoaVec<DenseItem<K, V>>) -> Self {
+        let (keys, _) = vec.as_slice_ptrs().into_parts();
+        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+
+        let inner = keys.to_vec().into_iter();
+        let context = vec.into_context().into_inner();
+
+        Self { context, inner }
+    }
+}
+
+impl<K, V> IntoKeys<K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { inner, .. } = self;
+        inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn context(&self) -> &V::Context {
+        let Self { context, .. } = self;
+        context
+    }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const K {
+        let (_, ptr) = self.as_ptr_with_context();
+        ptr
+    }
+
+    #[inline]
+    pub fn as_ptr_with_context(&self) -> (&V::Context, *const K) {
+        let Self { context, inner } = self;
+        let ptr = inner.as_slice().as_ptr();
+        (context, ptr)
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut K {
+        let (_, ptr) = self.as_mut_ptr_with_context();
+        ptr
+    }
+
+    #[inline]
+    pub fn as_mut_ptr_with_context(&mut self) -> (&V::Context, *mut K) {
+        let Self { context, inner } = self;
+        let ptr = inner.as_mut_slice().as_mut_ptr();
+        (context, ptr)
+    }
+
+    #[inline]
+    pub fn as_slice_ptr(&self) -> *const [K] {
+        let (_, slice) = self.as_slice_ptr_with_context();
+        slice
+    }
+
+    #[inline]
+    pub fn as_slice_ptr_with_context(&self) -> (&V::Context, *const [K]) {
+        let Self { context, inner } = self;
+        let slice = ptr::from_ref(inner.as_slice());
+        (context, slice)
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptr(&mut self) -> *mut [K] {
+        let (_, slice) = self.as_slice_mut_ptr_with_context();
+        slice
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptr_with_context(&mut self) -> (&V::Context, *mut [K]) {
+        let Self { context, inner } = self;
+        let slice = ptr::from_mut(inner.as_mut_slice());
+        (context, slice)
     }
 
     #[inline]
     pub fn as_slice(&self) -> &[K] {
-        let Self { inner, .. } = self;
-        inner.as_slice()
+        let (_, slice) = self.as_slice_with_context();
+        slice
+    }
+
+    #[inline]
+    pub fn as_slice_with_context(&self) -> (&V::Context, &[K]) {
+        let Self { context, inner } = self;
+        let slice = inner.as_slice();
+        (context, slice)
     }
 
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [K] {
-        let Self { inner, .. } = self;
-        inner.as_mut_slice()
+        let (_, slice) = self.as_mut_slice_with_context();
+        slice
+    }
+
+    #[inline]
+    pub fn as_mut_slice_with_context(&mut self) -> (&V::Context, &mut [K]) {
+        let Self { context, inner } = self;
+        let mut_slice = inner.as_mut_slice();
+        (context, mut_slice)
     }
 }
 
 impl<K, V> Debug for IntoKeys<K, V>
 where
     K: Debug,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let keys = &self.as_slice();
@@ -58,33 +151,36 @@ where
 
 impl<K, V> Default for IntoKeys<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
+    V::Context: Default,
 {
     #[inline]
     fn default() -> Self {
-        Self {
-            inner: core_alloc::vec::IntoIter::default(),
-            phantom: PhantomData,
-        }
+        let context = V::Context::default();
+        let inner = core_alloc::vec::IntoIter::default();
+        Self { context, inner }
     }
 }
 
 impl<K, V> Clone for IntoKeys<K, V>
 where
     K: Clone,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
+    V::Context: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
-        let Self { ref inner, phantom } = *self;
+        let Self { context, inner } = self;
+
+        let context = context.clone();
         let inner = inner.clone();
-        Self { inner, phantom }
+        Self { context, inner }
     }
 }
 
 impl<K, V> AsRef<[K]> for IntoKeys<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &[K] {
@@ -94,7 +190,7 @@ where
 
 impl<K, V> AsMut<[K]> for IntoKeys<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [K] {
@@ -104,7 +200,7 @@ where
 
 impl<K, V> Iterator for IntoKeys<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     type Item = K;
 
@@ -142,7 +238,7 @@ where
 
 impl<K, V> DoubleEndedIterator for IntoKeys<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -153,22 +249,109 @@ where
 
 impl<K, V> ExactSizeIterator for IntoKeys<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
+    #[inline]
     fn len(&self) -> usize {
-        let Self { inner, .. } = self;
-        inner.len()
+        Self::len(self)
     }
 }
 
-impl<K, V> FusedIterator for IntoKeys<K, V> where V: Soa {}
+impl<K, V> FusedIterator for IntoKeys<K, V> where V: RawSoa + ?Sized {}
 
 #[repr(transparent)]
 pub struct IntoValues<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     inner: vec::IntoIter<DenseItem<K, V>>,
+}
+
+impl<K, V> IntoValues<K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    #[inline]
+    pub(super) fn new(inner: vec::IntoIter<DenseItem<K, V>>) -> Self {
+        Self { inner }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn context(&self) -> &V::Context {
+        let Self { inner } = self;
+        inner.context()
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'_, V> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&V::Context, Ptrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_ptrs_with_context();
+        let (_, ptrs) = ptrs.into_parts();
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&V::Context, MutPtrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_mut_ptrs_with_context();
+        let (_, ptrs) = ptrs.into_parts();
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> SlicePtrs<'_, V> {
+        let (_, values) = self.as_slice_ptrs_with_context();
+        values
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(&self) -> (&V::Context, SlicePtrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_slice_ptrs_with_context();
+        let (_, values) = ptrs.into_parts();
+        (context, values)
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, V> {
+        let (_, values) = self.as_slice_mut_ptrs_with_context();
+        values
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&V::Context, SliceMutPtrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_slice_mut_ptrs_with_context();
+        let (_, values) = ptrs.into_parts();
+        (context, values)
+    }
 }
 
 impl<K, V> IntoValues<K, V>
@@ -176,24 +359,33 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: vec::IntoIter<DenseItem<K, V>>) -> Self {
-        Self { inner }
-    }
-
-    #[inline]
-    pub fn as_slice(&self) -> V::Slices<'_, '_> {
-        let Self { inner } = self;
-
-        let (_, values) = inner.as_slices().into_parts();
+    pub fn as_slices(&self) -> V::Slices<'_, '_> {
+        let (_, values) = self.as_slices_with_context();
         values
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> V::SlicesMut<'_, '_> {
+    pub fn as_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_mut_slices().into_parts();
+        let (context, slices) = inner.as_slices_with_context();
+        let (_, values) = slices.into_parts();
+        (context, values)
+    }
+
+    #[inline]
+    pub fn as_mut_slices(&mut self) -> V::SlicesMut<'_, '_> {
+        let (_, values) = self.as_mut_slices_with_context();
         values
+    }
+
+    #[inline]
+    pub fn as_mut_slices_with_context(&mut self) -> (&V::Context, V::SlicesMut<'_, '_>) {
+        let Self { inner } = self;
+
+        let (context, slices) = inner.as_mut_slices_with_context();
+        let (_, values) = slices.into_parts();
+        (context, values)
     }
 }
 
@@ -203,27 +395,28 @@ where
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let values = &self.as_slice();
+        let values = &self.as_slices();
         f.debug_tuple("IntoValues").field(values).finish()
     }
 }
 
 impl<K, V> Default for IntoValues<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     V::Context: Default,
 {
     #[inline]
     fn default() -> Self {
         let inner = vec::IntoIter::default();
-        Self { inner }
+        Self::new(inner)
     }
 }
 
 impl<K, V> Clone for IntoValues<K, V>
 where
-    V: Soa + ?Sized,
-    vec::IntoIter<DenseItem<K, V>>: Clone,
+    K: Clone,
+    V: SoaCloneToUninit + ?Sized,
+    V::Context: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -240,7 +433,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_slice().into()
+        self.as_slices().into()
     }
 }
 
@@ -251,13 +444,13 @@ where
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
-        self.as_mut_slice().into()
+        self.as_mut_slices().into()
     }
 }
 
 impl<K, V> Iterator for IntoValues<K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
     type Item = V;
 
@@ -295,7 +488,7 @@ where
 
 impl<K, V> DoubleEndedIterator for IntoValues<K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -306,21 +499,137 @@ where
 
 impl<K, V> ExactSizeIterator for IntoValues<K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
+    #[inline]
     fn len(&self) -> usize {
-        let Self { inner } = self;
-        inner.len()
+        Self::len(self)
     }
 }
 
-impl<K, V> FusedIterator for IntoValues<K, V> where V: Soa + SoaRead {}
+impl<K, V> FusedIterator for IntoValues<K, V> where V: SoaRead {}
 
+#[repr(transparent)]
 pub struct IntoIter<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     inner: vec::IntoIter<DenseItem<K, V>>,
+}
+
+impl<K, V> IntoIter<K, V>
+where
+    V: RawSoa + ?Sized,
+{
+    #[inline]
+    pub(super) fn new(inner: vec::IntoIter<DenseItem<K, V>>) -> Self {
+        Self { inner }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn context(&self) -> &V::Context {
+        let Self { inner } = self;
+        inner.context()
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> (*const K, Ptrs<'_, V>) {
+        let (_, key, value) = self.as_ptrs_with_context();
+        (key, value)
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&V::Context, *const K, Ptrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_ptrs_with_context();
+        let (key, value) = ptrs.into_parts();
+        (context, key, value)
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> (*mut K, MutPtrs<'_, V>) {
+        let (_, key, value) = self.as_mut_ptrs_with_context();
+        (key, value)
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&V::Context, *mut K, MutPtrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_mut_ptrs_with_context();
+        let (key, value) = ptrs.into_parts();
+        (context, key, value)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> (*const [K], SlicePtrs<'_, V>) {
+        let (_, keys, values) = self.as_slice_ptrs_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(&self) -> (&V::Context, *const [K], SlicePtrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_slice_ptrs_with_context();
+        let (keys, values) = ptrs.into_parts();
+        (context, keys, values)
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs(&mut self) -> (*mut [K], SliceMutPtrs<'_, V>) {
+        let (_, keys, values) = self.as_slice_mut_ptrs_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn as_slice_mut_ptrs_with_context(
+        &mut self,
+    ) -> (&V::Context, *mut [K], SliceMutPtrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_slice_mut_ptrs_with_context();
+        let (keys, values) = ptrs.into_parts();
+        (context, keys, values)
+    }
+
+    #[inline]
+    pub fn as_keys_slice(&self) -> &[K] {
+        let (_, keys) = self.as_keys_slice_with_context();
+        keys
+    }
+
+    #[inline]
+    pub fn as_keys_slice_with_context(&self) -> (&V::Context, &[K]) {
+        let (context, keys, _) = self.as_slice_ptrs_with_context();
+        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+
+    #[inline]
+    pub fn as_keys_mut_slice(&mut self) -> &mut [K] {
+        let (_, keys) = self.as_keys_mut_slice_with_context();
+        keys
+    }
+
+    #[inline]
+    pub fn as_keys_mut_slice_with_context(&mut self) -> (&V::Context, &mut [K]) {
+        let (context, keys, _) = self.as_slice_mut_ptrs_with_context();
+        let keys = unsafe { slice::from_raw_parts_mut(keys.cast(), keys.len()) };
+        (context, keys)
+    }
 }
 
 impl<K, V> IntoIter<K, V>
@@ -328,56 +637,57 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: vec::IntoIter<DenseItem<K, V>>) -> Self {
-        Self { inner }
-    }
-
-    #[inline]
-    pub fn as_keys_slice(&self) -> &[K] {
-        let Self { inner } = self;
-
-        let (keys, _) = inner.as_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub fn as_keys_mut_slice(&mut self) -> &mut [K] {
-        let Self { inner } = self;
-
-        let (keys, _) = inner.as_mut_slices().into_parts();
-        keys
-    }
-
-    #[inline]
-    pub fn as_values_slice(&self) -> V::Slices<'_, '_> {
-        let Self { inner } = self;
-
-        let (_, values) = inner.as_slices().into_parts();
+    pub fn as_value_slices(&self) -> V::Slices<'_, '_> {
+        let (_, values) = self.as_value_slices_with_context();
         values
     }
 
     #[inline]
-    pub fn as_values_mut_slice(&mut self) -> V::SlicesMut<'_, '_> {
-        let Self { inner } = self;
+    pub fn as_value_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
+        let (context, _, values) = self.as_slices_with_context();
+        (context, values)
+    }
 
-        let (_, values) = inner.as_mut_slices().into_parts();
+    #[inline]
+    pub fn as_value_mut_slices(&mut self) -> V::SlicesMut<'_, '_> {
+        let (_, values) = self.as_value_mut_slices_with_context();
         values
+    }
+
+    #[inline]
+    pub fn as_value_mut_slices_with_context(&mut self) -> (&V::Context, V::SlicesMut<'_, '_>) {
+        let (context, _, values) = self.as_mut_slices_with_context();
+        (context, values)
     }
 
     #[inline]
     pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
-        let Self { inner } = self;
-
-        let (keys, values) = inner.as_slices().into_parts();
+        let (_, keys, values) = self.as_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&mut [K], V::SlicesMut<'_, '_>) {
+    pub fn as_slices_with_context(&self) -> (&V::Context, &[K], V::Slices<'_, '_>) {
         let Self { inner } = self;
 
-        let (keys, values) = inner.as_mut_slices().into_parts();
+        let (context, ptrs) = inner.as_slices_with_context();
+        let (keys, values) = ptrs.into_parts();
+        (context, keys, values)
+    }
+
+    #[inline]
+    pub fn as_mut_slices(&mut self) -> (&mut [K], V::SlicesMut<'_, '_>) {
+        let (_, keys, values) = self.as_mut_slices_with_context();
         (keys, values)
+    }
+
+    #[inline]
+    pub fn as_mut_slices_with_context(&mut self) -> (&V::Context, &mut [K], V::SlicesMut<'_, '_>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_mut_slices_with_context();
+        let (keys, values) = ptrs.into_parts();
+        (context, keys, values)
     }
 }
 
@@ -388,30 +698,31 @@ where
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (keys, values) = self.as_slices();
+        let (keys, values) = &self.as_slices();
         f.debug_struct("IntoIter")
-            .field("keys", &keys)
-            .field("values", &values)
+            .field("keys", keys)
+            .field("values", values)
             .finish()
     }
 }
 
 impl<K, V> Default for IntoIter<K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     V::Context: Default,
 {
     #[inline]
     fn default() -> Self {
         let inner = vec::IntoIter::default();
-        Self { inner }
+        Self::new(inner)
     }
 }
 
 impl<K, V> Clone for IntoIter<K, V>
 where
-    V: Soa + ?Sized,
-    vec::IntoIter<DenseItem<K, V>>: Clone,
+    K: Clone,
+    V: SoaCloneToUninit + ?Sized,
+    V::Context: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -428,7 +739,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_values_slice().into()
+        self.as_value_slices().into()
     }
 }
 
@@ -439,13 +750,13 @@ where
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
-        self.as_values_mut_slice().into()
+        self.as_value_mut_slices().into()
     }
 }
 
 impl<K, V> Iterator for IntoIter<K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
     type Item = (K, V);
 
@@ -473,7 +784,7 @@ where
 
 impl<K, V> DoubleEndedIterator for IntoIter<K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -484,46 +795,123 @@ where
 
 impl<K, V> ExactSizeIterator for IntoIter<K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
+    #[inline]
     fn len(&self) -> usize {
-        let Self { inner } = self;
-        inner.len()
+        Self::len(self)
     }
 }
 
-impl<K, V> FusedIterator for IntoIter<K, V> where V: Soa + SoaRead {}
+impl<K, V> FusedIterator for IntoIter<K, V> where V: SoaRead {}
 
+#[repr(transparent)]
 pub struct Drain<'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     inner: vec::Drain<'a, DenseItem<K, V>>,
 }
 
 impl<'a, K, V> Drain<'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(crate) fn new(inner: vec::Drain<'a, DenseItem<K, V>>) -> Self {
+    pub(super) fn new(inner: vec::Drain<'a, DenseItem<K, V>>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub fn as_keys_slice(&self) -> &[K] {
+    pub fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn context(&self) -> &V::Context {
+        let Self { inner } = self;
+        inner.context()
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> (*const K, Ptrs<'_, V>) {
+        let (_, key, value) = self.as_ptrs_with_context();
+        (key, value)
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&V::Context, *const K, Ptrs<'_, V>) {
         let Self { inner } = self;
 
-        let (keys, _) = inner.as_slices().into_parts();
+        let (context, ptrs) = inner.as_ptrs_with_context();
+        let (key, value) = ptrs.into_parts();
+        (context, key, value)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs(&self) -> (*const [K], SlicePtrs<'_, V>) {
+        let (_, keys, values) = self.as_slice_ptrs_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn as_slice_ptrs_with_context(&self) -> (&V::Context, *const [K], SlicePtrs<'_, V>) {
+        let Self { inner } = self;
+
+        let (context, ptrs) = inner.as_slice_ptrs_with_context();
+        let (keys, values) = ptrs.into_parts();
+        (context, keys, values)
+    }
+
+    #[inline]
+    pub fn as_keys_slice(&self) -> &[K] {
+        let (_, keys) = self.as_keys_slice_with_context();
         keys
     }
 
     #[inline]
-    pub fn as_values_slice(&self) -> V::Slices<'_, '_> {
+    pub fn as_keys_slice_with_context(&self) -> (&V::Context, &[K]) {
+        let (context, keys, _) = self.as_slice_ptrs_with_context();
+        let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+        (context, keys)
+    }
+}
+
+impl<K, V> Drain<'_, K, V>
+where
+    V: Soa + ?Sized,
+{
+    #[inline]
+    pub fn as_value_slices(&self) -> V::Slices<'_, '_> {
+        let (_, values) = self.as_value_slices_with_context();
+        values
+    }
+
+    #[inline]
+    pub fn as_value_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
+        let (context, _, values) = self.as_slices_with_context();
+        (context, values)
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
+        let (_, keys, values) = self.as_slices_with_context();
+        (keys, values)
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&self) -> (&V::Context, &[K], V::Slices<'_, '_>) {
         let Self { inner } = self;
 
-        let (_, values) = inner.as_slices().into_parts();
-        values
+        let (context, ptrs) = inner.as_slices_with_context();
+        let (keys, values) = ptrs.into_parts();
+        (context, keys, values)
     }
 }
 
@@ -534,8 +922,7 @@ where
     for<'c, 'any> V::Slices<'c, 'any>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let keys = &self.as_keys_slice();
-        let values = &self.as_values_slice();
+        let (keys, values) = &self.as_slices();
         f.debug_struct("Drain")
             .field("keys", keys)
             .field("values", values)
@@ -550,13 +937,13 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        self.as_values_slice().into()
+        self.as_value_slices().into()
     }
 }
 
 impl<K, V> Iterator for Drain<'_, K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
     type Item = (K, V);
 
@@ -575,7 +962,7 @@ where
 
 impl<K, V> DoubleEndedIterator for Drain<'_, K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -586,12 +973,13 @@ where
 
 impl<K, V> ExactSizeIterator for Drain<'_, K, V>
 where
-    V: Soa + SoaRead,
+    V: SoaRead,
 {
+    #[inline]
     fn len(&self) -> usize {
         let Self { inner } = self;
         inner.len()
     }
 }
 
-impl<K, V> FusedIterator for Drain<'_, K, V> where V: Soa + SoaRead {}
+impl<K, V> FusedIterator for Drain<'_, K, V> where V: SoaRead {}

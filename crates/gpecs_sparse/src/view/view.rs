@@ -596,9 +596,9 @@ where
     pub fn as_slices_with_context(
         &self,
     ) -> (&V::Context, DenseSlices<'_, '_, K, V>, &[SparseItem<K>]) {
-        let Self { dense, sparse } = self;
-
-        let (context, dense) = dense.as_slices_with_context();
+        let (context, dense, sparse) = self.as_slice_ptrs_with_context();
+        let dense = unsafe { dense.deref(context) };
+        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
         (context, dense, sparse)
     }
 
@@ -641,9 +641,9 @@ where
         DenseSlices<'c, 'a, K, V>,
         &'a [SparseItem<K>],
     ) {
-        let Self { dense, sparse } = self;
-
-        let (context, dense) = dense.into_slices_with_context();
+        let (context, dense, sparse) = self.into_slice_ptrs_with_context();
+        let dense = unsafe { dense.deref(context) };
+        let sparse = unsafe { slice::from_raw_parts(sparse.cast(), sparse.len()) };
         (context, dense, sparse)
     }
 

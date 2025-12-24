@@ -9,8 +9,10 @@ use crate::{
     alloc::raw_vec::RawSoaVec,
     layout::BufferData,
     ptr::BufferDataPtr,
+    slice::SoaSlices,
     traits::{
-        MutPtrs, NonNullPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaRead,
+        MutPtrs, NonNullPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa,
+        SoaCloneToUninit, SoaRead,
     },
     vec::SoaVec,
     wrapper,
@@ -119,19 +121,8 @@ where
 
     #[inline]
     pub fn as_slice_ptrs_with_context(&self) -> (&T::Context, SlicePtrs<'_, T>) {
-        let Self {
-            ref ptrs,
-            buffer,
-            start,
-            ..
-        } = *self;
-        let context = unsafe { Self::context_of(buffer) };
-
         let len = self.len();
-        let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_to_ptrs(ptrs);
-        let ptrs = context.ptrs_cast_const(ptrs);
-        let ptrs = unsafe { context.ptrs_add(ptrs, start) };
+        let (context, ptrs) = self.as_ptrs_with_context();
         let slices = context.slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -144,18 +135,8 @@ where
 
     #[inline]
     pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
-        let Self {
-            ref ptrs,
-            buffer,
-            start,
-            ..
-        } = *self;
-        let context = unsafe { Self::context_of(buffer) };
-
         let len = self.len();
-        let ptrs = ptrs.clone().into_inner();
-        let ptrs = context.nonnull_to_ptrs(ptrs);
-        let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
+        let (context, ptrs) = self.as_mut_ptrs_with_context();
         let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
@@ -267,6 +248,22 @@ where
     #[inline]
     fn default() -> Self {
         let vec = SoaVec::new();
+        Self::new(vec)
+    }
+}
+
+impl<T> Clone for IntoIter<T>
+where
+    T: SoaCloneToUninit + ?Sized,
+    T::Context: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let len = self.len();
+        let (context, ptrs) = self.as_ptrs_with_context();
+        let slices = unsafe { SoaSlices::<T>::from_parts(context, ptrs, len) };
+
+        let vec = slices.to_vec();
         Self::new(vec)
     }
 }

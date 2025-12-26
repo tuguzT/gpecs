@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cargo_gpu::{Install, spirv_builder::SpirvMetadata};
+use cargo_gpu_install::{install::Install, spirv_builder::SpirvMetadata};
 use const_format::formatcp;
 
 const SHADER_CRATE_NAME: &str = "gpecs_simple_shader";

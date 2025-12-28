@@ -10,32 +10,32 @@ use crate::{
     soa::{traits::Soa, wrapper},
 };
 
-pub struct DenseRefsMut<'context, 'a, K, V>
+pub struct DenseRefsMut<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized + 'a,
 {
     pub key: &'a mut K,
-    pub value: wrapper::RefsMut<'context, 'a, V>,
+    pub value: wrapper::RefsMut<'ctx, 'a, V>,
 }
 
-impl<'context, 'a, K, V> DenseRefsMut<'context, 'a, K, V>
+impl<'ctx, 'a, K, V> DenseRefsMut<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub fn new(key: &'a mut K, value: V::RefsMut<'context, 'a>) -> Self {
+    pub fn new(key: &'a mut K, value: V::RefsMut<'ctx, 'a>) -> Self {
         let value = wrapper::RefsMut::new(value);
         Self { key, value }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a mut K, V::RefsMut<'context, 'a>) {
+    pub fn into_parts(self) -> (&'a mut K, V::RefsMut<'ctx, 'a>) {
         let Self { key, value } = self;
         (key, value.into_inner())
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> DenseMutPtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> DenseMutPtrs<'ctx, K, V> {
         let Self { key, value } = self;
 
         let key = ptr::from_mut(key);
@@ -44,7 +44,7 @@ where
     }
 
     #[inline]
-    pub fn into_refs(self, context: &'context V::Context) -> DenseRefs<'context, 'a, K, V> {
+    pub fn into_refs(self, context: &'ctx V::Context) -> DenseRefs<'ctx, 'a, K, V> {
         let Self { key, value } = self;
 
         let key = &*key;
@@ -53,25 +53,23 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a mut K, V::RefsMut<'context, 'a>)>
-    for DenseRefsMut<'context, 'a, K, V>
+impl<'ctx, 'a, K, V> From<(&'a mut K, V::RefsMut<'ctx, 'a>)> for DenseRefsMut<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (&'a mut K, V::RefsMut<'context, 'a>)) -> Self {
+    fn from(value: (&'a mut K, V::RefsMut<'ctx, 'a>)) -> Self {
         let (key, value) = value;
         Self::new(key, value)
     }
 }
 
-impl<'context, 'a, K, V> From<DenseRefsMut<'context, 'a, K, V>>
-    for (&'a mut K, V::RefsMut<'context, 'a>)
+impl<'ctx, 'a, K, V> From<DenseRefsMut<'ctx, 'a, K, V>> for (&'a mut K, V::RefsMut<'ctx, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: DenseRefsMut<'context, 'a, K, V>) -> Self {
+    fn from(value: DenseRefsMut<'ctx, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
@@ -80,7 +78,7 @@ impl<K, V> Debug for DenseRefsMut<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    for<'c, 'a> V::RefsMut<'c, 'a>: Debug,
+    for<'ctx, 'a> V::RefsMut<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -95,7 +93,7 @@ impl<K, V> PartialEq for DenseRefsMut<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
-    for<'c, 'a> V::RefsMut<'c, 'a>: PartialEq,
+    for<'ctx, 'a> V::RefsMut<'ctx, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -107,7 +105,7 @@ impl<K, V> Eq for DenseRefsMut<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
-    for<'c, 'a> V::RefsMut<'c, 'a>: Eq,
+    for<'ctx, 'a> V::RefsMut<'ctx, 'a>: Eq,
 {
 }
 
@@ -115,7 +113,7 @@ impl<K, V> PartialOrd for DenseRefsMut<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
-    for<'c, 'a> V::RefsMut<'c, 'a>: PartialOrd,
+    for<'ctx, 'a> V::RefsMut<'ctx, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -131,7 +129,7 @@ impl<K, V> Ord for DenseRefsMut<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
-    for<'c, 'a> V::RefsMut<'c, 'a>: Ord,
+    for<'ctx, 'a> V::RefsMut<'ctx, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -147,7 +145,7 @@ impl<K, V> Hash for DenseRefsMut<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
-    for<'c, 'a> V::RefsMut<'c, 'a>: Hash,
+    for<'ctx, 'a> V::RefsMut<'ctx, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;

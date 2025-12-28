@@ -9,32 +9,32 @@ use crate::soa::{
     wrapper,
 };
 
-pub enum TryInsertAccess<'context, 'a, T>
+pub enum TryInsertAccess<'ctx, 'a, T>
 where
     T: Soa + ?Sized + 'a,
 {
-    ReadWrite(wrapper::RefsMut<'context, 'a, T>),
-    WriteOnly(wrapper::MutPtrs<'context, T>),
+    ReadWrite(wrapper::RefsMut<'ctx, 'a, T>),
+    WriteOnly(wrapper::MutPtrs<'ctx, T>),
 }
 
-impl<'context, 'a, T> TryInsertAccess<'context, 'a, T>
+impl<'ctx, 'a, T> TryInsertAccess<'ctx, 'a, T>
 where
     T: Soa + ?Sized,
 {
     #[inline]
-    pub fn read_write(refs: T::RefsMut<'context, 'a>) -> Self {
+    pub fn read_write(refs: T::RefsMut<'ctx, 'a>) -> Self {
         let refs = wrapper::RefsMut::new(refs);
         Self::ReadWrite(refs)
     }
 
     #[inline]
-    pub fn write_only(ptrs: MutPtrs<'context, T>) -> Self {
+    pub fn write_only(ptrs: MutPtrs<'ctx, T>) -> Self {
         let ptrs = wrapper::MutPtrs::new(ptrs);
         Self::WriteOnly(ptrs)
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context T::Context) -> MutPtrs<'context, T> {
+    pub fn into_ptrs(self, context: &'ctx T::Context) -> MutPtrs<'ctx, T> {
         match self {
             Self::ReadWrite(refs) => T::refs_mut_as_ptrs(context, refs.into_inner()),
             Self::WriteOnly(ptrs) => ptrs.into_inner(),
@@ -45,8 +45,8 @@ where
 impl<T> Debug for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'a> T::RefsMut<'c, 'a>: Debug,
-    for<'c> MutPtrs<'c, T>: Debug,
+    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: Debug,
+    for<'ctx> MutPtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -59,8 +59,8 @@ where
 impl<T> PartialEq for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'a> T::RefsMut<'c, 'a>: PartialEq,
-    for<'c> MutPtrs<'c, T>: PartialEq,
+    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: PartialEq,
+    for<'ctx> MutPtrs<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -74,16 +74,16 @@ where
 impl<T> Eq for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'a> T::RefsMut<'c, 'a>: Eq,
-    for<'c> MutPtrs<'c, T>: Eq,
+    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: Eq,
+    for<'ctx> MutPtrs<'ctx, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'a> T::RefsMut<'c, 'a>: PartialOrd,
-    for<'c> MutPtrs<'c, T>: PartialOrd,
+    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: PartialOrd,
+    for<'ctx> MutPtrs<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match (self, other) {
@@ -98,8 +98,8 @@ where
 impl<T> Ord for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'a> T::RefsMut<'c, 'a>: Ord,
-    for<'c> MutPtrs<'c, T>: Ord,
+    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: Ord,
+    for<'ctx> MutPtrs<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match (self, other) {
@@ -114,8 +114,8 @@ where
 impl<T> Hash for TryInsertAccess<'_, '_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'a> T::RefsMut<'c, 'a>: Hash,
-    for<'c> MutPtrs<'c, T>: Hash,
+    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: Hash,
+    for<'ctx> MutPtrs<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {

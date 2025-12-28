@@ -355,8 +355,8 @@ impl<'r, Meta> IntoIterator for &'r mut EntityRegistry<Meta> {
     }
 }
 
-pub struct Iter<'c, 'a, Meta> {
-    inner: SparseIter<'c, 'a, Entity, Identity<Meta>>,
+pub struct Iter<'ctx, 'a, Meta> {
+    inner: SparseIter<'ctx, 'a, Entity, Identity<Meta>>,
 }
 
 impl<'a, Meta> Iter<'_, 'a, Meta> {
@@ -483,8 +483,8 @@ impl<Meta> ExactSizeIterator for Iter<'_, '_, Meta> {
 
 impl<Meta> FusedIterator for Iter<'_, '_, Meta> {}
 
-pub struct IterMut<'c, 'a, Meta> {
-    inner: SparseIterMut<'c, 'a, Entity, Identity<Meta>>,
+pub struct IterMut<'ctx, 'a, Meta> {
+    inner: SparseIterMut<'ctx, 'a, Entity, Identity<Meta>>,
 }
 
 impl<'a, Meta> IterMut<'_, 'a, Meta> {

@@ -9,26 +9,26 @@ use core::{
 
 use crate::traits::{RawSoa, RawSoaContext};
 
-type Inner<'a, T> = crate::traits::NonNullPtrs<'a, T>;
+type Inner<'ctx, T> = crate::traits::NonNullPtrs<'ctx, T>;
 
 /// Type wrapper for [non-null pointers](RawSoaContext::NonNullPtrs)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
-pub struct NonNullPtrs<'context, T>
+pub struct NonNullPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     inner: Inner<'static, T>,
-    phantom: PhantomData<&'context ()>,
+    phantom: PhantomData<&'ctx ()>,
 }
 
-impl<'context, T> NonNullPtrs<'context, T>
+impl<'ctx, T> NonNullPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     /// Creates self from the [non-null pointers](RawSoaContext::NonNullPtrs).
     #[inline]
-    pub fn new(inner: Inner<'context, T>) -> Self {
+    pub fn new(inner: Inner<'ctx, T>) -> Self {
         Self {
             inner: unsafe { transmute::<Inner<'_, T>, Inner<'_, T>>(inner) },
             phantom: PhantomData,
@@ -51,7 +51,7 @@ where
 
     /// Retrieves the [non-null pointers](RawSoaContext::NonNullPtrs).
     #[inline]
-    pub fn into_inner(self) -> Inner<'context, T> {
+    pub fn into_inner(self) -> Inner<'ctx, T> {
         let Self { inner, .. } = self;
         T::Context::upcast_nonnull_ptrs(inner)
     }
@@ -60,7 +60,7 @@ where
 impl<T> Debug for NonNullPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Debug,
+    for<'ctx> Inner<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -71,7 +71,7 @@ where
 impl<T> Default for NonNullPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Default,
+    for<'ctx> Inner<'ctx, T>: Default,
 {
     fn default() -> Self {
         Self {
@@ -95,14 +95,14 @@ where
 impl<T> Copy for NonNullPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Copy,
+    for<'ctx> Inner<'ctx, T>: Copy,
 {
 }
 
 impl<T> PartialEq for NonNullPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: PartialEq,
+    for<'ctx> Inner<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -113,14 +113,14 @@ where
 impl<T> Eq for NonNullPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Eq,
+    for<'ctx> Inner<'ctx, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for NonNullPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: PartialOrd,
+    for<'ctx> Inner<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -135,7 +135,7 @@ where
 impl<T> Ord for NonNullPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Ord,
+    for<'ctx> Inner<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -150,7 +150,7 @@ where
 impl<T> Hash for NonNullPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Hash,
+    for<'ctx> Inner<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;

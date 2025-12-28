@@ -96,8 +96,8 @@ where
 }
 
 impl SystemParam for &Context {
-    type Item<'context> = &'context Context;
-    type Error<'context> = Infallible;
+    type Item<'ctx> = &'ctx Context;
+    type Error<'ctx> = Infallible;
 
     #[inline]
     fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {
@@ -106,8 +106,8 @@ impl SystemParam for &Context {
 }
 
 impl SystemParam for &mut Context {
-    type Item<'context> = &'context mut Context;
-    type Error<'context> = Infallible;
+    type Item<'ctx> = &'ctx mut Context;
+    type Error<'ctx> = Infallible;
 
     #[inline]
     fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {
@@ -119,8 +119,8 @@ impl<B> SystemParam for Bundles<'_, '_, B>
 where
     B: Bundle,
 {
-    type Item<'context> = Bundles<'context, 'context, B>;
-    type Error<'context> = GetComponentsError;
+    type Item<'ctx> = Bundles<'ctx, 'ctx, B>;
+    type Error<'ctx> = GetComponentsError;
 
     #[inline]
     fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {
@@ -132,8 +132,8 @@ impl<B> SystemParam for BundlesMut<'_, '_, B>
 where
     B: Bundle,
 {
-    type Item<'context> = BundlesMut<'context, 'context, B>;
-    type Error<'context> = GetComponentsError;
+    type Item<'ctx> = BundlesMut<'ctx, 'ctx, B>;
+    type Error<'ctx> = GetComponentsError;
 
     #[inline]
     fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {

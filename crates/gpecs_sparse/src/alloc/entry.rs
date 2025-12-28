@@ -157,7 +157,7 @@ where
     K: Key + Debug,
     V: Soa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
-    for<'c, 'any> V::Refs<'c, 'any>: Debug,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
@@ -520,7 +520,7 @@ macro_rules! generate_entry_types {
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: $crate::soa::traits::Soa + core::fmt::Debug + ?Sized,
-            for<'c, 'any> V::Refs<'c, 'any>: Debug,
+            for<'ctx, 'a> V::Refs<'ctx, 'a>: Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
@@ -624,7 +624,7 @@ macro_rules! generate_entry_types {
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: $crate::soa::traits::Soa + core::fmt::Debug + ?Sized,
-            for<'c, 'any> V::Refs<'c, 'any>: core::fmt::Debug,
+            for<'ctx, 'a> V::Refs<'ctx, 'a>: core::fmt::Debug,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;

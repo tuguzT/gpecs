@@ -61,7 +61,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_with_permutation(permutation);
@@ -71,7 +71,7 @@ where
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
     {
         self.sort_with_permutation_by(permutation, |a, b| {
             let a = T::upcast_refs(a);
@@ -168,7 +168,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_unstable_with_permutation(permutation);

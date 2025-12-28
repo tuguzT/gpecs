@@ -9,26 +9,26 @@ use core::{
 
 use crate::traits::{RawSoa, RawSoaContext};
 
-type Inner<'a, T> = crate::traits::MutPtrs<'a, T>;
+type Inner<'ctx, T> = crate::traits::MutPtrs<'ctx, T>;
 
 /// Type wrapper for [mutable pointers](RawSoaContext::MutPtrs)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
-pub struct MutPtrs<'context, T>
+pub struct MutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     inner: Inner<'static, T>,
-    phantom: PhantomData<&'context ()>,
+    phantom: PhantomData<&'ctx ()>,
 }
 
-impl<'context, T> MutPtrs<'context, T>
+impl<'ctx, T> MutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     /// Creates self from the [mutable pointers](RawSoaContext::MutPtrs).
     #[inline]
-    pub fn new(inner: Inner<'context, T>) -> Self {
+    pub fn new(inner: Inner<'ctx, T>) -> Self {
         Self {
             inner: unsafe { transmute::<Inner<'_, T>, Inner<'_, T>>(inner) },
             phantom: PhantomData,
@@ -51,7 +51,7 @@ where
 
     /// Retrieves the [mutable pointers](RawSoaContext::MutPtrs).
     #[inline]
-    pub fn into_inner(self) -> Inner<'context, T> {
+    pub fn into_inner(self) -> Inner<'ctx, T> {
         let Self { inner, .. } = self;
         T::Context::upcast_mut_ptrs(inner)
     }
@@ -60,7 +60,7 @@ where
 impl<T> Debug for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Debug,
+    for<'ctx> Inner<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -71,7 +71,7 @@ where
 impl<T> Default for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Default,
+    for<'ctx> Inner<'ctx, T>: Default,
 {
     fn default() -> Self {
         Self {
@@ -95,14 +95,14 @@ where
 impl<T> Copy for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Copy,
+    for<'ctx> Inner<'ctx, T>: Copy,
 {
 }
 
 impl<T> PartialEq for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: PartialEq,
+    for<'ctx> Inner<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -113,14 +113,14 @@ where
 impl<T> Eq for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Eq,
+    for<'ctx> Inner<'ctx, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: PartialOrd,
+    for<'ctx> Inner<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -135,7 +135,7 @@ where
 impl<T> Ord for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Ord,
+    for<'ctx> Inner<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -150,7 +150,7 @@ where
 impl<T> Hash for MutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Hash,
+    for<'ctx> Inner<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;

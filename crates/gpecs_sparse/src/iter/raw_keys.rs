@@ -10,20 +10,20 @@ use crate::{
 };
 
 #[repr(transparent)]
-pub struct RawKeys<'c, K, V>
+pub struct RawKeys<'ctx, K, V>
 where
-    K: 'c,
-    V: RawSoa + ?Sized + 'c,
+    K: 'ctx,
+    V: RawSoa + ?Sized + 'ctx,
 {
-    inner: RawIter<'c, K, V>,
+    inner: RawIter<'ctx, K, V>,
 }
 
-impl<'c, K, V> RawKeys<'c, K, V>
+impl<'ctx, K, V> RawKeys<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(crate) fn from_inner(inner: soa::slice::RawIter<'c, DenseItem<K, V>>) -> Self {
+    pub(crate) fn from_inner(inner: soa::slice::RawIter<'ctx, DenseItem<K, V>>) -> Self {
         let inner = RawIter::from_inner(inner);
         Self { inner }
     }
@@ -40,7 +40,7 @@ where
     }
 
     #[inline]
-    pub fn context(&self) -> &'c V::Context {
+    pub fn context(&self) -> &'ctx V::Context {
         let Self { inner } = self;
         inner.context()
     }
@@ -52,7 +52,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptr_with_context(&self) -> (&'c V::Context, *const K) {
+    pub fn as_ptr_with_context(&self) -> (&'ctx V::Context, *const K) {
         let Self { inner } = self;
 
         let (context, key, _) = inner.as_ptrs_with_context();
@@ -66,7 +66,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptr_with_context(self) -> (&'c V::Context, *const K) {
+    pub fn into_ptr_with_context(self) -> (&'ctx V::Context, *const K) {
         let Self { inner } = self;
 
         let (context, key, _) = inner.into_ptrs_with_context();
@@ -80,7 +80,7 @@ where
     }
 
     #[inline]
-    pub fn as_slice_ptr_with_context(&self) -> (&'c V::Context, *const [K]) {
+    pub fn as_slice_ptr_with_context(&self) -> (&'ctx V::Context, *const [K]) {
         let Self { inner } = self;
 
         let (context, keys, _) = inner.as_slice_ptrs_with_context();
@@ -94,7 +94,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptr_with_context(self) -> (&'c V::Context, *const [K]) {
+    pub fn into_slice_ptr_with_context(self) -> (&'ctx V::Context, *const [K]) {
         let Self { inner } = self;
 
         let (context, keys, _) = inner.into_slice_ptrs_with_context();
@@ -102,7 +102,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> Keys<'c, 'a, K, V> {
+    pub unsafe fn deref<'a>(self) -> Keys<'ctx, 'a, K, V> {
         unsafe { Keys::from_inner(self) }
     }
 }

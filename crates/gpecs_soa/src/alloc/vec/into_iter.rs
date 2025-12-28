@@ -221,7 +221,7 @@ where
 impl<T, U> AsRef<[U]> for IntoIter<T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Into<&'any [U]>,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Into<&'a [U]>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -232,7 +232,7 @@ where
 impl<T> Debug for IntoIter<T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();

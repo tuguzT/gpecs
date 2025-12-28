@@ -35,8 +35,8 @@ use super::{
 };
 
 #[derive(Debug)]
-pub struct GpuExecutor<'context> {
-    context: &'context mut Context,
+pub struct GpuExecutor<'ctx> {
+    context: &'ctx mut Context,
     device: Device,
     components: GpuComponentRegistry,
     archetypes: GpuArchetypeRegistry,
@@ -46,9 +46,9 @@ pub struct GpuExecutor<'context> {
     timestamp_query_resources: Option<TimestampQueryResources>,
 }
 
-impl<'context> GpuExecutor<'context> {
+impl<'ctx> GpuExecutor<'ctx> {
     #[inline]
-    pub fn new(context: &'context mut Context, device: Device) -> Self {
+    pub fn new(context: &'ctx mut Context, device: Device) -> Self {
         Self {
             context,
             device,
@@ -107,7 +107,7 @@ impl<'context> GpuExecutor<'context> {
     }
 
     #[inline]
-    pub fn into_context(self) -> &'context mut Context {
+    pub fn into_context(self) -> &'ctx mut Context {
         let Self { context, .. } = self;
         context
     }

@@ -9,26 +9,26 @@ use core::{
 
 use crate::traits::{RawSoa, RawSoaContext};
 
-type Inner<'a, T> = crate::traits::FieldDescriptors<'a, T>;
+type Inner<'ctx, T> = crate::traits::FieldDescriptors<'ctx, T>;
 
 /// Type wrapper for [field descriptors](RawSoaContext::FieldDescriptors)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
-pub struct FieldDescriptors<'context, T>
+pub struct FieldDescriptors<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     inner: Inner<'static, T>,
-    phantom: PhantomData<&'context ()>,
+    phantom: PhantomData<&'ctx ()>,
 }
 
-impl<'context, T> FieldDescriptors<'context, T>
+impl<'ctx, T> FieldDescriptors<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     /// Creates self from the [field descriptors](RawSoaContext::FieldDescriptors).
     #[inline]
-    pub fn new(inner: Inner<'context, T>) -> Self {
+    pub fn new(inner: Inner<'ctx, T>) -> Self {
         Self {
             inner: unsafe { transmute::<Inner<'_, T>, Inner<'_, T>>(inner) },
             phantom: PhantomData,
@@ -51,7 +51,7 @@ where
 
     /// Retrieves the [field descriptors](RawSoaContext::FieldDescriptors).
     #[inline]
-    pub fn into_inner(self) -> Inner<'context, T> {
+    pub fn into_inner(self) -> Inner<'ctx, T> {
         let Self { inner, .. } = self;
         T::Context::upcast_field_descriptors(inner)
     }
@@ -60,7 +60,7 @@ where
 impl<T> Debug for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Debug,
+    for<'ctx> Inner<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -71,7 +71,7 @@ where
 impl<T> Default for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Default,
+    for<'ctx> Inner<'ctx, T>: Default,
 {
     fn default() -> Self {
         Self {
@@ -84,7 +84,7 @@ where
 impl<T> Clone for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Clone,
+    for<'ctx> Inner<'ctx, T>: Clone,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -96,14 +96,14 @@ where
 impl<T> Copy for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Copy,
+    for<'ctx> Inner<'ctx, T>: Copy,
 {
 }
 
 impl<T> PartialEq for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: PartialEq,
+    for<'ctx> Inner<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -114,14 +114,14 @@ where
 impl<T> Eq for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Eq,
+    for<'ctx> Inner<'ctx, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: PartialOrd,
+    for<'ctx> Inner<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -136,7 +136,7 @@ where
 impl<T> Ord for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Ord,
+    for<'ctx> Inner<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -151,7 +151,7 @@ where
 impl<T> Hash for FieldDescriptors<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Hash,
+    for<'ctx> Inner<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;
@@ -160,12 +160,12 @@ where
     }
 }
 
-impl<'context, T> IntoIterator for FieldDescriptors<'context, T>
+impl<'ctx, T> IntoIterator for FieldDescriptors<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
-    type Item = <Inner<'context, T> as IntoIterator>::Item;
-    type IntoIter = <Inner<'context, T> as IntoIterator>::IntoIter;
+    type Item = <Inner<'ctx, T> as IntoIterator>::Item;
+    type IntoIter = <Inner<'ctx, T> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.into_inner().into_iter()

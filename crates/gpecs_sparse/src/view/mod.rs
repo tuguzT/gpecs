@@ -3,11 +3,11 @@ pub use self::{
     view_ptr::EpochSparseViewPtr,
 };
 
-pub type SparseViewPtr<'c, T> = EpochSparseViewPtr<'c, usize, T>;
-pub type SparseViewMutPtr<'c, T> = EpochSparseViewMutPtr<'c, usize, T>;
+pub type SparseViewPtr<'ctx, T> = EpochSparseViewPtr<'ctx, usize, T>;
+pub type SparseViewMutPtr<'ctx, T> = EpochSparseViewMutPtr<'ctx, usize, T>;
 
-pub type SparseView<'c, 'a, T> = EpochSparseView<'c, 'a, usize, T>;
-pub type SparseViewMut<'c, 'a, T> = EpochSparseViewMut<'c, 'a, usize, T>;
+pub type SparseView<'ctx, 'a, T> = EpochSparseView<'ctx, 'a, usize, T>;
+pub type SparseViewMut<'ctx, 'a, T> = EpochSparseViewMut<'ctx, 'a, usize, T>;
 
 mod assert;
 mod view;

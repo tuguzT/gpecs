@@ -43,11 +43,11 @@ where
 
 #[inline]
 #[track_caller]
-pub fn validate_components<'components, 'context, T, I>(
+pub fn validate_components<'components, 'ctx, T, I>(
     components: &'components ComponentRegistry,
-    context: &'context T::Context,
+    context: &'ctx T::Context,
     component_ids: I,
-) -> impl Iterator<Item = ComponentId> + use<'components, 'context, T, I>
+) -> impl Iterator<Item = ComponentId> + use<'components, 'ctx, T, I>
 where
     T: Soa,
     I: IntoIterator<Item = ComponentId>,
@@ -59,12 +59,12 @@ where
 
 #[inline]
 #[track_caller]
-fn reorder_fields<'components, 'context, T, I, F>(
+fn reorder_fields<'components, 'ctx, T, I, F>(
     components: &'components ComponentRegistry,
-    context: &'context T::Context,
+    context: &'ctx T::Context,
     component_ids: I,
     mut fields: ErasedComponents<F>,
-) -> impl Iterator<Item = F> + use<'components, 'context, T, I, F>
+) -> impl Iterator<Item = F> + use<'components, 'ctx, T, I, F>
 where
     T: Soa,
     I: IntoIterator<Item = ComponentId>,

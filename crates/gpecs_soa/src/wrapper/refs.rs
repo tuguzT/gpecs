@@ -12,21 +12,21 @@ use crate::traits::Soa;
 /// Type wrapper for [references](Soa::Refs)
 /// which is covariant over generic lifetimes.
 #[repr(transparent)]
-pub struct Refs<'context, 'a, T>
+pub struct Refs<'ctx, 'a, T>
 where
     T: Soa + ?Sized + 'a,
 {
     inner: T::Refs<'static, 'a>,
-    phantom: PhantomData<&'context ()>,
+    phantom: PhantomData<&'ctx ()>,
 }
 
-impl<'context, 'a, T> Refs<'context, 'a, T>
+impl<'ctx, 'a, T> Refs<'ctx, 'a, T>
 where
     T: Soa + ?Sized,
 {
     /// Creates self from the [references](Soa::Refs).
     #[inline]
-    pub fn new(inner: T::Refs<'context, 'a>) -> Self {
+    pub fn new(inner: T::Refs<'ctx, 'a>) -> Self {
         Self {
             inner: unsafe { transmute::<T::Refs<'_, '_>, T::Refs<'_, '_>>(inner) },
             phantom: PhantomData,
@@ -49,7 +49,7 @@ where
 
     /// Retrieves the [references](Soa::Refs).
     #[inline]
-    pub fn into_inner(self) -> T::Refs<'context, 'a> {
+    pub fn into_inner(self) -> T::Refs<'ctx, 'a> {
         let Self { inner, .. } = self;
         T::upcast_refs(inner)
     }
@@ -58,7 +58,7 @@ where
 impl<'a, T> Debug for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: Debug,
+    for<'ctx> T::Refs<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -69,7 +69,7 @@ where
 impl<'a, T> Default for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: Default,
+    for<'ctx> T::Refs<'ctx, 'a>: Default,
 {
     fn default() -> Self {
         Self {
@@ -82,7 +82,7 @@ where
 impl<'a, T> Clone for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: Clone,
+    for<'ctx> T::Refs<'ctx, 'a>: Clone,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -94,14 +94,14 @@ where
 impl<'a, T> Copy for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: Copy,
+    for<'ctx> T::Refs<'ctx, 'a>: Copy,
 {
 }
 
 impl<'a, T> PartialEq for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: PartialEq,
+    for<'ctx> T::Refs<'ctx, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -112,14 +112,14 @@ where
 impl<'a, T> Eq for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: Eq,
+    for<'ctx> T::Refs<'ctx, 'a>: Eq,
 {
 }
 
 impl<'a, T> PartialOrd for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: PartialOrd,
+    for<'ctx> T::Refs<'ctx, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -134,7 +134,7 @@ where
 impl<'a, T> Ord for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: Ord,
+    for<'ctx> T::Refs<'ctx, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -149,7 +149,7 @@ where
 impl<'a, T> Hash for Refs<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::Refs<'any, 'a>: Hash,
+    for<'ctx> T::Refs<'ctx, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;

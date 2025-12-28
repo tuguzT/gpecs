@@ -10,32 +10,32 @@ use crate::{
     soa::{traits::Soa, wrapper},
 };
 
-pub struct DenseRefs<'context, 'a, K, V>
+pub struct DenseRefs<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized + 'a,
 {
     pub key: &'a K,
-    pub value: wrapper::Refs<'context, 'a, V>,
+    pub value: wrapper::Refs<'ctx, 'a, V>,
 }
 
-impl<'context, 'a, K, V> DenseRefs<'context, 'a, K, V>
+impl<'ctx, 'a, K, V> DenseRefs<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub fn new(key: &'a K, value: V::Refs<'context, 'a>) -> Self {
+    pub fn new(key: &'a K, value: V::Refs<'ctx, 'a>) -> Self {
         let value = wrapper::Refs::new(value);
         Self { key, value }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a K, V::Refs<'context, 'a>) {
+    pub fn into_parts(self) -> (&'a K, V::Refs<'ctx, 'a>) {
         let Self { key, value } = self;
         (key, value.into_inner())
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> DensePtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> DensePtrs<'ctx, K, V> {
         let Self { key, value } = self;
 
         let key = ptr::from_ref(key);
@@ -44,23 +44,23 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<(&'a K, V::Refs<'context, 'a>)> for DenseRefs<'context, 'a, K, V>
+impl<'ctx, 'a, K, V> From<(&'a K, V::Refs<'ctx, 'a>)> for DenseRefs<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: (&'a K, V::Refs<'context, 'a>)) -> Self {
+    fn from(value: (&'a K, V::Refs<'ctx, 'a>)) -> Self {
         let (key, value) = value;
         Self::new(key, value)
     }
 }
 
-impl<'context, 'a, K, V> From<DenseRefs<'context, 'a, K, V>> for (&'a K, V::Refs<'context, 'a>)
+impl<'ctx, 'a, K, V> From<DenseRefs<'ctx, 'a, K, V>> for (&'a K, V::Refs<'ctx, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: DenseRefs<'context, 'a, K, V>) -> Self {
+    fn from(value: DenseRefs<'ctx, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
@@ -69,7 +69,7 @@ impl<K, V> Debug for DenseRefs<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Refs<'c, 'a>: Debug,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -84,7 +84,7 @@ impl<K, V> PartialEq for DenseRefs<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Refs<'c, 'a>: PartialEq,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -96,7 +96,7 @@ impl<K, V> Eq for DenseRefs<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Refs<'c, 'a>: Eq,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: Eq,
 {
 }
 
@@ -104,7 +104,7 @@ impl<K, V> PartialOrd for DenseRefs<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Refs<'c, 'a>: PartialOrd,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -120,7 +120,7 @@ impl<K, V> Ord for DenseRefs<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Refs<'c, 'a>: Ord,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -136,7 +136,7 @@ impl<K, V> Hash for DenseRefs<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Refs<'c, 'a>: Hash,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -148,7 +148,7 @@ where
 impl<K, V> Clone for DenseRefs<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'a> V::Refs<'c, 'a>: Clone,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -161,6 +161,6 @@ where
 impl<K, V> Copy for DenseRefs<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'a> V::Refs<'c, 'a>: Copy,
+    for<'ctx, 'a> V::Refs<'ctx, 'a>: Copy,
 {
 }

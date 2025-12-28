@@ -10,21 +10,21 @@ use crate::soa::{
     wrapper,
 };
 
-pub struct DenseFieldDescriptors<'context, K, V>
+pub struct DenseFieldDescriptors<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     key: FieldDescriptor,
-    values: wrapper::FieldDescriptors<'context, V>,
+    values: wrapper::FieldDescriptors<'ctx, V>,
     phantom: PhantomData<fn() -> K>,
 }
 
-impl<'context, K, V> DenseFieldDescriptors<'context, K, V>
+impl<'ctx, K, V> DenseFieldDescriptors<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub fn new(context: &'context V::Context) -> Self {
+    pub fn new(context: &'ctx V::Context) -> Self {
         Self {
             key: FieldDescriptor::of::<K>(),
             values: wrapper::FieldDescriptors::new(context.field_descriptors()),
@@ -33,7 +33,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, FieldDescriptors<'context, V>) {
+    pub fn into_parts(self) -> (FieldDescriptor, FieldDescriptors<'ctx, V>) {
         let Self { key, values, .. } = self;
         (key, values.into_inner())
     }
@@ -42,7 +42,7 @@ where
 impl<K, V> Debug for DenseFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> FieldDescriptors<'c, V>: Debug,
+    for<'ctx> FieldDescriptors<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, values, .. } = self;
@@ -56,7 +56,7 @@ where
 impl<K, V> Clone for DenseFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> FieldDescriptors<'c, V>: Clone,
+    for<'ctx> FieldDescriptors<'ctx, V>: Clone,
 {
     fn clone(&self) -> Self {
         let Self {
@@ -75,11 +75,11 @@ where
 impl<K, V> Copy for DenseFieldDescriptors<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> FieldDescriptors<'c, V>: Copy,
+    for<'ctx> FieldDescriptors<'ctx, V>: Copy,
 {
 }
 
-impl<'context, K, V> IntoIterator for DenseFieldDescriptors<'context, K, V>
+impl<'ctx, K, V> IntoIterator for DenseFieldDescriptors<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
@@ -87,7 +87,7 @@ where
 
     type IntoIter = iter::Chain<
         iter::Once<FieldDescriptor>,
-        CopiedFieldDescriptors<<FieldDescriptors<'context, V> as IntoIterator>::IntoIter>,
+        CopiedFieldDescriptors<<FieldDescriptors<'ctx, V> as IntoIterator>::IntoIter>,
     >;
 
     #[inline]

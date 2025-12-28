@@ -8,21 +8,21 @@ use core::{
 use crate::{iter::RawKeys, soa::traits::RawSoa};
 
 #[repr(transparent)]
-pub struct Keys<'c, 'a, K, V>
+pub struct Keys<'ctx, 'a, K, V>
 where
-    K: 'c + 'a,
-    V: RawSoa + ?Sized + 'c,
+    K: 'ctx + 'a,
+    V: RawSoa + ?Sized + 'ctx,
 {
-    inner: RawKeys<'c, K, V>,
+    inner: RawKeys<'ctx, K, V>,
     phantom: PhantomData<&'a ()>,
 }
 
-impl<'c, 'a, K, V> Keys<'c, 'a, K, V>
+impl<'ctx, 'a, K, V> Keys<'ctx, 'a, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(super) unsafe fn from_inner(inner: RawKeys<'c, K, V>) -> Self {
+    pub(super) unsafe fn from_inner(inner: RawKeys<'ctx, K, V>) -> Self {
         Self {
             inner,
             phantom: PhantomData,
@@ -30,7 +30,7 @@ where
     }
 
     #[inline]
-    pub fn into_raw_keys(self) -> RawKeys<'c, K, V> {
+    pub fn into_raw_keys(self) -> RawKeys<'ctx, K, V> {
         let Self { inner, .. } = self;
         inner
     }
@@ -47,7 +47,7 @@ where
     }
 
     #[inline]
-    pub fn context(&self) -> &'c V::Context {
+    pub fn context(&self) -> &'ctx V::Context {
         let Self { inner, .. } = self;
         inner.context()
     }
@@ -59,7 +59,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptr_with_context(&self) -> (&'c V::Context, *const K) {
+    pub fn as_ptr_with_context(&self) -> (&'ctx V::Context, *const K) {
         let Self { inner, .. } = self;
 
         let (context, key) = inner.as_ptr_with_context();
@@ -73,7 +73,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptr_with_context(self) -> (&'c V::Context, *const K) {
+    pub fn into_ptr_with_context(self) -> (&'ctx V::Context, *const K) {
         let Self { inner, .. } = self;
 
         let (context, key) = inner.into_ptr_with_context();
@@ -87,7 +87,7 @@ where
     }
 
     #[inline]
-    pub fn as_slice_ptr_with_context(&self) -> (&'c V::Context, *const [K]) {
+    pub fn as_slice_ptr_with_context(&self) -> (&'ctx V::Context, *const [K]) {
         let Self { inner, .. } = self;
 
         let (context, key) = inner.as_slice_ptr_with_context();
@@ -101,7 +101,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptr_with_context(self) -> (&'c V::Context, *const [K]) {
+    pub fn into_slice_ptr_with_context(self) -> (&'ctx V::Context, *const [K]) {
         let Self { inner, .. } = self;
 
         let (context, key) = inner.into_slice_ptr_with_context();
@@ -115,7 +115,7 @@ where
     }
 
     #[inline]
-    pub fn as_slice_with_context(&self) -> (&'c V::Context, &'a [K]) {
+    pub fn as_slice_with_context(&self) -> (&'ctx V::Context, &'a [K]) {
         let (context, keys) = self.as_slice_ptr_with_context();
         let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
         (context, keys)
@@ -128,7 +128,7 @@ where
     }
 
     #[inline]
-    pub fn into_slice_with_context(self) -> (&'c V::Context, &'a [K]) {
+    pub fn into_slice_with_context(self) -> (&'ctx V::Context, &'a [K]) {
         let (context, keys) = self.into_slice_ptr_with_context();
         let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
         (context, keys)

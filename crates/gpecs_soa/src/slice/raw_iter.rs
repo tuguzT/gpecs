@@ -9,22 +9,22 @@ use crate::{
     wrapper,
 };
 
-pub struct RawIter<'c, T>
+pub struct RawIter<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: wrapper::Ptrs<'c, T>,
-    context: &'c T::Context,
+    ptrs: wrapper::Ptrs<'ctx, T>,
+    context: &'ctx T::Context,
     start: usize,
     end: usize,
 }
 
-impl<'c, T> RawIter<'c, T>
+impl<'ctx, T> RawIter<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    pub fn new(context: &'c T::Context, slices: SlicePtrs<'c, T>) -> Self {
+    pub fn new(context: &'ctx T::Context, slices: SlicePtrs<'ctx, T>) -> Self {
         let len = context.slice_ptrs_len(&slices);
         let ptrs = context.slice_ptrs_as_ptrs(slices);
         Self {
@@ -47,19 +47,19 @@ where
     }
 
     #[inline]
-    pub fn context(&self) -> &'c T::Context {
+    pub fn context(&self) -> &'ctx T::Context {
         let Self { context, .. } = *self;
         context
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> Ptrs<'c, T> {
+    pub fn as_ptrs(&self) -> Ptrs<'ctx, T> {
         let (_, ptrs) = self.as_ptrs_with_context();
         ptrs
     }
 
     #[inline]
-    pub fn as_ptrs_with_context(&self) -> (&'c T::Context, Ptrs<'c, T>) {
+    pub fn as_ptrs_with_context(&self) -> (&'ctx T::Context, Ptrs<'ctx, T>) {
         let Self {
             ref ptrs,
             context,
@@ -73,13 +73,13 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> Ptrs<'c, T> {
+    pub fn into_ptrs(self) -> Ptrs<'ctx, T> {
         let (_, ptrs) = self.into_ptrs_with_context();
         ptrs
     }
 
     #[inline]
-    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
+    pub fn into_ptrs_with_context(self) -> (&'ctx T::Context, Ptrs<'ctx, T>) {
         let Self {
             ptrs,
             context,
@@ -93,13 +93,13 @@ where
     }
 
     #[inline]
-    pub fn as_slice_ptrs(&self) -> SlicePtrs<'c, T> {
+    pub fn as_slice_ptrs(&self) -> SlicePtrs<'ctx, T> {
         let (_, slices) = self.as_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slice_ptrs_with_context(&self) -> (&'c T::Context, SlicePtrs<'c, T>) {
+    pub fn as_slice_ptrs_with_context(&self) -> (&'ctx T::Context, SlicePtrs<'ctx, T>) {
         let Self {
             ref ptrs,
             context,
@@ -115,14 +115,14 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> SlicePtrs<'c, T> {
+    pub fn into_slice_ptrs(self) -> SlicePtrs<'ctx, T> {
         let (_, slices) = self.into_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
     #[doc(alias = "into_parts")]
-    pub fn into_slice_ptrs_with_context(self) -> (&'c T::Context, SlicePtrs<'c, T>) {
+    pub fn into_slice_ptrs_with_context(self) -> (&'ctx T::Context, SlicePtrs<'ctx, T>) {
         let len = self.len();
         let Self {
             ptrs,
@@ -138,14 +138,14 @@ where
     }
 
     #[inline]
-    pub fn cast_mut(self) -> RawIterMut<'c, T> {
+    pub fn cast_mut(self) -> RawIterMut<'ctx, T> {
         let (context, slices) = self.into_slice_ptrs_with_context();
         let slices = context.slice_ptrs_cast_mut(slices);
         RawIterMut::new(context, slices)
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> Iter<'c, 'a, T> {
+    pub unsafe fn deref<'a>(self) -> Iter<'ctx, 'a, T> {
         let (context, slices) = self.into_slice_ptrs_with_context();
         unsafe { Iter::from_parts(context, slices) }
     }
@@ -174,12 +174,12 @@ where
     }
 }
 
-impl<'c, T> From<&'c T::Context> for RawIter<'c, T>
+impl<'ctx, T> From<&'ctx T::Context> for RawIter<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    fn from(context: &'c T::Context) -> Self {
+    fn from(context: &'ctx T::Context) -> Self {
         let ptrs = context.ptrs_dangling();
         let slices = context.slice_ptrs_from_raw_parts(ptrs, 0);
         Self::new(context, slices)
@@ -189,7 +189,7 @@ where
 impl<T> Debug for RawIter<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> SlicePtrs<'any, T>: Debug,
+    for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slice_ptrs();
@@ -220,11 +220,11 @@ where
 }
 
 #[expect(clippy::while_let_on_iterator)]
-impl<'c, T> Iterator for RawIter<'c, T>
+impl<'ctx, T> Iterator for RawIter<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
-    type Item = Ptrs<'c, T>;
+    type Item = Ptrs<'ctx, T>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

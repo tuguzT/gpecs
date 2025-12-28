@@ -546,7 +546,7 @@ unsafe impl<T> RawSoa for Identity<T> {
 }
 
 unsafe impl<T> Soa for Identity<T> {
-    type Refs<'context, 'a>
+    type Refs<'ctx, 'a>
         = &'a Self
     where
         Self: 'a;
@@ -558,7 +558,7 @@ unsafe impl<T> Soa for Identity<T> {
         from
     }
 
-    type RefsMut<'context, 'a>
+    type RefsMut<'ctx, 'a>
         = &'a mut Self
     where
         Self: 'a;
@@ -571,26 +571,26 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs<'context, 'a>(
-        _context: &'context Self::Context,
-        ptrs: Ptrs<'context, Self>,
-    ) -> Self::Refs<'context, 'a> {
+    unsafe fn ptrs_to_refs<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        ptrs: Ptrs<'ctx, Self>,
+    ) -> Self::Refs<'ctx, 'a> {
         unsafe { &*ptrs }
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs_mut<'context, 'a>(
-        _context: &'context Self::Context,
-        ptrs: MutPtrs<'context, Self>,
-    ) -> Self::RefsMut<'context, 'a> {
+    unsafe fn ptrs_to_refs_mut<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        ptrs: MutPtrs<'ctx, Self>,
+    ) -> Self::RefsMut<'ctx, 'a> {
         unsafe { &mut *ptrs }
     }
 
     #[inline]
-    fn refs_as_ptrs<'context, 'a>(
-        _context: &'context Self::Context,
-        refs: Self::Refs<'context, 'a>,
-    ) -> Ptrs<'context, Self>
+    fn refs_as_ptrs<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        refs: Self::Refs<'ctx, 'a>,
+    ) -> Ptrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -598,10 +598,10 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn refs_mut_as_ptrs<'context, 'a>(
-        _context: &'context Self::Context,
-        refs: Self::RefsMut<'context, 'a>,
-    ) -> MutPtrs<'context, Self>
+    fn refs_mut_as_ptrs<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        refs: Self::RefsMut<'ctx, 'a>,
+    ) -> MutPtrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -609,10 +609,10 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn refs_mut_as_refs<'context, 'a>(
-        _context: &'context Self::Context,
-        refs: Self::RefsMut<'context, 'a>,
-    ) -> Self::Refs<'context, 'a> {
+    fn refs_mut_as_refs<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        refs: Self::RefsMut<'ctx, 'a>,
+    ) -> Self::Refs<'ctx, 'a> {
         &*refs
     }
 
@@ -635,7 +635,7 @@ unsafe impl<T> Soa for Identity<T> {
         value
     }
 
-    type Slices<'context, 'a>
+    type Slices<'ctx, 'a>
         = &'a [Self]
     where
         Self: 'a;
@@ -647,7 +647,7 @@ unsafe impl<T> Soa for Identity<T> {
         from
     }
 
-    type SlicesMut<'context, 'a>
+    type SlicesMut<'ctx, 'a>
         = &'a mut [Self]
     where
         Self: 'a;
@@ -660,20 +660,20 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    unsafe fn slice_ptrs_to_slices<'context, 'a>(
-        _context: &'context Self::Context,
-        slices: SlicePtrs<'context, Self>,
-    ) -> Self::Slices<'context, 'a> {
+    unsafe fn slice_ptrs_to_slices<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        slices: SlicePtrs<'ctx, Self>,
+    ) -> Self::Slices<'ctx, 'a> {
         let data = slices.cast();
         let len = slices.len();
         unsafe { slice::from_raw_parts(data, len) }
     }
 
     #[inline]
-    unsafe fn mut_slice_ptrs_to_mut_slices<'context, 'a>(
-        _context: &'context Self::Context,
-        slices: SliceMutPtrs<'context, Self>,
-    ) -> Self::SlicesMut<'context, 'a> {
+    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        slices: SliceMutPtrs<'ctx, Self>,
+    ) -> Self::SlicesMut<'ctx, 'a> {
         let data = slices.cast();
         let len = slices.len();
         unsafe { slice::from_raw_parts_mut(data, len) }
@@ -696,10 +696,10 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn slices_as_slice_ptrs<'context, 'a>(
-        _context: &'context Self::Context,
-        slices: Self::Slices<'context, 'a>,
-    ) -> SlicePtrs<'context, Self>
+    fn slices_as_slice_ptrs<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        slices: Self::Slices<'ctx, 'a>,
+    ) -> SlicePtrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -707,10 +707,10 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn mut_slices_as_slice_ptrs<'context, 'a>(
-        _context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, 'a>,
-    ) -> SliceMutPtrs<'context, Self>
+    fn mut_slices_as_slice_ptrs<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        slices: Self::SlicesMut<'ctx, 'a>,
+    ) -> SliceMutPtrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -718,18 +718,18 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn mut_slices_as_slices<'context, 'a>(
-        _context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, 'a>,
-    ) -> Self::Slices<'context, 'a> {
+    fn mut_slices_as_slices<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        slices: Self::SlicesMut<'ctx, 'a>,
+    ) -> Self::Slices<'ctx, 'a> {
         &*slices
     }
 
     #[inline]
-    fn slices_as_ptrs<'context, 'a>(
-        _context: &'context Self::Context,
-        slices: Self::Slices<'context, 'a>,
-    ) -> Ptrs<'context, Self>
+    fn slices_as_ptrs<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        slices: Self::Slices<'ctx, 'a>,
+    ) -> Ptrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -737,10 +737,10 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn mut_slices_as_ptrs<'context, 'a>(
-        _context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, 'a>,
-    ) -> MutPtrs<'context, Self>
+    fn mut_slices_as_ptrs<'ctx, 'a>(
+        _context: &'ctx Self::Context,
+        slices: Self::SlicesMut<'ctx, 'a>,
+    ) -> MutPtrs<'ctx, Self>
     where
         Self: 'a,
     {

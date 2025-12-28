@@ -19,7 +19,7 @@ fn slice_null_opt() {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn iter_null_opt() {
-    type Iter<'c, 'a> = SoaIter<'c, 'a, (u32, u16, u8)>;
+    type Iter<'ctx, 'a> = SoaIter<'ctx, 'a, (u32, u16, u8)>;
 
     assert_eq!(size_of::<Option<Iter>>(), size_of::<Iter>());
 }
@@ -27,7 +27,7 @@ fn iter_null_opt() {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn iter_mut_null_opt() {
-    type IterMut<'c, 'a> = SoaIterMut<'c, 'a, (u32, u16, u8)>;
+    type IterMut<'ctx, 'a> = SoaIterMut<'ctx, 'a, (u32, u16, u8)>;
 
     assert_eq!(size_of::<Option<IterMut>>(), size_of::<IterMut>());
 }

@@ -552,7 +552,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'c, 'any> V::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> V::Refs<'ctx, 'a>: Ord,
     {
         let mut view_mut = self.as_view_mut();
         view_mut.sort();
@@ -596,7 +596,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'c, 'any> V::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> V::Refs<'ctx, 'a>: Ord,
     {
         let mut view_mut = self.as_view_mut();
         view_mut.sort_unstable();
@@ -1416,7 +1416,7 @@ impl<T, K, V> Index<K> for EpochSparseArena<K, V>
 where
     K: Key + Debug,
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T> + 'any,
+    for<'ctx, 'a> V: Soa<Refs<'ctx, 'a> = &'a T> + 'a,
 {
     type Output = T;
 
@@ -1430,7 +1430,7 @@ impl<T, K, V> IndexMut<K> for EpochSparseArena<K, V>
 where
     K: Key + Debug,
     V: Soa + ?Sized,
-    for<'c, 'any> V: Soa<Refs<'c, 'any> = &'any T, RefsMut<'c, 'any> = &'any mut T> + 'any,
+    for<'ctx, 'a> V: Soa<Refs<'ctx, 'a> = &'a T, RefsMut<'ctx, 'a> = &'a mut T> + 'a,
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
@@ -1442,7 +1442,7 @@ impl<T, K, V> AsRef<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -1454,7 +1454,7 @@ impl<T, K, V> AsMut<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
-    for<'c, 'any> V::SlicesMut<'c, 'any>: Into<&'any mut [T]>,
+    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Into<&'a mut [T]>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
@@ -1484,13 +1484,13 @@ where
     }
 }
 
-impl<'r, K, V> IntoIterator for &'r EpochSparseArena<K, V>
+impl<'a, K, V> IntoIterator for &'a EpochSparseArena<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
 {
-    type Item = (&'r K, V::Refs<'r, 'r>);
-    type IntoIter = Iter<'r, 'r, K, V>;
+    type Item = (&'a K, V::Refs<'a, 'a>);
+    type IntoIter = Iter<'a, 'a, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1498,13 +1498,13 @@ where
     }
 }
 
-impl<'r, K, V> IntoIterator for &'r mut EpochSparseArena<K, V>
+impl<'a, K, V> IntoIterator for &'a mut EpochSparseArena<K, V>
 where
     K: Key,
     V: Soa + ?Sized,
 {
-    type Item = (&'r K, V::RefsMut<'r, 'r>);
-    type IntoIter = IterMut<'r, 'r, K, V>;
+    type Item = (&'a K, V::RefsMut<'a, 'a>);
+    type IntoIter = IterMut<'a, 'a, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

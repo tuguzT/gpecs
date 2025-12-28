@@ -10,52 +10,56 @@ use crate::{
     wrapper,
 };
 
-pub struct SoaSliceMutPtrs<'c, T>
+pub struct SoaSliceMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
-    ptrs: wrapper::MutPtrs<'c, T>,
-    context: &'c T::Context,
+    ptrs: wrapper::MutPtrs<'ctx, T>,
+    context: &'ctx T::Context,
     len: usize,
 }
 
-impl<'c, T> SoaSliceMutPtrs<'c, T>
+impl<'ctx, T> SoaSliceMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    pub fn new(context: &'c T::Context, slices: SliceMutPtrs<'c, T>) -> Self {
+    pub fn new(context: &'ctx T::Context, slices: SliceMutPtrs<'ctx, T>) -> Self {
         let len = context.mut_slice_ptrs_len(&slices);
         let ptrs = context.mut_slice_ptrs_as_ptrs(slices);
         unsafe { Self::from_parts(context, ptrs, len) }
     }
 
     #[inline]
-    pub unsafe fn from_parts(context: &'c T::Context, ptrs: MutPtrs<'c, T>, len: usize) -> Self {
+    pub unsafe fn from_parts(
+        context: &'ctx T::Context,
+        ptrs: MutPtrs<'ctx, T>,
+        len: usize,
+    ) -> Self {
         let ptrs = wrapper::MutPtrs::new(ptrs);
         Self { ptrs, context, len }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'c T::Context, MutPtrs<'c, T>, usize) {
+    pub fn into_parts(self) -> (&'ctx T::Context, MutPtrs<'ctx, T>, usize) {
         let Self { context, ptrs, len } = self;
         (context, ptrs.into_inner(), len)
     }
 
     #[inline]
-    pub fn cast_const(self) -> SoaSlicePtrs<'c, T> {
+    pub fn cast_const(self) -> SoaSlicePtrs<'ctx, T> {
         let (context, ptrs, len) = self.into_parts();
         let ptrs = context.ptrs_cast_const(ptrs);
         unsafe { SoaSlicePtrs::from_parts(context, ptrs, len) }
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> SoaSlices<'c, 'a, T> {
+    pub unsafe fn deref<'a>(self) -> SoaSlices<'ctx, 'a, T> {
         unsafe { self.cast_const().deref() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> SoaSlicesMut<'c, 'a, T> {
+    pub unsafe fn deref_mut<'a>(self) -> SoaSlicesMut<'ctx, 'a, T> {
         let (context, ptrs, len) = self.into_parts();
         unsafe { SoaSlicesMut::from_parts(context, ptrs, len) }
     }
@@ -111,13 +115,13 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> Ptrs<'c, T> {
+    pub fn into_ptrs(self) -> Ptrs<'ctx, T> {
         let (_, ptrs) = self.into_ptrs_with_context();
         ptrs
     }
 
     #[inline]
-    pub fn into_ptrs_with_context(self) -> (&'c T::Context, Ptrs<'c, T>) {
+    pub fn into_ptrs_with_context(self) -> (&'ctx T::Context, Ptrs<'ctx, T>) {
         let Self { context, ptrs, .. } = self;
 
         let ptrs = ptrs.into_inner();
@@ -126,13 +130,13 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> MutPtrs<'c, T> {
+    pub fn into_mut_ptrs(self) -> MutPtrs<'ctx, T> {
         let (_, ptrs) = self.into_mut_ptrs_with_context();
         ptrs
     }
 
     #[inline]
-    pub fn into_mut_ptrs_with_context(self) -> (&'c T::Context, MutPtrs<'c, T>) {
+    pub fn into_mut_ptrs_with_context(self) -> (&'ctx T::Context, MutPtrs<'ctx, T>) {
         let Self { context, ptrs, .. } = self;
 
         let ptrs = ptrs.into_inner();
@@ -179,13 +183,13 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> SlicePtrs<'c, T> {
+    pub fn into_slice_ptrs(self) -> SlicePtrs<'ctx, T> {
         let (_, slices) = self.into_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn into_slice_ptrs_with_context(self) -> (&'c T::Context, SlicePtrs<'c, T>) {
+    pub fn into_slice_ptrs_with_context(self) -> (&'ctx T::Context, SlicePtrs<'ctx, T>) {
         let Self { context, len, ptrs } = self;
 
         let ptrs = ptrs.into_inner();
@@ -195,13 +199,13 @@ where
     }
 
     #[inline]
-    pub fn into_mut_slice_ptrs(self) -> SliceMutPtrs<'c, T> {
+    pub fn into_mut_slice_ptrs(self) -> SliceMutPtrs<'ctx, T> {
         let (_, slices) = self.into_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn into_mut_slice_ptrs_with_context(self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
+    pub fn into_mut_slice_ptrs_with_context(self) -> (&'ctx T::Context, SliceMutPtrs<'ctx, T>) {
         let Self { context, len, ptrs } = self;
 
         let ptrs = ptrs.into_inner();
@@ -251,7 +255,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'c>
+    pub unsafe fn into_get_unchecked<I>(self, index: I) -> I::Ptrs<'ctx>
     where
         I: SoaSlicePtrsIndex<T>,
     {
@@ -263,7 +267,7 @@ where
     pub unsafe fn into_get_unchecked_with_context<I>(
         self,
         index: I,
-    ) -> (&'c T::Context, I::Ptrs<'c>)
+    ) -> (&'ctx T::Context, I::Ptrs<'ctx>)
     where
         I: SoaSlicePtrsIndex<T>,
     {
@@ -273,7 +277,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn into_get_unchecked_mut<I>(self, index: I) -> I::MutPtrs<'c>
+    pub unsafe fn into_get_unchecked_mut<I>(self, index: I) -> I::MutPtrs<'ctx>
     where
         I: SoaSlicePtrsIndex<T>,
     {
@@ -285,7 +289,7 @@ where
     pub unsafe fn into_get_unchecked_mut_with_context<I>(
         self,
         index: I,
-    ) -> (&'c T::Context, I::MutPtrs<'c>)
+    ) -> (&'ctx T::Context, I::MutPtrs<'ctx>)
     where
         I: SoaSlicePtrsIndex<T>,
     {
@@ -319,18 +323,18 @@ where
     }
 
     #[inline]
-    pub fn into_iter_with_context(self) -> (&'c T::Context, RawIterMut<'c, T>) {
+    pub fn into_iter_with_context(self) -> (&'ctx T::Context, RawIterMut<'ctx, T>) {
         let (context, slices) = self.into_mut_slice_ptrs_with_context();
         (context, RawIterMut::new(context, slices))
     }
 }
 
-impl<'c, T> From<&'c T::Context> for SoaSliceMutPtrs<'c, T>
+impl<'ctx, T> From<&'ctx T::Context> for SoaSliceMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     #[inline]
-    fn from(context: &'c T::Context) -> Self {
+    fn from(context: &'ctx T::Context) -> Self {
         let ptrs = context.ptrs_dangling_mut();
         unsafe { Self::from_parts(context, ptrs, 0) }
     }
@@ -339,7 +343,7 @@ where
 impl<T> Debug for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> SlicePtrs<'any, T>: Debug,
+    for<'ctx> SlicePtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slice_ptrs();
@@ -367,7 +371,7 @@ where
 impl<T> Copy for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> MutPtrs<'any, T>: Copy,
+    for<'ctx> MutPtrs<'ctx, T>: Copy,
 {
 }
 
@@ -375,7 +379,7 @@ impl<T> PartialEq for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: PartialEq,
-    for<'any> MutPtrs<'any, T>: PartialEq,
+    for<'ctx> MutPtrs<'ctx, T>: PartialEq,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -388,7 +392,7 @@ impl<T> Eq for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Eq,
-    for<'any> MutPtrs<'any, T>: Eq,
+    for<'ctx> MutPtrs<'ctx, T>: Eq,
 {
 }
 
@@ -396,7 +400,7 @@ impl<T> PartialOrd for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: PartialOrd,
-    for<'any> MutPtrs<'any, T>: PartialOrd,
+    for<'ctx> MutPtrs<'ctx, T>: PartialOrd,
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -418,7 +422,7 @@ impl<T> Ord for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Ord,
-    for<'any> MutPtrs<'any, T>: Ord,
+    for<'ctx> MutPtrs<'ctx, T>: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -440,7 +444,7 @@ impl<T> Hash for SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
     T::Context: Hash,
-    for<'any> MutPtrs<'any, T>: Hash,
+    for<'ctx> MutPtrs<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { ptrs, context, len } = self;
@@ -451,12 +455,12 @@ where
     }
 }
 
-impl<'r, T> IntoIterator for &'r SoaSliceMutPtrs<'_, T>
+impl<'a, T> IntoIterator for &'a SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
-    type Item = Ptrs<'r, T>;
-    type IntoIter = RawIter<'r, T>;
+    type Item = Ptrs<'a, T>;
+    type IntoIter = RawIter<'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -464,12 +468,12 @@ where
     }
 }
 
-impl<'r, T> IntoIterator for &'r mut SoaSliceMutPtrs<'_, T>
+impl<'a, T> IntoIterator for &'a mut SoaSliceMutPtrs<'_, T>
 where
     T: RawSoa + ?Sized,
 {
-    type Item = MutPtrs<'r, T>;
-    type IntoIter = RawIterMut<'r, T>;
+    type Item = MutPtrs<'a, T>;
+    type IntoIter = RawIterMut<'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -477,12 +481,12 @@ where
     }
 }
 
-impl<'c, T> IntoIterator for SoaSliceMutPtrs<'c, T>
+impl<'ctx, T> IntoIterator for SoaSliceMutPtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
-    type Item = MutPtrs<'c, T>;
-    type IntoIter = RawIterMut<'c, T>;
+    type Item = MutPtrs<'ctx, T>;
+    type IntoIter = RawIterMut<'ctx, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

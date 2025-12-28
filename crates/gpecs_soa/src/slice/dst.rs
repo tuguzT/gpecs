@@ -365,7 +365,7 @@ where
     pub fn sort_unstable_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
     {
         self.mut_slices()
             .sort_unstable_with_permutation(permutation);
@@ -408,7 +408,7 @@ where
 impl<T> Debug for SoaSlice<T>
 where
     T: Soa + SoaTrustedFields + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
@@ -429,7 +429,7 @@ where
 impl<T, U> AsRef<[U]> for SoaSlice<T>
 where
     T: Soa + SoaTrustedFields + ?Sized,
-    for<'c, 'any> T: Soa<Slices<'c, 'any> = &'any [U]> + 'any,
+    for<'ctx, 'a> T: Soa<Slices<'ctx, 'a> = &'a [U]> + 'a,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -450,7 +450,7 @@ where
 impl<T, U> AsMut<[U]> for SoaSlice<T>
 where
     T: Soa + SoaTrustedFields + ?Sized,
-    for<'c, 'any> T: Soa<SlicesMut<'c, 'any> = &'any mut [U]> + 'any,
+    for<'ctx, 'a> T: Soa<SlicesMut<'ctx, 'a> = &'a mut [U]> + 'a,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [U] {
@@ -461,14 +461,14 @@ where
 impl<T> Eq for SoaSlice<T>
 where
     T: Soa + SoaTrustedFields + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Eq,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Eq,
 {
 }
 
 impl<T> Ord for SoaSlice<T>
 where
     T: Soa + SoaTrustedFields + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Ord,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -481,7 +481,7 @@ where
 impl<T> Hash for SoaSlice<T>
 where
     T: Soa + SoaTrustedFields + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Hash,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Hash,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -509,7 +509,7 @@ impl<T, U, I> Index<I> for SoaSlice<T>
 where
     T: Soa + SoaTrustedFields + ?Sized,
     U: ?Sized,
-    for<'c, 'any> I: IndexHelper<'c, 'any, T, Output = U>,
+    for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
 {
     type Output = U;
 
@@ -523,7 +523,7 @@ impl<T, U, I> IndexMut<I> for SoaSlice<T>
 where
     T: Soa + SoaTrustedFields + ?Sized,
     U: ?Sized,
-    for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
+    for<'ctx, 'a> I: IndexHelperMut<'ctx, 'a, T, Output = U>,
 {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {

@@ -144,7 +144,7 @@ where
 impl<T, U> AsRef<[U]> for Drain<'_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Into<&'any [U]>,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Into<&'a [U]>,
 {
     fn as_ref(&self) -> &[U] {
         self.as_slices().into()
@@ -154,7 +154,7 @@ where
 impl<T> Debug for Drain<'_, T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();

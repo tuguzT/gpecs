@@ -7,15 +7,15 @@ use super::system::{
 };
 
 #[derive(Debug)]
-pub struct CpuExecutor<'context> {
-    context: &'context mut Context,
+pub struct CpuExecutor<'ctx> {
+    context: &'ctx mut Context,
     systems: SystemRegistry,
     schedule: SystemSchedule,
 }
 
-impl<'context> CpuExecutor<'context> {
+impl<'ctx> CpuExecutor<'ctx> {
     #[inline]
-    pub fn new(context: &'context mut Context) -> Self {
+    pub fn new(context: &'ctx mut Context) -> Self {
         Self {
             context,
             systems: SystemRegistry::new(),
@@ -36,7 +36,7 @@ impl<'context> CpuExecutor<'context> {
     }
 
     #[inline]
-    pub fn into_context(self) -> &'context mut Context {
+    pub fn into_context(self) -> &'ctx mut Context {
         let Self { context, .. } = self;
         context
     }

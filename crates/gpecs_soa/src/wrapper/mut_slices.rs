@@ -12,21 +12,21 @@ use crate::traits::Soa;
 /// Type wrapper for [mutable slices](Soa::SlicesMut)
 /// which is covariant over generic lifetimes.
 #[repr(transparent)]
-pub struct SlicesMut<'context, 'a, T>
+pub struct SlicesMut<'ctx, 'a, T>
 where
     T: Soa + ?Sized + 'a,
 {
     inner: T::SlicesMut<'static, 'a>,
-    phantom: PhantomData<&'context ()>,
+    phantom: PhantomData<&'ctx ()>,
 }
 
-impl<'context, 'a, T> SlicesMut<'context, 'a, T>
+impl<'ctx, 'a, T> SlicesMut<'ctx, 'a, T>
 where
     T: Soa + ?Sized,
 {
     /// Creates self from the [mutable slices](Soa::SlicesMut).
     #[inline]
-    pub fn new(inner: T::SlicesMut<'context, 'a>) -> Self {
+    pub fn new(inner: T::SlicesMut<'ctx, 'a>) -> Self {
         Self {
             inner: unsafe { transmute::<T::SlicesMut<'_, '_>, T::SlicesMut<'_, '_>>(inner) },
             phantom: PhantomData,
@@ -49,7 +49,7 @@ where
 
     /// Retrieves the [mutable slices](Soa::SlicesMut).
     #[inline]
-    pub fn into_inner(self) -> T::SlicesMut<'context, 'a> {
+    pub fn into_inner(self) -> T::SlicesMut<'ctx, 'a> {
         let Self { inner, .. } = self;
         T::upcast_mut_slices(inner)
     }
@@ -58,7 +58,7 @@ where
 impl<'a, T> Debug for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: Debug,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -69,7 +69,7 @@ where
 impl<'a, T> Default for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: Default,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: Default,
 {
     fn default() -> Self {
         Self {
@@ -82,7 +82,7 @@ where
 impl<'a, T> Clone for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: Clone,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: Clone,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -94,14 +94,14 @@ where
 impl<'a, T> Copy for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: Copy,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: Copy,
 {
 }
 
 impl<'a, T> PartialEq for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: PartialEq,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -112,14 +112,14 @@ where
 impl<'a, T> Eq for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: Eq,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: Eq,
 {
 }
 
 impl<'a, T> PartialOrd for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: PartialOrd,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -134,7 +134,7 @@ where
 impl<'a, T> Ord for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: Ord,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -149,7 +149,7 @@ where
 impl<'a, T> Hash for SlicesMut<'_, 'a, T>
 where
     T: Soa + ?Sized,
-    for<'any> T::SlicesMut<'any, 'a>: Hash,
+    for<'ctx> T::SlicesMut<'ctx, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;

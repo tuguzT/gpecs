@@ -8,8 +8,8 @@ use crate::common::{ZST1, ZST2, ZST3};
 
 #[test]
 fn empty() {
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, (u8, u64, u16, ())>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (u8, u64, u16, ())>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, (u8, u64, u16, ())>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, (u8, u64, u16, ())>;
 
     let context = Default::default();
 
@@ -72,8 +72,8 @@ fn empty() {
 
 #[test]
 fn empty_identity() {
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, Identity<usize>>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, Identity<usize>>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Identity<usize>>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Identity<usize>>;
 
     let context = Default::default();
 
@@ -124,8 +124,8 @@ fn empty_identity() {
 
 #[test]
 fn empty_zst() {
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, (ZST1, ZST2, ZST3)>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (ZST1, ZST2, ZST3)>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, (ZST1, ZST2, ZST3)>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, (ZST1, ZST2, ZST3)>;
 
     let context = Default::default();
 
@@ -180,8 +180,8 @@ fn empty_zst() {
 
 #[test]
 fn one_item() {
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, (u8, u64, u16, ())>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (u8, u64, u16, ())>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, (u8, u64, u16, ())>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, (u8, u64, u16, ())>;
 
     let context = Default::default();
     let mut u8s = [1];
@@ -325,8 +325,8 @@ fn one_item() {
 
 #[test]
 fn one_item_identity() {
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, Identity<usize>>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, Identity<usize>>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Identity<usize>>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Identity<usize>>;
 
     let context = Default::default();
     let mut data = [1.into()];
@@ -390,8 +390,8 @@ fn one_item_identity() {
 
 #[test]
 fn one_item_zst() {
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, (ZST1, ZST2, ZST3)>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, (ZST1, ZST2, ZST3)>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, (ZST1, ZST2, ZST3)>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, (ZST1, ZST2, ZST3)>;
 
     let context = Default::default();
     let mut zst1s = [ZST1];
@@ -521,8 +521,8 @@ fn one_item_zst() {
 #[test]
 fn three_items() {
     type Item = (u8, String, u64, ());
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, Item>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, Item>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 
     let context = Default::default();
     let mut u8s = [1, 2, 3];
@@ -837,8 +837,8 @@ fn three_items() {
 #[test]
 fn three_items_identity() {
     type Item = Identity<usize>;
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, Item>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, Item>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 
     let context = Default::default();
     let mut data = [1.into(), 2.into(), 3.into()];
@@ -1010,8 +1010,8 @@ fn three_items_identity() {
 #[test]
 fn three_items_zst() {
     type Item = (ZST1, ZST2, ZST3);
-    type Slices<'c, 'a> = SoaSlices<'c, 'a, Item>;
-    type SlicesMut<'c, 'a> = SoaSlicesMut<'c, 'a, Item>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 
     let context = Default::default();
     let mut zst1s = [ZST1; 3];

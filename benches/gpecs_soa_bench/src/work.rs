@@ -22,11 +22,11 @@ pub trait Work: WithCapacity + Push {
         black_box(vec)
     }
 
-    type SoaSlfIter<'context, 'a>: Iterator + Clone;
+    type SoaSlfIter<'ctx, 'a>: Iterator + Clone;
 
-    fn soa_slf_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, Self>,
-    ) -> Self::SoaSlfIter<'context, 'a>;
+    fn soa_slf_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, Self>,
+    ) -> Self::SoaSlfIter<'ctx, 'a>;
 
     fn soa_slf_work(iter: Self::SoaSlfIter<'_, '_>) -> Self::Output;
 
@@ -39,11 +39,11 @@ pub trait Work: WithCapacity + Push {
         black_box(vec)
     }
 
-    type SoaSerIter<'context, 'a>: Iterator + Clone;
+    type SoaSerIter<'ctx, 'a>: Iterator + Clone;
 
-    fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
-    ) -> Self::SoaSerIter<'context, 'a>;
+    fn soa_ser_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, BoxedErasedSoa>,
+    ) -> Self::SoaSerIter<'ctx, 'a>;
 
     fn soa_ser_work(iter: Self::SoaSerIter<'_, '_>) -> Self::Output;
 
@@ -86,11 +86,11 @@ impl Work for Tiny {
         (index.try_into().unwrap(),)
     }
 
-    type SoaSlfIter<'context, 'a> = soa_slice::Iter<'context, 'a, Self>;
+    type SoaSlfIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, Self>;
 
-    fn soa_slf_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, Self>,
-    ) -> Self::SoaSlfIter<'context, 'a> {
+    fn soa_slf_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, Self>,
+    ) -> Self::SoaSlfIter<'ctx, 'a> {
         data.into_iter()
     }
 
@@ -102,11 +102,11 @@ impl Work for Tiny {
         black_box(result)
     }
 
-    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, BoxedErasedSoa>;
+    type SoaSerIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, BoxedErasedSoa>;
 
-    fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
-    ) -> Self::SoaSerIter<'context, 'a> {
+    fn soa_ser_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, BoxedErasedSoa>,
+    ) -> Self::SoaSerIter<'ctx, 'a> {
         data.into_iter()
     }
 
@@ -160,11 +160,11 @@ impl Work for Small {
         (1.0 * index, 0.2 * index, -2.3 * index)
     }
 
-    type SoaSlfIter<'context, 'a> = soa_slice::Iter<'context, 'a, Self>;
+    type SoaSlfIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, Self>;
 
-    fn soa_slf_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, Self>,
-    ) -> Self::SoaSlfIter<'context, 'a> {
+    fn soa_slf_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, Self>,
+    ) -> Self::SoaSlfIter<'ctx, 'a> {
         data.into_iter()
     }
 
@@ -176,11 +176,11 @@ impl Work for Small {
         black_box(result)
     }
 
-    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, BoxedErasedSoa>;
+    type SoaSerIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, BoxedErasedSoa>;
 
-    fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
-    ) -> Self::SoaSerIter<'context, 'a> {
+    fn soa_ser_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, BoxedErasedSoa>,
+    ) -> Self::SoaSerIter<'ctx, 'a> {
         data.into_iter()
     }
 
@@ -239,11 +239,11 @@ impl Work for Big {
         )
     }
 
-    type SoaSlfIter<'context, 'a> = soa_slice::Iter<'context, 'a, Self>;
+    type SoaSlfIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, Self>;
 
-    fn soa_slf_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, Self>,
-    ) -> Self::SoaSlfIter<'context, 'a> {
+    fn soa_slf_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, Self>,
+    ) -> Self::SoaSlfIter<'ctx, 'a> {
         data.into_iter()
     }
 
@@ -255,11 +255,11 @@ impl Work for Big {
         black_box(result)
     }
 
-    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, BoxedErasedSoa>;
+    type SoaSerIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, BoxedErasedSoa>;
 
-    fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
-    ) -> Self::SoaSerIter<'context, 'a> {
+    fn soa_ser_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, BoxedErasedSoa>,
+    ) -> Self::SoaSerIter<'ctx, 'a> {
         data.into_iter()
     }
 
@@ -332,11 +332,11 @@ impl Work for Large {
         )
     }
 
-    type SoaSlfIter<'context, 'a> = soa_slice::Iter<'context, 'a, Self>;
+    type SoaSlfIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, Self>;
 
-    fn soa_slf_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, Self>,
-    ) -> Self::SoaSlfIter<'context, 'a> {
+    fn soa_slf_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, Self>,
+    ) -> Self::SoaSlfIter<'ctx, 'a> {
         data.into_iter()
     }
 
@@ -350,11 +350,11 @@ impl Work for Large {
         black_box(result)
     }
 
-    type SoaSerIter<'context, 'a> = soa_slice::Iter<'context, 'a, BoxedErasedSoa>;
+    type SoaSerIter<'ctx, 'a> = soa_slice::Iter<'ctx, 'a, BoxedErasedSoa>;
 
-    fn soa_ser_prepare_iter<'context, 'a>(
-        data: SoaSlices<'context, 'a, BoxedErasedSoa>,
-    ) -> Self::SoaSerIter<'context, 'a> {
+    fn soa_ser_prepare_iter<'ctx, 'a>(
+        data: SoaSlices<'ctx, 'a, BoxedErasedSoa>,
+    ) -> Self::SoaSerIter<'ctx, 'a> {
         data.into_iter()
     }
 

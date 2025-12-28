@@ -392,7 +392,7 @@ where
 impl<K, V> Debug for IntoValues<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slices();
@@ -429,7 +429,7 @@ where
 impl<T, K, V> AsRef<[T]> for IntoValues<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -440,7 +440,7 @@ where
 impl<T, K, V> AsMut<[T]> for IntoValues<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V::SlicesMut<'c, 'any>: Into<&'any mut [T]>,
+    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Into<&'a mut [T]>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
@@ -695,7 +695,7 @@ impl<K, V> Debug for IntoIter<K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = &self.as_slices();
@@ -735,7 +735,7 @@ where
 impl<T, K, V> AsRef<[T]> for IntoIter<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -746,7 +746,7 @@ where
 impl<T, K, V> AsMut<[T]> for IntoIter<K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V::SlicesMut<'c, 'any>: Into<&'any mut [T]>,
+    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Into<&'a mut [T]>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
@@ -919,7 +919,7 @@ impl<K, V> Debug for Drain<'_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = &self.as_slices();
@@ -933,7 +933,7 @@ where
 impl<T, K, V> AsRef<[T]> for Drain<'_, K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {

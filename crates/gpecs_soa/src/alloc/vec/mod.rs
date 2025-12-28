@@ -965,7 +965,7 @@ where
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
     {
         self.mut_slices().sort_with_permutation(permutation);
     }
@@ -973,7 +973,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
     {
         self.mut_slices().sort();
     }
@@ -1039,7 +1039,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'c, 'any> T::Refs<'c, 'any>: Ord,
+        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
     {
         self.mut_slices().sort_unstable();
     }
@@ -1065,7 +1065,7 @@ where
 impl<T> Debug for SoaVec<T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
@@ -1147,14 +1147,14 @@ where
 impl<T> Eq for SoaVec<T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Eq,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Eq,
 {
 }
 
 impl<T> Ord for SoaVec<T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Ord,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1167,7 +1167,7 @@ where
 impl<T> Hash for SoaVec<T>
 where
     T: Soa + ?Sized,
-    for<'c, 'any> T::Slices<'c, 'any>: Hash,
+    for<'ctx, 'a> T::Slices<'ctx, 'a>: Hash,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1225,7 +1225,7 @@ impl<T, U, I> Index<I> for SoaVec<T>
 where
     T: Soa + ?Sized,
     U: ?Sized,
-    for<'c, 'any> I: IndexHelper<'c, 'any, T, Output = U>,
+    for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
 {
     type Output = U;
 
@@ -1239,7 +1239,7 @@ impl<T, U, I> IndexMut<I> for SoaVec<T>
 where
     T: Soa + ?Sized,
     U: ?Sized,
-    for<'c, 'any> I: IndexHelperMut<'c, 'any, T, Output = U>,
+    for<'ctx, 'a> I: IndexHelperMut<'ctx, 'a, T, Output = U>,
 {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {

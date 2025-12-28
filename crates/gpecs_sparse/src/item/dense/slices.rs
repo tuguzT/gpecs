@@ -10,25 +10,21 @@ use crate::{
     soa::{traits::Soa, wrapper},
 };
 
-pub struct DenseSlices<'context, 'a, K, V>
+pub struct DenseSlices<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized + 'a,
 {
     keys: &'a [K],
-    values: wrapper::Slices<'context, 'a, V>,
+    values: wrapper::Slices<'ctx, 'a, V>,
 }
 
-impl<'context, 'a, K, V> DenseSlices<'context, 'a, K, V>
+impl<'ctx, 'a, K, V> DenseSlices<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
     #[track_caller]
-    pub fn new(
-        context: &'context V::Context,
-        keys: &'a [K],
-        values: V::Slices<'context, 'a>,
-    ) -> Self {
+    pub fn new(context: &'ctx V::Context, keys: &'a [K], values: V::Slices<'ctx, 'a>) -> Self {
         let keys_len = keys.len();
         let values_len = V::slices_len(context, &values);
         assert_eq!(keys_len, values_len);
@@ -37,7 +33,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(keys: &'a [K], values: V::Slices<'context, 'a>) -> Self {
+    pub unsafe fn new_unchecked(keys: &'a [K], values: V::Slices<'ctx, 'a>) -> Self {
         let values = wrapper::Slices::new(values);
         Self { keys, values }
     }
@@ -49,13 +45,13 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a [K], V::Slices<'context, 'a>) {
+    pub fn into_parts(self) -> (&'a [K], V::Slices<'ctx, 'a>) {
         let Self { keys, values } = self;
         (keys, values.into_inner())
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self, context: &'context V::Context) -> DenseSlicePtrs<'context, K, V> {
+    pub fn into_slice_ptrs(self, context: &'ctx V::Context) -> DenseSlicePtrs<'ctx, K, V> {
         let Self { keys, values } = self;
 
         let keys = ptr::from_ref(keys);
@@ -64,7 +60,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> DensePtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> DensePtrs<'ctx, K, V> {
         let Self { keys, values } = self;
 
         let key = keys.as_ptr();
@@ -73,13 +69,12 @@ where
     }
 }
 
-impl<'context, 'a, K, V> From<DenseSlices<'context, 'a, K, V>>
-    for (&'a [K], V::Slices<'context, 'a>)
+impl<'ctx, 'a, K, V> From<DenseSlices<'ctx, 'a, K, V>> for (&'a [K], V::Slices<'ctx, 'a>)
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    fn from(value: DenseSlices<'context, 'a, K, V>) -> Self {
+    fn from(value: DenseSlices<'ctx, 'a, K, V>) -> Self {
         value.into_parts()
     }
 }
@@ -88,7 +83,7 @@ impl<K, V> Debug for DenseSlices<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: Debug,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -102,7 +97,7 @@ where
 impl<K, V> Default for DenseSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: Default,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Default,
 {
     #[inline]
     fn default() -> Self {
@@ -116,7 +111,7 @@ impl<K, V> PartialEq for DenseSlices<'_, '_, K, V>
 where
     K: PartialEq,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: PartialEq,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
@@ -128,7 +123,7 @@ impl<K, V> Eq for DenseSlices<'_, '_, K, V>
 where
     K: Eq,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: Eq,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Eq,
 {
 }
 
@@ -136,7 +131,7 @@ impl<K, V> PartialOrd for DenseSlices<'_, '_, K, V>
 where
     K: PartialOrd,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: PartialOrd,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
@@ -152,7 +147,7 @@ impl<K, V> Ord for DenseSlices<'_, '_, K, V>
 where
     K: Ord,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: Ord,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
@@ -168,7 +163,7 @@ impl<K, V> Hash for DenseSlices<'_, '_, K, V>
 where
     K: Hash,
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: Hash,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -180,7 +175,7 @@ where
 impl<K, V> Clone for DenseSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: Clone,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -193,6 +188,6 @@ where
 impl<K, V> Copy for DenseSlices<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'a> V::Slices<'c, 'a>: Copy,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Copy,
 {
 }

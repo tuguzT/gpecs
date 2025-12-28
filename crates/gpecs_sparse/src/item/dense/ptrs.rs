@@ -13,39 +13,39 @@ use crate::{
     },
 };
 
-pub struct DensePtrs<'context, K, V>
+pub struct DensePtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     pub key: *const K,
-    pub value: wrapper::Ptrs<'context, V>,
+    pub value: wrapper::Ptrs<'ctx, V>,
 }
 
-impl<'context, K, V> DensePtrs<'context, K, V>
+impl<'ctx, K, V> DensePtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub fn new(key: *const K, value: Ptrs<'context, V>) -> Self {
+    pub fn new(key: *const K, value: Ptrs<'ctx, V>) -> Self {
         let value = wrapper::Ptrs::new(value);
         Self { key, value }
     }
 
     #[inline]
-    pub fn dangling(context: &'context V::Context) -> Self {
+    pub fn dangling(context: &'ctx V::Context) -> Self {
         let key = ptr::dangling();
         let value = context.ptrs_dangling();
         Self::new(key, value)
     }
 
     #[inline]
-    pub fn into_parts(self) -> (*const K, Ptrs<'context, V>) {
+    pub fn into_parts(self) -> (*const K, Ptrs<'ctx, V>) {
         let Self { key, value } = self;
         (key, value.into_inner())
     }
 
     #[inline]
-    pub fn cast_mut(self, context: &'context V::Context) -> DenseMutPtrs<'context, K, V> {
+    pub fn cast_mut(self, context: &'ctx V::Context) -> DenseMutPtrs<'ctx, K, V> {
         let Self { key, value } = self;
 
         let key = key.cast_mut();
@@ -55,7 +55,7 @@ where
 
     #[inline]
     #[must_use]
-    pub unsafe fn add(self, context: &'context V::Context, offset: usize) -> Self {
+    pub unsafe fn add(self, context: &'ctx V::Context, offset: usize) -> Self {
         let Self { key, value } = self;
 
         let key = unsafe { key.add(offset) };
@@ -105,12 +105,12 @@ where
     }
 }
 
-impl<'context, K, V> DensePtrs<'context, K, V>
+impl<'ctx, K, V> DensePtrs<'ctx, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub unsafe fn deref<'a>(self, context: &'context V::Context) -> DenseRefs<'context, 'a, K, V> {
+    pub unsafe fn deref<'a>(self, context: &'ctx V::Context) -> DenseRefs<'ctx, 'a, K, V> {
         let Self { key, value } = self;
 
         let key = unsafe { &*key };
@@ -133,23 +133,23 @@ where
     }
 }
 
-impl<'context, K, V> From<(*const K, Ptrs<'context, V>)> for DensePtrs<'context, K, V>
+impl<'ctx, K, V> From<(*const K, Ptrs<'ctx, V>)> for DensePtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    fn from(value: (*const K, Ptrs<'context, V>)) -> Self {
+    fn from(value: (*const K, Ptrs<'ctx, V>)) -> Self {
         let (key, value) = value;
         Self::new(key, value)
     }
 }
 
-impl<'context, K, V> From<DensePtrs<'context, K, V>> for (*const K, Ptrs<'context, V>)
+impl<'ctx, K, V> From<DensePtrs<'ctx, K, V>> for (*const K, Ptrs<'ctx, V>)
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    fn from(value: DensePtrs<'context, K, V>) -> Self {
+    fn from(value: DensePtrs<'ctx, K, V>) -> Self {
         value.into_parts()
     }
 }
@@ -157,7 +157,7 @@ where
 impl<K, V> Debug for DensePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> Ptrs<'c, V>: Debug,
+    for<'ctx> Ptrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -171,7 +171,7 @@ where
 impl<K, V> PartialEq for DensePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> Ptrs<'c, V>: PartialEq,
+    for<'ctx> Ptrs<'ctx, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -182,14 +182,14 @@ where
 impl<K, V> Eq for DensePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> Ptrs<'c, V>: Eq,
+    for<'ctx> Ptrs<'ctx, V>: Eq,
 {
 }
 
 impl<K, V> PartialOrd for DensePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> Ptrs<'c, V>: PartialOrd,
+    for<'ctx> Ptrs<'ctx, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -204,7 +204,7 @@ where
 impl<K, V> Ord for DensePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> Ptrs<'c, V>: Ord,
+    for<'ctx> Ptrs<'ctx, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -219,7 +219,7 @@ where
 impl<K, V> Hash for DensePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> Ptrs<'c, V>: Hash,
+    for<'ctx> Ptrs<'ctx, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;
@@ -242,6 +242,6 @@ where
 impl<K, V> Copy for DensePtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> Ptrs<'c, V>: Copy,
+    for<'ctx> Ptrs<'ctx, V>: Copy,
 {
 }

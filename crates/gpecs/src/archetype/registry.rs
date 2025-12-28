@@ -496,10 +496,10 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn bundles<'c, B>(
+    pub fn bundles<'ctx, B>(
         &self,
-        components: &'c ComponentRegistry,
-    ) -> Result<Bundles<'_, 'c, B>, GetComponentsError>
+        components: &'ctx ComponentRegistry,
+    ) -> Result<Bundles<'_, 'ctx, B>, GetComponentsError>
     where
         B: Bundle,
     {
@@ -508,10 +508,10 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn bundles_mut<'c, B>(
+    pub fn bundles_mut<'ctx, B>(
         &mut self,
-        components: &'c ComponentRegistry,
-    ) -> Result<BundlesMut<'_, 'c, B>, GetComponentsError>
+        components: &'ctx ComponentRegistry,
+    ) -> Result<BundlesMut<'_, 'ctx, B>, GetComponentsError>
     where
         B: Bundle,
     {
@@ -1709,23 +1709,23 @@ fn compatible_archetypes_predicate(info: &ArchetypeInfo, component_ids: &[Compon
         .is_ok()
 }
 
-pub struct Bundles<'a, 'c, B>
+pub struct Bundles<'a, 'ctx, B>
 where
     B: Bundle,
 {
     archetypes: CompatibleArchetypes<'a>,
-    components: &'c ComponentRegistry,
+    components: &'ctx ComponentRegistry,
     phantom: PhantomData<fn() -> B>,
 }
 
-impl<'a, 'c, B> Bundles<'a, 'c, B>
+impl<'a, 'ctx, B> Bundles<'a, 'ctx, B>
 where
     B: Bundle,
 {
     #[inline]
     fn new(
         archetypes: &'a Archetypes,
-        components: &'c ComponentRegistry,
+        components: &'ctx ComponentRegistry,
     ) -> Result<Self, GetComponentsError> {
         let archetypes = CompatibleArchetypes::of::<B>(archetypes, components)?;
         Ok(Self {
@@ -1779,7 +1779,7 @@ where
     }
 }
 
-impl<'a, 'c, B> IntoIterator for Bundles<'a, 'c, B>
+impl<'a, 'ctx, B> IntoIterator for Bundles<'a, 'ctx, B>
 where
     B: Bundle,
 {
@@ -1787,7 +1787,7 @@ where
 
     // this actually should be just `FlatMap`,
     // but it cannot be returned because `impl Trait` is unstable in associated types
-    type IntoIter = BundlesIntoIter<'a, 'c, B>;
+    type IntoIter = BundlesIntoIter<'a, 'ctx, B>;
 
     fn into_iter(self) -> Self::IntoIter {
         let Self {
@@ -1807,24 +1807,24 @@ where
 type BundlesIntoIterInner<'a, B> =
     iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIter<'a, 'a, B>>;
 
-pub struct BundlesIntoIter<'a, 'c, B>
+pub struct BundlesIntoIter<'a, 'ctx, B>
 where
     B: Bundle,
 {
     archetypes: CompatibleArchetypes<'a>,
-    components: &'c ComponentRegistry,
+    components: &'ctx ComponentRegistry,
     inner_front: Option<BundlesIntoIterInner<'a, B>>,
     inner_back: Option<BundlesIntoIterInner<'a, B>>,
 }
 
-impl<'a, 'c, B> BundlesIntoIter<'a, 'c, B>
+impl<'a, 'ctx, B> BundlesIntoIter<'a, 'ctx, B>
 where
     B: Bundle,
 {
     #[inline]
     fn new_inner(
         info: &'a ArchetypeInfo,
-        components: &'c ComponentRegistry,
+        components: &'ctx ComponentRegistry,
     ) -> BundlesIntoIterInner<'a, B> {
         let archetype_id = info.id();
         let Ok((entities, components)) = info.storage().bundles::<B>(components) else {
@@ -1840,7 +1840,7 @@ where
 impl<B> Debug for BundlesIntoIter<'_, '_, B>
 where
     B: Bundle,
-    for<'c, 'any> B::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> B::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -1955,23 +1955,23 @@ where
 
 impl<B> FusedIterator for BundlesIntoIter<'_, '_, B> where B: Bundle {}
 
-pub struct BundlesMut<'a, 'c, B>
+pub struct BundlesMut<'a, 'ctx, B>
 where
     B: Bundle,
 {
     archetypes: CompatibleArchetypesMut<'a>,
-    components: &'c ComponentRegistry,
+    components: &'ctx ComponentRegistry,
     phantom: PhantomData<fn() -> B>,
 }
 
-impl<'a, 'c, B> BundlesMut<'a, 'c, B>
+impl<'a, 'ctx, B> BundlesMut<'a, 'ctx, B>
 where
     B: Bundle,
 {
     #[inline]
     fn new(
         archetypes: &'a mut Archetypes,
-        components: &'c ComponentRegistry,
+        components: &'ctx ComponentRegistry,
     ) -> Result<Self, GetComponentsError> {
         let archetypes = CompatibleArchetypesMut::of::<B>(archetypes, components)?;
         Ok(Self {
@@ -2012,7 +2012,7 @@ where
     }
 }
 
-impl<'a, 'c, B> IntoIterator for BundlesMut<'a, 'c, B>
+impl<'a, 'ctx, B> IntoIterator for BundlesMut<'a, 'ctx, B>
 where
     B: Bundle,
 {
@@ -2020,7 +2020,7 @@ where
 
     // this actually should be just `FlatMap`,
     // but it cannot be returned because `impl Trait` is unstable in associated types
-    type IntoIter = BundlesMutIntoIter<'a, 'c, B>;
+    type IntoIter = BundlesMutIntoIter<'a, 'ctx, B>;
 
     fn into_iter(self) -> Self::IntoIter {
         let Self {
@@ -2040,24 +2040,24 @@ where
 type BundlesMutIntoIterInner<'a, B> =
     iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIterMut<'a, 'a, B>>;
 
-pub struct BundlesMutIntoIter<'a, 'c, B>
+pub struct BundlesMutIntoIter<'a, 'ctx, B>
 where
     B: Bundle,
 {
     archetypes: CompatibleArchetypesMut<'a>,
-    components: &'c ComponentRegistry,
+    components: &'ctx ComponentRegistry,
     inner_front: Option<BundlesMutIntoIterInner<'a, B>>,
     inner_back: Option<BundlesMutIntoIterInner<'a, B>>,
 }
 
-impl<'a, 'c, B> BundlesMutIntoIter<'a, 'c, B>
+impl<'a, 'ctx, B> BundlesMutIntoIter<'a, 'ctx, B>
 where
     B: Bundle,
 {
     #[inline]
     fn new_inner(
         info: &'a mut ArchetypeInfo,
-        components: &'c ComponentRegistry,
+        components: &'ctx ComponentRegistry,
     ) -> BundlesMutIntoIterInner<'a, B> {
         let archetype_id = info.id();
         let Ok((entities, components)) = info.storage.bundles_mut::<B>(components) else {
@@ -2073,7 +2073,7 @@ where
 impl<B> Debug for BundlesMutIntoIter<'_, '_, B>
 where
     B: Bundle,
-    for<'c, 'any> B::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> B::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {

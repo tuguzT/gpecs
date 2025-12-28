@@ -13,26 +13,22 @@ use crate::{
     },
 };
 
-pub struct DenseSliceMutPtrs<'context, K, V>
+pub struct DenseSliceMutPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     keys: *mut [K],
-    values: wrapper::SliceMutPtrs<'context, V>,
+    values: wrapper::SliceMutPtrs<'ctx, V>,
 }
 
-impl<'context, K, V> DenseSliceMutPtrs<'context, K, V>
+impl<'ctx, K, V> DenseSliceMutPtrs<'ctx, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
     #[track_caller]
     #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
-    pub fn new(
-        context: &'context V::Context,
-        keys: *mut [K],
-        values: SliceMutPtrs<'context, V>,
-    ) -> Self {
+    pub fn new(context: &'ctx V::Context, keys: *mut [K], values: SliceMutPtrs<'ctx, V>) -> Self {
         let keys_len = keys.len();
         let values_len = context.mut_slice_ptrs_len(&values);
         assert_eq!(keys_len, values_len);
@@ -41,15 +37,15 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(keys: *mut [K], values: SliceMutPtrs<'context, V>) -> Self {
+    pub unsafe fn new_unchecked(keys: *mut [K], values: SliceMutPtrs<'ctx, V>) -> Self {
         let values = wrapper::SliceMutPtrs::new(values);
         Self { keys, values }
     }
 
     #[inline]
     pub fn from_raw_parts(
-        context: &'context V::Context,
-        ptrs: DenseMutPtrs<'context, K, V>,
+        context: &'ctx V::Context,
+        ptrs: DenseMutPtrs<'ctx, K, V>,
         len: usize,
     ) -> Self {
         let DenseMutPtrs { key, value } = ptrs;
@@ -60,7 +56,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (*mut [K], SliceMutPtrs<'context, V>) {
+    pub fn into_parts(self) -> (*mut [K], SliceMutPtrs<'ctx, V>) {
         let Self { keys, values } = self;
         (keys, values.into_inner())
     }
@@ -72,7 +68,7 @@ where
     }
 
     #[inline]
-    pub fn cast_const(self, context: &'context V::Context) -> DenseSlicePtrs<'context, K, V> {
+    pub fn cast_const(self, context: &'ctx V::Context) -> DenseSlicePtrs<'ctx, K, V> {
         let Self { keys, values } = self;
 
         let keys = keys.cast_const();
@@ -81,7 +77,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'context V::Context) -> DensePtrs<'context, K, V> {
+    pub fn into_ptrs(self, context: &'ctx V::Context) -> DensePtrs<'ctx, K, V> {
         let Self { keys, values } = self;
 
         let key = keys.cast_const().cast(); // should be `keys.as_ptr()` but it's unstable
@@ -91,7 +87,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self, context: &'context V::Context) -> DenseMutPtrs<'context, K, V> {
+    pub fn into_mut_ptrs(self, context: &'ctx V::Context) -> DenseMutPtrs<'ctx, K, V> {
         let Self { keys, values } = self;
 
         let key = keys.cast(); // should be `keys.as_ptr()` but it's unstable
@@ -110,23 +106,17 @@ where
     }
 }
 
-impl<'context, K, V> DenseSliceMutPtrs<'context, K, V>
+impl<'ctx, K, V> DenseSliceMutPtrs<'ctx, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub unsafe fn deref<'a>(
-        self,
-        context: &'context V::Context,
-    ) -> DenseSlices<'context, 'a, K, V> {
+    pub unsafe fn deref<'a>(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
         unsafe { self.cast_const(context).deref(context) }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(
-        self,
-        context: &'context V::Context,
-    ) -> DenseSlicesMut<'context, 'a, K, V> {
+    pub unsafe fn deref_mut<'a>(self, context: &'ctx V::Context) -> DenseSlicesMut<'ctx, 'a, K, V> {
         let Self { keys, values } = self;
 
         let keys = unsafe { &mut *keys };
@@ -135,13 +125,12 @@ where
     }
 }
 
-impl<'context, K, V> From<DenseSliceMutPtrs<'context, K, V>>
-    for (*mut [K], SliceMutPtrs<'context, V>)
+impl<'ctx, K, V> From<DenseSliceMutPtrs<'ctx, K, V>> for (*mut [K], SliceMutPtrs<'ctx, V>)
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    fn from(value: DenseSliceMutPtrs<'context, K, V>) -> Self {
+    fn from(value: DenseSliceMutPtrs<'ctx, K, V>) -> Self {
         value.into_parts()
     }
 }
@@ -149,7 +138,7 @@ where
 impl<K, V> Debug for DenseSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> SliceMutPtrs<'c, V>: Debug,
+    for<'ctx> SliceMutPtrs<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -163,7 +152,7 @@ where
 impl<K, V> PartialEq for DenseSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> SliceMutPtrs<'c, V>: PartialEq,
+    for<'ctx> SliceMutPtrs<'ctx, V>: PartialEq,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn eq(&self, other: &Self) -> bool {
@@ -175,14 +164,14 @@ where
 impl<K, V> Eq for DenseSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> SliceMutPtrs<'c, V>: Eq,
+    for<'ctx> SliceMutPtrs<'ctx, V>: Eq,
 {
 }
 
 impl<K, V> PartialOrd for DenseSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> SliceMutPtrs<'c, V>: PartialOrd,
+    for<'ctx> SliceMutPtrs<'ctx, V>: PartialOrd,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -198,7 +187,7 @@ where
 impl<K, V> Ord for DenseSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> SliceMutPtrs<'c, V>: Ord,
+    for<'ctx> SliceMutPtrs<'ctx, V>: Ord,
 {
     #[expect(ambiguous_wide_pointer_comparisons)]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -214,7 +203,7 @@ where
 impl<K, V> Hash for DenseSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> SliceMutPtrs<'c, V>: Hash,
+    for<'ctx> SliceMutPtrs<'ctx, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -238,6 +227,6 @@ where
 impl<K, V> Copy for DenseSliceMutPtrs<'_, K, V>
 where
     V: RawSoa + ?Sized,
-    for<'c> SliceMutPtrs<'c, V>: Copy,
+    for<'ctx> SliceMutPtrs<'ctx, V>: Copy,
 {
 }

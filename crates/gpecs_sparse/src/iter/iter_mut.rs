@@ -13,25 +13,25 @@ use crate::{
 };
 
 #[repr(transparent)]
-pub struct IterMut<'c, 'a, K, V>
+pub struct IterMut<'ctx, 'a, K, V>
 where
-    K: 'c + 'a,
-    V: RawSoa + ?Sized + 'c + 'a,
+    K: 'ctx + 'a,
+    V: RawSoa + ?Sized + 'ctx + 'a,
 {
-    inner: soa::slice::IterMut<'c, 'a, DenseItem<K, V>>,
+    inner: soa::slice::IterMut<'ctx, 'a, DenseItem<K, V>>,
 }
 
-impl<'c, 'a, K, V> IterMut<'c, 'a, K, V>
+impl<'ctx, 'a, K, V> IterMut<'ctx, 'a, K, V>
 where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(super) fn from_inner(inner: soa::slice::IterMut<'c, 'a, DenseItem<K, V>>) -> Self {
+    pub(super) fn from_inner(inner: soa::slice::IterMut<'ctx, 'a, DenseItem<K, V>>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub(super) fn into_inner(self) -> soa::slice::IterMut<'c, 'a, DenseItem<K, V>> {
+    pub(super) fn into_inner(self) -> soa::slice::IterMut<'ctx, 'a, DenseItem<K, V>> {
         let Self { inner } = self;
         inner
     }
@@ -48,19 +48,19 @@ where
     }
 
     #[inline]
-    pub fn context(&self) -> &'c V::Context {
+    pub fn context(&self) -> &'ctx V::Context {
         let Self { inner } = self;
         inner.context()
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const K, Ptrs<'c, V>) {
+    pub fn as_ptrs(&self) -> (*const K, Ptrs<'ctx, V>) {
         let (_, key, value) = self.as_ptrs_with_context();
         (key, value)
     }
 
     #[inline]
-    pub fn as_ptrs_with_context(&self) -> (&'c V::Context, *const K, Ptrs<'c, V>) {
+    pub fn as_ptrs_with_context(&self) -> (&'ctx V::Context, *const K, Ptrs<'ctx, V>) {
         let Self { inner } = self;
 
         let (context, ptrs) = inner.as_ptrs_with_context();
@@ -69,13 +69,13 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> (*const K, MutPtrs<'c, V>) {
+    pub fn as_mut_ptrs(&mut self) -> (*const K, MutPtrs<'ctx, V>) {
         let (_, key, value) = self.as_mut_ptrs_with_context();
         (key, value)
     }
 
     #[inline]
-    pub fn as_mut_ptrs_with_context(&mut self) -> (&'c V::Context, *const K, MutPtrs<'c, V>) {
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&'ctx V::Context, *const K, MutPtrs<'ctx, V>) {
         let Self { inner } = self;
 
         let (context, ptrs) = inner.as_mut_ptrs_with_context();
@@ -84,13 +84,13 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> (*const K, Ptrs<'c, V>) {
+    pub fn into_ptrs(self) -> (*const K, Ptrs<'ctx, V>) {
         let (_, key, value) = self.into_ptrs_with_context();
         (key, value)
     }
 
     #[inline]
-    pub fn into_ptrs_with_context(self) -> (&'c V::Context, *const K, Ptrs<'c, V>) {
+    pub fn into_ptrs_with_context(self) -> (&'ctx V::Context, *const K, Ptrs<'ctx, V>) {
         let Self { inner } = self;
 
         let (context, ptrs) = inner.into_ptrs_with_context();
@@ -99,13 +99,13 @@ where
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> (*const K, MutPtrs<'c, V>) {
+    pub fn into_mut_ptrs(self) -> (*const K, MutPtrs<'ctx, V>) {
         let (_, key, value) = self.into_mut_ptrs_with_context();
         (key, value)
     }
 
     #[inline]
-    pub fn into_mut_ptrs_with_context(self) -> (&'c V::Context, *const K, MutPtrs<'c, V>) {
+    pub fn into_mut_ptrs_with_context(self) -> (&'ctx V::Context, *const K, MutPtrs<'ctx, V>) {
         let Self { inner } = self;
 
         let (context, ptrs) = inner.into_mut_ptrs_with_context();
@@ -114,13 +114,13 @@ where
     }
 
     #[inline]
-    pub fn as_slice_ptrs(&self) -> (*const [K], SlicePtrs<'c, V>) {
+    pub fn as_slice_ptrs(&self) -> (*const [K], SlicePtrs<'ctx, V>) {
         let (_, keys, values) = self.as_slice_ptrs_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn as_slice_ptrs_with_context(&self) -> (&'c V::Context, *const [K], SlicePtrs<'c, V>) {
+    pub fn as_slice_ptrs_with_context(&self) -> (&'ctx V::Context, *const [K], SlicePtrs<'ctx, V>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.as_slice_ptrs_with_context();
@@ -129,7 +129,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_slice_ptrs(&mut self) -> (*const [K], SliceMutPtrs<'c, V>) {
+    pub fn as_mut_slice_ptrs(&mut self) -> (*const [K], SliceMutPtrs<'ctx, V>) {
         let (_, keys, values) = self.as_mut_slice_ptrs_with_context();
         (keys, values)
     }
@@ -137,7 +137,7 @@ where
     #[inline]
     pub fn as_mut_slice_ptrs_with_context(
         &mut self,
-    ) -> (&'c V::Context, *const [K], SliceMutPtrs<'c, V>) {
+    ) -> (&'ctx V::Context, *const [K], SliceMutPtrs<'ctx, V>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.as_mut_slice_ptrs_with_context();
@@ -146,13 +146,15 @@ where
     }
 
     #[inline]
-    pub fn into_slice_ptrs(self) -> (*const [K], SlicePtrs<'c, V>) {
+    pub fn into_slice_ptrs(self) -> (*const [K], SlicePtrs<'ctx, V>) {
         let (_, keys, values) = self.into_slice_ptrs_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn into_slice_ptrs_with_context(self) -> (&'c V::Context, *const [K], SlicePtrs<'c, V>) {
+    pub fn into_slice_ptrs_with_context(
+        self,
+    ) -> (&'ctx V::Context, *const [K], SlicePtrs<'ctx, V>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.into_slice_ptrs_with_context();
@@ -161,7 +163,7 @@ where
     }
 
     #[inline]
-    pub fn into_mut_slice_ptrs(self) -> (*const [K], SliceMutPtrs<'c, V>) {
+    pub fn into_mut_slice_ptrs(self) -> (*const [K], SliceMutPtrs<'ctx, V>) {
         let (_, keys, values) = self.into_mut_slice_ptrs_with_context();
         (keys, values)
     }
@@ -169,7 +171,7 @@ where
     #[inline]
     pub fn into_mut_slice_ptrs_with_context(
         self,
-    ) -> (&'c V::Context, *const [K], SliceMutPtrs<'c, V>) {
+    ) -> (&'ctx V::Context, *const [K], SliceMutPtrs<'ctx, V>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.into_mut_slice_ptrs_with_context();
@@ -178,30 +180,30 @@ where
     }
 
     #[inline]
-    pub fn into_raw_iter(self) -> RawIter<'c, K, V> {
+    pub fn into_raw_iter(self) -> RawIter<'ctx, K, V> {
         let Self { inner } = self;
         RawIter::from_inner(inner.into_raw_iter())
     }
 
     #[inline]
-    pub fn into_raw_iter_mut(self) -> RawIterMut<'c, K, V> {
+    pub fn into_raw_iter_mut(self) -> RawIterMut<'ctx, K, V> {
         let Self { inner } = self;
         RawIterMut::from_inner(inner.into_raw_iter_mut())
     }
 }
 
-impl<'c, 'a, K, V> IterMut<'c, 'a, K, V>
+impl<'ctx, 'a, K, V> IterMut<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub fn into_slices(self) -> (&'a [K], V::SlicesMut<'c, 'a>) {
+    pub fn into_slices(self) -> (&'a [K], V::SlicesMut<'ctx, 'a>) {
         let (_, keys, values) = self.into_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn into_slices_with_context(self) -> (&'c V::Context, &'a [K], V::SlicesMut<'c, 'a>) {
+    pub fn into_slices_with_context(self) -> (&'ctx V::Context, &'a [K], V::SlicesMut<'ctx, 'a>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.into_slices_with_context();
@@ -229,7 +231,7 @@ impl<K, V> Debug for IterMut<'_, '_, K, V>
 where
     K: Debug,
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Debug,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = &self.as_slices();
@@ -243,7 +245,7 @@ where
 impl<T, K, V> AsRef<[T]> for IterMut<'_, '_, K, V>
 where
     V: Soa + ?Sized,
-    for<'c, 'any> V::Slices<'c, 'any>: Into<&'any [T]>,
+    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -252,11 +254,11 @@ where
     }
 }
 
-impl<'c, 'a, K, V> Iterator for IterMut<'c, 'a, K, V>
+impl<'ctx, 'a, K, V> Iterator for IterMut<'ctx, 'a, K, V>
 where
     V: Soa + ?Sized,
 {
-    type Item = (&'a K, V::RefsMut<'c, 'a>);
+    type Item = (&'a K, V::RefsMut<'ctx, 'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

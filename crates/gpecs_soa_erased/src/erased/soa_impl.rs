@@ -316,8 +316,8 @@ where
     B: AlignedBytes + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
-    type Refs<'context, 'a>
-        = ErasedSoaRefs<'a, &'context [FieldDescriptor]>
+    type Refs<'ctx, 'a>
+        = ErasedSoaRefs<'a, &'ctx [FieldDescriptor]>
     where
         Self: 'a;
 
@@ -331,8 +331,8 @@ where
         from
     }
 
-    type RefsMut<'context, 'a>
-        = ErasedSoaRefsMut<'a, &'context [FieldDescriptor]>
+    type RefsMut<'ctx, 'a>
+        = ErasedSoaRefsMut<'a, &'ctx [FieldDescriptor]>
     where
         Self: 'a;
 
@@ -347,10 +347,10 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs<'context, 'a>(
-        context: &'context Self::Context,
-        ptrs: Ptrs<'context, Self>,
-    ) -> Self::Refs<'context, 'a>
+    unsafe fn ptrs_to_refs<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        ptrs: Ptrs<'ctx, Self>,
+    ) -> Self::Refs<'ctx, 'a>
     where
         Self: 'a,
     {
@@ -361,10 +361,10 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs_mut<'context, 'a>(
-        context: &'context Self::Context,
-        ptrs: MutPtrs<'context, Self>,
-    ) -> Self::RefsMut<'context, 'a>
+    unsafe fn ptrs_to_refs_mut<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        ptrs: MutPtrs<'ctx, Self>,
+    ) -> Self::RefsMut<'ctx, 'a>
     where
         Self: 'a,
     {
@@ -375,10 +375,10 @@ where
     }
 
     #[inline]
-    fn refs_as_ptrs<'context, 'a>(
-        context: &'context Self::Context,
-        refs: Self::Refs<'context, 'a>,
-    ) -> Ptrs<'context, Self>
+    fn refs_as_ptrs<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        refs: Self::Refs<'ctx, 'a>,
+    ) -> Ptrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -389,10 +389,10 @@ where
     }
 
     #[inline]
-    fn refs_mut_as_ptrs<'context, 'a>(
-        context: &'context Self::Context,
-        refs: Self::RefsMut<'context, 'a>,
-    ) -> MutPtrs<'context, Self>
+    fn refs_mut_as_ptrs<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        refs: Self::RefsMut<'ctx, 'a>,
+    ) -> MutPtrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -403,10 +403,10 @@ where
     }
 
     #[inline]
-    fn refs_mut_as_refs<'context, 'a>(
-        context: &'context Self::Context,
-        refs: Self::RefsMut<'context, 'a>,
-    ) -> Self::Refs<'context, 'a>
+    fn refs_mut_as_refs<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        refs: Self::RefsMut<'ctx, 'a>,
+    ) -> Self::Refs<'ctx, 'a>
     where
         Self: 'a,
     {
@@ -443,8 +443,8 @@ where
         value.as_mut_fields()
     }
 
-    type Slices<'context, 'a>
-        = ErasedSoaSlices<'a, &'context [FieldDescriptor]>
+    type Slices<'ctx, 'a>
+        = ErasedSoaSlices<'a, &'ctx [FieldDescriptor]>
     where
         Self: 'a;
 
@@ -458,8 +458,8 @@ where
         from
     }
 
-    type SlicesMut<'context, 'a>
-        = ErasedSoaSlicesMut<'a, &'context [FieldDescriptor]>
+    type SlicesMut<'ctx, 'a>
+        = ErasedSoaSlicesMut<'a, &'ctx [FieldDescriptor]>
     where
         Self: 'a;
 
@@ -474,10 +474,10 @@ where
     }
 
     #[inline]
-    unsafe fn slice_ptrs_to_slices<'context, 'a>(
-        context: &'context Self::Context,
-        slices: SlicePtrs<'context, Self>,
-    ) -> Self::Slices<'context, 'a>
+    unsafe fn slice_ptrs_to_slices<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        slices: SlicePtrs<'ctx, Self>,
+    ) -> Self::Slices<'ctx, 'a>
     where
         Self: 'a,
     {
@@ -488,10 +488,10 @@ where
     }
 
     #[inline]
-    unsafe fn mut_slice_ptrs_to_mut_slices<'context, 'a>(
-        context: &'context Self::Context,
-        slices: SliceMutPtrs<'context, Self>,
-    ) -> Self::SlicesMut<'context, 'a>
+    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        slices: SliceMutPtrs<'ctx, Self>,
+    ) -> Self::SlicesMut<'ctx, 'a>
     where
         Self: 'a,
     {
@@ -524,10 +524,10 @@ where
     }
 
     #[inline]
-    fn slices_as_slice_ptrs<'context, 'a>(
-        context: &'context Self::Context,
-        slices: Self::Slices<'context, 'a>,
-    ) -> SlicePtrs<'context, Self>
+    fn slices_as_slice_ptrs<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        slices: Self::Slices<'ctx, 'a>,
+    ) -> SlicePtrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -538,10 +538,10 @@ where
     }
 
     #[inline]
-    fn mut_slices_as_slice_ptrs<'context, 'a>(
-        context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, 'a>,
-    ) -> SliceMutPtrs<'context, Self>
+    fn mut_slices_as_slice_ptrs<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        slices: Self::SlicesMut<'ctx, 'a>,
+    ) -> SliceMutPtrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -551,10 +551,10 @@ where
         slices.into_mut_ptrs()
     }
 
-    fn mut_slices_as_slices<'context, 'a>(
-        context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, 'a>,
-    ) -> Self::Slices<'context, 'a>
+    fn mut_slices_as_slices<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        slices: Self::SlicesMut<'ctx, 'a>,
+    ) -> Self::Slices<'ctx, 'a>
     where
         Self: 'a,
     {
@@ -567,10 +567,10 @@ where
     }
 
     #[inline]
-    fn slices_as_ptrs<'context, 'a>(
-        context: &'context Self::Context,
-        slices: Self::Slices<'context, 'a>,
-    ) -> Ptrs<'context, Self>
+    fn slices_as_ptrs<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        slices: Self::Slices<'ctx, 'a>,
+    ) -> Ptrs<'ctx, Self>
     where
         Self: 'a,
     {
@@ -581,10 +581,10 @@ where
     }
 
     #[inline]
-    fn mut_slices_as_ptrs<'context, 'a>(
-        context: &'context Self::Context,
-        slices: Self::SlicesMut<'context, 'a>,
-    ) -> MutPtrs<'context, Self>
+    fn mut_slices_as_ptrs<'ctx, 'a>(
+        context: &'ctx Self::Context,
+        slices: Self::SlicesMut<'ctx, 'a>,
+    ) -> MutPtrs<'ctx, Self>
     where
         Self: 'a,
     {

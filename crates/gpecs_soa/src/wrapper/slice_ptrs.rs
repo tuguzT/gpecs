@@ -9,26 +9,26 @@ use core::{
 
 use crate::traits::{RawSoa, RawSoaContext};
 
-type Inner<'a, T> = crate::traits::SlicePtrs<'a, T>;
+type Inner<'ctx, T> = crate::traits::SlicePtrs<'ctx, T>;
 
 /// Type wrapper for [slice pointers](RawSoaContext::SlicePtrs)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
-pub struct SlicePtrs<'context, T>
+pub struct SlicePtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     inner: Inner<'static, T>,
-    phantom: PhantomData<&'context ()>,
+    phantom: PhantomData<&'ctx ()>,
 }
 
-impl<'context, T> SlicePtrs<'context, T>
+impl<'ctx, T> SlicePtrs<'ctx, T>
 where
     T: RawSoa + ?Sized,
 {
     /// Creates self from the [slice pointers](RawSoaContext::SlicePtrs).
     #[inline]
-    pub fn new(inner: Inner<'context, T>) -> Self {
+    pub fn new(inner: Inner<'ctx, T>) -> Self {
         Self {
             inner: unsafe { transmute::<Inner<'_, T>, Inner<'_, T>>(inner) },
             phantom: PhantomData,
@@ -51,7 +51,7 @@ where
 
     /// Retrieves the [slice pointers](RawSoaContext::SlicePtrs).
     #[inline]
-    pub fn into_inner(self) -> Inner<'context, T> {
+    pub fn into_inner(self) -> Inner<'ctx, T> {
         let Self { inner, .. } = self;
         T::Context::upcast_slice_ptrs(inner)
     }
@@ -60,7 +60,7 @@ where
 impl<T> Debug for SlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Debug,
+    for<'ctx> Inner<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -71,7 +71,7 @@ where
 impl<T> Default for SlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Default,
+    for<'ctx> Inner<'ctx, T>: Default,
 {
     fn default() -> Self {
         Self {
@@ -95,14 +95,14 @@ where
 impl<T> Copy for SlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Copy,
+    for<'ctx> Inner<'ctx, T>: Copy,
 {
 }
 
 impl<T> PartialEq for SlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: PartialEq,
+    for<'ctx> Inner<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -113,14 +113,14 @@ where
 impl<T> Eq for SlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Eq,
+    for<'ctx> Inner<'ctx, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for SlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: PartialOrd,
+    for<'ctx> Inner<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -135,7 +135,7 @@ where
 impl<T> Ord for SlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Ord,
+    for<'ctx> Inner<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -150,7 +150,7 @@ where
 impl<T> Hash for SlicePtrs<'_, T>
 where
     T: RawSoa + ?Sized,
-    for<'any> Inner<'any, T>: Hash,
+    for<'ctx> Inner<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;

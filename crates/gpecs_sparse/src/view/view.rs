@@ -9,7 +9,10 @@ use core::{
 };
 
 use crate::{
-    algo::{sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_with_key, sparse_index},
+    algo::{
+        check_parts, sparse_contains_key, sparse_get, sparse_get_epoch, sparse_get_with_key,
+        sparse_index,
+    },
     error::FromPartsError,
     item::{DenseItem, DensePtrs, DenseSlicePtrs, DenseSlices, SparseItem},
     iter::{Iter, Keys, RawIter, RawKeys, RawValues, Values},
@@ -18,7 +21,7 @@ use crate::{
         slice::SoaSlices,
         traits::{Ptrs, RawSoa, SlicePtrs, Soa},
     },
-    view::{EpochSparseViewPtr, assert::check_parts},
+    view::EpochSparseViewPtr,
 };
 
 pub struct EpochSparseView<'ctx, 'a, K, V>
@@ -35,6 +38,17 @@ where
     K: Key,
     V: RawSoa + ?Sized,
 {
+    #[inline]
+    pub fn new(
+        dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
+        sparse: &'a [SparseItem<K>],
+    ) -> Result<Self, FromPartsError<K>> {
+        check_parts(dense.slices(), sparse)?;
+
+        let me = unsafe { Self::from_parts(dense, sparse) };
+        Ok(me)
+    }
+
     #[inline]
     pub unsafe fn from_parts(
         dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
@@ -489,6 +503,20 @@ where
     }
 
     #[inline]
+    pub fn get_epoch(&self, sparse_index: K::SparseIndex) -> Option<K::Epoch> {
+        let dense_keys = self.as_key_slice();
+        let sparse = self.as_sparse_slice();
+        sparse_get_epoch(dense_keys, sparse, sparse_index)
+    }
+
+    #[inline]
+    pub fn contains_key(&self, key: K) -> bool {
+        let dense_keys = self.as_key_slice();
+        let sparse = self.as_sparse_slice();
+        sparse_contains_key(dense_keys, sparse, key)
+    }
+
+    #[inline]
     pub fn raw_keys(&self) -> RawKeys<'_, K, V> {
         let (_, iter) = self.raw_keys_with_context();
         iter
@@ -577,6 +605,32 @@ where
         let iter = RawIter::from_inner(inner);
         (context, iter)
     }
+
+    #[inline]
+    pub fn keys(&self) -> Keys<'_, '_, K, V> {
+        let (_, iter) = self.keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn keys_with_context(&self) -> (&V::Context, Keys<'_, '_, K, V>) {
+        let (context, iter) = self.raw_keys_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
+    }
+
+    #[inline]
+    pub fn into_keys(self) -> Keys<'ctx, 'a, K, V> {
+        let (_, iter) = self.into_keys_with_context();
+        iter
+    }
+
+    #[inline]
+    pub fn into_keys_with_context(self) -> (&'ctx V::Context, Keys<'ctx, 'a, K, V>) {
+        let (context, iter) = self.into_raw_keys_with_context();
+        let iter = unsafe { iter.deref() };
+        (context, iter)
+    }
 }
 
 impl<'ctx, 'a, K, V> EpochSparseView<'ctx, 'a, K, V>
@@ -584,17 +638,6 @@ where
     K: Key,
     V: Soa + ?Sized,
 {
-    #[inline]
-    pub fn new(
-        dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
-        sparse: &'a [SparseItem<K>],
-    ) -> Result<Self, FromPartsError<K>> {
-        check_parts(&dense, sparse)?;
-
-        let me = unsafe { Self::from_parts(dense, sparse) };
-        Ok(me)
-    }
-
     #[inline]
     pub fn as_slices(&self) -> (DenseSlices<'_, '_, K, V>, &[SparseItem<K>]) {
         let (_, dense, sparse) = self.as_slices_with_context();
@@ -791,48 +834,6 @@ where
         let (context, dense) = dense.into_iter_with_context();
         let pair = sparse_get_with_key(dense.map(From::from), sparse, sparse_index);
         (context, pair)
-    }
-
-    #[inline]
-    pub fn get_epoch(&self, sparse_index: K::SparseIndex) -> Option<K::Epoch> {
-        let Self { dense, sparse } = self;
-
-        let (keys, _) = dense.as_slices().into_parts();
-        sparse_get_epoch(keys, sparse, sparse_index)
-    }
-
-    #[inline]
-    pub fn contains_key(&self, key: K) -> bool {
-        let Self { dense, sparse } = self;
-
-        let (keys, _) = dense.as_slices().into_parts();
-        sparse_contains_key(keys, sparse, key)
-    }
-
-    #[inline]
-    pub fn keys(&self) -> Keys<'_, '_, K, V> {
-        let (_, iter) = self.keys_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn keys_with_context(&self) -> (&V::Context, Keys<'_, '_, K, V>) {
-        let (context, iter) = self.raw_keys_with_context();
-        let iter = unsafe { iter.deref() };
-        (context, iter)
-    }
-
-    #[inline]
-    pub fn into_keys(self) -> Keys<'ctx, 'a, K, V> {
-        let (_, iter) = self.into_keys_with_context();
-        iter
-    }
-
-    #[inline]
-    pub fn into_keys_with_context(self) -> (&'ctx V::Context, Keys<'ctx, 'a, K, V>) {
-        let (context, iter) = self.into_raw_keys_with_context();
-        let iter = unsafe { iter.deref() };
-        (context, iter)
     }
 
     #[inline]

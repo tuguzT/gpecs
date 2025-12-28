@@ -145,14 +145,14 @@ where
     }
 
     #[inline]
-    pub fn as_key_mut_ptr(&mut self) -> *mut K {
-        let (_, key) = self.as_key_mut_ptr_with_context();
+    pub fn as_mut_key_ptr(&mut self) -> *mut K {
+        let (_, key) = self.as_mut_key_ptr_with_context();
         key
     }
 
     #[inline]
-    pub fn as_key_mut_ptr_with_context(&mut self) -> (&V::Context, *mut K) {
-        let (context, dense) = self.as_dense_mut_ptrs_with_context();
+    pub fn as_mut_key_ptr_with_context(&mut self) -> (&V::Context, *mut K) {
+        let (context, dense) = self.as_mut_dense_ptrs_with_context();
         let (key, _) = dense.into_parts();
         (context, key)
     }
@@ -171,14 +171,14 @@ where
     }
 
     #[inline]
-    pub fn as_value_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
-        let (_, value) = self.as_value_mut_ptrs_with_context();
+    pub fn as_mut_value_ptrs(&mut self) -> MutPtrs<'_, V> {
+        let (_, value) = self.as_mut_value_ptrs_with_context();
         value
     }
 
     #[inline]
-    pub fn as_value_mut_ptrs_with_context(&mut self) -> (&V::Context, MutPtrs<'_, V>) {
-        let (context, dense) = self.as_dense_mut_ptrs_with_context();
+    pub fn as_mut_value_ptrs_with_context(&mut self) -> (&V::Context, MutPtrs<'_, V>) {
+        let (context, dense) = self.as_mut_dense_ptrs_with_context();
         let (_, value) = dense.into_parts();
         (context, value)
     }
@@ -196,13 +196,13 @@ where
     }
 
     #[inline]
-    pub fn as_dense_mut_ptrs(&mut self) -> DenseMutPtrs<'_, K, V> {
-        let (_, dense) = self.as_dense_mut_ptrs_with_context();
+    pub fn as_mut_dense_ptrs(&mut self) -> DenseMutPtrs<'_, K, V> {
+        let (_, dense) = self.as_mut_dense_ptrs_with_context();
         dense
     }
 
     #[inline]
-    pub fn as_dense_mut_ptrs_with_context(&mut self) -> (&V::Context, DenseMutPtrs<'_, K, V>) {
+    pub fn as_mut_dense_ptrs_with_context(&mut self) -> (&V::Context, DenseMutPtrs<'_, K, V>) {
         let (context, dense, _) = self.as_mut_ptrs_with_context();
         (context, dense)
     }
@@ -220,13 +220,13 @@ where
     }
 
     #[inline]
-    pub fn as_sparse_mut_ptr(&mut self) -> *mut SparseItem<K> {
-        let (_, sparse) = self.as_sparse_mut_ptr_with_context();
+    pub fn as_mut_sparse_ptr(&mut self) -> *mut SparseItem<K> {
+        let (_, sparse) = self.as_mut_sparse_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn as_sparse_mut_ptr_with_context(&mut self) -> (&V::Context, *mut SparseItem<K>) {
+    pub fn as_mut_sparse_ptr_with_context(&mut self) -> (&V::Context, *mut SparseItem<K>) {
         let (context, _, sparse) = self.as_mut_ptrs_with_context();
         (context, sparse)
     }
@@ -287,14 +287,14 @@ where
     }
 
     #[inline]
-    pub fn into_key_mut_ptr(self) -> *mut K {
-        let (_, key) = self.into_key_mut_ptr_with_context();
+    pub fn into_mut_key_ptr(self) -> *mut K {
+        let (_, key) = self.into_mut_key_ptr_with_context();
         key
     }
 
     #[inline]
-    pub fn into_key_mut_ptr_with_context(self) -> (&'ctx V::Context, *mut K) {
-        let (context, dense) = self.into_dense_mut_ptrs_with_context();
+    pub fn into_mut_key_ptr_with_context(self) -> (&'ctx V::Context, *mut K) {
+        let (context, dense) = self.into_mut_dense_ptrs_with_context();
         let (key, _) = dense.into_parts();
         (context, key)
     }
@@ -313,14 +313,14 @@ where
     }
 
     #[inline]
-    pub fn into_value_mut_ptrs(self) -> MutPtrs<'ctx, V> {
-        let (_, value) = self.into_value_mut_ptrs_with_context();
+    pub fn into_mut_value_ptrs(self) -> MutPtrs<'ctx, V> {
+        let (_, value) = self.into_mut_value_ptrs_with_context();
         value
     }
 
     #[inline]
-    pub fn into_value_mut_ptrs_with_context(self) -> (&'ctx V::Context, MutPtrs<'ctx, V>) {
-        let (context, dense) = self.into_dense_mut_ptrs_with_context();
+    pub fn into_mut_value_ptrs_with_context(self) -> (&'ctx V::Context, MutPtrs<'ctx, V>) {
+        let (context, dense) = self.into_mut_dense_ptrs_with_context();
         let (_, value) = dense.into_parts();
         (context, value)
     }
@@ -338,13 +338,13 @@ where
     }
 
     #[inline]
-    pub fn into_dense_mut_ptrs(self) -> DenseMutPtrs<'ctx, K, V> {
-        let (_, dense) = self.into_dense_mut_ptrs_with_context();
+    pub fn into_mut_dense_ptrs(self) -> DenseMutPtrs<'ctx, K, V> {
+        let (_, dense) = self.into_mut_dense_ptrs_with_context();
         dense
     }
 
     #[inline]
-    pub fn into_dense_mut_ptrs_with_context(self) -> (&'ctx V::Context, DenseMutPtrs<'ctx, K, V>) {
+    pub fn into_mut_dense_ptrs_with_context(self) -> (&'ctx V::Context, DenseMutPtrs<'ctx, K, V>) {
         let (context, dense, _) = self.into_mut_ptrs_with_context();
         (context, dense)
     }
@@ -362,13 +362,13 @@ where
     }
 
     #[inline]
-    pub fn into_sparse_mut_ptr(self) -> *mut SparseItem<K> {
-        let (_, sparse) = self.into_sparse_mut_ptr_with_context();
+    pub fn into_mut_sparse_ptr(self) -> *mut SparseItem<K> {
+        let (_, sparse) = self.into_mut_sparse_ptr_with_context();
         sparse
     }
 
     #[inline]
-    pub fn into_sparse_mut_ptr_with_context(self) -> (&'ctx V::Context, *mut SparseItem<K>) {
+    pub fn into_mut_sparse_ptr_with_context(self) -> (&'ctx V::Context, *mut SparseItem<K>) {
         let (context, _, sparse) = self.into_mut_ptrs_with_context();
         (context, sparse)
     }

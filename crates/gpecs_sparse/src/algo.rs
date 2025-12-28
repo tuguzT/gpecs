@@ -1,12 +1,18 @@
-use core::{borrow::Borrow, fmt::Debug, ops};
+use core::{borrow::Borrow, fmt::Debug, ops, slice};
 
 use crate::{
     assert::{
-        check_compatible_key, check_dense_index_bounds, check_equal_key, unwrap_dense,
+        assert_compatible_key, assert_dense_index_bounds, assert_equal_key, unwrap_dense,
         unwrap_into_usize,
     },
-    item::{SparseItem, SparseItemKind},
+    error::{
+        DenseIndexMismatchError, DenseIndexOutOfBoundsError, EpochMismatchError, FromPartsError,
+        OccupiedSparseItemExpectedError, SparseIndexMismatchError, SparseIndexOutOfBoundsError,
+        TooLargeSparseIndexError, TooSmallSparseIndexError,
+    },
+    item::{DenseItem, SparseItem, SparseItemKind},
     key::Key,
+    soa::{slice::SoaSlices, traits::RawSoa},
 };
 
 // https://stackoverflow.com/a/73428605/14928295
@@ -109,7 +115,7 @@ where
 
     let (dense_key, value) = unwrap_dense(dense, dense_index);
     let &dense_key = dense_key.borrow();
-    check_equal_key(key, dense_key);
+    assert_equal_key(key, dense_key);
 
     Some(value)
 }
@@ -163,7 +169,7 @@ where
 
     let (dense_key, value) = unwrap_dense(dense, dense_index);
     let &dense_key = dense_key.borrow();
-    check_compatible_key(K::new(sparse_index, sparse_item.epoch), dense_key);
+    assert_compatible_key(K::new(sparse_index, sparse_item.epoch), dense_key);
 
     Some((dense_key, value))
 }
@@ -182,7 +188,7 @@ where
     if let Some(dense_index) = sparse_item.dense_index() {
         let dense_index = unwrap_into_usize(*dense_index);
         let &dense_key = unwrap_dense(dense_keys, dense_index);
-        check_compatible_key(K::new(sparse_index, epoch), dense_key);
+        assert_compatible_key(K::new(sparse_index, epoch), dense_key);
     }
 
     Some(epoch)
@@ -200,6 +206,104 @@ where
     };
     let dense_index = unwrap_into_usize(dense_index);
 
-    check_dense_index_bounds(dense_index, dense_keys.len());
+    assert_dense_index_bounds(dense_index, dense_keys.len());
     true
+}
+
+#[inline]
+pub fn dense_keys<'a, K, V>(dense: SoaSlices<'_, 'a, DenseItem<K, V>>) -> &'a [K]
+where
+    V: RawSoa + ?Sized,
+{
+    let (_, keys) = dense_keys_with_context(dense);
+    keys
+}
+
+#[inline]
+pub fn dense_keys_with_context<'ctx, 'a, K, V>(
+    dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
+) -> (&'ctx V::Context, &'a [K])
+where
+    V: RawSoa + ?Sized,
+{
+    let (context, slices) = dense.into_slice_ptrs_with_context();
+
+    let (keys, _) = slices.into_parts();
+    let keys = unsafe { slice::from_raw_parts(keys.cast(), keys.len()) };
+
+    (context, keys)
+}
+
+pub fn check_parts<K, V>(
+    dense: SoaSlices<DenseItem<K, V>>,
+    sparse: &[SparseItem<K>],
+) -> Result<(), FromPartsError<K>>
+where
+    K: Key,
+    V: RawSoa + ?Sized,
+{
+    let dense = dense_keys(dense);
+
+    for (sparse_index, &SparseItem { kind, epoch }) in sparse.iter().enumerate() {
+        let sparse_index = sparse_index
+            .try_into()
+            .map_err(TooSmallSparseIndexError::new)?;
+        let Some(dense_index) = kind.dense_index().copied() else {
+            continue;
+        };
+
+        let dense_index = dense_index
+            .try_into()
+            .map_err(TooLargeSparseIndexError::new)?;
+        let key = dense
+            .get(dense_index)
+            .ok_or_else(|| DenseIndexOutOfBoundsError::new(dense_index, dense.len()))?;
+
+        let sparse_index_from_key = key.sparse_index();
+        if sparse_index_from_key != sparse_index {
+            let error = SparseIndexMismatchError::new(sparse_index_from_key, sparse_index);
+            return Err(error.into());
+        }
+
+        let epoch_from_key = key.epoch();
+        let expected_epoch = epoch;
+        if epoch_from_key != expected_epoch {
+            let error = EpochMismatchError::new(epoch_from_key, expected_epoch);
+            return Err(error.into());
+        }
+    }
+
+    for (dense_index, key) in dense.iter().enumerate() {
+        let sparse_index = key
+            .sparse_index()
+            .try_into()
+            .map_err(TooLargeSparseIndexError::new)?;
+        let sparse_item = sparse
+            .get(sparse_index)
+            .ok_or_else(|| SparseIndexOutOfBoundsError::new(sparse_index, sparse.len()))?;
+
+        let dense_index = dense_index
+            .try_into()
+            .map_err(TooSmallSparseIndexError::new)?;
+        let dense_index_from_item = match *sparse_item.kind() {
+            SparseItemKind::Occupied { dense_index } => dense_index,
+            SparseItemKind::Vacant { next_vacant } => {
+                let error = OccupiedSparseItemExpectedError::new(next_vacant);
+                return Err(error.into());
+            }
+        };
+        if dense_index_from_item != dense_index {
+            let error = DenseIndexMismatchError::new(dense_index_from_item, dense_index);
+            return Err(error.into());
+        }
+
+        let epoch_from_item = sparse_item.epoch;
+        let expected_epoch = key.epoch();
+        if epoch_from_item != expected_epoch {
+            let error = EpochMismatchError::new(epoch_from_item, expected_epoch);
+            return Err(error.into());
+        }
+    }
+
+    Ok(())
 }

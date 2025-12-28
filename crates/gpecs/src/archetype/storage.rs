@@ -803,7 +803,7 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
     ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_>>) {
-        let (dense, _) = Self::as_view_mut(self).into_parts();
+        let (dense, _) = Self::as_mut_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
         let values_len = values.len();
@@ -881,7 +881,7 @@ impl ErasedStorageExt for ErasedStorage {
         component_ids: &ComponentIdMap,
         entity: Entity,
     ) -> Option<ErasedComponents<ErasedFieldRefMut<'_>>> {
-        let view = Self::as_view_mut(self);
+        let view = Self::as_mut_view(self);
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();

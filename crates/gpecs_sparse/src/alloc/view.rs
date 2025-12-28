@@ -12,7 +12,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'ca, 'a> V::Refs<'ca, 'a>: Ord,
+        for<'ctx, 'a> V::Refs<'ctx, 'a>: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {

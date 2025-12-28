@@ -10,9 +10,9 @@ use crate::{
     key::Key,
     set::EpochSparseSet,
     soa::{
-        mem::replace as soa_replace,
-        slice::{SoaSlices, SoaSlicesMut},
-        traits::{Soa, SoaRead, SoaWrite},
+        self,
+        slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
+        traits::{MutPtrs, Ptrs, RawSoa, Soa, SoaRead, SoaWrite},
     },
 };
 
@@ -20,20 +20,20 @@ use super::assert::try_replace_key_failed;
 
 pub struct OccupiedEntry<'a, K, V, C>
 where
-    K: Key,
-    V: Soa + ?Sized,
+    K: Key + 'a,
+    V: RawSoa + ?Sized + 'a,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     key: K,
     dense_index: usize,
     container: &'a mut C,
-    phantom: PhantomData<&'a mut V>,
+    phantom: PhantomData<fn() -> V>,
 }
 
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
 where
-    K: Key + 'a,
-    V: Soa + ?Sized,
+    K: Key,
+    V: RawSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -47,39 +47,9 @@ where
     }
 
     #[inline]
-    pub fn get(&self) -> V::Refs<'_, '_> {
-        let Self {
-            dense_index,
-            container,
-            ..
-        } = self;
-
-        let values = container.slices();
-        unwrap_dense(values, *dense_index)
-    }
-
-    #[inline]
-    pub fn get_mut(&mut self) -> V::RefsMut<'_, '_> {
-        let Self {
-            dense_index,
-            container,
-            ..
-        } = self;
-
-        let values = container.slices_mut();
-        unwrap_dense(values, *dense_index)
-    }
-
-    #[inline]
-    pub fn into_mut(self) -> V::RefsMut<'a, 'a> {
-        let Self {
-            dense_index,
-            container,
-            ..
-        } = self;
-
-        let values = container.slices_mut();
-        unwrap_dense(values, dense_index)
+    pub fn context(&self) -> &V::Context {
+        let Self { container, .. } = self;
+        container.context()
     }
 
     #[inline]
@@ -87,12 +57,134 @@ where
         let Self { key, .. } = self;
         *key
     }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> Ptrs<'_, V> {
+        let (_, ptrs) = self.as_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_context(&self) -> (&V::Context, Ptrs<'_, V>) {
+        let Self {
+            dense_index,
+            container,
+            ..
+        } = self;
+
+        let (context, values) = container.slices().into_raw_iter_with_context();
+        let ptrs = unwrap_dense(values, *dense_index);
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
+        let (_, ptrs) = self.as_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_context(&mut self) -> (&V::Context, MutPtrs<'_, V>) {
+        let Self {
+            dense_index,
+            container,
+            ..
+        } = self;
+
+        let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
+        let ptrs = unwrap_dense(values, *dense_index);
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> Ptrs<'a, V> {
+        let (_, ptrs) = self.into_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_ptrs_with_context(self) -> (&'a V::Context, Ptrs<'a, V>) {
+        let Self {
+            dense_index,
+            container,
+            ..
+        } = self;
+
+        let (context, values) = container.mut_slices().into_raw_iter_with_context();
+        let ptrs = unwrap_dense(values, dense_index);
+        (context, ptrs)
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs(self) -> MutPtrs<'a, V> {
+        let (_, ptrs) = self.into_mut_ptrs_with_context();
+        ptrs
+    }
+
+    #[inline]
+    pub fn into_mut_ptrs_with_context(self) -> (&'a V::Context, MutPtrs<'a, V>) {
+        let Self {
+            dense_index,
+            container,
+            ..
+        } = self;
+
+        let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
+        let ptrs = unwrap_dense(values, dense_index);
+        (context, ptrs)
+    }
 }
 
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
 where
-    K: Key + 'a,
-    V: Soa + SoaRead,
+    K: Key,
+    V: Soa + ?Sized,
+    C: EpochSparseContainer<K, V> + ?Sized,
+{
+    #[inline]
+    pub fn get(&self) -> V::Refs<'_, '_> {
+        let (_, refs) = self.get_with_context();
+        refs
+    }
+
+    #[inline]
+    pub fn get_with_context(&self) -> (&V::Context, V::Refs<'_, '_>) {
+        let (context, ptrs) = self.as_ptrs_with_context();
+        let refs = unsafe { V::ptrs_to_refs(context, ptrs) };
+        (context, refs)
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self) -> V::RefsMut<'_, '_> {
+        let (_, refs) = self.get_mut_with_context();
+        refs
+    }
+
+    #[inline]
+    pub fn get_mut_with_context(&mut self) -> (&V::Context, V::RefsMut<'_, '_>) {
+        let (context, ptrs) = self.as_mut_ptrs_with_context();
+        let refs = unsafe { V::ptrs_to_refs_mut(context, ptrs) };
+        (context, refs)
+    }
+
+    #[inline]
+    pub fn into_mut(self) -> V::RefsMut<'a, 'a> {
+        let (_, refs) = self.into_mut_with_context();
+        refs
+    }
+
+    #[inline]
+    pub fn into_mut_with_context(self) -> (&'a V::Context, V::RefsMut<'a, 'a>) {
+        let (context, ptrs) = self.into_mut_ptrs_with_context();
+        let refs = unsafe { V::ptrs_to_refs_mut(context, ptrs) };
+        (context, refs)
+    }
+}
+
+impl<K, V, C> OccupiedEntry<'_, K, V, C>
+where
+    K: Key,
+    V: SoaRead,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -112,10 +204,10 @@ where
     }
 }
 
-impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
+impl<K, V, C> OccupiedEntry<'_, K, V, C>
 where
-    K: Key + 'a,
-    V: Soa + SoaRead + SoaWrite,
+    K: Key,
+    V: SoaRead + SoaWrite,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -126,10 +218,9 @@ where
             ..
         } = self;
 
-        let (context, values) = container.slices_mut().into_slices_with_context();
-        let values = SoaSlicesMut::<V>::new(context, values);
+        let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
         let previous = unwrap_dense(values, *dense_index);
-        soa_replace(context, previous, value)
+        unsafe { soa::ptr::replace(context, previous, value) }
     }
 
     #[inline]
@@ -172,19 +263,19 @@ where
 
 pub struct VacantEntry<'a, K, V, C>
 where
-    K: Key,
-    V: Soa + ?Sized,
+    K: Key + 'a,
+    V: RawSoa + ?Sized + 'a,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     key: K,
     container: &'a mut C,
-    phantom: PhantomData<&'a mut V>,
+    phantom: PhantomData<fn() -> V>,
 }
 
 impl<'a, K, V, C> VacantEntry<'a, K, V, C>
 where
-    K: Key + 'a,
-    V: Soa + ?Sized,
+    K: Key,
+    V: RawSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -203,6 +294,12 @@ where
     }
 
     #[inline]
+    pub fn context(&self) -> &V::Context {
+        let Self { container, .. } = self;
+        container.context()
+    }
+
+    #[inline]
     pub fn key(&self) -> K {
         let Self { key, .. } = self;
         *key
@@ -211,48 +308,27 @@ where
 
 impl<'a, K, V, C> VacantEntry<'a, K, V, C>
 where
-    K: Key + 'a,
-    V: Soa + SoaRead + SoaWrite,
+    K: Key,
+    V: SoaRead + SoaWrite,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
-    pub fn insert(self, value: V) -> V::RefsMut<'a, 'a> {
+    pub fn insert(self, value: V) -> OccupiedEntry<'a, K, V, C> {
         let Self { key, container, .. } = self;
 
         if container.try_insert(key, value).is_err() {
             unreachable!()
         }
 
-        let value = container.slices_mut().into_iter().last();
-        unwrap_entry_value(value)
-    }
-
-    #[inline]
-    pub fn insert_entry(self, value: V) -> OccupiedEntry<'a, K, V, C> {
-        let Self {
-            key,
-            container,
-            phantom,
-        } = self;
-
-        if container.try_insert(key, value).is_err() {
-            unreachable!()
-        }
         let dense_index = container.slices().len() - 1;
-
-        OccupiedEntry {
-            key,
-            dense_index,
-            container,
-            phantom,
-        }
+        OccupiedEntry::new(key, dense_index, container)
     }
 }
 
 impl<K, V, C> Debug for VacantEntry<'_, K, V, C>
 where
     K: Key + Debug,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -280,11 +356,13 @@ fn unwrap_entry_value<T>(value: Option<T>) -> T {
 pub trait EpochSparseContainer<K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
+    fn context(&self) -> &V::Context;
+
     fn slices(&self) -> SoaSlices<'_, '_, V>;
 
-    fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, V>;
+    fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V>;
 
     fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>>
     where
@@ -302,16 +380,29 @@ where
 impl<K, V> EpochSparseContainer<K, V> for EpochSparseSet<K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
-    fn slices(&self) -> SoaSlices<'_, '_, V> {
-        Self::slices(self)
+    fn context(&self) -> &<V as RawSoa>::Context {
+        Self::context(self)
     }
 
     #[inline]
-    fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, V> {
-        Self::slices_mut(self)
+    fn slices(&self) -> SoaSlices<'_, '_, V> {
+        let (dense, _) = self.as_view().into_parts();
+        let (context, slices) = dense.into_slice_ptrs_with_context();
+        let (_, values) = slices.into_parts();
+        unsafe { SoaSlicePtrs::new(context.as_inner(), values).deref() }
+    }
+
+    #[inline]
+    fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V> {
+        let (dense, _) = self.as_mut_view().into_parts();
+        let (context, slices) = dense
+            .into_mut_slice_ptrs()
+            .into_mut_slice_ptrs_with_context();
+        let (_, values) = slices.into_parts();
+        unsafe { SoaSliceMutPtrs::new(context.as_inner(), values).deref_mut() }
     }
 
     #[inline]
@@ -342,16 +433,29 @@ where
 impl<K, V> EpochSparseContainer<K, V> for EpochSparseArena<K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: RawSoa + ?Sized,
 {
     #[inline]
-    fn slices(&self) -> SoaSlices<'_, '_, V> {
-        Self::slices(self)
+    fn context(&self) -> &<V as RawSoa>::Context {
+        Self::context(self)
     }
 
     #[inline]
-    fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, V> {
-        Self::slices_mut(self)
+    fn slices(&self) -> SoaSlices<'_, '_, V> {
+        let (dense, _) = self.as_view().into_parts();
+        let (context, slices) = dense.into_slice_ptrs_with_context();
+        let (_, values) = slices.into_parts();
+        unsafe { SoaSlicePtrs::new(context.as_inner(), values).deref() }
+    }
+
+    #[inline]
+    fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V> {
+        let (dense, _) = self.as_mut_view().into_parts();
+        let (context, slices) = dense
+            .into_mut_slice_ptrs()
+            .into_mut_slice_ptrs_with_context();
+        let (_, values) = slices.into_parts();
+        unsafe { SoaSliceMutPtrs::new(context.as_inner(), values).deref_mut() }
     }
 
     #[inline]
@@ -384,7 +488,7 @@ macro_rules! generate_entry_types {
         pub enum Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: $crate::soa::traits::RawSoa + ?Sized,
         {
             Occupied(OccupiedEntry<'a, K, V>),
             Vacant(VacantEntry<'a, K, V>),
@@ -393,7 +497,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: $crate::soa::traits::RawSoa + ?Sized,
         {
             #[inline]
             pub const fn is_occupied(&self) -> bool {
@@ -406,6 +510,14 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
+            pub fn context(&self) -> &V::Context {
+                match self {
+                    Self::Occupied(entry) => entry.context(),
+                    Self::Vacant(entry) => entry.context(),
+                }
+            }
+
+            #[inline]
             pub fn key(&self) -> K {
                 match self {
                     Self::Occupied(entry) => entry.key(),
@@ -414,18 +526,76 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get(&self) -> Option<V::Refs<'_, '_>> {
+            pub fn as_ptrs(&self) -> Option<Ptrs<'_, V>> {
+                let (_, ptrs) = self.as_ptrs_with_context();
+                ptrs
+            }
+
+            #[inline]
+            pub fn as_ptrs_with_context(&self) -> (&V::Context, Option<Ptrs<'_, V>>) {
                 match self {
-                    Self::Occupied(entry) => Some(entry.get()),
-                    Self::Vacant(_) => None,
+                    Self::Occupied(entry) => {
+                        let (context, ptrs) = entry.as_ptrs_with_context();
+                        (context, Some(ptrs))
+                    }
+                    Self::Vacant(entry) => (entry.context(), None),
+                }
+            }
+
+            #[inline]
+            pub fn as_mut_ptrs(&mut self) -> Option<MutPtrs<'_, V>> {
+                let (_, ptrs) = self.as_mut_ptrs_with_context();
+                ptrs
+            }
+
+            #[inline]
+            pub fn as_mut_ptrs_with_context(&mut self) -> (&V::Context, Option<MutPtrs<'_, V>>) {
+                match self {
+                    Self::Occupied(entry) => {
+                        let (context, ptrs) = entry.as_mut_ptrs_with_context();
+                        (context, Some(ptrs))
+                    }
+                    Self::Vacant(entry) => (entry.context(), None),
+                }
+            }
+        }
+
+        impl<'a, K, V> Entry<'a, K, V>
+        where
+            K: $crate::key::Key,
+            V: $crate::soa::traits::Soa + ?Sized,
+        {
+            #[inline]
+            pub fn get(&self) -> Option<V::Refs<'_, '_>> {
+                let (_, refs) = self.get_with_context();
+                refs
+            }
+
+            #[inline]
+            pub fn get_with_context(&self) -> (&V::Context, Option<V::Refs<'_, '_>>) {
+                match self {
+                    Self::Occupied(entry) => {
+                        let (context, refs) = entry.get_with_context();
+                        (context, Some(refs))
+                    }
+                    Self::Vacant(entry) => (entry.context(), None),
                 }
             }
 
             #[inline]
             pub fn get_mut(&mut self) -> Option<V::RefsMut<'_, '_>> {
+                let (_, refs) = self.get_mut_with_context();
+                refs
+            }
+
+            #[inline]
+            pub fn get_mut_with_context(&mut self) -> (&V::Context, Option<V::RefsMut<'_, '_>>) {
                 match self {
-                    Self::Occupied(entry) => Some(entry.get_mut()),
-                    Self::Vacant(_) => None,
+                    Self::Occupied(entry) => {
+                        let (context, refs) = entry.get_mut_with_context();
+                        (context, Some(refs))
+                    }
+                    Self::Vacant(entry) => (entry.context(), None),
                 }
             }
 
@@ -433,11 +603,12 @@ macro_rules! generate_entry_types {
             #[must_use]
             pub fn and_modify<F>(self, f: F) -> Self
             where
-                F: FnOnce(V::RefsMut<'_, '_>),
+                F: FnOnce(&V::Context, V::RefsMut<'_, '_>),
             {
                 match self {
                     Self::Occupied(mut entry) => {
-                        f(entry.get_mut());
+                        let (context, refs) = entry.get_mut_with_context();
+                        f(context, refs);
                         Self::Occupied(entry)
                     }
                     Self::Vacant(entry) => Self::Vacant(entry),
@@ -448,48 +619,46 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa
-                + $crate::soa::traits::SoaRead
-                + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
         {
             #[inline]
-            pub fn or_insert(self, default: V) -> V::RefsMut<'a, 'a> {
+            pub fn or_insert(self, default: V) -> OccupiedEntry<'a, K, V> {
                 match self {
-                    Self::Occupied(entry) => entry.into_mut(),
+                    Self::Occupied(entry) => entry,
                     Self::Vacant(entry) => entry.insert(default),
                 }
             }
 
             #[inline]
-            pub fn or_insert_with<F>(self, default: F) -> V::RefsMut<'a, 'a>
+            pub fn or_insert_with<F>(self, default: F) -> OccupiedEntry<'a, K, V>
             where
                 F: FnOnce() -> V,
             {
                 match self {
-                    Self::Occupied(entry) => entry.into_mut(),
+                    Self::Occupied(entry) => entry,
                     Self::Vacant(entry) => entry.insert(default()),
                 }
             }
 
             #[inline]
-            pub fn or_default(self) -> V::RefsMut<'a, 'a>
+            pub fn or_default(self) -> OccupiedEntry<'a, K, V>
             where
                 V: Default,
             {
                 match self {
-                    Self::Occupied(entry) => entry.into_mut(),
+                    Self::Occupied(entry) => entry,
                     Self::Vacant(entry) => entry.insert(Default::default()),
                 }
             }
 
             #[inline]
-            pub fn insert_entry(self, value: V) -> OccupiedEntry<'a, K, V> {
+            pub fn insert(self, value: V) -> OccupiedEntry<'a, K, V> {
                 match self {
                     Self::Occupied(mut entry) => {
                         entry.insert(value);
                         entry
                     }
-                    Self::Vacant(entry) => entry.insert_entry(value),
+                    Self::Vacant(entry) => entry.insert(value),
                 }
             }
 
@@ -534,7 +703,7 @@ macro_rules! generate_entry_types {
         pub struct OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: $crate::soa::traits::RawSoa + ?Sized,
         {
             inner: $crate::alloc::entry::OccupiedEntry<'a, K, V, $container>,
         }
@@ -542,7 +711,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: $crate::soa::traits::RawSoa + ?Sized,
         {
             #[inline]
             fn new(key: K, dense_index: usize, container: &'a mut $container) -> Self {
@@ -551,9 +720,81 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
+            pub fn context(&self) -> &V::Context {
+                let Self { inner } = self;
+                inner.context()
+            }
+
+            #[inline]
+            pub fn key(&self) -> K {
+                let Self { inner } = self;
+                inner.key()
+            }
+
+            #[inline]
+            pub fn as_ptrs(&self) -> Ptrs<'_, V> {
+                let Self { inner } = self;
+                inner.as_ptrs()
+            }
+
+            #[inline]
+            pub fn as_ptrs_with_context(&self) -> (&V::Context, Ptrs<'_, V>) {
+                let Self { inner } = self;
+                inner.as_ptrs_with_context()
+            }
+
+            #[inline]
+            pub fn as_mut_ptrs(&mut self) -> MutPtrs<'_, V> {
+                let Self { inner } = self;
+                inner.as_mut_ptrs()
+            }
+
+            #[inline]
+            pub fn as_mut_ptrs_with_context(&mut self) -> (&V::Context, MutPtrs<'_, V>) {
+                let Self { inner } = self;
+                inner.as_mut_ptrs_with_context()
+            }
+
+            #[inline]
+            pub fn into_ptrs(self) -> Ptrs<'a, V> {
+                let Self { inner } = self;
+                inner.into_ptrs()
+            }
+
+            #[inline]
+            pub fn into_ptrs_with_context(self) -> (&'a V::Context, Ptrs<'a, V>) {
+                let Self { inner } = self;
+                inner.into_ptrs_with_context()
+            }
+
+            #[inline]
+            pub fn into_mut_ptrs(self) -> MutPtrs<'a, V> {
+                let Self { inner } = self;
+                inner.into_mut_ptrs()
+            }
+
+            #[inline]
+            pub fn into_mut_ptrs_with_context(self) -> (&'a V::Context, MutPtrs<'a, V>) {
+                let Self { inner } = self;
+                inner.into_mut_ptrs_with_context()
+            }
+        }
+
+        impl<'a, K, V> OccupiedEntry<'a, K, V>
+        where
+            K: $crate::key::Key,
+            V: $crate::soa::traits::Soa + ?Sized,
+        {
+            #[inline]
             pub fn get(&self) -> V::Refs<'_, '_> {
                 let Self { inner } = self;
                 inner.get()
+            }
+
+            #[inline]
+            pub fn get_with_context(&self) -> (&V::Context, V::Refs<'_, '_>) {
+                let Self { inner } = self;
+                inner.get_with_context()
             }
 
             #[inline]
@@ -563,22 +804,28 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
+            pub fn get_mut_with_context(&mut self) -> (&V::Context, V::RefsMut<'_, '_>) {
+                let Self { inner } = self;
+                inner.get_mut_with_context()
+            }
+
+            #[inline]
             pub fn into_mut(self) -> V::RefsMut<'a, 'a> {
                 let Self { inner } = self;
                 inner.into_mut()
             }
 
             #[inline]
-            pub fn key(&self) -> K {
+            pub fn into_mut_with_context(self) -> (&'a V::Context, V::RefsMut<'a, 'a>) {
                 let Self { inner } = self;
-                inner.key()
+                inner.into_mut_with_context()
             }
         }
 
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + $crate::soa::traits::SoaRead,
+            V: $crate::soa::traits::SoaRead,
         {
             #[inline]
             pub fn remove(self) -> V {
@@ -596,9 +843,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa
-                + $crate::soa::traits::SoaRead
-                + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
         {
             #[inline]
             pub fn insert(&mut self, value: V) -> V {
@@ -636,7 +881,7 @@ macro_rules! generate_entry_types {
         pub struct VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: $crate::soa::traits::RawSoa + ?Sized,
         {
             inner: $crate::alloc::entry::VacantEntry<'a, K, V, $container>,
         }
@@ -644,7 +889,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: $crate::soa::traits::RawSoa + ?Sized,
         {
             #[inline]
             fn new(key: K, container: &'a mut $container) -> Self {
@@ -659,6 +904,12 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
+            pub fn context(&self) -> &V::Context {
+                let Self { inner } = self;
+                inner.context()
+            }
+
+            #[inline]
             pub fn key(&self) -> K {
                 let Self { inner } = self;
                 inner.key()
@@ -668,19 +919,12 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa
-                + $crate::soa::traits::SoaRead
-                + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
         {
             #[inline]
-            pub fn insert(self, value: V) -> V::RefsMut<'a, 'a> {
+            pub fn insert(self, value: V) -> OccupiedEntry<'a, K, V> {
                 let Self { inner } = self;
-                inner.insert(value)
-            }
-
-            #[inline]
-            pub fn insert_entry(self, value: V) -> OccupiedEntry<'a, K, V> {
-                let inner = self.inner.insert_entry(value);
+                let inner = inner.insert(value);
                 OccupiedEntry { inner }
             }
         }
@@ -688,7 +932,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> core::fmt::Debug for VacantEntry<'a, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: $crate::soa::traits::RawSoa + ?Sized,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;

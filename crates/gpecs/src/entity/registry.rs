@@ -108,7 +108,7 @@ impl<Meta> EntityRegistry<Meta> {
     #[inline]
     pub fn as_ptr(&self) -> *const Entity {
         let Self { inner } = self;
-        inner.as_keys_ptr()
+        inner.as_key_ptr()
     }
 
     #[inline]

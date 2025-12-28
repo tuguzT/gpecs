@@ -1,4 +1,4 @@
-pub use self::access::TryInsertAccess;
+pub use self::access::{ReadWriteAccess, TryInsertAccess};
 
 pub mod arena;
 pub mod entry;

@@ -2,31 +2,156 @@ use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
+    marker::PhantomData,
 };
 
 use crate::soa::{
-    traits::{MutPtrs, RawSoaContext, Soa, SoaWrite},
+    traits::{MutPtrs, RawSoa, RawSoaContext, Soa, SoaWrite},
     wrapper,
 };
 
-pub enum TryInsertAccess<'ctx, 'a, T>
+#[repr(transparent)]
+pub struct ReadWriteAccess<'ctx, 'a, T>
 where
-    T: Soa + ?Sized + 'a,
+    T: RawSoa + ?Sized + 'a,
 {
-    ReadWrite(wrapper::RefsMut<'ctx, 'a, T>),
-    WriteOnly(wrapper::MutPtrs<'ctx, T>),
+    ptrs: wrapper::MutPtrs<'ctx, T>,
+    phantom: PhantomData<&'a ()>,
 }
 
-impl<'ctx, 'a, T> TryInsertAccess<'ctx, 'a, T>
+impl<'ctx, T> ReadWriteAccess<'ctx, '_, T>
+where
+    T: RawSoa + ?Sized,
+{
+    #[inline]
+    pub unsafe fn from_ptrs(ptrs: MutPtrs<'ctx, T>) -> Self {
+        Self {
+            ptrs: wrapper::MutPtrs::new(ptrs),
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> &MutPtrs<'_, T> {
+        let Self { ptrs, .. } = self;
+        ptrs.as_inner()
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> &mut MutPtrs<'_, T> {
+        let Self { ptrs, .. } = self;
+        ptrs.as_inner_mut()
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> MutPtrs<'ctx, T> {
+        let Self { ptrs, .. } = self;
+        ptrs.into_inner()
+    }
+}
+
+impl<'ctx, 'a, T> ReadWriteAccess<'ctx, 'a, T>
 where
     T: Soa + ?Sized,
 {
     #[inline]
-    pub fn read_write(refs: T::RefsMut<'ctx, 'a>) -> Self {
-        let refs = wrapper::RefsMut::new(refs);
-        Self::ReadWrite(refs)
+    pub fn from_refs(context: &'ctx T::Context, refs: T::RefsMut<'ctx, 'a>) -> Self {
+        let ptrs = T::refs_mut_as_ptrs(context, refs);
+        unsafe { Self::from_ptrs(ptrs) }
     }
 
+    #[inline]
+    pub fn into_refs(self, context: &'ctx T::Context) -> T::RefsMut<'ctx, 'a> {
+        let ptrs = self.into_ptrs();
+        unsafe { T::ptrs_to_refs_mut(context, ptrs) }
+    }
+}
+
+impl<T> Debug for ReadWriteAccess<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    for<'ctx> MutPtrs<'ctx, T>: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { ptrs, .. } = self;
+        f.debug_tuple("ReadWriteAccess").field(ptrs).finish()
+    }
+}
+
+impl<T> PartialEq for ReadWriteAccess<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    for<'ctx> MutPtrs<'ctx, T>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let Self { ptrs, phantom } = self;
+        *ptrs == other.ptrs && *phantom == other.phantom
+    }
+}
+
+impl<T> Eq for ReadWriteAccess<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    for<'ctx> MutPtrs<'ctx, T>: Eq,
+{
+}
+
+impl<T> PartialOrd for ReadWriteAccess<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    for<'ctx> MutPtrs<'ctx, T>: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        let Self { ptrs, phantom } = self;
+
+        match ptrs.partial_cmp(&other.ptrs) {
+            Some(cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        phantom.partial_cmp(&other.phantom)
+    }
+}
+
+impl<T> Ord for ReadWriteAccess<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    for<'ctx> MutPtrs<'ctx, T>: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let Self { ptrs, phantom } = self;
+
+        match ptrs.cmp(&other.ptrs) {
+            cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        phantom.cmp(&other.phantom)
+    }
+}
+
+impl<T> Hash for ReadWriteAccess<'_, '_, T>
+where
+    T: RawSoa + ?Sized,
+    for<'ctx> MutPtrs<'ctx, T>: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        let Self { ptrs, phantom } = self;
+        ptrs.hash(state);
+        phantom.hash(state);
+    }
+}
+
+pub enum TryInsertAccess<'ctx, 'a, T>
+where
+    T: RawSoa + ?Sized + 'a,
+{
+    ReadWrite(ReadWriteAccess<'ctx, 'a, T>),
+    WriteOnly(wrapper::MutPtrs<'ctx, T>),
+}
+
+impl<'ctx, T> TryInsertAccess<'ctx, '_, T>
+where
+    T: RawSoa + ?Sized,
+{
     #[inline]
     pub fn write_only(ptrs: MutPtrs<'ctx, T>) -> Self {
         let ptrs = wrapper::MutPtrs::new(ptrs);
@@ -34,23 +159,63 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self, context: &'ctx T::Context) -> MutPtrs<'ctx, T> {
+    pub unsafe fn read_write_unchecked(ptrs: MutPtrs<'ctx, T>) -> Self {
+        let refs = unsafe { ReadWriteAccess::from_ptrs(ptrs) };
+        Self::ReadWrite(refs)
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> &MutPtrs<'_, T> {
         match self {
-            Self::ReadWrite(refs) => T::refs_mut_as_ptrs(context, refs.into_inner()),
+            Self::ReadWrite(refs) => refs.as_ptrs(),
+            Self::WriteOnly(ptrs) => ptrs.as_inner(),
+        }
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> &mut MutPtrs<'_, T> {
+        match self {
+            Self::ReadWrite(refs) => refs.as_mut_ptrs(),
+            Self::WriteOnly(ptrs) => ptrs.as_inner_mut(),
+        }
+    }
+
+    #[inline]
+    pub fn into_ptrs(self) -> MutPtrs<'ctx, T> {
+        match self {
+            Self::ReadWrite(refs) => refs.into_ptrs(),
             Self::WriteOnly(ptrs) => ptrs.into_inner(),
+        }
+    }
+}
+
+impl<'ctx, 'a, T> TryInsertAccess<'ctx, 'a, T>
+where
+    T: Soa + ?Sized,
+{
+    #[inline]
+    pub fn read_write(context: &'ctx T::Context, refs: T::RefsMut<'ctx, 'a>) -> Self {
+        let refs = ReadWriteAccess::from_refs(context, refs);
+        Self::ReadWrite(refs)
+    }
+
+    #[inline]
+    pub fn into_refs(self, context: &'ctx T::Context) -> Option<T::RefsMut<'ctx, 'a>> {
+        match self {
+            Self::ReadWrite(refs) => Some(refs.into_refs(context)),
+            Self::WriteOnly(_) => None,
         }
     }
 }
 
 impl<T> Debug for TryInsertAccess<'_, '_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: Debug,
+    T: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ReadWrite(refs) => f.debug_tuple("ReadWrite").field(refs).finish(),
+            Self::ReadWrite(refs) => f.debug_tuple("ReadWrite").field(refs.as_ptrs()).finish(),
             Self::WriteOnly(ptrs) => f.debug_tuple("WriteOnly").field(ptrs).finish(),
         }
     }
@@ -58,8 +223,7 @@ where
 
 impl<T> PartialEq for TryInsertAccess<'_, '_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: PartialEq,
+    T: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -73,16 +237,14 @@ where
 
 impl<T> Eq for TryInsertAccess<'_, '_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: Eq,
+    T: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for TryInsertAccess<'_, '_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: PartialOrd,
+    T: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -97,8 +259,7 @@ where
 
 impl<T> Ord for TryInsertAccess<'_, '_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: Ord,
+    T: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -113,8 +274,7 @@ where
 
 impl<T> Hash for TryInsertAccess<'_, '_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::RefsMut<'ctx, 'a>: Hash,
+    T: RawSoa + ?Sized,
     for<'ctx> MutPtrs<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -125,21 +285,17 @@ where
     }
 }
 
-pub unsafe fn drop_old_then_write<V>(
-    context: &V::Context,
-    dst: Option<TryInsertAccess<V>>,
-    value: V,
-) where
-    V: Soa + SoaWrite,
+pub unsafe fn drop_old_then_write<V>(context: &V::Context, dst: TryInsertAccess<V>, value: V)
+where
+    V: SoaWrite,
 {
     let dst = match dst {
-        Some(TryInsertAccess::ReadWrite(dst)) => {
-            let dst = V::refs_mut_as_ptrs(context, dst.into_inner());
+        TryInsertAccess::ReadWrite(refs) => {
+            let dst = refs.into_ptrs();
             unsafe { context.ptrs_drop_in_place(dst.clone()) }
             dst
         }
-        Some(TryInsertAccess::WriteOnly(dst)) => dst.into_inner(),
-        None => return,
+        TryInsertAccess::WriteOnly(ptrs) => ptrs.into_inner(),
     };
     unsafe { V::write(context, dst, value) }
 }

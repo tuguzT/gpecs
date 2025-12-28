@@ -8,7 +8,7 @@ use core::{
 use crate::{
     layout::{BufferData, BufferPrefix, buffer_layout, is_zst, should_allocate},
     slice::SoaSlice,
-    traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SoaTrustedFields},
+    traits::{MutPtrs, Ptrs, RawSoa, RawSoaContext, SoaRead, SoaTrustedFields, SoaWrite},
 };
 
 #[inline]
@@ -52,6 +52,23 @@ where
         .expect("layout size should not exceed `isize::MAX`")
         .size();
     capacity_in_bytes / size_of::<BufferData<T>>()
+}
+
+/// Version of [`core::ptr::replace()`] but for [SoA](RawSoa) types.
+pub unsafe fn replace<T>(context: &T::Context, dest: MutPtrs<'_, T>, src: T) -> T
+where
+    T: SoaRead + SoaWrite,
+{
+    let dest = T::Context::upcast_mut_ptrs(dest);
+
+    // SAFETY: We read from `dest` but directly write `src` into it afterwards,
+    // such that the old value is not duplicated. Nothing is dropped and
+    // nothing here can panic.
+    unsafe {
+        let result = T::read(context, context.ptrs_cast_const(dest.clone()));
+        T::write(context, dest, src);
+        result
+    }
 }
 
 pub trait SoaSlicePtr<T>: Copy + private::Sealed

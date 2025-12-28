@@ -25,7 +25,7 @@ where
                 local_len: 0,
             };
 
-            let (context, dst, _) = set_len_on_drop.vec.slices_mut().into_parts();
+            let (context, dst, _) = set_len_on_drop.vec.mut_slices().into_parts();
             for (index, src) in self.raw_iter().enumerate() {
                 set_len_on_drop.local_len = index;
 

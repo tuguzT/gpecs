@@ -108,15 +108,15 @@ where
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'c, T> {
-        let (_, slices) = self.as_slice_mut_ptrs_with_context();
+    pub fn as_mut_slice_ptrs(&mut self) -> SliceMutPtrs<'c, T> {
+        let (_, slices) = self.as_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
+    pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
         let Self { inner, .. } = self;
-        inner.as_slice_mut_ptrs_with_context()
+        inner.as_mut_slice_ptrs_with_context()
     }
 
     #[inline]
@@ -132,15 +132,15 @@ where
     }
 
     #[inline]
-    pub fn into_slice_mut_ptrs(self) -> SliceMutPtrs<'c, T> {
-        let (_, slices) = self.into_slice_mut_ptrs_with_context();
+    pub fn into_mut_slice_ptrs(self) -> SliceMutPtrs<'c, T> {
+        let (_, slices) = self.into_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn into_slice_mut_ptrs_with_context(self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
+    pub fn into_mut_slice_ptrs_with_context(self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
         let Self { inner, .. } = self;
-        inner.into_slice_mut_ptrs_with_context()
+        inner.into_mut_slice_ptrs_with_context()
     }
 
     #[inline]
@@ -174,7 +174,7 @@ where
 {
     #[inline]
     pub fn new(context: &'c T::Context, slices: T::SlicesMut<'c, 'a>) -> Self {
-        let slices = T::slices_mut_as_slice_ptrs(context, slices);
+        let slices = T::mut_slices_as_slice_ptrs(context, slices);
         unsafe { Self::from_parts(context, slices) }
     }
 
@@ -189,8 +189,8 @@ where
     pub fn into_slices_with_context(self) -> (&'c T::Context, T::SlicesMut<'c, 'a>) {
         let Self { inner, .. } = self;
 
-        let (context, slices) = inner.into_slice_mut_ptrs_with_context();
-        let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
+        let (context, slices) = inner.into_mut_slice_ptrs_with_context();
+        let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
         (context, slices)
     }
 

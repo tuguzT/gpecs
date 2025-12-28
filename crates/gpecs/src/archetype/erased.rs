@@ -150,7 +150,7 @@ where
 {
     let iter = fields
         .into_iter()
-        .map(|(component_id, mut r#ref)| (component_id, r#ref.as_field_mut_ptr()));
+        .map(|(component_id, mut r#ref)| (component_id, r#ref.as_mut_field_ptr()));
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
     unsafe { B::ptrs_to_refs_mut(B::CONTEXT, ptrs) }
 }
@@ -174,7 +174,7 @@ where
 }
 
 #[inline]
-pub unsafe fn from_erased_slices_mut<'a, B>(
+pub unsafe fn from_erased_mut_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
     fields: ErasedComponents<ErasedFieldSliceMut<'a>>,
@@ -184,10 +184,10 @@ where
 {
     let iter = fields
         .into_iter()
-        .map(|(component_id, mut slice)| (component_id, slice.as_field_mut_ptr()));
+        .map(|(component_id, mut slice)| (component_id, slice.as_mut_field_ptr()));
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
-    let slices = B::CONTEXT.slice_mut_ptrs_from_raw_parts(ptrs, len);
-    unsafe { B::slice_mut_ptrs_to_slices(B::CONTEXT, slices) }
+    let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);
+    unsafe { B::mut_slice_ptrs_to_mut_slices(B::CONTEXT, slices) }
 }
 
 #[inline]

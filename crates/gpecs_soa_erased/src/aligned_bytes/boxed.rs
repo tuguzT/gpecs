@@ -87,7 +87,7 @@ impl AlignedUninitBoxedByteSlice {
     }
 
     #[inline]
-    pub fn as_uninit_slice_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+    pub fn as_mut_uninit_slice(&mut self) -> &mut [MaybeUninit<u8>] {
         let Self { ptr, layout } = *self;
 
         let data = ptr.as_ptr().cast();
@@ -148,7 +148,7 @@ impl AsRef<[MaybeUninit<u8>]> for AlignedUninitBoxedByteSlice {
 impl AsMut<[MaybeUninit<u8>]> for AlignedUninitBoxedByteSlice {
     #[inline]
     fn as_mut(&mut self) -> &mut [MaybeUninit<u8>] {
-        self.as_uninit_slice_mut()
+        self.as_mut_uninit_slice()
     }
 }
 

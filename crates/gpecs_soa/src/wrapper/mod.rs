@@ -1,16 +1,16 @@
 pub use self::{
-    field_descriptors::FieldDescriptors, mut_ptrs::MutPtrs, nonnull_ptrs::NonNullPtrs, ptrs::Ptrs,
-    refs::Refs, refs_mut::RefsMut, slice_mut_ptrs::SliceMutPtrs, slice_ptrs::SlicePtrs,
-    slices::Slices, slices_mut::SlicesMut,
+    field_descriptors::FieldDescriptors, mut_ptrs::MutPtrs, mut_refs::RefsMut,
+    mut_slice_ptrs::SliceMutPtrs, mut_slices::SlicesMut, nonnull_ptrs::NonNullPtrs, ptrs::Ptrs,
+    refs::Refs, slice_ptrs::SlicePtrs, slices::Slices,
 };
 
 mod field_descriptors;
 mod mut_ptrs;
+mod mut_refs;
+mod mut_slice_ptrs;
+mod mut_slices;
 mod nonnull_ptrs;
 mod ptrs;
 mod refs;
-mod refs_mut;
-mod slice_mut_ptrs;
 mod slice_ptrs;
 mod slices;
-mod slices_mut;

@@ -121,7 +121,7 @@ where
         let into_self = |ptrs| unsafe { Self::from_mut_ptrs(ptrs, len) };
         let ptrs = result.map_err(|err| err.map_value(into_self))?;
 
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         Ok(slices)
     }
 }

@@ -499,14 +499,14 @@ unsafe impl<T> RawSoaContext for IdentityContext<T> {
     type SliceMutPtrs<'a> = *mut [Identity<T>];
 
     #[inline]
-    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+    fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short> {
         from
     }
 
     #[inline]
-    fn slice_mut_ptrs_from_raw_parts<'a>(
+    fn mut_slice_ptrs_from_raw_parts<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
         len: usize,
@@ -515,12 +515,12 @@ unsafe impl<T> RawSoaContext for IdentityContext<T> {
     }
 
     #[inline]
-    fn slice_mut_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
+    fn mut_slice_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
         slices.len()
     }
 
     #[inline]
-    fn slice_mut_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
         slices.cast()
     }
 
@@ -653,7 +653,7 @@ unsafe impl<T> Soa for Identity<T> {
         Self: 'a;
 
     #[inline]
-    fn upcast_slices_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+    fn upcast_mut_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::SlicesMut<'long, 'a_long>,
     ) -> Self::SlicesMut<'short, 'a_short> {
         from
@@ -670,7 +670,7 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
+    unsafe fn mut_slice_ptrs_to_mut_slices<'context, 'a>(
         _context: &'context Self::Context,
         slices: SliceMutPtrs<'context, Self>,
     ) -> Self::SlicesMut<'context, 'a> {
@@ -688,7 +688,7 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn slices_mut_len<'a>(_context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
+    fn mut_slices_len<'a>(_context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
     where
         Self: 'a,
     {
@@ -707,7 +707,7 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn slices_mut_as_slice_ptrs<'context, 'a>(
+    fn mut_slices_as_slice_ptrs<'context, 'a>(
         _context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> SliceMutPtrs<'context, Self>
@@ -718,7 +718,7 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn slices_mut_as_slices<'context, 'a>(
+    fn mut_slices_as_slices<'context, 'a>(
         _context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a> {
@@ -737,7 +737,7 @@ unsafe impl<T> Soa for Identity<T> {
     }
 
     #[inline]
-    fn slices_mut_as_ptrs<'context, 'a>(
+    fn mut_slices_as_ptrs<'context, 'a>(
         _context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> MutPtrs<'context, Self>

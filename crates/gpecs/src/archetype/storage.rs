@@ -26,8 +26,8 @@ use crate::{
 
 use super::{
     erased::{
-        ErasedComponents, drop_erased_in_place, from_erased_fields, from_erased_refs,
-        from_erased_refs_mut, from_erased_slices, from_erased_slices_mut, get_component_info_fail,
+        ErasedComponents, drop_erased_in_place, from_erased_fields, from_erased_mut_slices,
+        from_erased_refs, from_erased_refs_mut, from_erased_slices, get_component_info_fail,
         into_erased_fields, validate_components,
     },
     error::{
@@ -410,8 +410,8 @@ impl ArchetypeStorage {
         } = *self;
 
         let (entities, fields) = erased_storage.erased_components_mut(components, component_ids);
-        let components = unsafe { from_erased_slices_mut::<B>(components, entities.len(), fields) };
-        let components = B::upcast_slices_mut(components);
+        let components = unsafe { from_erased_mut_slices::<B>(components, entities.len(), fields) };
+        let components = B::upcast_mut_slices(components);
         Ok((entities, components))
     }
 
@@ -538,7 +538,7 @@ impl ArchetypeStorage {
             return false;
         };
 
-        let erased_refs_mut = erased_fields.as_refs_mut();
+        let erased_refs_mut = erased_fields.as_mut_fields();
         Self::destroy_refs_mut(component_ids, erased_refs_mut);
         true
     }
@@ -771,7 +771,7 @@ trait ErasedStorageExt {
 impl ErasedStorageExt for ErasedStorage {
     #[inline]
     fn entities(&self) -> &[Entity] {
-        let entities = self.as_keys_slice();
+        let entities = self.as_key_slice();
         must_cast_slice(entities)
     }
 

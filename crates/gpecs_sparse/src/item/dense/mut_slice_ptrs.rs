@@ -34,7 +34,7 @@ where
         values: SliceMutPtrs<'context, V>,
     ) -> Self {
         let keys_len = keys.len();
-        let values_len = context.slice_mut_ptrs_len(&values);
+        let values_len = context.mut_slice_ptrs_len(&values);
         assert_eq!(keys_len, values_len);
 
         unsafe { Self::new_unchecked(keys, values) }
@@ -55,7 +55,7 @@ where
         let DenseMutPtrs { key, value } = ptrs;
 
         let keys = ptr::slice_from_raw_parts_mut(key, len);
-        let values = context.slice_mut_ptrs_from_raw_parts(value.into_inner(), len);
+        let values = context.mut_slice_ptrs_from_raw_parts(value.into_inner(), len);
         unsafe { Self::new_unchecked(keys, values) }
     }
 
@@ -68,7 +68,7 @@ where
     #[inline]
     pub fn len(&self, context: &V::Context) -> usize {
         let Self { values, .. } = self;
-        context.slice_mut_ptrs_len(values.as_inner())
+        context.mut_slice_ptrs_len(values.as_inner())
     }
 
     #[inline]
@@ -95,7 +95,7 @@ where
         let Self { keys, values } = self;
 
         let key = keys.cast(); // should be `keys.as_ptr()` but it's unstable
-        let value = context.slice_mut_ptrs_as_ptrs(values.into_inner());
+        let value = context.mut_slice_ptrs_as_ptrs(values.into_inner());
         DenseMutPtrs::new(key, value)
     }
 
@@ -130,7 +130,7 @@ where
         let Self { keys, values } = self;
 
         let keys = unsafe { &mut *keys };
-        let values = unsafe { V::slice_mut_ptrs_to_slices(context, values.into_inner()) };
+        let values = unsafe { V::mut_slice_ptrs_to_mut_slices(context, values.into_inner()) };
         unsafe { DenseSlicesMut::new_unchecked(keys, values) }
     }
 }

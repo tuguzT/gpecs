@@ -25,8 +25,8 @@ where
 {
     #[inline]
     pub fn new(context: &'c T::Context, slices: SliceMutPtrs<'c, T>) -> Self {
-        let len = context.slice_mut_ptrs_len(&slices);
-        let ptrs = context.slice_mut_ptrs_as_ptrs(slices);
+        let len = context.mut_slice_ptrs_len(&slices);
+        let ptrs = context.mut_slice_ptrs_as_ptrs(slices);
         unsafe { Self::from_parts(context, ptrs, len) }
     }
 
@@ -160,13 +160,13 @@ where
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
-        let (_, slices) = self.as_slice_mut_ptrs_with_context();
+    pub fn as_mut_slice_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
+        let (_, slices) = self.as_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
+    pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
         let Self {
             context,
             len,
@@ -174,7 +174,7 @@ where
         } = *self;
 
         let ptrs = ptrs.clone().into_inner();
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
 
@@ -195,17 +195,17 @@ where
     }
 
     #[inline]
-    pub fn into_slice_mut_ptrs(self) -> SliceMutPtrs<'c, T> {
-        let (_, slices) = self.into_slice_mut_ptrs_with_context();
+    pub fn into_mut_slice_ptrs(self) -> SliceMutPtrs<'c, T> {
+        let (_, slices) = self.into_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn into_slice_mut_ptrs_with_context(self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
+    pub fn into_mut_slice_ptrs_with_context(self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
         let Self { context, len, ptrs } = self;
 
         let ptrs = ptrs.into_inner();
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
 
@@ -245,7 +245,7 @@ where
     where
         I: SoaSlicePtrsIndex<T>,
     {
-        let (context, slices) = self.as_slice_mut_ptrs_with_context();
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
         let ptrs = unsafe { index.get_unchecked_mut(context, slices) };
         (context, ptrs)
     }
@@ -289,7 +289,7 @@ where
     where
         I: SoaSlicePtrsIndex<T>,
     {
-        let (context, slices) = self.into_slice_mut_ptrs_with_context();
+        let (context, slices) = self.into_mut_slice_ptrs_with_context();
         let ptrs = unsafe { index.get_unchecked_mut(context, slices) };
         (context, ptrs)
     }
@@ -314,13 +314,13 @@ where
 
     #[inline]
     pub fn iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
-        let (context, slices) = self.as_slice_mut_ptrs_with_context();
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
         (context, RawIterMut::new(context, slices))
     }
 
     #[inline]
     pub fn into_iter_with_context(self) -> (&'c T::Context, RawIterMut<'c, T>) {
-        let (context, slices) = self.into_slice_mut_ptrs_with_context();
+        let (context, slices) = self.into_mut_slice_ptrs_with_context();
         (context, RawIterMut::new(context, slices))
     }
 }

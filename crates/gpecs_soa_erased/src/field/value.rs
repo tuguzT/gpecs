@@ -60,7 +60,7 @@ where
             return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
         }
 
-        if let Err(err) = init_bytes_from(bytes.as_uninit_bytes_mut(), data) {
+        if let Err(err) = init_bytes_from(bytes.as_mut_uninit_bytes(), data) {
             return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
         }
 
@@ -132,7 +132,7 @@ where
         check_len(data.len(), layout.size())?;
 
         let mut bytes = B::from_layout(layout).map_err(ErasedFieldFromDescDataError::FromLayout)?;
-        init_bytes_from(bytes.as_uninit_bytes_mut(), data)?;
+        init_bytes_from(bytes.as_mut_uninit_bytes(), data)?;
 
         let bytes = unsafe { AlignedInitBytes::new_unchecked(bytes) };
         let me = Self { bytes };
@@ -189,7 +189,7 @@ where
     }
 
     #[inline]
-    pub fn as_field_ref(&self) -> ErasedFieldRef<'_> {
+    pub fn as_field(&self) -> ErasedFieldRef<'_> {
         let desc = self.descriptor();
         let buffer = self.as_slice();
         unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
@@ -203,14 +203,14 @@ where
     }
 
     #[inline]
-    pub fn as_field_ref_mut(&mut self) -> ErasedFieldRefMut<'_> {
+    pub fn as_mut_field(&mut self) -> ErasedFieldRefMut<'_> {
         let desc = self.descriptor();
         let buffer = self.as_mut_slice();
         unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
     }
 
     #[inline]
-    pub fn as_field_mut_ptr(&mut self) -> ErasedFieldMutPtr {
+    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr {
         let desc = self.descriptor();
         let buffer = ptr::from_mut(self.as_mut_slice());
         unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }

@@ -108,7 +108,7 @@ fn empty_into_iter() {
     let into_iter = sparse_arena.into_iter();
 
     assert_eq!(into_iter.len(), 0);
-    assert_eq!(into_iter.as_keys_slice(), &[]);
+    assert_eq!(into_iter.as_key_slice(), &[]);
     assert_eq!(into_iter.as_value_slices(), &[]);
 }
 
@@ -420,7 +420,7 @@ fn one_item_parts() {
         .expect("creation of sparse arena from valid parts should not fail");
     assert_eq!(sparse_arena.len(), 1);
     assert_eq!(sparse_arena.as_slices(), &[42.into()]);
-    assert_eq!(sparse_arena.as_keys_slice(), &[2]);
+    assert_eq!(sparse_arena.as_key_slice(), &[2]);
     assert_eq!(sparse_arena.get(2), Some(&42.into()));
 }
 
@@ -507,7 +507,7 @@ fn one_item_into_iter() {
 
     let into_iter = sparse_arena.into_iter();
     assert_eq!(into_iter.len(), 1);
-    assert_eq!(into_iter.as_keys_slice(), &[0]);
+    assert_eq!(into_iter.as_key_slice(), &[0]);
     assert_eq!(into_iter.as_value_slices(), &[42.into()]);
 }
 
@@ -957,7 +957,7 @@ fn three_items_parts() {
         .expect("creation of sparse arena from valid parts should not fail");
     assert_eq!(sparse_arena.len(), 3);
     assert_eq!(sparse_arena.as_slices(), &[34.into(), 42.into(), 69.into()]);
-    assert_eq!(sparse_arena.as_keys_slice(), &[2, 1, 5]);
+    assert_eq!(sparse_arena.as_key_slice(), &[2, 1, 5]);
 
     assert_eq!(sparse_arena.get(2), Some(&34.into()));
     assert_eq!(sparse_arena.get(1), Some(&42.into()));
@@ -1066,7 +1066,7 @@ fn three_items_into_iter() {
 
     let into_iter = sparse_arena.into_iter();
     assert_eq!(into_iter.len(), 3);
-    assert_eq!(into_iter.as_keys_slice(), &[2, 1, 5]);
+    assert_eq!(into_iter.as_key_slice(), &[2, 1, 5]);
     assert_eq!(
         into_iter.as_value_slices(),
         &[34.into(), 42.into(), 69.into()],
@@ -1252,7 +1252,7 @@ fn five_items_retain() {
 
     sparse_arena.retain(|key, _| key % 2 == 0);
     assert_eq!(sparse_arena.len(), 3);
-    assert_eq!(sparse_arena.as_keys_slice(), &[8, 4, 6]);
+    assert_eq!(sparse_arena.as_key_slice(), &[8, 4, 6]);
     assert_eq!(
         sparse_arena.as_slices(),
         &[34.into(), 69.into(), 666.into()],
@@ -1266,7 +1266,7 @@ fn five_items_retain() {
 
     sparse_arena.retain(|_, value| **value % 2 == 1);
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.as_keys_slice(), &[4]);
+    assert_eq!(sparse_arena.as_key_slice(), &[4]);
     assert_eq!(sparse_arena.as_slices(), &[69.into()]);
 
     assert_eq!(sparse_arena.get(8), None);
@@ -1286,7 +1286,7 @@ fn five_items_drain() {
     sparse_arena.insert(6, Identity(666));
 
     let drain = sparse_arena.drain();
-    assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
+    assert_eq!(drain.as_key_slice(), &[8, 1, 4, 3, 6]);
     assert_eq!(
         drain.as_value_slices(),
         &[34.into(), 42.into(), 69.into(), 228.into(), 666.into()],
@@ -1310,7 +1310,7 @@ fn five_items_insert_truncate() {
 
     sparse_arena.truncate(usize::MAX, 5);
     assert_eq!(sparse_arena.sparse_len(), 5);
-    assert_eq!(sparse_arena.as_keys_slice(), &[1, 4, 3]);
+    assert_eq!(sparse_arena.as_key_slice(), &[1, 4, 3]);
     assert_eq!(
         sparse_arena.as_slices(),
         &[42.into(), 69.into(), 228.into()],
@@ -1322,7 +1322,7 @@ fn five_items_insert_truncate() {
 
     sparse_arena.truncate(1, usize::MAX);
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.as_keys_slice(), &[1]);
+    assert_eq!(sparse_arena.as_key_slice(), &[1]);
     assert_eq!(sparse_arena.as_slices(), &[42.into()]);
 
     assert_eq!(sparse_arena.get(1), Some(&42.into()));
@@ -1339,7 +1339,7 @@ fn five_items_push_truncate() {
 
     sparse_arena.truncate(usize::MAX, 3);
     assert_eq!(sparse_arena.sparse_len(), 3);
-    assert_eq!(sparse_arena.as_keys_slice(), &[key0, key1, key2]);
+    assert_eq!(sparse_arena.as_key_slice(), &[key0, key1, key2]);
     assert_eq!(sparse_arena.as_slices(), &[34.into(), 42.into(), 69.into()]);
 
     assert_eq!(sparse_arena.get(key0), Some(&34.into()));
@@ -1350,7 +1350,7 @@ fn five_items_push_truncate() {
 
     sparse_arena.truncate(1, usize::MAX);
     assert_eq!(sparse_arena.len(), 1);
-    assert_eq!(sparse_arena.as_keys_slice(), &[key0]);
+    assert_eq!(sparse_arena.as_key_slice(), &[key0]);
     assert_eq!(sparse_arena.as_slices(), &[34.into()]);
 
     assert_eq!(sparse_arena.get(key0), Some(&34.into()));
@@ -1366,7 +1366,7 @@ fn five_items_sort() {
     sparse_arena.insert(6, Identity(34));
 
     sparse_arena.sort();
-    assert_eq!(sparse_arena.as_keys_slice(), &[6, 8, 4, 1, 3]);
+    assert_eq!(sparse_arena.as_key_slice(), &[6, 8, 4, 1, 3]);
     assert_eq!(
         sparse_arena.as_slices(),
         &[34.into(), 42.into(), 69.into(), 228.into(), 666.into()],
@@ -1389,7 +1389,7 @@ fn five_items_sort_keys() {
     sparse_arena.insert(6, Identity(34));
 
     sparse_arena.sort_keys();
-    assert_eq!(sparse_arena.as_keys_slice(), &[1, 3, 4, 6, 8]);
+    assert_eq!(sparse_arena.as_key_slice(), &[1, 3, 4, 6, 8]);
     assert_eq!(
         sparse_arena.as_slices(),
         &[228.into(), 666.into(), 69.into(), 34.into(), 42.into()],
@@ -1412,7 +1412,7 @@ fn five_items_sort_by() {
     sparse_arena.insert(6, Identity(34));
 
     sparse_arena.sort_by(|(_, a), (_, b)| Ord::cmp(b, a));
-    assert_eq!(sparse_arena.as_keys_slice(), &[3, 1, 4, 8, 6]);
+    assert_eq!(sparse_arena.as_key_slice(), &[3, 1, 4, 8, 6]);
     assert_eq!(
         sparse_arena.as_slices(),
         &[666.into(), 228.into(), 69.into(), 42.into(), 34.into()],

@@ -150,7 +150,7 @@ impl GpuComponentRegistry {
     pub fn component_ids(&self) -> GpuComponentIds<'_> {
         let Self { components } = self;
 
-        let keys = components.as_keys_slice();
+        let keys = components.as_key_slice();
         let component_ids = must_cast_slice(keys);
         let inner = component_ids.iter();
         GpuComponentIds { inner }

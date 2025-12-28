@@ -25,8 +25,8 @@ where
 {
     #[inline]
     pub fn new(context: &'c T::Context, slices: SliceMutPtrs<'c, T>) -> Self {
-        let len = context.slice_mut_ptrs_len(&slices);
-        let ptrs = context.slice_mut_ptrs_as_ptrs(slices);
+        let len = context.mut_slice_ptrs_len(&slices);
+        let ptrs = context.mut_slice_ptrs_as_ptrs(slices);
         Self {
             ptrs: wrapper::MutPtrs::new(ptrs),
             context,
@@ -158,13 +158,13 @@ where
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'c, T> {
-        let (_, slices) = self.as_slice_mut_ptrs_with_context();
+    pub fn as_mut_slice_ptrs(&mut self) -> SliceMutPtrs<'c, T> {
+        let (_, slices) = self.as_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
+    pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
         let Self {
             ref ptrs,
             context,
@@ -175,7 +175,7 @@ where
         let len = self.len();
         let ptrs = ptrs.clone().into_inner();
         let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
 
@@ -203,14 +203,14 @@ where
     }
 
     #[inline]
-    pub fn into_slice_mut_ptrs(self) -> SliceMutPtrs<'c, T> {
-        let (_, slices) = self.into_slice_mut_ptrs_with_context();
+    pub fn into_mut_slice_ptrs(self) -> SliceMutPtrs<'c, T> {
+        let (_, slices) = self.into_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
     #[doc(alias = "into_parts")]
-    pub fn into_slice_mut_ptrs_with_context(self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
+    pub fn into_mut_slice_ptrs_with_context(self) -> (&'c T::Context, SliceMutPtrs<'c, T>) {
         let len = self.len();
         let Self {
             ptrs,
@@ -221,7 +221,7 @@ where
 
         let ptrs = ptrs.into_inner();
         let ptrs = unsafe { context.ptrs_add_mut(ptrs, start) };
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
 
@@ -238,7 +238,7 @@ where
 
     #[inline]
     pub unsafe fn deref_mut<'a>(self) -> IterMut<'c, 'a, T> {
-        let (context, slices) = self.into_slice_mut_ptrs_with_context();
+        let (context, slices) = self.into_mut_slice_ptrs_with_context();
         unsafe { IterMut::from_parts(context, slices) }
     }
 
@@ -273,7 +273,7 @@ where
     #[inline]
     fn from(context: &'c T::Context) -> Self {
         let ptrs = context.ptrs_dangling_mut();
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, 0);
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, 0);
         Self::new(context, slices)
     }
 }

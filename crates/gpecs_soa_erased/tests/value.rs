@@ -56,7 +56,7 @@ fn value() {
             .eq(descriptors.iter().map(FieldDescriptor::layout)),
     );
 
-    let erased_refs = erased_value.as_refs();
+    let erased_refs = erased_value.as_fields();
     assert_eq!(erased_refs.into_iter().len(), 5);
 
     let field_ref = erased_refs.into_iter().nth(0).unwrap();
@@ -154,7 +154,7 @@ fn value() {
     .expect("all the fields should be valid");
     assert!(
         erased_value
-            .as_refs()
+            .as_fields()
             .into_iter()
             .map(ErasedFieldRef::into_buffer)
             .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),
@@ -190,7 +190,7 @@ fn value_zst() {
     ];
     assert!(
         erased_value
-            .as_refs()
+            .as_fields()
             .into_iter()
             .map(ErasedFieldRef::into_buffer)
             .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),

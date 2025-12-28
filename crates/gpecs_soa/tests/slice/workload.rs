@@ -767,7 +767,7 @@ fn three_items() {
     );
 
     let sub_slices = unsafe { slices_mut.get_unchecked_mut(..=1) };
-    let sub_slices = unsafe { Item::slice_mut_ptrs_to_slices(&context, sub_slices) };
+    let sub_slices = unsafe { Item::mut_slice_ptrs_to_mut_slices(&context, sub_slices) };
     assert_eq!(
         sub_slices,
         (
@@ -968,7 +968,7 @@ fn three_items_identity() {
     assert_eq!(sub_slices, [1.into()]);
 
     let sub_slices_mut = unsafe { slices_mut.get_unchecked_mut(..=1) };
-    let sub_slices_mut = unsafe { Item::slice_mut_ptrs_to_slices(&context, sub_slices_mut) };
+    let sub_slices_mut = unsafe { Item::mut_slice_ptrs_to_mut_slices(&context, sub_slices_mut) };
     assert_eq!(sub_slices_mut, [1.into(), 2.into()]);
 
     let slices = Slices::from(slices_mut);
@@ -1186,7 +1186,7 @@ fn three_items_zst() {
     );
 
     let sub_slices = unsafe { slices_mut.get_unchecked_mut(..=1) };
-    let sub_slices = unsafe { Item::slice_mut_ptrs_to_slices(&context, sub_slices) };
+    let sub_slices = unsafe { Item::mut_slice_ptrs_to_mut_slices(&context, sub_slices) };
     assert_eq!(
         sub_slices,
         (

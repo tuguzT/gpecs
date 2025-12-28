@@ -16,7 +16,7 @@ pub unsafe trait AlignedBytes {
     /// Pointer to the start of [slice](AlignedBytes::as_uninit_bytes) of self.
     fn as_ptr(&self) -> *const u8;
 
-    /// Mutable pointer to the start of [slice](AlignedBytes::as_uninit_bytes_mut) of self.
+    /// Mutable pointer to the start of [slice](AlignedBytes::as_mut_uninit_bytes) of self.
     fn as_mut_ptr(&mut self) -> *mut u8;
 
     /// Layout of [slice](AlignedBytes::as_uninit_bytes) of self: its length and alignment.
@@ -32,7 +32,7 @@ pub unsafe trait AlignedBytes {
 
     /// Retrieve a mutable uninitialized byte [prim@slice] of self,
     /// even if such bytes could be initialized.
-    fn as_uninit_bytes_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+    fn as_mut_uninit_bytes(&mut self) -> &mut [MaybeUninit<u8>] {
         let data = self.as_mut_ptr().cast();
         let len = self.layout().size();
         unsafe { core::slice::from_raw_parts_mut(data, len) }
@@ -132,7 +132,7 @@ pub unsafe trait AlignedBytesFromLayout: AlignedBytes + Sized {
         let mut new = Self::from_layout(layout)?;
 
         let src = self.as_uninit_bytes();
-        let dst = new.as_uninit_bytes_mut();
+        let dst = new.as_mut_uninit_bytes();
         let len = Ord::min(src.len(), dst.len());
         dst[..len].copy_from_slice(&src[..len]);
 

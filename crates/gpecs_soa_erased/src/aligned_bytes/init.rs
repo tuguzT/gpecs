@@ -38,7 +38,7 @@ where
 {
     #[inline]
     pub fn new(mut bytes: B) -> Self {
-        bytes.as_uninit_bytes_mut().fill(ZERO_UNINIT_BYTE);
+        bytes.as_mut_uninit_bytes().fill(ZERO_UNINIT_BYTE);
         unsafe { Self::new_unchecked(bytes) }
     }
 }
@@ -61,7 +61,7 @@ where
         let old_len = bytes.layout().size();
         bytes.set_layout(layout)?;
 
-        if let Some(remainder) = bytes.as_uninit_bytes_mut().get_mut(old_len..) {
+        if let Some(remainder) = bytes.as_mut_uninit_bytes().get_mut(old_len..) {
             remainder.fill(ZERO_UNINIT_BYTE);
         }
         Ok(())
@@ -85,7 +85,7 @@ where
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         let Self { bytes } = self;
-        let bytes = bytes.as_uninit_bytes_mut();
+        let bytes = bytes.as_mut_uninit_bytes();
 
         let data = bytes.as_mut_ptr().cast();
         let len = bytes.len();

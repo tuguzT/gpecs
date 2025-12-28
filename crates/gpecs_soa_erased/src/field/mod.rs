@@ -1,13 +1,13 @@
 pub use self::{
+    mut_ptrs::ErasedFieldMutPtr,
+    mut_refs::ErasedFieldRefMut,
+    mut_slice_ptrs::{ErasedFieldSliceMutPtr, field_slice_from_raw_parts_mut},
+    mut_slices::ErasedFieldSliceMut,
     nonnull_ptrs::ErasedFieldNonNullPtr,
     ptrs::ErasedFieldPtr,
-    ptrs_mut::ErasedFieldMutPtr,
     refs::ErasedFieldRef,
-    refs_mut::ErasedFieldRefMut,
     slice_ptrs::{ErasedFieldSlicePtr, field_slice_from_raw_parts},
-    slice_ptrs_mut::{ErasedFieldSliceMutPtr, field_slice_from_raw_parts_mut},
     slices::ErasedFieldSlice,
-    slices_mut::ErasedFieldSliceMut,
     value::ErasedField,
 };
 
@@ -17,13 +17,13 @@ pub use self::value::BoxedErasedField;
 pub mod error;
 
 mod assert;
+mod mut_ptrs;
+mod mut_refs;
+mod mut_slice_ptrs;
+mod mut_slices;
 mod nonnull_ptrs;
 mod ptrs;
-mod ptrs_mut;
 mod refs;
-mod refs_mut;
 mod slice_ptrs;
-mod slice_ptrs_mut;
 mod slices;
-mod slices_mut;
 mod value;

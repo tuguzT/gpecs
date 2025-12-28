@@ -277,7 +277,7 @@ where
     pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, V> {
         let Self { dense, .. } = self;
 
-        let (context, slices) = dense.slices_mut().into_slices_with_context();
+        let (context, slices) = dense.mut_slices().into_slices_with_context();
         let (_, values) = slices.into_parts();
         SoaSlicesMut::new(context.as_inner(), values)
     }
@@ -299,7 +299,7 @@ where
     }
 
     #[inline]
-    pub fn as_keys_slice(&self) -> &[K] {
+    pub fn as_key_slice(&self) -> &[K] {
         let Self { dense, .. } = self;
 
         let (keys, _) = dense.as_slices().into_parts();
@@ -307,7 +307,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn as_keys_slice_mut(&mut self) -> &mut [K] {
+    pub unsafe fn as_key_slice_mut(&mut self) -> &mut [K] {
         let Self { dense, .. } = self;
 
         let (keys, _) = dense.as_mut_slices().into_parts();
@@ -375,7 +375,7 @@ where
     #[inline]
     pub fn as_view_mut_ptr(&mut self) -> EpochSparseViewMutPtr<'_, K, V> {
         let Self { dense, sparse, .. } = self;
-        unsafe { EpochSparseViewMutPtr::from_parts(dense.slice_mut_ptrs(), sparse.as_mut_slice()) }
+        unsafe { EpochSparseViewMutPtr::from_parts(dense.mut_slice_ptrs(), sparse.as_mut_slice()) }
     }
 
     #[inline]
@@ -472,14 +472,14 @@ where
 
         let mut last = 0;
         for curr in 0..old_len {
-            let (&mut key, value) = dense.slices_mut().into_index_mut(curr).into();
+            let (&mut key, value) = dense.mut_slices().into_index_mut(curr).into();
             if !f(key, value) {
                 let sparse_index = unwrap_into_usize(key.sparse_index());
                 sparse[sparse_index] = SparseItem::vacant(unwrap_into_index(0), key.epoch().next());
                 continue;
             }
 
-            dense.slices_mut().swap(curr, last);
+            dense.mut_slices().swap(curr, last);
 
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
@@ -883,7 +883,7 @@ where
         }
 
         if let SparseItemKind::Occupied { dense_index } = sparse_item.kind {
-            let (context, dense) = dense.slices_mut().into_slices_with_context();
+            let (context, dense) = dense.mut_slices().into_slices_with_context();
             let dense = SoaSlicesMut::<DenseItem<K, V>>::new(context, dense);
 
             let dense_index = unwrap_into_usize(dense_index);

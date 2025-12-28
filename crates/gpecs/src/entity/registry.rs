@@ -102,7 +102,7 @@ impl<Meta> EntityRegistry<Meta> {
     #[inline]
     pub fn as_slice(&self) -> &[Entity] {
         let Self { inner } = self;
-        inner.as_keys_slice()
+        inner.as_key_slice()
     }
 
     #[inline]

@@ -115,17 +115,17 @@ where
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
-        let (_, slices) = self.as_slice_mut_ptrs_with_context();
+    pub fn as_mut_slice_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
+        let (_, slices) = self.as_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
+    pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
         let len = self.len();
         let (context, ptrs) = self.as_mut_ptrs_with_context();
 
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
 
@@ -136,8 +136,8 @@ where
     }
 
     #[inline]
-    pub fn slice_mut_ptrs(&mut self) -> SoaSliceMutPtrs<'_, T> {
-        let (context, slices) = self.as_slice_mut_ptrs_with_context();
+    pub fn mut_slice_ptrs(&mut self) -> SoaSliceMutPtrs<'_, T> {
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
         SoaSliceMutPtrs::new(context, slices)
     }
 
@@ -147,8 +147,8 @@ where
     }
 
     #[inline]
-    pub fn slices_mut(&mut self) -> SoaSlicesMut<'_, '_, T> {
-        unsafe { self.slice_mut_ptrs().deref_mut() }
+    pub fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, T> {
+        unsafe { self.mut_slice_ptrs().deref_mut() }
     }
 
     #[inline]
@@ -158,7 +158,7 @@ where
         T::Fields: Copy,
     {
         let src = src.slices();
-        self.slices_mut().copy_from_slices(&src);
+        self.mut_slices().copy_from_slices(&src);
     }
 
     #[inline]
@@ -195,7 +195,7 @@ where
     where
         I: SoaSlicePtrsIndex<T>,
     {
-        let ptrs = self.slice_mut_ptrs();
+        let ptrs = self.mut_slice_ptrs();
         unsafe { ptrs.into_get_unchecked_mut_with_context(index) }
     }
 
@@ -218,13 +218,13 @@ where
 
     #[inline]
     pub fn raw_iter_mut_with_context(&mut self) -> (&T::Context, RawIterMut<'_, T>) {
-        self.slices_mut().into_raw_iter_mut_with_context()
+        self.mut_slices().into_raw_iter_mut_with_context()
     }
 
     #[inline]
     #[track_caller]
     pub fn swap(&mut self, a: usize, b: usize) {
-        self.slices_mut().swap(a, b);
+        self.mut_slices().swap(a, b);
     }
 }
 
@@ -253,8 +253,8 @@ where
 
     #[inline]
     pub fn as_mut_slices_with_context(&mut self) -> (&T::Context, T::SlicesMut<'_, '_>) {
-        let (context, slices) = self.as_slice_mut_ptrs_with_context();
-        let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
+        let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
         (context, slices)
     }
 
@@ -289,7 +289,7 @@ where
     where
         I: SoaSlicesIndex<T>,
     {
-        self.slices_mut().into_get_mut_with_context(index)
+        self.mut_slices().into_get_mut_with_context(index)
     }
 
     #[inline]
@@ -327,7 +327,7 @@ where
     where
         I: SoaSlicesIndex<T>,
     {
-        self.slices_mut().into_index_mut_with_context(index)
+        self.mut_slices().into_index_mut_with_context(index)
     }
 
     #[inline]
@@ -349,7 +349,7 @@ where
 
     #[inline]
     pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
-        self.slices_mut().into_iter_with_context()
+        self.mut_slices().into_iter_with_context()
     }
 
     #[inline]
@@ -367,7 +367,7 @@ where
         P: AsMut<[usize]>,
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
-        self.slices_mut()
+        self.mut_slices()
             .sort_unstable_with_permutation(permutation);
     }
 
@@ -377,7 +377,7 @@ where
         P: AsMut<[usize]>,
         F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
     {
-        self.slices_mut()
+        self.mut_slices()
             .sort_unstable_with_permutation_by(permutation, compare);
     }
 
@@ -388,7 +388,7 @@ where
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
-        self.slices_mut()
+        self.mut_slices()
             .sort_unstable_with_permutation_by_key(permutation, f);
     }
 }
@@ -401,7 +401,7 @@ where
     #[track_caller]
     pub fn clone_from_slice(&mut self, src: &Self) {
         let src = src.slices();
-        self.slices_mut().clone_from_slices(&src);
+        self.mut_slices().clone_from_slices(&src);
     }
 }
 
@@ -500,7 +500,7 @@ where
             return;
         }
 
-        let (context, slices) = self.as_slice_mut_ptrs_with_context();
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
         unsafe { context.slices_drop_in_place(slices) }
     }
 }

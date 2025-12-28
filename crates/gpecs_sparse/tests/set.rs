@@ -108,7 +108,7 @@ fn empty_into_iter() {
     let into_iter = sparse_set.into_iter();
 
     assert_eq!(into_iter.len(), 0);
-    assert_eq!(into_iter.as_keys_slice(), &[]);
+    assert_eq!(into_iter.as_key_slice(), &[]);
     assert_eq!(into_iter.as_value_slices(), &[]);
 }
 
@@ -418,7 +418,7 @@ fn one_item_parts() {
         .expect("creation of sparse set from valid parts should not fail");
     assert_eq!(sparse_set.len(), 1);
     assert_eq!(sparse_set.as_slices(), &[42.into()]);
-    assert_eq!(sparse_set.as_keys_slice(), &[2]);
+    assert_eq!(sparse_set.as_key_slice(), &[2]);
     assert_eq!(sparse_set.get(2), Some(&42.into()));
 }
 
@@ -505,7 +505,7 @@ fn one_item_into_iter() {
 
     let into_iter = sparse_set.into_iter();
     assert_eq!(into_iter.len(), 1);
-    assert_eq!(into_iter.as_keys_slice(), &[0]);
+    assert_eq!(into_iter.as_key_slice(), &[0]);
     assert_eq!(into_iter.as_value_slices(), &[42.into()]);
 }
 
@@ -955,7 +955,7 @@ fn three_items_parts() {
         .expect("creation of sparse set from valid parts should not fail");
     assert_eq!(sparse_set.len(), 3);
     assert_eq!(sparse_set.as_slices(), &[34.into(), 42.into(), 69.into()]);
-    assert_eq!(sparse_set.as_keys_slice(), &[2, 1, 5]);
+    assert_eq!(sparse_set.as_key_slice(), &[2, 1, 5]);
 
     assert_eq!(sparse_set.get(2), Some(&34.into()));
     assert_eq!(sparse_set.get(1), Some(&42.into()));
@@ -1064,7 +1064,7 @@ fn three_items_into_iter() {
 
     let into_iter = sparse_set.into_iter();
     assert_eq!(into_iter.len(), 3);
-    assert_eq!(into_iter.as_keys_slice(), &[2, 1, 5]);
+    assert_eq!(into_iter.as_key_slice(), &[2, 1, 5]);
     assert_eq!(
         into_iter.as_value_slices(),
         &[34.into(), 42.into(), 69.into()],
@@ -1290,7 +1290,7 @@ fn five_items_drain() {
     sparse_set.insert(6, Identity(666));
 
     let drain = sparse_set.drain();
-    assert_eq!(drain.as_keys_slice(), &[8, 1, 4, 3, 6]);
+    assert_eq!(drain.as_key_slice(), &[8, 1, 4, 3, 6]);
     assert_eq!(
         drain.as_value_slices(),
         &[34.into(), 42.into(), 69.into(), 228.into(), 666.into()],
@@ -1343,7 +1343,7 @@ fn five_items_push_truncate() {
 
     sparse_set.truncate(usize::MAX, 3);
     assert_eq!(sparse_set.sparse_len(), 3);
-    assert_eq!(sparse_set.as_keys_slice(), &[key0, key1, key2]);
+    assert_eq!(sparse_set.as_key_slice(), &[key0, key1, key2]);
     assert_eq!(sparse_set.as_slices(), &[34.into(), 42.into(), 69.into()]);
 
     assert_eq!(sparse_set.get(key0), Some(&34.into()));
@@ -1354,7 +1354,7 @@ fn five_items_push_truncate() {
 
     sparse_set.truncate(1, usize::MAX);
     assert_eq!(sparse_set.len(), 1);
-    assert_eq!(sparse_set.as_keys_slice(), &[key0]);
+    assert_eq!(sparse_set.as_key_slice(), &[key0]);
     assert_eq!(sparse_set.as_slices(), &[34.into()]);
 
     assert_eq!(sparse_set.get(key0), Some(&34.into()));

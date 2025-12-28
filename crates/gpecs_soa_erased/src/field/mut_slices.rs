@@ -130,15 +130,15 @@ impl<'a> ErasedFieldSliceMut<'a> {
     }
 
     #[inline]
-    pub fn as_field_slice_mut_ptr(&mut self) -> ErasedFieldSliceMutPtr {
+    pub fn as_mut_field_slice_ptr(&mut self) -> ErasedFieldSliceMutPtr {
         let Self { ptr, .. } = *self;
         ptr
     }
 
     #[inline]
-    pub fn as_field_mut_ptr(&mut self) -> ErasedFieldMutPtr {
+    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr {
         let Self { ptr, .. } = self;
-        ptr.as_field_mut_ptr()
+        ptr.as_mut_field_ptr()
     }
 
     #[inline]

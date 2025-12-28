@@ -246,14 +246,14 @@ where
     type SliceMutPtrs<'a> = ErasedSoaSliceMutPtrs<&'a [FieldDescriptor]>;
 
     #[inline]
-    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+    fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short> {
         from
     }
 
     #[inline]
-    fn slice_mut_ptrs_from_raw_parts<'a>(
+    fn mut_slice_ptrs_from_raw_parts<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
         len: usize,
@@ -265,7 +265,7 @@ where
     }
 
     #[inline]
-    fn slice_mut_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
+    fn mut_slice_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -273,7 +273,7 @@ where
     }
 
     #[inline]
-    fn slice_mut_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
+    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
         let descriptors = self.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -426,7 +426,7 @@ where
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, value.field_descriptors());
 
-        value.as_refs()
+        value.as_fields()
     }
 
     #[inline]
@@ -440,7 +440,7 @@ where
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, value.field_descriptors());
 
-        value.as_refs_mut()
+        value.as_mut_fields()
     }
 
     type Slices<'context, 'a>
@@ -464,7 +464,7 @@ where
         Self: 'a;
 
     #[inline]
-    fn upcast_slices_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+    fn upcast_mut_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::SlicesMut<'long, 'a_long>,
     ) -> Self::SlicesMut<'short, 'a_short>
     where
@@ -488,7 +488,7 @@ where
     }
 
     #[inline]
-    unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
+    unsafe fn mut_slice_ptrs_to_mut_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: SliceMutPtrs<'context, Self>,
     ) -> Self::SlicesMut<'context, 'a>
@@ -513,7 +513,7 @@ where
     }
 
     #[inline]
-    fn slices_mut_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
+    fn mut_slices_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
     where
         Self: 'a,
     {
@@ -538,7 +538,7 @@ where
     }
 
     #[inline]
-    fn slices_mut_as_slice_ptrs<'context, 'a>(
+    fn mut_slices_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> SliceMutPtrs<'context, Self>
@@ -551,7 +551,7 @@ where
         slices.into_mut_ptrs()
     }
 
-    fn slices_mut_as_slices<'context, 'a>(
+    fn mut_slices_as_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a>
@@ -581,7 +581,7 @@ where
     }
 
     #[inline]
-    fn slices_mut_as_ptrs<'context, 'a>(
+    fn mut_slices_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> MutPtrs<'context, Self>
@@ -626,7 +626,7 @@ where
         debug_assert_descriptors(descriptors, value.field_descriptors());
 
         dst.into_iter()
-            .zip(value.as_refs())
+            .zip(value.as_fields())
             .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) });
     }
 }

@@ -128,16 +128,16 @@ where
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
-        let (_, slices) = self.as_slice_mut_ptrs_with_context();
+    pub fn as_mut_slice_ptrs(&mut self) -> SliceMutPtrs<'_, T> {
+        let (_, slices) = self.as_mut_slice_ptrs_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
+    pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&T::Context, SliceMutPtrs<'_, T>) {
         let len = self.len();
         let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let slices = context.slice_mut_ptrs_from_raw_parts(ptrs, len);
+        let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);
         (context, slices)
     }
 
@@ -196,8 +196,8 @@ where
 
     #[inline]
     pub fn as_mut_slices_with_context(&mut self) -> (&T::Context, T::SlicesMut<'_, '_>) {
-        let (context, slices) = self.as_slice_mut_ptrs_with_context();
-        let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
+        let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
         (context, slices)
     }
 }
@@ -308,7 +308,7 @@ where
         let Self { buffer, .. } = **iter;
         let context = unsafe { Self::context_of(buffer) };
 
-        let slices = iter.as_slice_mut_ptrs();
+        let slices = iter.as_mut_slice_ptrs();
         unsafe { context.slices_drop_in_place(slices) }
         // now `guard` will be dropped and do the rest
     }

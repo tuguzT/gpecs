@@ -51,7 +51,7 @@ where
     #[inline]
     pub fn into_inner(self) -> T::SlicesMut<'context, 'a> {
         let Self { inner, .. } = self;
-        T::upcast_slices_mut(inner)
+        T::upcast_mut_slices(inner)
     }
 }
 

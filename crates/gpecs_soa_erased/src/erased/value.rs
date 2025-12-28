@@ -131,7 +131,7 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
-    pub fn as_refs(&self) -> ErasedSoaRefs<'_, &[FieldDescriptor]> {
+    pub fn as_fields(&self) -> ErasedSoaRefs<'_, &[FieldDescriptor]> {
         let Self { bytes, descriptors } = self;
 
         let descriptors = descriptors.as_ref();
@@ -140,7 +140,7 @@ where
     }
 
     #[inline]
-    pub fn as_refs_mut(&mut self) -> ErasedSoaRefsMut<'_, &[FieldDescriptor]> {
+    pub fn as_mut_fields(&mut self) -> ErasedSoaRefsMut<'_, &[FieldDescriptor]> {
         let Self {
             ref mut bytes,
             ref descriptors,
@@ -267,7 +267,7 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let fields = &self.as_refs().into_iter();
+        let fields = &self.as_fields().into_iter();
         f.debug_struct("ErasedSoa").field("fields", fields).finish()
     }
 }

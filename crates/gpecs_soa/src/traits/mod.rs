@@ -283,7 +283,7 @@ pub unsafe trait RawSoaContext {
 
     /// Restricts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_slice_mut_ptrs<'short, 'long: 'short>(
+    fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
         from: Self::SliceMutPtrs<'long>,
     ) -> Self::SliceMutPtrs<'short>;
 
@@ -291,7 +291,7 @@ pub unsafe trait RawSoaContext {
     /// from [mutable pointers](RawSoaContext::MutPtrs) to each field and a length.
     ///
     /// The len argument is the number of elements, not the number of bytes.
-    fn slice_mut_ptrs_from_raw_parts<'a>(
+    fn mut_slice_ptrs_from_raw_parts<'a>(
         &'a self,
         ptrs: Self::MutPtrs<'a>,
         len: usize,
@@ -302,11 +302,11 @@ pub unsafe trait RawSoaContext {
     ///
     /// Note that resulting lengths should be the same for all the mutable slice pointers,
     /// or else this method could panic.
-    fn slice_mut_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize;
+    fn mut_slice_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize;
 
     /// Returns [mutable pointers](RawSoaContext::MutPtrs) to the slice's buffer
     /// of each [mutable slice pointer](RawSoaContext::SliceMutPtrs) of stored fields.
-    fn slice_mut_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a>;
+    fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a>;
 
     /// Converts [slice pointers](RawSoaContext::SlicePtrs) of each field of stored fields
     /// to the [mutable ones](RawSoaContext::SliceMutPtrs).
@@ -324,9 +324,9 @@ pub unsafe trait RawSoaContext {
     ///
     /// By default, this method just iterates by all the fields of slices and drops such fields one by one.
     unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
-        let slices = Self::upcast_slice_mut_ptrs(slices);
-        let len = self.slice_mut_ptrs_len(&slices);
-        let ptrs = self.slice_mut_ptrs_as_ptrs(slices);
+        let slices = Self::upcast_mut_slice_ptrs(slices);
+        let len = self.mut_slice_ptrs_len(&slices);
+        let ptrs = self.mut_slice_ptrs_as_ptrs(slices);
         for index in 0..len {
             let ptrs = unsafe { self.ptrs_add_mut(ptrs.clone(), index) };
             unsafe { self.ptrs_drop_in_place(ptrs) }
@@ -545,7 +545,7 @@ pub unsafe trait Soa: RawSoa {
 
     /// Restricts [mutable slices](Soa::SlicesMut) to each stored field
     /// to be covariant over generic lifetimes.
-    fn upcast_slices_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
+    fn upcast_mut_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
         from: Self::SlicesMut<'long, 'a_long>,
     ) -> Self::SlicesMut<'short, 'a_short>
     where
@@ -568,7 +568,7 @@ pub unsafe trait Soa: RawSoa {
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn slice_mut_ptrs_to_slices<'context, 'a>(
+    unsafe fn mut_slice_ptrs_to_mut_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: SliceMutPtrs<'context, Self>,
     ) -> Self::SlicesMut<'context, 'a>
@@ -589,7 +589,7 @@ pub unsafe trait Soa: RawSoa {
     ///
     /// Note that resulting lengths should be the same for all the mutable slices,
     /// or else this method could panic.
-    fn slices_mut_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
+    fn mut_slices_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
     where
         Self: 'a;
 
@@ -604,7 +604,7 @@ pub unsafe trait Soa: RawSoa {
 
     /// Converts [mutable slices](Soa::SlicesMut) to each stored field
     /// to their [mutable slice pointers](RawSoaContext::SliceMutPtrs) by taking the pointer of each one of them.
-    fn slices_mut_as_slice_ptrs<'context, 'a>(
+    fn mut_slices_as_slice_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> SliceMutPtrs<'context, Self>
@@ -613,7 +613,7 @@ pub unsafe trait Soa: RawSoa {
 
     /// Converts [mutable slices](Soa::SlicesMut) to each stored field
     /// to their [slices](Soa::Slices) by explicitly converting each one of them via `&*` operator combination.
-    fn slices_mut_as_slices<'context, 'a>(
+    fn mut_slices_as_slices<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> Self::Slices<'context, 'a>
@@ -631,7 +631,7 @@ pub unsafe trait Soa: RawSoa {
 
     /// Returns [mutable pointers](RawSoaContext::MutPtrs) to the slice's buffer
     /// of each [mutable slice](Soa::SlicesMut) of each stored field.
-    fn slices_mut_as_ptrs<'context, 'a>(
+    fn mut_slices_as_ptrs<'context, 'a>(
         context: &'context Self::Context,
         slices: Self::SlicesMut<'context, 'a>,
     ) -> MutPtrs<'context, Self>

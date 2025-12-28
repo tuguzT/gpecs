@@ -95,7 +95,7 @@ where
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let slices = result.map_err(|err| err.map_value(into_self))?;
 
-        let slices = unsafe { T::slice_mut_ptrs_to_slices(context, slices) };
+        let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
         Ok(slices)
     }
 }

@@ -1,15 +1,15 @@
 pub use self::{
     context::ErasedSoaContext,
     fields::ErasedSoaFields,
+    mut_ptrs::{ErasedSoaMutPtrs, ErasedSoaMutPtrsIter},
+    mut_refs::{ErasedSoaRefsMut, ErasedSoaRefsMutIter},
+    mut_slice_ptrs::{ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter, slice_from_raw_parts_mut},
+    mut_slices::{ErasedSoaSlicesMut, ErasedSoaSlicesMutIter},
     nonnull_ptrs::{ErasedSoaNonNullPtrs, ErasedSoaNonNullPtrsIter},
     ptrs::{ErasedSoaPtrs, ErasedSoaPtrsIter},
-    ptrs_mut::{ErasedSoaMutPtrs, ErasedSoaMutPtrsIter},
     refs::{ErasedSoaRefs, ErasedSoaRefsIter},
-    refs_mut::{ErasedSoaRefsMut, ErasedSoaRefsMutIter},
     slice_ptrs::{ErasedSoaSlicePtrs, ErasedSoaSlicePtrsIter, slice_from_raw_parts},
-    slice_ptrs_mut::{ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter, slice_from_raw_parts_mut},
     slices::{ErasedSoaSlices, ErasedSoaSlicesIter},
-    slices_mut::{ErasedSoaSlicesMut, ErasedSoaSlicesMutIter},
     value::{ErasedSoa, ErasedSoaIntoFields},
 };
 
@@ -21,14 +21,14 @@ pub mod error;
 mod assert;
 mod context;
 mod fields;
+mod mut_ptrs;
+mod mut_refs;
+mod mut_slice_ptrs;
+mod mut_slices;
 mod nonnull_ptrs;
 mod ptrs;
-mod ptrs_mut;
 mod refs;
-mod refs_mut;
 mod slice_ptrs;
-mod slice_ptrs_mut;
 mod slices;
-mod slices_mut;
 mod soa_impl;
 mod value;

@@ -125,16 +125,16 @@ where
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs(&mut self) -> SliceMutPtrs<'c, V> {
-        let (_, values) = self.as_slice_mut_ptrs_with_context();
+    pub fn as_mut_slice_ptrs(&mut self) -> SliceMutPtrs<'c, V> {
+        let (_, values) = self.as_mut_slice_ptrs_with_context();
         values
     }
 
     #[inline]
-    pub fn as_slice_mut_ptrs_with_context(&mut self) -> (&'c V::Context, SliceMutPtrs<'c, V>) {
+    pub fn as_mut_slice_ptrs_with_context(&mut self) -> (&'c V::Context, SliceMutPtrs<'c, V>) {
         let Self { inner } = self;
 
-        let (context, _, values) = inner.as_slice_mut_ptrs_with_context();
+        let (context, _, values) = inner.as_mut_slice_ptrs_with_context();
         (context, values)
     }
 
@@ -153,16 +153,16 @@ where
     }
 
     #[inline]
-    pub fn into_slice_mut_ptrs(self) -> SliceMutPtrs<'c, V> {
-        let (_, values) = self.into_slice_mut_ptrs_with_context();
+    pub fn into_mut_slice_ptrs(self) -> SliceMutPtrs<'c, V> {
+        let (_, values) = self.into_mut_slice_ptrs_with_context();
         values
     }
 
     #[inline]
-    pub fn into_slice_mut_ptrs_with_context(self) -> (&'c V::Context, SliceMutPtrs<'c, V>) {
+    pub fn into_mut_slice_ptrs_with_context(self) -> (&'c V::Context, SliceMutPtrs<'c, V>) {
         let Self { inner } = self;
 
-        let (context, _, values) = inner.into_slice_mut_ptrs_with_context();
+        let (context, _, values) = inner.into_mut_slice_ptrs_with_context();
         (context, values)
     }
 

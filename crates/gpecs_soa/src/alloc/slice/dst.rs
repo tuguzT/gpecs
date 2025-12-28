@@ -31,7 +31,7 @@ where
         P: AsMut<[usize]>,
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
-        self.slices_mut().sort_with_permutation(permutation);
+        self.mut_slices().sort_with_permutation(permutation);
     }
 
     #[inline]
@@ -39,7 +39,7 @@ where
     where
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
-        self.slices_mut().sort();
+        self.mut_slices().sort();
     }
 
     #[inline]
@@ -48,7 +48,7 @@ where
         P: AsMut<[usize]>,
         F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
     {
-        self.slices_mut()
+        self.mut_slices()
             .sort_with_permutation_by(permutation, compare);
     }
 
@@ -57,7 +57,7 @@ where
     where
         F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
     {
-        self.slices_mut().sort_by(compare);
+        self.mut_slices().sort_by(compare);
     }
 
     #[inline]
@@ -67,7 +67,7 @@ where
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
-        self.slices_mut()
+        self.mut_slices()
             .sort_with_permutation_by_key(permutation, f);
     }
 
@@ -77,7 +77,7 @@ where
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
-        self.slices_mut().sort_by_key(f);
+        self.mut_slices().sort_by_key(f);
     }
 
     #[inline]
@@ -87,7 +87,7 @@ where
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
-        self.slices_mut()
+        self.mut_slices()
             .sort_with_permutation_by_cached_key(permutation, f);
     }
 
@@ -97,7 +97,7 @@ where
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
-        self.slices_mut().sort_by_cached_key(f);
+        self.mut_slices().sort_by_cached_key(f);
     }
 
     #[inline]
@@ -105,7 +105,7 @@ where
     where
         for<'c, 'any> T::Refs<'c, 'any>: Ord,
     {
-        self.slices_mut().sort_unstable();
+        self.mut_slices().sort_unstable();
     }
 
     #[inline]
@@ -113,7 +113,7 @@ where
     where
         F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
     {
-        self.slices_mut().sort_unstable_by(compare);
+        self.mut_slices().sort_unstable_by(compare);
     }
 
     #[inline]
@@ -122,7 +122,7 @@ where
         F: FnMut(T::Refs<'_, '_>) -> K,
         K: Ord,
     {
-        self.slices_mut().sort_unstable_by_key(f);
+        self.mut_slices().sort_unstable_by_key(f);
     }
 }
 

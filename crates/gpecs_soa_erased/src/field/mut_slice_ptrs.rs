@@ -116,7 +116,7 @@ impl ErasedFieldSliceMutPtr {
     }
 
     #[inline]
-    pub fn as_field_mut_ptr(self) -> ErasedFieldMutPtr {
+    pub fn as_mut_field_ptr(self) -> ErasedFieldMutPtr {
         let Self { ptr, .. } = self;
         ptr
     }

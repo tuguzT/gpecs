@@ -54,7 +54,7 @@ impl Push for Zero {
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
-            let ptrs = value.as_refs().into_ptrs();
+            let ptrs = value.as_fields().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
     }
@@ -84,7 +84,7 @@ impl Push for Tiny {
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
-            let ptrs = value.as_refs().into_ptrs();
+            let ptrs = value.as_fields().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
     }
@@ -116,7 +116,7 @@ impl Push for Small {
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
-            let ptrs = value.as_refs().into_ptrs();
+            let ptrs = value.as_fields().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
     }
@@ -148,7 +148,7 @@ impl Push for Medium {
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
-            let ptrs = value.as_refs().into_ptrs();
+            let ptrs = value.as_fields().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
     }
@@ -183,7 +183,7 @@ impl Push for Big {
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
-            let ptrs = value.as_refs().into_ptrs();
+            let ptrs = value.as_fields().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
     }
@@ -223,7 +223,7 @@ impl Push for Large {
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
-            let ptrs = value.as_refs().into_ptrs();
+            let ptrs = value.as_fields().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
     }

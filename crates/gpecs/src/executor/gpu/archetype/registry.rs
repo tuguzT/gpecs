@@ -176,7 +176,7 @@ impl GpuArchetypeRegistry {
     pub fn archetype_ids(&self) -> GpuArchetypeIds<'_> {
         let Self { gpu_archetypes } = self;
 
-        let keys = gpu_archetypes.as_keys_slice();
+        let keys = gpu_archetypes.as_key_slice();
         let archetype_ids = must_cast_slice(keys);
         let inner = archetype_ids.iter();
         GpuArchetypeIds { inner }

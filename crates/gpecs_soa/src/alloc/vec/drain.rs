@@ -304,7 +304,7 @@ where
             let drop_offset = usize::try_from(drop_offset).unwrap_unchecked();
 
             let ptrs = context.ptrs_add_mut(vec_ptrs, drop_offset);
-            let to_drop = context.slice_mut_ptrs_from_raw_parts(ptrs, drop_len);
+            let to_drop = context.mut_slice_ptrs_from_raw_parts(ptrs, drop_len);
             context.slices_drop_in_place(to_drop);
         }
     }

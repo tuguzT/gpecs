@@ -742,7 +742,7 @@ fn three_items() {
     // use this code instead of `retain_mut` to drop needed contents,
     // erased vec does not do it automatically
     for index in (0..vec.len()).rev() {
-        let refs = vec.slices_mut().into_index_mut(index);
+        let refs = vec.mut_slices().into_index_mut(index);
         let (x, _, _, _) = unsafe { refs.try_into::<Soa>(&context) }.unwrap();
         if *x <= 3 {
             *x += 1;

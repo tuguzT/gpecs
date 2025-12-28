@@ -53,7 +53,7 @@ where
     #[inline]
     pub fn into_inner(self) -> Inner<'context, T> {
         let Self { inner, .. } = self;
-        T::Context::upcast_slice_mut_ptrs(inner)
+        T::Context::upcast_mut_slice_ptrs(inner)
     }
 }
 

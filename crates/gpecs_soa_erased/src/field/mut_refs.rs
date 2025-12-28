@@ -108,7 +108,7 @@ impl<'a> ErasedFieldRefMut<'a> {
     }
 
     #[inline]
-    pub fn as_field_mut_ptr(&mut self) -> ErasedFieldMutPtr {
+    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr {
         let Self { ptr, .. } = *self;
         ptr
     }

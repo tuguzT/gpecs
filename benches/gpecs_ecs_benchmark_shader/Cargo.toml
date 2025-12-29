@@ -8,9 +8,6 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
-[lib]
-crate-type = ["dylib", "lib"]
-
 [dependencies]
 gpecs_types = { workspace = true }
 gpecs_ecs_benchmark_types = { workspace = true }

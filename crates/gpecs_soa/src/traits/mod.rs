@@ -1,5 +1,3 @@
-#![allow(clippy::doc_markdown)] // suppress 'SoA' item in documentation is missing backticks
-
 use core::alloc::{Layout, LayoutError};
 
 use crate::field::{FieldDescriptor, buffer_layout};

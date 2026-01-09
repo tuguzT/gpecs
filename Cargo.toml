@@ -72,6 +72,7 @@ must_use_candidate = { level = "allow", priority = 1 }
 missing_safety_doc = { level = "allow", priority = 1 }
 missing_errors_doc = { level = "allow", priority = 1 }
 missing_panics_doc = { level = "allow", priority = 1 }
+doc_markdown = { level = "allow", priority = 1 }
 
 [profile.release]
 debug = true

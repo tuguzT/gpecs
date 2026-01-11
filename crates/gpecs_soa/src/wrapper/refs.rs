@@ -10,7 +10,7 @@ use core::{
 use crate::traits::Soa;
 
 /// Type wrapper for [references](Soa::Refs)
-/// which is covariant over generic lifetimes.
+/// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct Refs<'ctx, 'a, T>
 where

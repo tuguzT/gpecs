@@ -15,7 +15,7 @@ where
     T: RawSoa + ?Sized + 'a,
 {
     inner: RawIterMut<'ctx, T>,
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
 impl<'ctx, T> IterMut<'ctx, '_, T>

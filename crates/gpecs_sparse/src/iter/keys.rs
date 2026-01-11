@@ -14,7 +14,7 @@ where
     V: RawSoa + ?Sized + 'ctx,
 {
     inner: RawKeys<'ctx, K, V>,
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
 impl<'ctx, 'a, K, V> Keys<'ctx, 'a, K, V>

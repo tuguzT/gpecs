@@ -15,7 +15,7 @@ where
     T: RawSoa + ?Sized + 'a,
 {
     inner: RawIter<'ctx, T>,
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
 impl<'ctx, T> Iter<'ctx, '_, T>
@@ -125,17 +125,18 @@ where
     }
 
     #[inline]
-    pub fn as_slices(&self) -> T::Slices<'ctx, 'a> {
+    pub fn as_slices(&self) -> T::Slices<'_, '_> {
         let (_, slices) = self.as_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&'ctx T::Context, T::Slices<'ctx, 'a>) {
+    pub fn as_slices_with_context(&self) -> (&'ctx T::Context, T::Slices<'_, '_>) {
         let Self { inner, .. } = self;
 
         let (context, slices) = inner.as_slice_ptrs_with_context();
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        let slices = T::upcast_slices(slices);
         (context, slices)
     }
 

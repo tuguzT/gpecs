@@ -16,7 +16,7 @@ where
     T: RawSoa + ?Sized + 'a,
 {
     ptrs: wrapper::MutPtrs<'ctx, T>,
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
 impl<'ctx, T> ReadWriteAccess<'ctx, '_, T>

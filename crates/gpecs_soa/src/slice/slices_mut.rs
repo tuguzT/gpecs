@@ -22,7 +22,7 @@ where
     T: RawSoa + ?Sized + 'a,
 {
     ptrs: SoaSliceMutPtrs<'ctx, T>,
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
 impl<'ctx, T> SoaSlicesMut<'ctx, '_, T>
@@ -639,7 +639,7 @@ where
     pub fn sort_unstable_with_permutation_by<P, F>(&mut self, permutation: P, mut compare: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'any> F: FnMut(T::Refs<'_, 'any>, T::Refs<'_, 'any>) -> cmp::Ordering,
     {
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = me.slices().into_parts();

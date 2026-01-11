@@ -441,9 +441,9 @@ macro_rules! soa_tuple_impl {
                 Self: 'a;
 
             #[inline]
-            fn upcast_refs<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
-                from: Self::Refs<'long, 'a_long>,
-            ) -> Self::Refs<'short, 'a_short> {
+            fn upcast_refs<'short, 'long: 'short, 'a>(
+                from: Self::Refs<'long, 'a>,
+            ) -> Self::Refs<'short, 'a> {
                 from
             }
 
@@ -453,9 +453,9 @@ macro_rules! soa_tuple_impl {
                 Self: 'a;
 
             #[inline]
-            fn upcast_refs_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
-                from: Self::RefsMut<'long, 'a_long>,
-            ) -> Self::RefsMut<'short, 'a_short> {
+            fn upcast_refs_mut<'short, 'long: 'short, 'a>(
+                from: Self::RefsMut<'long, 'a>,
+            ) -> Self::RefsMut<'short, 'a> {
                 from
             }
 
@@ -537,9 +537,9 @@ macro_rules! soa_tuple_impl {
                 Self: 'a;
 
             #[inline]
-            fn upcast_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
-                from: Self::Slices<'long, 'a_long>,
-            ) -> Self::Slices<'short, 'a_short> {
+            fn upcast_slices<'short, 'long: 'short, 'a>(
+                from: Self::Slices<'long, 'a>,
+            ) -> Self::Slices<'short, 'a> {
                 from
             }
 
@@ -549,9 +549,9 @@ macro_rules! soa_tuple_impl {
                 Self: 'a;
 
             #[inline]
-            fn upcast_mut_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
-                from: Self::SlicesMut<'long, 'a_long>,
-            ) -> Self::SlicesMut<'short, 'a_short> {
+            fn upcast_mut_slices<'short, 'long: 'short, 'a>(
+                from: Self::SlicesMut<'long, 'a>,
+            ) -> Self::SlicesMut<'short, 'a> {
                 from
             }
 

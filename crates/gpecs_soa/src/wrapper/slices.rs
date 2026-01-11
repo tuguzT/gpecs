@@ -10,7 +10,7 @@ use core::{
 use crate::traits::Soa;
 
 /// Type wrapper for [slices](Soa::Slices)
-/// which is covariant over generic lifetimes.
+/// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct Slices<'ctx, 'a, T>
 where

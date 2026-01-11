@@ -83,7 +83,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(T::Refs<'_, 'a>, T::Refs<'_, 'a>) -> cmp::Ordering,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_with_permutation_by(permutation, compare);
@@ -93,7 +93,7 @@ where
     pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, mut compare: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(T::Refs<'_, 'a>, T::Refs<'_, 'a>) -> cmp::Ordering,
     {
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = me.slices().into_parts();

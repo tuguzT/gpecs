@@ -112,13 +112,13 @@ where
     V: Soa + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&self) -> V::Slices<'ctx, 'a> {
+    pub fn as_slices(&self) -> V::Slices<'_, '_> {
         let (_, values) = self.as_slices_with_context();
         values
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&'ctx V::Context, V::Slices<'ctx, 'a>) {
+    pub fn as_slices_with_context(&self) -> (&'ctx V::Context, V::Slices<'_, '_>) {
         let Self { inner } = self;
         let (context, _, values) = inner.as_slices_with_context();
         (context, values)

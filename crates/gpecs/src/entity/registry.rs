@@ -359,21 +359,21 @@ pub struct Iter<'ctx, 'a, Meta> {
     inner: SparseIter<'ctx, 'a, Entity, Identity<Meta>>,
 }
 
-impl<'a, Meta> Iter<'_, 'a, Meta> {
+impl<Meta> Iter<'_, '_, Meta> {
     #[inline]
-    pub fn entities(&self) -> &'a [Entity] {
+    pub fn entities(&self) -> &[Entity] {
         let (entities, _) = self.as_slices();
         entities
     }
 
     #[inline]
-    pub fn metas(&self) -> &'a [Meta] {
+    pub fn metas(&self) -> &[Meta] {
         let (_, metas) = self.as_slices();
         metas
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&'a [Entity], &'a [Meta]) {
+    pub fn as_slices(&self) -> (&[Entity], &[Meta]) {
         let Self { inner } = self;
 
         let (entities, metas) = inner.as_slices();

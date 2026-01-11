@@ -431,12 +431,12 @@ pub unsafe trait Soa: RawSoa {
         Self: 'a;
 
     /// Restricts [references](Soa::Refs) to each stored field
-    /// to be covariant over generic lifetimes.
-    fn upcast_refs<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
-        from: Self::Refs<'long, 'a_long>,
-    ) -> Self::Refs<'short, 'a_short>
+    /// to be covariant over generic lifetime.
+    fn upcast_refs<'short, 'long: 'short, 'a>(
+        from: Self::Refs<'long, 'a>,
+    ) -> Self::Refs<'short, 'a>
     where
-        Self: 'a_long;
+        Self: 'a;
 
     /// Non-empty collection of mutable references to each stored field.
     ///
@@ -446,12 +446,12 @@ pub unsafe trait Soa: RawSoa {
         Self: 'a;
 
     /// Restricts [mutable references](Soa::RefsMut) to each stored field
-    /// to be covariant over generic lifetimes.
-    fn upcast_refs_mut<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
-        from: Self::RefsMut<'long, 'a_long>,
-    ) -> Self::RefsMut<'short, 'a_short>
+    /// to be covariant over generic lifetime.
+    fn upcast_refs_mut<'short, 'long: 'short, 'a>(
+        from: Self::RefsMut<'long, 'a>,
+    ) -> Self::RefsMut<'short, 'a>
     where
-        Self: 'a_long;
+        Self: 'a;
 
     /// Converts [pointers](RawSoaContext::Ptrs) to each stored field
     /// to their [references](Soa::Refs) by dereferencing each one of them.
@@ -527,12 +527,12 @@ pub unsafe trait Soa: RawSoa {
         Self: 'a;
 
     /// Restricts [slices](Soa::Slices) to each stored field
-    /// to be covariant over generic lifetimes.
-    fn upcast_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
-        from: Self::Slices<'long, 'a_long>,
-    ) -> Self::Slices<'short, 'a_short>
+    /// to be covariant over generic lifetime.
+    fn upcast_slices<'short, 'long: 'short, 'a>(
+        from: Self::Slices<'long, 'a>,
+    ) -> Self::Slices<'short, 'a>
     where
-        Self: 'a_long;
+        Self: 'a;
 
     /// Non-empty collection of mutable slices of each stored field.
     ///
@@ -542,12 +542,12 @@ pub unsafe trait Soa: RawSoa {
         Self: 'a;
 
     /// Restricts [mutable slices](Soa::SlicesMut) to each stored field
-    /// to be covariant over generic lifetimes.
-    fn upcast_mut_slices<'short, 'long: 'short, 'a_short, 'a_long: 'a_short>(
-        from: Self::SlicesMut<'long, 'a_long>,
-    ) -> Self::SlicesMut<'short, 'a_short>
+    /// to be covariant over generic lifetime.
+    fn upcast_mut_slices<'short, 'long: 'short, 'a>(
+        from: Self::SlicesMut<'long, 'a>,
+    ) -> Self::SlicesMut<'short, 'a>
     where
-        Self: 'a_long;
+        Self: 'a;
 
     /// Converts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
     /// to their [slices](Soa::Slices) by dereferencing each one of them.

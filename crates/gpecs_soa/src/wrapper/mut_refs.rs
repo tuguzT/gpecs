@@ -10,7 +10,7 @@ use core::{
 use crate::traits::Soa;
 
 /// Type wrapper for [mutable references](Soa::RefsMut)
-/// which is covariant over generic lifetimes.
+/// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct RefsMut<'ctx, 'a, T>
 where

@@ -16,7 +16,7 @@ where
     T: RawSoa + ?Sized + 'a,
 {
     ptrs: SoaSlicePtrs<'ctx, T>,
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
 impl<'ctx, T> SoaSlices<'ctx, '_, T>

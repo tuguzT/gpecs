@@ -86,12 +86,12 @@ where
     }
 }
 
-impl<'ctx, K, V> DenseSlicePtrs<'ctx, K, V>
+impl<'ctx, 'a, K, V> DenseSlicePtrs<'ctx, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub unsafe fn deref<'a>(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
+    pub unsafe fn deref(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
         let Self { keys, values } = self;
 
         let keys = unsafe { &*keys };

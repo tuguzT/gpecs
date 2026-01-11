@@ -7,12 +7,13 @@ use crate::{
 impl<K, V> EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: ?Sized,
+    for<'a> V: Soa<'a>,
 {
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'ctx, 'a> V::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <V as Soa<'a>>::Refs<'ctx>: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
@@ -30,7 +31,8 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, mut f: F)
     where
-        F: FnMut((K, V::Refs<'_, '_>), (K, V::Refs<'_, '_>)) -> cmp::Ordering,
+        for<'a> F:
+            FnMut((K, <V as Soa<'a>>::Refs<'_>), (K, <V as Soa<'a>>::Refs<'_>)) -> cmp::Ordering,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by(|&lhs_key, &rhs_key| {
@@ -50,7 +52,7 @@ where
     #[inline]
     pub fn sort_by_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, V::Refs<'_, '_>)) -> T,
+        F: FnMut((K, <V as Soa<'_>>::Refs<'_>)) -> T,
         T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
@@ -65,7 +67,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, V::Refs<'_, '_>)) -> T,
+        F: FnMut((K, <V as Soa<'_>>::Refs<'_>)) -> T,
         T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {

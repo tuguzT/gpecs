@@ -265,214 +265,164 @@ where
     type Fields = (K, V::Fields);
 }
 
-unsafe impl<K, V> Soa for DenseItem<K, V>
+unsafe impl<'a, K, V> Soa<'a> for DenseItem<K, V>
 where
-    V: Soa + ?Sized,
+    K: 'a,
+    V: Soa<'a> + ?Sized,
 {
-    type Refs<'ctx, 'a>
-        = DenseRefs<'ctx, 'a, K, V>
-    where
-        Self: 'a;
+    type Refs<'ctx> = DenseRefs<'ctx, 'a, K, V>;
 
     #[inline]
-    fn upcast_refs<'short, 'long: 'short, 'a>(
-        from: Self::Refs<'long, 'a>,
-    ) -> Self::Refs<'short, 'a> {
+    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
         let DenseRefs { key, value } = from;
         let value = V::upcast_refs(value.into_inner());
         DenseRefs::new(key, value)
     }
 
-    type RefsMut<'ctx, 'a>
-        = DenseRefsMut<'ctx, 'a, K, V>
-    where
-        Self: 'a;
+    type RefsMut<'ctx> = DenseRefsMut<'ctx, 'a, K, V>;
 
     #[inline]
-    fn upcast_refs_mut<'short, 'long: 'short, 'a>(
-        from: Self::RefsMut<'long, 'a>,
-    ) -> Self::RefsMut<'short, 'a> {
+    fn upcast_refs_mut<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
         let DenseRefsMut { key, value } = from;
         let value = V::upcast_refs_mut(value.into_inner());
         DenseRefsMut::new(key, value)
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs<'ctx, 'a>(
+    unsafe fn ptrs_to_refs<'ctx>(
         context: &'ctx Self::Context,
         ptrs: Ptrs<'ctx, Self>,
-    ) -> Self::Refs<'ctx, 'a> {
+    ) -> Self::Refs<'ctx> {
         unsafe { ptrs.deref(context) }
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs_mut<'ctx, 'a>(
+    unsafe fn ptrs_to_refs_mut<'ctx>(
         context: &'ctx Self::Context,
         ptrs: MutPtrs<'ctx, Self>,
-    ) -> Self::RefsMut<'ctx, 'a> {
+    ) -> Self::RefsMut<'ctx> {
         unsafe { ptrs.deref_mut(context) }
     }
 
     #[inline]
-    fn refs_as_ptrs<'ctx, 'a>(
+    fn refs_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        refs: Self::Refs<'ctx, 'a>,
-    ) -> Ptrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        refs: Self::Refs<'ctx>,
+    ) -> Ptrs<'ctx, Self> {
         refs.into_ptrs(context)
     }
 
     #[inline]
-    fn refs_mut_as_ptrs<'ctx, 'a>(
+    fn refs_mut_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx, 'a>,
-    ) -> MutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        refs: Self::RefsMut<'ctx>,
+    ) -> MutPtrs<'ctx, Self> {
         refs.into_ptrs(context)
     }
 
     #[inline]
-    fn refs_mut_as_refs<'ctx, 'a>(
+    fn refs_mut_as_refs<'ctx>(
         context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx, 'a>,
-    ) -> Self::Refs<'ctx, 'a> {
+        refs: Self::RefsMut<'ctx>,
+    ) -> Self::Refs<'ctx> {
         refs.into_refs(context)
     }
 
     #[inline]
-    fn value_as_refs<'a>(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a, 'a>
-    where
-        Self: 'a,
-    {
+    fn value_as_refs(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a> {
         value.as_refs(context)
     }
 
     #[inline]
-    fn mut_value_as_refs<'a>(
-        context: &'a Self::Context,
-        value: &'a mut Self,
-    ) -> Self::RefsMut<'a, 'a>
-    where
-        Self: 'a,
-    {
+    fn mut_value_as_refs(context: &'a Self::Context, value: &'a mut Self) -> Self::RefsMut<'a> {
         value.as_refs_mut(context)
     }
 
-    type Slices<'ctx, 'a>
-        = DenseSlices<'ctx, 'a, K, V>
-    where
-        Self: 'a;
+    type Slices<'ctx> = DenseSlices<'ctx, 'a, K, V>;
 
     #[inline]
-    fn upcast_slices<'short, 'long: 'short, 'a>(
-        from: Self::Slices<'long, 'a>,
-    ) -> Self::Slices<'short, 'a> {
+    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
         let (keys, values) = from.into_parts();
         let values = V::upcast_slices(values);
         unsafe { DenseSlices::new_unchecked(keys, values) }
     }
 
-    type SlicesMut<'ctx, 'a>
-        = DenseSlicesMut<'ctx, 'a, K, V>
-    where
-        Self: 'a;
+    type SlicesMut<'ctx> = DenseSlicesMut<'ctx, 'a, K, V>;
 
     #[inline]
-    fn upcast_mut_slices<'short, 'long: 'short, 'a>(
-        from: Self::SlicesMut<'long, 'a>,
-    ) -> Self::SlicesMut<'short, 'a> {
+    fn upcast_mut_slices<'short, 'long: 'short>(
+        from: Self::SlicesMut<'long>,
+    ) -> Self::SlicesMut<'short> {
         let (keys, values) = from.into_parts();
         let values = V::upcast_mut_slices(values);
         unsafe { DenseSlicesMut::new_unchecked(keys, values) }
     }
 
     #[inline]
-    unsafe fn slice_ptrs_to_slices<'ctx, 'a>(
+    unsafe fn slice_ptrs_to_slices<'ctx>(
         context: &'ctx Self::Context,
         slices: SlicePtrs<'ctx, Self>,
-    ) -> Self::Slices<'ctx, 'a> {
+    ) -> Self::Slices<'ctx> {
         unsafe { slices.deref(context) }
     }
 
     #[inline]
-    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx, 'a>(
+    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx>(
         context: &'ctx Self::Context,
         slices: SliceMutPtrs<'ctx, Self>,
-    ) -> Self::SlicesMut<'ctx, 'a> {
+    ) -> Self::SlicesMut<'ctx> {
         unsafe { slices.deref_mut(context) }
     }
 
     #[inline]
     #[track_caller]
-    fn slices_len<'a>(context: &Self::Context, slices: &Self::Slices<'_, 'a>) -> usize
-    where
-        Self: 'a,
-    {
+    fn slices_len(context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
         slices.len(context)
     }
 
     #[inline]
     #[track_caller]
-    fn mut_slices_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
-    where
-        Self: 'a,
-    {
+    fn mut_slices_len(context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize {
         slices.len(context)
     }
 
     #[inline]
-    fn slices_as_slice_ptrs<'ctx, 'a>(
+    fn slices_as_slice_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx, 'a>,
-    ) -> SlicePtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::Slices<'ctx>,
+    ) -> SlicePtrs<'ctx, Self> {
         slices.into_slice_ptrs(context)
     }
 
     #[inline]
-    fn mut_slices_as_slice_ptrs<'ctx, 'a>(
+    fn mut_slices_as_slice_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> SliceMutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> SliceMutPtrs<'ctx, Self> {
         slices.into_mut_slice_ptrs(context)
     }
 
     #[inline]
-    fn mut_slices_as_slices<'ctx, 'a>(
+    fn mut_slices_as_slices<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> Self::Slices<'ctx, 'a> {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> Self::Slices<'ctx> {
         slices.into_slices(context)
     }
 
     #[inline]
-    fn slices_as_ptrs<'ctx, 'a>(
+    fn slices_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx, 'a>,
-    ) -> Ptrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::Slices<'ctx>,
+    ) -> Ptrs<'ctx, Self> {
         slices.into_ptrs(context)
     }
 
     #[inline]
-    fn mut_slices_as_ptrs<'ctx, 'a>(
+    fn mut_slices_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> MutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> MutPtrs<'ctx, Self> {
         slices.into_mut_ptrs(context)
     }
 }

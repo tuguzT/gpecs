@@ -12,7 +12,7 @@ use crate::{
 
 pub struct DenseSlicesMut<'ctx, 'a, K, V>
 where
-    V: Soa + ?Sized + 'a,
+    V: Soa<'a> + ?Sized,
 {
     keys: &'a mut [K],
     values: wrapper::SlicesMut<'ctx, 'a, V>,
@@ -20,15 +20,11 @@ where
 
 impl<'ctx, 'a, K, V> DenseSlicesMut<'ctx, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
     #[track_caller]
-    pub fn new(
-        context: &'ctx V::Context,
-        keys: &'a mut [K],
-        values: V::SlicesMut<'ctx, 'a>,
-    ) -> Self {
+    pub fn new(context: &'ctx V::Context, keys: &'a mut [K], values: V::SlicesMut<'ctx>) -> Self {
         let keys_len = keys.len();
         let values_len = V::mut_slices_len(context, &values);
         assert_eq!(keys_len, values_len);
@@ -37,7 +33,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(keys: &'a mut [K], values: V::SlicesMut<'ctx, 'a>) -> Self {
+    pub unsafe fn new_unchecked(keys: &'a mut [K], values: V::SlicesMut<'ctx>) -> Self {
         let values = wrapper::SlicesMut::new(values);
         Self { keys, values }
     }
@@ -49,7 +45,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a mut [K], V::SlicesMut<'ctx, 'a>) {
+    pub fn into_parts(self) -> (&'a mut [K], V::SlicesMut<'ctx>) {
         let Self { keys, values } = self;
         (keys, values.into_inner())
     }
@@ -102,9 +98,9 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> From<DenseSlicesMut<'ctx, 'a, K, V>> for (&'a mut [K], V::SlicesMut<'ctx, 'a>)
+impl<'ctx, 'a, K, V> From<DenseSlicesMut<'ctx, 'a, K, V>> for (&'a mut [K], V::SlicesMut<'ctx>)
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
     fn from(value: DenseSlicesMut<'ctx, 'a, K, V>) -> Self {
@@ -115,8 +111,8 @@ where
 impl<K, V> Debug for DenseSlicesMut<'_, '_, K, V>
 where
     K: Debug,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Debug,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -129,8 +125,8 @@ where
 
 impl<K, V> Default for DenseSlicesMut<'_, '_, K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Default,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: Default>,
 {
     #[inline]
     fn default() -> Self {
@@ -143,8 +139,8 @@ where
 impl<K, V> PartialEq for DenseSlicesMut<'_, '_, K, V>
 where
     K: PartialEq,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: PartialEq,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: PartialEq>,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
@@ -155,16 +151,16 @@ where
 impl<K, V> Eq for DenseSlicesMut<'_, '_, K, V>
 where
     K: Eq,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Eq,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: Eq>,
 {
 }
 
 impl<K, V> PartialOrd for DenseSlicesMut<'_, '_, K, V>
 where
     K: PartialOrd,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: PartialOrd,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: PartialOrd>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
@@ -179,8 +175,8 @@ where
 impl<K, V> Ord for DenseSlicesMut<'_, '_, K, V>
 where
     K: Ord,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Ord,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: Ord>,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
@@ -195,8 +191,8 @@ where
 impl<K, V> Hash for DenseSlicesMut<'_, '_, K, V>
 where
     K: Hash,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Hash,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: Hash>,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;

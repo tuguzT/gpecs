@@ -81,9 +81,9 @@ where
     pub unsafe fn try_into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::RefsMut<'_, 'a>, ErasedSoaIntoValueError<Self>>
+    ) -> Result<T::RefsMut<'_>, ErasedSoaIntoValueError<Self>>
     where
-        T: Soa,
+        T: Soa<'a> + ?Sized,
     {
         let Self { ptrs, .. } = self;
 

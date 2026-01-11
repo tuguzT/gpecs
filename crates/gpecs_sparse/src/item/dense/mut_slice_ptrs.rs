@@ -106,17 +106,17 @@ where
     }
 }
 
-impl<'ctx, K, V> DenseSliceMutPtrs<'ctx, K, V>
+impl<'ctx, 'a, K, V> DenseSliceMutPtrs<'ctx, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub unsafe fn deref<'a>(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
+    pub unsafe fn deref(self, context: &'ctx V::Context) -> DenseSlices<'ctx, 'a, K, V> {
         unsafe { self.cast_const(context).deref(context) }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self, context: &'ctx V::Context) -> DenseSlicesMut<'ctx, 'a, K, V> {
+    pub unsafe fn deref_mut(self, context: &'ctx V::Context) -> DenseSlicesMut<'ctx, 'a, K, V> {
         let Self { keys, values } = self;
 
         let keys = unsafe { &mut *keys };

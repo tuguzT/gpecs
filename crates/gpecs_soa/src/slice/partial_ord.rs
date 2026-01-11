@@ -9,8 +9,8 @@ macro_rules! partial_ord_impl {
         impl<T, $($vars)*> PartialOrd<$rhs> for $lhs
         where
             $($ty: $bound,)?
-            T: $crate::traits::Soa + ?Sized,
-            for<'_c, '_a> T::Slices<'_c, '_a>: PartialOrd,
+            T: ?Sized,
+            for<'_c, '_a> T: $crate::traits::Soa<'_a, Slices<'_c>: PartialOrd>,
         {
             #[inline]
             fn partial_cmp(&self, other: &$rhs) -> Option<::core::cmp::Ordering> {

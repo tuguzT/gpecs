@@ -23,13 +23,14 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: SoaTrustedFields + ?Sized,
+    for<'a> T: Soa<'a>,
 {
     #[inline]
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         self.mut_slices().sort_with_permutation(permutation);
     }
@@ -37,7 +38,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         self.mut_slices().sort();
     }
@@ -46,7 +47,7 @@ where
     pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, compare: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         self.mut_slices()
             .sort_with_permutation_by(permutation, compare);
@@ -55,7 +56,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         self.mut_slices().sort_by(compare);
     }
@@ -64,7 +65,7 @@ where
     pub fn sort_with_permutation_by_key<P, K, F>(&mut self, permutation: P, f: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices()
@@ -74,7 +75,7 @@ where
     #[inline]
     pub fn sort_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_by_key(f);
@@ -84,7 +85,7 @@ where
     pub fn sort_with_permutation_by_cached_key<P, K, F>(&mut self, permutation: P, f: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices()
@@ -94,7 +95,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_by_cached_key(f);
@@ -103,7 +104,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         self.mut_slices().sort_unstable();
     }
@@ -111,7 +112,7 @@ where
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         self.mut_slices().sort_unstable_by(compare);
     }
@@ -119,7 +120,7 @@ where
     #[inline]
     pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_unstable_by_key(f);
@@ -159,12 +160,12 @@ where
     }
 }
 
-impl<'r, T> IntoIterator for &'r Box<SoaSlice<T>>
+impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: Soa<'a> + SoaTrustedFields + ?Sized,
 {
-    type Item = T::Refs<'r, 'r>;
-    type IntoIter = Iter<'r, 'r, T>;
+    type Item = T::Refs<'a>;
+    type IntoIter = Iter<'a, 'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -172,12 +173,12 @@ where
     }
 }
 
-impl<'r, T> IntoIterator for &'r mut Box<SoaSlice<T>>
+impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
 where
-    T: Soa + SoaTrustedFields + ?Sized,
+    T: Soa<'a> + SoaTrustedFields + ?Sized,
 {
-    type Item = T::RefsMut<'r, 'r>;
-    type IntoIter = IterMut<'r, 'r, T>;
+    type Item = T::RefsMut<'a>;
+    type IntoIter = IterMut<'a, 'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

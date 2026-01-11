@@ -52,16 +52,16 @@ where
 
 impl<'ctx, 'a, T> ReadWriteAccess<'ctx, 'a, T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn from_refs(context: &'ctx T::Context, refs: T::RefsMut<'ctx, 'a>) -> Self {
+    pub fn from_refs(context: &'ctx T::Context, refs: T::RefsMut<'ctx>) -> Self {
         let ptrs = T::refs_mut_as_ptrs(context, refs);
         unsafe { Self::from_ptrs(ptrs) }
     }
 
     #[inline]
-    pub fn into_refs(self, context: &'ctx T::Context) -> T::RefsMut<'ctx, 'a> {
+    pub fn into_refs(self, context: &'ctx T::Context) -> T::RefsMut<'ctx> {
         let ptrs = self.into_ptrs();
         unsafe { T::ptrs_to_refs_mut(context, ptrs) }
     }
@@ -191,16 +191,16 @@ where
 
 impl<'ctx, 'a, T> TryInsertAccess<'ctx, 'a, T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn read_write(context: &'ctx T::Context, refs: T::RefsMut<'ctx, 'a>) -> Self {
+    pub fn read_write(context: &'ctx T::Context, refs: T::RefsMut<'ctx>) -> Self {
         let refs = ReadWriteAccess::from_refs(context, refs);
         Self::ReadWrite(refs)
     }
 
     #[inline]
-    pub fn into_refs(self, context: &'ctx T::Context) -> Option<T::RefsMut<'ctx, 'a>> {
+    pub fn into_refs(self, context: &'ctx T::Context) -> Option<T::RefsMut<'ctx>> {
         match self {
             Self::ReadWrite(refs) => Some(refs.into_refs(context)),
             Self::WriteOnly(_) => None,

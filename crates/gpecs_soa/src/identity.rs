@@ -545,205 +545,157 @@ unsafe impl<T> RawSoa for Identity<T> {
     type Fields = Identity<T>;
 }
 
-unsafe impl<T> Soa for Identity<T> {
-    type Refs<'ctx, 'a>
-        = &'a Self
-    where
-        Self: 'a;
+unsafe impl<'a, T> Soa<'a> for Identity<T>
+where
+    T: 'a,
+{
+    type Refs<'ctx> = &'a Self;
 
     #[inline]
-    fn upcast_refs<'short, 'long: 'short, 'a>(
-        from: Self::Refs<'long, 'a>,
-    ) -> Self::Refs<'short, 'a> {
+    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
         from
     }
 
-    type RefsMut<'ctx, 'a>
-        = &'a mut Self
-    where
-        Self: 'a;
+    type RefsMut<'ctx> = &'a mut Self;
 
     #[inline]
-    fn upcast_refs_mut<'short, 'long: 'short, 'a>(
-        from: Self::RefsMut<'long, 'a>,
-    ) -> Self::RefsMut<'short, 'a> {
+    fn upcast_refs_mut<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
         from
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs<'ctx, 'a>(
+    unsafe fn ptrs_to_refs<'ctx>(
         _context: &'ctx Self::Context,
         ptrs: Ptrs<'ctx, Self>,
-    ) -> Self::Refs<'ctx, 'a> {
+    ) -> Self::Refs<'ctx> {
         unsafe { &*ptrs }
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs_mut<'ctx, 'a>(
+    unsafe fn ptrs_to_refs_mut<'ctx>(
         _context: &'ctx Self::Context,
         ptrs: MutPtrs<'ctx, Self>,
-    ) -> Self::RefsMut<'ctx, 'a> {
+    ) -> Self::RefsMut<'ctx> {
         unsafe { &mut *ptrs }
     }
 
     #[inline]
-    fn refs_as_ptrs<'ctx, 'a>(
+    fn refs_as_ptrs<'ctx>(
         _context: &'ctx Self::Context,
-        refs: Self::Refs<'ctx, 'a>,
-    ) -> Ptrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        refs: Self::Refs<'ctx>,
+    ) -> Ptrs<'ctx, Self> {
         ptr::from_ref(refs)
     }
 
     #[inline]
-    fn refs_mut_as_ptrs<'ctx, 'a>(
+    fn refs_mut_as_ptrs<'ctx>(
         _context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx, 'a>,
-    ) -> MutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        refs: Self::RefsMut<'ctx>,
+    ) -> MutPtrs<'ctx, Self> {
         ptr::from_mut(refs)
     }
 
     #[inline]
-    fn refs_mut_as_refs<'ctx, 'a>(
+    fn refs_mut_as_refs<'ctx>(
         _context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx, 'a>,
-    ) -> Self::Refs<'ctx, 'a> {
+        refs: Self::RefsMut<'ctx>,
+    ) -> Self::Refs<'ctx> {
         &*refs
     }
 
     #[inline]
-    fn value_as_refs<'a>(_context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a, 'a>
-    where
-        Self: 'a,
-    {
+    fn value_as_refs(_context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a> {
         value
     }
 
     #[inline]
-    fn mut_value_as_refs<'a>(
-        _context: &'a Self::Context,
-        value: &'a mut Self,
-    ) -> Self::RefsMut<'a, 'a>
-    where
-        Self: 'a,
-    {
+    fn mut_value_as_refs(_context: &'a Self::Context, value: &'a mut Self) -> Self::RefsMut<'a> {
         value
     }
 
-    type Slices<'ctx, 'a>
-        = &'a [Self]
-    where
-        Self: 'a;
+    type Slices<'ctx> = &'a [Self];
 
     #[inline]
-    fn upcast_slices<'short, 'long: 'short, 'a>(
-        from: Self::Slices<'long, 'a>,
-    ) -> Self::Slices<'short, 'a> {
+    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
         from
     }
 
-    type SlicesMut<'ctx, 'a>
-        = &'a mut [Self]
-    where
-        Self: 'a;
+    type SlicesMut<'ctx> = &'a mut [Self];
 
     #[inline]
-    fn upcast_mut_slices<'short, 'long: 'short, 'a>(
-        from: Self::SlicesMut<'long, 'a>,
-    ) -> Self::SlicesMut<'short, 'a> {
+    fn upcast_mut_slices<'short, 'long: 'short>(
+        from: Self::SlicesMut<'long>,
+    ) -> Self::SlicesMut<'short> {
         from
     }
 
     #[inline]
-    unsafe fn slice_ptrs_to_slices<'ctx, 'a>(
+    unsafe fn slice_ptrs_to_slices<'ctx>(
         _context: &'ctx Self::Context,
         slices: SlicePtrs<'ctx, Self>,
-    ) -> Self::Slices<'ctx, 'a> {
+    ) -> Self::Slices<'ctx> {
         let data = slices.cast();
         let len = slices.len();
         unsafe { slice::from_raw_parts(data, len) }
     }
 
     #[inline]
-    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx, 'a>(
+    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx>(
         _context: &'ctx Self::Context,
         slices: SliceMutPtrs<'ctx, Self>,
-    ) -> Self::SlicesMut<'ctx, 'a> {
+    ) -> Self::SlicesMut<'ctx> {
         let data = slices.cast();
         let len = slices.len();
         unsafe { slice::from_raw_parts_mut(data, len) }
     }
 
     #[inline]
-    fn slices_len<'a>(_context: &Self::Context, slices: &Self::Slices<'_, 'a>) -> usize
-    where
-        Self: 'a,
-    {
+    fn slices_len(_context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
         slices.len()
     }
 
     #[inline]
-    fn mut_slices_len<'a>(_context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
-    where
-        Self: 'a,
-    {
+    fn mut_slices_len(_context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize {
         slices.len()
     }
 
     #[inline]
-    fn slices_as_slice_ptrs<'ctx, 'a>(
+    fn slices_as_slice_ptrs<'ctx>(
         _context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx, 'a>,
-    ) -> SlicePtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::Slices<'ctx>,
+    ) -> SlicePtrs<'ctx, Self> {
         ptr::from_ref(slices)
     }
 
     #[inline]
-    fn mut_slices_as_slice_ptrs<'ctx, 'a>(
+    fn mut_slices_as_slice_ptrs<'ctx>(
         _context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> SliceMutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> SliceMutPtrs<'ctx, Self> {
         ptr::from_mut(slices)
     }
 
     #[inline]
-    fn mut_slices_as_slices<'ctx, 'a>(
+    fn mut_slices_as_slices<'ctx>(
         _context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> Self::Slices<'ctx, 'a> {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> Self::Slices<'ctx> {
         &*slices
     }
 
     #[inline]
-    fn slices_as_ptrs<'ctx, 'a>(
+    fn slices_as_ptrs<'ctx>(
         _context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx, 'a>,
-    ) -> Ptrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::Slices<'ctx>,
+    ) -> Ptrs<'ctx, Self> {
         slices.as_ptr()
     }
 
     #[inline]
-    fn mut_slices_as_ptrs<'ctx, 'a>(
+    fn mut_slices_as_ptrs<'ctx>(
         _context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> MutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> MutPtrs<'ctx, Self> {
         slices.as_mut_ptr()
     }
 }

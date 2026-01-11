@@ -30,6 +30,7 @@ use crate::{
     entity::Entity,
     hash::{IndexMap, IndexSet},
     soa::slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
+    soa::traits::Soa,
 };
 
 use super::{
@@ -396,7 +397,7 @@ impl ArchetypeRegistry {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<B::Refs<'_, '_>, IncompatibleBundleError>
+    ) -> Result<<B as Soa<'_>>::Refs<'_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -411,7 +412,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<B::Refs<'_, '_>, IncompatibleBundleError>
+    ) -> Result<<B as Soa<'_>>::Refs<'_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -439,7 +440,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<B::RefsMut<'_, '_>, IncompatibleBundleError>
+    ) -> Result<<B as Soa<'_>>::RefsMut<'_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -454,7 +455,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<B::RefsMut<'_, '_>, IncompatibleBundleError>
+    ) -> Result<<B as Soa<'_>>::RefsMut<'_>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -1783,7 +1784,7 @@ impl<'a, 'ctx, B> IntoIterator for Bundles<'a, 'ctx, B>
 where
     B: Bundle,
 {
-    type Item = (Entity, B::Refs<'a, 'a>);
+    type Item = (Entity, <B as Soa<'a>>::Refs<'a>);
 
     // this actually should be just `FlatMap`,
     // but it cannot be returned because `impl Trait` is unstable in associated types
@@ -1840,7 +1841,7 @@ where
 impl<B> Debug for BundlesIntoIter<'_, '_, B>
 where
     B: Bundle,
-    for<'ctx, 'a> B::Slices<'ctx, 'a>: Debug,
+    for<'ctx, 'a> <B as Soa<'a>>::Slices<'ctx>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -1882,7 +1883,7 @@ impl<'a, B> Iterator for BundlesIntoIter<'a, '_, B>
 where
     B: Bundle,
 {
-    type Item = (Entity, B::Refs<'a, 'a>);
+    type Item = (Entity, <B as Soa<'a>>::Refs<'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -2016,7 +2017,7 @@ impl<'a, 'ctx, B> IntoIterator for BundlesMut<'a, 'ctx, B>
 where
     B: Bundle,
 {
-    type Item = (Entity, B::RefsMut<'a, 'a>);
+    type Item = (Entity, <B as Soa<'a>>::RefsMut<'a>);
 
     // this actually should be just `FlatMap`,
     // but it cannot be returned because `impl Trait` is unstable in associated types
@@ -2073,7 +2074,7 @@ where
 impl<B> Debug for BundlesMutIntoIter<'_, '_, B>
 where
     B: Bundle,
-    for<'ctx, 'a> B::Slices<'ctx, 'a>: Debug,
+    for<'ctx, 'a> <B as Soa<'a>>::Slices<'ctx>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -2095,7 +2096,7 @@ impl<'a, B> Iterator for BundlesMutIntoIter<'a, '_, B>
 where
     B: Bundle,
 {
-    type Item = (Entity, B::RefsMut<'a, 'a>);
+    type Item = (Entity, <B as Soa<'a>>::RefsMut<'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

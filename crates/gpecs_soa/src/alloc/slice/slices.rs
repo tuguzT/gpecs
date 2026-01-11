@@ -56,12 +56,13 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: Soa + ?Sized,
+    T: ?Sized,
+    for<'a> T: Soa<'a>,
 {
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_with_permutation(permutation);
@@ -71,7 +72,7 @@ where
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         self.sort_with_permutation_by(permutation, |a, b| {
             let a = T::upcast_refs(a);
@@ -83,7 +84,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
-        for<'a> F: FnMut(T::Refs<'_, 'a>, T::Refs<'_, 'a>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_with_permutation_by(permutation, compare);
@@ -93,7 +94,7 @@ where
     pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, mut compare: F)
     where
         P: AsMut<[usize]>,
-        for<'a> F: FnMut(T::Refs<'_, 'a>, T::Refs<'_, 'a>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         self.sort_impl(permutation, |me, permutation| {
             let (context, ptrs, _) = me.slices().into_parts();
@@ -114,7 +115,7 @@ where
     #[inline]
     pub fn sort_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         let permutation = alloc_permutation(self.len());
@@ -125,7 +126,7 @@ where
     pub fn sort_with_permutation_by_key<P, K, F>(&mut self, permutation: P, mut f: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.sort_impl(permutation, |me, permutation| {
@@ -141,7 +142,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         let permutation = alloc_permutation(self.len());
@@ -152,7 +153,7 @@ where
     pub fn sort_with_permutation_by_cached_key<P, K, F>(&mut self, permutation: P, mut f: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.sort_impl(permutation, |me, permutation| {
@@ -168,7 +169,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_unstable_with_permutation(permutation);
@@ -177,7 +178,7 @@ where
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         let permutation = alloc_permutation(self.len());
         self.sort_unstable_with_permutation_by(permutation, compare);
@@ -186,7 +187,7 @@ where
     #[inline]
     pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         let permutation = alloc_permutation(self.len());

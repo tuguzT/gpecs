@@ -116,39 +116,23 @@ where
 
 impl<'ctx, 'a, T> Iter<'ctx, 'a, T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn new(context: &'ctx T::Context, slices: T::Slices<'ctx, 'a>) -> Self {
+    pub fn new(context: &'ctx T::Context, slices: T::Slices<'ctx>) -> Self {
         let slices = T::slices_as_slice_ptrs(context, slices);
         unsafe { Self::from_parts(context, slices) }
     }
 
     #[inline]
-    pub fn as_slices(&self) -> T::Slices<'_, '_> {
-        let (_, slices) = self.as_slices_with_context();
-        slices
-    }
-
-    #[inline]
-    pub fn as_slices_with_context(&self) -> (&'ctx T::Context, T::Slices<'_, '_>) {
-        let Self { inner, .. } = self;
-
-        let (context, slices) = inner.as_slice_ptrs_with_context();
-        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
-        let slices = T::upcast_slices(slices);
-        (context, slices)
-    }
-
-    #[inline]
-    pub fn into_slices(self) -> T::Slices<'ctx, 'a> {
+    pub fn into_slices(self) -> T::Slices<'ctx> {
         let (_, slices) = self.into_slices_with_context();
         slices
     }
 
     #[inline]
     #[doc(alias = "into_parts")]
-    pub fn into_slices_with_context(self) -> (&'ctx T::Context, T::Slices<'ctx, 'a>) {
+    pub fn into_slices_with_context(self) -> (&'ctx T::Context, T::Slices<'ctx>) {
         let Self { inner, .. } = self;
 
         let (context, slices) = inner.into_slice_ptrs_with_context();
@@ -157,10 +141,31 @@ where
     }
 }
 
+impl<'a, T> Iter<'_, '_, T>
+where
+    T: Soa<'a> + ?Sized,
+{
+    #[inline]
+    pub fn as_slices(&'a self) -> T::Slices<'a> {
+        let (_, slices) = self.as_slices_with_context();
+        slices
+    }
+
+    #[inline]
+    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, T::Slices<'a>) {
+        let Self { inner, .. } = self;
+
+        let (context, slices) = inner.as_slice_ptrs_with_context();
+        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        let slices = T::upcast_slices(slices);
+        (context, slices)
+    }
+}
+
 impl<T, U> AsRef<[U]> for Iter<'_, '_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::Slices<'ctx, 'a>: Into<&'a [U]>,
+    T: ?Sized,
+    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Into<&'a [U]>>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -170,8 +175,8 @@ where
 
 impl<T> Debug for Iter<'_, '_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::Slices<'ctx, 'a>: Debug,
+    T: ?Sized,
+    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
@@ -194,9 +199,9 @@ where
 
 impl<'ctx, 'a, T> Iterator for Iter<'ctx, 'a, T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
-    type Item = T::Refs<'ctx, 'a>;
+    type Item = T::Refs<'ctx>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -214,9 +219,9 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for Iter<'_, '_, T>
+impl<'a, T> DoubleEndedIterator for Iter<'_, 'a, T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -228,9 +233,9 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for Iter<'_, '_, T>
+impl<'a, T> ExactSizeIterator for Iter<'_, 'a, T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -238,4 +243,4 @@ where
     }
 }
 
-impl<T> FusedIterator for Iter<'_, '_, T> where T: Soa + ?Sized {}
+impl<'a, T> FusedIterator for Iter<'_, 'a, T> where T: Soa<'a> + ?Sized {}

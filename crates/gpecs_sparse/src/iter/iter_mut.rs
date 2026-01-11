@@ -194,31 +194,36 @@ where
 
 impl<'ctx, 'a, K, V> IterMut<'ctx, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn into_slices(self) -> (&'a [K], V::SlicesMut<'ctx, 'a>) {
+    pub fn into_slices(self) -> (&'a [K], V::SlicesMut<'ctx>) {
         let (_, keys, values) = self.into_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn into_slices_with_context(self) -> (&'ctx V::Context, &'a [K], V::SlicesMut<'ctx, 'a>) {
+    pub fn into_slices_with_context(self) -> (&'ctx V::Context, &'a [K], V::SlicesMut<'ctx>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.into_slices_with_context();
         let (keys, values) = slices.into_parts();
         (context, keys, values)
     }
+}
 
+impl<'a, K, V> IterMut<'_, '_, K, V>
+where
+    V: Soa<'a> + ?Sized,
+{
     #[inline]
-    pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
+    pub fn as_slices(&'a self) -> (&'a [K], V::Slices<'a>) {
         let (_, keys, values) = self.as_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&V::Context, &[K], V::Slices<'_, '_>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, &'a [K], V::Slices<'a>) {
         let Self { inner, .. } = self;
 
         let (context, slices) = inner.as_slices_with_context();
@@ -230,8 +235,8 @@ where
 impl<K, V> Debug for IterMut<'_, '_, K, V>
 where
     K: Debug,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = &self.as_slices();
@@ -244,8 +249,8 @@ where
 
 impl<T, K, V> AsRef<[T]> for IterMut<'_, '_, K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Into<&'a [T]>>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -256,9 +261,9 @@ where
 
 impl<'ctx, 'a, K, V> Iterator for IterMut<'ctx, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
-    type Item = (&'a K, V::RefsMut<'ctx, 'a>);
+    type Item = (&'a K, V::RefsMut<'ctx>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -276,9 +281,9 @@ where
     }
 }
 
-impl<K, V> DoubleEndedIterator for IterMut<'_, '_, K, V>
+impl<'a, K, V> DoubleEndedIterator for IterMut<'_, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -290,9 +295,9 @@ where
     }
 }
 
-impl<K, V> ExactSizeIterator for IterMut<'_, '_, K, V>
+impl<'a, K, V> ExactSizeIterator for IterMut<'_, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -300,4 +305,4 @@ where
     }
 }
 
-impl<K, V> FusedIterator for IterMut<'_, '_, K, V> where V: Soa {}
+impl<'a, K, V> FusedIterator for IterMut<'_, 'a, K, V> where V: Soa<'a> {}

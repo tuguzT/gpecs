@@ -15,7 +15,7 @@ pub fn update_entity_position(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &[Entity],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] positions: &mut [Position],
 ) {
-    let (entities,): <(_,) as Soa>::Slices<'_, '_> = (entities,);
+    let (entities,): <(_,) as Soa<'_>>::Slices<'_> = (entities,);
 
     let index = id.x as usize;
     let entity = entities[index];
@@ -34,7 +34,7 @@ pub fn update_entity_mass(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] entities: &[Entity],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] masses: &mut [Mass],
 ) {
-    let (entities,): <(_,) as Soa>::Slices<'_, '_> = (entities,);
+    let (entities,): <(_,) as Soa<'_>>::Slices<'_> = (entities,);
 
     let index = id.x as usize;
     let entity = entities[index];

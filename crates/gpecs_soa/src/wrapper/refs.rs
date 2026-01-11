@@ -14,42 +14,42 @@ use crate::traits::Soa;
 #[repr(transparent)]
 pub struct Refs<'ctx, 'a, T>
 where
-    T: Soa + ?Sized + 'a,
+    T: Soa<'a> + ?Sized,
 {
-    inner: T::Refs<'static, 'a>,
+    inner: T::Refs<'static>,
     phantom: PhantomData<&'ctx ()>,
 }
 
 impl<'ctx, 'a, T> Refs<'ctx, 'a, T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
     /// Creates self from the [references](Soa::Refs).
     #[inline]
-    pub fn new(inner: T::Refs<'ctx, 'a>) -> Self {
+    pub fn new(inner: T::Refs<'ctx>) -> Self {
         Self {
-            inner: unsafe { transmute::<T::Refs<'_, '_>, T::Refs<'_, '_>>(inner) },
+            inner: unsafe { transmute::<T::Refs<'_>, T::Refs<'_>>(inner) },
             phantom: PhantomData,
         }
     }
 
     /// Retrieves a reference of [references](Soa::Refs).
     #[inline]
-    pub fn as_inner(&self) -> &T::Refs<'_, '_> {
+    pub fn as_inner(&self) -> &T::Refs<'_> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
     /// Retrieves a mutable reference of [references](Soa::Refs).
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut T::Refs<'_, '_> {
+    pub fn as_inner_mut(&mut self) -> &mut T::Refs<'_> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
     /// Retrieves the [references](Soa::Refs).
     #[inline]
-    pub fn into_inner(self) -> T::Refs<'ctx, 'a> {
+    pub fn into_inner(self) -> T::Refs<'ctx> {
         let Self { inner, .. } = self;
         T::upcast_refs(inner)
     }
@@ -57,8 +57,8 @@ where
 
 impl<'a, T> Debug for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: Debug,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -68,8 +68,8 @@ where
 
 impl<'a, T> Default for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: Default,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: Default,
 {
     fn default() -> Self {
         Self {
@@ -81,8 +81,8 @@ where
 
 impl<'a, T> Clone for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: Clone,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: Clone,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -93,15 +93,15 @@ where
 
 impl<'a, T> Copy for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: Copy,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: Copy,
 {
 }
 
 impl<'a, T> PartialEq for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: PartialEq,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -111,15 +111,15 @@ where
 
 impl<'a, T> Eq for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: Eq,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: Eq,
 {
 }
 
 impl<'a, T> PartialOrd for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: PartialOrd,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -133,8 +133,8 @@ where
 
 impl<'a, T> Ord for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: Ord,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -148,8 +148,8 @@ where
 
 impl<'a, T> Hash for Refs<'_, 'a, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx> T::Refs<'ctx, 'a>: Hash,
+    T: Soa<'a> + ?Sized,
+    for<'ctx> T::Refs<'ctx>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;

@@ -19,12 +19,12 @@ impl<K, V> DenseItem<K, V> {
     }
 }
 
-impl<K, V> DenseItem<K, V>
+impl<'a, K, V> DenseItem<K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_refs<'a>(&'a self, context: &'a V::Context) -> DenseRefs<'a, 'a, K, V> {
+    pub fn as_refs(&'a self, context: &'a V::Context) -> DenseRefs<'a, 'a, K, V> {
         let Self { key, value } = self;
 
         let value = V::value_as_refs(context, value);
@@ -32,7 +32,7 @@ where
     }
 
     #[inline]
-    pub fn as_refs_mut<'a>(&'a mut self, context: &'a V::Context) -> DenseRefsMut<'a, 'a, K, V> {
+    pub fn as_refs_mut(&'a mut self, context: &'a V::Context) -> DenseRefsMut<'a, 'a, K, V> {
         let Self { key, value } = self;
 
         let value = V::mut_value_as_refs(context, value);

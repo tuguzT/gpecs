@@ -12,7 +12,7 @@ use crate::{
 
 pub struct DenseSlices<'ctx, 'a, K, V>
 where
-    V: Soa + ?Sized + 'a,
+    V: Soa<'a> + ?Sized,
 {
     keys: &'a [K],
     values: wrapper::Slices<'ctx, 'a, V>,
@@ -20,11 +20,11 @@ where
 
 impl<'ctx, 'a, K, V> DenseSlices<'ctx, 'a, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
     #[track_caller]
-    pub fn new(context: &'ctx V::Context, keys: &'a [K], values: V::Slices<'ctx, 'a>) -> Self {
+    pub fn new(context: &'ctx V::Context, keys: &'a [K], values: V::Slices<'ctx>) -> Self {
         let keys_len = keys.len();
         let values_len = V::slices_len(context, &values);
         assert_eq!(keys_len, values_len);
@@ -33,7 +33,7 @@ where
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(keys: &'a [K], values: V::Slices<'ctx, 'a>) -> Self {
+    pub unsafe fn new_unchecked(keys: &'a [K], values: V::Slices<'ctx>) -> Self {
         let values = wrapper::Slices::new(values);
         Self { keys, values }
     }
@@ -45,7 +45,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a [K], V::Slices<'ctx, 'a>) {
+    pub fn into_parts(self) -> (&'a [K], V::Slices<'ctx>) {
         let Self { keys, values } = self;
         (keys, values.into_inner())
     }
@@ -69,9 +69,9 @@ where
     }
 }
 
-impl<'ctx, 'a, K, V> From<DenseSlices<'ctx, 'a, K, V>> for (&'a [K], V::Slices<'ctx, 'a>)
+impl<'ctx, 'a, K, V> From<DenseSlices<'ctx, 'a, K, V>> for (&'a [K], V::Slices<'ctx>)
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
     fn from(value: DenseSlices<'ctx, 'a, K, V>) -> Self {
@@ -82,8 +82,8 @@ where
 impl<K, V> Debug for DenseSlices<'_, '_, K, V>
 where
     K: Debug,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { keys, values } = self;
@@ -96,8 +96,8 @@ where
 
 impl<K, V> Default for DenseSlices<'_, '_, K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Default,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Default>,
 {
     #[inline]
     fn default() -> Self {
@@ -110,8 +110,8 @@ where
 impl<K, V> PartialEq for DenseSlices<'_, '_, K, V>
 where
     K: PartialEq,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: PartialEq,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: PartialEq>,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { keys, values } = self;
@@ -122,16 +122,16 @@ where
 impl<K, V> Eq for DenseSlices<'_, '_, K, V>
 where
     K: Eq,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Eq,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Eq>,
 {
 }
 
 impl<K, V> PartialOrd for DenseSlices<'_, '_, K, V>
 where
     K: PartialOrd,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: PartialOrd,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: PartialOrd>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { keys, values } = self;
@@ -146,8 +146,8 @@ where
 impl<K, V> Ord for DenseSlices<'_, '_, K, V>
 where
     K: Ord,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Ord,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Ord>,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { keys, values } = self;
@@ -162,8 +162,8 @@ where
 impl<K, V> Hash for DenseSlices<'_, '_, K, V>
 where
     K: Hash,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Hash,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Hash>,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { keys, values } = self;
@@ -174,8 +174,8 @@ where
 
 impl<K, V> Clone for DenseSlices<'_, '_, K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Clone,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Clone>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -187,7 +187,7 @@ where
 
 impl<K, V> Copy for DenseSlices<'_, '_, K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Copy,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Copy>,
 {
 }

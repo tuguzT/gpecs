@@ -138,44 +138,51 @@ where
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
 where
     K: Key,
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
-    pub fn get(&self) -> V::Refs<'_, '_> {
+    pub fn into_mut(self) -> V::RefsMut<'a> {
+        let (_, refs) = self.into_mut_with_context();
+        refs
+    }
+
+    #[inline]
+    pub fn into_mut_with_context(self) -> (&'a V::Context, V::RefsMut<'a>) {
+        let (context, ptrs) = self.into_mut_ptrs_with_context();
+        let refs = unsafe { V::ptrs_to_refs_mut(context, ptrs) };
+        (context, refs)
+    }
+}
+
+impl<'a, K, V, C> OccupiedEntry<'_, K, V, C>
+where
+    K: Key,
+    V: Soa<'a> + ?Sized,
+    C: EpochSparseContainer<K, V> + ?Sized,
+{
+    #[inline]
+    pub fn get(&'a self) -> V::Refs<'a> {
         let (_, refs) = self.get_with_context();
         refs
     }
 
     #[inline]
-    pub fn get_with_context(&self) -> (&V::Context, V::Refs<'_, '_>) {
+    pub fn get_with_context(&'a self) -> (&'a V::Context, V::Refs<'a>) {
         let (context, ptrs) = self.as_ptrs_with_context();
         let refs = unsafe { V::ptrs_to_refs(context, ptrs) };
         (context, refs)
     }
 
     #[inline]
-    pub fn get_mut(&mut self) -> V::RefsMut<'_, '_> {
+    pub fn get_mut(&'a mut self) -> V::RefsMut<'a> {
         let (_, refs) = self.get_mut_with_context();
         refs
     }
 
     #[inline]
-    pub fn get_mut_with_context(&mut self) -> (&V::Context, V::RefsMut<'_, '_>) {
+    pub fn get_mut_with_context(&'a mut self) -> (&'a V::Context, V::RefsMut<'a>) {
         let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let refs = unsafe { V::ptrs_to_refs_mut(context, ptrs) };
-        (context, refs)
-    }
-
-    #[inline]
-    pub fn into_mut(self) -> V::RefsMut<'a, 'a> {
-        let (_, refs) = self.into_mut_with_context();
-        refs
-    }
-
-    #[inline]
-    pub fn into_mut_with_context(self) -> (&'a V::Context, V::RefsMut<'a, 'a>) {
-        let (context, ptrs) = self.into_mut_ptrs_with_context();
         let refs = unsafe { V::ptrs_to_refs_mut(context, ptrs) };
         (context, refs)
     }
@@ -246,9 +253,9 @@ where
 impl<K, V, C> Debug for OccupiedEntry<'_, K, V, C>
 where
     K: Key + Debug,
-    V: Soa + ?Sized,
+    V: ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
-    for<'ctx, 'a> V::Refs<'ctx, 'a>: Debug,
+    for<'ctx, 'a> V: Soa<'a, Refs<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
@@ -560,19 +567,42 @@ macro_rules! generate_entry_types {
             }
         }
 
-        impl<'a, K, V> Entry<'a, K, V>
+        impl<K, V> Entry<'_, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: ?Sized,
+            for<'a> V: $crate::soa::traits::Soa<'a>,
         {
             #[inline]
-            pub fn get(&self) -> Option<V::Refs<'_, '_>> {
+            #[must_use]
+            pub fn and_modify<F>(self, f: F) -> Self
+            where
+                F: FnOnce(&V::Context, <V as Soa<'_>>::RefsMut<'_>),
+            {
+                match self {
+                    Self::Occupied(mut entry) => {
+                        let (context, refs) = entry.get_mut_with_context();
+                        f(context, refs);
+                        Self::Occupied(entry)
+                    }
+                    Self::Vacant(entry) => Self::Vacant(entry),
+                }
+            }
+        }
+
+        impl<'a, K, V> Entry<'_, K, V>
+        where
+            K: $crate::key::Key,
+            V: $crate::soa::traits::Soa<'a> + ?Sized,
+        {
+            #[inline]
+            pub fn get(&'a self) -> Option<V::Refs<'a>> {
                 let (_, refs) = self.get_with_context();
                 refs
             }
 
             #[inline]
-            pub fn get_with_context(&self) -> (&V::Context, Option<V::Refs<'_, '_>>) {
+            pub fn get_with_context(&'a self) -> (&'a V::Context, Option<V::Refs<'a>>) {
                 match self {
                     Self::Occupied(entry) => {
                         let (context, refs) = entry.get_with_context();
@@ -583,35 +613,19 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get_mut(&mut self) -> Option<V::RefsMut<'_, '_>> {
+            pub fn get_mut(&'a mut self) -> Option<V::RefsMut<'a>> {
                 let (_, refs) = self.get_mut_with_context();
                 refs
             }
 
             #[inline]
-            pub fn get_mut_with_context(&mut self) -> (&V::Context, Option<V::RefsMut<'_, '_>>) {
+            pub fn get_mut_with_context(&'a mut self) -> (&'a V::Context, Option<V::RefsMut<'a>>) {
                 match self {
                     Self::Occupied(entry) => {
                         let (context, refs) = entry.get_mut_with_context();
                         (context, Some(refs))
                     }
                     Self::Vacant(entry) => (entry.context(), None),
-                }
-            }
-
-            #[inline]
-            #[must_use]
-            pub fn and_modify<F>(self, f: F) -> Self
-            where
-                F: FnOnce(&V::Context, V::RefsMut<'_, '_>),
-            {
-                match self {
-                    Self::Occupied(mut entry) => {
-                        let (context, refs) = entry.get_mut_with_context();
-                        f(context, refs);
-                        Self::Occupied(entry)
-                    }
-                    Self::Vacant(entry) => Self::Vacant(entry),
                 }
             }
         }
@@ -688,8 +702,8 @@ macro_rules! generate_entry_types {
         impl<K, V> core::fmt::Debug for Entry<'_, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::Soa + core::fmt::Debug + ?Sized,
-            for<'ctx, 'a> V::Refs<'ctx, 'a>: Debug,
+            V: ?Sized,
+            for<'ctx, 'a> V: $crate::soa::traits::Soa<'a, Refs<'ctx>: Debug>,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
@@ -783,42 +797,48 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa + ?Sized,
+            V: $crate::soa::traits::Soa<'a> + ?Sized,
         {
             #[inline]
-            pub fn get(&self) -> V::Refs<'_, '_> {
-                let Self { inner } = self;
-                inner.get()
-            }
-
-            #[inline]
-            pub fn get_with_context(&self) -> (&V::Context, V::Refs<'_, '_>) {
-                let Self { inner } = self;
-                inner.get_with_context()
-            }
-
-            #[inline]
-            pub fn get_mut(&mut self) -> V::RefsMut<'_, '_> {
-                let Self { inner } = self;
-                inner.get_mut()
-            }
-
-            #[inline]
-            pub fn get_mut_with_context(&mut self) -> (&V::Context, V::RefsMut<'_, '_>) {
-                let Self { inner } = self;
-                inner.get_mut_with_context()
-            }
-
-            #[inline]
-            pub fn into_mut(self) -> V::RefsMut<'a, 'a> {
+            pub fn into_mut(self) -> V::RefsMut<'a> {
                 let Self { inner } = self;
                 inner.into_mut()
             }
 
             #[inline]
-            pub fn into_mut_with_context(self) -> (&'a V::Context, V::RefsMut<'a, 'a>) {
+            pub fn into_mut_with_context(self) -> (&'a V::Context, V::RefsMut<'a>) {
                 let Self { inner } = self;
                 inner.into_mut_with_context()
+            }
+        }
+
+        impl<'a, K, V> OccupiedEntry<'_, K, V>
+        where
+            K: $crate::key::Key,
+            V: $crate::soa::traits::Soa<'a> + ?Sized,
+        {
+            #[inline]
+            pub fn get(&'a self) -> V::Refs<'a> {
+                let Self { inner } = self;
+                inner.get()
+            }
+
+            #[inline]
+            pub fn get_with_context(&'a self) -> (&'a V::Context, V::Refs<'a>) {
+                let Self { inner } = self;
+                inner.get_with_context()
+            }
+
+            #[inline]
+            pub fn get_mut(&'a mut self) -> V::RefsMut<'a> {
+                let Self { inner } = self;
+                inner.get_mut()
+            }
+
+            #[inline]
+            pub fn get_mut_with_context(&'a mut self) -> (&'a V::Context, V::RefsMut<'a>) {
+                let Self { inner } = self;
+                inner.get_mut_with_context()
             }
         }
 
@@ -868,8 +888,8 @@ macro_rules! generate_entry_types {
         impl<K, V> core::fmt::Debug for OccupiedEntry<'_, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::Soa + core::fmt::Debug + ?Sized,
-            for<'ctx, 'a> V::Refs<'ctx, 'a>: core::fmt::Debug,
+            V: ?Sized,
+            for<'ctx, 'a> V: $crate::soa::traits::Soa<'a, Refs<'ctx>: core::fmt::Debug>,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;

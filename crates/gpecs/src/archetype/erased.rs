@@ -43,13 +43,13 @@ where
 
 #[inline]
 #[track_caller]
-pub fn validate_components<'components, 'ctx, T, I>(
+pub fn validate_components<'a, 'components, 'ctx, T, I>(
     components: &'components ComponentRegistry,
     context: &'ctx T::Context,
     component_ids: I,
 ) -> impl Iterator<Item = ComponentId> + use<'components, 'ctx, T, I>
 where
-    T: Soa,
+    T: Soa<'a>,
     I: IntoIterator<Item = ComponentId>,
 {
     zip(component_ids, context.field_descriptors())
@@ -59,14 +59,14 @@ where
 
 #[inline]
 #[track_caller]
-fn reorder_fields<'components, 'ctx, T, I, F>(
+fn reorder_fields<'a, 'components, 'ctx, T, I, F>(
     components: &'components ComponentRegistry,
     context: &'ctx T::Context,
     component_ids: I,
     mut fields: ErasedComponents<F>,
 ) -> impl Iterator<Item = F> + use<'components, 'ctx, T, I, F>
 where
-    T: Soa,
+    T: Soa<'a>,
     I: IntoIterator<Item = ComponentId>,
 {
     #[cold]
@@ -86,14 +86,14 @@ where
 }
 
 #[inline]
-pub unsafe fn from_erased_fields<T>(
+pub unsafe fn from_erased_fields<'a, T>(
     components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     fields: ErasedComponents<BoxedErasedField>,
 ) -> T
 where
-    T: Soa + SoaRead,
+    T: Soa<'a> + SoaRead,
 {
     let (descriptors, fields): (Vec<_>, Vec<_>) =
         reorder_fields::<T, _, _>(components, context, component_ids, fields)
@@ -105,14 +105,14 @@ where
 }
 
 #[inline]
-pub fn into_erased_fields<T>(
+pub fn into_erased_fields<'a, T>(
     components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     value: T,
 ) -> ErasedComponents<BoxedErasedField>
 where
-    T: Soa + SoaWrite,
+    T: Soa<'a> + SoaWrite,
 {
     let erased_value = BoxedErasedSoa::try_from(context, value)
         .unwrap()
@@ -128,7 +128,7 @@ where
 pub unsafe fn from_erased_refs<'a, B>(
     components: &ComponentRegistry,
     fields: ErasedComponents<ErasedFieldRef<'a>>,
-) -> B::Refs<'static, 'a>
+) -> <B as Soa<'a>>::Refs<'static>
 where
     B: Bundle,
 {
@@ -144,7 +144,7 @@ where
 pub unsafe fn from_erased_refs_mut<'a, B>(
     components: &ComponentRegistry,
     fields: ErasedComponents<ErasedFieldRefMut<'a>>,
-) -> B::RefsMut<'static, 'a>
+) -> <B as Soa<'a>>::RefsMut<'static>
 where
     B: Bundle,
 {
@@ -160,7 +160,7 @@ pub unsafe fn from_erased_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
     fields: ErasedComponents<ErasedFieldSlice<'a>>,
-) -> B::Slices<'static, 'a>
+) -> <B as Soa<'a>>::Slices<'static>
 where
     B: Bundle,
 {
@@ -178,7 +178,7 @@ pub unsafe fn from_erased_mut_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
     fields: ErasedComponents<ErasedFieldSliceMut<'a>>,
-) -> B::SlicesMut<'static, 'a>
+) -> <B as Soa<'a>>::SlicesMut<'static>
 where
     B: Bundle,
 {

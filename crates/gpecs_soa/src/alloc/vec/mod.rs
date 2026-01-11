@@ -769,40 +769,40 @@ where
     }
 }
 
-impl<T> SoaVec<T>
+impl<'a, T> SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&self) -> T::Slices<'_, '_> {
+    pub fn as_slices(&'a self) -> T::Slices<'a> {
         let (_, slices) = self.as_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_, '_>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, T::Slices<'a>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
         let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
         (context, slices)
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> T::SlicesMut<'_, '_> {
+    pub fn as_mut_slices(&'a mut self) -> T::SlicesMut<'a> {
         let (_, slices) = self.as_mut_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_mut_slices_with_context(&mut self) -> (&T::Context, T::SlicesMut<'_, '_>) {
+    pub fn as_mut_slices_with_context(&'a mut self) -> (&'a T::Context, T::SlicesMut<'a>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
         let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
         (context, slices)
     }
 
     #[inline]
-    pub fn retain<F>(&mut self, mut f: F)
+    pub fn retain<F>(&'a mut self, mut f: F)
     where
-        F: FnMut(&T::Context, T::Refs<'_, '_>) -> bool,
+        F: FnMut(&T::Context, T::Refs<'_>) -> bool,
     {
         self.retain_mut(|context, refs| {
             let refs = T::upcast_refs_mut(refs);
@@ -811,9 +811,9 @@ where
         });
     }
 
-    pub fn retain_mut<F>(&mut self, mut f: F)
+    pub fn retain_mut<F>(&'a mut self, mut f: F)
     where
-        F: FnMut(&T::Context, T::RefsMut<'_, '_>) -> bool,
+        F: FnMut(&T::Context, T::RefsMut<'_>) -> bool,
     {
         let original_len = self.len();
         // Avoid double drop if the drop guard is not executed,
@@ -836,7 +836,7 @@ where
         #[expect(clippy::items_after_statements)]
         struct BackshiftOnDrop<'a, T>
         where
-            T: Soa + ?Sized,
+            T: Soa<'a> + ?Sized,
         {
             v: &'a mut SoaVec<T>,
             processed_len: usize,
@@ -845,9 +845,9 @@ where
         }
 
         #[expect(clippy::items_after_statements)]
-        impl<T> Drop for BackshiftOnDrop<'_, T>
+        impl<'a, T> Drop for BackshiftOnDrop<'a, T>
         where
-            T: Soa + ?Sized,
+            T: Soa<'a> + ?Sized,
         {
             fn drop(&mut self) {
                 let Self {
@@ -882,13 +882,13 @@ where
         };
 
         #[expect(clippy::items_after_statements)]
-        fn process_loop<F, T, const DELETED: bool>(
+        fn process_loop<'a, F, T, const DELETED: bool>(
             original_len: usize,
             f: &mut F,
-            g: &mut BackshiftOnDrop<'_, T>,
+            g: &mut BackshiftOnDrop<'a, T>,
         ) where
-            T: Soa + ?Sized,
-            F: FnMut(&T::Context, T::RefsMut<'_, '_>) -> bool,
+            T: Soa<'a> + ?Sized,
+            F: FnMut(&T::Context, T::RefsMut<'_>) -> bool,
         {
             while g.processed_len != original_len {
                 let (context, ptrs) = g.v.as_mut_ptrs_with_context();
@@ -936,36 +936,42 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, '_, T> {
+    pub fn iter(&'a self) -> Iter<'a, 'a, T> {
         let (_, iter) = self.iter_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_with_context(&self) -> (&T::Context, Iter<'_, '_, T>) {
+    pub fn iter_with_context(&'a self) -> (&'a T::Context, Iter<'a, 'a, T>) {
         let (context, iter) = self.raw_iter_with_context();
         let iter = unsafe { iter.deref() };
         (context, iter)
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T> {
+    pub fn iter_mut(&'a mut self) -> IterMut<'a, 'a, T> {
         let (_, iter) = self.iter_mut_with_context();
         iter
     }
 
     #[inline]
-    pub fn iter_mut_with_context(&mut self) -> (&T::Context, IterMut<'_, '_, T>) {
+    pub fn iter_mut_with_context(&'a mut self) -> (&'a T::Context, IterMut<'a, 'a, T>) {
         let (context, iter) = self.raw_iter_mut_with_context();
         let iter = unsafe { iter.deref_mut() };
         (context, iter)
     }
+}
 
+impl<T> SoaVec<T>
+where
+    T: ?Sized,
+    for<'a> T: Soa<'a>,
+{
     #[inline]
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         self.mut_slices().sort_with_permutation(permutation);
     }
@@ -973,7 +979,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         self.mut_slices().sort();
     }
@@ -982,7 +988,7 @@ where
     pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, compare: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         self.mut_slices()
             .sort_with_permutation_by(permutation, compare);
@@ -991,7 +997,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         self.mut_slices().sort_by(compare);
     }
@@ -1000,7 +1006,7 @@ where
     pub fn sort_with_permutation_by_key<P, K, F>(&mut self, permutation: P, f: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices()
@@ -1010,7 +1016,7 @@ where
     #[inline]
     pub fn sort_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_by_key(f);
@@ -1020,7 +1026,7 @@ where
     pub fn sort_with_permutation_by_cached_key<P, K, F>(&mut self, permutation: P, f: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices()
@@ -1030,7 +1036,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_by_cached_key(f);
@@ -1039,7 +1045,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'ctx, 'a> T::Refs<'ctx, 'a>: Ord,
+        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
     {
         self.mut_slices().sort_unstable();
     }
@@ -1047,7 +1053,7 @@ where
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
-        F: FnMut(T::Refs<'_, '_>, T::Refs<'_, '_>) -> cmp::Ordering,
+        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
     {
         self.mut_slices().sort_unstable_by(compare);
     }
@@ -1055,7 +1061,7 @@ where
     #[inline]
     pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(T::Refs<'_, '_>) -> K,
+        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_unstable_by_key(f);
@@ -1064,8 +1070,8 @@ where
 
 impl<T> Debug for SoaVec<T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::Slices<'ctx, 'a>: Debug,
+    T: ?Sized,
+    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
@@ -1146,15 +1152,15 @@ where
 
 impl<T> Eq for SoaVec<T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::Slices<'ctx, 'a>: Eq,
+    T: ?Sized,
+    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Eq>,
 {
 }
 
 impl<T> Ord for SoaVec<T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::Slices<'ctx, 'a>: Ord,
+    T: ?Sized,
+    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Ord>,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1166,8 +1172,8 @@ where
 
 impl<T> Hash for SoaVec<T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::Slices<'ctx, 'a>: Hash,
+    T: ?Sized,
+    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Hash>,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -1223,8 +1229,9 @@ where
 
 impl<T, U, I> Index<I> for SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: ?Sized,
     U: ?Sized,
+    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
 {
     type Output = U;
@@ -1237,8 +1244,9 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: ?Sized,
     U: ?Sized,
+    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelperMut<'ctx, 'a, T, Output = U>,
 {
     #[inline]
@@ -1316,12 +1324,12 @@ where
     }
 }
 
-impl<'r, T> IntoIterator for &'r SoaVec<T>
+impl<'a, T> IntoIterator for &'a SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
-    type Item = T::Refs<'r, 'r>;
-    type IntoIter = Iter<'r, 'r, T>;
+    type Item = T::Refs<'a>;
+    type IntoIter = Iter<'a, 'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1329,12 +1337,12 @@ where
     }
 }
 
-impl<'r, T> IntoIterator for &'r mut SoaVec<T>
+impl<'a, T> IntoIterator for &'a mut SoaVec<T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
-    type Item = T::RefsMut<'r, 'r>;
-    type IntoIter = IterMut<'r, 'r, T>;
+    type Item = T::RefsMut<'a>;
+    type IntoIter = IterMut<'a, 'a, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

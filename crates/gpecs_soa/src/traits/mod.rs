@@ -422,217 +422,158 @@ pub unsafe trait SoaWrite: RawSoa + Sized {
 
 /// An extension of [SoA](RawSoa) type which allows to access
 /// each stored field by their reference types.
-pub unsafe trait Soa: RawSoa {
+pub unsafe trait Soa<'a>: RawSoa {
     /// Non-empty collection of references to each stored field.
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
-    type Refs<'ctx, 'a>
-    where
-        Self: 'a;
+    type Refs<'ctx>;
 
     /// Restricts [references](Soa::Refs) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_refs<'short, 'long: 'short, 'a>(
-        from: Self::Refs<'long, 'a>,
-    ) -> Self::Refs<'short, 'a>
-    where
-        Self: 'a;
+    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short>;
 
     /// Non-empty collection of mutable references to each stored field.
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
-    type RefsMut<'ctx, 'a>
-    where
-        Self: 'a;
+    type RefsMut<'ctx>;
 
     /// Restricts [mutable references](Soa::RefsMut) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_refs_mut<'short, 'long: 'short, 'a>(
-        from: Self::RefsMut<'long, 'a>,
-    ) -> Self::RefsMut<'short, 'a>
-    where
-        Self: 'a;
+    fn upcast_refs_mut<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short>;
 
     /// Converts [pointers](RawSoaContext::Ptrs) to each stored field
     /// to their [references](Soa::Refs) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_to_refs<'ctx, 'a>(
+    unsafe fn ptrs_to_refs<'ctx>(
         context: &'ctx Self::Context,
         ptrs: Ptrs<'ctx, Self>,
-    ) -> Self::Refs<'ctx, 'a>
-    where
-        Self: 'a;
+    ) -> Self::Refs<'ctx>;
 
     /// Converts [mutable pointers](RawSoaContext::MutPtrs) to each stored field
     /// to their [mutable references](Soa::RefsMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_to_refs_mut<'ctx, 'a>(
+    unsafe fn ptrs_to_refs_mut<'ctx>(
         context: &'ctx Self::Context,
         ptrs: MutPtrs<'ctx, Self>,
-    ) -> Self::RefsMut<'ctx, 'a>
-    where
-        Self: 'a;
+    ) -> Self::RefsMut<'ctx>;
 
     /// Converts [references](Soa::Refs) to each stored field
     /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
-    fn refs_as_ptrs<'ctx, 'a>(
-        context: &'ctx Self::Context,
-        refs: Self::Refs<'ctx, 'a>,
-    ) -> Ptrs<'ctx, Self>
-    where
-        Self: 'a;
+    fn refs_as_ptrs<'ctx>(context: &'ctx Self::Context, refs: Self::Refs<'ctx>)
+    -> Ptrs<'ctx, Self>;
 
     /// Converts [mutable references](Soa::RefsMut) to each stored field
     /// to their [mutable pointers](RawSoaContext::MutPtrs) by taking the pointer of each one of them.
-    fn refs_mut_as_ptrs<'ctx, 'a>(
+    fn refs_mut_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx, 'a>,
-    ) -> MutPtrs<'ctx, Self>
-    where
-        Self: 'a;
+        refs: Self::RefsMut<'ctx>,
+    ) -> MutPtrs<'ctx, Self>;
 
     /// Converts [mutable references](Soa::RefsMut) to each stored field
     /// to their [references](Soa::Refs) by explicitly converting each one of them via `&*` operator combination.
-    fn refs_mut_as_refs<'ctx, 'a>(
+    fn refs_mut_as_refs<'ctx>(
         context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx, 'a>,
-    ) -> Self::Refs<'ctx, 'a>
-    where
-        Self: 'a;
+        refs: Self::RefsMut<'ctx>,
+    ) -> Self::Refs<'ctx>;
 
     /// Retrieves [references](Soa::Refs) to each stored field
     /// from a given value reference by taking the reference of each one of them.
-    fn value_as_refs<'a>(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a, 'a>
-    where
-        Self: 'a;
+    fn value_as_refs(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a>;
 
     /// Retrieves [mutable references](Soa::RefsMut) to each stored field
     /// from a given mutable value reference by taking the mutable reference of each one of them.
-    fn mut_value_as_refs<'a>(
-        context: &'a Self::Context,
-        value: &'a mut Self,
-    ) -> Self::RefsMut<'a, 'a>
-    where
-        Self: 'a;
+    fn mut_value_as_refs(context: &'a Self::Context, value: &'a mut Self) -> Self::RefsMut<'a>;
 
     /// Non-empty collection of slices of each stored field.
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
-    type Slices<'ctx, 'a>
-    where
-        Self: 'a;
+    type Slices<'ctx>;
 
     /// Restricts [slices](Soa::Slices) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_slices<'short, 'long: 'short, 'a>(
-        from: Self::Slices<'long, 'a>,
-    ) -> Self::Slices<'short, 'a>
-    where
-        Self: 'a;
+    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short>;
 
     /// Non-empty collection of mutable slices of each stored field.
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
-    type SlicesMut<'ctx, 'a>
-    where
-        Self: 'a;
+    type SlicesMut<'ctx>;
 
     /// Restricts [mutable slices](Soa::SlicesMut) to each stored field
     /// to be covariant over generic lifetime.
-    fn upcast_mut_slices<'short, 'long: 'short, 'a>(
-        from: Self::SlicesMut<'long, 'a>,
-    ) -> Self::SlicesMut<'short, 'a>
-    where
-        Self: 'a;
+    fn upcast_mut_slices<'short, 'long: 'short>(
+        from: Self::SlicesMut<'long>,
+    ) -> Self::SlicesMut<'short>;
 
     /// Converts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
     /// to their [slices](Soa::Slices) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each slice pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn slice_ptrs_to_slices<'ctx, 'a>(
+    unsafe fn slice_ptrs_to_slices<'ctx>(
         context: &'ctx Self::Context,
         slices: SlicePtrs<'ctx, Self>,
-    ) -> Self::Slices<'ctx, 'a>
-    where
-        Self: 'a;
+    ) -> Self::Slices<'ctx>;
 
     /// Converts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
     /// to their [mutable slices](Soa::SlicesMut) by dereferencing each one of them.
     ///
     /// All the safety requirements resulting from dereferencing of each mutable slice pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx, 'a>(
+    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx>(
         context: &'ctx Self::Context,
         slices: SliceMutPtrs<'ctx, Self>,
-    ) -> Self::SlicesMut<'ctx, 'a>
-    where
-        Self: 'a;
+    ) -> Self::SlicesMut<'ctx>;
 
     /// Returns the number of elements in [slices](Soa::Slices) to each stored field,
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the slices,
     /// or else this method could panic.
-    fn slices_len<'a>(context: &Self::Context, slices: &Self::Slices<'_, 'a>) -> usize
-    where
-        Self: 'a;
+    fn slices_len(context: &Self::Context, slices: &Self::Slices<'_>) -> usize;
 
     /// Returns the number of elements in [mutable slices](Soa::SlicesMut) to each stored field,
     /// also referred to as their 'length'.
     ///
     /// Note that resulting lengths should be the same for all the mutable slices,
     /// or else this method could panic.
-    fn mut_slices_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
-    where
-        Self: 'a;
+    fn mut_slices_len(context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize;
 
     /// Converts [slices](Soa::Slices) to each stored field
     /// to their [slice pointers](RawSoaContext::SlicePtrs) by taking the pointer of each one of them.
-    fn slices_as_slice_ptrs<'ctx, 'a>(
+    fn slices_as_slice_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx, 'a>,
-    ) -> SlicePtrs<'ctx, Self>
-    where
-        Self: 'a;
+        slices: Self::Slices<'ctx>,
+    ) -> SlicePtrs<'ctx, Self>;
 
     /// Converts [mutable slices](Soa::SlicesMut) to each stored field
     /// to their [mutable slice pointers](RawSoaContext::SliceMutPtrs) by taking the pointer of each one of them.
-    fn mut_slices_as_slice_ptrs<'ctx, 'a>(
+    fn mut_slices_as_slice_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> SliceMutPtrs<'ctx, Self>
-    where
-        Self: 'a;
+        slices: Self::SlicesMut<'ctx>,
+    ) -> SliceMutPtrs<'ctx, Self>;
 
     /// Converts [mutable slices](Soa::SlicesMut) to each stored field
     /// to their [slices](Soa::Slices) by explicitly converting each one of them via `&*` operator combination.
-    fn mut_slices_as_slices<'ctx, 'a>(
+    fn mut_slices_as_slices<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> Self::Slices<'ctx, 'a>
-    where
-        Self: 'a;
+        slices: Self::SlicesMut<'ctx>,
+    ) -> Self::Slices<'ctx>;
 
     /// Returns [pointers](RawSoaContext::Ptrs) to the slice's buffer
     /// of each [slice](Soa::Slices) of each stored field.
-    fn slices_as_ptrs<'ctx, 'a>(
+    fn slices_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx, 'a>,
-    ) -> Ptrs<'ctx, Self>
-    where
-        Self: 'a;
+        slices: Self::Slices<'ctx>,
+    ) -> Ptrs<'ctx, Self>;
 
     /// Returns [mutable pointers](RawSoaContext::MutPtrs) to the slice's buffer
     /// of each [mutable slice](Soa::SlicesMut) of each stored field.
-    fn mut_slices_as_ptrs<'ctx, 'a>(
+    fn mut_slices_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> MutPtrs<'ctx, Self>
-    where
-        Self: 'a;
+        slices: Self::SlicesMut<'ctx>,
+    ) -> MutPtrs<'ctx, Self>;
 }

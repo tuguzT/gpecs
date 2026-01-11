@@ -145,7 +145,7 @@ where
         context: &T::Context,
     ) -> Result<Ptrs<'_, T>, ErasedSoaIntoValueError<Self>>
     where
-        T: RawSoa,
+        T: RawSoa + ?Sized,
     {
         let Self {
             ref descriptors,

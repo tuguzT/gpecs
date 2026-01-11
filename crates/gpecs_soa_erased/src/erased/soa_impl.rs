@@ -311,47 +311,30 @@ where
     type Fields = ErasedSoaFields;
 }
 
-unsafe impl<B, D> Soa for ErasedSoa<B, D>
+unsafe impl<'a, B, D> Soa<'a> for ErasedSoa<B, D>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedBytes + ?Sized + 'a,
     D: AsRef<[FieldDescriptor]>,
 {
-    type Refs<'ctx, 'a>
-        = ErasedSoaRefs<'a, &'ctx [FieldDescriptor]>
-    where
-        Self: 'a;
+    type Refs<'ctx> = ErasedSoaRefs<'a, &'ctx [FieldDescriptor]>;
 
     #[inline]
-    fn upcast_refs<'short, 'long: 'short, 'a>(from: Self::Refs<'long, 'a>) -> Self::Refs<'short, 'a>
-    where
-        Self: 'a,
-    {
+    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
         from
     }
 
-    type RefsMut<'ctx, 'a>
-        = ErasedSoaRefsMut<'a, &'ctx [FieldDescriptor]>
-    where
-        Self: 'a;
+    type RefsMut<'ctx> = ErasedSoaRefsMut<'a, &'ctx [FieldDescriptor]>;
 
     #[inline]
-    fn upcast_refs_mut<'short, 'long: 'short, 'a>(
-        from: Self::RefsMut<'long, 'a>,
-    ) -> Self::RefsMut<'short, 'a>
-    where
-        Self: 'a,
-    {
+    fn upcast_refs_mut<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
         from
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs<'ctx, 'a>(
+    unsafe fn ptrs_to_refs<'ctx>(
         context: &'ctx Self::Context,
         ptrs: Ptrs<'ctx, Self>,
-    ) -> Self::Refs<'ctx, 'a>
-    where
-        Self: 'a,
-    {
+    ) -> Self::Refs<'ctx> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
@@ -359,13 +342,10 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_to_refs_mut<'ctx, 'a>(
+    unsafe fn ptrs_to_refs_mut<'ctx>(
         context: &'ctx Self::Context,
         ptrs: MutPtrs<'ctx, Self>,
-    ) -> Self::RefsMut<'ctx, 'a>
-    where
-        Self: 'a,
-    {
+    ) -> Self::RefsMut<'ctx> {
         let descriptors: &[FieldDescriptor] = context.field_descriptors();
         debug_assert_descriptors(descriptors, ptrs.field_descriptors());
 
@@ -373,13 +353,10 @@ where
     }
 
     #[inline]
-    fn refs_as_ptrs<'ctx, 'a>(
+    fn refs_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        refs: Self::Refs<'ctx, 'a>,
-    ) -> Ptrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        refs: Self::Refs<'ctx>,
+    ) -> Ptrs<'ctx, Self> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, refs.field_descriptors());
 
@@ -387,13 +364,10 @@ where
     }
 
     #[inline]
-    fn refs_mut_as_ptrs<'ctx, 'a>(
+    fn refs_mut_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx, 'a>,
-    ) -> MutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        refs: Self::RefsMut<'ctx>,
+    ) -> MutPtrs<'ctx, Self> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, refs.field_descriptors());
 
@@ -401,13 +375,10 @@ where
     }
 
     #[inline]
-    fn refs_mut_as_refs<'ctx, 'a>(
+    fn refs_mut_as_refs<'ctx>(
         context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx, 'a>,
-    ) -> Self::Refs<'ctx, 'a>
-    where
-        Self: 'a,
-    {
+        refs: Self::RefsMut<'ctx>,
+    ) -> Self::Refs<'ctx> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, refs.field_descriptors());
 
@@ -417,10 +388,7 @@ where
     }
 
     #[inline]
-    fn value_as_refs<'a>(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a, 'a>
-    where
-        Self: 'a,
-    {
+    fn value_as_refs(context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, value.field_descriptors());
 
@@ -428,57 +396,34 @@ where
     }
 
     #[inline]
-    fn mut_value_as_refs<'a>(
-        context: &'a Self::Context,
-        value: &'a mut Self,
-    ) -> Self::RefsMut<'a, 'a>
-    where
-        Self: 'a,
-    {
+    fn mut_value_as_refs(context: &'a Self::Context, value: &'a mut Self) -> Self::RefsMut<'a> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, value.field_descriptors());
 
         value.as_mut_fields()
     }
 
-    type Slices<'ctx, 'a>
-        = ErasedSoaSlices<'a, &'ctx [FieldDescriptor]>
-    where
-        Self: 'a;
+    type Slices<'ctx> = ErasedSoaSlices<'a, &'ctx [FieldDescriptor]>;
 
     #[inline]
-    fn upcast_slices<'short, 'long: 'short, 'a>(
-        from: Self::Slices<'long, 'a>,
-    ) -> Self::Slices<'short, 'a>
-    where
-        Self: 'a,
-    {
+    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
         from
     }
 
-    type SlicesMut<'ctx, 'a>
-        = ErasedSoaSlicesMut<'a, &'ctx [FieldDescriptor]>
-    where
-        Self: 'a;
+    type SlicesMut<'ctx> = ErasedSoaSlicesMut<'a, &'ctx [FieldDescriptor]>;
 
     #[inline]
-    fn upcast_mut_slices<'short, 'long: 'short, 'a>(
-        from: Self::SlicesMut<'long, 'a>,
-    ) -> Self::SlicesMut<'short, 'a>
-    where
-        Self: 'a,
-    {
+    fn upcast_mut_slices<'short, 'long: 'short>(
+        from: Self::SlicesMut<'long>,
+    ) -> Self::SlicesMut<'short> {
         from
     }
 
     #[inline]
-    unsafe fn slice_ptrs_to_slices<'ctx, 'a>(
+    unsafe fn slice_ptrs_to_slices<'ctx>(
         context: &'ctx Self::Context,
         slices: SlicePtrs<'ctx, Self>,
-    ) -> Self::Slices<'ctx, 'a>
-    where
-        Self: 'a,
-    {
+    ) -> Self::Slices<'ctx> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -486,13 +431,10 @@ where
     }
 
     #[inline]
-    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx, 'a>(
+    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx>(
         context: &'ctx Self::Context,
         slices: SliceMutPtrs<'ctx, Self>,
-    ) -> Self::SlicesMut<'ctx, 'a>
-    where
-        Self: 'a,
-    {
+    ) -> Self::SlicesMut<'ctx> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -500,10 +442,7 @@ where
     }
 
     #[inline]
-    fn slices_len<'a>(context: &Self::Context, slices: &Self::Slices<'_, 'a>) -> usize
-    where
-        Self: 'a,
-    {
+    fn slices_len(context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -511,10 +450,7 @@ where
     }
 
     #[inline]
-    fn mut_slices_len<'a>(context: &Self::Context, slices: &Self::SlicesMut<'_, 'a>) -> usize
-    where
-        Self: 'a,
-    {
+    fn mut_slices_len(context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -522,13 +458,10 @@ where
     }
 
     #[inline]
-    fn slices_as_slice_ptrs<'ctx, 'a>(
+    fn slices_as_slice_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx, 'a>,
-    ) -> SlicePtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::Slices<'ctx>,
+    ) -> SlicePtrs<'ctx, Self> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -536,26 +469,20 @@ where
     }
 
     #[inline]
-    fn mut_slices_as_slice_ptrs<'ctx, 'a>(
+    fn mut_slices_as_slice_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> SliceMutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> SliceMutPtrs<'ctx, Self> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
         slices.into_mut_ptrs()
     }
 
-    fn mut_slices_as_slices<'ctx, 'a>(
+    fn mut_slices_as_slices<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> Self::Slices<'ctx, 'a>
-    where
-        Self: 'a,
-    {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> Self::Slices<'ctx> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -565,13 +492,10 @@ where
     }
 
     #[inline]
-    fn slices_as_ptrs<'ctx, 'a>(
+    fn slices_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx, 'a>,
-    ) -> Ptrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::Slices<'ctx>,
+    ) -> Ptrs<'ctx, Self> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 
@@ -579,13 +503,10 @@ where
     }
 
     #[inline]
-    fn mut_slices_as_ptrs<'ctx, 'a>(
+    fn mut_slices_as_ptrs<'ctx>(
         context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx, 'a>,
-    ) -> MutPtrs<'ctx, Self>
-    where
-        Self: 'a,
-    {
+        slices: Self::SlicesMut<'ctx>,
+    ) -> MutPtrs<'ctx, Self> {
         let descriptors = context.field_descriptors();
         debug_assert_descriptors(descriptors, slices.field_descriptors());
 

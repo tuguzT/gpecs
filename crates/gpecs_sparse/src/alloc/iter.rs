@@ -354,18 +354,18 @@ where
     }
 }
 
-impl<K, V> IntoValues<K, V>
+impl<'a, K, V> IntoValues<K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&self) -> V::Slices<'_, '_> {
+    pub fn as_slices(&'a self) -> V::Slices<'a> {
         let (_, values) = self.as_slices_with_context();
         values
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, V::Slices<'a>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.as_slices_with_context();
@@ -374,13 +374,13 @@ where
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> V::SlicesMut<'_, '_> {
+    pub fn as_mut_slices(&'a mut self) -> V::SlicesMut<'a> {
         let (_, values) = self.as_mut_slices_with_context();
         values
     }
 
     #[inline]
-    pub fn as_mut_slices_with_context(&mut self) -> (&V::Context, V::SlicesMut<'_, '_>) {
+    pub fn as_mut_slices_with_context(&'a mut self) -> (&'a V::Context, V::SlicesMut<'a>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.as_mut_slices_with_context();
@@ -391,8 +391,8 @@ where
 
 impl<K, V> Debug for IntoValues<K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = &self.as_slices();
@@ -428,8 +428,8 @@ where
 
 impl<T, K, V> AsRef<[T]> for IntoValues<K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Into<&'a [T]>>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -439,8 +439,8 @@ where
 
 impl<T, K, V> AsMut<[T]> for IntoValues<K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Into<&'a mut [T]>,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: Into<&'a mut [T]>>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
@@ -632,42 +632,42 @@ where
     }
 }
 
-impl<K, V> IntoIter<K, V>
+impl<'a, K, V> IntoIter<K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_value_slices(&self) -> V::Slices<'_, '_> {
+    pub fn as_value_slices(&'a self) -> V::Slices<'a> {
         let (_, values) = self.as_value_slices_with_context();
         values
     }
 
     #[inline]
-    pub fn as_value_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
+    pub fn as_value_slices_with_context(&'a self) -> (&'a V::Context, V::Slices<'a>) {
         let (context, _, values) = self.as_slices_with_context();
         (context, values)
     }
 
     #[inline]
-    pub fn as_mut_value_slices(&mut self) -> V::SlicesMut<'_, '_> {
+    pub fn as_mut_value_slices(&'a mut self) -> V::SlicesMut<'a> {
         let (_, values) = self.as_mut_value_slices_with_context();
         values
     }
 
     #[inline]
-    pub fn as_mut_value_slices_with_context(&mut self) -> (&V::Context, V::SlicesMut<'_, '_>) {
+    pub fn as_mut_value_slices_with_context(&'a mut self) -> (&'a V::Context, V::SlicesMut<'a>) {
         let (context, _, values) = self.as_mut_slices_with_context();
         (context, values)
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
+    pub fn as_slices(&'a self) -> (&'a [K], V::Slices<'a>) {
         let (_, keys, values) = self.as_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&V::Context, &[K], V::Slices<'_, '_>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, &'a [K], V::Slices<'a>) {
         let Self { inner } = self;
 
         let (context, ptrs) = inner.as_slices_with_context();
@@ -676,13 +676,15 @@ where
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&mut [K], V::SlicesMut<'_, '_>) {
+    pub fn as_mut_slices(&'a mut self) -> (&'a mut [K], V::SlicesMut<'a>) {
         let (_, keys, values) = self.as_mut_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn as_mut_slices_with_context(&mut self) -> (&V::Context, &mut [K], V::SlicesMut<'_, '_>) {
+    pub fn as_mut_slices_with_context(
+        &'a mut self,
+    ) -> (&'a V::Context, &'a mut [K], V::SlicesMut<'a>) {
         let Self { inner } = self;
 
         let (context, ptrs) = inner.as_mut_slices_with_context();
@@ -694,8 +696,8 @@ where
 impl<K, V> Debug for IntoIter<K, V>
 where
     K: Debug,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = &self.as_slices();
@@ -734,8 +736,8 @@ where
 
 impl<T, K, V> AsRef<[T]> for IntoIter<K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Into<&'a [T]>>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -745,8 +747,8 @@ where
 
 impl<T, K, V> AsMut<[T]> for IntoIter<K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::SlicesMut<'ctx, 'a>: Into<&'a mut [T]>,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, SlicesMut<'ctx>: Into<&'a mut [T]>>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
@@ -883,30 +885,30 @@ where
     }
 }
 
-impl<K, V> Drain<'_, K, V>
+impl<'a, K, V> Drain<'_, K, V>
 where
-    V: Soa + ?Sized,
+    V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_value_slices(&self) -> V::Slices<'_, '_> {
+    pub fn as_value_slices(&'a self) -> V::Slices<'a> {
         let (_, values) = self.as_value_slices_with_context();
         values
     }
 
     #[inline]
-    pub fn as_value_slices_with_context(&self) -> (&V::Context, V::Slices<'_, '_>) {
+    pub fn as_value_slices_with_context(&'a self) -> (&'a V::Context, V::Slices<'a>) {
         let (context, _, values) = self.as_slices_with_context();
         (context, values)
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[K], V::Slices<'_, '_>) {
+    pub fn as_slices(&'a self) -> (&'a [K], V::Slices<'a>) {
         let (_, keys, values) = self.as_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&V::Context, &[K], V::Slices<'_, '_>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, &'a [K], V::Slices<'a>) {
         let Self { inner } = self;
 
         let (context, ptrs) = inner.as_slices_with_context();
@@ -918,8 +920,8 @@ where
 impl<K, V> Debug for Drain<'_, K, V>
 where
     K: Debug,
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Debug,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = &self.as_slices();
@@ -932,8 +934,8 @@ where
 
 impl<T, K, V> AsRef<[T]> for Drain<'_, K, V>
 where
-    V: Soa + ?Sized,
-    for<'ctx, 'a> V::Slices<'ctx, 'a>: Into<&'a [T]>,
+    V: ?Sized,
+    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Into<&'a [T]>>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {

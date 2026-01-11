@@ -8,7 +8,7 @@ use crate::{
 mod impls;
 
 /// Non-empty collection of [components](crate::component::Component).
-pub unsafe trait Bundle: Soa + SoaRead + SoaWrite + 'static {
+pub unsafe trait Bundle: for<'a> Soa<'a> + SoaRead + SoaWrite + 'static {
     /// Static [`Context`](crate::soa::traits::RawSoa::Context) instance of this bundle.
     ///
     /// This ensures that components of this bundle are known at compile time.

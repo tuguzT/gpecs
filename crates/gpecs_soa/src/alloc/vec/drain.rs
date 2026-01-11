@@ -108,18 +108,18 @@ where
     }
 }
 
-impl<T> Drain<'_, T>
+impl<'a, T> Drain<'_, T>
 where
-    T: Soa + ?Sized,
+    T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&self) -> T::Slices<'_, '_> {
+    pub fn as_slices(&'a self) -> T::Slices<'a> {
         let (_, iter) = self.as_slices_with_context();
         iter
     }
 
     #[inline]
-    pub fn as_slices_with_context(&self) -> (&T::Context, T::Slices<'_, '_>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, T::Slices<'a>) {
         let Self { iter, .. } = self;
         iter.as_slices_with_context()
     }
@@ -143,8 +143,8 @@ where
 
 impl<T, U> AsRef<[U]> for Drain<'_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::Slices<'ctx, 'a>: Into<&'a [U]>,
+    T: ?Sized,
+    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Into<&'a [U]>>,
 {
     fn as_ref(&self) -> &[U] {
         self.as_slices().into()
@@ -153,8 +153,8 @@ where
 
 impl<T> Debug for Drain<'_, T>
 where
-    T: Soa + ?Sized,
-    for<'ctx, 'a> T::Slices<'ctx, 'a>: Debug,
+    T: ?Sized,
+    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();

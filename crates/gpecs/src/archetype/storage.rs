@@ -71,8 +71,8 @@ impl From<NoEpochEntity> for Entity {
     }
 }
 
-pub type Bundles<'a, B> = (&'a [Entity], <B as Soa>::Slices<'a, 'a>);
-pub type BundlesMut<'a, B> = (&'a [Entity], <B as Soa>::SlicesMut<'a, 'a>);
+pub type Bundles<'a, B> = (&'a [Entity], <B as Soa<'a>>::Slices<'a>);
+pub type BundlesMut<'a, B> = (&'a [Entity], <B as Soa<'a>>::SlicesMut<'a>);
 
 type ErasedStorage = EpochSparseSet<NoEpochEntity, BoxedErasedSoa>;
 type ComponentIdMap = IndexMap<ComponentId, Option<DropFn>>;
@@ -420,7 +420,7 @@ impl ArchetypeStorage {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<B::Refs<'_, '_>>, IncompatibleBundleError>
+    ) -> Result<Option<<B as Soa<'_>>::Refs<'_>>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -444,7 +444,7 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<B::RefsMut<'_, '_>>, IncompatibleBundleError>
+    ) -> Result<Option<<B as Soa<'_>>::RefsMut<'_>>, IncompatibleBundleError>
     where
         B: Bundle,
     {

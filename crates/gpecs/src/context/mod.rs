@@ -18,7 +18,7 @@ use crate::{
         Entity,
         registry::{self as entities, EntityRegistry},
     },
-    soa::traits::Soa,
+    soa::traits::{Refs, RefsMut},
     world::registry::{WorldId, WorldRegistry},
 };
 
@@ -243,10 +243,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_bundle<B>(
-        &self,
-        entity: Entity,
-    ) -> Result<<B as Soa<'_>>::Refs<'_>, IncompatibleBundleError>
+    pub fn get_bundle<B>(&self, entity: Entity) -> Result<Refs<'_, '_, B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -269,7 +266,7 @@ impl Context {
     pub fn get_bundle_mut<B>(
         &mut self,
         entity: Entity,
-    ) -> Result<<B as Soa<'_>>::RefsMut<'_>, IncompatibleBundleError>
+    ) -> Result<RefsMut<'_, '_, B>, IncompatibleBundleError>
     where
         B: Bundle,
     {

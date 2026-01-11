@@ -1,7 +1,7 @@
 pub use crate::{
     identity::Identity,
     slice::{SoaSlice, SoaSlices, SoaSlicesMut},
-    traits::Soa,
+    traits::{RawSoa, RawSoaContext, Soa, SoaContext, SoaOwned},
 };
 
 #[cfg(feature = "alloc")]

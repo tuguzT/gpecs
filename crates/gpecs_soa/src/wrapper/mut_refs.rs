@@ -7,16 +7,18 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::Soa;
+use crate::traits::{Soa, SoaContext};
 
-/// Type wrapper for [mutable references](Soa::RefsMut)
+type Inner<'ctx, 'a, T> = crate::traits::RefsMut<'ctx, 'a, T>;
+
+/// Type wrapper for [mutable references](SoaContext::RefsMut)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
 {
-    inner: T::RefsMut<'static>,
+    inner: Inner<'static, 'a, T>,
     phantom: PhantomData<&'ctx ()>,
 }
 
@@ -24,41 +26,41 @@ impl<'ctx, 'a, T> RefsMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
 {
-    /// Creates self from the [mutable references](Soa::RefsMut).
+    /// Creates self from the [mutable references](SoaContext::RefsMut).
     #[inline]
-    pub fn new(inner: T::RefsMut<'ctx>) -> Self {
+    pub fn new(inner: Inner<'ctx, 'a, T>) -> Self {
         Self {
-            inner: unsafe { transmute::<T::RefsMut<'_>, T::RefsMut<'_>>(inner) },
+            inner: unsafe { transmute::<Inner<'_, '_, T>, Inner<'_, '_, T>>(inner) },
             phantom: PhantomData,
         }
     }
 
-    /// Retrieves a reference of [mutable references](Soa::RefsMut).
+    /// Retrieves a reference of [mutable references](SoaContext::RefsMut).
     #[inline]
-    pub fn as_inner(&self) -> &T::RefsMut<'_> {
+    pub fn as_inner(&self) -> &Inner<'_, 'a, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [mutable references](Soa::RefsMut).
+    /// Retrieves a mutable reference of [mutable references](SoaContext::RefsMut).
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut T::RefsMut<'_> {
+    pub fn as_inner_mut(&mut self) -> &mut Inner<'_, 'a, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [mutable references](Soa::RefsMut).
+    /// Retrieves the [mutable references](SoaContext::RefsMut).
     #[inline]
-    pub fn into_inner(self) -> T::RefsMut<'ctx> {
+    pub fn into_inner(self) -> Inner<'ctx, 'a, T> {
         let Self { inner, .. } = self;
-        T::upcast_refs_mut(inner)
+        T::Context::upcast_mut_refs(inner)
     }
 }
 
 impl<'a, T> Debug for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: Debug,
+    for<'ctx> Inner<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { inner, .. } = self;
@@ -69,7 +71,7 @@ where
 impl<'a, T> Default for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: Default,
+    for<'ctx> Inner<'ctx, 'a, T>: Default,
 {
     fn default() -> Self {
         Self {
@@ -82,7 +84,7 @@ where
 impl<'a, T> Clone for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: Clone,
+    for<'ctx> Inner<'ctx, 'a, T>: Clone,
 {
     fn clone(&self) -> Self {
         let Self { ref inner, phantom } = *self;
@@ -94,14 +96,14 @@ where
 impl<'a, T> Copy for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: Copy,
+    for<'ctx> Inner<'ctx, 'a, T>: Copy,
 {
 }
 
 impl<'a, T> PartialEq for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: PartialEq,
+    for<'ctx> Inner<'ctx, 'a, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { inner, phantom } = self;
@@ -112,14 +114,14 @@ where
 impl<'a, T> Eq for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: Eq,
+    for<'ctx> Inner<'ctx, 'a, T>: Eq,
 {
 }
 
 impl<'a, T> PartialOrd for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: PartialOrd,
+    for<'ctx> Inner<'ctx, 'a, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { inner, phantom } = self;
@@ -134,7 +136,7 @@ where
 impl<'a, T> Ord for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: Ord,
+    for<'ctx> Inner<'ctx, 'a, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { inner, phantom } = self;
@@ -149,7 +151,7 @@ where
 impl<'a, T> Hash for RefsMut<'_, 'a, T>
 where
     T: Soa<'a> + ?Sized,
-    for<'ctx> T::RefsMut<'ctx>: Hash,
+    for<'ctx> Inner<'ctx, 'a, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { inner, phantom } = self;

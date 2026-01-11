@@ -3,7 +3,7 @@ use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
     slice::{Iter, IterMut, SoaSlice},
-    traits::{Soa, SoaCloneToUninit, SoaRead, SoaTrustedFields},
+    traits::{Refs, RefsMut, Soa, SoaCloneToUninit, SoaRead, SoaTrustedFields},
     vec::{IntoIter, SoaVec},
 };
 
@@ -30,7 +30,7 @@ where
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
+        for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
         self.mut_slices().sort_with_permutation(permutation);
     }
@@ -38,7 +38,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
+        for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
         self.mut_slices().sort();
     }
@@ -47,7 +47,7 @@ where
     pub fn sort_with_permutation_by<P, F>(&mut self, permutation: P, compare: F)
     where
         P: AsMut<[usize]>,
-        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
+        for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
         self.mut_slices()
             .sort_with_permutation_by(permutation, compare);
@@ -56,7 +56,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, compare: F)
     where
-        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
+        for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
         self.mut_slices().sort_by(compare);
     }
@@ -65,7 +65,7 @@ where
     pub fn sort_with_permutation_by_key<P, K, F>(&mut self, permutation: P, f: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
+        F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
         self.mut_slices()
@@ -75,7 +75,7 @@ where
     #[inline]
     pub fn sort_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
+        F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_by_key(f);
@@ -85,7 +85,7 @@ where
     pub fn sort_with_permutation_by_cached_key<P, K, F>(&mut self, permutation: P, f: F)
     where
         P: AsMut<[usize]>,
-        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
+        F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
         self.mut_slices()
@@ -95,7 +95,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
+        F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_by_cached_key(f);
@@ -104,7 +104,7 @@ where
     #[inline]
     pub fn sort_unstable(&mut self)
     where
-        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
+        for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
         self.mut_slices().sort_unstable();
     }
@@ -112,7 +112,7 @@ where
     #[inline]
     pub fn sort_unstable_by<F>(&mut self, compare: F)
     where
-        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
+        for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
         self.mut_slices().sort_unstable_by(compare);
     }
@@ -120,7 +120,7 @@ where
     #[inline]
     pub fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
-        F: FnMut(<T as Soa<'_>>::Refs<'_>) -> K,
+        F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
         self.mut_slices().sort_unstable_by_key(f);
@@ -164,7 +164,7 @@ impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
 where
     T: Soa<'a> + SoaTrustedFields + ?Sized,
 {
-    type Item = T::Refs<'a>;
+    type Item = Refs<'a, 'a, T>;
     type IntoIter = Iter<'a, 'a, T>;
 
     #[inline]
@@ -177,7 +177,7 @@ impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
 where
     T: Soa<'a> + SoaTrustedFields + ?Sized,
 {
-    type Item = T::RefsMut<'a>;
+    type Item = RefsMut<'a, 'a, T>;
     type IntoIter = IterMut<'a, 'a, T>;
 
     #[inline]

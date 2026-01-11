@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::soa::{
-    traits::{MutPtrs, RawSoa, RawSoaContext, Soa, SoaWrite},
+    traits::{MutPtrs, RawSoa, RawSoaContext, RefsMut, Soa, SoaContext, SoaWrite},
     wrapper,
 };
 
@@ -55,15 +55,15 @@ where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn from_refs(context: &'ctx T::Context, refs: T::RefsMut<'ctx>) -> Self {
-        let ptrs = T::refs_mut_as_ptrs(context, refs);
+    pub fn from_refs(context: &'ctx T::Context, refs: RefsMut<'ctx, 'a, T>) -> Self {
+        let ptrs = context.mut_refs_as_mut_ptrs(refs);
         unsafe { Self::from_ptrs(ptrs) }
     }
 
     #[inline]
-    pub fn into_refs(self, context: &'ctx T::Context) -> T::RefsMut<'ctx> {
+    pub fn into_refs(self, context: &'ctx T::Context) -> RefsMut<'ctx, 'a, T> {
         let ptrs = self.into_ptrs();
-        unsafe { T::ptrs_to_refs_mut(context, ptrs) }
+        unsafe { context.mut_ptrs_to_mut_refs(ptrs) }
     }
 }
 
@@ -194,13 +194,13 @@ where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn read_write(context: &'ctx T::Context, refs: T::RefsMut<'ctx>) -> Self {
+    pub fn read_write(context: &'ctx T::Context, refs: RefsMut<'ctx, 'a, T>) -> Self {
         let refs = ReadWriteAccess::from_refs(context, refs);
         Self::ReadWrite(refs)
     }
 
     #[inline]
-    pub fn into_refs(self, context: &'ctx T::Context) -> Option<T::RefsMut<'ctx>> {
+    pub fn into_refs(self, context: &'ctx T::Context) -> Option<RefsMut<'ctx, 'a, T>> {
         match self {
             Self::ReadWrite(refs) => Some(refs.into_refs(context)),
             Self::WriteOnly(_) => None,

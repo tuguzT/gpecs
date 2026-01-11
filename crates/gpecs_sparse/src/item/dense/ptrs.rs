@@ -8,7 +8,7 @@ use core::{
 use crate::{
     item::{DenseItem, DenseMutPtrs, DenseRefs},
     soa::{
-        traits::{Ptrs, RawSoa, RawSoaContext, Soa, SoaCloneToUninit, SoaRead},
+        traits::{Ptrs, RawSoa, RawSoaContext, Soa, SoaCloneToUninit, SoaContext, SoaRead},
         wrapper,
     },
 };
@@ -114,7 +114,7 @@ where
         let Self { key, value } = self;
 
         let key = unsafe { &*key };
-        let value = unsafe { V::ptrs_to_refs(context, value.into_inner()) };
+        let value = unsafe { context.ptrs_to_refs(value.into_inner()) };
         DenseRefs::new(key, value)
     }
 }

@@ -7,7 +7,10 @@ use core::{
 
 use crate::{
     item::{DenseMutPtrs, DenseRefs},
-    soa::{traits::Soa, wrapper},
+    soa::{
+        traits::{RefsMut, Soa, SoaContext},
+        wrapper,
+    },
 };
 
 pub struct DenseRefsMut<'ctx, 'a, K, V>
@@ -23,13 +26,13 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn new(key: &'a mut K, value: V::RefsMut<'ctx>) -> Self {
+    pub fn new(key: &'a mut K, value: RefsMut<'ctx, 'a, V>) -> Self {
         let value = wrapper::RefsMut::new(value);
         Self { key, value }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (&'a mut K, V::RefsMut<'ctx>) {
+    pub fn into_parts(self) -> (&'a mut K, RefsMut<'ctx, 'a, V>) {
         let Self { key, value } = self;
         (key, value.into_inner())
     }
@@ -39,7 +42,7 @@ where
         let Self { key, value } = self;
 
         let key = ptr::from_mut(key);
-        let value = V::refs_mut_as_ptrs(context, value.into_inner());
+        let value = context.mut_refs_as_mut_ptrs(value.into_inner());
         DenseMutPtrs::new(key, value)
     }
 
@@ -48,23 +51,23 @@ where
         let Self { key, value } = self;
 
         let key = &*key;
-        let value = V::refs_mut_as_refs(context, value.into_inner());
+        let value = context.mut_refs_as_refs(value.into_inner());
         DenseRefs::new(key, value)
     }
 }
 
-impl<'ctx, 'a, K, V> From<(&'a mut K, V::RefsMut<'ctx>)> for DenseRefsMut<'ctx, 'a, K, V>
+impl<'ctx, 'a, K, V> From<(&'a mut K, RefsMut<'ctx, 'a, V>)> for DenseRefsMut<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    fn from(value: (&'a mut K, V::RefsMut<'ctx>)) -> Self {
+    fn from(value: (&'a mut K, RefsMut<'ctx, 'a, V>)) -> Self {
         let (key, value) = value;
         Self::new(key, value)
     }
 }
 
-impl<'ctx, 'a, K, V> From<DenseRefsMut<'ctx, 'a, K, V>> for (&'a mut K, V::RefsMut<'ctx>)
+impl<'ctx, 'a, K, V> From<DenseRefsMut<'ctx, 'a, K, V>> for (&'a mut K, RefsMut<'ctx, 'a, V>)
 where
     V: Soa<'a> + ?Sized,
 {
@@ -78,7 +81,8 @@ impl<K, V> Debug for DenseRefsMut<'_, '_, K, V>
 where
     K: Debug,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, RefsMut<'ctx>: Debug>,
+    for<'a> V: Soa<'a>,
+    for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, value } = self;
@@ -93,7 +97,8 @@ impl<K, V> PartialEq for DenseRefsMut<'_, '_, K, V>
 where
     K: PartialEq,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, RefsMut<'ctx>: PartialEq>,
+    for<'a> V: Soa<'a>,
+    for<'ctx, 'a> RefsMut<'ctx, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self { key, value } = self;
@@ -105,7 +110,8 @@ impl<K, V> Eq for DenseRefsMut<'_, '_, K, V>
 where
     K: Eq,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, RefsMut<'ctx>: Eq>,
+    for<'a> V: Soa<'a>,
+    for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Eq,
 {
 }
 
@@ -113,7 +119,8 @@ impl<K, V> PartialOrd for DenseRefsMut<'_, '_, K, V>
 where
     K: PartialOrd,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, RefsMut<'ctx>: PartialOrd>,
+    for<'a> V: Soa<'a>,
+    for<'ctx, 'a> RefsMut<'ctx, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self { key, value } = self;
@@ -129,7 +136,8 @@ impl<K, V> Ord for DenseRefsMut<'_, '_, K, V>
 where
     K: Ord,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, RefsMut<'ctx>: Ord>,
+    for<'a> V: Soa<'a>,
+    for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { key, value } = self;
@@ -145,7 +153,8 @@ impl<K, V> Hash for DenseRefsMut<'_, '_, K, V>
 where
     K: Hash,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, RefsMut<'ctx>: Hash>,
+    for<'a> V: Soa<'a>,
+    for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { key, value } = self;

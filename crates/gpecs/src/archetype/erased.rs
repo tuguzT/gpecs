@@ -14,7 +14,9 @@ use crate::{
     hash::IndexMap,
     soa::{
         field::FieldDescriptor,
-        traits::{RawSoaContext, Soa, SoaRead, SoaWrite},
+        traits::{
+            RawSoaContext, Refs, RefsMut, Slices, SlicesMut, Soa, SoaContext, SoaRead, SoaWrite,
+        },
     },
 };
 
@@ -128,7 +130,7 @@ where
 pub unsafe fn from_erased_refs<'a, B>(
     components: &ComponentRegistry,
     fields: ErasedComponents<ErasedFieldRef<'a>>,
-) -> <B as Soa<'a>>::Refs<'static>
+) -> Refs<'static, 'a, B>
 where
     B: Bundle,
 {
@@ -137,14 +139,14 @@ where
         .map(|(component_id, r#ref)| (component_id, r#ref.as_field_ptr().cast_mut()));
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
     let ptrs = B::CONTEXT.ptrs_cast_const(ptrs);
-    unsafe { B::ptrs_to_refs(B::CONTEXT, ptrs) }
+    unsafe { B::CONTEXT.ptrs_to_refs(ptrs) }
 }
 
 #[inline]
 pub unsafe fn from_erased_refs_mut<'a, B>(
     components: &ComponentRegistry,
     fields: ErasedComponents<ErasedFieldRefMut<'a>>,
-) -> <B as Soa<'a>>::RefsMut<'static>
+) -> RefsMut<'static, 'a, B>
 where
     B: Bundle,
 {
@@ -152,7 +154,7 @@ where
         .into_iter()
         .map(|(component_id, mut r#ref)| (component_id, r#ref.as_mut_field_ptr()));
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
-    unsafe { B::ptrs_to_refs_mut(B::CONTEXT, ptrs) }
+    unsafe { B::CONTEXT.mut_ptrs_to_mut_refs(ptrs) }
 }
 
 #[inline]
@@ -160,7 +162,7 @@ pub unsafe fn from_erased_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
     fields: ErasedComponents<ErasedFieldSlice<'a>>,
-) -> <B as Soa<'a>>::Slices<'static>
+) -> Slices<'static, 'a, B>
 where
     B: Bundle,
 {
@@ -170,7 +172,7 @@ where
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
     let ptrs = B::CONTEXT.ptrs_cast_const(ptrs);
     let slices = B::CONTEXT.slice_ptrs_from_raw_parts(ptrs, len);
-    unsafe { B::slice_ptrs_to_slices(B::CONTEXT, slices) }
+    unsafe { B::CONTEXT.slice_ptrs_to_slices(slices) }
 }
 
 #[inline]
@@ -178,7 +180,7 @@ pub unsafe fn from_erased_mut_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
     fields: ErasedComponents<ErasedFieldSliceMut<'a>>,
-) -> <B as Soa<'a>>::SlicesMut<'static>
+) -> SlicesMut<'static, 'a, B>
 where
     B: Bundle,
 {
@@ -187,7 +189,7 @@ where
         .map(|(component_id, mut slice)| (component_id, slice.as_mut_field_ptr()));
     let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
     let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);
-    unsafe { B::mut_slice_ptrs_to_mut_slices(B::CONTEXT, slices) }
+    unsafe { B::CONTEXT.mut_slice_ptrs_to_mut_slices(slices) }
 }
 
 #[inline]

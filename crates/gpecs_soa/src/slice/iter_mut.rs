@@ -6,7 +6,9 @@ use core::{
 
 use crate::{
     slice::{RawIter, RawIterMut},
-    traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs, Soa},
+    traits::{
+        MutPtrs, Ptrs, RawSoa, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaContext,
+    },
 };
 
 #[repr(transparent)]
@@ -173,24 +175,24 @@ where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn new(context: &'ctx T::Context, slices: T::SlicesMut<'ctx>) -> Self {
-        let slices = T::mut_slices_as_slice_ptrs(context, slices);
+    pub fn new(context: &'ctx T::Context, slices: SlicesMut<'ctx, 'a, T>) -> Self {
+        let slices = context.mut_slices_as_mut_slice_ptrs(slices);
         unsafe { Self::from_parts(context, slices) }
     }
 
     #[inline]
-    pub fn into_slices(self) -> T::SlicesMut<'ctx> {
+    pub fn into_slices(self) -> SlicesMut<'ctx, 'a, T> {
         let (_, slices) = self.into_slices_with_context();
         slices
     }
 
     #[inline]
     #[doc(alias = "into_parts")]
-    pub fn into_slices_with_context(self) -> (&'ctx T::Context, T::SlicesMut<'ctx>) {
+    pub fn into_slices_with_context(self) -> (&'ctx T::Context, SlicesMut<'ctx, 'a, T>) {
         let Self { inner, .. } = self;
 
         let (context, slices) = inner.into_mut_slice_ptrs_with_context();
-        let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
+        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
         (context, slices)
     }
 }
@@ -200,18 +202,18 @@ where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> T::Slices<'a> {
+    pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
         let (_, slices) = self.as_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, T::Slices<'a>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let Self { inner, .. } = self;
 
         let (context, slices) = inner.as_slice_ptrs_with_context();
-        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
-        let slices = T::upcast_slices(slices);
+        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
+        let slices = T::Context::upcast_slices(slices);
         (context, slices)
     }
 }
@@ -219,7 +221,8 @@ where
 impl<T, U> AsRef<[U]> for IterMut<'_, '_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Into<&'a [U]>>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -230,7 +233,8 @@ where
 impl<T> Debug for IterMut<'_, '_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Debug>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
@@ -242,14 +246,14 @@ impl<'ctx, 'a, T> Iterator for IterMut<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
 {
-    type Item = T::RefsMut<'ctx>;
+    type Item = RefsMut<'ctx, 'a, T>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner, .. } = self;
         let context = inner.context();
 
-        let f = |ptrs| unsafe { T::ptrs_to_refs_mut(context, ptrs) };
+        let f = |ptrs| unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
         inner.next().map(f)
     }
 
@@ -269,7 +273,7 @@ where
         let Self { inner, .. } = self;
         let context = inner.context();
 
-        let f = |ptrs| unsafe { T::ptrs_to_refs_mut(context, ptrs) };
+        let f = |ptrs| unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
         inner.next_back().map(f)
     }
 }

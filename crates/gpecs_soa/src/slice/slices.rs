@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     slice::{IndexHelper, Iter, RawIter, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlicesIndex},
-    traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs, Soa},
+    traits::{Ptrs, RawSoa, RawSoaContext, Refs, SlicePtrs, Slices, Soa, SoaContext},
 };
 
 pub struct SoaSlices<'ctx, 'a, T>
@@ -186,8 +186,8 @@ where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn new(context: &'ctx T::Context, slices: T::Slices<'ctx>) -> Self {
-        let slices = T::slices_as_slice_ptrs(context, slices);
+    pub fn new(context: &'ctx T::Context, slices: Slices<'ctx, 'a, T>) -> Self {
+        let slices = context.slices_as_slice_ptrs(slices);
         Self {
             ptrs: SoaSlicePtrs::new(context, slices),
             phantom: PhantomData,
@@ -195,17 +195,17 @@ where
     }
 
     #[inline]
-    pub fn into_slices(self) -> T::Slices<'ctx> {
+    pub fn into_slices(self) -> Slices<'ctx, 'a, T> {
         let (_, slices) = self.into_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn into_slices_with_context(self) -> (&'ctx T::Context, T::Slices<'ctx>) {
+    pub fn into_slices_with_context(self) -> (&'ctx T::Context, Slices<'ctx, 'a, T>) {
         let Self { ptrs, .. } = self;
 
         let (context, slices) = ptrs.into_slice_ptrs_with_context();
-        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
         (context, slices)
     }
 
@@ -260,17 +260,17 @@ where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> T::Slices<'a> {
+    pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
         let (_, slices) = self.as_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, T::Slices<'a>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let Self { ptrs, .. } = self;
 
         let (context, slices) = ptrs.as_slice_ptrs_with_context();
-        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
         (context, slices)
     }
 
@@ -328,10 +328,10 @@ where
     #[inline]
     pub fn contains<V>(&'a self, value: V) -> bool
     where
-        T::Refs<'a>: PartialEq<V>,
+        Refs<'a, 'a, T>: PartialEq<V>,
     {
         let mut iter = self.into_iter();
-        iter.any(move |item: <T as Soa<'_>>::Refs<'a>| item.eq(&value))
+        iter.any(move |item| item.eq(&value))
     }
 }
 
@@ -359,7 +359,8 @@ where
 impl<T> Debug for SoaSlices<'_, '_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Debug>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
@@ -380,7 +381,8 @@ where
 impl<T, U> AsRef<[U]> for SoaSlices<'_, '_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Into<&'a [U]>>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -391,14 +393,16 @@ where
 impl<T> Eq for SoaSlices<'_, '_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Eq>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
 }
 
 impl<T> Ord for SoaSlices<'_, '_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Ord>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -411,7 +415,8 @@ where
 impl<T> Hash for SoaSlices<'_, '_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Hash>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -459,7 +464,7 @@ impl<'a, T> IntoIterator for &'a SoaSlices<'_, '_, T>
 where
     T: Soa<'a> + ?Sized,
 {
-    type Item = T::Refs<'a>;
+    type Item = Refs<'a, 'a, T>;
     type IntoIter = Iter<'a, 'a, T>;
 
     #[inline]
@@ -472,7 +477,7 @@ impl<'ctx, 'a, T> IntoIterator for SoaSlices<'ctx, 'a, T>
 where
     T: Soa<'a> + ?Sized,
 {
-    type Item = T::Refs<'ctx>;
+    type Item = Refs<'ctx, 'a, T>;
     type IntoIter = Iter<'ctx, 'a, T>;
 
     #[inline]

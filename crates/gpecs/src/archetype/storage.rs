@@ -21,7 +21,10 @@ use crate::{
     },
     entity::Entity,
     hash::{IndexMap, IndexSet},
-    soa::{field::FieldDescriptor, traits::Soa},
+    soa::{
+        field::FieldDescriptor,
+        traits::{Refs, RefsMut, Slices, SlicesMut, SoaContext},
+    },
 };
 
 use super::{
@@ -71,8 +74,8 @@ impl From<NoEpochEntity> for Entity {
     }
 }
 
-pub type Bundles<'a, B> = (&'a [Entity], <B as Soa<'a>>::Slices<'a>);
-pub type BundlesMut<'a, B> = (&'a [Entity], <B as Soa<'a>>::SlicesMut<'a>);
+pub type Bundles<'a, B> = (&'a [Entity], Slices<'a, 'a, B>);
+pub type BundlesMut<'a, B> = (&'a [Entity], SlicesMut<'a, 'a, B>);
 
 type ErasedStorage = EpochSparseSet<NoEpochEntity, BoxedErasedSoa>;
 type ComponentIdMap = IndexMap<ComponentId, Option<DropFn>>;
@@ -390,7 +393,7 @@ impl ArchetypeStorage {
 
         let (entities, fields) = erased_storage.erased_components(components, component_ids);
         let components = unsafe { from_erased_slices::<B>(components, entities.len(), fields) };
-        let components = B::upcast_slices(components);
+        let components = B::Context::upcast_slices(components);
         Ok((entities, components))
     }
 
@@ -411,7 +414,7 @@ impl ArchetypeStorage {
 
         let (entities, fields) = erased_storage.erased_components_mut(components, component_ids);
         let components = unsafe { from_erased_mut_slices::<B>(components, entities.len(), fields) };
-        let components = B::upcast_mut_slices(components);
+        let components = B::Context::upcast_mut_slices(components);
         Ok((entities, components))
     }
 
@@ -420,7 +423,7 @@ impl ArchetypeStorage {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<<B as Soa<'_>>::Refs<'_>>, IncompatibleBundleError>
+    ) -> Result<Option<Refs<'_, '_, B>>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -435,7 +438,7 @@ impl ArchetypeStorage {
             return Ok(None);
         };
         let refs = unsafe { from_erased_refs::<B>(components, fields) };
-        let refs = B::upcast_refs(refs);
+        let refs = B::Context::upcast_refs(refs);
         Ok(Some(refs))
     }
 
@@ -444,7 +447,7 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<<B as Soa<'_>>::RefsMut<'_>>, IncompatibleBundleError>
+    ) -> Result<Option<RefsMut<'_, '_, B>>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -459,7 +462,7 @@ impl ArchetypeStorage {
             return Ok(None);
         };
         let refs = unsafe { from_erased_refs_mut::<B>(components, fields) };
-        let refs = B::upcast_refs_mut(refs);
+        let refs = B::Context::upcast_mut_refs(refs);
         Ok(Some(refs))
     }
 

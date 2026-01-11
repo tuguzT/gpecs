@@ -11,7 +11,10 @@ use crate::{
         error::{ErasedSoaIntoValueError, ErasedSoaPtrsError},
     },
     field::ErasedFieldRef,
-    soa::{field::FieldDescriptor, traits::Soa},
+    soa::{
+        field::FieldDescriptor,
+        traits::{Refs, Soa, SoaContext},
+    },
 };
 
 #[derive(Clone, Copy)]
@@ -76,7 +79,7 @@ where
     pub unsafe fn try_into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::Refs<'_>, ErasedSoaIntoValueError<Self>>
+    ) -> Result<Refs<'_, 'a, T>, ErasedSoaIntoValueError<Self>>
     where
         T: Soa<'a> + ?Sized,
     {
@@ -86,7 +89,7 @@ where
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let ptrs = result.map_err(|err| err.map_value(into_self))?;
 
-        let refs = unsafe { T::ptrs_to_refs(context, ptrs) };
+        let refs = unsafe { context.ptrs_to_refs(ptrs) };
         Ok(refs)
     }
 }

@@ -12,7 +12,7 @@ use crate::{
     soa::{
         self,
         slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
-        traits::{MutPtrs, Ptrs, RawSoa, Soa, SoaRead, SoaWrite},
+        traits::{MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaRead, SoaWrite},
     },
 };
 
@@ -142,15 +142,15 @@ where
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
-    pub fn into_mut(self) -> V::RefsMut<'a> {
+    pub fn into_mut(self) -> RefsMut<'a, 'a, V> {
         let (_, refs) = self.into_mut_with_context();
         refs
     }
 
     #[inline]
-    pub fn into_mut_with_context(self) -> (&'a V::Context, V::RefsMut<'a>) {
+    pub fn into_mut_with_context(self) -> (&'a V::Context, RefsMut<'a, 'a, V>) {
         let (context, ptrs) = self.into_mut_ptrs_with_context();
-        let refs = unsafe { V::ptrs_to_refs_mut(context, ptrs) };
+        let refs = unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
         (context, refs)
     }
 }
@@ -162,28 +162,28 @@ where
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
-    pub fn get(&'a self) -> V::Refs<'a> {
+    pub fn get(&'a self) -> Refs<'a, 'a, V> {
         let (_, refs) = self.get_with_context();
         refs
     }
 
     #[inline]
-    pub fn get_with_context(&'a self) -> (&'a V::Context, V::Refs<'a>) {
+    pub fn get_with_context(&'a self) -> (&'a V::Context, Refs<'a, 'a, V>) {
         let (context, ptrs) = self.as_ptrs_with_context();
-        let refs = unsafe { V::ptrs_to_refs(context, ptrs) };
+        let refs = unsafe { context.ptrs_to_refs(ptrs) };
         (context, refs)
     }
 
     #[inline]
-    pub fn get_mut(&'a mut self) -> V::RefsMut<'a> {
+    pub fn get_mut(&'a mut self) -> RefsMut<'a, 'a, V> {
         let (_, refs) = self.get_mut_with_context();
         refs
     }
 
     #[inline]
-    pub fn get_mut_with_context(&'a mut self) -> (&'a V::Context, V::RefsMut<'a>) {
+    pub fn get_mut_with_context(&'a mut self) -> (&'a V::Context, RefsMut<'a, 'a, V>) {
         let (context, ptrs) = self.as_mut_ptrs_with_context();
-        let refs = unsafe { V::ptrs_to_refs_mut(context, ptrs) };
+        let refs = unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
         (context, refs)
     }
 }
@@ -255,7 +255,7 @@ where
     K: Key + Debug,
     V: ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
-    for<'ctx, 'a> V: Soa<'a, Refs<'ctx>: Debug>,
+    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, Refs<'ctx>: Debug>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
@@ -577,7 +577,7 @@ macro_rules! generate_entry_types {
             #[must_use]
             pub fn and_modify<F>(self, f: F) -> Self
             where
-                F: FnOnce(&V::Context, <V as Soa<'_>>::RefsMut<'_>),
+                F: FnOnce(&V::Context, $crate::soa::traits::RefsMut<'_, '_, V>),
             {
                 match self {
                     Self::Occupied(mut entry) => {
@@ -596,13 +596,15 @@ macro_rules! generate_entry_types {
             V: $crate::soa::traits::Soa<'a> + ?Sized,
         {
             #[inline]
-            pub fn get(&'a self) -> Option<V::Refs<'a>> {
+            pub fn get(&'a self) -> Option<$crate::soa::traits::Refs<'a, 'a, V>> {
                 let (_, refs) = self.get_with_context();
                 refs
             }
 
             #[inline]
-            pub fn get_with_context(&'a self) -> (&'a V::Context, Option<V::Refs<'a>>) {
+            pub fn get_with_context(
+                &'a self,
+            ) -> (&'a V::Context, Option<$crate::soa::traits::Refs<'a, 'a, V>>) {
                 match self {
                     Self::Occupied(entry) => {
                         let (context, refs) = entry.get_with_context();
@@ -613,13 +615,18 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn get_mut(&'a mut self) -> Option<V::RefsMut<'a>> {
+            pub fn get_mut(&'a mut self) -> Option<$crate::soa::traits::RefsMut<'a, 'a, V>> {
                 let (_, refs) = self.get_mut_with_context();
                 refs
             }
 
             #[inline]
-            pub fn get_mut_with_context(&'a mut self) -> (&'a V::Context, Option<V::RefsMut<'a>>) {
+            pub fn get_mut_with_context(
+                &'a mut self,
+            ) -> (
+                &'a V::Context,
+                Option<$crate::soa::traits::RefsMut<'a, 'a, V>>,
+            ) {
                 match self {
                     Self::Occupied(entry) => {
                         let (context, refs) = entry.get_mut_with_context();
@@ -703,7 +710,10 @@ macro_rules! generate_entry_types {
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: ?Sized,
-            for<'ctx, 'a> V: $crate::soa::traits::Soa<'a, Refs<'ctx>: Debug>,
+            for<'ctx, 'a> V: $crate::soa::traits::Soa<
+                    'a,
+                    Context: $crate::soa::traits::SoaContext<'a, Refs<'ctx>: Debug>,
+                >,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
@@ -800,13 +810,15 @@ macro_rules! generate_entry_types {
             V: $crate::soa::traits::Soa<'a> + ?Sized,
         {
             #[inline]
-            pub fn into_mut(self) -> V::RefsMut<'a> {
+            pub fn into_mut(self) -> $crate::soa::traits::RefsMut<'a, 'a, V> {
                 let Self { inner } = self;
                 inner.into_mut()
             }
 
             #[inline]
-            pub fn into_mut_with_context(self) -> (&'a V::Context, V::RefsMut<'a>) {
+            pub fn into_mut_with_context(
+                self,
+            ) -> (&'a V::Context, $crate::soa::traits::RefsMut<'a, 'a, V>) {
                 let Self { inner } = self;
                 inner.into_mut_with_context()
             }
@@ -818,25 +830,29 @@ macro_rules! generate_entry_types {
             V: $crate::soa::traits::Soa<'a> + ?Sized,
         {
             #[inline]
-            pub fn get(&'a self) -> V::Refs<'a> {
+            pub fn get(&'a self) -> $crate::soa::traits::Refs<'a, 'a, V> {
                 let Self { inner } = self;
                 inner.get()
             }
 
             #[inline]
-            pub fn get_with_context(&'a self) -> (&'a V::Context, V::Refs<'a>) {
+            pub fn get_with_context(
+                &'a self,
+            ) -> (&'a V::Context, $crate::soa::traits::Refs<'a, 'a, V>) {
                 let Self { inner } = self;
                 inner.get_with_context()
             }
 
             #[inline]
-            pub fn get_mut(&'a mut self) -> V::RefsMut<'a> {
+            pub fn get_mut(&'a mut self) -> $crate::soa::traits::RefsMut<'a, 'a, V> {
                 let Self { inner } = self;
                 inner.get_mut()
             }
 
             #[inline]
-            pub fn get_mut_with_context(&'a mut self) -> (&'a V::Context, V::RefsMut<'a>) {
+            pub fn get_mut_with_context(
+                &'a mut self,
+            ) -> (&'a V::Context, $crate::soa::traits::RefsMut<'a, 'a, V>) {
                 let Self { inner } = self;
                 inner.get_mut_with_context()
             }
@@ -889,7 +905,10 @@ macro_rules! generate_entry_types {
         where
             K: $crate::key::Key + core::fmt::Debug,
             V: ?Sized,
-            for<'ctx, 'a> V: $crate::soa::traits::Soa<'a, Refs<'ctx>: core::fmt::Debug>,
+            for<'ctx, 'a> V: $crate::soa::traits::Soa<
+                    'a,
+                    Context: $crate::soa::traits::SoaContext<'a, Refs<'ctx>: core::fmt::Debug>,
+                >,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;

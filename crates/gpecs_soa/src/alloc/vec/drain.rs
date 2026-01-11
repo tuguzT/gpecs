@@ -8,7 +8,7 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, range},
-    traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs, Soa, SoaRead},
+    traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs, Slices, Soa, SoaRead},
 };
 
 use super::SoaVec;
@@ -113,13 +113,13 @@ where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> T::Slices<'a> {
+    pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
         let (_, iter) = self.as_slices_with_context();
         iter
     }
 
     #[inline]
-    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, T::Slices<'a>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let Self { iter, .. } = self;
         iter.as_slices_with_context()
     }
@@ -144,7 +144,8 @@ where
 impl<T, U> AsRef<[U]> for Drain<'_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Into<&'a [U]>>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     fn as_ref(&self) -> &[U] {
         self.as_slices().into()
@@ -154,7 +155,8 @@ where
 impl<T> Debug for Drain<'_, T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Debug>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();

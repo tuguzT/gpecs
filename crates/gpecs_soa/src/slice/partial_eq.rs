@@ -10,7 +10,8 @@ macro_rules! partial_eq_impl {
         where
             $($ty: $bound,)?
             T: ?Sized,
-            for<'_c, '_a> T: $crate::traits::Soa<'_a, Slices<'_c>: PartialEq>,
+            for<'_a> T: $crate::traits::Soa<'_a>,
+            for<'_c, '_a> $crate::traits::Slices<'_c, '_a, T>: PartialEq,
         {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool {

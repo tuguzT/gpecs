@@ -11,8 +11,8 @@ use crate::{
     ptr::BufferDataPtr,
     slice::SoaSlices,
     traits::{
-        MutPtrs, NonNullPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa,
-        SoaCloneToUninit, SoaRead,
+        MutPtrs, NonNullPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Slices,
+        SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaRead,
     },
     vec::SoaVec,
     wrapper,
@@ -176,28 +176,28 @@ where
     T: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> T::Slices<'a> {
+    pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
         let (_, slices) = self.as_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, T::Slices<'a>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
         (context, slices)
     }
 
     #[inline]
-    pub fn as_mut_slices(&'a mut self) -> T::SlicesMut<'a> {
+    pub fn as_mut_slices(&'a mut self) -> SlicesMut<'a, 'a, T> {
         let (_, slices) = self.as_mut_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_mut_slices_with_context(&'a mut self) -> (&'a T::Context, T::SlicesMut<'a>) {
+    pub fn as_mut_slices_with_context(&'a mut self) -> (&'a T::Context, SlicesMut<'a, 'a, T>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
+        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
         (context, slices)
     }
 }
@@ -221,7 +221,8 @@ where
 impl<T, U> AsRef<[U]> for IntoIter<T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Into<&'a [U]>>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -232,7 +233,8 @@ where
 impl<T> Debug for IntoIter<T>
 where
     T: ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Debug>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();

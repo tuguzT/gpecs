@@ -2,13 +2,13 @@ use gpecs_soa_erased::field::ErasedFieldMutPtr;
 
 use crate::{
     component::registry::{ComponentId, ComponentRegistry},
-    soa::traits::{MutPtrs, Soa, SoaRead, SoaWrite},
+    soa::traits::{MutPtrs, SoaOwned, SoaRead, SoaWrite},
 };
 
 mod impls;
 
 /// Non-empty collection of [components](crate::component::Component).
-pub unsafe trait Bundle: for<'a> Soa<'a> + SoaRead + SoaWrite + 'static {
+pub unsafe trait Bundle: SoaOwned + SoaRead + SoaWrite + 'static {
     /// Static [`Context`](crate::soa::traits::RawSoa::Context) instance of this bundle.
     ///
     /// This ensures that components of this bundle are known at compile time.

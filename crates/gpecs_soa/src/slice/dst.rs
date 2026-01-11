@@ -13,8 +13,8 @@ use crate::{
         slice_from_raw_parts_mut,
     },
     traits::{
-        MutPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
-        SoaTrustedFields,
+        MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut,
+        Soa, SoaCloneToUninit, SoaContext, SoaTrustedFields,
     },
 };
 
@@ -233,28 +233,28 @@ where
     T: Soa<'a> + SoaTrustedFields + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> T::Slices<'a> {
+    pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
         let (_, slices) = self.as_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, T::Slices<'a>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a T::Context, Slices<'a, 'a, T>) {
         let (context, slices) = self.as_slice_ptrs_with_context();
-        let slices = unsafe { T::slice_ptrs_to_slices(context, slices) };
+        let slices = unsafe { context.slice_ptrs_to_slices(slices) };
         (context, slices)
     }
 
     #[inline]
-    pub fn as_mut_slices(&'a mut self) -> T::SlicesMut<'a> {
+    pub fn as_mut_slices(&'a mut self) -> SlicesMut<'a, 'a, T> {
         let (_, slices) = self.as_mut_slices_with_context();
         slices
     }
 
     #[inline]
-    pub fn as_mut_slices_with_context(&'a mut self) -> (&'a T::Context, T::SlicesMut<'a>) {
+    pub fn as_mut_slices_with_context(&'a mut self) -> (&'a T::Context, SlicesMut<'a, 'a, T>) {
         let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
+        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
         (context, slices)
     }
 
@@ -358,7 +358,7 @@ where
     #[inline]
     pub fn contains<V>(&'a self, value: V) -> bool
     where
-        T::Refs<'a>: PartialEq<V>,
+        Refs<'a, 'a, T>: PartialEq<V>,
     {
         let mut iter = self.into_iter();
         iter.any(move |item| item.eq(&value))
@@ -374,7 +374,7 @@ where
     pub fn sort_unstable_with_permutation<P>(&mut self, permutation: P)
     where
         P: AsMut<[usize]>,
-        for<'ctx, 'a> <T as Soa<'a>>::Refs<'ctx>: Ord,
+        for<'ctx, 'a> Refs<'ctx, 'a, T>: Ord,
     {
         self.mut_slices()
             .sort_unstable_with_permutation(permutation);
@@ -384,7 +384,7 @@ where
     pub fn sort_unstable_with_permutation_by<P, F>(&mut self, permutation: P, compare: F)
     where
         P: AsMut<[usize]>,
-        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>, <T as Soa<'a>>::Refs<'_>) -> cmp::Ordering,
+        for<'a> F: FnMut(Refs<'_, 'a, T>, Refs<'_, 'a, T>) -> cmp::Ordering,
     {
         self.mut_slices()
             .sort_unstable_with_permutation_by(permutation, compare);
@@ -394,7 +394,7 @@ where
     pub fn sort_unstable_with_permutation_by_key<P, K, F>(&mut self, permutation: P, f: F)
     where
         P: AsMut<[usize]>,
-        for<'a> F: FnMut(<T as Soa<'a>>::Refs<'_>) -> K,
+        F: FnMut(Refs<'_, '_, T>) -> K,
         K: Ord,
     {
         self.mut_slices()
@@ -417,7 +417,8 @@ where
 impl<T> Debug for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Debug>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slices = self.as_slices();
@@ -438,7 +439,7 @@ where
 impl<T, U> AsRef<[U]> for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx> = &'a [U]>,
+    for<'ctx, 'a> T: Soa<'a, Context: SoaContext<'a, Slices<'ctx> = &'a [U]>>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -459,7 +460,7 @@ where
 impl<T, U> AsMut<[U]> for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
-    for<'ctx, 'a> T: Soa<'a, SlicesMut<'ctx> = &'a mut [U]>,
+    for<'ctx, 'a> T: Soa<'a, Context: SoaContext<'a, SlicesMut<'ctx> = &'a mut [U]>>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [U] {
@@ -470,14 +471,16 @@ where
 impl<T> Eq for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Eq>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
 }
 
 impl<T> Ord for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Ord>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -490,7 +493,8 @@ where
 impl<T> Hash for SoaSlice<T>
 where
     T: SoaTrustedFields + ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Slices<'ctx>: Hash>,
+    for<'a> T: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
 {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -546,7 +550,7 @@ impl<'a, T> IntoIterator for &'a SoaSlice<T>
 where
     T: Soa<'a> + SoaTrustedFields + ?Sized,
 {
-    type Item = T::Refs<'a>;
+    type Item = Refs<'a, 'a, T>;
     type IntoIter = Iter<'a, 'a, T>;
 
     #[inline]
@@ -559,7 +563,7 @@ impl<'a, T> IntoIterator for &'a mut SoaSlice<T>
 where
     T: Soa<'a> + SoaTrustedFields + ?Sized,
 {
-    type Item = T::RefsMut<'a>;
+    type Item = RefsMut<'a, 'a, T>;
     type IntoIter = IterMut<'a, 'a, T>;
 
     #[inline]

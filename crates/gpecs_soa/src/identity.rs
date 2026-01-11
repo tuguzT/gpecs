@@ -14,8 +14,8 @@ use crate::{
     field::FieldDescriptor,
     ptr::assert_ptr_is_aligned,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, SliceMutPtrs, SlicePtrs, Soa, SoaCloneToUninit,
-        SoaRead, SoaTrustedFields, SoaWrite,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, Soa, SoaAsMutRefs, SoaAsRefs,
+        SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
 
@@ -545,158 +545,20 @@ unsafe impl<T> RawSoa for Identity<T> {
     type Fields = Identity<T>;
 }
 
-unsafe impl<'a, T> Soa<'a> for Identity<T>
+unsafe impl<T> SoaTrustedFields for Identity<T> {}
+
+unsafe impl<T> SoaCloneToUninit for Identity<T>
 where
-    T: 'a,
+    T: Clone,
 {
-    type Refs<'ctx> = &'a Self;
-
     #[inline]
-    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
-        from
-    }
-
-    type RefsMut<'ctx> = &'a mut Self;
-
-    #[inline]
-    fn upcast_refs_mut<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
-        from
-    }
-
-    #[inline]
-    unsafe fn ptrs_to_refs<'ctx>(
-        _context: &'ctx Self::Context,
-        ptrs: Ptrs<'ctx, Self>,
-    ) -> Self::Refs<'ctx> {
-        unsafe { &*ptrs }
-    }
-
-    #[inline]
-    unsafe fn ptrs_to_refs_mut<'ctx>(
-        _context: &'ctx Self::Context,
-        ptrs: MutPtrs<'ctx, Self>,
-    ) -> Self::RefsMut<'ctx> {
-        unsafe { &mut *ptrs }
-    }
-
-    #[inline]
-    fn refs_as_ptrs<'ctx>(
-        _context: &'ctx Self::Context,
-        refs: Self::Refs<'ctx>,
-    ) -> Ptrs<'ctx, Self> {
-        ptr::from_ref(refs)
-    }
-
-    #[inline]
-    fn refs_mut_as_ptrs<'ctx>(
-        _context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx>,
-    ) -> MutPtrs<'ctx, Self> {
-        ptr::from_mut(refs)
-    }
-
-    #[inline]
-    fn refs_mut_as_refs<'ctx>(
-        _context: &'ctx Self::Context,
-        refs: Self::RefsMut<'ctx>,
-    ) -> Self::Refs<'ctx> {
-        &*refs
-    }
-
-    #[inline]
-    fn value_as_refs(_context: &'a Self::Context, value: &'a Self) -> Self::Refs<'a> {
-        value
-    }
-
-    #[inline]
-    fn mut_value_as_refs(_context: &'a Self::Context, value: &'a mut Self) -> Self::RefsMut<'a> {
-        value
-    }
-
-    type Slices<'ctx> = &'a [Self];
-
-    #[inline]
-    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
-        from
-    }
-
-    type SlicesMut<'ctx> = &'a mut [Self];
-
-    #[inline]
-    fn upcast_mut_slices<'short, 'long: 'short>(
-        from: Self::SlicesMut<'long>,
-    ) -> Self::SlicesMut<'short> {
-        from
-    }
-
-    #[inline]
-    unsafe fn slice_ptrs_to_slices<'ctx>(
-        _context: &'ctx Self::Context,
-        slices: SlicePtrs<'ctx, Self>,
-    ) -> Self::Slices<'ctx> {
-        let data = slices.cast();
-        let len = slices.len();
-        unsafe { slice::from_raw_parts(data, len) }
-    }
-
-    #[inline]
-    unsafe fn mut_slice_ptrs_to_mut_slices<'ctx>(
-        _context: &'ctx Self::Context,
-        slices: SliceMutPtrs<'ctx, Self>,
-    ) -> Self::SlicesMut<'ctx> {
-        let data = slices.cast();
-        let len = slices.len();
-        unsafe { slice::from_raw_parts_mut(data, len) }
-    }
-
-    #[inline]
-    fn slices_len(_context: &Self::Context, slices: &Self::Slices<'_>) -> usize {
-        slices.len()
-    }
-
-    #[inline]
-    fn mut_slices_len(_context: &Self::Context, slices: &Self::SlicesMut<'_>) -> usize {
-        slices.len()
-    }
-
-    #[inline]
-    fn slices_as_slice_ptrs<'ctx>(
-        _context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx>,
-    ) -> SlicePtrs<'ctx, Self> {
-        ptr::from_ref(slices)
-    }
-
-    #[inline]
-    fn mut_slices_as_slice_ptrs<'ctx>(
-        _context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx>,
-    ) -> SliceMutPtrs<'ctx, Self> {
-        ptr::from_mut(slices)
-    }
-
-    #[inline]
-    fn mut_slices_as_slices<'ctx>(
-        _context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx>,
-    ) -> Self::Slices<'ctx> {
-        &*slices
-    }
-
-    #[inline]
-    fn slices_as_ptrs<'ctx>(
-        _context: &'ctx Self::Context,
-        slices: Self::Slices<'ctx>,
-    ) -> Ptrs<'ctx, Self> {
-        slices.as_ptr()
-    }
-
-    #[inline]
-    fn mut_slices_as_ptrs<'ctx>(
-        _context: &'ctx Self::Context,
-        slices: Self::SlicesMut<'ctx>,
-    ) -> MutPtrs<'ctx, Self> {
-        slices.as_mut_ptr()
+    unsafe fn clone_to_uninit(
+        _context: &Self::Context,
+        src: Ptrs<'_, Self>,
+        dst: MutPtrs<'_, Self>,
+    ) {
+        let src = unsafe { &*src }.clone();
+        unsafe { ptr::write(dst, src) }
     }
 }
 
@@ -714,19 +576,125 @@ unsafe impl<T> SoaWrite for Identity<T> {
     }
 }
 
-unsafe impl<T> SoaCloneToUninit for Identity<T>
+unsafe impl<'data, T> SoaContext<'data> for IdentityContext<T>
 where
-    T: Clone,
+    T: 'data,
 {
+    type Refs<'a> = &'data Identity<T>;
+
     #[inline]
-    unsafe fn clone_to_uninit(
-        _context: &Self::Context,
-        src: Ptrs<'_, Self>,
-        dst: MutPtrs<'_, Self>,
-    ) {
-        let src = unsafe { &*src }.clone();
-        unsafe { ptr::write(dst, src) }
+    fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
+        from
+    }
+
+    #[inline]
+    unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
+        unsafe { &*ptrs }
+    }
+
+    #[inline]
+    fn refs_as_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::Ptrs<'a> {
+        ptr::from_ref(refs)
+    }
+
+    type RefsMut<'a> = &'data mut Identity<T>;
+
+    #[inline]
+    fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
+        from
+    }
+
+    #[inline]
+    unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
+        unsafe { &mut *ptrs }
+    }
+
+    #[inline]
+    fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
+        ptr::from_mut(refs)
+    }
+
+    #[inline]
+    fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
+        &*refs
+    }
+
+    type Slices<'a> = &'data [Identity<T>];
+
+    #[inline]
+    fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
+        from
+    }
+
+    #[inline]
+    unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
+        unsafe { slice::from_raw_parts(slices.cast(), slices.len()) }
+    }
+
+    #[inline]
+    fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a> {
+        ptr::from_ref(slices)
+    }
+
+    #[inline]
+    fn slices_len(&self, slices: &Self::Slices<'_>) -> usize {
+        slices.len()
+    }
+
+    type SlicesMut<'a> = &'data mut [Identity<T>];
+
+    #[inline]
+    fn upcast_mut_slices<'short, 'long: 'short>(
+        from: Self::SlicesMut<'long>,
+    ) -> Self::SlicesMut<'short> {
+        from
+    }
+
+    #[inline]
+    unsafe fn mut_slice_ptrs_to_mut_slices<'a>(
+        &'a self,
+        slices: Self::SliceMutPtrs<'a>,
+    ) -> Self::SlicesMut<'a> {
+        unsafe { slice::from_raw_parts_mut(slices.cast(), slices.len()) }
+    }
+
+    #[inline]
+    fn mut_slices_as_mut_slice_ptrs<'a>(
+        &'a self,
+        slices: Self::SlicesMut<'a>,
+    ) -> Self::SliceMutPtrs<'a> {
+        ptr::from_mut(slices)
+    }
+
+    #[inline]
+    fn mut_slices_len(&self, slices: &Self::SlicesMut<'_>) -> usize {
+        slices.len()
+    }
+
+    #[inline]
+    fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
+        &*slices
     }
 }
 
-unsafe impl<T> SoaTrustedFields for Identity<T> {}
+unsafe impl<'a, T> Soa<'a> for Identity<T> where T: 'a {}
+
+impl<'a, T> SoaAsRefs<'a> for Identity<T>
+where
+    T: 'a,
+{
+    #[inline]
+    fn as_refs(&'a self, _context: &'a Self::Context) -> Refs<'a, 'a, Self> {
+        self
+    }
+}
+
+impl<'a, T> SoaAsMutRefs<'a> for Identity<T>
+where
+    T: 'a,
+{
+    #[inline]
+    fn as_mut_refs(&'a mut self, _context: &'a Self::Context) -> RefsMut<'a, 'a, Self> {
+        self
+    }
+}

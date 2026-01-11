@@ -8,7 +8,7 @@ use core::{
 use crate::{
     item::{DenseMutPtrs, DensePtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut},
     soa::{
-        traits::{RawSoa, RawSoaContext, SliceMutPtrs, Soa},
+        traits::{RawSoa, RawSoaContext, SliceMutPtrs, Soa, SoaContext},
         wrapper,
     },
 };
@@ -120,7 +120,7 @@ where
         let Self { keys, values } = self;
 
         let keys = unsafe { &mut *keys };
-        let values = unsafe { V::mut_slice_ptrs_to_mut_slices(context, values.into_inner()) };
+        let values = unsafe { context.mut_slice_ptrs_to_mut_slices(values.into_inner()) };
         unsafe { DenseSlicesMut::new_unchecked(keys, values) }
     }
 }

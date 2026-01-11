@@ -11,7 +11,10 @@ use crate::{
         error::{ErasedSoaIntoValueError, ErasedSoaSlicePtrsError},
     },
     field::{ErasedFieldSlice, ErasedFieldSliceMut},
-    soa::{field::FieldDescriptor, traits::Soa},
+    soa::{
+        field::FieldDescriptor,
+        traits::{SlicesMut, Soa, SoaContext},
+    },
 };
 
 pub struct ErasedSoaSlicesMut<'a, D>
@@ -85,7 +88,7 @@ where
     pub unsafe fn try_into<T>(
         self,
         context: &T::Context,
-    ) -> Result<T::SlicesMut<'_>, ErasedSoaIntoValueError<Self>>
+    ) -> Result<SlicesMut<'_, 'a, T>, ErasedSoaIntoValueError<Self>>
     where
         T: Soa<'a> + ?Sized,
     {
@@ -95,7 +98,7 @@ where
         let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let slices = result.map_err(|err| err.map_value(into_self))?;
 
-        let slices = unsafe { T::mut_slice_ptrs_to_mut_slices(context, slices) };
+        let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
         Ok(slices)
     }
 }

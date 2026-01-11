@@ -1,6 +1,6 @@
 use crate::{
     item::{DenseRefs, DenseRefsMut},
-    soa::traits::Soa,
+    soa::traits::{SoaAsMutRefs, SoaAsRefs},
 };
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -21,21 +21,26 @@ impl<K, V> DenseItem<K, V> {
 
 impl<'a, K, V> DenseItem<K, V>
 where
-    V: Soa<'a> + ?Sized,
+    V: SoaAsRefs<'a> + ?Sized,
 {
     #[inline]
     pub fn as_refs(&'a self, context: &'a V::Context) -> DenseRefs<'a, 'a, K, V> {
         let Self { key, value } = self;
 
-        let value = V::value_as_refs(context, value);
+        let value = value.as_refs(context);
         DenseRefs::new(key, value)
     }
+}
 
+impl<'a, K, V> DenseItem<K, V>
+where
+    V: SoaAsMutRefs<'a> + ?Sized,
+{
     #[inline]
-    pub fn as_refs_mut(&'a mut self, context: &'a V::Context) -> DenseRefsMut<'a, 'a, K, V> {
+    pub fn as_mut_refs(&'a mut self, context: &'a V::Context) -> DenseRefsMut<'a, 'a, K, V> {
         let Self { key, value } = self;
 
-        let value = V::mut_value_as_refs(context, value);
+        let value = value.as_mut_refs(context);
         DenseRefsMut::new(key, value)
     }
 }

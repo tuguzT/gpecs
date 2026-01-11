@@ -10,7 +10,7 @@ use crate::{
     iter::RawIter,
     soa::{
         self,
-        traits::{Ptrs, RawSoa, SlicePtrs, Soa},
+        traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa},
     },
 };
 
@@ -129,13 +129,13 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn into_slices(self) -> (&'a [K], V::Slices<'ctx>) {
+    pub fn into_slices(self) -> (&'a [K], Slices<'ctx, 'a, V>) {
         let (_, keys, values) = self.into_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn into_slices_with_context(self) -> (&'ctx V::Context, &'a [K], V::Slices<'ctx>) {
+    pub fn into_slices_with_context(self) -> (&'ctx V::Context, &'a [K], Slices<'ctx, 'a, V>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.into_slices_with_context();
@@ -149,13 +149,13 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
-    pub fn as_slices(&'a self) -> (&'a [K], V::Slices<'a>) {
+    pub fn as_slices(&'a self) -> (&'a [K], Slices<'a, 'a, V>) {
         let (_, keys, values) = self.as_slices_with_context();
         (keys, values)
     }
 
     #[inline]
-    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, &'a [K], V::Slices<'a>) {
+    pub fn as_slices_with_context(&'a self) -> (&'a V::Context, &'a [K], Slices<'a, 'a, V>) {
         let Self { inner } = self;
 
         let (context, slices) = inner.as_slices_with_context();
@@ -168,7 +168,8 @@ impl<K, V> Debug for Iter<'_, '_, K, V>
 where
     K: Debug,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Debug>,
+    for<'a> V: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (keys, values) = &self.as_slices();
@@ -195,7 +196,8 @@ where
 impl<T, K, V> AsRef<[T]> for Iter<'_, '_, K, V>
 where
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, Slices<'ctx>: Into<&'a [T]>>,
+    for<'a> V: Soa<'a>,
+    for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
@@ -208,7 +210,7 @@ impl<'ctx, 'a, K, V> Iterator for Iter<'ctx, 'a, K, V>
 where
     V: Soa<'a> + ?Sized,
 {
-    type Item = (&'a K, V::Refs<'ctx>);
+    type Item = (&'a K, Refs<'ctx, 'a, V>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

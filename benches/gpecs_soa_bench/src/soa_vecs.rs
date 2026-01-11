@@ -2,7 +2,7 @@ use gpecs_soa_erased::soa::prelude::*;
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero};
 
-pub trait SoaVecs: for<'a> Soa<'a> {
+pub trait SoaVecs: SoaOwned {
     type Vecs;
 }
 

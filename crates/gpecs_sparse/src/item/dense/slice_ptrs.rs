@@ -8,7 +8,7 @@ use core::{
 use crate::{
     item::{DensePtrs, DenseSliceMutPtrs, DenseSlices},
     soa::{
-        traits::{RawSoa, RawSoaContext, SlicePtrs, Soa},
+        traits::{RawSoa, RawSoaContext, SlicePtrs, Soa, SoaContext},
         wrapper,
     },
 };
@@ -95,7 +95,7 @@ where
         let Self { keys, values } = self;
 
         let keys = unsafe { &*keys };
-        let values = unsafe { V::slice_ptrs_to_slices(context, values.into_inner()) };
+        let values = unsafe { context.slice_ptrs_to_slices(values.into_inner()) };
         unsafe { DenseSlices::new_unchecked(keys, values) }
     }
 }

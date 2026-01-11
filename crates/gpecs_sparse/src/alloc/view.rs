@@ -1,7 +1,10 @@
 use core::cmp;
 
 use crate::{
-    assert::unwrap_dense_from_sparse_index, key::Key, soa::traits::Soa, view::EpochSparseViewMut,
+    assert::unwrap_dense_from_sparse_index,
+    key::Key,
+    soa::traits::{Refs, Soa},
+    view::EpochSparseViewMut,
 };
 
 impl<K, V> EpochSparseViewMut<'_, '_, K, V>
@@ -13,7 +16,7 @@ where
     #[inline]
     pub fn sort(&mut self)
     where
-        for<'ctx, 'a> <V as Soa<'a>>::Refs<'ctx>: Ord,
+        for<'ctx, 'a> Refs<'ctx, 'a, V>: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by_cached_key(|&key| {
@@ -31,8 +34,7 @@ where
     #[inline]
     pub fn sort_by<F>(&mut self, mut f: F)
     where
-        for<'a> F:
-            FnMut((K, <V as Soa<'a>>::Refs<'_>), (K, <V as Soa<'a>>::Refs<'_>)) -> cmp::Ordering,
+        for<'a> F: FnMut((K, Refs<'_, 'a, V>), (K, Refs<'_, 'a, V>)) -> cmp::Ordering,
     {
         self.sort_impl(|keys, values, sparse| {
             keys.sort_by(|&lhs_key, &rhs_key| {
@@ -52,7 +54,7 @@ where
     #[inline]
     pub fn sort_by_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, <V as Soa<'_>>::Refs<'_>)) -> T,
+        F: FnMut((K, Refs<'_, '_, V>)) -> T,
         T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {
@@ -67,7 +69,7 @@ where
     #[inline]
     pub fn sort_by_cached_key<T, F>(&mut self, mut f: F)
     where
-        F: FnMut((K, <V as Soa<'_>>::Refs<'_>)) -> T,
+        F: FnMut((K, Refs<'_, '_, V>)) -> T,
         T: Ord,
     {
         self.sort_impl(|keys, values, sparse| {

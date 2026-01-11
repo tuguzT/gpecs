@@ -1,24 +1,24 @@
 use crate::{
     ptr,
-    traits::{RawSoaContext, Soa, SoaRead, SoaWrite},
+    traits::{RawSoaContext, RefsMut, Soa, SoaContext, SoaRead, SoaWrite},
 };
 
 /// Version of [`core::mem::replace()`] but for [SoA](Soa) types.
-pub fn replace<'a, T>(context: &T::Context, dest: T::RefsMut<'_>, src: T) -> T
+pub fn replace<'a, T>(context: &T::Context, dest: RefsMut<'_, 'a, T>, src: T) -> T
 where
     T: Soa<'a> + SoaRead + SoaWrite,
 {
-    let dest = T::refs_mut_as_ptrs(context, T::upcast_refs_mut(dest));
+    let dest = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(dest));
     unsafe { ptr::replace(context, dest, src) }
 }
 
 /// Version of [`core::mem::swap()`] but for [SoA](Soa) types.
-pub fn swap<'a, T>(context: &T::Context, x: T::RefsMut<'_>, y: T::RefsMut<'_>)
+pub fn swap<'a, T>(context: &T::Context, x: RefsMut<'_, 'a, T>, y: RefsMut<'_, 'a, T>)
 where
     T: Soa<'a> + ?Sized,
 {
-    let x = T::refs_mut_as_ptrs(context, T::upcast_refs_mut(x));
-    let y = T::refs_mut_as_ptrs(context, T::upcast_refs_mut(y));
+    let x = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(x));
+    let y = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(y));
 
     // SAFETY: `&mut` guarantees these are typed readable and writable
     // as well as non-overlapping.

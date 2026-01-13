@@ -1,1 +1,1 @@
-{"id":"markdownlint","name":"Markdownlint","version":"0.0.6","minAppVersion":"1.7.2","description":"Use markdownlint to make the contents of your files more consistent","author":"ebullient","authorUrl":"https://github.com/ebullient","isDesktopOnly":false}
+{"id":"markdownlint","name":"Markdownlint","version":"0.0.8","minAppVersion":"1.9.0","description":"Use markdownlint to make the contents of your files more consistent","author":"ebullient","authorUrl":"https://github.com/ebullient","fundingUrl":"https://buymeacoffee.com/ebullient","isDesktopOnly":true}

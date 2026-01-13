@@ -7,7 +7,10 @@ use crate::soa::{
 pub type BoxedErasedSoaContext = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ErasedSoaContext<D> {
+pub struct ErasedSoaContext<D>
+where
+    D: ?Sized,
+{
     descriptors: D,
 }
 
@@ -26,7 +29,7 @@ impl<D> ErasedSoaContext<D> {
 
 impl<D> ErasedSoaContext<D>
 where
-    D: AsRef<[FieldDescriptor]>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
     pub fn field_descriptors(&self) -> &[FieldDescriptor] {
@@ -70,6 +73,7 @@ where
     type Item = FieldDescriptor;
     type IntoIter = D::IntoIter;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { descriptors } = self;
         descriptors.into_iter()

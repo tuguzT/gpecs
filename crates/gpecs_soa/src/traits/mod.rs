@@ -550,7 +550,14 @@ pub type SlicesMut<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data>>
 
 /// An extension of [SoA](RawSoa) type which allows to access
 /// each stored field by their reference types of specific lifetime.
-pub unsafe trait Soa<'a>: RawSoa<Context: SoaContext<'a>> {}
+pub trait Soa<'a>: RawSoa<Context: SoaContext<'a>> {}
+
+impl<'a, T> Soa<'a> for T
+where
+    T: RawSoa + ?Sized,
+    T::Context: SoaContext<'a>,
+{
+}
 
 /// An extension of [SoA](RawSoa) type which allows to access
 /// each stored field by their reference types of **any** lifetime.

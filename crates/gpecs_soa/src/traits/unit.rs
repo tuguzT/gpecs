@@ -7,8 +7,8 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, Soa, SoaAsMutRefs,
-        SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SoaAsMutRefs, SoaAsRefs,
+        SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
 
@@ -360,8 +360,6 @@ unsafe impl<'data> SoaContext<'data> for () {
         &*slices
     }
 }
-
-unsafe impl Soa<'_> for () {}
 
 impl<'a> SoaAsRefs<'a> for () {
     #[inline]

@@ -412,13 +412,6 @@ where
     }
 }
 
-unsafe impl<'a, K, V> Soa<'a> for DenseItem<K, V>
-where
-    K: 'a,
-    V: Soa<'a> + ?Sized,
-{
-}
-
 impl<'a, K, V> SoaAsRefs<'a> for DenseItem<K, V>
 where
     K: 'a,

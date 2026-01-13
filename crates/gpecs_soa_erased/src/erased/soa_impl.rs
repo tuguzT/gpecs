@@ -5,7 +5,7 @@ use crate::{
     soa::{
         field::FieldDescriptor,
         traits::{
-            MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, Soa, SoaAsMutRefs, SoaAsRefs,
+            MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs,
             SoaContext, SoaRead, SoaWrite,
         },
     },
@@ -489,16 +489,9 @@ where
     }
 }
 
-unsafe impl<'a, B, D> Soa<'a> for ErasedSoa<B, D>
-where
-    B: ?Sized + 'a,
-    D: AsRef<[FieldDescriptor]>,
-{
-}
-
 impl<'a, B, D> SoaAsRefs<'a> for ErasedSoa<B, D>
 where
-    B: AlignedBytes + ?Sized + 'a,
+    B: AlignedBytes + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
@@ -512,7 +505,7 @@ where
 
 impl<'a, B, D> SoaAsMutRefs<'a> for ErasedSoa<B, D>
 where
-    B: AlignedBytes + ?Sized + 'a,
+    B: AlignedBytes + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]

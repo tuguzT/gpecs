@@ -12,7 +12,7 @@ use crate::{
     field::FieldDescriptor,
     ptr::assert_ptr_is_aligned,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, Soa, SoaAsMutRefs, SoaAsRefs,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs,
         SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
@@ -582,12 +582,6 @@ macro_rules! soa_tuple_impl {
                 let slices = ($(&*slices.$indices,)*);
                 slices
             }
-        }
-
-        unsafe impl<'a, $($types,)*> Soa<'a> for ($($types,)*)
-        where
-            $($types: 'a,)*
-        {
         }
 
         impl<'a, $($types,)*> SoaAsRefs<'a> for ($($types,)*)

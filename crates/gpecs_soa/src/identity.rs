@@ -14,7 +14,7 @@ use crate::{
     field::FieldDescriptor,
     ptr::assert_ptr_is_aligned,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, Soa, SoaAsMutRefs, SoaAsRefs,
+        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs,
         SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
     },
 };
@@ -676,8 +676,6 @@ where
         &*slices
     }
 }
-
-unsafe impl<'a, T> Soa<'a> for Identity<T> where T: 'a {}
 
 impl<'a, T> SoaAsRefs<'a> for Identity<T>
 where

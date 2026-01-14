@@ -14,28 +14,36 @@ fn context() {
 #[cfg_attr(miri, ignore)]
 fn context_of() {
     let context = Default::default();
-    let context = ErasedSoaContext::<ArrayDescriptors<1>>::of::<()>(&context);
-    let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(
-        context
-            .field_descriptors()
-            .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
-    );
-
-    let context = Default::default();
     let context = ErasedSoaContext::<ArrayDescriptors<3>>::of::<(u32, u16, u8)>(&context);
+
     let descriptors = [
         FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<u16>(),
         FieldDescriptor::of::<u32>(),
     ];
-    assert!(
+    itertools::assert_equal(
         context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
+    );
+}
+
+#[test]
+#[cfg_attr(miri, ignore)]
+fn context_of_zst() {
+    let context = Default::default();
+    let context = ErasedSoaContext::<ArrayDescriptors<1>>::of::<()>(&context);
+
+    let descriptors = [FieldDescriptor::of::<()>()];
+    itertools::assert_equal(
+        context
+            .field_descriptors()
+            .iter()
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 }

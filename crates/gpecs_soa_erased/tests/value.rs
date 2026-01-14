@@ -48,12 +48,13 @@ fn value() {
         FieldDescriptor::of::<u32>(),
         FieldDescriptor::of::<String>(),
     ];
-    assert!(
+    itertools::assert_equal(
         erased_value
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout)),
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let erased_refs = erased_value.as_fields();
@@ -151,18 +152,19 @@ fn value() {
         fields,
         descriptors,
     )
-    .expect("all the fields should be valid");
-    assert!(
-        erased_value
-            .as_fields()
+    .expect("all the fields should be valid here");
+
+    let erased_value_refs = erased_value.as_fields();
+    itertools::assert_equal(
+        erased_value_refs
             .into_iter()
-            .map(ErasedFieldRef::into_buffer)
-            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),
+            .map(ErasedFieldRef::into_buffer),
+        field_refs.into_iter().map(ErasedFieldRef::into_buffer),
     );
 
     let context = Default::default();
     let value = unsafe { erased_value.try_into::<((), u32, u16, u8)>(&context) }
-        .expect("all the fields should be valid");
+        .expect("all the fields should be valid here");
     assert_eq!(value, ((), i1, i2, i3));
 }
 
@@ -177,26 +179,27 @@ fn value_zst() {
         ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, &context, value).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(
+    itertools::assert_equal(
         erased_value
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout)),
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let field_refs = [
         ErasedFieldRef::new(FieldDescriptor::of::<()>(), [].as_slice()).expect("incorrect inputs"),
     ];
-    assert!(
+    itertools::assert_equal(
         erased_value
             .as_fields()
             .into_iter()
-            .map(ErasedFieldRef::into_buffer)
-            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),
+            .map(ErasedFieldRef::into_buffer),
+        field_refs.into_iter().map(ErasedFieldRef::into_buffer),
     );
 
-    let value =
-        unsafe { erased_value.try_into::<()>(&context) }.expect("all the fields should be valid");
+    let value = unsafe { erased_value.try_into::<()>(&context) }
+        .expect("all the fields should be valid here");
     assert_eq!(value, ());
 }

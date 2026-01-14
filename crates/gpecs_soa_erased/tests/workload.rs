@@ -21,12 +21,13 @@ fn new() {
         FieldDescriptor::of::<u16>(),
         FieldDescriptor::of::<u64>(),
     ];
-    assert!(
+    itertools::assert_equal(
         erased_context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let vec = Vec::with_context(erased_context);
@@ -73,12 +74,13 @@ fn new_zst() {
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(
+    itertools::assert_equal(
         erased_context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let vec = Vec::with_context(erased_context);
@@ -130,12 +132,13 @@ fn with_capacity() {
         FieldDescriptor::of::<u16>(),
         FieldDescriptor::of::<u64>(),
     ];
-    assert!(
+    itertools::assert_equal(
         erased_context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let vec = Vec::with_context_and_capacity(erased_context, 10);
@@ -183,12 +186,13 @@ fn with_capacity_zst() {
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(
+    itertools::assert_equal(
         erased_context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let vec = Vec::with_context_and_capacity(erased_context, 10);
@@ -241,12 +245,13 @@ fn one_item() {
         FieldDescriptor::of::<u16>(),
         FieldDescriptor::of::<u64>(),
     ];
-    assert!(
+    itertools::assert_equal(
         erased_context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let mut vec = Vec::with_context(erased_context);
@@ -347,12 +352,13 @@ fn one_item_zst() {
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(
+    itertools::assert_equal(
         erased_context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let mut vec = Vec::with_context(erased_context);
@@ -440,12 +446,13 @@ fn three_items() {
         FieldDescriptor::of::<String>(),
         FieldDescriptor::of::<u64>(),
     ];
-    assert!(
+    itertools::assert_equal(
         erased_context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let mut vec = Vec::with_context(erased_context);
@@ -790,12 +797,13 @@ fn three_items_zst() {
     let erased_context = ErasedSoaContext::of::<Soa>(&context);
 
     let descriptors = [FieldDescriptor::of::<()>()];
-    assert!(
+    itertools::assert_equal(
         erased_context
             .field_descriptors()
             .iter()
-            .map(FieldDescriptor::layout)
-            .eq(descriptors.iter().map(FieldDescriptor::layout))
+            .copied()
+            .map(FieldDescriptor::layout),
+        descriptors.map(FieldDescriptor::layout),
     );
 
     let mut vec = Vec::with_context(erased_context);

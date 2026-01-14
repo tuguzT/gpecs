@@ -11,7 +11,7 @@ pub fn assert_eq_descriptors(a: &[FieldDescriptor], b: &[FieldDescriptor]) {
 
     #[cfg(debug_assertions)]
     itertools::assert_equal(
-        a.iter().map(FieldDescriptor::layout),
-        b.iter().map(FieldDescriptor::layout),
+        a.iter().copied().map(FieldDescriptor::layout),
+        b.iter().copied().map(FieldDescriptor::layout),
     );
 }

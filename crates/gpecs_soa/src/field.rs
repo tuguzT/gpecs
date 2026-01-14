@@ -3,34 +3,38 @@ use core::{
     iter::FusedIterator,
 };
 
-/// Descriptor for any field type used by [`Soa`](crate::traits::Soa) trait.
+/// Descriptor for any field type used by [SoA](crate::traits::RawSoa) types.
 ///
 /// For now this contains only a [`Layout`] of such field.
 /// Some additional data may be added in the future.
 #[derive(Debug, Clone, Copy)]
+#[repr(C)] // should be just `Layout`, but it is not `repr(C)`
 pub struct FieldDescriptor {
-    layout: Layout,
+    size: usize,
+    align: usize,
 }
 
 impl FieldDescriptor {
     /// Creates a new field descriptor from the given [`Layout`].
     #[inline]
     pub const fn new(layout: Layout) -> Self {
-        Self { layout }
+        let size = layout.size();
+        let align = layout.align();
+        Self { size, align }
     }
 
     /// Creates a new field descriptor from the given type.
     #[inline]
     pub const fn of<T>() -> Self {
         let layout = Layout::new::<T>();
-        Self { layout }
+        Self::new(layout)
     }
 
     /// Returns the [`Layout`] of this field descriptor.
     #[inline]
-    pub const fn layout(&self) -> Layout {
-        let Self { layout, .. } = *self;
-        layout
+    pub const fn layout(self) -> Layout {
+        let Self { size, align } = self;
+        unsafe { Layout::from_size_align_unchecked(size, align) }
     }
 }
 

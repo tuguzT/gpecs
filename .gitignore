@@ -25,6 +25,7 @@ target/
 
 # cargo-flamegraph artifacts
 flamegraph.svg
+flamegraph-*.svg
 
 # cargo-llvm-cov artifacts
 lcov.info

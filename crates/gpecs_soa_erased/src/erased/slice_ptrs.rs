@@ -224,12 +224,6 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
-        let Self { ptrs, .. } = self;
-        ptrs.as_ptr()
-    }
-
-    #[inline]
     pub fn capacity(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.capacity()

@@ -7,7 +7,7 @@ use core::{
 use crate::{
     erased::{
         ErasedSoaMutPtrs, ErasedSoaRefs,
-        assert::debug_assert_descriptors,
+        assert::assert_eq_descriptors,
         error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset, check_sufficient_len},
     },
     error::{check_layout, check_len},
@@ -227,7 +227,7 @@ where
 
         assert_eq!(ptr, origin.ptr);
         assert_eq!(capacity, origin.capacity);
-        debug_assert_descriptors(descriptors.as_ref(), origin.field_descriptors());
+        assert_eq_descriptors(descriptors.as_ref(), origin.field_descriptors());
 
         unsafe { (offset - origin.offset).try_into().unwrap_unchecked() }
     }
@@ -314,12 +314,6 @@ impl<D> ErasedSoaPtrsIter<D>
 where
     D: ?Sized,
 {
-    #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
     #[inline]
     pub fn capacity(&self) -> usize {
         let Self { capacity, .. } = *self;

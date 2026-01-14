@@ -7,7 +7,7 @@ use core::{
 use crate::{
     erased::{
         ErasedSoaPtrs, ErasedSoaPtrsIter, ErasedSoaRefs, ErasedSoaRefsMut,
-        assert::debug_assert_descriptors,
+        assert::assert_eq_descriptors,
         error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset, check_sufficient_len},
     },
     error::{check_layout, check_len},
@@ -238,7 +238,7 @@ where
 
         assert_eq!(ptr.cast_const(), origin.as_ptr());
         assert_eq!(capacity, origin.capacity());
-        debug_assert_descriptors(descriptors.as_ref(), origin.field_descriptors());
+        assert_eq_descriptors(descriptors.as_ref(), origin.field_descriptors());
 
         unsafe { (offset - origin.offset()).try_into().unwrap_unchecked() }
     }
@@ -250,7 +250,7 @@ where
         A: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self { descriptors, .. } = &self;
-        debug_assert_descriptors(descriptors.as_ref(), with.field_descriptors());
+        assert_eq_descriptors(descriptors.as_ref(), with.field_descriptors());
 
         itertools::zip_eq(self, with).for_each(|(this, with)| unsafe { this.swap(with) });
     }
@@ -262,7 +262,7 @@ where
         A: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self { descriptors, .. } = &self;
-        debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
+        assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self, from)
             .for_each(|(this, from)| unsafe { this.copy_from(from, count) });
@@ -275,7 +275,7 @@ where
         A: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self { descriptors, .. } = &self;
-        debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
+        assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         #[inline]
         #[track_caller]
@@ -305,7 +305,7 @@ where
         A: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self { descriptors, .. } = &self;
-        debug_assert_descriptors(descriptors.as_ref(), from.field_descriptors());
+        assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self, from)
             .for_each(|(this, from)| unsafe { this.copy_from_nonoverlapping(from, count) });
@@ -419,18 +419,6 @@ impl<D> ErasedSoaMutPtrsIter<D>
 where
     D: ?Sized,
 {
-    #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
-        let Self { ptr, .. } = *self;
-        ptr.cast_const()
-    }
-
-    #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
     #[inline]
     pub fn capacity(&self) -> usize {
         let Self { capacity, .. } = *self;

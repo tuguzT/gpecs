@@ -4,6 +4,7 @@ members = [
     # Main crates
     "crates/gpecs",
     "crates/gpecs_types",
+    "crates/gpecs_shaders",
     # Utility crates
     "crates/gpecs_soa",
     "crates/gpecs_soa_erased",

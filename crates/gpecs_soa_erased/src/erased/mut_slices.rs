@@ -72,7 +72,7 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
-    pub fn new<R>(
+    pub fn new(
         descriptors: D,
         buffer: &'a mut [u8],
         capacity: usize,

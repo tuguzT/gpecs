@@ -665,6 +665,8 @@ name = "gpecs"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
+ "cargo-gpu-install",
+ "const_format",
  "gpecs_soa_erased",
  "gpecs_sparse",
  "gpecs_types",
@@ -710,6 +712,15 @@ dependencies = [
  "bytemuck",
  "gpecs_types",
  "num-traits",
+]
+
+[[package]]
+name = "gpecs_shaders"
+version = "0.0.0"
+dependencies = [
+ "gpecs_soa_erased",
+ "gpecs_types",
+ "spirv-std",
 ]
 
 [[package]]

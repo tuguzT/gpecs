@@ -7,46 +7,8 @@ pub use self::tuple::*;
 mod tuple;
 mod unit;
 
-/// Marker trait for an addressible unit of memory for a given target (CPU or GPU).
-pub trait AddressableUnit: Copy + 'static {}
-
-/// The smallest addressible unit for all the CPU targets.
-impl AddressableUnit for u8 {}
-
-/// The guaranteed addressible unit for any GPU target.
-impl AddressableUnit for u32 {}
-
-/// Marker trait indicating that self type & all of its fields
-/// could be addressed by a given addressible unit.
-pub unsafe trait AddressableBy<A>
-where
-    A: AddressableUnit,
-{
-}
-
-/// Any Rust type is aligned to [`u8`], which size is exactly 1 byte.
-unsafe impl<T> AddressableBy<u8> for T where T: ?Sized {}
-
-/// ZSTs should be supported by any addressible unit.
-unsafe impl AddressableBy<u32> for () {}
-
-/// Supported on any GPU target.
-unsafe impl AddressableBy<u32> for u32 {}
-/// Supported on any GPU target.
-unsafe impl AddressableBy<u32> for f32 {}
-
 /// This trait is used to perform all memory operations & pointer arithmetics for [SoA](RawSoa) types.
-///
-/// # Safety
-///
-/// - Each stored field should be aligned to a given addressible unit.
-///
-///   In other words, alignment of each layout of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
-///   should be greater or equal to the alignment of an addressible unit type, or its size should be zero.
-pub unsafe trait RawSoaContext<A = u8>
-where
-    A: AddressableUnit,
-{
+pub unsafe trait RawSoaContext {
     /// Non-empty collection of [descriptors](FieldDescriptor) for each stored field.
     ///
     /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
@@ -115,7 +77,7 @@ where
     ///
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
     /// must be the same as the one returned by [`buffer_layout()`](RawSoaContext::buffer_layout) method.
-    unsafe fn ptrs_from_buffer(&self, buffer: *const A, capacity: usize) -> Self::Ptrs<'_>;
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_>;
 
     /// Adds an unsigned offset to each [pointer](RawSoaContext::Ptrs) of each stored field.
     ///
@@ -161,7 +123,7 @@ where
     ///
     /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
     /// must be the same as the one returned by [`buffer_layout()`](RawSoaContext::buffer_layout) method.
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut A, capacity: usize) -> Self::MutPtrs<'_>;
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
 
     /// Adds an unsigned offset to each [mutable pointer](RawSoaContext::MutPtrs) of each stored field.
     ///
@@ -372,42 +334,36 @@ where
 
 /// Alias for the [`FieldDescriptors`](RawSoaContext::FieldDescriptors) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type FieldDescriptors<'a, T, A = u8> =
-    <<T as RawSoa<A>>::Context as RawSoaContext<A>>::FieldDescriptors<'a>;
+pub type FieldDescriptors<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::FieldDescriptors<'a>;
 
 /// Alias for the [`Ptrs`](RawSoaContext::Ptrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type Ptrs<'a, T, A = u8> = <<T as RawSoa<A>>::Context as RawSoaContext<A>>::Ptrs<'a>;
+pub type Ptrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::Ptrs<'a>;
 
 /// Alias for the [`MutPtrs`](RawSoaContext::MutPtrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type MutPtrs<'a, T, A = u8> = <<T as RawSoa<A>>::Context as RawSoaContext<A>>::MutPtrs<'a>;
+pub type MutPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::MutPtrs<'a>;
 
 /// Alias for the [`NonNullPtrs`](RawSoaContext::NonNullPtrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type NonNullPtrs<'a, T, A = u8> =
-    <<T as RawSoa<A>>::Context as RawSoaContext<A>>::NonNullPtrs<'a>;
+pub type NonNullPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::NonNullPtrs<'a>;
 
 /// Alias for the [`SlicePtrs`](RawSoaContext::SlicePtrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type SlicePtrs<'a, T, A = u8> = <<T as RawSoa<A>>::Context as RawSoaContext<A>>::SlicePtrs<'a>;
+pub type SlicePtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::SlicePtrs<'a>;
 
 /// Alias for the [`SliceMutPtrs`](RawSoaContext::SliceMutPtrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type SliceMutPtrs<'a, T, A = u8> =
-    <<T as RawSoa<A>>::Context as RawSoaContext<A>>::SliceMutPtrs<'a>;
+pub type SliceMutPtrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::SliceMutPtrs<'a>;
 
 /// The main trait of the [crate] which defines behavior of this type
 /// in the context of Structure of Arrays pattern, or SoA.
-pub unsafe trait RawSoa<A = u8>
-where
-    A: AddressableUnit,
-{
+pub unsafe trait RawSoa {
     /// Type of SoA [context](RawSoaContext).
     ///
     /// Most of the time, this should be zero-sized type.
     /// This is true for all the SoA types with stored fields' size and alignment known at compile-time.
-    type Context: RawSoaContext<A>;
+    type Context: RawSoaContext;
 
     /// Special type containing all the fields which are stored inside of a buffer.
     ///
@@ -422,71 +378,49 @@ where
 /// Marker trait which places additional safety requirements
 /// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
 ///
-/// # Safety
-///
-/// - Sum of layouts' sizes of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
-///   should be less or equal to the size of [`Fields`](RawSoa::Fields).
-///
-/// - Alignment of each layout of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
-///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields).
-pub unsafe trait SoaTrustedFields<A = u8>: RawSoa<A>
-where
-    A: AddressableUnit,
-{
-}
+/// These safety requirements are:
+/// - sum of layouts' sizes of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
+///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
+/// - alignment of each layout of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
+///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
+pub unsafe trait SoaTrustedFields: RawSoa {}
 
 /// A generalization of [`Clone`] specifically for [SoA](RawSoa) type.
 ///
 /// This trait is analogous to the unstable [`CloneToUninit`](core::clone::CloneToUninit) trait.
-pub unsafe trait SoaCloneToUninit<A = u8>: RawSoa<A>
-where
-    A: AddressableUnit,
-{
+pub unsafe trait SoaCloneToUninit: RawSoa {
     /// Performs copy-assignment of each stored field from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs).
     /// Before this function is called, src must point to initialized memory and dst may point to uninitialized memory.
-    unsafe fn clone_to_uninit(
-        context: &Self::Context,
-        src: Ptrs<'_, Self, A>,
-        dst: MutPtrs<'_, Self, A>,
-    );
+    unsafe fn clone_to_uninit(context: &Self::Context, src: Ptrs<'_, Self>, dst: MutPtrs<'_, Self>);
 }
 
 /// An extension of [SoA](RawSoa) type which allows to read `Self`
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait SoaRead<A = u8>: RawSoa<A> + Sized
-where
-    A: AddressableUnit,
-{
+pub unsafe trait SoaRead: RawSoa + Sized {
     /// Constructs the value from reading each field to which [src](RawSoaContext::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::read()`](core::ptr::read) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn read(context: &Self::Context, src: Ptrs<'_, Self, A>) -> Self;
+    unsafe fn read(context: &Self::Context, src: Ptrs<'_, Self>) -> Self;
 }
 
 /// An extension of [SoA](RawSoa) type which allows to write given value of `Self`
 /// into [mutable pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait SoaWrite<A = u8>: RawSoa<A> + Sized
-where
-    A: AddressableUnit,
-{
+pub unsafe trait SoaWrite: RawSoa + Sized {
     /// Overwrites a memory [location](RawSoaContext::MutPtrs) of each stored field
     /// with the given value without reading or dropping the old value.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::write()`](core::ptr::write) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self, A>, value: Self);
+    unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self);
 }
 
 /// An extension of [SoA context](RawSoaContext) type which provides
 /// reference and slice types of specific lifetime to each stored field.
-pub unsafe trait SoaContext<'data, A = u8>: RawSoaContext<A>
-where
-    A: AddressableUnit,
-{
+pub unsafe trait SoaContext<'data>: RawSoaContext {
     /// Non-empty collection of references to each stored field.
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
@@ -600,72 +534,49 @@ where
 
 /// Alias for the [`Refs`](SoaContext::Refs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
-pub type Refs<'a, 'data, T, A = u8> = <<T as RawSoa<A>>::Context as SoaContext<'data, A>>::Refs<'a>;
+pub type Refs<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data>>::Refs<'a>;
 
 /// Alias for the [`RefsMut`](SoaContext::RefsMut) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
-pub type RefsMut<'a, 'data, T, A = u8> =
-    <<T as RawSoa<A>>::Context as SoaContext<'data, A>>::RefsMut<'a>;
+pub type RefsMut<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data>>::RefsMut<'a>;
 
 /// Alias for the [`Slices`](SoaContext::Slices) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
-pub type Slices<'a, 'data, T, A = u8> =
-    <<T as RawSoa<A>>::Context as SoaContext<'data, A>>::Slices<'a>;
+pub type Slices<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data>>::Slices<'a>;
 
 /// Alias for the [`SlicesMut`](SoaContext::SlicesMut) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](Soa) type.
-pub type SlicesMut<'a, 'data, T, A = u8> =
-    <<T as RawSoa<A>>::Context as SoaContext<'data, A>>::SlicesMut<'a>;
+pub type SlicesMut<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data>>::SlicesMut<'a>;
 
 /// An extension of [SoA](RawSoa) type which allows to access
 /// each stored field by their reference types of specific lifetime.
-pub trait Soa<'a, A = u8>: RawSoa<A, Context: SoaContext<'a, A>>
-where
-    A: AddressableUnit,
-{
-}
+pub trait Soa<'a>: RawSoa<Context: SoaContext<'a>> {}
 
-impl<'a, T, A> Soa<'a, A> for T
+impl<'a, T> Soa<'a> for T
 where
-    A: AddressableUnit,
-    T: RawSoa<A> + ?Sized,
-    T::Context: SoaContext<'a, A>,
+    T: RawSoa + ?Sized,
+    T::Context: SoaContext<'a>,
 {
 }
 
 /// An extension of [SoA](RawSoa) type which allows to access
 /// each stored field by their reference types of **any** lifetime.
-pub trait SoaOwned<A = u8>: for<'a> Soa<'a, A>
-where
-    A: AddressableUnit,
-{
-}
+pub trait SoaOwned: for<'a> Soa<'a> {}
 
-impl<T, A> SoaOwned<A> for T
-where
-    A: AddressableUnit,
-    T: for<'a> Soa<'a, A> + ?Sized,
-{
-}
+impl<T> SoaOwned for T where T: for<'a> Soa<'a> + ?Sized {}
 
 /// An extension of [SoA](Soa) type which allows to retrieve
 /// [references](SoaContext::Refs) to each stored field from a value of `Self`.
-pub trait SoaAsRefs<'a, A = u8>: Soa<'a, A>
-where
-    A: AddressableUnit,
-{
+pub trait SoaAsRefs<'a>: Soa<'a> {
     /// Retrieves [references](SoaContext::Refs) to each stored field
     /// from a given value reference by taking the reference of each one of them.
-    fn as_refs(&'a self, context: &'a Self::Context) -> Refs<'a, 'a, Self, A>;
+    fn as_refs(&'a self, context: &'a Self::Context) -> Refs<'a, 'a, Self>;
 }
 
 /// An extension of [SoA](Soa) type which allows to retrieve
 /// [mutable references](SoaContext::RefsMut) to each stored field from a value of `Self`.
-pub trait SoaAsMutRefs<'a, A = u8>: Soa<'a, A>
-where
-    A: AddressableUnit,
-{
+pub trait SoaAsMutRefs<'a>: Soa<'a> {
     /// Retrieves [mutable references](SoaContext::RefsMut) to each stored field
     /// from a given mutable value reference by taking the mutable reference of each one of them.
-    fn as_mut_refs(&'a mut self, context: &'a Self::Context) -> RefsMut<'a, 'a, Self, A>;
+    fn as_mut_refs(&'a mut self, context: &'a Self::Context) -> RefsMut<'a, 'a, Self>;
 }

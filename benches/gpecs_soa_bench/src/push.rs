@@ -2,13 +2,13 @@ use std::{alloc::Layout, hint::black_box, mem::MaybeUninit};
 
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
-    aligned_bytes::AlignedUninitByteSlice,
     erased::{BoxedErasedSoa, ErasedSoa},
     soa::{
         field::FieldDescriptor,
         prelude::*,
         traits::{SoaWrite, TupleContext},
     },
+    storage::AlignedUninitByteSlice,
 };
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};

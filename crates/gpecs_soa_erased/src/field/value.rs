@@ -5,7 +5,6 @@ use core::{
 };
 
 use crate::{
-    aligned_bytes::{AlignedBytes, AlignedBytesFromLayout, AlignedInitBytes},
     error::{LenMismatchError, check_layout, check_len},
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
@@ -17,10 +16,11 @@ use crate::{
     },
     fmt::DebugBytesUpperHex,
     soa::field::FieldDescriptor,
+    storage::{AlignedInitSlice, AlignedSlice, AlignedSliceFromLayout},
 };
 
 #[cfg(feature = "alloc")]
-use crate::aligned_bytes::AlignedUninitBoxedByteSlice;
+use crate::storage::AlignedUninitBoxedByteSlice;
 
 #[cfg(feature = "alloc")]
 pub type BoxedErasedField = ErasedField<AlignedUninitBoxedByteSlice>;
@@ -29,12 +29,12 @@ pub struct ErasedField<B>
 where
     B: ?Sized,
 {
-    bytes: AlignedInitBytes<B>,
+    bytes: AlignedInitSlice<B, u8>,
 }
 
 impl<B> ErasedField<B>
 where
-    B: AlignedBytes,
+    B: AlignedSlice<u8>,
 {
     #[inline]
     pub fn try_from_bytes_desc_data<T>(
@@ -60,11 +60,11 @@ where
             return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
         }
 
-        if let Err(err) = init_bytes_from(bytes.as_mut_uninit_bytes(), data) {
+        if let Err(err) = init_bytes_from(bytes.as_mut_uninit_slice(), data) {
             return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
         }
 
-        let bytes = unsafe { AlignedInitBytes::new_unchecked(bytes) };
+        let bytes = unsafe { AlignedInitSlice::new_unchecked(bytes) };
         let me = Self { bytes };
         Ok(me)
     }
@@ -101,13 +101,13 @@ where
     }
 
     #[inline]
-    pub fn into_bytes(self) -> AlignedInitBytes<B> {
+    pub fn into_bytes(self) -> AlignedInitSlice<B, u8> {
         let Self { bytes } = self;
         bytes
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitBytes<B>) {
+    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitSlice<B, u8>) {
         let desc = self.descriptor();
         let Self { bytes } = self;
 
@@ -117,13 +117,13 @@ where
 
 impl<B> ErasedField<B>
 where
-    B: AlignedBytesFromLayout,
+    B: AlignedSliceFromLayout<u8>,
 {
     #[inline]
     pub fn try_from_desc_data<T>(
         desc: FieldDescriptor,
         data: T,
-    ) -> Result<Self, ErasedFieldFromDescDataError<B>>
+    ) -> Result<Self, ErasedFieldFromDescDataError<B, u8>>
     where
         T: AsRef<[u8]>,
     {
@@ -132,15 +132,15 @@ where
         check_len(data.len(), layout.size())?;
 
         let mut bytes = B::from_layout(layout).map_err(ErasedFieldFromDescDataError::FromLayout)?;
-        init_bytes_from(bytes.as_mut_uninit_bytes(), data)?;
+        init_bytes_from(bytes.as_mut_uninit_slice(), data)?;
 
-        let bytes = unsafe { AlignedInitBytes::new_unchecked(bytes) };
+        let bytes = unsafe { AlignedInitSlice::new_unchecked(bytes) };
         let me = Self { bytes };
         Ok(me)
     }
 
     #[inline]
-    pub fn try_from<T>(value: T) -> Result<Self, ErasedFieldFromValueError<B, T>> {
+    pub fn try_from<T>(value: T) -> Result<Self, ErasedFieldFromValueError<B, T, u8>> {
         let desc = FieldDescriptor::of::<T>();
         let data = ptr::from_ref(&value).cast();
         let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
@@ -160,7 +160,7 @@ where
 
 impl<B> ErasedField<B>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
 {
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
@@ -243,7 +243,7 @@ where
 
 impl<B> Debug for ErasedField<B>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
@@ -257,7 +257,7 @@ where
 
 impl<B> AsRef<[u8]> for ErasedField<B>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &[u8] {
@@ -267,7 +267,7 @@ where
 
 impl<B> AsMut<[u8]> for ErasedField<B>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [u8] {

@@ -8,9 +8,9 @@ use core::{
 use crate::{
     erased::{
         assert::assert_eq_descriptors,
-        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset, check_sufficient_len},
+        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset},
     },
-    error::{check_layout, check_len},
+    error::{check_layout, check_len, check_sufficient_len},
     field::ErasedFieldNonNullPtr,
     soa::{
         field::{FieldDescriptor, buffer_layout},

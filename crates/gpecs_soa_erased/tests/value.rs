@@ -5,14 +5,14 @@ use std::{ptr, slice};
 
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
-    aligned_bytes::AlignedUninitByteSlice, erased::ErasedSoa, field::ErasedFieldRef,
-    soa::field::FieldDescriptor,
+    erased::ErasedSoa, field::ErasedFieldRef, soa::field::FieldDescriptor,
+    storage::AlignedUninitByteSlice,
 };
 
 #[cfg(feature = "alloc")]
 use gpecs_soa_erased::{
-    aligned_bytes::AlignedUninitBoxedByteSlice,
     field::{BoxedErasedField, ErasedField},
+    storage::AlignedUninitBoxedByteSlice,
 };
 
 type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;

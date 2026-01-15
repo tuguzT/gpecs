@@ -128,6 +128,70 @@ pub fn check_layout(layout: Layout, expected: Layout) -> Result<(), LayoutMismat
 }
 
 #[derive(Clone)]
+pub struct InsufficientLenError {
+    expected: usize,
+    actual: usize,
+}
+
+impl InsufficientLenError {
+    #[inline]
+    #[track_caller]
+    pub fn new(expected: usize, actual: usize) -> Self {
+        assert!(
+            actual < expected,
+            "actual length should be smaller than expected length",
+        );
+        Self { expected, actual }
+    }
+
+    #[inline]
+    pub fn expected(&self) -> usize {
+        let Self { expected, .. } = *self;
+        expected
+    }
+
+    #[inline]
+    pub fn actual(&self) -> usize {
+        let Self { actual, .. } = *self;
+        actual
+    }
+}
+
+impl Debug for InsufficientLenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+
+        let Self { expected, actual } = self;
+        f.debug_struct("InsufficientLenError")
+            .field("expected", expected)
+            .field("actual", actual)
+            .finish()
+    }
+}
+
+impl Display for InsufficientLenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { expected, actual } = self;
+        write!(
+            f,
+            "expected length to be greater than {expected}, but got {actual}"
+        )
+    }
+}
+
+impl Error for InsufficientLenError {}
+
+#[inline]
+pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), InsufficientLenError> {
+    if len < expected {
+        return Err(InsufficientLenError::new(expected, len));
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
 pub struct NotAlignedError {
     ptr: *const u8,
     target_align: NonZeroUsize,

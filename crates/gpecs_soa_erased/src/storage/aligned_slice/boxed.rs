@@ -8,6 +8,8 @@ use core::{
     slice,
 };
 
+use crate::storage::{AlignedSlice, AlignedSliceFromLayout};
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 /// Just a copy of unstable [`core::alloc::AllocError`].
@@ -159,6 +161,37 @@ impl Drop for AlignedUninitBoxedByteSlice {
             return;
         }
         unsafe { dealloc(ptr.as_ptr(), layout) }
+    }
+}
+
+unsafe impl AlignedSlice<u8> for AlignedUninitBoxedByteSlice {
+    #[inline]
+    fn as_ptr(&self) -> *const u8 {
+        Self::as_ptr(self)
+    }
+
+    #[inline]
+    fn as_mut_ptr(&mut self) -> *mut u8 {
+        Self::as_mut_ptr(self)
+    }
+
+    #[inline]
+    fn layout(&self) -> Layout {
+        Self::layout(self)
+    }
+}
+
+unsafe impl AlignedSliceFromLayout<u8> for AlignedUninitBoxedByteSlice {
+    type Error = AllocError;
+
+    #[inline]
+    fn from_layout(layout: Layout) -> Result<Self, Self::Error> {
+        Self::new(layout)
+    }
+
+    #[inline]
+    fn set_layout(&mut self, layout: Layout) -> Result<(), Self::Error> {
+        Self::set_layout(self, layout)
     }
 }
 

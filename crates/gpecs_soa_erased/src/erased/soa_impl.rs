@@ -1,7 +1,6 @@
 use core::{fmt::Debug, ptr::NonNull};
 
 use crate::{
-    aligned_bytes::{AlignedBytes, AlignedBytesFromLayout},
     soa::{
         field::FieldDescriptor,
         traits::{
@@ -9,6 +8,7 @@ use crate::{
             SoaContext, SoaRead, SoaWrite,
         },
     },
+    storage::{AlignedSlice, AlignedSliceFromLayout},
 };
 
 use super::{
@@ -314,7 +314,8 @@ where
 
 unsafe impl<B, D> SoaRead for ErasedSoa<B, D>
 where
-    B: AlignedBytesFromLayout<Error: Debug>,
+    B: AlignedSliceFromLayout<u8>,
+    B::Error: Debug,
     D: AsRef<[FieldDescriptor]> + Clone,
 {
     #[inline]
@@ -333,7 +334,7 @@ where
 
 unsafe impl<B, D> SoaWrite for ErasedSoa<B, D>
 where
-    B: AlignedBytes,
+    B: AlignedSlice<u8>,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
@@ -491,7 +492,7 @@ where
 
 impl<'a, B, D> SoaAsRefs<'a> for ErasedSoa<B, D>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
@@ -505,7 +506,7 @@ where
 
 impl<'a, B, D> SoaAsMutRefs<'a> for ErasedSoa<B, D>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]

@@ -7,11 +7,9 @@ use core::{
 use crate::{
     erased::{
         ErasedSoaPtrs, ErasedSoaPtrsIter, ErasedSoaSliceMutPtrs, ErasedSoaSlices,
-        error::{
-            ErasedSoaIntoValueError, ErasedSoaSlicePtrsError, check_offset, check_offset_len,
-            check_sufficient_len,
-        },
+        error::{ErasedSoaIntoValueError, ErasedSoaSlicePtrsError, check_offset, check_offset_len},
     },
+    error::check_sufficient_len,
     field::{ErasedFieldSlicePtr, field_slice_from_raw_parts},
     soa::{
         field::{FieldDescriptor, buffer_layout},

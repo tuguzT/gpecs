@@ -10,7 +10,6 @@ use core::{
 use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
-    aligned_bytes::{AlignedBytes, AlignedBytesFromLayout},
     erased::{
         ErasedSoaRefs, ErasedSoaRefsMut,
         error::{
@@ -25,13 +24,12 @@ use crate::{
         field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_layout, buffer_offsets},
         traits::{RawSoaContext, SoaRead, SoaWrite},
     },
+    storage::{AlignedSlice, AlignedSliceFromLayout},
 };
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedSoa = ErasedSoa<
-    crate::aligned_bytes::AlignedUninitBoxedByteSlice,
-    alloc::boxed::Box<[FieldDescriptor]>,
->;
+pub type BoxedErasedSoa =
+    ErasedSoa<crate::storage::AlignedUninitBoxedByteSlice, alloc::boxed::Box<[FieldDescriptor]>>;
 
 pub struct ErasedSoa<B, D>
 where
@@ -55,7 +53,7 @@ where
 
 impl<B, D> ErasedSoa<B, D>
 where
-    B: AlignedBytes,
+    B: AlignedSlice<u8>,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
@@ -127,7 +125,7 @@ where
 
 impl<B, D> ErasedSoa<B, D>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
@@ -154,14 +152,14 @@ where
 
 impl<B, D> ErasedSoa<B, D>
 where
-    B: AlignedBytesFromLayout,
+    B: AlignedSliceFromLayout<u8>,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
     pub fn try_from_fields_descriptors<I, F>(
         fields: I,
         descriptors: D,
-    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<B>>
+    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<B, u8>>
     where
         I: IntoIterator<Item = F>,
         F: AsRef<[u8]>,
@@ -179,7 +177,7 @@ where
 
 impl<B, D> ErasedSoa<B, D>
 where
-    B: AlignedBytes,
+    B: AlignedSlice<u8>,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
@@ -213,11 +211,14 @@ where
 
 impl<B, D> ErasedSoa<B, D>
 where
-    B: AlignedBytesFromLayout,
+    B: AlignedSliceFromLayout<u8>,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn try_from<T>(context: &T::Context, value: T) -> Result<Self, ErasedSoaFromValueError<B>>
+    pub fn try_from<T>(
+        context: &T::Context,
+        value: T,
+    ) -> Result<Self, ErasedSoaFromValueError<B, u8>>
     where
         T: SoaWrite,
     {
@@ -242,13 +243,13 @@ where
 
 impl<B, D> ErasedSoa<B, D>
 where
-    B: AlignedBytes,
+    B: AlignedSlice<u8>,
     D: AsRef<[FieldDescriptor]> + IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
     #[inline]
     pub fn into_fields<T>(self) -> ErasedSoaIntoFields<B, D::IntoIter, T>
     where
-        T: AlignedBytesFromLayout,
+        T: AlignedSliceFromLayout<u8>,
     {
         let Self { bytes, descriptors } = self;
 
@@ -263,7 +264,7 @@ where
 
 impl<B, D> Debug for ErasedSoa<B, D>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -308,12 +309,12 @@ where
 
 impl<B, I, T> Iterator for ErasedSoaIntoFields<B, I, T>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
     I: Iterator,
     I::Item: AsRef<FieldDescriptor>,
-    T: AlignedBytesFromLayout,
+    T: AlignedSliceFromLayout<u8>,
 {
-    type Item = Result<ErasedField<T>, ErasedFieldFromDescDataError<T>>;
+    type Item = Result<ErasedField<T>, ErasedFieldFromDescDataError<T, u8>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -343,10 +344,10 @@ where
 
 impl<B, I, T> ExactSizeIterator for ErasedSoaIntoFields<B, I, T>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
     I: ExactSizeIterator,
     I::Item: AsRef<FieldDescriptor>,
-    T: AlignedBytesFromLayout,
+    T: AlignedSliceFromLayout<u8>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -357,10 +358,10 @@ where
 
 impl<B, I, T> FusedIterator for ErasedSoaIntoFields<B, I, T>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
     I: FusedIterator,
     I::Item: AsRef<FieldDescriptor>,
-    T: AlignedBytesFromLayout,
+    T: AlignedSliceFromLayout<u8>,
 {
 }
 
@@ -412,9 +413,9 @@ impl From<FillBytesWithFieldsError> for ErasedSoaFromBytesFieldsDescriptorsError
     }
 }
 
-impl<B> From<FillBytesWithFieldsError> for ErasedSoaFromFieldsDescriptorsError<B>
+impl<B> From<FillBytesWithFieldsError> for ErasedSoaFromFieldsDescriptorsError<B, u8>
 where
-    B: AlignedBytesFromLayout,
+    B: AlignedSliceFromLayout<u8>,
 {
     #[inline]
     fn from(value: FillBytesWithFieldsError) -> Self {
@@ -431,7 +432,7 @@ fn fill_bytes_with_fields<B, I, F>(
     descriptors: &[FieldDescriptor],
 ) -> Result<(), FillBytesWithFieldsError>
 where
-    B: AlignedBytes + ?Sized,
+    B: AlignedSlice<u8> + ?Sized,
     I: IntoIterator<Item = F>,
     F: AsRef<[u8]>,
 {

@@ -8,11 +8,9 @@ use crate::{
     erased::{
         ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaPtrs, ErasedSoaSlicePtrs,
         ErasedSoaSlicePtrsIter, ErasedSoaSlices, ErasedSoaSlicesMut,
-        error::{
-            ErasedSoaIntoValueError, ErasedSoaSlicePtrsError, check_offset, check_offset_len,
-            check_sufficient_len,
-        },
+        error::{ErasedSoaIntoValueError, ErasedSoaSlicePtrsError, check_offset, check_offset_len},
     },
+    error::check_sufficient_len,
     field::{ErasedFieldSliceMutPtr, ErasedFieldSlicePtr, field_slice_from_raw_parts_mut},
     soa::{
         field::{FieldDescriptor, buffer_layout},

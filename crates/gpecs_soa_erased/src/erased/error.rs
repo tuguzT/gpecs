@@ -5,73 +5,9 @@ use core::{
 };
 
 use crate::{
-    aligned_bytes::AlignedBytesFromLayout,
-    error::{LayoutMismatchError, LenMismatchError},
+    error::{InsufficientLenError, LayoutMismatchError, LenMismatchError},
+    storage::{AddressableUnit, AlignedSliceFromLayout},
 };
-
-#[derive(Clone)]
-pub struct InsufficientLenError {
-    expected: usize,
-    actual: usize,
-}
-
-impl InsufficientLenError {
-    #[inline]
-    #[track_caller]
-    pub fn new(expected: usize, actual: usize) -> Self {
-        assert!(
-            actual < expected,
-            "actual length should be smaller than expected length",
-        );
-        Self { expected, actual }
-    }
-
-    #[inline]
-    pub fn expected(&self) -> usize {
-        let Self { expected, .. } = *self;
-        expected
-    }
-
-    #[inline]
-    pub fn actual(&self) -> usize {
-        let Self { actual, .. } = *self;
-        actual
-    }
-}
-
-impl Debug for InsufficientLenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("InsufficientLenError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
-    }
-}
-
-impl Display for InsufficientLenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { expected, actual } = self;
-        write!(
-            f,
-            "expected length to be greater than {expected}, but got {actual}"
-        )
-    }
-}
-
-impl Error for InsufficientLenError {}
-
-#[inline]
-pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), InsufficientLenError> {
-    if len < expected {
-        return Err(InsufficientLenError::new(expected, len));
-    }
-    Ok(())
-}
 
 #[derive(Clone)]
 pub struct InvalidOffsetError {
@@ -404,18 +340,20 @@ impl Error for ErasedSoaFromBytesFieldsDescriptorsError {
     }
 }
 
-pub enum ErasedSoaFromFieldsDescriptorsError<B>
+pub enum ErasedSoaFromFieldsDescriptorsError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
 {
     LenMismatch(IterOrFieldLenMismatchError),
     InvalidLayout(LayoutError),
     FromLayout(B::Error),
 }
 
-impl<B> From<IterOrFieldLenMismatchError> for ErasedSoaFromFieldsDescriptorsError<B>
+impl<B, A> From<IterOrFieldLenMismatchError> for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
 {
     #[inline]
     fn from(value: IterOrFieldLenMismatchError) -> Self {
@@ -423,9 +361,10 @@ where
     }
 }
 
-impl<B> From<LayoutError> for ErasedSoaFromFieldsDescriptorsError<B>
+impl<B, A> From<LayoutError> for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
 {
     #[inline]
     fn from(value: LayoutError) -> Self {
@@ -433,9 +372,10 @@ where
     }
 }
 
-impl<B> Debug for ErasedSoaFromFieldsDescriptorsError<B>
+impl<B, A> Debug for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -447,9 +387,10 @@ where
     }
 }
 
-impl<B> Display for ErasedSoaFromFieldsDescriptorsError<B>
+impl<B, A> Display for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -461,9 +402,10 @@ where
     }
 }
 
-impl<B> Clone for ErasedSoaFromFieldsDescriptorsError<B>
+impl<B, A> Clone for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Clone,
 {
     fn clone(&self) -> Self {
@@ -482,9 +424,10 @@ where
     }
 }
 
-impl<B> Error for ErasedSoaFromFieldsDescriptorsError<B>
+impl<B, A> Error for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Debug + Display,
 {
 }
@@ -539,17 +482,19 @@ impl Error for ErasedSoaFromBytesValueError {
     }
 }
 
-pub enum ErasedSoaFromValueError<B>
+pub enum ErasedSoaFromValueError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
 {
     InvalidLayout(LayoutError),
     FromLayout(B::Error),
 }
 
-impl<B> From<LayoutError> for ErasedSoaFromValueError<B>
+impl<B, A> From<LayoutError> for ErasedSoaFromValueError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
 {
     #[inline]
     fn from(value: LayoutError) -> Self {
@@ -557,9 +502,10 @@ where
     }
 }
 
-impl<B> Clone for ErasedSoaFromValueError<B>
+impl<B, A> Clone for ErasedSoaFromValueError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Clone,
 {
     fn clone(&self) -> Self {
@@ -577,9 +523,10 @@ where
     }
 }
 
-impl<B> Debug for ErasedSoaFromValueError<B>
+impl<B, A> Debug for ErasedSoaFromValueError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -590,9 +537,10 @@ where
     }
 }
 
-impl<B> Display for ErasedSoaFromValueError<B>
+impl<B, A> Display for ErasedSoaFromValueError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -603,9 +551,10 @@ where
     }
 }
 
-impl<B> Error for ErasedSoaFromValueError<B>
+impl<B, A> Error for ErasedSoaFromValueError<B, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Debug + Display,
 {
 }

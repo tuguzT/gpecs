@@ -4,8 +4,8 @@ use core::{
 };
 
 use crate::{
-    aligned_bytes::AlignedBytesFromLayout,
     error::{LayoutMismatchError, LenMismatchError, NotAlignedError},
+    storage::{AddressableUnit, AlignedSliceFromLayout},
 };
 
 #[derive(Clone)]
@@ -264,17 +264,19 @@ impl Error for ErasedFieldError {
     }
 }
 
-pub enum ErasedFieldFromDescDataError<T>
+pub enum ErasedFieldFromDescDataError<T, A>
 where
-    T: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    T: AlignedSliceFromLayout<A>,
 {
     LenMismatch(LenMismatchError),
     FromLayout(T::Error),
 }
 
-impl<T> From<LenMismatchError> for ErasedFieldFromDescDataError<T>
+impl<T, A> From<LenMismatchError> for ErasedFieldFromDescDataError<T, A>
 where
-    T: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    T: AlignedSliceFromLayout<A>,
 {
     #[inline]
     fn from(error: LenMismatchError) -> Self {
@@ -282,9 +284,10 @@ where
     }
 }
 
-impl<T> Clone for ErasedFieldFromDescDataError<T>
+impl<T, A> Clone for ErasedFieldFromDescDataError<T, A>
 where
-    T: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    T: AlignedSliceFromLayout<A>,
     T::Error: Clone,
 {
     fn clone(&self) -> Self {
@@ -295,9 +298,10 @@ where
     }
 }
 
-impl<T> Debug for ErasedFieldFromDescDataError<T>
+impl<T, A> Debug for ErasedFieldFromDescDataError<T, A>
 where
-    T: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    T: AlignedSliceFromLayout<A>,
     T::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -308,9 +312,10 @@ where
     }
 }
 
-impl<T> Display for ErasedFieldFromDescDataError<T>
+impl<T, A> Display for ErasedFieldFromDescDataError<T, A>
 where
-    T: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    T: AlignedSliceFromLayout<A>,
     T::Error: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -321,9 +326,10 @@ where
     }
 }
 
-impl<T> Error for ErasedFieldFromDescDataError<T>
+impl<T, A> Error for ErasedFieldFromDescDataError<T, A>
 where
-    T: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    T: AlignedSliceFromLayout<A>,
     T::Error: Error,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
@@ -336,18 +342,20 @@ where
 
 #[derive(Clone)]
 #[non_exhaustive]
-pub struct ErasedFieldFromValueError<B, T>
+pub struct ErasedFieldFromValueError<B, T, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     T: ?Sized,
 {
     pub reason: B::Error,
     pub value: T,
 }
 
-impl<B, T> Debug for ErasedFieldFromValueError<B, T>
+impl<B, T, A> Debug for ErasedFieldFromValueError<B, T, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Debug,
     T: Debug + ?Sized,
 {
@@ -360,9 +368,10 @@ where
     }
 }
 
-impl<B, T> ErasedFieldFromValueError<B, T>
+impl<B, T, A> ErasedFieldFromValueError<B, T, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
 {
     #[inline]
     pub(crate) fn new(reason: B::Error, value: T) -> Self {
@@ -370,9 +379,10 @@ where
     }
 }
 
-impl<B, T> Display for ErasedFieldFromValueError<B, T>
+impl<B, T, A> Display for ErasedFieldFromValueError<B, T, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Display,
     T: Display + ?Sized,
 {
@@ -382,9 +392,10 @@ where
     }
 }
 
-impl<B, T> Error for ErasedFieldFromValueError<B, T>
+impl<B, T, A> Error for ErasedFieldFromValueError<B, T, A>
 where
-    B: AlignedBytesFromLayout,
+    A: AddressableUnit,
+    B: AlignedSliceFromLayout<A>,
     B::Error: Debug + Display,
     T: Debug + Display + ?Sized,
 {

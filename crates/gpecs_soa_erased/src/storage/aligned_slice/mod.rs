@@ -1,6 +1,6 @@
 pub use self::{
     init::AlignedInitSlice,
-    slice::{AlignedUninitByteSlice, AlignedUninitByteSliceError},
+    slice::{AlignedUninitSlice, AlignedUninitSliceError},
     traits::{AlignedSlice, AlignedSliceFromLayout},
 };
 

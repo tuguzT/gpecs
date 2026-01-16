@@ -6,7 +6,7 @@ use std::{ptr, slice};
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
     erased::ErasedSoa, field::ErasedFieldRef, soa::field::FieldDescriptor,
-    storage::AlignedUninitByteSlice,
+    storage::AlignedUninitSlice,
 };
 
 #[cfg(feature = "alloc")]
@@ -37,7 +37,7 @@ fn value() {
         bytes
     };
 
-    let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Value>()).unwrap();
+    let bytes = AlignedUninitSlice::new(bytes, Layout::new::<Value>()).unwrap();
     let erased_value =
         ErasedSoa::<_, ArrayDescriptors<5>>::try_from_bytes_value(bytes, &context, value).unwrap();
 
@@ -174,7 +174,7 @@ fn value_zst() {
     let value = ();
 
     let bytes = [MaybeUninit::zeroed(); size_of::<()>() * 2];
-    let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<()>()).unwrap();
+    let bytes = AlignedUninitSlice::new(bytes, Layout::new::<()>()).unwrap();
     let erased_value =
         ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, &context, value).unwrap();
 

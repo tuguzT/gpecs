@@ -8,7 +8,7 @@ use gpecs_soa_erased::{
         prelude::*,
         traits::{SoaWrite, TupleContext},
     },
-    storage::AlignedUninitByteSlice,
+    storage::AlignedUninitSlice,
 };
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
@@ -48,7 +48,7 @@ impl Push for Zero {
         let value = black_box(value);
 
         let bytes = [MaybeUninit::<u8>::zeroed(); size_of::<Self>() * 2];
-        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let bytes = AlignedUninitSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
             ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
@@ -78,7 +78,7 @@ impl Push for Tiny {
             bytes
         };
 
-        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let bytes = AlignedUninitSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
             ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
@@ -110,7 +110,7 @@ impl Push for Small {
             bytes
         };
 
-        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let bytes = AlignedUninitSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
             ErasedSoa::<_, ArrayDescriptors<3>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
@@ -142,7 +142,7 @@ impl Push for Medium {
             bytes
         };
 
-        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let bytes = AlignedUninitSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
             ErasedSoa::<_, ArrayDescriptors<3>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
@@ -177,7 +177,7 @@ impl Push for Big {
             bytes
         };
 
-        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let bytes = AlignedUninitSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
             ErasedSoa::<_, ArrayDescriptors<5>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();
@@ -217,7 +217,7 @@ impl Push for Large {
             bytes
         };
 
-        let bytes = AlignedUninitByteSlice::new(bytes, Layout::new::<Self>()).unwrap();
+        let bytes = AlignedUninitSlice::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
             ErasedSoa::<_, ArrayDescriptors<10>>::try_from_bytes_value(bytes, context, value)
                 .unwrap();

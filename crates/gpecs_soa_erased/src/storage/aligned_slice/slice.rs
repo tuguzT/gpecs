@@ -1,29 +1,38 @@
 use core::{
     alloc::Layout,
     error::Error,
-    fmt::{self, Display},
+    fmt::{self, Debug, Display},
+    hash::{self, Hash},
+    marker::PhantomData,
     mem::MaybeUninit,
 };
 
 use crate::{
     error::{InsufficientLenError, NotAlignedError, check_align, check_sufficient_len},
-    storage::AlignedSlice,
+    storage::{AddressableUnit, AlignedSlice},
 };
 
-// TODO: support & test all the addressable units
-
-pub struct AlignedUninitByteSlice<T>
+pub struct AlignedUninitSlice<T, A>
 where
+    A: AddressableUnit,
     T: ?Sized,
 {
+    phantom: PhantomData<fn() -> A>,
     layout: Layout,
     inner: T,
 }
 
-impl<T> AlignedUninitByteSlice<T> {
+impl<T, A> AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
     pub unsafe fn new_unchecked(inner: T, layout: Layout) -> Self {
-        Self { layout, inner }
+        Self {
+            phantom: PhantomData,
+            layout,
+            inner,
+        }
     }
 
     #[inline]
@@ -33,23 +42,25 @@ impl<T> AlignedUninitByteSlice<T> {
     }
 }
 
-impl<T> AlignedUninitByteSlice<T>
+impl<T, A> AlignedUninitSlice<T, A>
 where
-    T: AsRef<[MaybeUninit<u8>]>,
+    A: AddressableUnit,
+    T: AsRef<[MaybeUninit<A>]>,
 {
     #[inline]
-    pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitByteSliceError> {
+    pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitSliceError> {
         let slice = inner.as_ref();
         check_align(slice.as_ptr().cast(), layout)?;
-        check_sufficient_len(slice.len() * size_of::<u8>(), layout.size())?;
+        check_sufficient_len(slice.len() * size_of::<A>(), layout.size())?;
 
         let me = unsafe { Self::new_unchecked(inner, layout) };
         Ok(me)
     }
 }
 
-impl<T> AlignedUninitByteSlice<T>
+impl<T, A> AlignedUninitSlice<T, A>
 where
+    A: AddressableUnit,
     T: ?Sized,
 {
     #[inline]
@@ -69,58 +80,150 @@ where
         let Self { layout, .. } = *self;
         layout
     }
+}
 
+impl<T, A> AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+    T: AsRef<[MaybeUninit<A>]> + ?Sized,
+{
     #[inline]
-    pub fn as_slice(&self) -> &[MaybeUninit<u8>]
-    where
-        T: AsRef<[MaybeUninit<u8>]>,
-    {
+    pub fn as_slice(&self) -> &[MaybeUninit<A>] {
         let Self { inner, .. } = self;
         inner.as_ref()
     }
+}
 
+impl<T, A> AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+    T: AsMut<[MaybeUninit<A>]> + ?Sized,
+{
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<u8>]
-    where
-        T: AsMut<[MaybeUninit<u8>]>,
-    {
+    pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<A>] {
         let Self { inner, .. } = self;
         inner.as_mut()
     }
 }
 
-impl<T> AsRef<[MaybeUninit<u8>]> for AlignedUninitByteSlice<T>
+impl<T, A> AsRef<[MaybeUninit<A>]> for AlignedUninitSlice<T, A>
 where
-    T: AsRef<[MaybeUninit<u8>]> + ?Sized,
+    A: AddressableUnit,
+    T: AsRef<[MaybeUninit<A>]> + ?Sized,
 {
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<u8>] {
+    fn as_ref(&self) -> &[MaybeUninit<A>] {
         self.as_slice()
     }
 }
 
-impl<T> AsMut<[MaybeUninit<u8>]> for AlignedUninitByteSlice<T>
+impl<T, A> AsMut<[MaybeUninit<A>]> for AlignedUninitSlice<T, A>
 where
-    T: AsMut<[MaybeUninit<u8>]> + ?Sized,
+    A: AddressableUnit,
+    T: AsMut<[MaybeUninit<A>]> + ?Sized,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+    fn as_mut(&mut self) -> &mut [MaybeUninit<A>] {
         self.as_mut_slice()
     }
 }
 
-unsafe impl<T> AlignedSlice<u8> for AlignedUninitByteSlice<T>
+impl<T, A> Debug for AlignedUninitSlice<T, A>
 where
-    T: AsRef<[MaybeUninit<u8>]> + AsMut<[MaybeUninit<u8>]> + ?Sized,
+    A: AddressableUnit,
+    T: Debug + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { layout, inner, .. } = self;
+        f.debug_struct("AlignedUninitSlice")
+            .field("layout", layout)
+            .field("inner", &inner)
+            .finish()
+    }
+}
+
+#[expect(clippy::expl_impl_clone_on_copy, reason = "false positive")]
+impl<T, A> Clone for AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        let Self {
+            phantom,
+            layout,
+            ref inner,
+        } = *self;
+
+        Self {
+            phantom,
+            layout,
+            inner: inner.clone(),
+        }
+    }
+}
+
+impl<T, A> Copy for AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+    T: Copy,
+{
+}
+
+impl<T, A> PartialEq for AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+    T: PartialEq + ?Sized,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            phantom,
+            layout,
+            inner,
+        } = self;
+
+        *phantom == other.phantom && *layout == other.layout && *inner == other.inner
+    }
+}
+
+impl<T, A> Eq for AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+    T: Eq + ?Sized,
+{
+}
+
+impl<T, A> Hash for AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+    T: Hash + ?Sized,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        let Self {
+            phantom,
+            layout,
+            inner,
+        } = self;
+
+        phantom.hash(state);
+        layout.hash(state);
+        inner.hash(state);
+    }
+}
+
+unsafe impl<T, A> AlignedSlice<A> for AlignedUninitSlice<T, A>
+where
+    A: AddressableUnit,
+    T: AsRef<[MaybeUninit<A>]> + AsMut<[MaybeUninit<A>]> + ?Sized,
 {
     #[inline]
-    fn as_ptr(&self) -> *const u8 {
+    fn as_ptr(&self) -> *const A {
         let slice = self.as_slice();
         slice.as_ptr().cast()
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut u8 {
+    fn as_mut_ptr(&mut self) -> *mut A {
         let slice = self.as_mut_slice();
         slice.as_mut_ptr().cast()
     }
@@ -132,39 +235,39 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum AlignedUninitByteSliceError {
+pub enum AlignedUninitSliceError {
     NotAligned(NotAlignedError),
     InsufficientLen(InsufficientLenError),
 }
 
-impl From<NotAlignedError> for AlignedUninitByteSliceError {
+impl From<NotAlignedError> for AlignedUninitSliceError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<InsufficientLenError> for AlignedUninitByteSliceError {
+impl From<InsufficientLenError> for AlignedUninitSliceError {
     #[inline]
     fn from(error: InsufficientLenError) -> Self {
         Self::InsufficientLen(error)
     }
 }
 
-impl Display for AlignedUninitByteSliceError {
+impl Display for AlignedUninitSliceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NotAligned(e) => e.fmt(f),
-            Self::InsufficientLen(e) => e.fmt(f),
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::InsufficientLen(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl Error for AlignedUninitByteSliceError {
+impl Error for AlignedUninitSliceError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::NotAligned(e) => Some(e),
-            Self::InsufficientLen(e) => Some(e),
+            Self::NotAligned(error) => Some(error),
+            Self::InsufficientLen(error) => Some(error),
         }
     }
 }

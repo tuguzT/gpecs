@@ -1,6 +1,7 @@
 use core::{
     alloc::{Layout, LayoutError},
     iter::FusedIterator,
+    num::NonZeroUsize,
 };
 
 /// Descriptor for any field type used by [SoA](crate::traits::RawSoa) types.
@@ -11,7 +12,7 @@ use core::{
 #[repr(C)] // should be just `Layout`, but it is not `repr(C)`
 pub struct FieldDescriptor {
     size: usize,
-    align: usize,
+    align: NonZeroUsize,
 }
 
 impl FieldDescriptor {
@@ -19,7 +20,8 @@ impl FieldDescriptor {
     #[inline]
     pub const fn new(layout: Layout) -> Self {
         let size = layout.size();
-        let align = layout.align();
+        // SAFETY: Layout::align() is guaranteed to be a power of two, which is non-zero.
+        let align = unsafe { NonZeroUsize::new_unchecked(layout.align()) };
         Self { size, align }
     }
 
@@ -34,7 +36,7 @@ impl FieldDescriptor {
     #[inline]
     pub const fn layout(self) -> Layout {
         let Self { size, align } = self;
-        unsafe { Layout::from_size_align_unchecked(size, align) }
+        unsafe { Layout::from_size_align_unchecked(size, align.get()) }
     }
 }
 

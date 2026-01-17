@@ -16,25 +16,25 @@ use crate::{
     },
     fmt::SliceUpperHex,
     soa::field::FieldDescriptor,
-    storage::{AlignedInitSlice, AlignedSlice, AlignedSliceFromLayout},
+    storage::{AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
 };
 
 #[cfg(feature = "alloc")]
-use crate::storage::AlignedUninitBoxedByteSlice;
+use crate::storage::BoxedAlignedUninitStorage;
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedField = ErasedField<AlignedUninitBoxedByteSlice>;
+pub type BoxedErasedField = ErasedField<BoxedAlignedUninitStorage>;
 
 pub struct ErasedField<B>
 where
     B: ?Sized,
 {
-    bytes: AlignedInitSlice<B, u8>,
+    bytes: AlignedInitStorage<B, u8>,
 }
 
 impl<B> ErasedField<B>
 where
-    B: AlignedSlice<u8>,
+    B: AlignedStorage<u8>,
 {
     #[inline]
     pub fn try_from_bytes_desc_data<T>(
@@ -64,7 +64,7 @@ where
             return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
         }
 
-        let bytes = unsafe { AlignedInitSlice::new_unchecked(bytes) };
+        let bytes = unsafe { AlignedInitStorage::new_unchecked(bytes) };
         let me = Self { bytes };
         Ok(me)
     }
@@ -101,13 +101,13 @@ where
     }
 
     #[inline]
-    pub fn into_bytes(self) -> AlignedInitSlice<B, u8> {
+    pub fn into_bytes(self) -> AlignedInitStorage<B, u8> {
         let Self { bytes } = self;
         bytes
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitSlice<B, u8>) {
+    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitStorage<B, u8>) {
         let desc = self.descriptor();
         let Self { bytes } = self;
 
@@ -117,7 +117,7 @@ where
 
 impl<B> ErasedField<B>
 where
-    B: AlignedSliceFromLayout<u8>,
+    B: AlignedStorageFromLayout<u8>,
 {
     #[inline]
     pub fn try_from_desc_data<T>(
@@ -134,7 +134,7 @@ where
         let mut bytes = B::from_layout(layout).map_err(ErasedFieldFromDescDataError::FromLayout)?;
         init_bytes_from(bytes.as_mut_uninit_slice(), data)?;
 
-        let bytes = unsafe { AlignedInitSlice::new_unchecked(bytes) };
+        let bytes = unsafe { AlignedInitStorage::new_unchecked(bytes) };
         let me = Self { bytes };
         Ok(me)
     }
@@ -160,7 +160,7 @@ where
 
 impl<B> ErasedField<B>
 where
-    B: AlignedSlice<u8> + ?Sized,
+    B: AlignedStorage<u8> + ?Sized,
 {
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
@@ -243,7 +243,7 @@ where
 
 impl<B> Debug for ErasedField<B>
 where
-    B: AlignedSlice<u8> + ?Sized,
+    B: AlignedStorage<u8> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
@@ -257,7 +257,7 @@ where
 
 impl<B> AsRef<[u8]> for ErasedField<B>
 where
-    B: AlignedSlice<u8> + ?Sized,
+    B: AlignedStorage<u8> + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &[u8] {
@@ -267,7 +267,7 @@ where
 
 impl<B> AsMut<[u8]> for ErasedField<B>
 where
-    B: AlignedSlice<u8> + ?Sized,
+    B: AlignedStorage<u8> + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [u8] {

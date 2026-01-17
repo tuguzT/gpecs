@@ -9,10 +9,10 @@ use core::{
 
 use crate::{
     error::{InsufficientLenError, NotAlignedError, check_ptr_align, check_sufficient_len},
-    storage::{AddressableUnit, AlignedSlice},
+    storage::{AddressableUnit, AlignedStorage},
 };
 
-pub struct AlignedUninitSlice<T, A>
+pub struct AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: ?Sized,
@@ -22,7 +22,7 @@ where
     inner: T,
 }
 
-impl<T, A> AlignedUninitSlice<T, A>
+impl<T, A> AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
 {
@@ -42,13 +42,13 @@ where
     }
 }
 
-impl<T, A> AlignedUninitSlice<T, A>
+impl<T, A> AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: AsRef<[MaybeUninit<A>]>,
 {
     #[inline]
-    pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitSliceError> {
+    pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitStorageError> {
         let slice = inner.as_ref();
         check_sufficient_len(slice.len() * size_of::<A>(), layout.size())?;
         check_ptr_align(slice.as_ptr().cast(), layout)?;
@@ -58,7 +58,7 @@ where
     }
 }
 
-impl<T, A> AlignedUninitSlice<T, A>
+impl<T, A> AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: ?Sized,
@@ -82,7 +82,7 @@ where
     }
 }
 
-impl<T, A> AlignedUninitSlice<T, A>
+impl<T, A> AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: AsRef<[MaybeUninit<A>]> + ?Sized,
@@ -94,7 +94,7 @@ where
     }
 }
 
-impl<T, A> AlignedUninitSlice<T, A>
+impl<T, A> AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: AsMut<[MaybeUninit<A>]> + ?Sized,
@@ -106,7 +106,7 @@ where
     }
 }
 
-impl<T, A> AsRef<[MaybeUninit<A>]> for AlignedUninitSlice<T, A>
+impl<T, A> AsRef<[MaybeUninit<A>]> for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: AsRef<[MaybeUninit<A>]> + ?Sized,
@@ -117,7 +117,7 @@ where
     }
 }
 
-impl<T, A> AsMut<[MaybeUninit<A>]> for AlignedUninitSlice<T, A>
+impl<T, A> AsMut<[MaybeUninit<A>]> for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: AsMut<[MaybeUninit<A>]> + ?Sized,
@@ -128,7 +128,7 @@ where
     }
 }
 
-impl<T, A> Debug for AlignedUninitSlice<T, A>
+impl<T, A> Debug for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: Debug + ?Sized,
@@ -143,7 +143,7 @@ where
 }
 
 #[expect(clippy::expl_impl_clone_on_copy, reason = "false positive")]
-impl<T, A> Clone for AlignedUninitSlice<T, A>
+impl<T, A> Clone for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: Clone,
@@ -163,14 +163,14 @@ where
     }
 }
 
-impl<T, A> Copy for AlignedUninitSlice<T, A>
+impl<T, A> Copy for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: Copy,
 {
 }
 
-impl<T, A> PartialEq for AlignedUninitSlice<T, A>
+impl<T, A> PartialEq for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: PartialEq + ?Sized,
@@ -186,14 +186,14 @@ where
     }
 }
 
-impl<T, A> Eq for AlignedUninitSlice<T, A>
+impl<T, A> Eq for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: Eq + ?Sized,
 {
 }
 
-impl<T, A> Hash for AlignedUninitSlice<T, A>
+impl<T, A> Hash for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: Hash + ?Sized,
@@ -211,7 +211,7 @@ where
     }
 }
 
-unsafe impl<T, A> AlignedSlice<A> for AlignedUninitSlice<T, A>
+unsafe impl<T, A> AlignedStorage<A> for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,
     T: AsRef<[MaybeUninit<A>]> + AsMut<[MaybeUninit<A>]> + ?Sized,
@@ -235,26 +235,26 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum AlignedUninitSliceError {
+pub enum AlignedUninitStorageError {
     NotAligned(NotAlignedError),
     InsufficientLen(InsufficientLenError),
 }
 
-impl From<NotAlignedError> for AlignedUninitSliceError {
+impl From<NotAlignedError> for AlignedUninitStorageError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<InsufficientLenError> for AlignedUninitSliceError {
+impl From<InsufficientLenError> for AlignedUninitStorageError {
     #[inline]
     fn from(error: InsufficientLenError) -> Self {
         Self::InsufficientLen(error)
     }
 }
 
-impl Display for AlignedUninitSliceError {
+impl Display for AlignedUninitStorageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotAligned(error) => Display::fmt(error, f),
@@ -263,7 +263,7 @@ impl Display for AlignedUninitSliceError {
     }
 }
 
-impl Error for AlignedUninitSliceError {
+impl Error for AlignedUninitStorageError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::NotAligned(error) => Some(error),

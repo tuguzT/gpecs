@@ -1,19 +1,26 @@
-use core::{alloc::Layout, mem::MaybeUninit, slice};
+use core::{alloc::Layout, fmt::UpperHex, mem::MaybeUninit, slice};
 
-use crate::storage::AddressableUnit;
+/// Marker trait for an addressible unit of memory for a given target (CPU or GPU).
+pub trait AddressableUnit: UpperHex + Copy + Default + 'static {}
+
+/// The smallest addressible unit for any CPU target.
+impl AddressableUnit for u8 {}
+
+/// The guaranteed addressible unit for any GPU target.
+impl AddressableUnit for u32 {}
 
 /// [Slice](prim@slice) of dynamically aligned, potentially uninitialized addressible units.
-pub unsafe trait AlignedSlice<A>
+pub unsafe trait AlignedStorage<A>
 where
     A: AddressableUnit,
 {
-    /// Pointer to the start of [slice](AlignedSlice::as_uninit_slice) of self.
+    /// Pointer to the start of [slice](AlignedStorage::as_uninit_slice) of self.
     fn as_ptr(&self) -> *const A;
 
-    /// Mutable pointer to the start of [slice](AlignedSlice::as_mut_uninit_slice) of self.
+    /// Mutable pointer to the start of [slice](AlignedStorage::as_mut_uninit_slice) of self.
     fn as_mut_ptr(&mut self) -> *mut A;
 
-    /// Layout of [slice](AlignedSlice::as_uninit_slice) of self: its length and alignment.
+    /// Layout of [slice](AlignedStorage::as_uninit_slice) of self: its length and alignment.
     fn layout(&self) -> Layout;
 
     /// Retrieve an uninitialized [slice](prim@slice) of self,
@@ -33,10 +40,10 @@ where
     }
 }
 
-unsafe impl<A, T> AlignedSlice<A> for &mut T
+unsafe impl<A, T> AlignedStorage<A> for &mut T
 where
     A: AddressableUnit,
-    T: AlignedSlice<A> + ?Sized,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
     fn as_ptr(&self) -> *const A {
@@ -64,14 +71,14 @@ where
     }
 }
 
-/// An extension of [aligned slice](AlignedSlice) type
+/// An extension of [aligned slice](AlignedStorage) type
 /// which could potentially be constructed from a given layout.
 ///
 /// # Safety
 ///
-/// - [`set_layout()`](AlignedSliceFromLayout::set_layout()) should preserve old data
+/// - [`set_layout()`](AlignedStorageFromLayout::set_layout()) should preserve old data
 ///   by copying it from the old byte slice to the new one.
-pub unsafe trait AlignedSliceFromLayout<A>: AlignedSlice<A> + Sized
+pub unsafe trait AlignedStorageFromLayout<A>: AlignedStorage<A> + Sized
 where
     A: AddressableUnit,
 {

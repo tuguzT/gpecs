@@ -1,7 +1,15 @@
 pub use self::{
-    addressable_unit::{AddressableBy, AddressableUnit},
-    aligned_slice::*,
+    init::AlignedInitStorage,
+    slice::{AlignedUninitStorage, AlignedUninitStorageError},
+    traits::{AddressableUnit, AlignedStorage, AlignedStorageFromLayout},
 };
 
-mod addressable_unit;
-mod aligned_slice;
+#[cfg(feature = "alloc")]
+pub use self::boxed::{AllocError, BoxedAlignedUninitStorage};
+
+mod init;
+mod slice;
+mod traits;
+
+#[cfg(feature = "alloc")]
+mod boxed;

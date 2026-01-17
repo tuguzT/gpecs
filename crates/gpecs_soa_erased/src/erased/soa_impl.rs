@@ -8,7 +8,7 @@ use crate::{
             SoaContext, SoaRead, SoaWrite,
         },
     },
-    storage::{AlignedSlice, AlignedSliceFromLayout},
+    storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
 use super::{
@@ -314,7 +314,7 @@ where
 
 unsafe impl<B, D> SoaRead for ErasedSoa<B, D>
 where
-    B: AlignedSliceFromLayout<u8>,
+    B: AlignedStorageFromLayout<u8>,
     B::Error: Debug,
     D: AsRef<[FieldDescriptor]> + Clone,
 {
@@ -334,7 +334,7 @@ where
 
 unsafe impl<B, D> SoaWrite for ErasedSoa<B, D>
 where
-    B: AlignedSlice<u8>,
+    B: AlignedStorage<u8>,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
@@ -492,7 +492,7 @@ where
 
 impl<'a, B, D> SoaAsRefs<'a> for ErasedSoa<B, D>
 where
-    B: AlignedSlice<u8> + ?Sized,
+    B: AlignedStorage<u8> + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
@@ -506,7 +506,7 @@ where
 
 impl<'a, B, D> SoaAsMutRefs<'a> for ErasedSoa<B, D>
 where
-    B: AlignedSlice<u8> + ?Sized,
+    B: AlignedStorage<u8> + ?Sized,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]

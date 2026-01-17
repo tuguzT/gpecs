@@ -5,7 +5,7 @@ use core::{
 
 use crate::{
     error::{InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError},
-    storage::{AddressableUnit, AlignedSliceFromLayout},
+    storage::{AddressableUnit, AlignedStorageFromLayout},
 };
 
 #[derive(Clone)]
@@ -209,7 +209,7 @@ impl Error for ErasedFieldPtrError {
 pub enum ErasedFieldFromDescDataError<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSliceFromLayout<A>,
+    T: AlignedStorageFromLayout<A>,
 {
     LenMismatch(LenMismatchError),
     FromLayout(T::Error),
@@ -218,7 +218,7 @@ where
 impl<T, A> From<LenMismatchError> for ErasedFieldFromDescDataError<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSliceFromLayout<A>,
+    T: AlignedStorageFromLayout<A>,
 {
     #[inline]
     fn from(error: LenMismatchError) -> Self {
@@ -229,7 +229,7 @@ where
 impl<T, A> Clone for ErasedFieldFromDescDataError<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSliceFromLayout<A>,
+    T: AlignedStorageFromLayout<A>,
     T::Error: Clone,
 {
     fn clone(&self) -> Self {
@@ -243,7 +243,7 @@ where
 impl<T, A> Debug for ErasedFieldFromDescDataError<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSliceFromLayout<A>,
+    T: AlignedStorageFromLayout<A>,
     T::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -257,7 +257,7 @@ where
 impl<T, A> Display for ErasedFieldFromDescDataError<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSliceFromLayout<A>,
+    T: AlignedStorageFromLayout<A>,
     T::Error: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -271,7 +271,7 @@ where
 impl<T, A> Error for ErasedFieldFromDescDataError<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSliceFromLayout<A>,
+    T: AlignedStorageFromLayout<A>,
     T::Error: Error,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
@@ -287,7 +287,7 @@ where
 pub struct ErasedFieldFromValueError<B, T, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     T: ?Sized,
 {
     pub reason: B::Error,
@@ -297,7 +297,7 @@ where
 impl<B, T, A> Debug for ErasedFieldFromValueError<B, T, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Debug,
     T: Debug + ?Sized,
 {
@@ -313,7 +313,7 @@ where
 impl<B, T, A> ErasedFieldFromValueError<B, T, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
 {
     #[inline]
     pub(crate) fn new(reason: B::Error, value: T) -> Self {
@@ -324,7 +324,7 @@ where
 impl<B, T, A> Display for ErasedFieldFromValueError<B, T, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Display,
     T: Display + ?Sized,
 {
@@ -337,7 +337,7 @@ where
 impl<B, T, A> Error for ErasedFieldFromValueError<B, T, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Debug + Display,
     T: Debug + Display + ?Sized,
 {

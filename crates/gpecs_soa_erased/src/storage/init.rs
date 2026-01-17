@@ -9,9 +9,9 @@ use core::{
     slice,
 };
 
-use crate::storage::{AddressableUnit, AlignedSlice, AlignedSliceFromLayout};
+use crate::storage::{AddressableUnit, AlignedStorage, AlignedStorageFromLayout};
 
-pub struct AlignedInitSlice<T, A>
+pub struct AlignedInitStorage<T, A>
 where
     T: ?Sized,
     A: AddressableUnit,
@@ -20,7 +20,7 @@ where
     inner: T,
 }
 
-impl<T, A> AlignedInitSlice<T, A>
+impl<T, A> AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
 {
@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<T, A> AlignedInitSlice<T, A>
+impl<T, A> AlignedInitStorage<T, A>
 where
     T: ?Sized,
     A: AddressableUnit,
@@ -55,10 +55,10 @@ where
     }
 }
 
-impl<T, A> AlignedInitSlice<T, A>
+impl<T, A> AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSlice<A>,
+    T: AlignedStorage<A>,
 {
     #[inline]
     pub fn new(mut slice: T) -> Self {
@@ -67,10 +67,10 @@ where
     }
 }
 
-impl<T, A> AlignedInitSlice<T, A>
+impl<T, A> AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSliceFromLayout<A>,
+    T: AlignedStorageFromLayout<A>,
 {
     #[inline]
     pub fn from_layout(layout: Layout) -> Result<Self, T::Error> {
@@ -93,10 +93,10 @@ where
     }
 }
 
-impl<T, A> AlignedInitSlice<T, A>
+impl<T, A> AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSlice<A> + ?Sized,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
     pub fn as_slice(&self) -> &[A] {
@@ -137,7 +137,7 @@ where
     }
 }
 
-impl<T, A> Debug for AlignedInitSlice<T, A>
+impl<T, A> Debug for AlignedInitStorage<T, A>
 where
     T: Debug + ?Sized,
     A: AddressableUnit,
@@ -149,7 +149,7 @@ where
 }
 
 #[expect(clippy::expl_impl_clone_on_copy, reason = "false positive")]
-impl<T, A> Clone for AlignedInitSlice<T, A>
+impl<T, A> Clone for AlignedInitStorage<T, A>
 where
     T: Clone,
     A: AddressableUnit,
@@ -170,14 +170,14 @@ where
     }
 }
 
-impl<T, A> Copy for AlignedInitSlice<T, A>
+impl<T, A> Copy for AlignedInitStorage<T, A>
 where
     T: Copy,
     A: AddressableUnit,
 {
 }
 
-impl<T, A> PartialEq for AlignedInitSlice<T, A>
+impl<T, A> PartialEq for AlignedInitStorage<T, A>
 where
     T: PartialEq + ?Sized,
     A: AddressableUnit,
@@ -189,14 +189,14 @@ where
     }
 }
 
-impl<T, A> Eq for AlignedInitSlice<T, A>
+impl<T, A> Eq for AlignedInitStorage<T, A>
 where
     T: Eq + ?Sized,
     A: AddressableUnit,
 {
 }
 
-impl<T, A> PartialOrd for AlignedInitSlice<T, A>
+impl<T, A> PartialOrd for AlignedInitStorage<T, A>
 where
     T: PartialOrd + ?Sized,
     A: AddressableUnit,
@@ -213,7 +213,7 @@ where
     }
 }
 
-impl<T, A> Ord for AlignedInitSlice<T, A>
+impl<T, A> Ord for AlignedInitStorage<T, A>
 where
     T: Ord + ?Sized,
     A: AddressableUnit,
@@ -230,7 +230,7 @@ where
     }
 }
 
-impl<T, A> Hash for AlignedInitSlice<T, A>
+impl<T, A> Hash for AlignedInitStorage<T, A>
 where
     T: Hash + ?Sized,
     A: AddressableUnit,
@@ -244,10 +244,10 @@ where
     }
 }
 
-impl<T, A> Deref for AlignedInitSlice<T, A>
+impl<T, A> Deref for AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSlice<A> + ?Sized,
+    T: AlignedStorage<A> + ?Sized,
 {
     type Target = [A];
 
@@ -257,10 +257,10 @@ where
     }
 }
 
-impl<T, A> DerefMut for AlignedInitSlice<T, A>
+impl<T, A> DerefMut for AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSlice<A> + ?Sized,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -268,10 +268,10 @@ where
     }
 }
 
-impl<T, A> AsRef<[A]> for AlignedInitSlice<T, A>
+impl<T, A> AsRef<[A]> for AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSlice<A> + ?Sized,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &[A] {
@@ -279,10 +279,10 @@ where
     }
 }
 
-impl<T, A> AsMut<[A]> for AlignedInitSlice<T, A>
+impl<T, A> AsMut<[A]> for AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSlice<A> + ?Sized,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [A] {
@@ -290,10 +290,10 @@ where
     }
 }
 
-unsafe impl<T, A> AlignedSlice<A> for AlignedInitSlice<T, A>
+unsafe impl<T, A> AlignedStorage<A> for AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSlice<A> + ?Sized,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
     fn as_ptr(&self) -> *const A {
@@ -311,10 +311,10 @@ where
     }
 }
 
-unsafe impl<T, A> AlignedSliceFromLayout<A> for AlignedInitSlice<T, A>
+unsafe impl<T, A> AlignedStorageFromLayout<A> for AlignedInitStorage<T, A>
 where
     A: AddressableUnit,
-    T: AlignedSliceFromLayout<A>,
+    T: AlignedStorageFromLayout<A>,
 {
     type Error = T::Error;
 

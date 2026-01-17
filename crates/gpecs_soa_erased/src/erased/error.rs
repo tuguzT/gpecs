@@ -6,7 +6,7 @@ use core::{
 
 use crate::{
     error::{InsufficientLenError, LayoutMismatchError, LenMismatchError},
-    storage::{AddressableUnit, AlignedSliceFromLayout},
+    storage::{AddressableUnit, AlignedStorageFromLayout},
 };
 
 #[derive(Clone)]
@@ -343,7 +343,7 @@ impl Error for ErasedSoaFromBytesFieldsDescriptorsError {
 pub enum ErasedSoaFromFieldsDescriptorsError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
 {
     LenMismatch(IterOrFieldLenMismatchError),
     InvalidLayout(LayoutError),
@@ -353,7 +353,7 @@ where
 impl<B, A> From<IterOrFieldLenMismatchError> for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
 {
     #[inline]
     fn from(value: IterOrFieldLenMismatchError) -> Self {
@@ -364,7 +364,7 @@ where
 impl<B, A> From<LayoutError> for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
 {
     #[inline]
     fn from(value: LayoutError) -> Self {
@@ -375,7 +375,7 @@ where
 impl<B, A> Debug for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -390,7 +390,7 @@ where
 impl<B, A> Display for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -405,7 +405,7 @@ where
 impl<B, A> Clone for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Clone,
 {
     fn clone(&self) -> Self {
@@ -427,7 +427,7 @@ where
 impl<B, A> Error for ErasedSoaFromFieldsDescriptorsError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Debug + Display,
 {
 }
@@ -485,7 +485,7 @@ impl Error for ErasedSoaFromBytesValueError {
 pub enum ErasedSoaFromValueError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
 {
     InvalidLayout(LayoutError),
     FromLayout(B::Error),
@@ -494,7 +494,7 @@ where
 impl<B, A> From<LayoutError> for ErasedSoaFromValueError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
 {
     #[inline]
     fn from(value: LayoutError) -> Self {
@@ -505,7 +505,7 @@ where
 impl<B, A> Clone for ErasedSoaFromValueError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Clone,
 {
     fn clone(&self) -> Self {
@@ -526,7 +526,7 @@ where
 impl<B, A> Debug for ErasedSoaFromValueError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -540,7 +540,7 @@ where
 impl<B, A> Display for ErasedSoaFromValueError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -554,7 +554,7 @@ where
 impl<B, A> Error for ErasedSoaFromValueError<B, A>
 where
     A: AddressableUnit,
-    B: AlignedSliceFromLayout<A>,
+    B: AlignedStorageFromLayout<A>,
     B::Error: Debug + Display,
 {
 }

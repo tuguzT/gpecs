@@ -8,7 +8,7 @@ use core::{
     slice,
 };
 
-use crate::storage::{AlignedSlice, AlignedSliceFromLayout};
+use crate::storage::{AlignedStorage, AlignedStorageFromLayout};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
@@ -24,12 +24,12 @@ impl Display for AllocError {
 impl Error for AllocError {}
 
 #[derive(Debug)]
-pub struct AlignedUninitBoxedByteSlice {
+pub struct BoxedAlignedUninitStorage {
     ptr: NonNull<u8>,
     layout: Layout,
 }
 
-impl AlignedUninitBoxedByteSlice {
+impl BoxedAlignedUninitStorage {
     #[inline]
     pub fn new(layout: Layout) -> Result<Self, AllocError> {
         let ptr = match layout.size() {
@@ -126,35 +126,35 @@ impl AlignedUninitBoxedByteSlice {
     }
 }
 
-impl AsRef<Self> for AlignedUninitBoxedByteSlice {
+impl AsRef<Self> for BoxedAlignedUninitStorage {
     #[inline]
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl AsMut<Self> for AlignedUninitBoxedByteSlice {
+impl AsMut<Self> for BoxedAlignedUninitStorage {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl AsRef<[MaybeUninit<u8>]> for AlignedUninitBoxedByteSlice {
+impl AsRef<[MaybeUninit<u8>]> for BoxedAlignedUninitStorage {
     #[inline]
     fn as_ref(&self) -> &[MaybeUninit<u8>] {
         self.as_uninit_slice()
     }
 }
 
-impl AsMut<[MaybeUninit<u8>]> for AlignedUninitBoxedByteSlice {
+impl AsMut<[MaybeUninit<u8>]> for BoxedAlignedUninitStorage {
     #[inline]
     fn as_mut(&mut self) -> &mut [MaybeUninit<u8>] {
         self.as_mut_uninit_slice()
     }
 }
 
-impl Drop for AlignedUninitBoxedByteSlice {
+impl Drop for BoxedAlignedUninitStorage {
     fn drop(&mut self) {
         let Self { ptr, layout } = *self;
         if layout.size() == 0 {
@@ -164,7 +164,7 @@ impl Drop for AlignedUninitBoxedByteSlice {
     }
 }
 
-unsafe impl AlignedSlice<u8> for AlignedUninitBoxedByteSlice {
+unsafe impl AlignedStorage<u8> for BoxedAlignedUninitStorage {
     #[inline]
     fn as_ptr(&self) -> *const u8 {
         Self::as_ptr(self)
@@ -181,7 +181,7 @@ unsafe impl AlignedSlice<u8> for AlignedUninitBoxedByteSlice {
     }
 }
 
-unsafe impl AlignedSliceFromLayout<u8> for AlignedUninitBoxedByteSlice {
+unsafe impl AlignedStorageFromLayout<u8> for BoxedAlignedUninitStorage {
     type Error = AllocError;
 
     #[inline]
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn new() {
         let layout = Layout::new::<u64>();
-        let mut bytes = AlignedUninitBoxedByteSlice::new(layout).unwrap();
+        let mut bytes = BoxedAlignedUninitStorage::new(layout).unwrap();
 
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn new_zst() {
         let layout = Layout::new::<()>();
-        let mut bytes = AlignedUninitBoxedByteSlice::new(layout).unwrap();
+        let mut bytes = BoxedAlignedUninitStorage::new(layout).unwrap();
 
         assert_eq!(bytes.layout(), layout);
         assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn set_layout() {
         let layout = Layout::new::<u64>();
-        let mut bytes = AlignedUninitBoxedByteSlice::new(layout).unwrap();
+        let mut bytes = BoxedAlignedUninitStorage::new(layout).unwrap();
         unsafe { bytes.as_mut_ptr().cast::<u64>().write(42) }
 
         let layout = Layout::new::<u128>();

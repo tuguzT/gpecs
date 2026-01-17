@@ -176,7 +176,7 @@ impl Display for InsufficientLenError {
         let Self { expected, actual } = self;
         write!(
             f,
-            "expected length to be greater than {expected}, but got {actual}"
+            "expected length to be greater than or equal to {expected}, but got {actual}"
         )
     }
 }
@@ -192,27 +192,89 @@ pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), Insuffici
 }
 
 #[derive(Clone)]
+pub struct InsufficientAlignError {
+    expected: NonZeroUsize,
+    actual: NonZeroUsize,
+}
+
+const _: () = assert_npo::<InsufficientAlignError>();
+
+impl InsufficientAlignError {
+    #[inline]
+    #[track_caller]
+    pub fn new(expected: Layout, actual: Layout) -> Self {
+        let expected = nonzero_align(expected);
+        let actual = nonzero_align(actual);
+        assert!(
+            actual < expected,
+            "actual alignment should be smaller than expected alignment",
+        );
+
+        Self { expected, actual }
+    }
+
+    #[inline]
+    pub fn expected(&self) -> NonZeroUsize {
+        let Self { expected, .. } = *self;
+        expected
+    }
+
+    #[inline]
+    pub fn actual(&self) -> NonZeroUsize {
+        let Self { actual, .. } = *self;
+        actual
+    }
+}
+
+impl Debug for InsufficientAlignError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+
+        let Self { expected, actual } = self;
+        f.debug_struct("InsufficientAlignError")
+            .field("expected", expected)
+            .field("actual", actual)
+            .finish()
+    }
+}
+
+impl Display for InsufficientAlignError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { expected, actual } = self;
+        write!(
+            f,
+            "expected alignment to be greater than or equal to {expected}, but got {actual}"
+        )
+    }
+}
+
+impl Error for InsufficientAlignError {}
+
+#[inline]
+pub fn check_sufficient_align(
+    actual: Layout,
+    expected: Layout,
+) -> Result<(), InsufficientAlignError> {
+    if actual.align() < expected.align() {
+        return Err(InsufficientAlignError::new(expected, actual));
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
 pub struct NotAlignedError {
     ptr: *const u8,
     target_align: NonZeroUsize,
 }
 
-const _: () = assert!(
-    size_of::<NotAlignedError>() == size_of::<Option<NotAlignedError>>(),
-    "non-zero usize should allow for non-zero field optimization",
-);
-const _: () = assert!(
-    align_of::<NotAlignedError>() == align_of::<Option<NotAlignedError>>(),
-    "non-zero usize should allow for non-zero field optimization",
-);
+const _: () = assert_npo::<NotAlignedError>();
 
 impl NotAlignedError {
     #[inline]
     pub fn new(ptr: *const u8, target_layout: Layout) -> Self {
-        let target_align: NonZeroUsize = target_layout
-            .align()
-            .try_into()
-            .expect("alignment should not be zero because it is power of two");
+        let target_align = nonzero_align(target_layout);
         assert!(
             ptr.align_offset(target_align.get()) != 0,
             "the pointer {ptr:p} should not be aligned to {target_align}",
@@ -228,9 +290,9 @@ impl NotAlignedError {
     }
 
     #[inline]
-    pub fn target_align(&self) -> usize {
+    pub fn target_align(&self) -> NonZeroUsize {
         let Self { target_align, .. } = *self;
-        target_align.get()
+        target_align
     }
 }
 
@@ -262,9 +324,29 @@ impl Display for NotAlignedError {
 impl Error for NotAlignedError {}
 
 #[inline]
-pub fn check_align(ptr: *const u8, target_layout: Layout) -> Result<(), NotAlignedError> {
+pub fn check_ptr_align(ptr: *const u8, target_layout: Layout) -> Result<(), NotAlignedError> {
     match ptr.align_offset(target_layout.align()) {
         0 => Ok(()),
         _ => Err(NotAlignedError::new(ptr, target_layout)),
     }
+}
+
+#[inline]
+const fn assert_npo<T>() {
+    assert!(
+        size_of::<T>() == size_of::<Option<T>>(),
+        "non-zero usize should allow for NPO",
+    );
+    assert!(
+        align_of::<T>() == align_of::<Option<T>>(),
+        "non-zero usize should allow for NPO",
+    );
+}
+
+#[inline]
+fn nonzero_align(layout: Layout) -> NonZeroUsize {
+    layout
+        .align()
+        .try_into()
+        .expect("alignment should not be zero because it is power of two")
 }

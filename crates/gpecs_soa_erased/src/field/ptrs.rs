@@ -1,38 +1,47 @@
 use core::{
+    alloc::Layout,
     fmt::{self, Debug},
     ptr,
 };
 
 use crate::{
-    error::{check_align, check_layout, check_len},
+    error::{
+        InsufficientAlignError, check_layout, check_len, check_ptr_align, check_sufficient_align,
+    },
     field::{
         ErasedFieldMutPtr, ErasedFieldRef,
         assert::check_into_layout,
         error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
     },
     soa::field::FieldDescriptor,
+    storage::AddressableUnit,
 };
 
-#[derive(Clone, Copy)]
-pub struct ErasedFieldPtr {
+pub struct ErasedFieldPtr<A>
+where
+    A: AddressableUnit,
+{
     desc: FieldDescriptor,
-    ptr: *const u8,
+    ptr: *const A,
 }
 
-impl ErasedFieldPtr {
+impl<A> ErasedFieldPtr<A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: *const [u8]) -> Result<Self, ErasedFieldPtrError> {
-        let ptr = buffer.cast();
-        check_len(buffer.len(), desc.layout().size())?;
-        check_align(ptr, desc.layout())?;
+    pub fn new(desc: FieldDescriptor, buffer: *const [A]) -> Result<Self, ErasedFieldPtrError> {
+        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
+        check_len(buffer.len() * size_of::<A>(), desc.layout().size())?;
+        check_ptr_align(buffer.cast(), desc.layout())?;
 
+        let ptr = buffer.cast();
         Ok(Self { desc, ptr })
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: *const [u8]) -> Self {
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: *const [A]) -> Self {
         if cfg!(debug_assertions) {
             return Self::new(desc, buffer).expect("incorrect inputs");
         }
@@ -42,16 +51,23 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
-    pub fn dangling(desc: FieldDescriptor) -> Self {
+    pub fn dangling(desc: FieldDescriptor) -> Result<Self, InsufficientAlignError> {
+        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
+
         let data = ptr::without_provenance(desc.layout().align());
-        let buffer = ptr::slice_from_raw_parts(data, desc.layout().size());
-        unsafe { Self::new_unchecked(desc, buffer) }
+        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let buffer = ptr::slice_from_raw_parts(data, len);
+
+        let me = unsafe { Self::new_unchecked(desc, buffer) };
+        Ok(me)
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedFieldMutPtr {
+    pub fn cast_mut(self) -> ErasedFieldMutPtr<A> {
         let Self { desc, ptr } = self;
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast_mut(), desc.layout().size());
+
+        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast_mut(), len);
         unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
     }
 
@@ -60,7 +76,7 @@ impl ErasedFieldPtr {
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { desc, ptr } = self;
 
-        let size = desc.layout().size();
+        let size = desc.layout().size().div_ceil(size_of::<A>());
         let data = unsafe { ptr.add(count * size) };
         let buffer = ptr::slice_from_raw_parts(data, size);
         unsafe { Self::new_unchecked(desc, buffer) }
@@ -76,6 +92,7 @@ impl ErasedFieldPtr {
         let field_size = desc
             .layout()
             .size()
+            .div_ceil(size_of::<A>())
             .try_into()
             .expect("layout size should not exceed `isize::MAX`");
         offset
@@ -84,7 +101,7 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a> {
+    pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a, A> {
         unsafe { ErasedFieldRef::from_ptr(self) }
     }
 
@@ -95,27 +112,34 @@ impl ErasedFieldPtr {
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [u8] {
+    pub fn as_buffer(self) -> *const [A] {
         let Self { desc, ptr } = self;
-        ptr::slice_from_raw_parts(ptr, desc.layout().size())
+
+        let len = desc.layout().size().div_ceil(size_of::<A>());
+        ptr::slice_from_raw_parts(ptr, len)
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const u8 {
+    pub fn as_ptr(self) -> *const A {
         let Self { ptr, .. } = self;
         ptr
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, *const [u8]) {
+    pub fn into_parts(self) -> (FieldDescriptor, *const [A]) {
         let Self { desc, ptr } = self;
-        let buffer = ptr::slice_from_raw_parts(ptr, desc.layout().size());
+
+        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let buffer = ptr::slice_from_raw_parts(ptr, len);
         (desc, buffer)
     }
 }
 
 #[expect(clippy::missing_fields_in_debug, reason = "buffer instead of ptr")]
-impl Debug for ErasedFieldPtr {
+impl<A> Debug for ErasedFieldPtr<A>
+where
+    A: AddressableUnit,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.desc;
         let buffer = &self.as_buffer();
@@ -126,20 +150,46 @@ impl Debug for ErasedFieldPtr {
     }
 }
 
-impl<T> From<*const T> for ErasedFieldPtr {
+#[expect(clippy::expl_impl_clone_on_copy, reason = "no auto-placed bounds")]
+impl<A> Clone for ErasedFieldPtr<A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    fn from(ptr: *const T) -> Self {
-        let desc = FieldDescriptor::of::<T>();
-        let buffer = ptr::slice_from_raw_parts(ptr.cast(), desc.layout().size());
-        unsafe { Self::new_unchecked(desc, buffer) }
+    fn clone(&self) -> Self {
+        *self
     }
 }
 
-impl<T> TryFrom<ErasedFieldPtr> for *const T {
-    type Error = ErasedFieldIntoValueError<ErasedFieldPtr>;
+impl<A> Copy for ErasedFieldPtr<A> where A: AddressableUnit {}
+
+impl<T, A> TryFrom<*const T> for ErasedFieldPtr<A>
+where
+    A: AddressableUnit,
+{
+    type Error = InsufficientAlignError;
 
     #[inline]
-    fn try_from(value: ErasedFieldPtr) -> Result<Self, Self::Error> {
+    fn try_from(ptr: *const T) -> Result<Self, Self::Error> {
+        let desc = FieldDescriptor::of::<T>();
+        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
+
+        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let buffer = ptr::slice_from_raw_parts(ptr.cast(), len);
+
+        let me = unsafe { Self::new_unchecked(desc, buffer) };
+        Ok(me)
+    }
+}
+
+impl<T, A> TryFrom<ErasedFieldPtr<A>> for *const T
+where
+    A: AddressableUnit,
+{
+    type Error = ErasedFieldIntoValueError<ErasedFieldPtr<A>>;
+
+    #[inline]
+    fn try_from(value: ErasedFieldPtr<A>) -> Result<Self, Self::Error> {
         let ErasedFieldPtr { desc, .. } = value;
         let value = check_into_layout::<T, _>(desc.layout(), value)?;
 

@@ -67,7 +67,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::from(&()).into_buffer(),
+        ErasedFieldRef::try_from(&()).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.into_iter().nth(1).unwrap();
@@ -77,7 +77,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::from(&i3).into_buffer(),
+        ErasedFieldRef::try_from(&i3).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.into_iter().nth(2).unwrap();
@@ -87,7 +87,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::from(&i2).into_buffer(),
+        ErasedFieldRef::try_from(&i2).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.into_iter().nth(3).unwrap();
@@ -97,7 +97,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::from(&i1).into_buffer(),
+        ErasedFieldRef::try_from(&i1).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.into_iter().nth(4).unwrap();

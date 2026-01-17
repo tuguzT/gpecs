@@ -8,7 +8,7 @@ use core::{
 };
 
 use crate::{
-    error::{InsufficientLenError, NotAlignedError, check_align, check_sufficient_len},
+    error::{InsufficientLenError, NotAlignedError, check_ptr_align, check_sufficient_len},
     storage::{AddressableUnit, AlignedSlice},
 };
 
@@ -50,8 +50,8 @@ where
     #[inline]
     pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitSliceError> {
         let slice = inner.as_ref();
-        check_align(slice.as_ptr().cast(), layout)?;
         check_sufficient_len(slice.len() * size_of::<A>(), layout.size())?;
+        check_ptr_align(slice.as_ptr().cast(), layout)?;
 
         let me = unsafe { Self::new_unchecked(inner, layout) };
         Ok(me)

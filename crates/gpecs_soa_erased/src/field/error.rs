@@ -4,7 +4,7 @@ use core::{
 };
 
 use crate::{
-    error::{LayoutMismatchError, LenMismatchError, NotAlignedError},
+    error::{InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError},
     storage::{AddressableUnit, AlignedSliceFromLayout},
 };
 
@@ -147,6 +147,7 @@ where
 pub enum ErasedFieldPtrError {
     NotAligned(NotAlignedError),
     LenMismatch(LenMismatchError),
+    InsufficientAlign(InsufficientAlignError),
 }
 
 impl From<NotAlignedError> for ErasedFieldPtrError {
@@ -163,6 +164,13 @@ impl From<LenMismatchError> for ErasedFieldPtrError {
     }
 }
 
+impl From<InsufficientAlignError> for ErasedFieldPtrError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
 impl Debug for ErasedFieldPtrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !f.alternate() {
@@ -171,6 +179,9 @@ impl Debug for ErasedFieldPtrError {
         match self {
             Self::NotAligned(error) => f.debug_tuple("NotAligned").field(error).finish(),
             Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
+            Self::InsufficientAlign(error) => {
+                f.debug_tuple("InsufficientAlign").field(error).finish()
+            }
         }
     }
 }
@@ -180,6 +191,7 @@ impl Display for ErasedFieldPtrError {
         match self {
             Self::NotAligned(error) => Display::fmt(error, f),
             Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
         }
     }
 }
@@ -189,77 +201,7 @@ impl Error for ErasedFieldPtrError {
         match self {
             Self::NotAligned(error) => Some(error),
             Self::LenMismatch(error) => Some(error),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum ErasedFieldError {
-    NotAligned(NotAlignedError),
-    LenMismatch(LenMismatchError),
-    LayoutMismatch(LayoutMismatchError),
-}
-
-impl From<NotAlignedError> for ErasedFieldError {
-    #[inline]
-    fn from(error: NotAlignedError) -> Self {
-        Self::NotAligned(error)
-    }
-}
-
-impl From<LenMismatchError> for ErasedFieldError {
-    #[inline]
-    fn from(error: LenMismatchError) -> Self {
-        Self::LenMismatch(error)
-    }
-}
-
-impl From<LayoutMismatchError> for ErasedFieldError {
-    #[inline]
-    fn from(error: LayoutMismatchError) -> Self {
-        Self::LayoutMismatch(error)
-    }
-}
-
-impl From<ErasedFieldPtrError> for ErasedFieldError {
-    #[inline]
-    fn from(error: ErasedFieldPtrError) -> Self {
-        match error {
-            ErasedFieldPtrError::NotAligned(error) => Self::NotAligned(error),
-            ErasedFieldPtrError::LenMismatch(error) => Self::LenMismatch(error),
-        }
-    }
-}
-
-impl Debug for ErasedFieldError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-        match self {
-            Self::NotAligned(error) => f.debug_tuple("NotAligned").field(error).finish(),
-            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
-            Self::LayoutMismatch(error) => f.debug_tuple("LayoutMismatch").field(error).finish(),
-        }
-    }
-}
-
-impl Display for ErasedFieldError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NotAligned(error) => Display::fmt(error, f),
-            Self::LenMismatch(error) => Display::fmt(error, f),
-            Self::LayoutMismatch(error) => Display::fmt(error, f),
-        }
-    }
-}
-
-impl Error for ErasedFieldError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::NotAligned(error) => Some(error),
-            Self::LenMismatch(error) => Some(error),
-            Self::LayoutMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
         }
     }
 }
@@ -407,12 +349,12 @@ pub struct ErasedFieldFromBytesError<T>
 where
     T: ?Sized,
 {
-    pub reason: ErasedFieldError,
+    pub reason: ErasedFieldFromBytesErrorKind,
     pub bytes: T,
 }
 
 impl<T> ErasedFieldFromBytesError<T> {
-    pub(crate) fn new(reason: ErasedFieldError, bytes: T) -> Self {
+    pub(crate) fn new(reason: ErasedFieldFromBytesErrorKind, bytes: T) -> Self {
         Self { reason, bytes }
     }
 }
@@ -438,9 +380,95 @@ where
 }
 
 #[derive(Clone)]
+pub enum ErasedFieldFromBytesErrorKind {
+    NotAligned(NotAlignedError),
+    LenMismatch(LenMismatchError),
+    LayoutMismatch(LayoutMismatchError),
+    InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<NotAlignedError> for ErasedFieldFromBytesErrorKind {
+    #[inline]
+    fn from(error: NotAlignedError) -> Self {
+        Self::NotAligned(error)
+    }
+}
+
+impl From<LenMismatchError> for ErasedFieldFromBytesErrorKind {
+    #[inline]
+    fn from(error: LenMismatchError) -> Self {
+        Self::LenMismatch(error)
+    }
+}
+
+impl From<LayoutMismatchError> for ErasedFieldFromBytesErrorKind {
+    #[inline]
+    fn from(error: LayoutMismatchError) -> Self {
+        Self::LayoutMismatch(error)
+    }
+}
+
+impl From<InsufficientAlignError> for ErasedFieldFromBytesErrorKind {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl From<ErasedFieldPtrError> for ErasedFieldFromBytesErrorKind {
+    #[inline]
+    fn from(error: ErasedFieldPtrError) -> Self {
+        match error {
+            ErasedFieldPtrError::NotAligned(error) => Self::NotAligned(error),
+            ErasedFieldPtrError::LenMismatch(error) => Self::LenMismatch(error),
+            ErasedFieldPtrError::InsufficientAlign(error) => Self::InsufficientAlign(error),
+        }
+    }
+}
+
+impl Debug for ErasedFieldFromBytesErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+        match self {
+            Self::NotAligned(error) => f.debug_tuple("NotAligned").field(error).finish(),
+            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
+            Self::LayoutMismatch(error) => f.debug_tuple("LayoutMismatch").field(error).finish(),
+            Self::InsufficientAlign(error) => {
+                f.debug_tuple("InsufficientAlign").field(error).finish()
+            }
+        }
+    }
+}
+
+impl Display for ErasedFieldFromBytesErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::LayoutMismatch(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for ErasedFieldFromBytesErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NotAligned(error) => Some(error),
+            Self::LenMismatch(error) => Some(error),
+            Self::LayoutMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum ErasedFieldSlicePtrError {
     NotAligned(NotAlignedError),
     LenMismatch(SliceLenMismatchError),
+    InsufficientAlign(InsufficientAlignError),
 }
 
 impl From<NotAlignedError> for ErasedFieldSlicePtrError {
@@ -457,6 +485,13 @@ impl From<SliceLenMismatchError> for ErasedFieldSlicePtrError {
     }
 }
 
+impl From<InsufficientAlignError> for ErasedFieldSlicePtrError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
 impl Debug for ErasedFieldSlicePtrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !f.alternate() {
@@ -465,6 +500,9 @@ impl Debug for ErasedFieldSlicePtrError {
         match self {
             Self::NotAligned(error) => f.debug_tuple("NotAligned").field(error).finish(),
             Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
+            Self::InsufficientAlign(error) => {
+                f.debug_tuple("InsufficientAlign").field(error).finish()
+            }
         }
     }
 }
@@ -474,6 +512,7 @@ impl Display for ErasedFieldSlicePtrError {
         match self {
             Self::NotAligned(error) => Display::fmt(error, f),
             Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
         }
     }
 }
@@ -483,6 +522,7 @@ impl Error for ErasedFieldSlicePtrError {
         match self {
             Self::NotAligned(error) => Some(error),
             Self::LenMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
         }
     }
 }

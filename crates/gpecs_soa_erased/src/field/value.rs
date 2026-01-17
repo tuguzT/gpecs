@@ -14,7 +14,7 @@ use crate::{
             ErasedFieldIntoValueError,
         },
     },
-    fmt::DebugBytesUpperHex,
+    fmt::SliceUpperHex,
     soa::field::FieldDescriptor,
     storage::{AlignedInitSlice, AlignedSlice, AlignedSliceFromLayout},
 };
@@ -189,28 +189,28 @@ where
     }
 
     #[inline]
-    pub fn as_field(&self) -> ErasedFieldRef<'_> {
+    pub fn as_field(&self) -> ErasedFieldRef<'_, u8> {
         let desc = self.descriptor();
         let buffer = self.as_slice();
         unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<u8> {
         let desc = self.descriptor();
         let buffer = ptr::from_ref(self.as_slice());
         unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]
-    pub fn as_mut_field(&mut self) -> ErasedFieldRefMut<'_> {
+    pub fn as_mut_field(&mut self) -> ErasedFieldRefMut<'_, u8> {
         let desc = self.descriptor();
         let buffer = self.as_mut_slice();
         unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
     }
 
     #[inline]
-    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr {
+    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<u8> {
         let desc = self.descriptor();
         let buffer = ptr::from_mut(self.as_mut_slice());
         unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
@@ -247,7 +247,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let data = &DebugBytesUpperHex(self.as_slice());
+        let data = &SliceUpperHex(self.as_slice());
         f.debug_struct("ErasedField")
             .field("desc", desc)
             .field("data", data)

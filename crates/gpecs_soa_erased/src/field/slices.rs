@@ -5,26 +5,33 @@ use core::{
 };
 
 use crate::{
+    error::InsufficientAlignError,
     field::{
         ErasedFieldPtr, ErasedFieldSlicePtr,
         error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
     },
-    fmt::DebugBytesUpperHex,
+    fmt::SliceUpperHex,
     soa::field::FieldDescriptor,
+    storage::AddressableUnit,
 };
 
-#[derive(Clone, Copy)]
-pub struct ErasedFieldSlice<'a> {
-    ptr: ErasedFieldSlicePtr,
-    phantom: PhantomData<&'a [u8]>,
+pub struct ErasedFieldSlice<'a, A>
+where
+    A: AddressableUnit,
+{
+    ptr: ErasedFieldSlicePtr<A>,
+    phantom: PhantomData<&'a [A]>,
 }
 
-impl<'a> ErasedFieldSlice<'a> {
+impl<'a, A> ErasedFieldSlice<'a, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
     #[track_caller]
     pub fn new(
         desc: FieldDescriptor,
-        buffer: &'a [u8],
+        buffer: &'a [A],
         len: usize,
     ) -> Result<Self, ErasedFieldSlicePtrError> {
         let ptr = ErasedFieldSlicePtr::new(desc, buffer, len)?;
@@ -34,17 +41,15 @@ impl<'a> ErasedFieldSlice<'a> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [u8], len: usize) -> Self {
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [A], len: usize) -> Self {
         let ptr = unsafe { ErasedFieldSlicePtr::new_unchecked(desc, buffer, len) };
         unsafe { Self::from_ptr(ptr) }
     }
 
     #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedFieldSlicePtr) -> Self {
-        Self {
-            ptr,
-            phantom: PhantomData,
-        }
+    pub unsafe fn from_ptr(ptr: ErasedFieldSlicePtr<A>) -> Self {
+        let phantom = PhantomData;
+        Self { ptr, phantom }
     }
 
     #[inline]
@@ -83,38 +88,38 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[u8] {
+    pub fn as_buffer(&self) -> &[A] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> *const A {
         let Self { ptr, .. } = self;
         ptr.as_ptr()
     }
 
     #[inline]
-    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr {
+    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr<A> {
         let Self { ptr, .. } = *self;
         ptr
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
         let Self { ptr, .. } = self;
         ptr.as_field_ptr()
     }
 
     #[inline]
-    pub fn into_buffer(self) -> &'a [u8] {
+    pub fn into_buffer(self) -> &'a [A] {
         let (_, buffer, _) = self.into_parts();
         buffer
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a [u8], usize) {
+    pub fn into_parts(self) -> (FieldDescriptor, &'a [A], usize) {
         let Self { ptr, .. } = self;
         let (desc, buffer, len) = ptr.into_parts();
         let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
@@ -122,10 +127,13 @@ impl<'a> ErasedFieldSlice<'a> {
     }
 }
 
-impl Debug for ErasedFieldSlice<'_> {
+impl<A> Debug for ErasedFieldSlice<'_, A>
+where
+    A: AddressableUnit,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &DebugBytesUpperHex(self.as_buffer());
+        let buffer = &SliceUpperHex(self.as_buffer());
         let len = &self.len();
         f.debug_struct("ErasedFieldSlice")
             .field("desc", desc)
@@ -135,17 +143,39 @@ impl Debug for ErasedFieldSlice<'_> {
     }
 }
 
-impl AsRef<[u8]> for ErasedFieldSlice<'_> {
+#[expect(clippy::expl_impl_clone_on_copy, reason = "no auto-placed bounds")]
+impl<A> Clone for ErasedFieldSlice<'_, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    fn as_ref(&self) -> &[u8] {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<A> Copy for ErasedFieldSlice<'_, A> where A: AddressableUnit {}
+
+impl<A> AsRef<[A]> for ErasedFieldSlice<'_, A>
+where
+    A: AddressableUnit,
+{
+    #[inline]
+    fn as_ref(&self) -> &[A] {
         self.as_buffer()
     }
 }
 
-impl<'a, T> From<&'a [T]> for ErasedFieldSlice<'a> {
+impl<'a, T, A> TryFrom<&'a [T]> for ErasedFieldSlice<'a, A>
+where
+    A: AddressableUnit,
+{
+    type Error = InsufficientAlignError;
+
     #[inline]
-    fn from(slice: &'a [T]) -> Self {
-        let ptr = ptr::from_ref(slice).into();
-        unsafe { Self::from_ptr(ptr) }
+    fn try_from(slice: &'a [T]) -> Result<Self, Self::Error> {
+        let ptr = ptr::from_ref(slice).try_into()?;
+        let me = unsafe { Self::from_ptr(ptr) };
+        Ok(me)
     }
 }

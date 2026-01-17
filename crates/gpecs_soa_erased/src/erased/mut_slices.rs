@@ -186,7 +186,7 @@ impl<'a, D> IntoIterator for &'a ErasedSoaSlicesMut<'_, D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Item = ErasedFieldSlice<'a>;
+    type Item = ErasedFieldSlice<'a, u8>;
     type IntoIter = ErasedSoaSlicesIter<'a, slice::Iter<'a, FieldDescriptor>>;
 
     #[inline]
@@ -199,7 +199,7 @@ impl<'a, D> IntoIterator for &'a mut ErasedSoaSlicesMut<'_, D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Item = ErasedFieldSliceMut<'a>;
+    type Item = ErasedFieldSliceMut<'a, u8>;
     type IntoIter = ErasedSoaSlicesMutIter<'a, slice::Iter<'a, FieldDescriptor>>;
 
     #[inline]
@@ -214,7 +214,7 @@ where
     D::Item: AsRef<FieldDescriptor>,
     D::IntoIter: AsRef<[FieldDescriptor]>,
 {
-    type Item = ErasedFieldSliceMut<'a>;
+    type Item = ErasedFieldSliceMut<'a, u8>;
     type IntoIter = ErasedSoaSlicesMutIter<'a, D::IntoIter>;
 
     #[inline]
@@ -298,7 +298,7 @@ where
     D: AsRef<[FieldDescriptor]> + Iterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
-    type Item = ErasedFieldSliceMut<'a>;
+    type Item = ErasedFieldSliceMut<'a, u8>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

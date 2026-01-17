@@ -38,7 +38,7 @@ where
     #[inline]
     unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> MutPtrs<'static, Self>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
+        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<u8>)>,
     {
         let component_id = unsafe { components.component_id::<T>().unwrap_unchecked() };
         let (_, ptr) = unsafe {
@@ -83,7 +83,7 @@ macro_rules! bundle_tuple_impl {
             #[inline]
             unsafe fn ptrs_from_iter<Iter>(components: &ComponentRegistry, iter: Iter) -> MutPtrs<'static, Self>
             where
-                Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>,
+                Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<u8>)>,
             {
                 let component_ids = [$(unsafe { components.component_id::<$types>().unwrap_unchecked() },)*];
 

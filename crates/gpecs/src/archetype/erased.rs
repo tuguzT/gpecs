@@ -129,7 +129,7 @@ where
 #[inline]
 pub unsafe fn from_erased_refs<'a, B>(
     components: &ComponentRegistry,
-    fields: ErasedComponents<ErasedFieldRef<'a>>,
+    fields: ErasedComponents<ErasedFieldRef<'a, u8>>,
 ) -> Refs<'static, 'a, B>
 where
     B: Bundle,
@@ -145,7 +145,7 @@ where
 #[inline]
 pub unsafe fn from_erased_refs_mut<'a, B>(
     components: &ComponentRegistry,
-    fields: ErasedComponents<ErasedFieldRefMut<'a>>,
+    fields: ErasedComponents<ErasedFieldRefMut<'a, u8>>,
 ) -> RefsMut<'static, 'a, B>
 where
     B: Bundle,
@@ -161,7 +161,7 @@ where
 pub unsafe fn from_erased_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
-    fields: ErasedComponents<ErasedFieldSlice<'a>>,
+    fields: ErasedComponents<ErasedFieldSlice<'a, u8>>,
 ) -> Slices<'static, 'a, B>
 where
     B: Bundle,
@@ -179,7 +179,7 @@ where
 pub unsafe fn from_erased_mut_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
-    fields: ErasedComponents<ErasedFieldSliceMut<'a>>,
+    fields: ErasedComponents<ErasedFieldSliceMut<'a, u8>>,
 ) -> SlicesMut<'static, 'a, B>
 where
     B: Bundle,

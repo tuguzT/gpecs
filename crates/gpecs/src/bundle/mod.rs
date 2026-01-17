@@ -28,5 +28,5 @@ pub unsafe trait Bundle: SoaOwned + SoaRead + SoaWrite + 'static {
 
     unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> MutPtrs<'static, Self>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr)>;
+        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<u8>)>;
 }

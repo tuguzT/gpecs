@@ -5,24 +5,30 @@ use core::{
 };
 
 use crate::{
+    error::InsufficientAlignError,
     field::{
         ErasedFieldPtr,
         error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
     },
-    fmt::DebugBytesUpperHex,
+    fmt::SliceUpperHex,
     soa::field::FieldDescriptor,
+    storage::AddressableUnit,
 };
 
-#[derive(Clone, Copy)]
-pub struct ErasedFieldRef<'a> {
-    ptr: ErasedFieldPtr,
-    phantom: PhantomData<&'a [u8]>,
+pub struct ErasedFieldRef<'a, A>
+where
+    A: AddressableUnit,
+{
+    ptr: ErasedFieldPtr<A>,
+    phantom: PhantomData<&'a [A]>,
 }
 
-impl<'a> ErasedFieldRef<'a> {
+impl<'a, A> ErasedFieldRef<'a, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    #[track_caller]
-    pub fn new(desc: FieldDescriptor, buffer: &'a [u8]) -> Result<Self, ErasedFieldPtrError> {
+    pub fn new(desc: FieldDescriptor, buffer: &'a [A]) -> Result<Self, ErasedFieldPtrError> {
         let ptr = ErasedFieldPtr::new(desc, buffer)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
@@ -30,17 +36,22 @@ impl<'a> ErasedFieldRef<'a> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [u8]) -> Self {
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [A]) -> Self {
         let ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
         unsafe { Self::from_ptr(ptr) }
     }
 
     #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedFieldPtr) -> Self {
-        Self {
-            ptr,
-            phantom: PhantomData,
-        }
+    pub unsafe fn from_ptr(ptr: ErasedFieldPtr<A>) -> Self {
+        let phantom = PhantomData;
+        Self { ptr, phantom }
+    }
+
+    #[inline]
+    pub fn try_from<T>(r#ref: &'a T) -> Result<Self, InsufficientAlignError> {
+        let ptr = ptr::from_ref(r#ref).try_into()?;
+        let me = unsafe { Self::from_ptr(ptr) };
+        Ok(me)
     }
 
     #[inline]
@@ -68,32 +79,32 @@ impl<'a> ErasedFieldRef<'a> {
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[u8] {
+    pub fn as_buffer(&self) -> &[A] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> *const A {
         let Self { ptr, .. } = self;
         ptr.as_ptr()
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
         let Self { ptr, .. } = *self;
         ptr
     }
 
     #[inline]
-    pub fn into_buffer(self) -> &'a [u8] {
+    pub fn into_buffer(self) -> &'a [A] {
         let (_, buffer) = self.into_parts();
         buffer
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a [u8]) {
+    pub fn into_parts(self) -> (FieldDescriptor, &'a [A]) {
         let Self { ptr, .. } = self;
         let (desc, buffer) = ptr.into_parts();
         let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
@@ -101,10 +112,13 @@ impl<'a> ErasedFieldRef<'a> {
     }
 }
 
-impl Debug for ErasedFieldRef<'_> {
+impl<A> Debug for ErasedFieldRef<'_, A>
+where
+    A: AddressableUnit,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &DebugBytesUpperHex(self.as_buffer());
+        let buffer = &SliceUpperHex(self.as_buffer());
         f.debug_struct("ErasedFieldRef")
             .field("desc", desc)
             .field("buffer", buffer)
@@ -112,17 +126,25 @@ impl Debug for ErasedFieldRef<'_> {
     }
 }
 
-impl AsRef<[u8]> for ErasedFieldRef<'_> {
+#[expect(clippy::expl_impl_clone_on_copy, reason = "no auto-placed bounds")]
+impl<A> Clone for ErasedFieldRef<'_, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    fn as_ref(&self) -> &[u8] {
-        self.as_buffer()
+    fn clone(&self) -> Self {
+        *self
     }
 }
 
-impl<'a, T> From<&'a T> for ErasedFieldRef<'a> {
+impl<A> Copy for ErasedFieldRef<'_, A> where A: AddressableUnit {}
+
+impl<A> AsRef<[A]> for ErasedFieldRef<'_, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    fn from(r#ref: &'a T) -> Self {
-        let ptr = ptr::from_ref(r#ref).into();
-        unsafe { Self::from_ptr(ptr) }
+    fn as_ref(&self) -> &[A] {
+        self.as_buffer()
     }
 }

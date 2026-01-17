@@ -5,26 +5,33 @@ use core::{
 };
 
 use crate::{
+    error::InsufficientAlignError,
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMutPtr,
         ErasedFieldSlicePtr,
         error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
     },
-    fmt::DebugBytesUpperHex,
+    fmt::SliceUpperHex,
     soa::field::FieldDescriptor,
+    storage::AddressableUnit,
 };
 
-pub struct ErasedFieldSliceMut<'a> {
-    ptr: ErasedFieldSliceMutPtr,
-    phantom: PhantomData<&'a mut [u8]>,
+pub struct ErasedFieldSliceMut<'a, A>
+where
+    A: AddressableUnit,
+{
+    ptr: ErasedFieldSliceMutPtr<A>,
+    phantom: PhantomData<&'a mut [A]>,
 }
 
-impl<'a> ErasedFieldSliceMut<'a> {
+impl<'a, A> ErasedFieldSliceMut<'a, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    #[track_caller]
     pub fn new(
         desc: FieldDescriptor,
-        buffer: &'a mut [u8],
+        buffer: &'a mut [A],
         len: usize,
     ) -> Result<Self, ErasedFieldSlicePtrError> {
         let ptr = ErasedFieldSliceMutPtr::new(desc, buffer, len)?;
@@ -34,17 +41,15 @@ impl<'a> ErasedFieldSliceMut<'a> {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a mut [u8], len: usize) -> Self {
+    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a mut [A], len: usize) -> Self {
         let ptr = unsafe { ErasedFieldSliceMutPtr::new_unchecked(desc, buffer, len) };
         unsafe { Self::from_ptr(ptr) }
     }
 
     #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedFieldSliceMutPtr) -> Self {
-        Self {
-            ptr,
-            phantom: PhantomData,
-        }
+    pub unsafe fn from_ptr(ptr: ErasedFieldSliceMutPtr<A>) -> Self {
+        let phantom = PhantomData;
+        Self { ptr, phantom }
     }
 
     #[inline]
@@ -92,63 +97,63 @@ impl<'a> ErasedFieldSliceMut<'a> {
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[u8] {
+    pub fn as_buffer(&self) -> &[A] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> *const A {
         let Self { ptr, .. } = self;
         ptr.as_ptr()
     }
 
     #[inline]
-    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr {
+    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr<A> {
         let Self { ptr, .. } = self;
         ptr.cast_const()
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr {
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
         let Self { ptr, .. } = self;
         ptr.as_field_ptr()
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> &mut [u8] {
+    pub fn as_mut_buffer(&mut self) -> &mut [A] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_mut_buffer();
         unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub fn as_mut_ptr(&mut self) -> *mut A {
         let Self { ptr, .. } = self;
         ptr.as_mut_ptr()
     }
 
     #[inline]
-    pub fn as_mut_field_slice_ptr(&mut self) -> ErasedFieldSliceMutPtr {
+    pub fn as_mut_field_slice_ptr(&mut self) -> ErasedFieldSliceMutPtr<A> {
         let Self { ptr, .. } = *self;
         ptr
     }
 
     #[inline]
-    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr {
+    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<A> {
         let Self { ptr, .. } = self;
         ptr.as_mut_field_ptr()
     }
 
     #[inline]
-    pub fn into_buffer(self) -> &'a mut [u8] {
+    pub fn into_buffer(self) -> &'a mut [A] {
         let (_, buffer, _) = self.into_parts();
         buffer
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a mut [u8], usize) {
+    pub fn into_parts(self) -> (FieldDescriptor, &'a mut [A], usize) {
         let Self { ptr, .. } = self;
         let (desc, buffer, len) = ptr.into_parts();
         let buffer = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
@@ -156,10 +161,13 @@ impl<'a> ErasedFieldSliceMut<'a> {
     }
 }
 
-impl Debug for ErasedFieldSliceMut<'_> {
+impl<A> Debug for ErasedFieldSliceMut<'_, A>
+where
+    A: AddressableUnit,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &DebugBytesUpperHex(self.as_buffer());
+        let buffer = &SliceUpperHex(self.as_buffer());
         let len = &self.len();
         f.debug_struct("ErasedFieldSliceMut")
             .field("desc", desc)
@@ -169,30 +177,45 @@ impl Debug for ErasedFieldSliceMut<'_> {
     }
 }
 
-impl AsRef<[u8]> for ErasedFieldSliceMut<'_> {
+impl<A> AsRef<[A]> for ErasedFieldSliceMut<'_, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    fn as_ref(&self) -> &[u8] {
+    fn as_ref(&self) -> &[A] {
         self.as_buffer()
     }
 }
 
-impl AsMut<[u8]> for ErasedFieldSliceMut<'_> {
+impl<A> AsMut<[A]> for ErasedFieldSliceMut<'_, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
+    fn as_mut(&mut self) -> &mut [A] {
         self.as_mut_buffer()
     }
 }
 
-impl<'a, T> From<&'a mut [T]> for ErasedFieldSliceMut<'a> {
+impl<'a, T, A> TryFrom<&'a mut [T]> for ErasedFieldSliceMut<'a, A>
+where
+    A: AddressableUnit,
+{
+    type Error = InsufficientAlignError;
+
     #[inline]
-    fn from(slice: &'a mut [T]) -> Self {
-        let ptr = ptr::from_mut(slice).into();
-        unsafe { Self::from_ptr(ptr) }
+    fn try_from(slice: &'a mut [T]) -> Result<Self, Self::Error> {
+        let ptr = ptr::from_mut(slice).try_into()?;
+        let me = unsafe { Self::from_ptr(ptr) };
+        Ok(me)
     }
 }
 
-impl<'a> From<ErasedFieldSliceMut<'a>> for ErasedFieldSlice<'a> {
-    fn from(value: ErasedFieldSliceMut<'a>) -> Self {
+impl<'a, A> From<ErasedFieldSliceMut<'a, A>> for ErasedFieldSlice<'a, A>
+where
+    A: AddressableUnit,
+{
+    fn from(value: ErasedFieldSliceMut<'a, A>) -> Self {
         let (desc, buffer, len) = value.into_parts();
         unsafe { ErasedFieldSlice::new_unchecked(desc, buffer, len) }
     }

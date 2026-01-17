@@ -169,7 +169,7 @@ impl<'a, D> IntoIterator for &'a ErasedSoaSlicePtrs<D>
 where
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Item = ErasedFieldSlicePtr;
+    type Item = ErasedFieldSlicePtr<u8>;
     type IntoIter = ErasedSoaSlicePtrsIter<slice::Iter<'a, FieldDescriptor>>;
 
     #[inline]
@@ -184,7 +184,7 @@ where
     D::Item: AsRef<FieldDescriptor>,
     D::IntoIter: AsRef<[FieldDescriptor]>,
 {
-    type Item = ErasedFieldSlicePtr;
+    type Item = ErasedFieldSlicePtr<u8>;
     type IntoIter = ErasedSoaSlicePtrsIter<D::IntoIter>;
 
     #[inline]
@@ -268,7 +268,7 @@ where
     D: AsRef<[FieldDescriptor]> + Iterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
-    type Item = ErasedFieldSlicePtr;
+    type Item = ErasedFieldSlicePtr<u8>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

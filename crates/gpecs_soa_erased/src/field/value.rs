@@ -1,249 +1,273 @@
 use core::{
+    alloc::Layout,
     fmt::{self, Debug},
     mem::{MaybeUninit, forget},
     ptr, slice,
 };
 
 use crate::{
-    error::{LenMismatchError, check_layout, check_len},
+    error::{LenMismatchError, check_layout, check_len, check_sufficient_align},
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
         assert::check_into_layout,
         error::{
-            ErasedFieldFromBytesError, ErasedFieldFromDescDataError, ErasedFieldFromValueError,
-            ErasedFieldIntoValueError,
+            ErasedFieldFromDescDataError, ErasedFieldFromStorageError, ErasedFieldFromValueError,
+            ErasedFieldFromValueErrorKind, ErasedFieldIntoValueError,
         },
     },
     fmt::SliceUpperHex,
     soa::field::FieldDescriptor,
-    storage::{AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
+    storage::{AddressableUnit, AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
 };
 
 #[cfg(feature = "alloc")]
 use crate::storage::BoxedAlignedUninitStorage;
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedField = ErasedField<BoxedAlignedUninitStorage>;
+pub type BoxedErasedField = ErasedField<BoxedAlignedUninitStorage, u8>;
 
-pub struct ErasedField<B>
+pub struct ErasedField<T, A>
 where
-    B: ?Sized,
+    A: AddressableUnit,
+    T: ?Sized,
 {
-    bytes: AlignedInitStorage<B, u8>,
+    storage: AlignedInitStorage<T, A>,
 }
 
-impl<B> ErasedField<B>
+impl<T, A> ErasedField<T, A>
 where
-    B: AlignedStorage<u8>,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
 {
     #[inline]
-    pub fn try_from_bytes_desc_data<T>(
-        mut bytes: B,
+    pub fn try_from_storage_desc_data<V>(
+        mut storage: T,
         desc: FieldDescriptor,
-        data: T,
-    ) -> Result<Self, ErasedFieldFromBytesError<B>>
+        data: V,
+    ) -> Result<Self, ErasedFieldFromStorageError<T>>
     where
-        T: AsRef<[u8]>,
+        V: AsRef<[A]>,
     {
-        let data = data.as_ref();
-        let len = data.len();
-
-        let layout = bytes.layout();
-        let expected_layout = desc.layout();
-        if let Err(err) = check_len(len, layout.size()) {
-            return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
+        let layout = storage.layout();
+        if let Err(err) = check_sufficient_align(layout, Layout::new::<A>()) {
+            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
         }
+
+        let data = data.as_ref();
+        let len = size_of_val(data);
+        if let Err(err) = check_len(len, layout.size()) {
+            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
+        }
+
+        let expected_layout = desc.layout();
         if let Err(err) = check_len(len, expected_layout.size()) {
-            return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
+            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
         }
         if let Err(err) = check_layout(layout, expected_layout) {
-            return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
+            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
         }
 
-        if let Err(err) = init_bytes_from(bytes.as_mut_uninit_slice(), data) {
-            return Err(ErasedFieldFromBytesError::new(err.into(), bytes));
+        if let Err(err) = init_from(storage.as_mut_uninit_slice(), data) {
+            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
         }
 
-        let bytes = unsafe { AlignedInitStorage::new_unchecked(bytes) };
-        let me = Self { bytes };
+        let storage = unsafe { AlignedInitStorage::new_unchecked(storage) };
+        let me = Self { storage };
         Ok(me)
     }
 
     #[inline]
-    pub fn try_from_bytes_value<T>(
-        bytes: B,
-        value: T,
-    ) -> Result<Self, ErasedFieldFromBytesError<(B, T)>> {
-        let desc = FieldDescriptor::of::<T>();
+    pub fn try_from_storage_value<V>(
+        storage: T,
+        value: V,
+    ) -> Result<Self, ErasedFieldFromStorageError<(T, V)>> {
+        let desc = FieldDescriptor::of::<V>();
+
         let data = ptr::from_ref(&value).cast();
-        let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
-        match Self::try_from_bytes_desc_data(bytes, desc, data) {
+        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let data = unsafe { slice::from_raw_parts(data, len) };
+
+        match Self::try_from_storage_desc_data(storage, desc, data) {
             Ok(me) => {
                 forget(value);
                 Ok(me)
             }
             Err(err) => {
-                let ErasedFieldFromBytesError { reason, bytes } = err;
-                let err = ErasedFieldFromBytesError::new(reason, (bytes, value));
+                let ErasedFieldFromStorageError { reason, storage } = err;
+                let err = ErasedFieldFromStorageError::new(reason, (storage, value));
                 Err(err)
             }
         }
     }
 
     #[inline]
-    pub unsafe fn try_into<T>(self) -> Result<T, ErasedFieldIntoValueError<Self>> {
+    pub unsafe fn try_into<V>(self) -> Result<V, ErasedFieldIntoValueError<Self>> {
         let desc = self.descriptor();
-        let me = check_into_layout::<T, _>(desc.layout(), self)?;
-        let Self { bytes } = me;
+        let me = check_into_layout::<V, _>(desc.layout(), self)?;
+        let Self { storage } = me;
 
-        let src = bytes.as_ptr().cast();
+        let src = storage.as_ptr().cast();
         Ok(unsafe { ptr::read(src) })
     }
 
     #[inline]
-    pub fn into_bytes(self) -> AlignedInitStorage<B, u8> {
-        let Self { bytes } = self;
-        bytes
+    pub fn into_storage(self) -> AlignedInitStorage<T, A> {
+        let Self { storage } = self;
+        storage
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitStorage<B, u8>) {
+    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitStorage<T, A>) {
         let desc = self.descriptor();
-        let Self { bytes } = self;
+        let Self { storage } = self;
 
-        (desc, bytes)
+        (desc, storage)
     }
 }
 
-impl<B> ErasedField<B>
+impl<T, A> ErasedField<T, A>
 where
-    B: AlignedStorageFromLayout<u8>,
+    A: AddressableUnit,
+    T: AlignedStorageFromLayout<A>,
 {
     #[inline]
-    pub fn try_from_desc_data<T>(
+    pub fn try_from_desc_data<V>(
         desc: FieldDescriptor,
-        data: T,
-    ) -> Result<Self, ErasedFieldFromDescDataError<B, u8>>
+        data: V,
+    ) -> Result<Self, ErasedFieldFromDescDataError<T, A>>
     where
-        T: AsRef<[u8]>,
+        V: AsRef<[A]>,
     {
-        let data = data.as_ref();
         let layout = desc.layout();
-        check_len(data.len(), layout.size())?;
+        check_sufficient_align(layout, Layout::new::<A>())?;
 
-        let mut bytes = B::from_layout(layout).map_err(ErasedFieldFromDescDataError::FromLayout)?;
-        init_bytes_from(bytes.as_mut_uninit_slice(), data)?;
+        let data = data.as_ref();
+        check_len(size_of_val(data), layout.size())?;
 
-        let bytes = unsafe { AlignedInitStorage::new_unchecked(bytes) };
-        let me = Self { bytes };
+        let mut storage =
+            T::from_layout(layout).map_err(ErasedFieldFromDescDataError::FromLayout)?;
+        init_from(storage.as_mut_uninit_slice(), data)?;
+
+        let storage = unsafe { AlignedInitStorage::new_unchecked(storage) };
+        let me = Self { storage };
         Ok(me)
     }
 
     #[inline]
-    pub fn try_from<T>(value: T) -> Result<Self, ErasedFieldFromValueError<B, T, u8>> {
-        let desc = FieldDescriptor::of::<T>();
+    pub fn try_from<V>(value: V) -> Result<Self, ErasedFieldFromValueError<T, V, A>> {
+        let desc = FieldDescriptor::of::<V>();
+
         let data = ptr::from_ref(&value).cast();
-        let data = unsafe { slice::from_raw_parts(data, desc.layout().size()) };
+        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let data = unsafe { slice::from_raw_parts(data, len) };
+
         match Self::try_from_desc_data(desc, data) {
             Ok(me) => {
                 forget(value);
                 Ok(me)
             }
-            Err(ErasedFieldFromDescDataError::FromLayout(err)) => {
-                let err = ErasedFieldFromValueError::new(err, value);
-                Err(err)
+            Err(ErasedFieldFromDescDataError::LenMismatch(error)) => unreachable!("{error}"),
+            Err(ErasedFieldFromDescDataError::InsufficientAlign(error)) => {
+                let error = ErasedFieldFromValueError::new(error.into(), value);
+                Err(error)
             }
-            Err(ErasedFieldFromDescDataError::LenMismatch(err)) => unreachable!("{err}"),
+            Err(ErasedFieldFromDescDataError::FromLayout(error)) => {
+                let reason = ErasedFieldFromValueErrorKind::FromLayout(error);
+                let error = ErasedFieldFromValueError::new(reason, value);
+                Err(error)
+            }
         }
     }
 }
 
-impl<B> ErasedField<B>
+impl<T, A> ErasedField<T, A>
 where
-    B: AlignedStorage<u8> + ?Sized,
+    A: AddressableUnit,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { bytes } = self;
-        FieldDescriptor::new(bytes.layout())
+        let Self { storage } = self;
+        FieldDescriptor::new(storage.layout())
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&T, ErasedFieldIntoValueError<&Self>> {
+    pub unsafe fn cast<V>(&self) -> Result<&V, ErasedFieldIntoValueError<&Self>> {
         let desc = self.descriptor();
-        let me = check_into_layout::<T, _>(desc.layout(), self)?;
-        let Self { bytes } = me;
+        let me = check_into_layout::<V, _>(desc.layout(), self)?;
+        let Self { storage } = me;
 
-        let ptr = bytes.as_ptr().cast();
+        let ptr = storage.as_ptr().cast();
         Ok(unsafe { &*ptr })
     }
 
     #[inline]
-    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut T, ErasedFieldIntoValueError<&mut Self>> {
+    pub unsafe fn cast_mut<V>(&mut self) -> Result<&mut V, ErasedFieldIntoValueError<&mut Self>> {
         let desc = self.descriptor();
-        let me = check_into_layout::<T, _>(desc.layout(), self)?;
-        let Self { bytes } = me;
+        let me = check_into_layout::<V, _>(desc.layout(), self)?;
+        let Self { storage } = me;
 
-        let ptr = bytes.as_mut_ptr().cast();
+        let ptr = storage.as_mut_ptr().cast();
         Ok(unsafe { &mut *ptr })
     }
 
     #[inline]
-    pub fn as_field(&self) -> ErasedFieldRef<'_, u8> {
+    pub fn as_field(&self) -> ErasedFieldRef<'_, A> {
         let desc = self.descriptor();
         let buffer = self.as_slice();
         unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr<u8> {
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
         let desc = self.descriptor();
         let buffer = ptr::from_ref(self.as_slice());
         unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]
-    pub fn as_mut_field(&mut self) -> ErasedFieldRefMut<'_, u8> {
+    pub fn as_mut_field(&mut self) -> ErasedFieldRefMut<'_, A> {
         let desc = self.descriptor();
         let buffer = self.as_mut_slice();
         unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
     }
 
     #[inline]
-    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<u8> {
+    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<A> {
         let desc = self.descriptor();
         let buffer = ptr::from_mut(self.as_mut_slice());
         unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[u8] {
-        let Self { bytes } = self;
-        bytes.as_slice()
+    pub fn as_slice(&self) -> &[A] {
+        let Self { storage } = self;
+        storage.as_slice()
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
-        let Self { bytes, .. } = self;
-        bytes.as_ptr()
+    pub fn as_ptr(&self) -> *const A {
+        let Self { storage, .. } = self;
+        storage.as_ptr()
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        let Self { bytes } = self;
-        bytes.as_mut_slice()
+    pub fn as_mut_slice(&mut self) -> &mut [A] {
+        let Self { storage } = self;
+        storage.as_mut_slice()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        let Self { bytes, .. } = self;
-        bytes.as_mut_ptr()
+    pub fn as_mut_ptr(&mut self) -> *mut A {
+        let Self { storage, .. } = self;
+        storage.as_mut_ptr()
     }
 }
 
-impl<B> Debug for ErasedField<B>
+impl<T, A> Debug for ErasedField<T, A>
 where
-    B: AlignedStorage<u8> + ?Sized,
+    A: AddressableUnit,
+    T: AlignedStorage<A> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
@@ -255,28 +279,33 @@ where
     }
 }
 
-impl<B> AsRef<[u8]> for ErasedField<B>
+impl<T, A> AsRef<[A]> for ErasedField<T, A>
 where
-    B: AlignedStorage<u8> + ?Sized,
+    A: AddressableUnit,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
-    fn as_ref(&self) -> &[u8] {
+    fn as_ref(&self) -> &[A] {
         self.as_slice()
     }
 }
 
-impl<B> AsMut<[u8]> for ErasedField<B>
+impl<T, A> AsMut<[A]> for ErasedField<T, A>
 where
-    B: AlignedStorage<u8> + ?Sized,
+    A: AddressableUnit,
+    T: AlignedStorage<A> + ?Sized,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
+    fn as_mut(&mut self) -> &mut [A] {
         self.as_mut_slice()
     }
 }
 
 #[inline]
-fn init_bytes_from(dst: &mut [MaybeUninit<u8>], src: &[u8]) -> Result<(), LenMismatchError> {
+fn init_from<T>(dst: &mut [MaybeUninit<T>], src: &[T]) -> Result<(), LenMismatchError>
+where
+    T: Copy,
+{
     let expected = dst.len();
     let len = src.len();
     check_len(len, expected)?;

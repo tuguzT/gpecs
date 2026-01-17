@@ -314,7 +314,7 @@ where
     I::Item: AsRef<FieldDescriptor>,
     T: AlignedStorageFromLayout<u8>,
 {
-    type Item = Result<ErasedField<T>, ErasedFieldFromDescDataError<T, u8>>;
+    type Item = Result<ErasedField<T, u8>, ErasedFieldFromDescDataError<T, u8>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

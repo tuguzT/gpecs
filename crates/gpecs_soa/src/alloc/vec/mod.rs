@@ -20,8 +20,8 @@ use crate::{
         from_raw_parts_mut, range,
     },
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-        SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
+        AllocSoa, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs,
+        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
     },
 };
 
@@ -36,7 +36,7 @@ mod partial_ord;
 
 pub struct SoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     buffer: RawSoaVec<T>,
     len: usize,
@@ -44,7 +44,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     #[inline]
     #[must_use]
@@ -572,7 +572,7 @@ where
         #[expect(clippy::items_after_statements)]
         struct CopyBackGuard<'a, T>
         where
-            T: RawSoa + ?Sized,
+            T: AllocSoa + ?Sized,
         {
             v: &'a mut SoaVec<T>,
             index: usize,
@@ -581,7 +581,7 @@ where
         #[expect(clippy::items_after_statements)]
         impl<T> Drop for CopyBackGuard<'_, T>
         where
-            T: RawSoa + ?Sized,
+            T: AllocSoa + ?Sized,
         {
             fn drop(&mut self) {
                 let Self { ref mut v, index } = *self;
@@ -641,7 +641,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaCloneToUninit + ?Sized,
+    T: AllocSoa + SoaCloneToUninit + ?Sized,
 {
     #[track_caller]
     pub fn extend_from_within<R>(&mut self, src: R)
@@ -674,12 +674,12 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
     pub fn as_slice(&self) -> &SoaSlice<T>
     where
-        T: SoaTrustedFields,
+        T: AllocSoaTrusted,
     {
         self
     }
@@ -687,7 +687,7 @@ where
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut SoaSlice<T>
     where
-        T: SoaTrustedFields,
+        T: AllocSoaTrusted,
     {
         self
     }
@@ -705,7 +705,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: AllocSoaTrusted + SoaCloneToUninit + ?Sized,
 {
     #[track_caller]
     pub fn extend_from_slice(&mut self, other: &SoaSlice<T>) {
@@ -732,7 +732,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaRead,
+    T: AllocSoa + SoaRead,
 {
     #[inline]
     pub fn swap_remove(&mut self, index: usize) -> T {
@@ -752,7 +752,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: SoaWrite,
+    T: AllocSoa + SoaWrite,
 {
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
@@ -771,7 +771,7 @@ where
 
 impl<'a, T> SoaVec<T>
 where
-    T: Soa<'a> + ?Sized,
+    T: AllocSoa + Soa<'a> + ?Sized,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
@@ -836,7 +836,7 @@ where
         #[expect(clippy::items_after_statements)]
         struct BackshiftOnDrop<'a, T>
         where
-            T: Soa<'a> + ?Sized,
+            T: AllocSoa + Soa<'a> + ?Sized,
         {
             v: &'a mut SoaVec<T>,
             processed_len: usize,
@@ -847,7 +847,7 @@ where
         #[expect(clippy::items_after_statements)]
         impl<'a, T> Drop for BackshiftOnDrop<'a, T>
         where
-            T: Soa<'a> + ?Sized,
+            T: AllocSoa + Soa<'a> + ?Sized,
         {
             fn drop(&mut self) {
                 let Self {
@@ -887,7 +887,7 @@ where
             f: &mut F,
             g: &mut BackshiftOnDrop<'a, T>,
         ) where
-            T: Soa<'a> + ?Sized,
+            T: AllocSoa + Soa<'a> + ?Sized,
             F: FnMut(&T::Context, RefsMut<'_, 'a, T>) -> bool,
         {
             while g.processed_len != original_len {
@@ -964,7 +964,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     for<'a> T: Soa<'a>,
 {
     #[inline]
@@ -1070,7 +1070,7 @@ where
 
 impl<T> Debug for SoaVec<T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     for<'a> T: Soa<'a>,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
@@ -1082,7 +1082,7 @@ where
 
 impl<T> Default for SoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     T::Context: Default,
 {
     #[inline]
@@ -1093,7 +1093,7 @@ where
 
 impl<T> AsRef<Self> for SoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -1103,7 +1103,7 @@ where
 
 impl<T> AsRef<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &SoaSlice<T> {
@@ -1113,7 +1113,7 @@ where
 
 impl<T> AsMut<Self> for SoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -1123,7 +1123,7 @@ where
 
 impl<T> AsMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut SoaSlice<T> {
@@ -1133,7 +1133,7 @@ where
 
 impl<T> Borrow<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
     fn borrow(&self) -> &SoaSlice<T> {
@@ -1143,7 +1143,7 @@ where
 
 impl<T> BorrowMut<SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
     fn borrow_mut(&mut self) -> &mut SoaSlice<T> {
@@ -1153,7 +1153,7 @@ where
 
 impl<T> Eq for SoaVec<T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     for<'a> T: Soa<'a>,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
@@ -1161,7 +1161,7 @@ where
 
 impl<T> Ord for SoaVec<T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     for<'a> T: Soa<'a>,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
 {
@@ -1175,7 +1175,7 @@ where
 
 impl<T> Hash for SoaVec<T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     for<'a> T: Soa<'a>,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
 {
@@ -1188,7 +1188,7 @@ where
 
 impl<T> Clone for SoaVec<T>
 where
-    T: SoaCloneToUninit + ?Sized,
+    T: AllocSoa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -1205,7 +1205,7 @@ where
 
 impl<T> Deref for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     type Target = SoaSlice<T>;
 
@@ -1220,7 +1220,7 @@ where
 
 impl<T> DerefMut for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -1233,7 +1233,7 @@ where
 
 impl<T, U, I> Index<I> for SoaVec<T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     U: ?Sized,
     for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
@@ -1248,7 +1248,7 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaVec<T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     U: ?Sized,
     for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelperMut<'ctx, 'a, T, Output = U>,
@@ -1261,7 +1261,7 @@ where
 
 impl<T> Extend<T> for SoaVec<T>
 where
-    T: SoaWrite,
+    T: AllocSoa + SoaWrite,
 {
     #[inline]
     #[track_caller]
@@ -1298,7 +1298,7 @@ where
 
 impl<T> From<Box<SoaSlice<T>>> for SoaVec<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
     fn from(value: Box<SoaSlice<T>>) -> Self {
@@ -1308,7 +1308,7 @@ where
 
 impl<T> From<&SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: AllocSoaTrusted + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -1319,7 +1319,7 @@ where
 
 impl<T> From<&mut SoaSlice<T>> for SoaVec<T>
 where
-    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: AllocSoaTrusted + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -1330,7 +1330,7 @@ where
 
 impl<'a, T> IntoIterator for &'a SoaVec<T>
 where
-    T: Soa<'a> + ?Sized,
+    T: AllocSoa + Soa<'a> + ?Sized,
 {
     type Item = Refs<'a, 'a, T>;
     type IntoIter = Iter<'a, 'a, T>;
@@ -1343,7 +1343,7 @@ where
 
 impl<'a, T> IntoIterator for &'a mut SoaVec<T>
 where
-    T: Soa<'a> + ?Sized,
+    T: AllocSoa + Soa<'a> + ?Sized,
 {
     type Item = RefsMut<'a, 'a, T>;
     type IntoIter = IterMut<'a, 'a, T>;
@@ -1356,7 +1356,7 @@ where
 
 impl<T> IntoIterator for SoaVec<T>
 where
-    T: SoaRead,
+    T: AllocSoa + SoaRead,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;
@@ -1369,7 +1369,7 @@ where
 
 impl<T> FromIterator<T> for SoaVec<T>
 where
-    T: SoaWrite,
+    T: AllocSoa + SoaWrite,
     T::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
@@ -1405,7 +1405,7 @@ where
 
 impl<T> Drop for SoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     fn drop(&mut self) {
         if self.is_empty() {
@@ -1420,7 +1420,7 @@ where
 #[inline]
 fn actual_capacity<T>(context: &T::Context, capacity: usize) -> usize
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     let buffer_layout =
         buffer_layout::<T>(context, capacity).expect("layout size should not exceed `isize::MAX`");

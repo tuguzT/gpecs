@@ -22,7 +22,7 @@ use crate::{
     field::{ErasedField, error::ErasedFieldFromDescDataError},
     soa::{
         field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_layout, buffer_offsets},
-        traits::{RawSoaContext, SoaRead, SoaWrite},
+        traits::{AllocSoa, AllocSoaContext, SoaRead, SoaWrite},
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
@@ -82,7 +82,7 @@ where
         context: &T::Context,
     ) -> Result<T, ErasedSoaIntoValueError<Self>>
     where
-        T: SoaRead,
+        T: AllocSoa + SoaRead,
     {
         let Self {
             ref descriptors,
@@ -187,7 +187,7 @@ where
         value: T,
     ) -> Result<Self, ErasedSoaFromBytesValueError>
     where
-        T: SoaWrite,
+        T: AllocSoa + SoaWrite,
     {
         let descriptors = context
             .field_descriptors()
@@ -220,7 +220,7 @@ where
         value: T,
     ) -> Result<Self, ErasedSoaFromValueError<B, u8>>
     where
-        T: SoaWrite,
+        T: AllocSoa + SoaWrite,
     {
         let descriptors = context
             .field_descriptors()

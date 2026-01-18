@@ -6,8 +6,8 @@ use crate::{
         DenseRefs, DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
     },
     soa::traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, Soa, SoaAsMutRefs, SoaAsRefs,
-        SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
+        AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
+        SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
     },
 };
 
@@ -15,29 +15,6 @@ unsafe impl<K, V> RawSoaContext for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
 {
-    type FieldDescriptors<'a> = DenseFieldDescriptors<'a, K, V>;
-
-    #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short> {
-        from
-    }
-
-    #[inline]
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
-        let context = self.as_inner();
-        DenseFieldDescriptors::new(context)
-    }
-
-    #[inline]
-    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
-        let keys = Layout::array::<K>(capacity)?;
-        let values = self.as_inner().buffer_layout(capacity)?;
-        let (buffer_layout, _) = keys.extend(values)?;
-        Ok(buffer_layout)
-    }
-
     type Ptrs<'a> = DensePtrs<'a, K, V>;
 
     #[inline]
@@ -49,20 +26,6 @@ where
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
         let context = self.as_inner();
         DensePtrs::dangling(context)
-    }
-
-    #[inline]
-    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
-        let context = self.as_inner();
-
-        let keys = unsafe { Layout::array::<K>(capacity).unwrap_unchecked() };
-        let values = unsafe { context.buffer_layout(capacity).unwrap_unchecked() };
-        let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
-
-        let key = buffer.cast();
-        let buffer = unsafe { buffer.add(offset) };
-        let value = unsafe { context.ptrs_from_buffer(buffer, capacity) };
-        DensePtrs::new(key, value)
     }
 
     #[inline]
@@ -86,20 +49,6 @@ where
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
         let context = self.as_inner();
         DenseMutPtrs::dangling(context)
-    }
-
-    #[inline]
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
-        let context = self.as_inner();
-
-        let keys = unsafe { Layout::array::<K>(capacity).unwrap_unchecked() };
-        let values = unsafe { context.buffer_layout(capacity).unwrap_unchecked() };
-        let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
-
-        let key = buffer.cast();
-        let buffer = unsafe { buffer.add(offset) };
-        let value = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
-        DenseMutPtrs::new(key, value)
     }
 
     #[inline]
@@ -265,8 +214,6 @@ where
     type Fields = (K, V::Fields);
 }
 
-unsafe impl<K, V> SoaTrustedFields for DenseItem<K, V> where V: SoaTrustedFields {}
-
 unsafe impl<K, V> SoaCloneToUninit for DenseItem<K, V>
 where
     K: Clone,
@@ -302,10 +249,68 @@ where
     }
 }
 
+unsafe impl<K, V> AllocSoaContext for DenseContext<K, V>
+where
+    V: RawSoa<Context: AllocSoaContext> + ?Sized,
+{
+    type FieldDescriptors<'a> = DenseFieldDescriptors<'a, K, V>;
+
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short> {
+        from
+    }
+
+    #[inline]
+    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+        let context = self.as_inner();
+        DenseFieldDescriptors::new(context)
+    }
+
+    #[inline]
+    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
+        let keys = Layout::array::<K>(capacity)?;
+        let values = self.as_inner().buffer_layout(capacity)?;
+        let (buffer_layout, _) = keys.extend(values)?;
+        Ok(buffer_layout)
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
+        let context = self.as_inner();
+
+        let keys = unsafe { Layout::array::<K>(capacity).unwrap_unchecked() };
+        let values = unsafe { context.buffer_layout(capacity).unwrap_unchecked() };
+        let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
+
+        let key = buffer.cast();
+        let buffer = unsafe { buffer.add(offset) };
+        let value = unsafe { context.ptrs_from_buffer(buffer, capacity) };
+        DensePtrs::new(key, value)
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
+        let context = self.as_inner();
+
+        let keys = unsafe { Layout::array::<K>(capacity).unwrap_unchecked() };
+        let values = unsafe { context.buffer_layout(capacity).unwrap_unchecked() };
+        let (_, offset) = unsafe { keys.extend(values).unwrap_unchecked() };
+
+        let key = buffer.cast();
+        let buffer = unsafe { buffer.add(offset) };
+        let value = unsafe { context.ptrs_from_buffer_mut(buffer, capacity) };
+        DenseMutPtrs::new(key, value)
+    }
+}
+
+unsafe impl<K, V> AllocSoaTrusted for DenseItem<K, V> where V: AllocSoaTrusted {}
+
 unsafe impl<'data, K, V> SoaContext<'data> for DenseContext<K, V>
 where
     K: 'data,
-    V: Soa<'data> + ?Sized,
+    V: RawSoa<Context: SoaContext<'data>> + ?Sized,
 {
     type Refs<'a> = DenseRefs<'a, 'data, K, V>;
 

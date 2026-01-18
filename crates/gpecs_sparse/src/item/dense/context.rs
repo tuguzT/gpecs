@@ -4,7 +4,7 @@ use core::{
     hash::{self, Hash},
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    ptr::NonNull,
+    ptr,
 };
 
 use crate::soa::traits::RawSoa;
@@ -14,8 +14,26 @@ pub struct DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
 {
-    context: V::Context,
     phantom: PhantomData<fn() -> K>,
+    context: V::Context,
+}
+
+impl<K, V> DenseContext<K, V>
+where
+    V: RawSoa + ?Sized,
+    V::Context: Sized,
+{
+    #[inline]
+    pub const fn from_inner(context: V::Context) -> Self {
+        let phantom = PhantomData;
+        Self { phantom, context }
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> V::Context {
+        let Self { context, .. } = self;
+        context
+    }
 }
 
 impl<K, V> DenseContext<K, V>
@@ -23,29 +41,15 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub const fn from_inner(context: V::Context) -> Self {
-        Self {
-            context,
-            phantom: PhantomData,
-        }
-    }
-
-    #[inline]
     pub const fn from_inner_ref(context: &V::Context) -> &Self {
         // SAFETY: Self is `#[repr(transparent)]` over `V::Context`.
-        unsafe { NonNull::from_ref(context).cast().as_ref() }
+        unsafe { &*(ptr::from_ref(context) as *const _) }
     }
 
     #[inline]
     pub const fn from_inner_mut(context: &mut V::Context) -> &mut Self {
         // SAFETY: Self is `#[repr(transparent)]` over `V::Context`.
-        unsafe { NonNull::from_mut(context).cast().as_mut() }
-    }
-
-    #[inline]
-    pub fn into_inner(self) -> V::Context {
-        let Self { context, .. } = self;
-        context
+        unsafe { &mut *(ptr::from_mut(context) as *mut _) }
     }
 
     #[inline]
@@ -68,7 +72,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { context, .. } = self;
-        f.debug_tuple("DenseContext").field(context).finish()
+        f.debug_tuple("DenseContext").field(&context).finish()
     }
 }
 

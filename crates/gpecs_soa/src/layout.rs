@@ -3,14 +3,14 @@ use core::{
     mem::{ManuallyDrop, MaybeUninit, offset_of},
 };
 
-use crate::traits::{RawSoa, RawSoaContext};
+use crate::traits::{AllocSoa, AllocSoaContext};
 
 /// Special type which is used to properly allocate a buffer in memory
 /// with respect to the size and alignment of
-/// [`Fields`](RawSoa::Fields) and [`Context`](RawSoa::Context) associated types.
+/// [`Fields`](crate::traits::RawSoa::Fields) and [`Context`](crate::traits::RawSoa::Context) associated types.
 pub union BufferData<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     _align: ManuallyDrop<BufferAlign<T>>,
     _fields: ManuallyDrop<MaybeUninit<T::Fields>>,
@@ -20,7 +20,7 @@ where
 #[repr(C)]
 pub struct BufferPrefix<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     _align: BufferAlign<T>,
     pub context: T::Context,
@@ -31,7 +31,7 @@ where
 #[inline]
 pub fn is_zst<T>(context: &T::Context) -> bool
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     let packed_size = context
         .field_descriptors()
@@ -44,7 +44,7 @@ where
 #[inline]
 pub fn is_context_zst<T>() -> bool
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     size_of::<T::Context>() == 0
 }
@@ -52,7 +52,7 @@ where
 #[inline]
 pub fn should_allocate<T>(context: &T::Context, capacity: usize) -> bool
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>(context) || capacity == 0);
     !should_not_allocate
@@ -61,7 +61,7 @@ where
 #[inline]
 pub fn buffer_layout<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
         if is_context_zst::<T>() {
@@ -87,7 +87,7 @@ where
 #[cfg_attr(not(feature = "alloc"), expect(dead_code))]
 pub fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     let size_of_prefix = size_of::<BufferPrefix<T>>();
     if is_zst::<T>(context) || buffer_layout.size() < size_of_prefix {
@@ -106,7 +106,7 @@ where
 #[repr(C)]
 struct BufferAlign<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     _fields: [T::Fields; 0],
     _context: [T::Context; 0],
@@ -118,7 +118,7 @@ const _: () = {
     #[cfg_attr(coverage_nightly, coverage(off))]
     const fn assert_safety_preconditions<T>()
     where
-        T: RawSoa + ?Sized,
+        T: AllocSoa + ?Sized,
     {
         assert!(
             size_of::<BufferAlign<T>>() == 0,
@@ -143,7 +143,7 @@ const _: () = {
 #[inline]
 fn buffer_layout_not_padded<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     if is_zst::<T>(context) || capacity == 0 {
         if is_context_zst::<T>() {
@@ -162,7 +162,7 @@ where
 #[inline]
 fn capacity_from_not_padded<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     let size_of_prefix = size_of::<BufferPrefix<T>>();
     if is_zst::<T>(context) || buffer_layout.size() < size_of_prefix {

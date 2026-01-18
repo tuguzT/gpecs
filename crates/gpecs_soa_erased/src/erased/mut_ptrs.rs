@@ -14,7 +14,7 @@ use crate::{
     field::{ErasedFieldMutPtr, ErasedFieldPtr},
     soa::{
         field::{FieldDescriptor, buffer_layout},
-        traits::{MutPtrs, RawSoa, RawSoaContext},
+        traits::{AllocSoa, AllocSoaContext, MutPtrs, RawSoaContext},
     },
 };
 
@@ -150,7 +150,7 @@ where
         context: &T::Context,
     ) -> Result<MutPtrs<'_, T>, ErasedSoaIntoValueError<Self>>
     where
-        T: RawSoa + ?Sized,
+        T: AllocSoa + ?Sized,
     {
         let Self {
             ref descriptors,

@@ -13,7 +13,7 @@ use crate::{
     field::ErasedFieldRef,
     soa::{
         field::FieldDescriptor,
-        traits::{Refs, Soa, SoaContext},
+        traits::{AllocSoa, Refs, Soa, SoaContext},
     },
 };
 
@@ -81,7 +81,7 @@ where
         context: &T::Context,
     ) -> Result<Refs<'_, 'a, T>, ErasedSoaIntoValueError<Self>>
     where
-        T: Soa<'a> + ?Sized,
+        T: AllocSoa + Soa<'a> + ?Sized,
     {
         let Self { ptrs, .. } = self;
 

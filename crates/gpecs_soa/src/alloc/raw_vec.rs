@@ -15,7 +15,7 @@ use crate::{
     layout::{BufferData, buffer_layout, capacity_from, is_zst, should_allocate},
     ptr::{BufferDataPtr, BufferDataPtrMut, ptrs_from_buffer_mut, slice_from_raw_parts_mut},
     slice::SoaSlice,
-    traits::{MutPtrs, NonNullPtrs, RawSoa, RawSoaContext, SoaTrustedFields},
+    traits::{AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, NonNullPtrs, RawSoaContext},
 };
 
 use self::TryReserveErrorKind::{AllocError, CapacityOverflow};
@@ -93,7 +93,7 @@ enum AllocInit {
 
 pub struct RawSoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     ptr: NonNull<BufferData<T>>,
     capacity: usize,
@@ -101,7 +101,7 @@ where
 
 impl<T> RawSoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     // Tiny Vecs are dumb. Skip to:
     // - 8 if the element size is 1, because any heap allocators is likely
@@ -229,7 +229,7 @@ where
     #[must_use]
     pub unsafe fn into_box(self, len: usize) -> Box<SoaSlice<T>>
     where
-        T: SoaTrustedFields,
+        T: AllocSoaTrusted,
     {
         debug_assert!(
             len <= self.capacity(),
@@ -326,7 +326,7 @@ where
         #[cold]
         fn do_reserve_and_handle<T>(this: &mut RawSoaVec<T>, len: usize, additional: usize)
         where
-            T: RawSoa + ?Sized,
+            T: AllocSoa + ?Sized,
         {
             if let Err(err) = this.grow_amortized(len, additional) {
                 handle_error(err);
@@ -471,7 +471,7 @@ where
 
 impl<T> Drop for RawSoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     #[inline]
     fn drop(&mut self) {
@@ -481,7 +481,7 @@ where
 
 unsafe impl<T> Send for RawSoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     T::Context: Send,
     T::Fields: Send,
 {
@@ -489,7 +489,7 @@ where
 
 unsafe impl<T> Sync for RawSoaVec<T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {

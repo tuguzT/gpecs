@@ -7,16 +7,16 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::traits::{RawSoa, RawSoaContext};
+use crate::traits::{AllocSoa, AllocSoaContext};
 
 type Inner<'ctx, T> = crate::traits::FieldDescriptors<'ctx, T>;
 
-/// Type wrapper for [field descriptors](RawSoaContext::FieldDescriptors)
+/// Type wrapper for [field descriptors](AllocSoaContext::FieldDescriptors)
 /// which is covariant over generic lifetime.
 #[repr(transparent)]
 pub struct FieldDescriptors<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     inner: Inner<'static, T>,
     phantom: PhantomData<&'ctx ()>,
@@ -24,9 +24,9 @@ where
 
 impl<'ctx, T> FieldDescriptors<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
-    /// Creates self from the [field descriptors](RawSoaContext::FieldDescriptors).
+    /// Creates self from the [field descriptors](AllocSoaContext::FieldDescriptors).
     #[inline]
     pub fn new(inner: Inner<'ctx, T>) -> Self {
         Self {
@@ -35,21 +35,21 @@ where
         }
     }
 
-    /// Retrieves a reference of [field descriptors](RawSoaContext::FieldDescriptors).
+    /// Retrieves a reference of [field descriptors](AllocSoaContext::FieldDescriptors).
     #[inline]
     pub fn as_inner(&self) -> &Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_ref(inner).cast().as_ref() }
     }
 
-    /// Retrieves a mutable reference of [field descriptors](RawSoaContext::FieldDescriptors).
+    /// Retrieves a mutable reference of [field descriptors](AllocSoaContext::FieldDescriptors).
     #[inline]
     pub fn as_inner_mut(&mut self) -> &mut Inner<'_, T> {
         let Self { inner, .. } = self;
         unsafe { NonNull::from_mut(inner).cast().as_mut() }
     }
 
-    /// Retrieves the [field descriptors](RawSoaContext::FieldDescriptors).
+    /// Retrieves the [field descriptors](AllocSoaContext::FieldDescriptors).
     #[inline]
     pub fn into_inner(self) -> Inner<'ctx, T> {
         let Self { inner, .. } = self;
@@ -59,7 +59,7 @@ where
 
 impl<T> Debug for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -70,7 +70,7 @@ where
 
 impl<T> Default for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: Default,
 {
     fn default() -> Self {
@@ -83,7 +83,7 @@ where
 
 impl<T> Clone for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: Clone,
 {
     fn clone(&self) -> Self {
@@ -95,14 +95,14 @@ where
 
 impl<T> Copy for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: Copy,
 {
 }
 
 impl<T> PartialEq for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -113,14 +113,14 @@ where
 
 impl<T> Eq for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: Eq,
 {
 }
 
 impl<T> PartialOrd for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -135,7 +135,7 @@ where
 
 impl<T> Ord for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -150,7 +150,7 @@ where
 
 impl<T> Hash for FieldDescriptors<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     for<'ctx> Inner<'ctx, T>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -162,7 +162,7 @@ where
 
 impl<'ctx, T> IntoIterator for FieldDescriptors<'ctx, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     type Item = <Inner<'ctx, T> as IntoIterator>::Item;
     type IntoIter = <Inner<'ctx, T> as IntoIterator>::IntoIter;

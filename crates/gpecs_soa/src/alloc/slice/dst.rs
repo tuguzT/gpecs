@@ -3,13 +3,13 @@ use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
     slice::{Iter, IterMut, SoaSlice},
-    traits::{Refs, RefsMut, Soa, SoaCloneToUninit, SoaRead, SoaTrustedFields},
+    traits::{AllocSoaTrusted, Refs, RefsMut, Soa, SoaCloneToUninit, SoaRead},
     vec::{IntoIter, SoaVec},
 };
 
 impl<T> SoaSlice<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
 {
     #[inline]
     #[must_use]
@@ -23,7 +23,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: SoaTrustedFields + ?Sized,
+    T: AllocSoaTrusted + ?Sized,
     for<'a> T: Soa<'a>,
 {
     #[inline]
@@ -129,7 +129,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: AllocSoaTrusted + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -140,7 +140,7 @@ where
 
 impl<T> ToOwned for SoaSlice<T>
 where
-    T: SoaTrustedFields + SoaCloneToUninit + ?Sized,
+    T: AllocSoaTrusted + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     type Owned = SoaVec<T>;
@@ -162,7 +162,7 @@ where
 
 impl<'a, T> IntoIterator for &'a Box<SoaSlice<T>>
 where
-    T: Soa<'a> + SoaTrustedFields + ?Sized,
+    T: Soa<'a> + AllocSoaTrusted + ?Sized,
 {
     type Item = Refs<'a, 'a, T>;
     type IntoIter = Iter<'a, 'a, T>;
@@ -175,7 +175,7 @@ where
 
 impl<'a, T> IntoIterator for &'a mut Box<SoaSlice<T>>
 where
-    T: Soa<'a> + SoaTrustedFields + ?Sized,
+    T: Soa<'a> + AllocSoaTrusted + ?Sized,
 {
     type Item = RefsMut<'a, 'a, T>;
     type IntoIter = IterMut<'a, 'a, T>;
@@ -188,7 +188,7 @@ where
 
 impl<T> IntoIterator for Box<SoaSlice<T>>
 where
-    T: SoaTrustedFields + SoaRead,
+    T: AllocSoaTrusted + SoaRead,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;

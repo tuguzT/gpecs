@@ -1,6 +1,6 @@
 use crate::{
     slice::{SoaSlice, SoaSlices, SoaSlicesMut},
-    traits::SoaTrustedFields,
+    traits::AllocSoaTrusted,
 };
 
 // Slightly modified version of one from crate `alloc`: src/vec/partial_eq.rs
@@ -27,20 +27,20 @@ pub(crate) use partial_ord_impl;
 
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, Self }
 partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaSlicesMut<'_, '_, T> }
-partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaSlice<T> where T: SoaTrustedFields }
-partial_ord_impl! { [] SoaSlices<'_, '_, T>, &SoaSlice<T> where T: SoaTrustedFields }
-partial_ord_impl! { [] SoaSlices<'_, '_, T>, &mut SoaSlice<T> where T: SoaTrustedFields }
+partial_ord_impl! { [] SoaSlices<'_, '_, T>, SoaSlice<T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] SoaSlices<'_, '_, T>, &SoaSlice<T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] SoaSlices<'_, '_, T>, &mut SoaSlice<T> where T: AllocSoaTrusted }
 
 partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, Self }
 partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlices<'_, '_, T> }
-partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlice<T> where T: SoaTrustedFields }
-partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, &SoaSlice<T> where T: SoaTrustedFields }
-partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, &mut SoaSlice<T> where T: SoaTrustedFields }
+partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, SoaSlice<T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, &SoaSlice<T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] SoaSlicesMut<'_, '_, T>, &mut SoaSlice<T> where T: AllocSoaTrusted }
 
-partial_ord_impl! { [] SoaSlice<T>, Self where T: SoaTrustedFields }
-partial_ord_impl! { [] SoaSlice<T>, SoaSlices<'_, '_, T> where T: SoaTrustedFields }
-partial_ord_impl! { [] SoaSlice<T>, SoaSlicesMut<'_, '_, T> where T: SoaTrustedFields }
-partial_ord_impl! { [] &SoaSlice<T>, SoaSlices<'_, '_, T> where T: SoaTrustedFields }
-partial_ord_impl! { [] &SoaSlice<T>, SoaSlicesMut<'_, '_, T> where T: SoaTrustedFields }
-partial_ord_impl! { [] &mut SoaSlice<T>, SoaSlices<'_, '_, T> where T: SoaTrustedFields }
-partial_ord_impl! { [] &mut SoaSlice<T>, SoaSlicesMut<'_, '_, T> where T: SoaTrustedFields }
+partial_ord_impl! { [] SoaSlice<T>, Self where T: AllocSoaTrusted }
+partial_ord_impl! { [] SoaSlice<T>, SoaSlices<'_, '_, T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] SoaSlice<T>, SoaSlicesMut<'_, '_, T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] &SoaSlice<T>, SoaSlices<'_, '_, T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] &SoaSlice<T>, SoaSlicesMut<'_, '_, T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] &mut SoaSlice<T>, SoaSlices<'_, '_, T> where T: AllocSoaTrusted }
+partial_ord_impl! { [] &mut SoaSlice<T>, SoaSlicesMut<'_, '_, T> where T: AllocSoaTrusted }

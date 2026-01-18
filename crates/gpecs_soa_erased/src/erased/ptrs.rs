@@ -14,10 +14,11 @@ use crate::{
     field::ErasedFieldPtr,
     soa::{
         field::{FieldDescriptor, buffer_layout},
-        traits::{Ptrs, RawSoa, RawSoaContext},
+        traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext},
     },
 };
 
+// TODO: add support for addressible units other than u8
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedSoaPtrs<D>
 where
@@ -145,7 +146,7 @@ where
         context: &T::Context,
     ) -> Result<Ptrs<'_, T>, ErasedSoaIntoValueError<Self>>
     where
-        T: RawSoa + ?Sized,
+        T: AllocSoa + ?Sized,
     {
         let Self {
             ref descriptors,

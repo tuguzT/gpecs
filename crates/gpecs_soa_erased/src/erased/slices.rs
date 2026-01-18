@@ -13,7 +13,7 @@ use crate::{
     field::ErasedFieldSlice,
     soa::{
         field::FieldDescriptor,
-        traits::{Slices, Soa, SoaContext},
+        traits::{AllocSoa, Slices, Soa, SoaContext},
     },
 };
 
@@ -84,7 +84,7 @@ where
         context: &T::Context,
     ) -> Result<Slices<'_, 'a, T>, ErasedSoaIntoValueError<Self>>
     where
-        T: Soa<'a> + ?Sized,
+        T: AllocSoa + Soa<'a> + ?Sized,
     {
         let Self { ptrs, .. } = self;
 

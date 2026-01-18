@@ -12,8 +12,8 @@ use crate::{
     field::FieldDescriptor,
     ptr::assert_ptr_is_aligned,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs,
-        SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
+        AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
+        SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
     },
 };
 
@@ -145,31 +145,6 @@ macro_rules! soa_tuple_impl {
         }
 
         unsafe impl<$($types,)*> RawSoaContext for TupleContext<($($types,)*)> {
-            type FieldDescriptors<'a> = [FieldDescriptor; count_idents!($($types,)*)];
-
-            #[inline]
-            fn upcast_field_descriptors<'short, 'long: 'short>(
-                from: Self::FieldDescriptors<'long>,
-            ) -> Self::FieldDescriptors<'short> {
-                from
-            }
-
-            #[inline]
-            fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
-                Self::FIELD_DESCRIPTORS
-            }
-
-            #[inline]
-            fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
-                let permutation = Self::PERMUTATION;
-
-                let mut layout = Layout::new::<()>();
-                let regions = [$(Layout::array::<$types>(capacity)?,)*];
-                $((layout, _) = layout.extend(regions[permutation[$indices]])?;)*
-
-                Ok(layout)
-            }
-
             type Ptrs<'a> = ($(*const $types,)*);
 
             #[inline]
@@ -180,22 +155,6 @@ macro_rules! soa_tuple_impl {
             #[inline]
             fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
                 let ptrs = ($(ptr::dangling::<$types>(),)*);
-                ptrs
-            }
-
-            #[inline]
-            unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
-                let permutation = Self::PERMUTATION;
-
-                let mut layout = Layout::new::<()>();
-                let mut offsets = [0; count_idents!($($types,)*)];
-
-                let regions = unsafe { [$(Layout::array::<$types>(capacity).unwrap_unchecked(),)*] };
-                $((layout, offsets[permutation[$indices]]) = unsafe { layout.extend(regions[permutation[$indices]]).unwrap_unchecked() };)*
-                let _ = layout;
-
-                let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
-                $(assert_ptr_is_aligned(ptrs.$indices);)*
                 ptrs
             }
 
@@ -222,22 +181,6 @@ macro_rules! soa_tuple_impl {
             #[inline]
             fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
                 let ptrs = ($(ptr::dangling_mut::<$types>(),)*);
-                ptrs
-            }
-
-            #[inline]
-            unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
-                let permutation = Self::PERMUTATION;
-
-                let mut layout = Layout::new::<()>();
-                let mut offsets = [0; count_idents!($($types,)*)];
-
-                let regions = unsafe { [$(Layout::array::<$types>(capacity).unwrap_unchecked(),)*] };
-                $((layout, offsets[permutation[$indices]]) = unsafe { layout.extend(regions[permutation[$indices]]).unwrap_unchecked() };)*
-                let _ = layout;
-
-                let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
-                $(assert_ptr_is_aligned(ptrs.$indices);)*
                 ptrs
             }
 
@@ -434,8 +377,6 @@ macro_rules! soa_tuple_impl {
             type Fields = ($($types,)*);
         }
 
-        unsafe impl<$($types,)*> SoaTrustedFields for ($($types,)*) {}
-
         unsafe impl<$($types,)*> SoaCloneToUninit for ($($types,)*)
         where
             $($types: Clone,)*
@@ -464,6 +405,67 @@ macro_rules! soa_tuple_impl {
                 unsafe { $(ptr::write(dst.$indices, value.$indices);)* }
             }
         }
+
+        unsafe impl<$($types,)*> AllocSoaContext for TupleContext<($($types,)*)> {
+            type FieldDescriptors<'a> = [FieldDescriptor; count_idents!($($types,)*)];
+
+            #[inline]
+            fn upcast_field_descriptors<'short, 'long: 'short>(
+                from: Self::FieldDescriptors<'long>,
+            ) -> Self::FieldDescriptors<'short> {
+                from
+            }
+
+            #[inline]
+            fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+                Self::FIELD_DESCRIPTORS
+            }
+
+            #[inline]
+            fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
+                let permutation = Self::PERMUTATION;
+
+                let mut layout = Layout::new::<()>();
+                let regions = [$(Layout::array::<$types>(capacity)?,)*];
+                $((layout, _) = layout.extend(regions[permutation[$indices]])?;)*
+
+                Ok(layout)
+            }
+
+            #[inline]
+            unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
+                let permutation = Self::PERMUTATION;
+
+                let mut layout = Layout::new::<()>();
+                let mut offsets = [0; count_idents!($($types,)*)];
+
+                let regions = unsafe { [$(Layout::array::<$types>(capacity).unwrap_unchecked(),)*] };
+                $((layout, offsets[permutation[$indices]]) = unsafe { layout.extend(regions[permutation[$indices]]).unwrap_unchecked() };)*
+                let _ = layout;
+
+                let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
+                $(assert_ptr_is_aligned(ptrs.$indices);)*
+                ptrs
+            }
+
+            #[inline]
+            unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
+                let permutation = Self::PERMUTATION;
+
+                let mut layout = Layout::new::<()>();
+                let mut offsets = [0; count_idents!($($types,)*)];
+
+                let regions = unsafe { [$(Layout::array::<$types>(capacity).unwrap_unchecked(),)*] };
+                $((layout, offsets[permutation[$indices]]) = unsafe { layout.extend(regions[permutation[$indices]]).unwrap_unchecked() };)*
+                let _ = layout;
+
+                let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
+                $(assert_ptr_is_aligned(ptrs.$indices);)*
+                ptrs
+            }
+        }
+
+        unsafe impl<$($types,)*> AllocSoaTrusted for ($($types,)*) {}
 
         unsafe impl<'data, $($types,)*> SoaContext<'data> for TupleContext<($($types,)*)>
         where

@@ -14,8 +14,8 @@ use crate::{
     field::FieldDescriptor,
     ptr::assert_ptr_is_aligned,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs,
-        SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
+        AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
+        SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
     },
 };
 
@@ -316,33 +316,6 @@ impl<T> Hash for IdentityContext<T> {
 }
 
 unsafe impl<T> RawSoaContext for IdentityContext<T> {
-    type FieldDescriptors<'a> = [FieldDescriptor; 1];
-
-    #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short> {
-        from
-    }
-
-    #[inline]
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
-        [FieldDescriptor::of::<T>()]
-    }
-
-    #[inline]
-    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
-        Layout::array::<T>(capacity)
-    }
-
-    #[inline]
-    fn capacity_from(&self, buffer_layout: Layout) -> usize {
-        buffer_layout
-            .size()
-            .checked_div(size_of::<T>())
-            .unwrap_or(usize::MAX)
-    }
-
     type Ptrs<'a> = *const Identity<T>;
 
     #[inline]
@@ -353,13 +326,6 @@ unsafe impl<T> RawSoaContext for IdentityContext<T> {
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
         ptr::dangling()
-    }
-
-    #[inline]
-    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, _capacity: usize) -> Self::Ptrs<'_> {
-        let ptrs = buffer.cast();
-        assert_ptr_is_aligned(ptrs);
-        ptrs
     }
 
     #[inline]
@@ -382,13 +348,6 @@ unsafe impl<T> RawSoaContext for IdentityContext<T> {
     #[inline]
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
-    }
-
-    #[inline]
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, _capacity: usize) -> Self::MutPtrs<'_> {
-        let ptrs = buffer.cast();
-        assert_ptr_is_aligned(ptrs);
-        ptrs
     }
 
     #[inline]
@@ -545,8 +504,6 @@ unsafe impl<T> RawSoa for Identity<T> {
     type Fields = Identity<T>;
 }
 
-unsafe impl<T> SoaTrustedFields for Identity<T> {}
-
 unsafe impl<T> SoaCloneToUninit for Identity<T>
 where
     T: Clone,
@@ -575,6 +532,51 @@ unsafe impl<T> SoaWrite for Identity<T> {
         unsafe { ptr::write(dst, value) }
     }
 }
+
+unsafe impl<T> AllocSoaContext for IdentityContext<T> {
+    type FieldDescriptors<'a> = [FieldDescriptor; 1];
+
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short> {
+        from
+    }
+
+    #[inline]
+    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+        [FieldDescriptor::of::<T>()]
+    }
+
+    #[inline]
+    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
+        Layout::array::<T>(capacity)
+    }
+
+    #[inline]
+    fn capacity_from(&self, buffer_layout: Layout) -> usize {
+        buffer_layout
+            .size()
+            .checked_div(size_of::<T>())
+            .unwrap_or(usize::MAX)
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, _capacity: usize) -> Self::Ptrs<'_> {
+        let ptrs = buffer.cast();
+        assert_ptr_is_aligned(ptrs);
+        ptrs
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, _capacity: usize) -> Self::MutPtrs<'_> {
+        let ptrs = buffer.cast();
+        assert_ptr_is_aligned(ptrs);
+        ptrs
+    }
+}
+
+unsafe impl<T> AllocSoaTrusted for Identity<T> {}
 
 unsafe impl<'data, T> SoaContext<'data> for IdentityContext<T>
 where

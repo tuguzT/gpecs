@@ -6,13 +6,13 @@ use core::{
 
 use crate::soa::{
     field::{CopiedFieldDescriptors, FieldDescriptor},
-    traits::{FieldDescriptors, RawSoa, RawSoaContext},
+    traits::{AllocSoa, AllocSoaContext, FieldDescriptors},
     wrapper,
 };
 
 pub struct DenseFieldDescriptors<'ctx, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     key: FieldDescriptor,
     values: wrapper::FieldDescriptors<'ctx, V>,
@@ -21,7 +21,7 @@ where
 
 impl<'ctx, K, V> DenseFieldDescriptors<'ctx, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     #[inline]
     pub fn new(context: &'ctx V::Context) -> Self {
@@ -41,7 +41,7 @@ where
 
 impl<K, V> Debug for DenseFieldDescriptors<'_, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     for<'ctx> FieldDescriptors<'ctx, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -55,7 +55,7 @@ where
 
 impl<K, V> Clone for DenseFieldDescriptors<'_, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     for<'ctx> FieldDescriptors<'ctx, V>: Clone,
 {
     fn clone(&self) -> Self {
@@ -74,14 +74,14 @@ where
 
 impl<K, V> Copy for DenseFieldDescriptors<'_, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     for<'ctx> FieldDescriptors<'ctx, V>: Copy,
 {
 }
 
 impl<'ctx, K, V> IntoIterator for DenseFieldDescriptors<'ctx, K, V>
 where
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     type Item = FieldDescriptor;
 

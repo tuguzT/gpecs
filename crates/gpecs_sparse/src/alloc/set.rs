@@ -29,7 +29,7 @@ use crate::{
     soa::{
         self,
         traits::{
-            MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
+            AllocSoa, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
             SlicesMut, Soa, SoaContext, SoaRead, SoaWrite,
         },
         vec::SoaVec,
@@ -49,7 +49,7 @@ pub type SparseSet<T> = EpochSparseSet<usize, T>;
 pub struct EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     dense: SoaVec<DenseItem<K, V>>,
     sparse: Vec<SparseItem<K>>,
@@ -58,7 +58,7 @@ where
 impl<K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     #[inline]
     #[must_use]
@@ -1119,7 +1119,7 @@ where
 impl<'a, K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: Soa<'a> + ?Sized,
+    V: AllocSoa + Soa<'a> + ?Sized,
 {
     #[inline]
     pub fn as_slices(&'a self) -> (DenseSlices<'a, 'a, K, V>, &'a [SparseItem<K>]) {
@@ -1369,7 +1369,7 @@ where
 impl<K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: ?Sized,
+    V: AllocSoa + ?Sized,
     for<'a> V: Soa<'a>,
 {
     pub fn retain<F>(&mut self, mut f: F)
@@ -1483,7 +1483,7 @@ where
 impl<K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: SoaRead,
+    V: AllocSoa + SoaRead,
 {
     #[inline]
     pub fn swap_remove(&mut self, key: K) -> Option<V> {
@@ -1516,7 +1516,7 @@ where
 impl<K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: SoaWrite,
+    V: AllocSoa + SoaWrite,
 {
     #[inline]
     #[track_caller]
@@ -1540,7 +1540,7 @@ where
 impl<K, V> EpochSparseSet<K, V>
 where
     K: Key,
-    V: SoaRead + SoaWrite,
+    V: AllocSoa + SoaRead + SoaWrite,
 {
     #[inline]
     #[track_caller]
@@ -1569,7 +1569,7 @@ where
 impl<K, V> Debug for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     SparseItem<K>: Debug,
     SoaVec<DenseItem<K, V>>: Debug,
 {
@@ -1585,7 +1585,7 @@ where
 impl<K, V> Default for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     V::Context: Default,
 {
     fn default() -> Self {
@@ -1596,7 +1596,7 @@ where
 impl<K, V> PartialEq for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     SoaVec<DenseItem<K, V>>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -1608,7 +1608,7 @@ where
 impl<K, V> Eq for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     SoaVec<DenseItem<K, V>>: Eq,
 {
 }
@@ -1616,7 +1616,7 @@ where
 impl<K, V> PartialOrd for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     SoaVec<DenseItem<K, V>>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -1633,7 +1633,7 @@ where
 impl<K, V> Ord for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     SoaVec<DenseItem<K, V>>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -1650,7 +1650,7 @@ where
 impl<K, V> Hash for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     SparseItem<K>: Hash,
     SoaVec<DenseItem<K, V>>: Hash,
 {
@@ -1665,7 +1665,7 @@ where
 impl<K, V> Clone for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     SoaVec<DenseItem<K, V>>: Clone,
 {
     fn clone(&self) -> Self {
@@ -1691,7 +1691,7 @@ where
 impl<T, K, V> Index<K> for EpochSparseSet<K, V>
 where
     K: Key + Debug,
-    V: ?Sized,
+    V: AllocSoa + ?Sized,
     for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, Refs<'ctx> = &'a T>>,
 {
     type Output = T;
@@ -1705,7 +1705,7 @@ where
 impl<T, K, V> IndexMut<K> for EpochSparseSet<K, V>
 where
     K: Key + Debug,
-    V: ?Sized,
+    V: AllocSoa + ?Sized,
     for<'ctx, 'a> V:
         Soa<'a, Context: SoaContext<'a, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>>,
 {
@@ -1718,7 +1718,7 @@ where
 impl<T, K, V> AsRef<[T]> for EpochSparseSet<K, V>
 where
     K: Key,
-    V: ?Sized,
+    V: AllocSoa + ?Sized,
     for<'a> V: Soa<'a>,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
@@ -1731,7 +1731,7 @@ where
 impl<T, K, V> AsMut<[T]> for EpochSparseSet<K, V>
 where
     K: Key,
-    V: ?Sized,
+    V: AllocSoa + ?Sized,
     for<'a> V: Soa<'a>,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
 {
@@ -1744,7 +1744,7 @@ where
 impl<K, V> AsRef<Self> for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     #[inline]
     fn as_ref(&self) -> &Self {
@@ -1755,7 +1755,7 @@ where
 impl<K, V> AsMut<Self> for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
@@ -1766,7 +1766,7 @@ where
 impl<'a, K, V> IntoIterator for &'a EpochSparseSet<K, V>
 where
     K: Key,
-    V: Soa<'a> + ?Sized,
+    V: AllocSoa + Soa<'a> + ?Sized,
 {
     type Item = (&'a K, Refs<'a, 'a, V>);
     type IntoIter = Iter<'a, 'a, K, V>;
@@ -1780,7 +1780,7 @@ where
 impl<'a, K, V> IntoIterator for &'a mut EpochSparseSet<K, V>
 where
     K: Key,
-    V: Soa<'a> + ?Sized,
+    V: AllocSoa + Soa<'a> + ?Sized,
 {
     type Item = (&'a K, RefsMut<'a, 'a, V>);
     type IntoIter = IterMut<'a, 'a, K, V>;
@@ -1794,7 +1794,7 @@ where
 impl<K, V> IntoIterator for EpochSparseSet<K, V>
 where
     K: Key,
-    V: SoaRead,
+    V: AllocSoa + SoaRead,
 {
     type Item = (K, V);
     type IntoIter = IntoIter<K, V>;
@@ -1809,7 +1809,7 @@ where
 impl<K, V> FromIterator<DenseItem<K, V>> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: AllocSoa + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = DenseItem<K, V>>>(iter: I) -> Self {
@@ -1833,7 +1833,7 @@ where
 impl<K, V> FromIterator<(K, V)> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: AllocSoa + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
@@ -1844,7 +1844,7 @@ where
 impl<K, V> FromIterator<V> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: AllocSoa + SoaWrite,
     V::Context: Default,
 {
     fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
@@ -1869,7 +1869,7 @@ where
 impl<K, V> Extend<DenseItem<K, V>> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: AllocSoa + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = DenseItem<K, V>>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
@@ -1888,7 +1888,7 @@ where
 impl<K, V> Extend<(K, V)> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: AllocSoa + SoaWrite,
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         self.extend(iter.into_iter().map(DenseItem::from));
@@ -1898,7 +1898,7 @@ where
 impl<K, V> Extend<V> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: SoaWrite,
+    V: AllocSoa + SoaWrite,
 {
     // I could have used `push_from` instead of `insert_from` by key, but in that case
     // it would search for a vacant sparse item multiple times from the beginning of a sparse
@@ -1927,7 +1927,7 @@ where
 impl<K, V> From<arena::EpochSparseArena<K, V>> for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     #[inline]
     fn from(value: arena::EpochSparseArena<K, V>) -> Self {

@@ -8,14 +8,14 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, range},
-    traits::{Ptrs, RawSoa, RawSoaContext, SlicePtrs, Slices, Soa, SoaRead},
+    traits::{AllocSoa, Ptrs, RawSoaContext, SlicePtrs, Slices, Soa, SoaRead},
 };
 
 use super::SoaVec;
 
 pub struct Drain<'a, T>
 where
-    T: RawSoa + ?Sized + 'a,
+    T: AllocSoa + ?Sized + 'a,
 {
     /// Index of tail to preserve
     tail_start: usize,
@@ -28,7 +28,7 @@ where
 
 impl<'a, T> Drain<'a, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     #[inline]
     #[track_caller]
@@ -110,7 +110,7 @@ where
 
 impl<'a, T> Drain<'_, T>
 where
-    T: Soa<'a> + ?Sized,
+    T: AllocSoa + Soa<'a> + ?Sized,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
@@ -127,7 +127,7 @@ where
 
 unsafe impl<T> Send for Drain<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     T::Context: Send,
     T::Fields: Send,
 {
@@ -135,7 +135,7 @@ where
 
 unsafe impl<T> Sync for Drain<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
 {
@@ -143,7 +143,7 @@ where
 
 impl<T, U> AsRef<[U]> for Drain<'_, T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     for<'a> T: Soa<'a>,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
@@ -154,7 +154,7 @@ where
 
 impl<T> Debug for Drain<'_, T>
 where
-    T: ?Sized,
+    T: AllocSoa + ?Sized,
     for<'a> T: Soa<'a>,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
@@ -166,7 +166,7 @@ where
 
 impl<T> Iterator for Drain<'_, T>
 where
-    T: SoaRead,
+    T: AllocSoa + SoaRead,
 {
     type Item = T;
 
@@ -189,7 +189,7 @@ where
 
 impl<T> DoubleEndedIterator for Drain<'_, T>
 where
-    T: SoaRead,
+    T: AllocSoa + SoaRead,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -204,7 +204,7 @@ where
 
 impl<T> ExactSizeIterator for Drain<'_, T>
 where
-    T: SoaRead,
+    T: AllocSoa + SoaRead,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -212,21 +212,21 @@ where
     }
 }
 
-impl<T> FusedIterator for Drain<'_, T> where T: SoaRead {}
+impl<T> FusedIterator for Drain<'_, T> where T: AllocSoa + SoaRead {}
 
 impl<T> Drop for Drain<'_, T>
 where
-    T: RawSoa + ?Sized,
+    T: AllocSoa + ?Sized,
 {
     fn drop(&mut self) {
         /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
         struct DropGuard<'r, 'a, T>(&'r mut Drain<'a, T>)
         where
-            T: RawSoa + ?Sized;
+            T: AllocSoa + ?Sized;
 
         impl<T> Drop for DropGuard<'_, '_, T>
         where
-            T: RawSoa + ?Sized,
+            T: AllocSoa + ?Sized,
         {
             fn drop(&mut self) {
                 let Self(drain) = self;

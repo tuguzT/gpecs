@@ -7,36 +7,12 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SoaAsMutRefs, SoaAsRefs,
-        SoaCloneToUninit, SoaContext, SoaRead, SoaTrustedFields, SoaWrite,
+        AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
+        SliceMutPtrs, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
     },
 };
 
 unsafe impl RawSoaContext for () {
-    type FieldDescriptors<'a> = [FieldDescriptor; 1];
-
-    #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short> {
-        from
-    }
-
-    #[inline]
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
-        [FieldDescriptor::of::<()>()]
-    }
-
-    #[inline]
-    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
-        Layout::array::<()>(capacity)
-    }
-
-    #[inline]
-    fn capacity_from(&self, _buffer_layout: Layout) -> usize {
-        usize::MAX
-    }
-
     type Ptrs<'a> = *const ();
 
     #[inline]
@@ -47,11 +23,6 @@ unsafe impl RawSoaContext for () {
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
         ptr::dangling()
-    }
-
-    #[inline]
-    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, _capacity: usize) -> Self::Ptrs<'_> {
-        buffer.cast()
     }
 
     #[inline]
@@ -75,11 +46,6 @@ unsafe impl RawSoaContext for () {
     #[inline]
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
         ptr::dangling_mut()
-    }
-
-    #[inline]
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, _capacity: usize) -> Self::MutPtrs<'_> {
-        buffer.cast()
     }
 
     #[inline]
@@ -237,8 +203,6 @@ unsafe impl RawSoa for () {
     type Fields = ();
 }
 
-unsafe impl SoaTrustedFields for () {}
-
 unsafe impl SoaCloneToUninit for () {
     #[inline]
     unsafe fn clone_to_uninit(
@@ -262,6 +226,44 @@ unsafe impl SoaWrite for () {
         unsafe { ptr::write(ptrs, value) }
     }
 }
+
+unsafe impl AllocSoaContext for () {
+    type FieldDescriptors<'a> = [FieldDescriptor; 1];
+
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short> {
+        from
+    }
+
+    #[inline]
+    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+        [FieldDescriptor::of::<()>()]
+    }
+
+    #[inline]
+    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
+        Layout::array::<()>(capacity)
+    }
+
+    #[inline]
+    fn capacity_from(&self, _buffer_layout: Layout) -> usize {
+        usize::MAX
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, _capacity: usize) -> Self::Ptrs<'_> {
+        buffer.cast()
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, _capacity: usize) -> Self::MutPtrs<'_> {
+        buffer.cast()
+    }
+}
+
+unsafe impl AllocSoaTrusted for () {}
 
 unsafe impl<'data> SoaContext<'data> for () {
     type Refs<'a> = &'data ();

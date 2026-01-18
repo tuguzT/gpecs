@@ -15,7 +15,8 @@ use crate::{
     soa::{
         field::FieldDescriptor,
         traits::{
-            RawSoaContext, Refs, RefsMut, Slices, SlicesMut, Soa, SoaContext, SoaRead, SoaWrite,
+            AllocSoa, AllocSoaContext, RawSoaContext, Refs, RefsMut, Slices, SlicesMut, Soa,
+            SoaContext, SoaRead, SoaWrite,
         },
     },
 };
@@ -51,7 +52,7 @@ pub fn validate_components<'a, 'components, 'ctx, T, I>(
     component_ids: I,
 ) -> impl Iterator<Item = ComponentId> + use<'components, 'ctx, T, I>
 where
-    T: Soa<'a>,
+    T: AllocSoa + Soa<'a>,
     I: IntoIterator<Item = ComponentId>,
 {
     zip(component_ids, context.field_descriptors())
@@ -68,7 +69,7 @@ fn reorder_fields<'a, 'components, 'ctx, T, I, F>(
     mut fields: ErasedComponents<F>,
 ) -> impl Iterator<Item = F> + use<'components, 'ctx, T, I, F>
 where
-    T: Soa<'a>,
+    T: AllocSoa + Soa<'a>,
     I: IntoIterator<Item = ComponentId>,
 {
     #[cold]
@@ -95,7 +96,7 @@ pub unsafe fn from_erased_fields<'a, T>(
     fields: ErasedComponents<BoxedErasedField>,
 ) -> T
 where
-    T: Soa<'a> + SoaRead,
+    T: AllocSoa + Soa<'a> + SoaRead,
 {
     let (descriptors, fields): (Vec<_>, Vec<_>) =
         reorder_fields::<T, _, _>(components, context, component_ids, fields)
@@ -114,7 +115,7 @@ pub fn into_erased_fields<'a, T>(
     value: T,
 ) -> ErasedComponents<BoxedErasedField>
 where
-    T: Soa<'a> + SoaWrite,
+    T: AllocSoa + Soa<'a> + SoaWrite,
 {
     let erased_value = BoxedErasedSoa::try_from(context, value)
         .unwrap()

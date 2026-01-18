@@ -14,7 +14,7 @@ use crate::{
     field::{ErasedFieldSliceMutPtr, ErasedFieldSlicePtr, field_slice_from_raw_parts_mut},
     soa::{
         field::{FieldDescriptor, buffer_layout},
-        traits::{RawSoa, RawSoaContext, SliceMutPtrs},
+        traits::{AllocSoa, RawSoaContext, SliceMutPtrs},
     },
 };
 
@@ -111,7 +111,7 @@ where
         context: &T::Context,
     ) -> Result<SliceMutPtrs<'_, T>, ErasedSoaIntoValueError<Self>>
     where
-        T: RawSoa + ?Sized,
+        T: AllocSoa + ?Sized,
     {
         let Self { ptrs, len } = self;
 

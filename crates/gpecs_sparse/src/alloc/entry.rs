@@ -12,7 +12,9 @@ use crate::{
     soa::{
         self,
         slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
-        traits::{MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaRead, SoaWrite},
+        traits::{
+            AllocSoa, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaRead, SoaWrite,
+        },
     },
 };
 
@@ -21,7 +23,7 @@ use super::assert::try_replace_key_failed;
 pub struct OccupiedEntry<'a, K, V, C>
 where
     K: Key + 'a,
-    V: RawSoa + ?Sized + 'a,
+    V: AllocSoa + ?Sized + 'a,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     key: K,
@@ -33,7 +35,7 @@ where
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -138,7 +140,7 @@ where
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
 where
     K: Key,
-    V: Soa<'a> + ?Sized,
+    V: AllocSoa + Soa<'a> + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -158,7 +160,7 @@ where
 impl<'a, K, V, C> OccupiedEntry<'_, K, V, C>
 where
     K: Key,
-    V: Soa<'a> + ?Sized,
+    V: AllocSoa + Soa<'a> + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -191,7 +193,7 @@ where
 impl<K, V, C> OccupiedEntry<'_, K, V, C>
 where
     K: Key,
-    V: SoaRead,
+    V: AllocSoa + SoaRead,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -214,7 +216,7 @@ where
 impl<K, V, C> OccupiedEntry<'_, K, V, C>
 where
     K: Key,
-    V: SoaRead + SoaWrite,
+    V: AllocSoa + SoaRead + SoaWrite,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -253,7 +255,7 @@ where
 impl<K, V, C> Debug for OccupiedEntry<'_, K, V, C>
 where
     K: Key + Debug,
-    V: ?Sized,
+    V: AllocSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
     for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, Refs<'ctx>: Debug>>,
 {
@@ -271,7 +273,7 @@ where
 pub struct VacantEntry<'a, K, V, C>
 where
     K: Key + 'a,
-    V: RawSoa + ?Sized + 'a,
+    V: AllocSoa + ?Sized + 'a,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     key: K,
@@ -282,7 +284,7 @@ where
 impl<'a, K, V, C> VacantEntry<'a, K, V, C>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -316,7 +318,7 @@ where
 impl<'a, K, V, C> VacantEntry<'a, K, V, C>
 where
     K: Key,
-    V: SoaRead + SoaWrite,
+    V: AllocSoa + SoaRead + SoaWrite,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     #[inline]
@@ -335,7 +337,7 @@ where
 impl<K, V, C> Debug for VacantEntry<'_, K, V, C>
 where
     K: Key + Debug,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -363,7 +365,7 @@ fn unwrap_entry_value<T>(value: Option<T>) -> T {
 pub trait EpochSparseContainer<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     fn context(&self) -> &V::Context;
 
@@ -387,7 +389,7 @@ where
 impl<K, V> EpochSparseContainer<K, V> for EpochSparseSet<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     #[inline]
     fn context(&self) -> &<V as RawSoa>::Context {
@@ -440,7 +442,7 @@ where
 impl<K, V> EpochSparseContainer<K, V> for EpochSparseArena<K, V>
 where
     K: Key,
-    V: RawSoa + ?Sized,
+    V: AllocSoa + ?Sized,
 {
     #[inline]
     fn context(&self) -> &<V as RawSoa>::Context {
@@ -495,7 +497,7 @@ macro_rules! generate_entry_types {
         pub enum Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::RawSoa + ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
         {
             Occupied(OccupiedEntry<'a, K, V>),
             Vacant(VacantEntry<'a, K, V>),
@@ -504,7 +506,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::RawSoa + ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
         {
             #[inline]
             pub const fn is_occupied(&self) -> bool {
@@ -570,7 +572,7 @@ macro_rules! generate_entry_types {
         impl<K, V> Entry<'_, K, V>
         where
             K: $crate::key::Key,
-            V: ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
             for<'a> V: $crate::soa::traits::Soa<'a>,
         {
             #[inline]
@@ -593,7 +595,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> Entry<'_, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa<'a> + ?Sized,
+            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
         {
             #[inline]
             pub fn get(&'a self) -> Option<$crate::soa::traits::Refs<'a, 'a, V>> {
@@ -640,7 +642,9 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> Entry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::AllocSoa
+                + $crate::soa::traits::SoaRead
+                + $crate::soa::traits::SoaWrite,
         {
             #[inline]
             pub fn or_insert(self, default: V) -> OccupiedEntry<'a, K, V> {
@@ -709,7 +713,7 @@ macro_rules! generate_entry_types {
         impl<K, V> core::fmt::Debug for Entry<'_, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
             for<'ctx, 'a> V: $crate::soa::traits::Soa<
                     'a,
                     Context: $crate::soa::traits::SoaContext<'a, Refs<'ctx>: Debug>,
@@ -727,7 +731,7 @@ macro_rules! generate_entry_types {
         pub struct OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::RawSoa + ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
         {
             inner: $crate::alloc::entry::OccupiedEntry<'a, K, V, $container>,
         }
@@ -735,7 +739,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::RawSoa + ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
         {
             #[inline]
             fn new(key: K, dense_index: usize, container: &'a mut $container) -> Self {
@@ -807,7 +811,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa<'a> + ?Sized,
+            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
         {
             #[inline]
             pub fn into_mut(self) -> $crate::soa::traits::RefsMut<'a, 'a, V> {
@@ -827,7 +831,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'_, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::Soa<'a> + ?Sized,
+            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
         {
             #[inline]
             pub fn get(&'a self) -> $crate::soa::traits::Refs<'a, 'a, V> {
@@ -861,7 +865,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaRead,
+            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::SoaRead,
         {
             #[inline]
             pub fn remove(self) -> V {
@@ -879,7 +883,9 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::AllocSoa
+                + $crate::soa::traits::SoaRead
+                + $crate::soa::traits::SoaWrite,
         {
             #[inline]
             pub fn insert(&mut self, value: V) -> V {
@@ -904,7 +910,7 @@ macro_rules! generate_entry_types {
         impl<K, V> core::fmt::Debug for OccupiedEntry<'_, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
             for<'ctx, 'a> V: $crate::soa::traits::Soa<
                     'a,
                     Context: $crate::soa::traits::SoaContext<'a, Refs<'ctx>: core::fmt::Debug>,
@@ -920,7 +926,7 @@ macro_rules! generate_entry_types {
         pub struct VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::RawSoa + ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
         {
             inner: $crate::alloc::entry::VacantEntry<'a, K, V, $container>,
         }
@@ -928,7 +934,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::RawSoa + ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
         {
             #[inline]
             fn new(key: K, container: &'a mut $container) -> Self {
@@ -958,7 +964,9 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> VacantEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaRead + $crate::soa::traits::SoaWrite,
+            V: $crate::soa::traits::AllocSoa
+                + $crate::soa::traits::SoaRead
+                + $crate::soa::traits::SoaWrite,
         {
             #[inline]
             pub fn insert(self, value: V) -> OccupiedEntry<'a, K, V> {
@@ -971,7 +979,7 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> core::fmt::Debug for VacantEntry<'a, K, V>
         where
             K: $crate::key::Key + core::fmt::Debug,
-            V: $crate::soa::traits::RawSoa + ?Sized,
+            V: $crate::soa::traits::AllocSoa + ?Sized,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let Self { inner } = self;

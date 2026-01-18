@@ -4,13 +4,13 @@ use core_alloc::boxed::Box;
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
     slice::{SoaSlices, SoaSlicesMut},
-    traits::{RawSoaContext, Refs, Soa, SoaCloneToUninit, SoaContext},
+    traits::{AllocSoa, RawSoaContext, Refs, Soa, SoaCloneToUninit, SoaContext},
     vec::SoaVec,
 };
 
 impl<T> SoaSlices<'_, '_, T>
 where
-    T: SoaCloneToUninit + ?Sized,
+    T: AllocSoa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]
@@ -45,7 +45,7 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: SoaCloneToUninit + ?Sized,
+    T: AllocSoa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
 {
     #[inline]

@@ -7,57 +7,9 @@ pub use self::tuple::*;
 mod tuple;
 mod unit;
 
-/// This trait is used to perform all memory operations & pointer arithmetics for [SoA](RawSoa) types.
+/// This trait is used to perform all raw pointer arithmetics for [SoA](RawSoa) types.
 pub unsafe trait RawSoaContext {
-    /// Non-empty collection of [descriptors](FieldDescriptor) for each stored field.
-    ///
-    /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
-    type FieldDescriptors<'a>: IntoIterator<Item: AsRef<FieldDescriptor>>;
-
-    /// Restricts [field descriptors](RawSoaContext::FieldDescriptors)
-    /// to be covariant over generic lifetime.
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short>;
-
-    /// Returns [field descriptors](RawSoaContext::FieldDescriptors) for each stored field.
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_>;
-
-    /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
-    ///
-    /// This layout should not include self, as it is handled by the crate itself.
-    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
-        let fields = self.field_descriptors();
-        self::buffer_layout(fields, capacity)
-    }
-
-    /// Retrieves maximum number of sets of fields which can be stored inside of a buffer with given layout.
-    fn capacity_from(&self, buffer_layout: Layout) -> usize {
-        let packed_size = self
-            .field_descriptors()
-            .into_iter()
-            .map(|desc| desc.as_ref().layout().size())
-            .sum();
-        let buffer_size = buffer_layout.size();
-        let max_capacity = buffer_size.checked_div(packed_size).unwrap_or(0);
-
-        let mut capacity = max_capacity;
-        while {
-            let layout = self
-                .buffer_layout(capacity)
-                .expect("new buffer layout should be smaller than the input one");
-            layout.size() > buffer_size
-        } {
-            capacity -= 1;
-        }
-        capacity
-    }
-
     /// Non-empty collection of pointers to each stored field.
-    ///
-    /// Unlike [field descriptors](RawSoaContext::FieldDescriptors),
-    /// order of such pointers **may not** resemble their order inside of a buffer in memory.
-    /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type Ptrs<'a>: Clone;
 
     /// Restricts [pointers](RawSoaContext::Ptrs) to each stored field
@@ -66,18 +18,6 @@ pub unsafe trait RawSoaContext {
 
     /// Returns dangling [pointers](RawSoaContext::Ptrs) to each stored field.
     fn ptrs_dangling(&self) -> Self::Ptrs<'_>;
-
-    /// Creates [pointers](RawSoaContext::Ptrs) to each stored field
-    /// from a given buffer with given capacity.
-    ///
-    /// Implementations of this method should not account for `Self`,
-    /// as it is handled by the crate itself.
-    ///
-    /// # Safety
-    ///
-    /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
-    /// must be the same as the one returned by [`buffer_layout()`](RawSoaContext::buffer_layout) method.
-    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_>;
 
     /// Adds an unsigned offset to each [pointer](RawSoaContext::Ptrs) of each stored field.
     ///
@@ -100,10 +40,6 @@ pub unsafe trait RawSoaContext {
     unsafe fn ptrs_offset_from(&self, ptrs: Self::Ptrs<'_>, origin: Self::Ptrs<'_>) -> isize;
 
     /// Non-empty collection of mutable pointers to each stored field.
-    ///
-    /// Unlike [field descriptors](RawSoaContext::FieldDescriptors),
-    /// order of such pointers **may not** resemble their order inside of a buffer in memory.
-    /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type MutPtrs<'a>: Clone;
 
     /// Restricts [mutable pointers](RawSoaContext::MutPtrs) to each stored field
@@ -112,18 +48,6 @@ pub unsafe trait RawSoaContext {
 
     /// Returns mutable dangling [pointers](RawSoaContext::MutPtrs) to each stored field.
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_>;
-
-    /// Creates [mutable pointers](RawSoaContext::MutPtrs) to each stored field
-    /// from a given buffer with given capacity.
-    ///
-    /// Implementations of this method should not account for `Self`,
-    /// as it is handled by the crate itself.
-    ///
-    /// # Safety
-    ///
-    /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
-    /// must be the same as the one returned by [`buffer_layout()`](RawSoaContext::buffer_layout) method.
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
 
     /// Adds an unsigned offset to each [mutable pointer](RawSoaContext::MutPtrs) of each stored field.
     ///
@@ -216,9 +140,6 @@ pub unsafe trait RawSoaContext {
     unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>);
 
     /// Non-empty collection of non-null pointers to each stored field.
-    ///
-    /// Order of such pointers **may not** resemble their order inside of a buffer in memory.
-    /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type NonNullPtrs<'a>: Clone;
 
     /// Restricts [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field
@@ -239,10 +160,6 @@ pub unsafe trait RawSoaContext {
     fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a>;
 
     /// Non-empty collection of slice pointers to each stored field.
-    ///
-    /// Unlike [field descriptors](RawSoaContext::FieldDescriptors),
-    /// order of such pointers **may not** resemble their order inside of a buffer in memory.
-    /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type SlicePtrs<'a>: Clone;
 
     /// Restricts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
@@ -273,10 +190,6 @@ pub unsafe trait RawSoaContext {
     fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a>;
 
     /// Non-empty collection of mutable slice pointers to each stored field.
-    ///
-    /// Unlike [field descriptors](RawSoaContext::FieldDescriptors),
-    /// order of such pointers **may not** resemble their order inside of a buffer in memory.
-    /// Reordering of such pointers in other methods is up to the implementation of this trait.
     type SliceMutPtrs<'a>: Clone;
 
     /// Restricts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
@@ -332,10 +245,6 @@ pub unsafe trait RawSoaContext {
     }
 }
 
-/// Alias for the [`FieldDescriptors`](RawSoaContext::FieldDescriptors) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type FieldDescriptors<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::FieldDescriptors<'a>;
-
 /// Alias for the [`Ptrs`](RawSoaContext::Ptrs) associated type
 /// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
 pub type Ptrs<'a, T> = <<T as RawSoa>::Context as RawSoaContext>::Ptrs<'a>;
@@ -363,7 +272,7 @@ pub unsafe trait RawSoa {
     ///
     /// Most of the time, this should be zero-sized type.
     /// This is true for all the SoA types with stored fields' size and alignment known at compile-time.
-    type Context: RawSoaContext;
+    type Context: RawSoaContext + ?Sized;
 
     /// Special type containing all the fields which are stored inside of a buffer.
     ///
@@ -374,16 +283,6 @@ pub unsafe trait RawSoa {
     /// This is true for such implementations which store all the fields of self.
     type Fields;
 }
-
-/// Marker trait which places additional safety requirements
-/// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
-///
-/// These safety requirements are:
-/// - sum of layouts' sizes of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
-///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
-/// - alignment of each layout of [`FieldDescriptors`](RawSoaContext::FieldDescriptors)
-///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
-pub unsafe trait SoaTrustedFields: RawSoa {}
 
 /// A generalization of [`Clone`] specifically for [SoA](RawSoa) type.
 ///
@@ -417,6 +316,110 @@ pub unsafe trait SoaWrite: RawSoa + Sized {
     /// should be satisfied to be safe to call this method.
     unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self);
 }
+
+/// An extension of [SoA context](RawSoaContext) type which allows
+/// to declare properties needed for buffer allocation & buffer memory manipulation.
+pub unsafe trait AllocSoaContext: RawSoaContext + Sized {
+    /// Non-empty collection of [descriptors](FieldDescriptor) for each stored field.
+    ///
+    /// # Safety
+    ///
+    /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
+    ///
+    /// Note that an order of [pointers](RawSoaContext::Ptrs) & their derivatives
+    /// **may not** resemble their order inside of a buffer in memory.
+    /// Reordering of such pointers in other methods is up to the implementation of this trait.
+    type FieldDescriptors<'a>: IntoIterator<Item: AsRef<FieldDescriptor>>;
+
+    /// Restricts [field descriptors](AllocSoaContext::FieldDescriptors)
+    /// to be covariant over generic lifetime.
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short>;
+
+    /// Returns [field descriptors](AllocSoaContext::FieldDescriptors) for each stored field.
+    fn field_descriptors(&self) -> Self::FieldDescriptors<'_>;
+
+    /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
+    ///
+    /// This layout should not include self, as it is handled by the crate itself.
+    fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
+        let fields = self.field_descriptors();
+        self::buffer_layout(fields, capacity)
+    }
+
+    /// Retrieves maximum number of sets of fields which can be stored inside of a buffer with given layout.
+    fn capacity_from(&self, buffer_layout: Layout) -> usize {
+        let packed_size = self
+            .field_descriptors()
+            .into_iter()
+            .map(|desc| desc.as_ref().layout().size())
+            .sum();
+        let buffer_size = buffer_layout.size();
+        let max_capacity = buffer_size.checked_div(packed_size).unwrap_or(0);
+
+        let mut capacity = max_capacity;
+        while {
+            let layout = self
+                .buffer_layout(capacity)
+                .expect("new buffer layout should be smaller than the input one");
+            layout.size() > buffer_size
+        } {
+            capacity -= 1;
+        }
+        capacity
+    }
+
+    /// Creates [pointers](RawSoaContext::Ptrs) to each stored field
+    /// from a given buffer with given capacity.
+    ///
+    /// Implementations of this method should not account for `Self`,
+    /// as it is handled by the crate itself.
+    ///
+    /// # Safety
+    ///
+    /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
+    /// must be the same as the one returned by [`buffer_layout()`](AllocSoaContext::buffer_layout) method.
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_>;
+
+    /// Creates [mutable pointers](RawSoaContext::MutPtrs) to each stored field
+    /// from a given buffer with given capacity.
+    ///
+    /// Implementations of this method should not account for `Self`,
+    /// as it is handled by the crate itself.
+    ///
+    /// # Safety
+    ///
+    /// Layout from a given pointer to a buffer to the end of the allocation of such buffer
+    /// must be the same as the one returned by [`buffer_layout()`](AllocSoaContext::buffer_layout) method.
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
+}
+
+/// Alias for the [`FieldDescriptors`](AllocSoaContext::FieldDescriptors) associated type
+/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
+pub type FieldDescriptors<'a, T> =
+    <<T as RawSoa>::Context as AllocSoaContext>::FieldDescriptors<'a>;
+
+/// An extension of [SoA](RawSoa) type which allows to
+/// declare properties needed for buffer allocation & buffer memory manipulation.
+pub unsafe trait AllocSoa: RawSoa<Context: AllocSoaContext> {}
+
+unsafe impl<T> AllocSoa for T
+where
+    T: RawSoa + ?Sized,
+    T::Context: AllocSoaContext,
+{
+}
+
+/// Marker trait which places additional safety requirements
+/// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
+///
+/// These safety requirements are:
+/// - sum of layouts' sizes of [`FieldDescriptors`](AllocSoaContext::FieldDescriptors)
+///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
+/// - alignment of each layout of [`FieldDescriptors`](AllocSoaContext::FieldDescriptors)
+///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
+pub unsafe trait AllocSoaTrusted: AllocSoa {}
 
 /// An extension of [SoA context](RawSoaContext) type which provides
 /// reference and slice types of specific lifetime to each stored field.
@@ -550,9 +553,9 @@ pub type SlicesMut<'a, 'data, T> = <<T as RawSoa>::Context as SoaContext<'data>>
 
 /// An extension of [SoA](RawSoa) type which allows to access
 /// each stored field by their reference types of specific lifetime.
-pub trait Soa<'a>: RawSoa<Context: SoaContext<'a>> {}
+pub unsafe trait Soa<'a>: RawSoa<Context: SoaContext<'a>> {}
 
-impl<'a, T> Soa<'a> for T
+unsafe impl<'a, T> Soa<'a> for T
 where
     T: RawSoa + ?Sized,
     T::Context: SoaContext<'a>,

@@ -7,7 +7,6 @@ use core::{
 };
 
 use crate::{
-    layout::is_zst,
     slice::{
         IndexHelper, IndexHelperMut, Iter, IterMut, RawIter, RawIterMut, SoaSliceMutPtrs,
         SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex, assert::slice_index_usize_fail,
@@ -344,8 +343,7 @@ where
             permutation_len_fail(permutation.len(), len);
         }
 
-        let context = self.context();
-        if is_zst::<T>(context) || len < 2 {
+        if len < 2 {
             return;
         }
 

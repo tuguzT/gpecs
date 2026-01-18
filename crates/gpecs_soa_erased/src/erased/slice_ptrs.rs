@@ -13,7 +13,7 @@ use crate::{
     field::{ErasedFieldSlicePtr, field_slice_from_raw_parts},
     soa::{
         field::{FieldDescriptor, buffer_layout},
-        traits::{RawSoa, RawSoaContext, SlicePtrs},
+        traits::{AllocSoa, RawSoaContext, SlicePtrs},
     },
 };
 
@@ -99,7 +99,7 @@ where
         context: &T::Context,
     ) -> Result<SlicePtrs<'_, T>, ErasedSoaIntoValueError<Self>>
     where
-        T: RawSoa + ?Sized,
+        T: AllocSoa + ?Sized,
     {
         let Self { ptrs, len } = self;
 

@@ -4,8 +4,8 @@ use crate::{
     soa::{
         field::FieldDescriptor,
         traits::{
-            MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs,
-            SoaContext, SoaRead, SoaWrite,
+            AllocSoaContext, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs,
+            SoaAsRefs, SoaContext, SoaRead, SoaWrite,
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
@@ -20,22 +20,8 @@ use super::{
 
 unsafe impl<D> RawSoaContext for ErasedSoaContext<D>
 where
-    D: AsRef<[FieldDescriptor]>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type FieldDescriptors<'a> = &'a [FieldDescriptor];
-
-    #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short> {
-        from
-    }
-
-    #[inline]
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
-        Self::field_descriptors(self)
-    }
-
     type Ptrs<'a> = ErasedSoaPtrs<&'a [FieldDescriptor]>;
 
     #[inline]
@@ -47,12 +33,6 @@ where
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
         let descriptors = self.field_descriptors();
         ErasedSoaPtrs::dangling(descriptors)
-    }
-
-    #[inline]
-    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
-        let descriptors = self.field_descriptors();
-        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 
     #[inline]
@@ -83,12 +63,6 @@ where
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
         let descriptors = self.field_descriptors();
         ErasedSoaMutPtrs::dangling(descriptors)
-    }
-
-    #[inline]
-    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
-        let descriptors = self.field_descriptors();
-        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 
     #[inline]
@@ -346,6 +320,37 @@ where
         dst.into_iter()
             .zip(value.as_fields())
             .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) });
+    }
+}
+
+unsafe impl<D> AllocSoaContext for ErasedSoaContext<D>
+where
+    D: AsRef<[FieldDescriptor]>,
+{
+    type FieldDescriptors<'a> = &'a [FieldDescriptor];
+
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: Self::FieldDescriptors<'long>,
+    ) -> Self::FieldDescriptors<'short> {
+        from
+    }
+
+    #[inline]
+    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+        Self::field_descriptors(self)
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
+        let descriptors = self.field_descriptors();
+        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
+    }
+
+    #[inline]
+    unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
+        let descriptors = self.field_descriptors();
+        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 }
 

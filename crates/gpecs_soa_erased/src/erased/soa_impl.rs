@@ -279,8 +279,7 @@ where
 
 unsafe impl<B, D> RawSoa for ErasedSoa<B, D>
 where
-    B: ?Sized,
-    D: AsRef<[FieldDescriptor]>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     type Context = ErasedSoaContext<D>;
     type Fields = ErasedSoaFields;
@@ -356,7 +355,7 @@ where
 
 unsafe impl<'data, D> SoaContext<'data> for ErasedSoaContext<D>
 where
-    D: AsRef<[FieldDescriptor]>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     type Refs<'a> = ErasedSoaRefs<'data, &'a [FieldDescriptor]>;
 
@@ -497,8 +496,8 @@ where
 
 impl<'a, B, D> SoaAsRefs<'a> for ErasedSoa<B, D>
 where
-    B: AlignedStorage<u8> + ?Sized,
-    D: AsRef<[FieldDescriptor]>,
+    B: AlignedStorage<u8>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
     fn as_refs(&'a self, context: &'a Self::Context) -> Refs<'a, 'a, Self> {
@@ -511,8 +510,8 @@ where
 
 impl<'a, B, D> SoaAsMutRefs<'a> for ErasedSoa<B, D>
 where
-    B: AlignedStorage<u8> + ?Sized,
-    D: AsRef<[FieldDescriptor]>,
+    B: AlignedStorage<u8>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
     fn as_mut_refs(&'a mut self, context: &'a Self::Context) -> RefsMut<'a, 'a, Self> {

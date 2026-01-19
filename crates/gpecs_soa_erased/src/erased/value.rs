@@ -33,16 +33,15 @@ pub type BoxedErasedSoa =
 
 pub struct ErasedSoa<B, D>
 where
-    B: ?Sized,
+    D: ?Sized,
 {
-    descriptors: D,
     bytes: B,
+    descriptors: D,
 }
 
 impl<B, D> ErasedSoa<B, D>
 where
-    B: ?Sized,
-    D: AsRef<[FieldDescriptor]>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
     pub fn field_descriptors(&self) -> &[FieldDescriptor] {
@@ -72,7 +71,7 @@ where
 
         fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
 
-        let me = Self { descriptors, bytes };
+        let me = Self { bytes, descriptors };
         Ok(me)
     }
 
@@ -125,8 +124,8 @@ where
 
 impl<B, D> ErasedSoa<B, D>
 where
-    B: AlignedStorage<u8> + ?Sized,
-    D: AsRef<[FieldDescriptor]>,
+    B: AlignedStorage<u8>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
     pub fn as_fields(&self) -> ErasedSoaRefs<'_, &[FieldDescriptor]> {
@@ -170,7 +169,7 @@ where
         let mut bytes = B::from_layout(layout).map_err(Error::FromLayout)?;
         fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
 
-        let me = Self { descriptors, bytes };
+        let me = Self { bytes, descriptors };
         Ok(me)
     }
 }
@@ -204,7 +203,7 @@ where
             T::write(context, dst, value);
         }
 
-        let me = Self { descriptors, bytes };
+        let me = Self { bytes, descriptors };
         Ok(me)
     }
 }
@@ -236,7 +235,7 @@ where
             T::write(context, dst, value);
         }
 
-        let me = Self { descriptors, bytes };
+        let me = Self { bytes, descriptors };
         Ok(me)
     }
 }
@@ -264,8 +263,8 @@ where
 
 impl<B, D> Debug for ErasedSoa<B, D>
 where
-    B: AlignedStorage<u8> + ?Sized,
-    D: AsRef<[FieldDescriptor]>,
+    B: AlignedStorage<u8>,
+    D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = &self.as_fields().into_iter();

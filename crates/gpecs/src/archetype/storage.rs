@@ -106,7 +106,7 @@ impl ArchetypeStorage {
             Clone::clone,
         )?;
 
-        let context = component_ids
+        let descriptors = component_ids
             .keys()
             .map(|&component_id| {
                 let info = components
@@ -115,6 +115,7 @@ impl ArchetypeStorage {
                 info.descriptor()
             })
             .collect();
+        let context = ErasedSoaContext::new(descriptors).expect("descriptors should be valid");
         let erased_storage = ErasedStorage::with_context(context);
 
         Ok(Self {
@@ -140,7 +141,7 @@ impl ArchetypeStorage {
             Clone::clone,
         )?;
 
-        let context = ErasedSoaContext::of::<B>(B::CONTEXT);
+        let context = ErasedSoaContext::of::<B>(B::CONTEXT).expect("descriptors should be valid");
         let erased_storage = ErasedStorage::with_context(context);
 
         Ok(Self {
@@ -547,8 +548,10 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    fn destroy_refs_mut<A>(component_ids: &ComponentIdMap, erased_refs_mut: ErasedSoaRefsMut<'_, A>)
-    where
+    fn destroy_refs_mut<A>(
+        component_ids: &ComponentIdMap,
+        erased_refs_mut: ErasedSoaRefsMut<'_, A, u8>,
+    ) where
         A: IntoIterator,
         A::Item: AsRef<FieldDescriptor>,
         A::IntoIter: AsRef<[FieldDescriptor]> + ExactSizeIterator,

@@ -1,12 +1,12 @@
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
-    mem::{MaybeUninit, forget},
+    mem::forget,
     ptr, slice,
 };
 
 use crate::{
-    error::{LenMismatchError, check_layout, check_len, check_sufficient_align},
+    error::{check_layout, check_len, check_sufficient_align},
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
         assert::check_into_layout,
@@ -18,6 +18,7 @@ use crate::{
     fmt::SliceUpperHex,
     soa::field::FieldDescriptor,
     storage::{AddressableUnit, AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
+    uninit::write_copy_of_slice,
 };
 
 #[cfg(feature = "alloc")]
@@ -67,7 +68,7 @@ where
             return Err(ErasedFieldFromStorageError::new(err.into(), storage));
         }
 
-        if let Err(err) = init_from(storage.as_mut_uninit_slice(), data) {
+        if let Err(err) = write_copy_of_slice(storage.as_mut_uninit_slice(), data) {
             return Err(ErasedFieldFromStorageError::new(err.into(), storage));
         }
 
@@ -146,7 +147,7 @@ where
 
         let mut storage =
             T::from_layout(layout).map_err(ErasedFieldFromDescDataError::FromLayout)?;
-        init_from(storage.as_mut_uninit_slice(), data)?;
+        write_copy_of_slice(storage.as_mut_uninit_slice(), data)?;
 
         let storage = unsafe { AlignedInitStorage::new_unchecked(storage) };
         let me = Self { storage };
@@ -299,19 +300,4 @@ where
     fn as_mut(&mut self) -> &mut [A] {
         self.as_mut_slice()
     }
-}
-
-#[inline]
-fn init_from<T>(dst: &mut [MaybeUninit<T>], src: &[T]) -> Result<(), LenMismatchError>
-where
-    T: Copy,
-{
-    let expected = dst.len();
-    let len = src.len();
-    check_len(len, expected)?;
-
-    let src = unsafe { slice::from_raw_parts(src.as_ptr().cast(), len) };
-    dst.copy_from_slice(src);
-
-    Ok(())
 }

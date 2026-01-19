@@ -1,10 +1,11 @@
 use core::{
-    alloc::LayoutError,
+    alloc::{Layout, LayoutError},
     error::Error,
     fmt::{self, Debug, Display},
     iter::FusedIterator,
     marker::PhantomData,
-    ptr, slice,
+    mem::MaybeUninit,
+    slice,
 };
 
 use itertools::{EitherOrBoth::Both, Itertools};
@@ -13,34 +14,64 @@ use crate::{
     erased::{
         ErasedSoaRefs, ErasedSoaRefsMut,
         error::{
-            ErasedSoaFromBytesFieldsDescriptorsError, ErasedSoaFromBytesValueError,
-            ErasedSoaFromFieldsDescriptorsError, ErasedSoaFromValueError, ErasedSoaIntoValueError,
+            ErasedSoaFromFieldsDescriptorsError, ErasedSoaFromStorageFieldsDescriptorsError,
+            ErasedSoaFromStorageValueError, ErasedSoaFromValueError, ErasedSoaIntoValueError,
             IterOrFieldLenMismatchError,
         },
     },
-    error::{LenMismatchError, check_layout, check_len},
+    error::{
+        InsufficientAlignError, LenMismatchError, check_layout, check_len, check_sufficient_align,
+    },
     field::{ErasedField, error::ErasedFieldFromDescDataError},
     soa::{
-        field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_layout, buffer_offsets},
+        field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_offsets},
         traits::{AllocSoa, AllocSoaContext, SoaRead, SoaWrite},
     },
-    storage::{AlignedStorage, AlignedStorageFromLayout},
+    storage::{AddressableUnit, AlignedStorage, AlignedStorageFromLayout},
+    uninit::write_copy_of_slice,
 };
 
 #[cfg(feature = "alloc")]
 pub type BoxedErasedSoa =
-    ErasedSoa<crate::storage::BoxedAlignedUninitStorage, alloc::boxed::Box<[FieldDescriptor]>>;
+    ErasedSoa<crate::storage::BoxedAlignedUninitStorage, alloc::boxed::Box<[FieldDescriptor]>, u8>;
 
-pub struct ErasedSoa<B, D>
+pub struct ErasedSoa<T, D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
-    bytes: B,
+    phantom: PhantomData<fn() -> A>,
+    storage: T,
     descriptors: D,
 }
 
-impl<B, D> ErasedSoa<B, D>
+impl<T, D, A> ErasedSoa<T, D, A>
 where
+    A: AddressableUnit,
+{
+    #[inline]
+    pub unsafe fn new_unchecked(storage: T, descriptors: D) -> Self {
+        Self {
+            phantom: PhantomData,
+            storage,
+            descriptors,
+        }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (T, D) {
+        let Self {
+            storage,
+            descriptors,
+            ..
+        } = self;
+        (storage, descriptors)
+    }
+}
+
+impl<T, D, A> ErasedSoa<T, D, A>
+where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
@@ -50,42 +81,57 @@ where
     }
 }
 
-impl<B, D> ErasedSoa<B, D>
+impl<T, D, A> ErasedSoa<T, D, A>
 where
-    B: AlignedStorage<u8>,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
-    pub fn try_from_bytes_fields_descriptors<I, F>(
-        mut bytes: B,
+    pub fn try_from_storage_fields_descriptors<I, F>(
+        mut storage: T,
         fields: I,
         descriptors: D,
-    ) -> Result<Self, ErasedSoaFromBytesFieldsDescriptorsError>
+    ) -> Result<Self, ErasedSoaFromStorageFieldsDescriptorsError>
     where
         I: IntoIterator<Item = F>,
-        F: AsRef<[u8]>,
+        F: AsRef<[A]>,
     {
-        let layout = bytes.layout();
-        let expected_layout = buffer_layout(descriptors.as_ref(), 1)?;
+        let mut offsets = buffer_offsets(descriptors.as_ref(), 1);
+        offsets.by_ref().try_for_each(|offset| {
+            let desc = offset?.field_descriptor;
+            check_sufficient_align(desc.layout(), Layout::new::<A>())
+                .map_err(ErasedSoaFromStorageFieldsDescriptorsError::from)
+        })?;
+
+        let layout = storage.layout();
+        let expected_layout = offsets.layout();
         check_layout(layout, expected_layout)?;
 
-        fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
+        write_copy_of_fields(storage.as_mut_uninit_slice(), fields, descriptors.as_ref())?;
 
-        let me = Self { bytes, descriptors };
+        let me = unsafe { Self::new_unchecked(storage, descriptors) };
         Ok(me)
     }
+}
 
+impl<T, D> ErasedSoa<T, D, u8>
+where
+    T: AlignedStorage<u8>,
+    D: AsRef<[FieldDescriptor]>,
+{
     #[inline]
-    pub unsafe fn try_into<T>(
+    pub unsafe fn try_into<V>(
         self,
-        context: &T::Context,
-    ) -> Result<T, ErasedSoaIntoValueError<Self>>
+        context: &V::Context,
+    ) -> Result<V, ErasedSoaIntoValueError<Self>>
     where
-        T: AllocSoa + SoaRead,
+        V: AllocSoa + SoaRead,
     {
         let Self {
             ref descriptors,
-            ref bytes,
+            ref storage,
+            ..
         } = self;
         let descriptors = descriptors.as_ref();
 
@@ -109,84 +155,98 @@ where
             Ok(layout) => layout,
             Err(error) => return Err(ErasedSoaIntoValueError::new(self, error.into())),
         };
-        if let Err(error) = check_len(layout.size(), bytes.layout().size()) {
+        if let Err(error) = check_len(layout.size(), storage.layout().size()) {
             return Err(ErasedSoaIntoValueError::new(self, error.into()));
         }
 
-        let Self { bytes, .. } = self;
+        let Self { storage, .. } = self;
         let value = unsafe {
-            let src = context.ptrs_from_buffer(bytes.as_ptr(), 1);
-            T::read(context, src)
+            let src = context.ptrs_from_buffer(storage.as_ptr(), 1);
+            V::read(context, src)
         };
         Ok(value)
     }
 }
 
-impl<B, D> ErasedSoa<B, D>
+impl<T, D, A> ErasedSoa<T, D, A>
 where
-    B: AlignedStorage<u8>,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
-    pub fn as_fields(&self) -> ErasedSoaRefs<'_, &[FieldDescriptor]> {
-        let Self { bytes, descriptors } = self;
+    pub fn as_fields(&self) -> ErasedSoaRefs<'_, &[FieldDescriptor], A> {
+        let Self {
+            ref storage,
+            ref descriptors,
+            ..
+        } = *self;
 
         let descriptors = descriptors.as_ref();
-        let buffer = bytes.as_ptr();
+        let buffer = storage.as_ptr();
         unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, 1, 0) }
     }
 
     #[inline]
-    pub fn as_mut_fields(&mut self) -> ErasedSoaRefsMut<'_, &[FieldDescriptor]> {
+    pub fn as_mut_fields(&mut self) -> ErasedSoaRefsMut<'_, &[FieldDescriptor], A> {
         let Self {
-            ref mut bytes,
+            ref mut storage,
             ref descriptors,
+            ..
         } = *self;
 
         let descriptors = descriptors.as_ref();
-        let buffer = bytes.as_mut_ptr();
+        let buffer = storage.as_mut_ptr();
         unsafe { ErasedSoaRefsMut::new_unchecked(descriptors, buffer, 1, 0) }
     }
 }
 
-impl<B, D> ErasedSoa<B, D>
+impl<T, D, A> ErasedSoa<T, D, A>
 where
-    B: AlignedStorageFromLayout<u8>,
+    A: AddressableUnit,
+    T: AlignedStorageFromLayout<A>,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
     pub fn try_from_fields_descriptors<I, F>(
         fields: I,
         descriptors: D,
-    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<B, u8>>
+    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<T, A>>
     where
         I: IntoIterator<Item = F>,
-        F: AsRef<[u8]>,
+        F: AsRef<[A]>,
     {
         use ErasedSoaFromFieldsDescriptorsError as Error;
 
-        let layout = buffer_layout(descriptors.as_ref(), 1)?;
-        let mut bytes = B::from_layout(layout).map_err(Error::FromLayout)?;
-        fill_bytes_with_fields(&mut bytes, fields, descriptors.as_ref())?;
+        let mut offsets = buffer_offsets(descriptors.as_ref(), 1);
+        offsets.by_ref().try_for_each(|offset| {
+            let desc = offset?.field_descriptor;
+            check_sufficient_align(desc.layout(), Layout::new::<A>()).map_err(Error::from)
+        })?;
 
-        let me = Self { bytes, descriptors };
+        let layout = offsets.layout();
+        let mut storage = T::from_layout(layout).map_err(Error::FromLayout)?;
+
+        write_copy_of_fields(storage.as_mut_uninit_slice(), fields, descriptors.as_ref())?;
+
+        let me = unsafe { Self::new_unchecked(storage, descriptors) };
         Ok(me)
     }
 }
 
-impl<B, D> ErasedSoa<B, D>
+impl<T, D> ErasedSoa<T, D, u8>
 where
-    B: AlignedStorage<u8>,
+    T: AlignedStorage<u8>,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn try_from_bytes_value<T>(
-        mut bytes: B,
-        context: &T::Context,
-        value: T,
-    ) -> Result<Self, ErasedSoaFromBytesValueError>
+    pub fn try_from_storage_value<V>(
+        mut storage: T,
+        context: &V::Context,
+        value: V,
+    ) -> Result<Self, ErasedSoaFromStorageValueError>
     where
-        T: AllocSoa + SoaWrite,
+        V: AllocSoa + SoaWrite,
     {
         let descriptors = context
             .field_descriptors()
@@ -195,31 +255,31 @@ where
             .collect();
 
         let expected_layout = context.buffer_layout(1)?;
-        let layout = bytes.layout();
+        let layout = storage.layout();
         check_layout(layout, expected_layout)?;
 
         unsafe {
-            let dst = context.ptrs_from_buffer_mut(bytes.as_mut_ptr(), 1);
-            T::write(context, dst, value);
+            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
+            V::write(context, dst, value);
         }
 
-        let me = Self { bytes, descriptors };
+        let me = unsafe { Self::new_unchecked(storage, descriptors) };
         Ok(me)
     }
 }
 
-impl<B, D> ErasedSoa<B, D>
+impl<T, D> ErasedSoa<T, D, u8>
 where
-    B: AlignedStorageFromLayout<u8>,
+    T: AlignedStorageFromLayout<u8>,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn try_from<T>(
-        context: &T::Context,
-        value: T,
-    ) -> Result<Self, ErasedSoaFromValueError<B, u8>>
+    pub fn try_from<V>(
+        context: &V::Context,
+        value: V,
+    ) -> Result<Self, ErasedSoaFromValueError<T, u8>>
     where
-        T: AllocSoa + SoaWrite,
+        V: AllocSoa + SoaWrite,
     {
         let descriptors = context
             .field_descriptors()
@@ -228,42 +288,39 @@ where
             .collect();
 
         let layout = context.buffer_layout(1)?;
-        let mut bytes = B::from_layout(layout).map_err(ErasedSoaFromValueError::FromLayout)?;
+        let mut storage = T::from_layout(layout).map_err(ErasedSoaFromValueError::FromLayout)?;
 
         unsafe {
-            let dst = context.ptrs_from_buffer_mut(bytes.as_mut_ptr(), 1);
-            T::write(context, dst, value);
+            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
+            V::write(context, dst, value);
         }
 
-        let me = Self { bytes, descriptors };
+        let me = unsafe { Self::new_unchecked(storage, descriptors) };
         Ok(me)
     }
 }
 
-impl<B, D> ErasedSoa<B, D>
+impl<T, D, A> ErasedSoa<T, D, A>
 where
-    B: AlignedStorage<u8>,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
     D: AsRef<[FieldDescriptor]> + IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
     #[inline]
-    pub fn into_fields<T>(self) -> ErasedSoaIntoFields<B, D::IntoIter, T>
+    pub fn into_fields<F>(self) -> ErasedSoaIntoFields<T, D::IntoIter, F, A>
     where
-        T: AlignedStorageFromLayout<u8>,
+        F: AlignedStorageFromLayout<A>,
     {
-        let Self { bytes, descriptors } = self;
-
-        let layout = buffer_layout(descriptors.as_ref(), 1)
-            .expect("buffer layout size should not exceed `isize::MAX`");
-        check_len(layout.size(), bytes.layout().size()).expect("buffer length should match");
-
+        let (storage, descriptors) = self.into_parts();
         let offsets = buffer_offsets(descriptors, 1);
-        ErasedSoaIntoFields::new(bytes, offsets)
+        ErasedSoaIntoFields::new(storage, offsets)
     }
 }
 
-impl<B, D> Debug for ErasedSoa<B, D>
+impl<T, D, A> Debug for ErasedSoa<T, D, A>
 where
-    B: AlignedStorage<u8>,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -272,68 +329,93 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct ErasedSoaIntoFields<B, I, T>
+pub struct ErasedSoaIntoFields<T, I, F, A>
 where
-    B: ?Sized,
+    A: AddressableUnit,
+    I: ?Sized,
 {
+    phantom: PhantomData<fn() -> (F, A)>,
+    storage: T,
     offsets: BufferOffsets<I>,
-    phantom: PhantomData<T>,
-    bytes: B,
 }
 
-impl<B, I, T> ErasedSoaIntoFields<B, I, T> {
-    fn new(bytes: B, offsets: BufferOffsets<I>) -> Self {
+impl<T, I, F, A> ErasedSoaIntoFields<T, I, F, A>
+where
+    A: AddressableUnit,
+{
+    fn new(storage: T, offsets: BufferOffsets<I>) -> Self {
         Self {
-            bytes,
-            offsets,
             phantom: PhantomData,
+            storage,
+            offsets,
         }
     }
 }
 
-impl<B, I, T> Debug for ErasedSoaIntoFields<B, I, T>
+impl<T, I, F, A> Debug for ErasedSoaIntoFields<T, I, F, A>
 where
-    B: Debug + ?Sized,
-    I: Debug,
+    A: AddressableUnit,
+    T: Debug,
+    I: Debug + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { bytes, offsets, .. } = self;
+        let Self {
+            storage, offsets, ..
+        } = self;
+
         f.debug_struct("ErasedSoaIntoFields")
-            .field("bytes", &bytes)
-            .field("offsets", offsets)
+            .field("storage", storage)
+            .field("offsets", &offsets)
             .finish()
     }
 }
 
-impl<B, I, T> Iterator for ErasedSoaIntoFields<B, I, T>
+impl<T, I, F, A> Clone for ErasedSoaIntoFields<T, I, F, A>
 where
-    B: AlignedStorage<u8> + ?Sized,
-    I: Iterator,
-    I::Item: AsRef<FieldDescriptor>,
-    T: AlignedStorageFromLayout<u8>,
+    A: AddressableUnit,
+    T: Clone,
+    I: Clone,
 {
-    type Item = Result<ErasedField<T, u8>, ErasedFieldFromDescDataError<T, u8>>;
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self {
+            storage, offsets, ..
+        } = self;
+
+        Self::new(storage.clone(), offsets.clone())
+    }
+}
+
+impl<T, I, F, A> Iterator for ErasedSoaIntoFields<T, I, F, A>
+where
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
+    I: Iterator + ?Sized,
+    I::Item: AsRef<FieldDescriptor>,
+    F: AlignedStorageFromLayout<A>,
+{
+    type Item = Result<ErasedField<F, A>, ErasedFieldFromDescDataError<F, A>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self {
-            ref bytes,
+            ref storage,
             ref mut offsets,
             ..
         } = *self;
 
-        let Ok(item) = offsets.next()? else {
-            unreachable!("buffer layout should be checked way earlier")
-        };
         let BufferOffset {
             field_descriptor,
             offset,
             ..
-        } = item;
+        } = offsets
+            .next()?
+            .expect("buffer layout should have been checked way earlier");
 
-        let len = field_descriptor.layout().size();
-        let data = unsafe { bytes.as_ptr().add(offset) };
+        let offset = offset.div_ceil(size_of::<A>());
+        let len = field_descriptor.layout().size().div_ceil(size_of::<A>());
+
+        let data = unsafe { storage.as_ptr().add(offset) };
         let data = unsafe { slice::from_raw_parts(data, len) };
 
         let item = ErasedField::try_from_desc_data(field_descriptor, data);
@@ -341,12 +423,13 @@ where
     }
 }
 
-impl<B, I, T> ExactSizeIterator for ErasedSoaIntoFields<B, I, T>
+impl<T, I, F, A> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, A>
 where
-    B: AlignedStorage<u8> + ?Sized,
-    I: ExactSizeIterator,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
+    I: ExactSizeIterator + ?Sized,
     I::Item: AsRef<FieldDescriptor>,
-    T: AlignedStorageFromLayout<u8>,
+    F: AlignedStorageFromLayout<A>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -355,85 +438,99 @@ where
     }
 }
 
-impl<B, I, T> FusedIterator for ErasedSoaIntoFields<B, I, T>
+impl<T, I, F, A> FusedIterator for ErasedSoaIntoFields<T, I, F, A>
 where
-    B: AlignedStorage<u8> + ?Sized,
-    I: FusedIterator,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
+    I: FusedIterator + ?Sized,
     I::Item: AsRef<FieldDescriptor>,
-    T: AlignedStorageFromLayout<u8>,
+    F: AlignedStorageFromLayout<A>,
 {
 }
 
 #[derive(Debug, Clone)]
-enum FillBytesWithFieldsError {
+enum WriteCopyOfFieldsError {
     LenMismatch(IterOrFieldLenMismatchError),
     InvalidLayout(LayoutError),
+    InsufficientAlign(InsufficientAlignError),
 }
 
-impl From<IterOrFieldLenMismatchError> for FillBytesWithFieldsError {
+impl From<IterOrFieldLenMismatchError> for WriteCopyOfFieldsError {
     #[inline]
-    fn from(value: IterOrFieldLenMismatchError) -> Self {
-        Self::LenMismatch(value)
+    fn from(error: IterOrFieldLenMismatchError) -> Self {
+        Self::LenMismatch(error)
     }
 }
 
-impl From<LayoutError> for FillBytesWithFieldsError {
+impl From<LayoutError> for WriteCopyOfFieldsError {
     #[inline]
-    fn from(value: LayoutError) -> Self {
-        Self::InvalidLayout(value)
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
     }
 }
 
-impl Display for FillBytesWithFieldsError {
+impl From<InsufficientAlignError> for WriteCopyOfFieldsError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl Display for WriteCopyOfFieldsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LenMismatch(err) => Display::fmt(err, f),
-            Self::InvalidLayout(err) => Display::fmt(err, f),
+            Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl Error for FillBytesWithFieldsError {
+impl Error for WriteCopyOfFieldsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::LenMismatch(err) => Some(err),
-            Self::InvalidLayout(err) => Some(err),
+            Self::LenMismatch(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
         }
     }
 }
 
-impl From<FillBytesWithFieldsError> for ErasedSoaFromBytesFieldsDescriptorsError {
+impl From<WriteCopyOfFieldsError> for ErasedSoaFromStorageFieldsDescriptorsError {
     #[inline]
-    fn from(value: FillBytesWithFieldsError) -> Self {
-        match value {
-            FillBytesWithFieldsError::LenMismatch(err) => Self::LenMismatch(err),
-            FillBytesWithFieldsError::InvalidLayout(err) => Self::InvalidLayout(err),
+    fn from(error: WriteCopyOfFieldsError) -> Self {
+        match error {
+            WriteCopyOfFieldsError::LenMismatch(error) => Self::LenMismatch(error),
+            WriteCopyOfFieldsError::InvalidLayout(error) => Self::InvalidLayout(error),
+            WriteCopyOfFieldsError::InsufficientAlign(error) => Self::InsufficientAlign(error),
         }
     }
 }
 
-impl<B> From<FillBytesWithFieldsError> for ErasedSoaFromFieldsDescriptorsError<B, u8>
+impl<T, A> From<WriteCopyOfFieldsError> for ErasedSoaFromFieldsDescriptorsError<T, A>
 where
-    B: AlignedStorageFromLayout<u8>,
+    A: AddressableUnit,
+    T: AlignedStorageFromLayout<A>,
 {
     #[inline]
-    fn from(value: FillBytesWithFieldsError) -> Self {
-        match value {
-            FillBytesWithFieldsError::LenMismatch(err) => Self::LenMismatch(err),
-            FillBytesWithFieldsError::InvalidLayout(err) => Self::InvalidLayout(err),
+    fn from(error: WriteCopyOfFieldsError) -> Self {
+        match error {
+            WriteCopyOfFieldsError::LenMismatch(error) => Self::LenMismatch(error),
+            WriteCopyOfFieldsError::InvalidLayout(error) => Self::InvalidLayout(error),
+            WriteCopyOfFieldsError::InsufficientAlign(error) => Self::InsufficientAlign(error),
         }
     }
 }
 
-fn fill_bytes_with_fields<B, I, F>(
-    bytes: &mut B,
+fn write_copy_of_fields<T, I, F>(
+    dst: &mut [MaybeUninit<T>],
     fields: I,
     descriptors: &[FieldDescriptor],
-) -> Result<(), FillBytesWithFieldsError>
+) -> Result<(), WriteCopyOfFieldsError>
 where
-    B: AlignedStorage<u8> + ?Sized,
+    T: Copy,
     I: IntoIterator<Item = F>,
-    F: AsRef<[u8]>,
+    F: AsRef<[T]>,
 {
     use IterOrFieldLenMismatchError::{FieldLenMismatch, IterLenMismatch};
 
@@ -441,26 +538,24 @@ where
         .zip_longest(fields)
         .enumerate()
         .try_for_each(|(field_index, item)| {
-            let Both(item, src) = item else {
-                let err = LenMismatchError::new(descriptors.len(), field_index);
-                let err = IterLenMismatch(err).into();
-                return Err(err);
+            let Both(offset, src) = item else {
+                let error = LenMismatchError::new(descriptors.len(), field_index);
+                let error = IterLenMismatch(error).into();
+                return Err(error);
             };
             let BufferOffset {
                 field_descriptor,
                 offset,
                 ..
-            } = item?;
+            } = offset?;
 
-            let src = src.as_ref();
-            let len = field_descriptor.layout().size();
-            check_len(src.len(), len).map_err(|error| FieldLenMismatch { error, field_index })?;
+            let layout = field_descriptor.layout();
+            check_sufficient_align(layout, Layout::new::<T>())?;
 
-            let src = src.as_ptr();
-            let dst = unsafe { bytes.as_mut_ptr().add(offset) };
-            unsafe {
-                ptr::copy_nonoverlapping(src, dst, len);
-            }
+            let offset = offset.div_ceil(size_of::<T>());
+            let len = layout.size().div_ceil(size_of::<T>());
+            write_copy_of_slice(&mut dst[offset..offset + len], src.as_ref())
+                .map_err(|error| FieldLenMismatch { error, field_index })?;
 
             Ok(())
         })

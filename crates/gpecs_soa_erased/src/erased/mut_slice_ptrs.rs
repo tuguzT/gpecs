@@ -1,4 +1,5 @@
 use core::{
+    alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
     slice,
@@ -10,28 +11,32 @@ use crate::{
         ErasedSoaSlicePtrsIter, ErasedSoaSlices, ErasedSoaSlicesMut,
         error::{ErasedSoaIntoValueError, ErasedSoaSlicePtrsError, check_offset, check_offset_len},
     },
-    error::check_sufficient_len,
+    error::{check_ptr_align, check_sufficient_align, check_sufficient_len},
     field::{ErasedFieldSliceMutPtr, ErasedFieldSlicePtr, field_slice_from_raw_parts_mut},
     soa::{
-        field::{FieldDescriptor, buffer_layout},
+        field::{FieldDescriptor, buffer_offsets},
         traits::{AllocSoa, RawSoaContext, SliceMutPtrs},
     },
+    storage::AddressableUnit,
 };
 
-#[derive(Debug, Clone, Copy)]
-pub struct ErasedSoaSliceMutPtrs<D>
+pub struct ErasedSoaSliceMutPtrs<D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
     len: usize,
-    ptrs: ErasedSoaMutPtrs<D>,
+    ptrs: ErasedSoaMutPtrs<D, A>,
 }
 
-impl<D> ErasedSoaSliceMutPtrs<D> {
+impl<D, A> ErasedSoaSliceMutPtrs<D, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        ptr: *mut u8,
+        ptr: *mut A,
         capacity: usize,
         offset: usize,
         len: usize,
@@ -41,62 +46,69 @@ impl<D> ErasedSoaSliceMutPtrs<D> {
     }
 
     #[inline]
-    pub unsafe fn from_mut_ptrs(ptrs: ErasedSoaMutPtrs<D>, len: usize) -> Self {
+    pub unsafe fn from_mut_ptrs(ptrs: ErasedSoaMutPtrs<D, A>, len: usize) -> Self {
         Self { len, ptrs }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, *mut u8, usize, usize, usize) {
+    pub fn into_parts(self) -> (D, *mut A, usize, usize, usize) {
         let Self { ptrs, len } = self;
         let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
         (descriptors, ptr, capacity, offset, len)
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, A> {
         let Self { ptrs, .. } = self;
         ptrs.cast_const()
     }
 
     #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D> {
+    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, A> {
         let Self { ptrs, .. } = self;
         ptrs
     }
 
     #[inline]
-    pub fn cast_const(self) -> ErasedSoaSlicePtrs<D> {
+    pub fn cast_const(self) -> ErasedSoaSlicePtrs<D, A> {
         let Self { ptrs, len } = self;
         unsafe { ErasedSoaSlicePtrs::from_ptrs(ptrs.cast_const(), len) }
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedSoaSlices<'a, D> {
+    pub unsafe fn deref<'a>(self) -> ErasedSoaSlices<'a, D, A> {
         unsafe { self.cast_const().deref() }
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedSoaSlicesMut<'a, D> {
-        let Self { ptrs, len } = self;
-        let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
-        unsafe { ErasedSoaSlicesMut::new_unchecked(descriptors, ptr, capacity, offset, len) }
+    pub unsafe fn deref_mut<'a>(self) -> ErasedSoaSlicesMut<'a, D, A> {
+        unsafe { ErasedSoaSlicesMut::from_mut_ptrs(self) }
     }
 }
 
-impl<D> ErasedSoaSliceMutPtrs<D>
+impl<D, A> ErasedSoaSliceMutPtrs<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
     pub fn new(
         descriptors: D,
-        buffer: *mut [u8],
+        buffer: *mut [A],
         capacity: usize,
         offset: usize,
         len: usize,
     ) -> Result<Self, ErasedSoaSlicePtrsError> {
-        let layout = buffer_layout(descriptors.as_ref(), capacity)?;
-        check_sufficient_len(buffer.len(), layout.size())?;
+        let mut offsets = buffer_offsets(descriptors.as_ref(), capacity);
+        offsets.by_ref().try_for_each(|offset| {
+            let desc = offset?.field_descriptor;
+            check_sufficient_align(desc.layout(), Layout::new::<A>())
+                .map_err(ErasedSoaSlicePtrsError::from)
+        })?;
+
+        let layout = offsets.layout();
+        check_sufficient_len(buffer.len() * size_of::<A>(), layout.size())?;
+        check_ptr_align(buffer.cast(), layout)?;
         check_offset(offset, capacity)?;
         check_offset_len(offset, len, capacity)?;
 
@@ -104,7 +116,12 @@ where
         let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset, len) };
         Ok(me)
     }
+}
 
+impl<D> ErasedSoaSliceMutPtrs<D, u8>
+where
+    D: AsRef<[FieldDescriptor]>,
+{
     #[inline]
     pub unsafe fn try_into<T>(
         self,
@@ -124,18 +141,19 @@ where
     }
 }
 
-impl<D> ErasedSoaSliceMutPtrs<D>
+impl<D, A> ErasedSoaSliceMutPtrs<D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> *const A {
         let Self { ptrs, .. } = self;
         ptrs.as_ptr()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub fn as_mut_ptr(&mut self) -> *mut A {
         let Self { ptrs, .. } = self;
         ptrs.as_mut_ptr()
     }
@@ -164,8 +182,9 @@ where
     }
 }
 
-impl<D> ErasedSoaSliceMutPtrs<D>
+impl<D, A> ErasedSoaSliceMutPtrs<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
@@ -175,7 +194,7 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedSoaSlicePtrsIter<slice::Iter<'_, FieldDescriptor>> {
+    pub fn iter(&self) -> ErasedSoaSlicePtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
         let Self { ref ptrs, len } = *self;
 
         let ptrs = ptrs.iter();
@@ -183,7 +202,7 @@ where
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> ErasedSoaSliceMutPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+    pub fn iter_mut(&mut self) -> ErasedSoaSliceMutPtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
         let Self { ref mut ptrs, len } = *self;
 
         let ptrs = ptrs.iter_mut();
@@ -191,12 +210,48 @@ where
     }
 }
 
-impl<'a, D> IntoIterator for &'a ErasedSoaSliceMutPtrs<D>
+impl<D, A> Debug for ErasedSoaSliceMutPtrs<D, A>
 where
+    A: AddressableUnit,
+    D: Debug + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { len, ptrs } = self;
+        f.debug_struct("ErasedSoaSliceMutPtrs")
+            .field("len", len)
+            .field("ptrs", &ptrs)
+            .finish()
+    }
+}
+
+impl<D, A> Clone for ErasedSoaSliceMutPtrs<D, A>
+where
+    A: AddressableUnit,
+    D: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self { len, ref ptrs } = *self;
+
+        let ptrs = ptrs.clone();
+        Self { len, ptrs }
+    }
+}
+
+impl<D, A> Copy for ErasedSoaSliceMutPtrs<D, A>
+where
+    A: AddressableUnit,
+    D: Copy,
+{
+}
+
+impl<'a, D, A> IntoIterator for &'a ErasedSoaSliceMutPtrs<D, A>
+where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Item = ErasedFieldSlicePtr<u8>;
-    type IntoIter = ErasedSoaSlicePtrsIter<slice::Iter<'a, FieldDescriptor>>;
+    type Item = ErasedFieldSlicePtr<A>;
+    type IntoIter = ErasedSoaSlicePtrsIter<slice::Iter<'a, FieldDescriptor>, A>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -204,12 +259,13 @@ where
     }
 }
 
-impl<'a, D> IntoIterator for &'a mut ErasedSoaSliceMutPtrs<D>
+impl<'a, D, A> IntoIterator for &'a mut ErasedSoaSliceMutPtrs<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Item = ErasedFieldSliceMutPtr<u8>;
-    type IntoIter = ErasedSoaSliceMutPtrsIter<slice::Iter<'a, FieldDescriptor>>;
+    type Item = ErasedFieldSliceMutPtr<A>;
+    type IntoIter = ErasedSoaSliceMutPtrsIter<slice::Iter<'a, FieldDescriptor>, A>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -217,14 +273,15 @@ where
     }
 }
 
-impl<D> IntoIterator for ErasedSoaSliceMutPtrs<D>
+impl<D, A> IntoIterator for ErasedSoaSliceMutPtrs<D, A>
 where
+    A: AddressableUnit,
     D: IntoIterator,
     D::Item: AsRef<FieldDescriptor>,
     D::IntoIter: AsRef<[FieldDescriptor]>,
 {
-    type Item = ErasedFieldSliceMutPtr<u8>;
-    type IntoIter = ErasedSoaSliceMutPtrsIter<D::IntoIter>;
+    type Item = ErasedFieldSliceMutPtr<A>;
+    type IntoIter = ErasedSoaSliceMutPtrsIter<D::IntoIter, A>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -236,31 +293,38 @@ where
 }
 
 #[inline]
-pub unsafe fn slice_from_raw_parts_mut<D>(
-    data: ErasedSoaMutPtrs<D>,
+pub unsafe fn slice_from_raw_parts_mut<D, A>(
+    data: ErasedSoaMutPtrs<D, A>,
     len: usize,
-) -> ErasedSoaSliceMutPtrs<D> {
+) -> ErasedSoaSliceMutPtrs<D, A>
+where
+    A: AddressableUnit,
+{
     unsafe { ErasedSoaSliceMutPtrs::from_mut_ptrs(data, len) }
 }
 
-#[derive(Clone)]
-pub struct ErasedSoaSliceMutPtrsIter<D>
+pub struct ErasedSoaSliceMutPtrsIter<D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
     len: usize,
-    ptrs: ErasedSoaMutPtrsIter<D>,
+    ptrs: ErasedSoaMutPtrsIter<D, A>,
 }
 
-impl<D> ErasedSoaSliceMutPtrsIter<D> {
+impl<D, A> ErasedSoaSliceMutPtrsIter<D, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    pub(super) unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrsIter<D>, len: usize) -> Self {
+    pub(super) unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrsIter<D, A>, len: usize) -> Self {
         Self { len, ptrs }
     }
 }
 
-impl<D> ErasedSoaSliceMutPtrsIter<D>
+impl<D, A> ErasedSoaSliceMutPtrsIter<D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
     #[inline]
@@ -276,8 +340,9 @@ where
     }
 }
 
-impl<D> ErasedSoaSliceMutPtrsIter<D>
+impl<D, A> ErasedSoaSliceMutPtrsIter<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
@@ -289,7 +354,7 @@ where
     #[inline]
     pub(super) fn debug_entries(
         &self,
-    ) -> ErasedSoaSliceMutPtrsIter<slice::Iter<'_, FieldDescriptor>> {
+    ) -> ErasedSoaSliceMutPtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
         let Self { ref ptrs, len } = *self;
 
         let ptrs = ptrs.debug_entries();
@@ -297,8 +362,9 @@ where
     }
 }
 
-impl<D> Debug for ErasedSoaSliceMutPtrsIter<D>
+impl<D, A> Debug for ErasedSoaSliceMutPtrsIter<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -307,12 +373,27 @@ where
     }
 }
 
-impl<D> Iterator for ErasedSoaSliceMutPtrsIter<D>
+impl<D, A> Clone for ErasedSoaSliceMutPtrsIter<D, A>
 where
+    A: AddressableUnit,
+    D: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self { len, ref ptrs } = *self;
+
+        let ptrs = ptrs.clone();
+        Self { len, ptrs }
+    }
+}
+
+impl<D, A> Iterator for ErasedSoaSliceMutPtrsIter<D, A>
+where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + Iterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
-    type Item = ErasedFieldSliceMutPtr<u8>;
+    type Item = ErasedFieldSliceMutPtr<A>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -330,8 +411,9 @@ where
     }
 }
 
-impl<D> ExactSizeIterator for ErasedSoaSliceMutPtrsIter<D>
+impl<D, A> ExactSizeIterator for ErasedSoaSliceMutPtrsIter<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ExactSizeIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
@@ -342,8 +424,9 @@ where
     }
 }
 
-impl<D> FusedIterator for ErasedSoaSliceMutPtrsIter<D>
+impl<D, A> FusedIterator for ErasedSoaSliceMutPtrsIter<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + FusedIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {

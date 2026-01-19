@@ -7,14 +7,15 @@ type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
 #[cfg_attr(miri, ignore)]
 fn context() {
     let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
-    let _context = ErasedSoaContext::new(descriptors);
+    let _context = ErasedSoaContext::<_, u8>::new(descriptors).unwrap();
 }
 
 #[test]
 #[cfg_attr(miri, ignore)]
 fn context_of() {
     let context = Default::default();
-    let context = ErasedSoaContext::<ArrayDescriptors<3>>::of::<(u32, u16, u8)>(&context);
+    let context =
+        ErasedSoaContext::<ArrayDescriptors<3>, u8>::of::<(u32, u16, u8)>(&context).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -35,7 +36,7 @@ fn context_of() {
 #[cfg_attr(miri, ignore)]
 fn context_of_zst() {
     let context = Default::default();
-    let context = ErasedSoaContext::<ArrayDescriptors<1>>::of::<()>(&context);
+    let context = ErasedSoaContext::<ArrayDescriptors<1>, u8>::of::<()>(&context).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(

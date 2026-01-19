@@ -19,7 +19,8 @@ where
 
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
-        let context = BoxedErasedSoaContext::of::<T>(&Default::default());
+        let context = BoxedErasedSoaContext::of::<T>(&Default::default())
+            .expect("descriptors should be valid");
         let fields = context.field_descriptors();
         let buffer_layout = buffer_layout(fields, capacity).unwrap();
         let bytes = buffer_layout.size();

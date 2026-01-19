@@ -39,7 +39,8 @@ fn value() {
 
     let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Value>()).unwrap();
     let erased_value =
-        ErasedSoa::<_, ArrayDescriptors<5>>::try_from_bytes_value(bytes, &context, value).unwrap();
+        ErasedSoa::<_, ArrayDescriptors<5>, _>::try_from_storage_value(bytes, &context, value)
+            .unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -148,9 +149,11 @@ fn value() {
 
     let (descriptors, fields): (ArrayDescriptors<4>, ArrayVec<_, 4>) =
         fields.into_iter().map(ErasedField::into_parts).unzip();
-    let erased_value =
-        ErasedSoa::<BoxedAlignedUninitStorage, _>::try_from_fields_descriptors(fields, descriptors)
-            .expect("all the fields should be valid here");
+    let erased_value = ErasedSoa::<BoxedAlignedUninitStorage, _, _>::try_from_fields_descriptors(
+        fields,
+        descriptors,
+    )
+    .expect("all the fields should be valid here");
 
     let erased_value_refs = erased_value.as_fields();
     itertools::assert_equal(
@@ -174,7 +177,8 @@ fn value_zst() {
     let bytes = [MaybeUninit::zeroed(); size_of::<()>() * 2];
     let bytes = AlignedUninitStorage::new(bytes, Layout::new::<()>()).unwrap();
     let erased_value =
-        ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, &context, value).unwrap();
+        ErasedSoa::<_, ArrayDescriptors<1>, _>::try_from_storage_value(bytes, &context, value)
+            .unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(

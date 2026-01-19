@@ -150,7 +150,6 @@ where
     }
 }
 
-#[expect(clippy::expl_impl_clone_on_copy, reason = "no auto-placed bounds")]
 impl<A> Clone for ErasedFieldPtr<A>
 where
     A: AddressableUnit,

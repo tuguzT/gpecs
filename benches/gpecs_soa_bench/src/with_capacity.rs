@@ -18,7 +18,7 @@ pub trait WithCapacity: SoaVecs<Context: Default> + Sized {
     fn soa_ser_with_capacity(capacity: usize) -> SoaVec<BoxedErasedSoa> {
         let capacity = black_box(capacity);
         let context = Default::default();
-        let context = ErasedSoaContext::of::<Self>(&context);
+        let context = ErasedSoaContext::of::<Self>(&context).expect("descriptors should be valid");
         let vec = SoaVec::with_context_and_capacity(context, capacity);
         black_box(vec)
     }

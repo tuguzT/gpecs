@@ -117,7 +117,6 @@ where
     }
 }
 
-#[expect(clippy::expl_impl_clone_on_copy)]
 impl<K> Clone for SparseItem<K>
 where
     K: Key,

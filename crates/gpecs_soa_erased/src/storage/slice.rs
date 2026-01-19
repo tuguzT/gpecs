@@ -142,7 +142,6 @@ where
     }
 }
 
-#[expect(clippy::expl_impl_clone_on_copy, reason = "false positive")]
 impl<T, A> Clone for AlignedUninitStorage<T, A>
 where
     A: AddressableUnit,

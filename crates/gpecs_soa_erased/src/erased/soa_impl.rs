@@ -8,7 +8,7 @@ use crate::{
             SoaAsRefs, SoaContext, SoaRead, SoaWrite,
         },
     },
-    storage::{AlignedStorage, AlignedStorageFromLayout},
+    storage::{AddressableUnit, AlignedStorage, AlignedStorageFromLayout},
 };
 
 use super::{
@@ -18,11 +18,12 @@ use super::{
     slice_from_raw_parts_mut,
 };
 
-unsafe impl<D> RawSoaContext for ErasedSoaContext<D>
+unsafe impl<D, A> RawSoaContext for ErasedSoaContext<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Ptrs<'a> = ErasedSoaPtrs<&'a [FieldDescriptor]>;
+    type Ptrs<'a> = ErasedSoaPtrs<&'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_ptrs<'short, 'long: 'short>(from: Self::Ptrs<'long>) -> Self::Ptrs<'short> {
@@ -32,7 +33,7 @@ where
     #[inline]
     fn ptrs_dangling(&self) -> Self::Ptrs<'_> {
         let descriptors = self.field_descriptors();
-        ErasedSoaPtrs::dangling(descriptors)
+        ErasedSoaPtrs::dangling(descriptors).expect("descriptors should have sufficient alignment")
     }
 
     #[inline]
@@ -52,7 +53,7 @@ where
         unsafe { ptrs.offset_from(&origin) }
     }
 
-    type MutPtrs<'a> = ErasedSoaMutPtrs<&'a [FieldDescriptor]>;
+    type MutPtrs<'a> = ErasedSoaMutPtrs<&'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_mut_ptrs<'short, 'long: 'short>(from: Self::MutPtrs<'long>) -> Self::MutPtrs<'short> {
@@ -63,6 +64,7 @@ where
     fn ptrs_dangling_mut(&self) -> Self::MutPtrs<'_> {
         let descriptors = self.field_descriptors();
         ErasedSoaMutPtrs::dangling(descriptors)
+            .expect("descriptors should have sufficient alignment")
     }
 
     #[inline]
@@ -152,7 +154,7 @@ where
         // do nothing; it's safe to not drop anything
     }
 
-    type NonNullPtrs<'a> = ErasedSoaNonNullPtrs<&'a [FieldDescriptor]>;
+    type NonNullPtrs<'a> = ErasedSoaNonNullPtrs<&'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_nonnull_ptrs<'short, 'long: 'short>(
@@ -181,7 +183,7 @@ where
         unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 
-    type SlicePtrs<'a> = ErasedSoaSlicePtrs<&'a [FieldDescriptor]>;
+    type SlicePtrs<'a> = ErasedSoaSlicePtrs<&'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_slice_ptrs<'short, 'long: 'short>(
@@ -218,7 +220,7 @@ where
         slices.into_ptrs()
     }
 
-    type SliceMutPtrs<'a> = ErasedSoaSliceMutPtrs<&'a [FieldDescriptor]>;
+    type SliceMutPtrs<'a> = ErasedSoaSliceMutPtrs<&'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
@@ -277,18 +279,20 @@ where
     }
 }
 
-unsafe impl<B, D> RawSoa for ErasedSoa<B, D>
+unsafe impl<T, D, A> RawSoa for ErasedSoa<T, D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Context = ErasedSoaContext<D>;
+    type Context = ErasedSoaContext<D, A>;
     type Fields = ErasedSoaFields;
 }
 
-unsafe impl<B, D> SoaRead for ErasedSoa<B, D>
+unsafe impl<T, D, A> SoaRead for ErasedSoa<T, D, A>
 where
-    B: AlignedStorageFromLayout<u8>,
-    B::Error: Debug,
+    A: AddressableUnit,
+    T: AlignedStorageFromLayout<A>,
+    T::Error: Debug,
     D: AsRef<[FieldDescriptor]> + Clone,
 {
     #[inline]
@@ -305,9 +309,10 @@ where
     }
 }
 
-unsafe impl<B, D> SoaWrite for ErasedSoa<B, D>
+unsafe impl<T, D, A> SoaWrite for ErasedSoa<T, D, A>
 where
-    B: AlignedStorage<u8>,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
@@ -322,7 +327,7 @@ where
     }
 }
 
-unsafe impl<D> AllocSoaContext for ErasedSoaContext<D>
+unsafe impl<D> AllocSoaContext for ErasedSoaContext<D, u8>
 where
     D: AsRef<[FieldDescriptor]>,
 {
@@ -353,11 +358,12 @@ where
     }
 }
 
-unsafe impl<'data, D> SoaContext<'data> for ErasedSoaContext<D>
+unsafe impl<'data, D, A> SoaContext<'data> for ErasedSoaContext<D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Refs<'a> = ErasedSoaRefs<'data, &'a [FieldDescriptor]>;
+    type Refs<'a> = ErasedSoaRefs<'data, &'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_refs<'short, 'long: 'short>(from: Self::Refs<'long>) -> Self::Refs<'short> {
@@ -380,7 +386,7 @@ where
         refs.into_ptrs()
     }
 
-    type RefsMut<'a> = ErasedSoaRefsMut<'data, &'a [FieldDescriptor]>;
+    type RefsMut<'a> = ErasedSoaRefsMut<'data, &'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_mut_refs<'short, 'long: 'short>(from: Self::RefsMut<'long>) -> Self::RefsMut<'short> {
@@ -413,7 +419,7 @@ where
         unsafe { ErasedSoaRefs::new_unchecked(descriptors, ptr, capacity, offset) }
     }
 
-    type Slices<'a> = ErasedSoaSlices<'data, &'a [FieldDescriptor]>;
+    type Slices<'a> = ErasedSoaSlices<'data, &'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_slices<'short, 'long: 'short>(from: Self::Slices<'long>) -> Self::Slices<'short> {
@@ -444,7 +450,7 @@ where
         slices.len()
     }
 
-    type SlicesMut<'a> = ErasedSoaSlicesMut<'data, &'a [FieldDescriptor]>;
+    type SlicesMut<'a> = ErasedSoaSlicesMut<'data, &'a [FieldDescriptor], A>;
 
     #[inline]
     fn upcast_mut_slices<'short, 'long: 'short>(
@@ -494,9 +500,10 @@ where
     }
 }
 
-impl<'a, B, D> SoaAsRefs<'a> for ErasedSoa<B, D>
+impl<'a, T, D, A> SoaAsRefs<'a> for ErasedSoa<T, D, A>
 where
-    B: AlignedStorage<u8>,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
@@ -508,9 +515,10 @@ where
     }
 }
 
-impl<'a, B, D> SoaAsMutRefs<'a> for ErasedSoa<B, D>
+impl<'a, T, D, A> SoaAsMutRefs<'a> for ErasedSoa<T, D, A>
 where
-    B: AlignedStorage<u8>,
+    A: AddressableUnit,
+    T: AlignedStorage<A>,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]

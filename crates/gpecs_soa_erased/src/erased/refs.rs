@@ -15,22 +15,26 @@ use crate::{
         field::FieldDescriptor,
         traits::{AllocSoa, Refs, Soa, SoaContext},
     },
+    storage::AddressableUnit,
 };
 
-#[derive(Clone, Copy)]
-pub struct ErasedSoaRefs<'a, D>
+pub struct ErasedSoaRefs<'a, D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
-    phantom: PhantomData<&'a [u8]>,
-    ptrs: ErasedSoaPtrs<D>,
+    phantom: PhantomData<&'a [A]>,
+    ptrs: ErasedSoaPtrs<D, A>,
 }
 
-impl<D> ErasedSoaRefs<'_, D> {
+impl<D, A> ErasedSoaRefs<'_, D, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        ptr: *const u8,
+        ptr: *const A,
         capacity: usize,
         offset: usize,
     ) -> Self {
@@ -39,34 +43,33 @@ impl<D> ErasedSoaRefs<'_, D> {
     }
 
     #[inline]
-    pub unsafe fn from_ptrs(ptrs: ErasedSoaPtrs<D>) -> Self {
-        Self {
-            ptrs,
-            phantom: PhantomData,
-        }
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaPtrs<D, A>) -> Self {
+        let phantom = PhantomData;
+        Self { phantom, ptrs }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, *const u8, usize, usize) {
+    pub fn into_parts(self) -> (D, *const A, usize, usize) {
         let Self { ptrs, .. } = self;
         ptrs.into_parts()
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D> {
+    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, A> {
         let Self { ptrs, .. } = self;
         ptrs
     }
 }
 
-impl<'a, D> ErasedSoaRefs<'a, D>
+impl<'a, D, A> ErasedSoaRefs<'a, D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
     pub fn new(
         descriptors: D,
-        buffer: &'a [u8],
+        buffer: &'a [A],
         capacity: usize,
         offset: usize,
     ) -> Result<Self, ErasedSoaPtrsError> {
@@ -74,7 +77,12 @@ where
         let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)
     }
+}
 
+impl<'a, D> ErasedSoaRefs<'a, D, u8>
+where
+    D: AsRef<[FieldDescriptor]>,
+{
     #[inline]
     pub unsafe fn try_into<T>(
         self,
@@ -94,12 +102,13 @@ where
     }
 }
 
-impl<D> ErasedSoaRefs<'_, D>
+impl<D, A> ErasedSoaRefs<'_, D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> *const A {
         let Self { ptrs, .. } = self;
         ptrs.as_ptr()
     }
@@ -117,8 +126,9 @@ where
     }
 }
 
-impl<D> ErasedSoaRefs<'_, D>
+impl<D, A> ErasedSoaRefs<'_, D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
@@ -128,7 +138,7 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedSoaRefsIter<'_, slice::Iter<'_, FieldDescriptor>> {
+    pub fn iter(&self) -> ErasedSoaRefsIter<'_, slice::Iter<'_, FieldDescriptor>, A> {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter();
@@ -136,8 +146,9 @@ where
     }
 }
 
-impl<D> Debug for ErasedSoaRefs<'_, D>
+impl<D, A> Debug for ErasedSoaRefs<'_, D, A>
 where
+    A: AddressableUnit,
     D: Debug + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -148,12 +159,34 @@ where
     }
 }
 
-impl<'a, D> IntoIterator for &'a ErasedSoaRefs<'_, D>
+impl<D, A> Clone for ErasedSoaRefs<'_, D, A>
 where
+    A: AddressableUnit,
+    D: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self { phantom, ref ptrs } = *self;
+
+        let ptrs = ptrs.clone();
+        Self { phantom, ptrs }
+    }
+}
+
+impl<D, A> Copy for ErasedSoaRefs<'_, D, A>
+where
+    A: AddressableUnit,
+    D: Copy,
+{
+}
+
+impl<'a, D, A> IntoIterator for &'a ErasedSoaRefs<'_, D, A>
+where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
-    type Item = ErasedFieldRef<'a, u8>;
-    type IntoIter = ErasedSoaRefsIter<'a, slice::Iter<'a, FieldDescriptor>>;
+    type Item = ErasedFieldRef<'a, A>;
+    type IntoIter = ErasedSoaRefsIter<'a, slice::Iter<'a, FieldDescriptor>, A>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -161,14 +194,15 @@ where
     }
 }
 
-impl<'a, D> IntoIterator for ErasedSoaRefs<'a, D>
+impl<'a, D, A> IntoIterator for ErasedSoaRefs<'a, D, A>
 where
+    A: AddressableUnit,
     D: IntoIterator,
     D::Item: AsRef<FieldDescriptor>,
     D::IntoIter: AsRef<[FieldDescriptor]>,
 {
-    type Item = ErasedFieldRef<'a, u8>;
-    type IntoIter = ErasedSoaRefsIter<'a, D::IntoIter>;
+    type Item = ErasedFieldRef<'a, A>;
+    type IntoIter = ErasedSoaRefsIter<'a, D::IntoIter, A>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -179,27 +213,29 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct ErasedSoaRefsIter<'a, D>
+pub struct ErasedSoaRefsIter<'a, D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
-    phantom: PhantomData<&'a [u8]>,
-    ptrs: ErasedSoaPtrsIter<D>,
+    phantom: PhantomData<&'a [A]>,
+    ptrs: ErasedSoaPtrsIter<D, A>,
 }
 
-impl<D> ErasedSoaRefsIter<'_, D> {
+impl<D, A> ErasedSoaRefsIter<'_, D, A>
+where
+    A: AddressableUnit,
+{
     #[inline]
-    pub(super) unsafe fn from_ptrs(ptrs: ErasedSoaPtrsIter<D>) -> Self {
-        Self {
-            ptrs,
-            phantom: PhantomData,
-        }
+    pub(super) unsafe fn from_ptrs(ptrs: ErasedSoaPtrsIter<D, A>) -> Self {
+        let phantom = PhantomData;
+        Self { phantom, ptrs }
     }
 }
 
-impl<D> ErasedSoaRefsIter<'_, D>
+impl<D, A> ErasedSoaRefsIter<'_, D, A>
 where
+    A: AddressableUnit,
     D: ?Sized,
 {
     #[inline]
@@ -215,8 +251,9 @@ where
     }
 }
 
-impl<D> ErasedSoaRefsIter<'_, D>
+impl<D, A> ErasedSoaRefsIter<'_, D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     #[inline]
@@ -226,7 +263,9 @@ where
     }
 
     #[inline]
-    pub(super) fn debug_entries(&self) -> ErasedSoaRefsIter<'_, slice::Iter<'_, FieldDescriptor>> {
+    pub(super) fn debug_entries(
+        &self,
+    ) -> ErasedSoaRefsIter<'_, slice::Iter<'_, FieldDescriptor>, A> {
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.debug_entries();
@@ -234,8 +273,9 @@ where
     }
 }
 
-impl<D> Debug for ErasedSoaRefsIter<'_, D>
+impl<D, A> Debug for ErasedSoaRefsIter<'_, D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -244,12 +284,27 @@ where
     }
 }
 
-impl<'a, D> Iterator for ErasedSoaRefsIter<'a, D>
+impl<D, A> Clone for ErasedSoaRefsIter<'_, D, A>
 where
+    A: AddressableUnit,
+    D: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let Self { phantom, ref ptrs } = *self;
+
+        let ptrs = ptrs.clone();
+        Self { phantom, ptrs }
+    }
+}
+
+impl<'a, D, A> Iterator for ErasedSoaRefsIter<'a, D, A>
+where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + Iterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
-    type Item = ErasedFieldRef<'a, u8>;
+    type Item = ErasedFieldRef<'a, A>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -266,8 +321,9 @@ where
     }
 }
 
-impl<D> ExactSizeIterator for ErasedSoaRefsIter<'_, D>
+impl<D, A> ExactSizeIterator for ErasedSoaRefsIter<'_, D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + ExactSizeIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
@@ -278,8 +334,9 @@ where
     }
 }
 
-impl<D> FusedIterator for ErasedSoaRefsIter<'_, D>
+impl<D, A> FusedIterator for ErasedSoaRefsIter<'_, D, A>
 where
+    A: AddressableUnit,
     D: AsRef<[FieldDescriptor]> + FusedIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {

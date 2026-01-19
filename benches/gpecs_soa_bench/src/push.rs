@@ -50,7 +50,7 @@ impl Push for Zero {
         let bytes = [MaybeUninit::<u8>::zeroed(); size_of::<Self>() * 2];
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, context, value)
+            ErasedSoa::<_, ArrayDescriptors<1>, _>::try_from_storage_value(bytes, context, value)
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -80,7 +80,7 @@ impl Push for Tiny {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<1>>::try_from_bytes_value(bytes, context, value)
+            ErasedSoa::<_, ArrayDescriptors<1>, _>::try_from_storage_value(bytes, context, value)
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -112,7 +112,7 @@ impl Push for Small {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<3>>::try_from_bytes_value(bytes, context, value)
+            ErasedSoa::<_, ArrayDescriptors<3>, _>::try_from_storage_value(bytes, context, value)
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -144,7 +144,7 @@ impl Push for Medium {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<3>>::try_from_bytes_value(bytes, context, value)
+            ErasedSoa::<_, ArrayDescriptors<3>, _>::try_from_storage_value(bytes, context, value)
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -179,7 +179,7 @@ impl Push for Big {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<5>>::try_from_bytes_value(bytes, context, value)
+            ErasedSoa::<_, ArrayDescriptors<5>, _>::try_from_storage_value(bytes, context, value)
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -219,7 +219,7 @@ impl Push for Large {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<10>>::try_from_bytes_value(bytes, context, value)
+            ErasedSoa::<_, ArrayDescriptors<10>, _>::try_from_storage_value(bytes, context, value)
                 .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {

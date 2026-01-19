@@ -68,12 +68,13 @@ missing_docs = "allow"
 [workspace.lints.clippy]
 all = "warn"
 pedantic = "warn"
+doc_markdown = { level = "allow", priority = 1 }
 must_use_candidate = { level = "allow", priority = 1 }
+expl_impl_clone_on_copy = { level = "allow", priority = 1 }
 # TODO make them "warn" after implementation & tests
 missing_safety_doc = { level = "allow", priority = 1 }
 missing_errors_doc = { level = "allow", priority = 1 }
 missing_panics_doc = { level = "allow", priority = 1 }
-doc_markdown = { level = "allow", priority = 1 }
 
 [profile.release]
 debug = true

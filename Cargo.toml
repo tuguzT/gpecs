@@ -39,7 +39,7 @@ gpecs_types = { path = "crates/gpecs_types" }
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 cargo-gpu-install = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "70160693564611ca85e17a3c441da93ee642d29a" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "08f98a7335ae7e2ac4ec9423a9b1acf9270f2a65" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "7ad4c4dd3ec2a4a87c47b036469e2c6f4081242a" }
 indexmap = { version = "2.13", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }
@@ -52,7 +52,7 @@ pollster = { version = "0.4", default-features = false }
 bytemuck = { version = "1.24", default-features = false }
 const_format = { version = "0.2", default-features = false }
 log = { version = "0.4", default-features = false }
-glam = { version = "0.30", default-features = false }
+glam = { version = "0.31", default-features = false }
 renderdoc = { version = "0.12", default-features = false }
 env_logger = { version = "0.11" }
 wgpu = { version = "28" }

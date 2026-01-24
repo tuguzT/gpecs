@@ -9,6 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_types = { workspace = true }
+gpecs_sparse = { workspace = true }
 gpecs_soa_erased = { workspace = true }
 spirv-std = { workspace = true }
 

@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     erased::{
-        assert::assert_eq_descriptors,
+        assert::debug_assert_eq_descriptors,
         error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset},
     },
     error::{
@@ -221,7 +221,7 @@ where
 
         assert_eq!(ptr, origin.as_ptr());
         assert_eq!(capacity, origin.capacity());
-        assert_eq_descriptors(descriptors.as_ref(), origin.field_descriptors());
+        debug_assert_eq_descriptors(descriptors.as_ref(), origin.field_descriptors());
 
         unsafe { (offset - origin.offset).try_into().unwrap_unchecked() }
     }
@@ -233,7 +233,7 @@ where
         E: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self { descriptors, .. } = &self;
-        assert_eq_descriptors(descriptors.as_ref(), with.field_descriptors());
+        debug_assert_eq_descriptors(descriptors.as_ref(), with.field_descriptors());
 
         itertools::zip_eq(self.iter(), with.iter()).for_each(|(me, with)| unsafe { me.swap(with) });
     }
@@ -245,7 +245,7 @@ where
         E: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self { descriptors, .. } = &self;
-        assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
+        debug_assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self.iter(), from)
             .for_each(|(me, from)| unsafe { me.copy_from(from, count) });
@@ -258,7 +258,7 @@ where
         E: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self { descriptors, .. } = &self;
-        assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
+        debug_assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         #[inline]
         #[expect(clippy::items_after_statements)]
@@ -289,7 +289,7 @@ where
         E: AsRef<[FieldDescriptor]> + ?Sized,
     {
         let Self { descriptors, .. } = &self;
-        assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
+        debug_assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
 
         itertools::zip_eq(self.iter(), from)
             .for_each(|(me, from)| unsafe { me.copy_from_nonoverlapping(from, count) });

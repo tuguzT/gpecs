@@ -27,8 +27,10 @@ pub fn erased_soa_work(
     let slices = unsafe {
         ErasedSoaSlicesMut::new_unchecked(descriptors, dense.as_mut_ptr(), capacity, 0, len)
     };
-    let slices = SoaSlicesMut::<ErasedSoa<&[u32], _, u32>>::new(&context, slices);
+    let mut dense = SoaSlicesMut::<ErasedSoa<&[u32], _, u32>>::new(&context, slices);
+    let _ = (&mut dense, invocation_id);
 
-    let ptrs = unsafe { slices.get_unchecked(invocation_id) };
-    dense[invocation_id] = u32::try_from(ptrs.offset()).unwrap_or_default();
+    // TODO: fix all the compilation issues
+    // uncomment the line below to get a compilation error to investigate
+    // dense.swap(invocation_id, invocation_id);
 }

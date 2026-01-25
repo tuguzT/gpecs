@@ -1,4 +1,7 @@
-use core::{fmt::Debug, ptr::NonNull};
+use core::{
+    fmt::Debug,
+    ptr::{self, NonNull},
+};
 
 use crate::{
     soa::{
@@ -348,12 +351,16 @@ where
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
         let descriptors = self.field_descriptors();
+        let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
+        let buffer = ptr::slice_from_raw_parts(buffer, layout.size());
         unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 
     #[inline]
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
         let descriptors = self.field_descriptors();
+        let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
+        let buffer = ptr::slice_from_raw_parts_mut(buffer, layout.size());
         unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 }
@@ -414,9 +421,8 @@ where
         let descriptors = self.field_descriptors();
         debug_assert_eq_descriptors(descriptors, refs.field_descriptors());
 
-        let (descriptors, ptr, capacity, offset) = refs.into_parts();
-        let ptr = ptr.cast_const();
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, ptr, capacity, offset) }
+        let (descriptors, buffer, capacity, offset) = refs.into_parts();
+        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 
     type Slices<'a> = ErasedSoaSlices<'data, &'a [FieldDescriptor], A>;
@@ -494,9 +500,8 @@ where
         let descriptors = self.field_descriptors();
         debug_assert_eq_descriptors(descriptors, slices.field_descriptors());
 
-        let (descriptors, ptr, capacity, offset, len) = slices.into_parts();
-        let ptr = ptr.cast_const();
-        unsafe { ErasedSoaSlices::new_unchecked(descriptors, ptr, capacity, offset, len) }
+        let (descriptors, buffer, capacity, offset, len) = slices.into_parts();
+        unsafe { ErasedSoaSlices::new_unchecked(descriptors, buffer, capacity, offset, len) }
     }
 }
 

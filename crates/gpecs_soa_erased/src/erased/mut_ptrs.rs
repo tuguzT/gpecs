@@ -28,7 +28,7 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    ptr: *mut A,
+    buffer: *mut [A],
     capacity: usize,
     offset: usize,
     descriptors: D,
@@ -41,12 +41,12 @@ where
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        ptr: *mut A,
+        buffer: *mut [A],
         capacity: usize,
         offset: usize,
     ) -> Self {
         Self {
-            ptr,
+            buffer,
             capacity,
             offset,
             descriptors,
@@ -54,21 +54,21 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, *mut A, usize, usize) {
+    pub fn into_parts(self) -> (D, *mut [A], usize, usize) {
         let Self {
             descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = self;
-        (descriptors, ptr, capacity, offset)
+        (descriptors, buffer, capacity, offset)
     }
 
     #[inline]
     pub fn cast_const(self) -> ErasedSoaPtrs<D, A> {
         let Self {
             descriptors,
-            ptr,
+            buffer: ptr,
             capacity,
             offset,
         } = self;
@@ -103,6 +103,7 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
+    #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
     pub fn new(
         descriptors: D,
         buffer: *mut [A],
@@ -121,8 +122,7 @@ where
         check_ptr_align(buffer.cast(), layout)?;
         check_offset(offset, capacity)?;
 
-        let ptr = buffer.cast();
-        let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) };
+        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset) };
         Ok(me)
     }
 
@@ -137,13 +137,14 @@ where
             Ok(usize::max(max_align, layout.align()))
         })?;
 
-        let ptr = ptr::without_provenance_mut(addr);
+        let data = ptr::without_provenance_mut(addr);
+        let buffer = ptr::slice_from_raw_parts_mut(data, 0);
         let capacity = match packed_size {
             0 => usize::MAX,
             _ => 0,
         };
 
-        let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, 0) };
+        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, 0) };
         Ok(me)
     }
 }
@@ -162,7 +163,7 @@ where
     {
         let Self {
             ref descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = self;
@@ -184,7 +185,7 @@ where
             return Err(ErasedSoaIntoValueError::new(self, error));
         }
 
-        let ptrs = unsafe { context.ptrs_from_buffer_mut(ptr, capacity) };
+        let ptrs = unsafe { context.ptrs_from_buffer_mut(buffer.cast(), capacity) };
         let ptrs = unsafe { context.ptrs_add_mut(ptrs, offset) };
         Ok(ptrs)
     }
@@ -196,15 +197,15 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_ptr(&self) -> *const A {
-        let Self { ptr, .. } = *self;
-        ptr
+    pub fn as_buffer(&self) -> *const [A] {
+        let Self { buffer, .. } = *self;
+        buffer
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut A {
-        let Self { ptr, .. } = *self;
-        ptr
+    pub fn as_mut_buffer(&mut self) -> *mut [A] {
+        let Self { buffer, .. } = *self;
+        buffer
     }
 
     #[inline]
@@ -239,12 +240,12 @@ where
     {
         let Self {
             ref descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = *self;
 
-        assert_eq!(ptr.cast_const(), origin.as_ptr());
+        assert_eq!(buffer.cast_const(), origin.as_buffer());
         assert_eq!(capacity, origin.capacity());
         debug_assert_eq_descriptors(descriptors.as_ref(), origin.field_descriptors());
 
@@ -321,26 +322,26 @@ where
     pub fn iter(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
         let Self {
             ref descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = *self;
 
         let descriptors = descriptors.as_ref().iter();
-        unsafe { ErasedSoaPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { ErasedSoaPtrsIter::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> ErasedSoaMutPtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
         let Self {
             ref descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = *self;
 
         let descriptors = descriptors.as_ref().iter();
-        unsafe { ErasedSoaMutPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { ErasedSoaMutPtrsIter::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 }
 
@@ -351,14 +352,14 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
-            ptr,
+            buffer,
             capacity,
             offset,
             descriptors,
         } = self;
 
         f.debug_struct("ErasedSoaMutPtrs")
-            .field("ptr", ptr)
+            .field("buffer", buffer)
             .field("capacity", capacity)
             .field("offset", offset)
             .field("descriptors", &descriptors)
@@ -374,14 +375,14 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self {
-            ptr,
+            buffer,
             capacity,
             offset,
             ref descriptors,
         } = *self;
 
         let descriptors = descriptors.clone();
-        unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 }
 
@@ -434,13 +435,13 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let Self {
             descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = self;
 
         let descriptors = descriptors.into_iter();
-        unsafe { ErasedSoaMutPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { ErasedSoaMutPtrsIter::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 }
 
@@ -462,12 +463,12 @@ where
     #[inline]
     pub(super) unsafe fn new_unchecked(
         descriptors: D,
-        ptr: *mut A,
+        buffer: *mut [A],
         capacity: usize,
         offset: usize,
     ) -> Self {
         Self {
-            ptr,
+            ptr: buffer.cast(),
             capacity,
             offset,
             descriptors,
@@ -516,7 +517,12 @@ where
         } = *self;
 
         let descriptors = descriptors.as_ref().iter();
-        unsafe { ErasedSoaMutPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
+        ErasedSoaMutPtrsIter {
+            ptr,
+            capacity,
+            offset,
+            descriptors,
+        }
     }
 }
 
@@ -546,7 +552,12 @@ where
         } = *self;
 
         let descriptors = descriptors.clone();
-        unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) }
+        Self {
+            ptr,
+            capacity,
+            offset,
+            descriptors,
+        }
     }
 }
 

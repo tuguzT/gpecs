@@ -2,7 +2,8 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
-    slice,
+    mem::MaybeUninit,
+    ptr, slice,
 };
 
 use crate::{
@@ -23,22 +24,24 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    phantom: PhantomData<&'a [A]>,
+    phantom: PhantomData<&'a [MaybeUninit<A>]>,
     ptrs: ErasedSoaPtrs<D, A>,
 }
 
-impl<D, A> ErasedSoaRefs<'_, D, A>
+impl<'a, D, A> ErasedSoaRefs<'a, D, A>
 where
     A: AddressableUnit,
 {
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        ptr: *const A,
+        buffer: &'a [MaybeUninit<A>],
         capacity: usize,
         offset: usize,
     ) -> Self {
-        let ptrs = unsafe { ErasedSoaPtrs::new_unchecked(descriptors, ptr, capacity, offset) };
+        let buffer = ptr::from_ref(buffer) as _;
+        let ptrs = unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, offset) };
+
         unsafe { Self::from_ptrs(ptrs) }
     }
 
@@ -49,9 +52,12 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, *const A, usize, usize) {
+    pub fn into_parts(self) -> (D, &'a [MaybeUninit<A>], usize, usize) {
         let Self { ptrs, .. } = self;
-        ptrs.into_parts()
+        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
+
+        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
+        (descriptors, buffer, capacity, offset)
     }
 
     #[inline]
@@ -69,11 +75,13 @@ where
     #[inline]
     pub fn new(
         descriptors: D,
-        buffer: &'a [A],
+        buffer: &'a [MaybeUninit<A>],
         capacity: usize,
         offset: usize,
     ) -> Result<Self, ErasedSoaPtrsError> {
+        let buffer = ptr::from_ref(buffer) as _;
         let ptrs = ErasedSoaPtrs::new(descriptors, buffer, capacity, offset)?;
+
         let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)
     }
@@ -108,9 +116,11 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_ptr(&self) -> *const A {
+    pub fn as_buffer(&self) -> &[MaybeUninit<A>] {
         let Self { ptrs, .. } = self;
-        ptrs.as_ptr()
+
+        let buffer = ptrs.as_buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
@@ -218,7 +228,7 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    phantom: PhantomData<&'a [A]>,
+    phantom: PhantomData<&'a [MaybeUninit<A>]>,
     ptrs: ErasedSoaPtrsIter<D, A>,
 }
 

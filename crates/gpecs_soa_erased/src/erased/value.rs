@@ -183,7 +183,7 @@ where
         } = *self;
 
         let descriptors = descriptors.as_ref();
-        let buffer = storage.as_ptr();
+        let buffer = storage.as_uninit_slice();
         unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, 1, 0) }
     }
 
@@ -196,7 +196,7 @@ where
         } = *self;
 
         let descriptors = descriptors.as_ref();
-        let buffer = storage.as_mut_ptr();
+        let buffer = storage.as_mut_uninit_slice();
         unsafe { ErasedSoaRefsMut::new_unchecked(descriptors, buffer, 1, 0) }
     }
 }

@@ -28,7 +28,7 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    ptr: NonNull<A>,
+    buffer: NonNull<[A]>,
     capacity: usize,
     offset: usize,
     descriptors: D,
@@ -41,12 +41,12 @@ where
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        ptr: NonNull<A>,
+        buffer: NonNull<[A]>,
         capacity: usize,
         offset: usize,
     ) -> Self {
         Self {
-            ptr,
+            buffer,
             capacity,
             offset,
             descriptors,
@@ -54,14 +54,14 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, NonNull<A>, usize, usize) {
+    pub fn into_parts(self) -> (D, NonNull<[A]>, usize, usize) {
         let Self {
             descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = self;
-        (descriptors, ptr, capacity, offset)
+        (descriptors, buffer, capacity, offset)
     }
 
     #[inline]
@@ -98,8 +98,7 @@ where
         check_ptr_align(buffer.as_ptr().cast(), layout)?;
         check_offset(offset, capacity)?;
 
-        let ptr = buffer.cast();
-        let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) };
+        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset) };
         Ok(me)
     }
 
@@ -114,14 +113,15 @@ where
             Ok(usize::max(max_align, layout.align()))
         })?;
 
-        let ptr = ptr::without_provenance_mut(addr);
-        let ptr = unsafe { NonNull::new_unchecked(ptr) };
+        let data = ptr::without_provenance_mut(addr);
+        let buffer = ptr::slice_from_raw_parts_mut(data, 0);
+        let buffer = unsafe { NonNull::new_unchecked(buffer) };
         let capacity = match packed_size {
             0 => usize::MAX,
             _ => 0,
         };
 
-        let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, 0) };
+        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, 0) };
         Ok(me)
     }
 }
@@ -140,7 +140,7 @@ where
     {
         let Self {
             ref descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = self;
@@ -163,7 +163,7 @@ where
         }
 
         unsafe {
-            let ptrs = context.ptrs_from_buffer_mut(ptr.as_ptr(), capacity);
+            let ptrs = context.ptrs_from_buffer_mut(buffer.as_ptr().cast(), capacity);
             let ptrs = context.ptrs_add_mut(ptrs, offset);
             let ptrs = context.ptrs_to_nonnull(ptrs);
             Ok(ptrs)
@@ -177,9 +177,9 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_ptr(&self) -> NonNull<A> {
-        let Self { ptr, .. } = *self;
-        ptr
+    pub fn as_buffer(&self) -> NonNull<[A]> {
+        let Self { buffer, .. } = *self;
+        buffer
     }
 
     #[inline]
@@ -214,12 +214,12 @@ where
     {
         let Self {
             ref descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = *self;
 
-        assert_eq!(ptr, origin.as_ptr());
+        assert_eq!(buffer, origin.as_buffer());
         assert_eq!(capacity, origin.capacity());
         debug_assert_eq_descriptors(descriptors.as_ref(), origin.field_descriptors());
 
@@ -299,13 +299,13 @@ where
     pub fn iter(&self) -> ErasedSoaNonNullPtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
         let Self {
             ref descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = *self;
 
         let descriptors = descriptors.as_ref().iter();
-        unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 }
 
@@ -316,14 +316,14 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
-            ptr,
+            buffer,
             capacity,
             offset,
             descriptors,
         } = self;
 
         f.debug_struct("ErasedSoaNonNullPtrs")
-            .field("ptr", ptr)
+            .field("buffer", buffer)
             .field("capacity", capacity)
             .field("offset", offset)
             .field("descriptors", &descriptors)
@@ -339,14 +339,14 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self {
-            ptr,
+            buffer,
             capacity,
             offset,
             ref descriptors,
         } = *self;
 
         let descriptors = descriptors.clone();
-        unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 }
 
@@ -385,13 +385,13 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let Self {
             descriptors,
-            ptr,
+            buffer,
             capacity,
             offset,
         } = self;
 
         let descriptors = descriptors.into_iter();
-        unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 }
 
@@ -413,12 +413,12 @@ where
     #[inline]
     pub(super) unsafe fn new_unchecked(
         descriptors: D,
-        ptr: NonNull<A>,
+        buffer: NonNull<[A]>,
         capacity: usize,
         offset: usize,
     ) -> Self {
         Self {
-            ptr,
+            ptr: buffer.cast(),
             capacity,
             offset,
             descriptors,
@@ -467,7 +467,12 @@ where
         } = *self;
 
         let descriptors = descriptors.as_ref().iter();
-        unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(descriptors, ptr, capacity, offset) }
+        ErasedSoaNonNullPtrsIter {
+            ptr,
+            capacity,
+            offset,
+            descriptors,
+        }
     }
 }
 
@@ -497,7 +502,12 @@ where
         } = *self;
 
         let descriptors = descriptors.clone();
-        unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset) }
+        Self {
+            ptr,
+            capacity,
+            offset,
+            descriptors,
+        }
     }
 }
 

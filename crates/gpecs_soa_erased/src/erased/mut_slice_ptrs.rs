@@ -36,12 +36,13 @@ where
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        ptr: *mut A,
+        buffer: *mut [A],
         capacity: usize,
         offset: usize,
         len: usize,
     ) -> Self {
-        let ptrs = unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, ptr, capacity, offset) };
+        let ptrs =
+            unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, offset) };
         unsafe { Self::from_mut_ptrs(ptrs, len) }
     }
 
@@ -51,10 +52,10 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, *mut A, usize, usize, usize) {
+    pub fn into_parts(self) -> (D, *mut [A], usize, usize, usize) {
         let Self { ptrs, len } = self;
-        let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
-        (descriptors, ptr, capacity, offset, len)
+        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
+        (descriptors, buffer, capacity, offset, len)
     }
 
     #[inline]
@@ -92,6 +93,7 @@ where
     D: AsRef<[FieldDescriptor]>,
 {
     #[inline]
+    #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
     pub fn new(
         descriptors: D,
         buffer: *mut [A],
@@ -112,8 +114,7 @@ where
         check_offset(offset, capacity)?;
         check_offset_len(offset, len, capacity)?;
 
-        let ptr = buffer.cast();
-        let me = unsafe { Self::new_unchecked(descriptors, ptr, capacity, offset, len) };
+        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset, len) };
         Ok(me)
     }
 }
@@ -147,15 +148,15 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_ptr(&self) -> *const A {
+    pub fn as_buffer(&self) -> *const [A] {
         let Self { ptrs, .. } = self;
-        ptrs.as_ptr()
+        ptrs.as_buffer()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut A {
+    pub fn as_mut_buffer(&mut self) -> *mut [A] {
         let Self { ptrs, .. } = self;
-        ptrs.as_mut_ptr()
+        ptrs.as_mut_buffer()
     }
 
     #[inline]

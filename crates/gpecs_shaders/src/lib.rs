@@ -1,6 +1,7 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![no_std]
 
+use core::mem::MaybeUninit;
 use spirv_std::{glam::USizeVec3, spirv};
 
 use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaContext, ErasedSoaSlicesMut};
@@ -17,20 +18,20 @@ pub struct ErasedSoaDesc {
 pub fn erased_soa_work(
     #[spirv(global_invocation_id)] id: USizeVec3,
     #[spirv(uniform, descriptor_set = 0, binding = 0)] erased_soa_desc: &ErasedSoaDesc,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] dense: &mut [u32],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] dense: &mut [MaybeUninit<u32>],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] descriptors: &[FieldDescriptor],
 ) {
     let ErasedSoaDesc { len, capacity } = *erased_soa_desc;
     let invocation_id = id.x;
 
     let context = unsafe { ErasedSoaContext::new_unchecked(descriptors) };
-    let slices = unsafe {
-        ErasedSoaSlicesMut::new_unchecked(descriptors, dense.as_mut_ptr(), capacity, 0, len)
-    };
-    let mut dense = SoaSlicesMut::<ErasedSoa<&[u32], _, u32>>::new(&context, slices);
-    let _ = (&mut dense, invocation_id);
+    let slices = unsafe { ErasedSoaSlicesMut::new_unchecked(descriptors, dense, capacity, 0, len) };
+    let mut dense_soa = SoaSlicesMut::<ErasedSoa<&[u32], _, u32>>::new(&context, slices);
+    let _ = &mut dense_soa;
+
+    dense[invocation_id].write(42);
 
     // TODO: fix all the compilation issues
     // uncomment the line below to get a compilation error to investigate
-    // dense.swap(invocation_id, invocation_id);
+    // dense_soa.swap(invocation_id, invocation_id + 1);
 }

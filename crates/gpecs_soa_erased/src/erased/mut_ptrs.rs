@@ -261,6 +261,7 @@ where
         let Self { descriptors, .. } = &self;
         debug_assert_eq_descriptors(descriptors.as_ref(), with.field_descriptors());
 
+        // TODO: rewrite this loop without zip
         for (this, with) in itertools::zip_eq(self, with) {
             unsafe { this.swap(with) }
         }

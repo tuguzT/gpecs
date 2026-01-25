@@ -261,7 +261,9 @@ where
         let Self { descriptors, .. } = &self;
         debug_assert_eq_descriptors(descriptors.as_ref(), with.field_descriptors());
 
-        itertools::zip_eq(self, with).for_each(|(this, with)| unsafe { this.swap(with) });
+        for (this, with) in itertools::zip_eq(self, with) {
+            unsafe { this.swap(with) }
+        }
     }
 
     #[inline]
@@ -273,8 +275,9 @@ where
         let Self { descriptors, .. } = &self;
         debug_assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
 
-        itertools::zip_eq(self, from)
-            .for_each(|(this, from)| unsafe { this.copy_from(from, count) });
+        for (this, from) in itertools::zip_eq(self, from) {
+            unsafe { this.copy_from(from, count) }
+        }
     }
 
     #[inline]
@@ -314,8 +317,9 @@ where
         let Self { descriptors, .. } = &self;
         debug_assert_eq_descriptors(descriptors.as_ref(), from.field_descriptors());
 
-        itertools::zip_eq(self, from)
-            .for_each(|(this, from)| unsafe { this.copy_from_nonoverlapping(from, count) });
+        for (this, from) in itertools::zip_eq(self, from) {
+            unsafe { this.copy_from_nonoverlapping(from, count) }
+        }
     }
 
     #[inline]

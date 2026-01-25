@@ -1,15 +1,17 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![no_std]
 
-use core::mem::MaybeUninit;
+use core::{convert::Infallible, mem::MaybeUninit};
 use spirv_std::{glam::USizeVec3, spirv};
 
 use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaContext, ErasedSoaSlicesMut};
 use gpecs_sparse::soa::{field::FieldDescriptor, slice::SoaSlicesMut};
 
+pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, u32>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
-pub struct ErasedSoaDesc {
+pub struct GpuErasedSoaDesc {
     pub len: usize,
     pub capacity: usize,
 }
@@ -17,16 +19,16 @@ pub struct ErasedSoaDesc {
 #[spirv(compute(threads(64)))]
 pub fn erased_soa_work(
     #[spirv(global_invocation_id)] id: USizeVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] erased_soa_desc: &ErasedSoaDesc,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] erased_soa_desc: &GpuErasedSoaDesc,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] dense: &mut [MaybeUninit<u32>],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] descriptors: &[FieldDescriptor],
 ) {
-    let ErasedSoaDesc { len, capacity } = *erased_soa_desc;
+    let GpuErasedSoaDesc { len, capacity } = *erased_soa_desc;
     let invocation_id = id.x;
 
     let context = unsafe { ErasedSoaContext::new_unchecked(descriptors) };
     let slices = unsafe { ErasedSoaSlicesMut::new_unchecked(descriptors, dense, capacity, 0, len) };
-    let mut dense_soa = SoaSlicesMut::<ErasedSoa<&[u32], _, u32>>::new(&context, slices);
+    let mut dense_soa = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, slices);
     let _ = &mut dense_soa;
 
     dense[invocation_id].write(42);

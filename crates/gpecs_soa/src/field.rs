@@ -143,7 +143,7 @@ where
 {
     layout: Layout,
     capacity: usize,
-    fields: CopiedFieldDescriptors<I>,
+    inner: CopiedFieldDescriptors<I>,
 }
 
 impl<I> BufferOffsets<I>
@@ -163,14 +163,45 @@ where
         let Self { capacity, .. } = *self;
         capacity
     }
+
+    /// Returns a reference to the iterator over all fields to be processed by self.
+    #[inline]
+    pub const fn as_inner(&self) -> &I {
+        let Self { inner, .. } = self;
+        let CopiedFieldDescriptors(fields) = inner;
+        fields
+    }
 }
 
 impl<I> BufferOffsets<I> {
+    /// Creates a new buffer offsets iterator from its parts.
+    #[inline]
+    pub unsafe fn from_parts(layout: Layout, capacity: usize, fields: I) -> Self {
+        Self {
+            layout,
+            capacity,
+            inner: fields.into(),
+        }
+    }
+
     /// Returns an iterator over all fields to be processed by self.
     #[inline]
-    pub fn into_fields(self) -> I {
-        let Self { fields, .. } = self;
-        fields.into_inner()
+    pub fn into_inner(self) -> I {
+        let Self { inner, .. } = self;
+        inner.into_inner()
+    }
+
+    /// Decomposes self into its parts.
+    #[inline]
+    pub fn into_parts(self) -> (Layout, usize, I) {
+        let Self {
+            layout,
+            inner,
+            capacity,
+        } = self;
+
+        let inner = inner.into_inner();
+        (layout, capacity, inner)
     }
 }
 
@@ -184,20 +215,20 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self {
-            ref mut fields,
+            ref mut inner,
             ref mut layout,
             capacity,
         } = *self;
 
-        let desc = fields.next()?;
+        let desc = inner.next()?;
         let item = try_create_buffer_offset(desc, layout, capacity);
         Some(item)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { fields, .. } = self;
-        fields.size_hint()
+        let Self { inner, .. } = self;
+        inner.size_hint()
     }
 }
 
@@ -208,8 +239,8 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { fields, .. } = self;
-        fields.len()
+        let Self { inner, .. } = self;
+        inner.len()
     }
 }
 
@@ -245,11 +276,9 @@ pub fn buffer_offsets<I>(fields: I, capacity: usize) -> BufferOffsets<I::IntoIte
 where
     I: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
-    BufferOffsets {
-        layout: Layout::new::<()>(),
-        fields: fields.into_iter().into(),
-        capacity,
-    }
+    let layout = Layout::new::<()>();
+    let fields = fields.into_iter();
+    unsafe { BufferOffsets::from_parts(layout, capacity, fields) }
 }
 
 /// Calculates layout needed to store provided regions in a single buffer.

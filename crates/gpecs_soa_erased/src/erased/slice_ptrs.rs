@@ -288,6 +288,12 @@ where
     D: ?Sized,
 {
     #[inline]
+    pub fn as_buffer(&self) -> *const [A] {
+        let Self { ptrs, .. } = self;
+        ptrs.as_buffer()
+    }
+
+    #[inline]
     pub fn capacity(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.capacity()
@@ -350,7 +356,7 @@ where
 impl<D, A> Iterator for ErasedSoaSlicePtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + Iterator + ?Sized,
+    D: Iterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
     type Item = ErasedFieldSlicePtr<A>;
@@ -374,7 +380,7 @@ where
 impl<D, A> ExactSizeIterator for ErasedSoaSlicePtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + ExactSizeIterator + ?Sized,
+    D: ExactSizeIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
     #[inline]
@@ -387,7 +393,7 @@ where
 impl<D, A> FusedIterator for ErasedSoaSlicePtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + FusedIterator + ?Sized,
+    D: FusedIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
 }

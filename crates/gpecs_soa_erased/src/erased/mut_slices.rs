@@ -279,6 +279,22 @@ where
     D: ?Sized,
 {
     #[inline]
+    pub fn as_buffer(&self) -> &[MaybeUninit<A>] {
+        let Self { ptrs, .. } = self;
+
+        let buffer = ptrs.as_buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+    }
+
+    #[inline]
+    pub fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<A>] {
+        let Self { ptrs, .. } = self;
+
+        let buffer = ptrs.as_mut_buffer();
+        unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
+    }
+
+    #[inline]
     pub fn capacity(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.capacity()
@@ -327,7 +343,7 @@ where
 impl<'a, D, A> Iterator for ErasedSoaSlicesMutIter<'a, D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + Iterator + ?Sized,
+    D: Iterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
     type Item = ErasedFieldSliceMut<'a, A>;
@@ -350,7 +366,7 @@ where
 impl<D, A> ExactSizeIterator for ErasedSoaSlicesMutIter<'_, D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + ExactSizeIterator + ?Sized,
+    D: ExactSizeIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
     #[inline]
@@ -363,7 +379,7 @@ where
 impl<D, A> FusedIterator for ErasedSoaSlicesMutIter<'_, D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + FusedIterator + ?Sized,
+    D: FusedIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
 }

@@ -17,7 +17,7 @@ use crate::{
     },
     field::ErasedFieldPtr,
     soa::{
-        field::{FieldDescriptor, buffer_offsets},
+        field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_offsets},
         traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext},
     },
     storage::AddressableUnit,
@@ -251,7 +251,8 @@ where
         } = *self;
 
         let descriptors = descriptors.as_ref().iter();
-        unsafe { ErasedSoaPtrsIter::new_unchecked(descriptors, buffer, capacity, offset) }
+        let inner = buffer_offsets(descriptors, capacity);
+        unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
     }
 }
 
@@ -337,7 +338,8 @@ where
         } = self;
 
         let descriptors = descriptors.into_iter();
-        unsafe { ErasedSoaPtrsIter::new_unchecked(descriptors, buffer, capacity, offset) }
+        let inner = buffer_offsets(descriptors, capacity);
+        unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
     }
 }
 
@@ -346,10 +348,9 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    ptr: *const A,
-    capacity: usize,
+    buffer: *const [A],
     offset: usize,
-    descriptors: D,
+    inner: BufferOffsets<D>,
 }
 
 impl<D, A> ErasedSoaPtrsIter<D, A>
@@ -358,16 +359,14 @@ where
 {
     #[inline]
     pub(super) unsafe fn new_unchecked(
-        descriptors: D,
+        inner: BufferOffsets<D>,
         buffer: *const [A],
-        capacity: usize,
         offset: usize,
     ) -> Self {
         Self {
-            ptr: buffer.cast(),
-            capacity,
+            buffer,
             offset,
-            descriptors,
+            inner,
         }
     }
 }
@@ -378,9 +377,15 @@ where
     D: ?Sized,
 {
     #[inline]
+    pub fn as_buffer(&self) -> *const [A] {
+        let Self { buffer, .. } = *self;
+        buffer
+    }
+
+    #[inline]
     pub fn capacity(&self) -> usize {
-        let Self { capacity, .. } = *self;
-        capacity
+        let Self { inner, .. } = self;
+        inner.capacity()
     }
 
     #[inline]
@@ -397,26 +402,24 @@ where
 {
     #[inline]
     pub fn field_descriptors(&self) -> &[FieldDescriptor] {
-        let Self { descriptors, .. } = self;
-        descriptors.as_ref()
+        let Self { inner, .. } = self;
+        inner.as_inner().as_ref()
     }
 
     #[inline]
     pub(super) fn debug_entries(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
         let Self {
-            ref descriptors,
-            ptr,
-            capacity,
+            ref inner,
+            buffer,
             offset,
         } = *self;
 
-        let descriptors = descriptors.as_ref().iter();
-        ErasedSoaPtrsIter {
-            ptr,
-            capacity,
-            offset,
-            descriptors,
-        }
+        let layout = inner.layout();
+        let capacity = inner.capacity();
+        let fields = inner.as_inner().as_ref().iter();
+
+        let inner = unsafe { BufferOffsets::from_parts(layout, capacity, fields) };
+        unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
     }
 }
 
@@ -439,26 +442,20 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self {
-            ptr,
-            capacity,
+            ref inner,
+            buffer,
             offset,
-            ref descriptors,
         } = *self;
 
-        let descriptors = descriptors.clone();
-        Self {
-            ptr,
-            capacity,
-            offset,
-            descriptors,
-        }
+        let inner = inner.clone();
+        unsafe { Self::new_unchecked(inner, buffer, offset) }
     }
 }
 
 impl<D, A> Iterator for ErasedSoaPtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + Iterator + ?Sized,
+    D: Iterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
     type Item = ErasedFieldPtr<A>;
@@ -466,52 +463,56 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self {
-            ref mut descriptors,
-            ref mut ptr,
-            capacity,
+            ref mut inner,
+            buffer,
             offset,
         } = *self;
 
-        let &desc = descriptors.next()?.as_ref();
         let field_ptr = {
+            let BufferOffset {
+                field_descriptor: desc,
+                offset,
+                ..
+            } = inner
+                .next()?
+                .expect("buffer layout should have been checked way earlier");
+
+            let offset = offset.div_ceil(size_of::<A>());
             let len = desc.layout().size().div_ceil(size_of::<A>());
-            let buffer = ptr::slice_from_raw_parts(*ptr, len);
+            let data = unsafe { buffer.cast::<A>().add(offset) };
+
+            let buffer = ptr::slice_from_raw_parts(data, len);
             unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
         };
 
         let item = unsafe { field_ptr.add(offset) };
-        *ptr = unsafe { field_ptr.add(capacity) }.as_ptr();
-
-        if let [desc, ..] = descriptors.as_ref() {
-            *ptr = unsafe { ptr.add(ptr.align_offset(desc.layout().align())) };
-        }
         Some(item)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { descriptors, .. } = self;
-        descriptors.size_hint()
+        let Self { inner, .. } = self;
+        inner.size_hint()
     }
 }
 
 impl<D, A> ExactSizeIterator for ErasedSoaPtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + ExactSizeIterator + ?Sized,
+    D: ExactSizeIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
     #[inline]
     fn len(&self) -> usize {
-        let Self { descriptors, .. } = self;
-        descriptors.len()
+        let Self { inner, .. } = self;
+        inner.len()
     }
 }
 
 impl<D, A> FusedIterator for ErasedSoaPtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + FusedIterator + ?Sized,
+    D: FusedIterator + ?Sized,
     D::Item: AsRef<FieldDescriptor>,
 {
 }

@@ -10,7 +10,7 @@ use crate::{
     error::{InsufficientAlignError, check_sufficient_align},
     soa::{
         field::FieldDescriptor,
-        traits::{AllocSoa, AllocSoaContext},
+        traits::{RawSoa, WithFieldDescriptors},
     },
     storage::AddressableUnit,
 };
@@ -83,7 +83,8 @@ where
     #[inline]
     pub fn of<T>(context: &T::Context) -> Result<Self, InsufficientAlignError>
     where
-        T: AllocSoa + ?Sized,
+        T: RawSoa + ?Sized,
+        T::Context: WithFieldDescriptors,
     {
         let descriptors = context
             .field_descriptors()

@@ -25,7 +25,7 @@ use crate::{
     field::{ErasedField, error::ErasedFieldFromDescDataError},
     soa::{
         field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_offsets},
-        traits::{AllocSoa, AllocSoaContext, SoaRead, SoaWrite},
+        traits::{AllocSoa, AllocSoaContext, SoaRead, SoaWrite, WithFieldDescriptors},
     },
     storage::{AddressableUnit, AlignedStorage, AlignedStorageFromLayout},
     uninit::write_copy_of_slice,

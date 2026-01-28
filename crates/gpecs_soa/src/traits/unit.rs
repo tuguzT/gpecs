@@ -9,6 +9,7 @@ use crate::{
     traits::{
         AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
         SliceMutPtrs, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+        WithFieldDescriptors,
     },
 };
 
@@ -227,7 +228,7 @@ unsafe impl SoaWrite for () {
     }
 }
 
-unsafe impl AllocSoaContext for () {
+impl WithFieldDescriptors for () {
     type FieldDescriptors<'a> = [FieldDescriptor; 1];
 
     #[inline]
@@ -241,7 +242,9 @@ unsafe impl AllocSoaContext for () {
     fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
         [FieldDescriptor::of::<()>()]
     }
+}
 
+unsafe impl AllocSoaContext for () {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         Layout::array::<()>(capacity)

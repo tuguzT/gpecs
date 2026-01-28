@@ -14,6 +14,7 @@ use crate::{
     traits::{
         AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
         SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+        WithFieldDescriptors,
     },
 };
 
@@ -406,7 +407,7 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        unsafe impl<$($types,)*> AllocSoaContext for TupleContext<($($types,)*)> {
+        impl<$($types,)*> WithFieldDescriptors for TupleContext<($($types,)*)> {
             type FieldDescriptors<'a> = [FieldDescriptor; count_idents!($($types,)*)];
 
             #[inline]
@@ -420,7 +421,9 @@ macro_rules! soa_tuple_impl {
             fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
                 Self::FIELD_DESCRIPTORS
             }
+        }
 
+        unsafe impl<$($types,)*> AllocSoaContext for TupleContext<($($types,)*)> {
             #[inline]
             fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
                 let permutation = Self::PERMUTATION;

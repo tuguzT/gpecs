@@ -6,7 +6,7 @@ use gpecs_soa_bench::{
 };
 use gpecs_soa_erased::{
     erased::BoxedErasedSoaContext,
-    soa::{field::buffer_layout, traits::AllocSoaContext},
+    soa::{field::buffer_layout, traits::WithFieldDescriptors},
 };
 
 fn with_capacity<T>(c: &mut Criterion)

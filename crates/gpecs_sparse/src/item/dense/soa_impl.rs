@@ -8,6 +8,7 @@ use crate::{
     soa::traits::{
         AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
         SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+        WithFieldDescriptors,
     },
 };
 
@@ -249,9 +250,10 @@ where
     }
 }
 
-unsafe impl<K, V> AllocSoaContext for DenseContext<K, V>
+impl<K, V> WithFieldDescriptors for DenseContext<K, V>
 where
-    V: RawSoa<Context: AllocSoaContext> + ?Sized,
+    V: RawSoa + ?Sized,
+    V::Context: WithFieldDescriptors,
 {
     type FieldDescriptors<'a> = DenseFieldDescriptors<'a, K, V>;
 
@@ -267,7 +269,12 @@ where
         let context = self.as_inner();
         DenseFieldDescriptors::new(context)
     }
+}
 
+unsafe impl<K, V> AllocSoaContext for DenseContext<K, V>
+where
+    V: RawSoa<Context: AllocSoaContext> + ?Sized,
+{
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         let keys = Layout::array::<K>(capacity)?;

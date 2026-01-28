@@ -3,7 +3,7 @@
 use std::iter;
 
 use gpecs_soa_erased::{
-    erased::{BoxedErasedSoa, ErasedSoa, ErasedSoaContext},
+    erased::{BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa},
     soa::{field::FieldDescriptor, vec::SoaVec},
 };
 
@@ -13,7 +13,7 @@ fn new() {
     type Vec = SoaVec<BoxedErasedSoa>;
 
     let context = Default::default();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -71,7 +71,7 @@ fn new_zst() {
     type Vec = SoaVec<BoxedErasedSoa>;
 
     let context = ();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(
@@ -124,7 +124,7 @@ fn with_capacity() {
     type Vec = SoaVec<BoxedErasedSoa>;
 
     let context = Default::default();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -183,7 +183,7 @@ fn with_capacity_zst() {
     type Vec = SoaVec<BoxedErasedSoa>;
 
     let context = ();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(
@@ -237,7 +237,7 @@ fn one_item() {
     type Vec = SoaVec<BoxedErasedSoa>;
 
     let context = Default::default();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -349,7 +349,7 @@ fn one_item_zst() {
     type Vec = SoaVec<BoxedErasedSoa>;
 
     let context = ();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(
@@ -438,7 +438,7 @@ fn three_items() {
     type Vec = SoaVec<BoxedErasedSoa>;
 
     let context = Default::default();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -794,7 +794,7 @@ fn three_items_zst() {
     type Vec = SoaVec<BoxedErasedSoa>;
 
     let context = ();
-    let erased_context = ErasedSoaContext::of::<Soa>(&context).unwrap();
+    let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(

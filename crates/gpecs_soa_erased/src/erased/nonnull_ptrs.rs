@@ -18,7 +18,7 @@ use crate::{
     field::ErasedFieldNonNullPtr,
     soa::{
         field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_offsets},
-        traits::{AllocSoa, AllocSoaContext, NonNullPtrs, RawSoaContext},
+        traits::{AllocSoa, AllocSoaContext, NonNullPtrs, RawSoaContext, WithFieldDescriptors},
     },
     storage::AddressableUnit,
 };

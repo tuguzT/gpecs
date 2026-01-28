@@ -3,14 +3,15 @@ use core::{
     mem::{ManuallyDrop, MaybeUninit, offset_of},
 };
 
-use crate::traits::{AllocSoa, AllocSoaContext};
+use crate::traits::{AllocSoa, AllocSoaContext, RawSoa, WithFieldDescriptors};
 
 /// Special type which is used to properly allocate a buffer in memory
 /// with respect to the size and alignment of
 /// [`Fields`](crate::traits::RawSoa::Fields) and [`Context`](crate::traits::RawSoa::Context) associated types.
 pub union BufferData<T>
 where
-    T: AllocSoa + ?Sized,
+    T: RawSoa + ?Sized,
+    T::Context: Sized,
 {
     _align: ManuallyDrop<BufferAlign<T>>,
     _fields: ManuallyDrop<MaybeUninit<T::Fields>>,
@@ -20,7 +21,8 @@ where
 #[repr(C)]
 pub struct BufferPrefix<T>
 where
-    T: AllocSoa + ?Sized,
+    T: RawSoa + ?Sized,
+    T::Context: Sized,
 {
     _align: BufferAlign<T>,
     pub context: T::Context,
@@ -31,7 +33,8 @@ where
 #[inline]
 pub fn is_zst<T>(context: &T::Context) -> bool
 where
-    T: AllocSoa + ?Sized,
+    T: RawSoa + ?Sized,
+    T::Context: WithFieldDescriptors,
 {
     let packed_size = context
         .field_descriptors()
@@ -44,7 +47,8 @@ where
 #[inline]
 pub fn is_context_zst<T>() -> bool
 where
-    T: AllocSoa + ?Sized,
+    T: RawSoa + ?Sized,
+    T::Context: Sized,
 {
     size_of::<T::Context>() == 0
 }
@@ -52,7 +56,8 @@ where
 #[inline]
 pub fn should_allocate<T>(context: &T::Context, capacity: usize) -> bool
 where
-    T: AllocSoa + ?Sized,
+    T: RawSoa + ?Sized,
+    T::Context: WithFieldDescriptors + Sized,
 {
     let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>(context) || capacity == 0);
     !should_not_allocate
@@ -106,7 +111,8 @@ where
 #[repr(C)]
 struct BufferAlign<T>
 where
-    T: AllocSoa + ?Sized,
+    T: RawSoa + ?Sized,
+    T::Context: Sized,
 {
     _fields: [T::Fields; 0],
     _context: [T::Context; 0],
@@ -118,7 +124,8 @@ const _: () = {
     #[cfg_attr(coverage_nightly, coverage(off))]
     const fn assert_safety_preconditions<T>()
     where
-        T: AllocSoa + ?Sized,
+        T: RawSoa + ?Sized,
+        T::Context: Sized,
     {
         assert!(
             size_of::<BufferAlign<T>>() == 0,

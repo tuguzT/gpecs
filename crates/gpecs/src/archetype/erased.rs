@@ -15,8 +15,8 @@ use crate::{
     soa::{
         field::FieldDescriptor,
         traits::{
-            AllocSoa, AllocSoaContext, RawSoaContext, Refs, RefsMut, Slices, SlicesMut, Soa,
-            SoaContext, SoaRead, SoaWrite,
+            AllocSoa, RawSoa, RawSoaContext, Refs, RefsMut, Slices, SlicesMut, Soa, SoaContext,
+            SoaRead, SoaWrite, WithFieldDescriptors,
         },
     },
 };
@@ -52,7 +52,8 @@ pub fn validate_components<'a, 'components, 'ctx, T, I>(
     component_ids: I,
 ) -> impl Iterator<Item = ComponentId> + use<'components, 'ctx, T, I>
 where
-    T: AllocSoa + Soa<'a>,
+    T: RawSoa + Soa<'a>,
+    T::Context: WithFieldDescriptors,
     I: IntoIterator<Item = ComponentId>,
 {
     zip(component_ids, context.field_descriptors())
@@ -69,7 +70,8 @@ fn reorder_fields<'a, 'components, 'ctx, T, I, F>(
     mut fields: ErasedComponents<F>,
 ) -> impl Iterator<Item = F> + use<'components, 'ctx, T, I, F>
 where
-    T: AllocSoa + Soa<'a>,
+    T: RawSoa + Soa<'a>,
+    T::Context: WithFieldDescriptors,
     I: IntoIterator<Item = ComponentId>,
 {
     #[cold]

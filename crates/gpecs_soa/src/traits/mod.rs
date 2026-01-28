@@ -317,29 +317,34 @@ pub unsafe trait SoaWrite: RawSoa + Sized {
     unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self);
 }
 
-/// An extension of [SoA context](RawSoaContext) type which allows
-/// to declare properties needed for buffer allocation & buffer memory manipulation.
-pub unsafe trait AllocSoaContext: RawSoaContext + Sized {
-    /// Non-empty collection of [descriptors](FieldDescriptor) for each stored field.
-    ///
-    /// # Safety
-    ///
-    /// Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
-    ///
-    /// Note that an order of [pointers](RawSoaContext::Ptrs) & their derivatives
-    /// **may not** resemble their order inside of a buffer in memory.
-    /// Reordering of such pointers in other methods is up to the implementation of this trait.
+/// Used to retrieve a non-owning collection of field descriptors.
+pub trait WithFieldDescriptors {
+    /// Collection of items which could be converted into a [field descriptor](FieldDescriptor).
     type FieldDescriptors<'a>: IntoIterator<Item: AsRef<FieldDescriptor>>;
 
-    /// Restricts [field descriptors](AllocSoaContext::FieldDescriptors)
+    /// Restricts [field descriptors](WithFieldDescriptors::FieldDescriptors)
     /// to be covariant over generic lifetime.
     fn upcast_field_descriptors<'short, 'long: 'short>(
         from: Self::FieldDescriptors<'long>,
     ) -> Self::FieldDescriptors<'short>;
 
-    /// Returns [field descriptors](AllocSoaContext::FieldDescriptors) for each stored field.
+    /// Returns [field descriptors](WithFieldDescriptors::FieldDescriptors) from self.
     fn field_descriptors(&self) -> Self::FieldDescriptors<'_>;
+}
 
+/// An extension of [SoA context](RawSoaContext) type which allows
+/// to declare properties needed for buffer allocation & buffer memory manipulation.
+///
+/// # Safety
+///
+/// - [Field descriptors](WithFieldDescriptors::FieldDescriptors) **MUST** accurately describe each stored field.
+/// - Count of such descriptors **MUST** be non-zero & equal to the number of stored fields.
+/// - Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
+///
+/// Note that an order of [pointers](RawSoaContext::Ptrs) & their derivatives
+/// **may not** resemble their order inside of a buffer in memory.
+/// Reordering of such pointers in other methods is up to the implementation of this trait.
+pub unsafe trait AllocSoaContext: RawSoaContext + WithFieldDescriptors + Sized {
     /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
     ///
     /// This layout should not include self, as it is handled by the crate itself.
@@ -395,11 +400,6 @@ pub unsafe trait AllocSoaContext: RawSoaContext + Sized {
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_>;
 }
 
-/// Alias for the [`FieldDescriptors`](AllocSoaContext::FieldDescriptors) associated type
-/// of the [`Context`](RawSoa::Context) associated type of a given [SoA](RawSoa) type.
-pub type FieldDescriptors<'a, T> =
-    <<T as RawSoa>::Context as AllocSoaContext>::FieldDescriptors<'a>;
-
 /// An extension of [SoA](RawSoa) type which allows to
 /// declare properties needed for buffer allocation & buffer memory manipulation.
 pub unsafe trait AllocSoa: RawSoa<Context: AllocSoaContext> {}
@@ -415,9 +415,9 @@ where
 /// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
 ///
 /// These safety requirements are:
-/// - sum of layouts' sizes of [`FieldDescriptors`](AllocSoaContext::FieldDescriptors)
+/// - sum of layouts' sizes of [field descriptors](WithFieldDescriptors::FieldDescriptors)
 ///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
-/// - alignment of each layout of [`FieldDescriptors`](AllocSoaContext::FieldDescriptors)
+/// - alignment of each layout of [field descriptors](WithFieldDescriptors::FieldDescriptors)
 ///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
 pub unsafe trait AllocSoaTrusted: AllocSoa {}
 

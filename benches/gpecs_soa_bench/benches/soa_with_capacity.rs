@@ -6,7 +6,7 @@ use gpecs_soa_bench::{
 };
 use gpecs_soa_erased::{
     erased::BoxedErasedSoaContext,
-    soa::{field::buffer_layout, traits::WithFieldDescriptors},
+    soa::field::{FieldDescriptors, IntoCopiedFieldDescriptors, buffer_layout},
 };
 
 fn with_capacity<T>(c: &mut Criterion)
@@ -49,8 +49,8 @@ where
 
         let bytes = context
             .field_descriptors()
-            .into_iter()
-            .map(|desc| capacity * desc.as_ref().layout().size())
+            .copied_field_descriptors()
+            .map(|desc| capacity * desc.layout().size())
             .sum::<usize>();
         group
             .throughput(Throughput::Bytes(bytes.try_into().unwrap()))

@@ -1,6 +1,8 @@
 use core::alloc::{Layout, LayoutError};
 
-use crate::field::{FieldDescriptor, buffer_layout};
+use crate::field::{
+    FieldDescriptors, FieldDescriptorsOwned, IntoCopiedFieldDescriptors, buffer_layout,
+};
 
 pub use self::tuple::*;
 
@@ -317,34 +319,19 @@ pub unsafe trait SoaWrite: RawSoa + Sized {
     unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self);
 }
 
-/// Used to retrieve a non-owning collection of field descriptors.
-pub trait WithFieldDescriptors {
-    /// Collection of items which could be converted into a [field descriptor](FieldDescriptor).
-    type FieldDescriptors<'a>: IntoIterator<Item: AsRef<FieldDescriptor>>;
-
-    /// Restricts [field descriptors](WithFieldDescriptors::FieldDescriptors)
-    /// to be covariant over generic lifetime.
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short>;
-
-    /// Returns [field descriptors](WithFieldDescriptors::FieldDescriptors) from self.
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_>;
-}
-
 /// An extension of [SoA context](RawSoaContext) type which allows
 /// to declare properties needed for buffer allocation & buffer memory manipulation.
 ///
 /// # Safety
 ///
-/// - [Field descriptors](WithFieldDescriptors::FieldDescriptors) **MUST** accurately describe each stored field.
+/// - [Field descriptors](FieldDescriptors::Output) **MUST** accurately describe each stored field.
 /// - Count of such descriptors **MUST** be non-zero & equal to the number of stored fields.
 /// - Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
 ///
 /// Note that an order of [pointers](RawSoaContext::Ptrs) & their derivatives
 /// **may not** resemble their order inside of a buffer in memory.
 /// Reordering of such pointers in other methods is up to the implementation of this trait.
-pub unsafe trait AllocSoaContext: RawSoaContext + WithFieldDescriptors + Sized {
+pub unsafe trait AllocSoaContext: RawSoaContext + FieldDescriptorsOwned + Sized {
     /// Calculates layout needed to store `capacity` number of fields inside of a buffer.
     ///
     /// This layout should not include self, as it is handled by the crate itself.
@@ -357,8 +344,8 @@ pub unsafe trait AllocSoaContext: RawSoaContext + WithFieldDescriptors + Sized {
     fn capacity_from(&self, buffer_layout: Layout) -> usize {
         let packed_size = self
             .field_descriptors()
-            .into_iter()
-            .map(|desc| desc.as_ref().layout().size())
+            .copied_field_descriptors()
+            .map(|desc| desc.layout().size())
             .sum();
         let buffer_size = buffer_layout.size();
         let max_capacity = buffer_size.checked_div(packed_size).unwrap_or(0);
@@ -415,9 +402,9 @@ where
 /// on the [`Fields`](RawSoa::Fields) associated type of [SoA](RawSoa) type.
 ///
 /// These safety requirements are:
-/// - sum of layouts' sizes of [field descriptors](WithFieldDescriptors::FieldDescriptors)
+/// - sum of layouts' sizes of [field descriptors](FieldDescriptors::Output)
 ///   should be less or equal to the size of [`Fields`](RawSoa::Fields)
-/// - alignment of each layout of [field descriptors](WithFieldDescriptors::FieldDescriptors)
+/// - alignment of each layout of [field descriptors](FieldDescriptors::Output)
 ///   should be less or equal to the alignment of [`Fields`](RawSoa::Fields)
 pub unsafe trait AllocSoaTrusted: AllocSoa {}
 

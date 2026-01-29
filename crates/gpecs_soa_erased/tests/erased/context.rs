@@ -1,7 +1,9 @@
-use arrayvec::ArrayVec;
-use gpecs_soa_erased::{erased::ErasedSoaContext, soa::field::FieldDescriptor};
+use gpecs_soa_erased::{
+    erased::ErasedSoaContext,
+    soa::field::{FieldDescriptor, FieldDescriptors},
+};
 
-type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
+use crate::common::ArrayDescriptors;
 
 #[test]
 #[cfg_attr(miri, ignore)]
@@ -15,7 +17,10 @@ fn context() {
 fn context_of() {
     let context = Default::default();
     let context =
-        ErasedSoaContext::<ArrayDescriptors<3>, u8>::of::<(u32, u16, u8)>(&context).unwrap();
+        ErasedSoaContext::<ArrayDescriptors<FieldDescriptor, 3>, u8>::of::<(u32, u16, u8)>(
+            &context,
+        )
+        .unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<u8>(),
@@ -36,7 +41,8 @@ fn context_of() {
 #[cfg_attr(miri, ignore)]
 fn context_of_zst() {
     let context = Default::default();
-    let context = ErasedSoaContext::<ArrayDescriptors<1>, u8>::of::<()>(&context).unwrap();
+    let context =
+        ErasedSoaContext::<ArrayDescriptors<FieldDescriptor, 1>, u8>::of::<()>(&context).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(

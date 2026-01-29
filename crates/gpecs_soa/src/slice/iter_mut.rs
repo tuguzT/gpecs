@@ -7,7 +7,8 @@ use core::{
 use crate::{
     slice::{RawIter, RawIterMut},
     traits::{
-        MutPtrs, Ptrs, RawSoa, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaContext,
+        MutPtrs, Ptrs, RawSoa, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
+        SoaContext, SoaOwned,
     },
 };
 
@@ -220,8 +221,7 @@ where
 
 impl<T, U> AsRef<[U]> for IterMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
@@ -232,8 +232,7 @@ where
 
 impl<T> Debug for IterMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

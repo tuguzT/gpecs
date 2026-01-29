@@ -7,9 +7,8 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
-        SliceMutPtrs, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
-        WithFieldDescriptors,
+        AllocSoaContext, AllocSoaTrusted, FieldDescriptors, MutPtrs, Ptrs, RawSoa, RawSoaContext,
+        Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
     },
 };
 
@@ -159,8 +158,8 @@ unsafe impl RawSoaContext for () {
 
     #[inline]
     fn upcast_mut_slice_ptrs<'short, 'long: 'short>(
-        from: SliceMutPtrs<'long, Self>,
-    ) -> SliceMutPtrs<'short, Self> {
+        from: Self::SliceMutPtrs<'long>,
+    ) -> Self::SliceMutPtrs<'short> {
         from
     }
 
@@ -228,18 +227,11 @@ unsafe impl SoaWrite for () {
     }
 }
 
-impl WithFieldDescriptors for () {
-    type FieldDescriptors<'a> = [FieldDescriptor; 1];
+impl<'a> FieldDescriptors<'a> for () {
+    type Output = [FieldDescriptor; 1];
 
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short> {
-        from
-    }
-
-    #[inline]
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+    fn field_descriptors(&'a self) -> Self::Output {
         [FieldDescriptor::of::<()>()]
     }
 }

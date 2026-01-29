@@ -10,7 +10,7 @@ use crate::{
     iter::RawIter,
     soa::{
         self,
-        traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa},
+        traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaOwned},
     },
 };
 
@@ -167,8 +167,7 @@ where
 impl<K, V> Debug for Iter<'_, '_, K, V>
 where
     K: Debug,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -195,8 +194,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for Iter<'_, '_, K, V>
 where
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]

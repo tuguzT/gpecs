@@ -22,7 +22,7 @@ use crate::{
     entity::Entity,
     hash::{IndexMap, IndexSet},
     soa::{
-        field::FieldDescriptor,
+        field::{FieldDescriptor, FieldDescriptors},
         traits::{Refs, RefsMut, Slices, SlicesMut, SoaContext},
     },
 };

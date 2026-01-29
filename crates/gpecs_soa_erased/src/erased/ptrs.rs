@@ -2,23 +2,26 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
-    ptr, slice,
+    ptr,
 };
 
 use crate::{
     erased::{
-        ErasedSoaMutPtrs, ErasedSoaRefs,
-        assert::debug_assert_eq_descriptors,
+        CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaRefs,
+        assert::{check_into_value, debug_assert_eq_descriptors},
+        dangling::{Dangling, dangling},
         error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset},
     },
     error::{
-        InsufficientAlignError, check_layout, check_len, check_ptr_align, check_sufficient_align,
-        check_sufficient_len,
+        InsufficientAlignError, check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
     field::ErasedFieldPtr,
     soa::{
-        field::{BufferOffset, BufferOffsets, FieldDescriptor, buffer_offsets},
-        traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext, WithFieldDescriptors},
+        field::{
+            BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
+            FieldDescriptorsOwned, buffer_offsets,
+        },
+        traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext},
     },
     storage::AddressableUnit,
 };
@@ -95,7 +98,7 @@ where
 impl<D, A> ErasedSoaPtrs<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]>,
+    D: FieldDescriptorsOwned,
 {
     #[inline]
     #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
@@ -105,14 +108,14 @@ where
         capacity: usize,
         offset: usize,
     ) -> Result<Self, ErasedSoaPtrsError> {
-        let mut offsets = buffer_offsets(descriptors.as_ref(), capacity);
+        let mut offsets = buffer_offsets(descriptors.field_descriptors(), capacity);
         offsets.by_ref().try_for_each(|offset| {
             let desc = offset?.field_descriptor;
             check_sufficient_align(desc.layout(), Layout::new::<A>())
                 .map_err(ErasedSoaPtrsError::from)
         })?;
 
-        let layout = offsets.layout();
+        let layout = offsets.into_layout();
         check_sufficient_len(buffer.len() * size_of::<A>(), layout.size())?;
         check_ptr_align(buffer.cast(), layout)?;
         check_offset(offset, capacity)?;
@@ -123,21 +126,10 @@ where
 
     #[inline]
     pub fn dangling(descriptors: D) -> Result<Self, InsufficientAlignError> {
-        let mut packed_size = 0;
-        let addr = descriptors.as_ref().iter().try_fold(1, |max_align, desc| {
-            let layout = desc.layout();
-            check_sufficient_align(layout, Layout::new::<A>())?;
-
-            packed_size += layout.size().div_ceil(size_of::<A>());
-            Ok(usize::max(max_align, layout.align()))
-        })?;
+        let Dangling { addr, capacity } = dangling::<_, A>(descriptors.field_descriptors())?;
 
         let data = ptr::without_provenance(addr);
         let buffer = ptr::slice_from_raw_parts(data, 0);
-        let capacity = match packed_size {
-            0 => usize::MAX,
-            _ => 0,
-        };
 
         let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, 0) };
         Ok(me)
@@ -146,7 +138,7 @@ where
 
 impl<D> ErasedSoaPtrs<D, u8>
 where
-    D: AsRef<[FieldDescriptor]>,
+    D: FieldDescriptorsOwned,
 {
     #[inline]
     pub unsafe fn try_into<T>(
@@ -162,20 +154,8 @@ where
             capacity,
             offset,
         } = self;
-        let descriptors = descriptors.as_ref();
 
-        let result = context
-            .field_descriptors()
-            .into_iter()
-            .zip(&self)
-            .try_fold(0, |len, (desc, slice)| {
-                check_layout(slice.descriptor().layout(), desc.as_ref().layout())?;
-                Ok(len + 1)
-            })
-            .and_then(|len| {
-                check_len(len, descriptors.len())?;
-                Ok(())
-            });
+        let result = check_into_value(descriptors.field_descriptors(), context.field_descriptors());
         if let Err(error) = result {
             return Err(ErasedSoaIntoValueError::new(self, error));
         }
@@ -210,22 +190,16 @@ where
     }
 }
 
-impl<D, A> ErasedSoaPtrs<D, A>
+impl<'a, D, A> ErasedSoaPtrs<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + ?Sized,
+    D: FieldDescriptors<'a> + ?Sized,
 {
     #[inline]
-    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
-        let Self { descriptors, .. } = self;
-        descriptors.as_ref()
-    }
-
-    #[inline]
     #[track_caller]
-    pub unsafe fn offset_from<E>(&self, origin: &ErasedSoaPtrs<E, A>) -> isize
+    pub unsafe fn offset_from<'e, E>(&'a self, origin: &'e ErasedSoaPtrs<E, A>) -> isize
     where
-        E: AsRef<[FieldDescriptor]> + ?Sized,
+        E: FieldDescriptors<'e> + ?Sized,
     {
         let Self {
             ref descriptors,
@@ -236,13 +210,13 @@ where
 
         assert_eq!(buffer, origin.buffer);
         assert_eq!(capacity, origin.capacity);
-        debug_assert_eq_descriptors(descriptors.as_ref(), origin.field_descriptors());
+        debug_assert_eq_descriptors(descriptors.field_descriptors(), origin.field_descriptors());
 
         unsafe { (offset - origin.offset).try_into().unwrap_unchecked() }
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
+    pub fn iter(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, A> {
         let Self {
             ref descriptors,
             buffer,
@@ -250,7 +224,7 @@ where
             offset,
         } = *self;
 
-        let descriptors = descriptors.as_ref().iter();
+        let descriptors = descriptors.field_descriptors().into_iter();
         let inner = buffer_offsets(descriptors, capacity);
         unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
     }
@@ -307,10 +281,10 @@ where
 impl<'a, D, A> IntoIterator for &'a ErasedSoaPtrs<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + ?Sized,
+    D: FieldDescriptors<'a> + ?Sized,
 {
     type Item = ErasedFieldPtr<A>;
-    type IntoIter = ErasedSoaPtrsIter<slice::Iter<'a, FieldDescriptor>, A>;
+    type IntoIter = ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, A>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -321,9 +295,7 @@ where
 impl<D, A> IntoIterator for ErasedSoaPtrs<D, A>
 where
     A: AddressableUnit,
-    D: IntoIterator,
-    D::Item: AsRef<FieldDescriptor>,
-    D::IntoIter: AsRef<[FieldDescriptor]>,
+    D: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
     type Item = ErasedFieldPtr<A>;
     type IntoIter = ErasedSoaPtrsIter<D::IntoIter, A>;
@@ -340,6 +312,33 @@ where
         let descriptors = descriptors.into_iter();
         let inner = buffer_offsets(descriptors, capacity);
         unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
+    }
+}
+
+impl<'a, D, A> FieldDescriptors<'a> for ErasedSoaPtrs<D, A>
+where
+    A: AddressableUnit,
+    D: FieldDescriptors<'a> + ?Sized,
+{
+    type Output = D::Output;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        let Self { descriptors, .. } = self;
+        descriptors.field_descriptors()
+    }
+}
+
+impl<D, A> CovariantFieldDescriptors for ErasedSoaPtrs<D, A>
+where
+    A: AddressableUnit,
+    D: CovariantFieldDescriptors + ?Sized,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        D::upcast_field_descriptors(from)
     }
 }
 
@@ -395,19 +394,13 @@ where
     }
 }
 
-impl<D, A> ErasedSoaPtrsIter<D, A>
+impl<'a, D, A> ErasedSoaPtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + ?Sized,
+    D: FieldDescriptors<'a> + ?Sized,
 {
     #[inline]
-    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
-        let Self { inner, .. } = self;
-        inner.as_inner().as_ref()
-    }
-
-    #[inline]
-    pub(super) fn debug_entries(&self) -> ErasedSoaPtrsIter<slice::Iter<'_, FieldDescriptor>, A> {
+    pub(super) fn entries(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, A> {
         let Self {
             ref inner,
             buffer,
@@ -416,7 +409,7 @@ where
 
         let layout = inner.layout();
         let capacity = inner.capacity();
-        let fields = inner.as_inner().as_ref().iter();
+        let fields = inner.as_inner().field_descriptors().into_iter();
 
         let inner = unsafe { BufferOffsets::from_parts(layout, capacity, fields) };
         unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
@@ -426,10 +419,10 @@ where
 impl<D, A> Debug for ErasedSoaPtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + ?Sized,
+    D: FieldDescriptorsOwned + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.debug_entries();
+        let entries = self.entries();
         f.debug_list().entries(entries).finish()
     }
 }
@@ -455,8 +448,7 @@ where
 impl<D, A> Iterator for ErasedSoaPtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: Iterator + ?Sized,
-    D::Item: AsRef<FieldDescriptor>,
+    D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
 {
     type Item = ErasedFieldPtr<A>;
 
@@ -499,8 +491,7 @@ where
 impl<D, A> ExactSizeIterator for ErasedSoaPtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: ExactSizeIterator + ?Sized,
-    D::Item: AsRef<FieldDescriptor>,
+    D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -512,7 +503,33 @@ where
 impl<D, A> FusedIterator for ErasedSoaPtrsIter<D, A>
 where
     A: AddressableUnit,
-    D: FusedIterator + ?Sized,
-    D::Item: AsRef<FieldDescriptor>,
+    D: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
 {
+}
+
+impl<'a, D, A> FieldDescriptors<'a> for ErasedSoaPtrsIter<D, A>
+where
+    A: AddressableUnit,
+    D: FieldDescriptors<'a> + ?Sized,
+{
+    type Output = D::Output;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        let Self { inner, .. } = self;
+        inner.as_inner().field_descriptors()
+    }
+}
+
+impl<D, A> CovariantFieldDescriptors for ErasedSoaPtrsIter<D, A>
+where
+    A: AddressableUnit,
+    D: CovariantFieldDescriptors + ?Sized,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        D::upcast_field_descriptors(from)
+    }
 }

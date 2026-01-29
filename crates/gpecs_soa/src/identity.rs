@@ -11,12 +11,11 @@ use core::{
 };
 
 use crate::{
-    field::FieldDescriptor,
+    field::{FieldDescriptor, FieldDescriptors},
     ptr::assert_ptr_is_aligned,
     traits::{
         AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
         SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
-        WithFieldDescriptors,
     },
 };
 
@@ -316,6 +315,48 @@ impl<T> Hash for IdentityContext<T> {
     }
 }
 
+impl<T, A> FromIterator<A> for Identity<T>
+where
+    T: FromIterator<A>,
+{
+    fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
+        Identity(T::from_iter(iter))
+    }
+}
+
+impl<T> IntoIterator for Identity<T>
+where
+    T: IntoIterator,
+{
+    type Item = T::Item;
+    type IntoIter = T::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_inner().into_iter()
+    }
+}
+
+impl<T, A> Extend<A> for Identity<T>
+where
+    T: Extend<A>,
+{
+    fn extend<I: IntoIterator<Item = A>>(&mut self, iter: I) {
+        self.as_inner_mut().extend(iter);
+    }
+}
+
+impl<'a, T> FieldDescriptors<'a> for Identity<T>
+where
+    T: FieldDescriptors<'a> + ?Sized,
+{
+    type Output = T::Output;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        self.as_inner().field_descriptors()
+    }
+}
+
 unsafe impl<T> RawSoaContext for IdentityContext<T> {
     type Ptrs<'a> = *const Identity<T>;
 
@@ -534,18 +575,11 @@ unsafe impl<T> SoaWrite for Identity<T> {
     }
 }
 
-impl<T> WithFieldDescriptors for IdentityContext<T> {
-    type FieldDescriptors<'a> = [FieldDescriptor; 1];
+impl<'a, T> FieldDescriptors<'a> for IdentityContext<T> {
+    type Output = [FieldDescriptor; 1];
 
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short> {
-        from
-    }
-
-    #[inline]
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+    fn field_descriptors(&'a self) -> Self::Output {
         [FieldDescriptor::of::<T>()]
     }
 }

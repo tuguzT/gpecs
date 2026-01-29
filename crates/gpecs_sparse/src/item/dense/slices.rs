@@ -8,7 +8,7 @@ use core::{
 use crate::{
     item::DenseSlicePtrs,
     soa::{
-        traits::{Slices, Soa, SoaContext},
+        traits::{Slices, Soa, SoaContext, SoaOwned},
         wrapper,
     },
 };
@@ -76,8 +76,7 @@ where
 impl<K, V> Debug for DenseSlices<'_, '_, K, V>
 where
     K: Debug,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -91,8 +90,7 @@ where
 
 impl<K, V> Default for DenseSlices<'_, '_, K, V>
 where
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Default,
 {
     #[inline]
@@ -106,8 +104,7 @@ where
 impl<K, V> PartialEq for DenseSlices<'_, '_, K, V>
 where
     K: PartialEq,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -119,8 +116,7 @@ where
 impl<K, V> Eq for DenseSlices<'_, '_, K, V>
 where
     K: Eq,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Eq,
 {
 }
@@ -128,8 +124,7 @@ where
 impl<K, V> PartialOrd for DenseSlices<'_, '_, K, V>
 where
     K: PartialOrd,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -145,8 +140,7 @@ where
 impl<K, V> Ord for DenseSlices<'_, '_, K, V>
 where
     K: Ord,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -162,8 +156,7 @@ where
 impl<K, V> Hash for DenseSlices<'_, '_, K, V>
 where
     K: Hash,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -175,8 +168,7 @@ where
 
 impl<K, V> Clone for DenseSlices<'_, '_, K, V>
 where
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Clone,
 {
     #[inline]
@@ -189,8 +181,7 @@ where
 
 impl<K, V> Copy for DenseSlices<'_, '_, K, V>
 where
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Copy,
 {
 }

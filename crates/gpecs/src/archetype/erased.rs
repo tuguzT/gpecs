@@ -13,10 +13,10 @@ use crate::{
     component::registry::{ComponentId, ComponentRegistry, DropFn},
     hash::IndexMap,
     soa::{
-        field::FieldDescriptor,
+        field::{FieldDescriptor, FieldDescriptors},
         traits::{
             AllocSoa, RawSoa, RawSoaContext, Refs, RefsMut, Slices, SlicesMut, Soa, SoaContext,
-            SoaRead, SoaWrite, WithFieldDescriptors,
+            SoaRead, SoaWrite,
         },
     },
 };
@@ -53,7 +53,7 @@ pub fn validate_components<'a, 'components, 'ctx, T, I>(
 ) -> impl Iterator<Item = ComponentId> + use<'components, 'ctx, T, I>
 where
     T: RawSoa + Soa<'a>,
-    T::Context: WithFieldDescriptors,
+    T::Context: FieldDescriptors<'ctx>,
     I: IntoIterator<Item = ComponentId>,
 {
     zip(component_ids, context.field_descriptors())
@@ -71,7 +71,7 @@ fn reorder_fields<'a, 'components, 'ctx, T, I, F>(
 ) -> impl Iterator<Item = F> + use<'components, 'ctx, T, I, F>
 where
     T: RawSoa + Soa<'a>,
-    T::Context: WithFieldDescriptors,
+    T::Context: FieldDescriptors<'ctx>,
     I: IntoIterator<Item = ComponentId>,
 {
     #[cold]

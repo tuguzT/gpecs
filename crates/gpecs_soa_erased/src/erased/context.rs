@@ -7,10 +7,13 @@ use core::{
 };
 
 use crate::{
+    erased::CovariantFieldDescriptors,
     error::{InsufficientAlignError, check_sufficient_align},
     soa::{
-        field::FieldDescriptor,
-        traits::{RawSoa, WithFieldDescriptors},
+        field::{
+            FieldDescriptor, FieldDescriptors, FieldDescriptorsOwned, IntoCopiedFieldDescriptors,
+        },
+        traits::RawSoa,
     },
     storage::AddressableUnit,
 };
@@ -40,7 +43,7 @@ where
     }
 
     #[inline]
-    pub fn into_field_descriptors(self) -> D {
+    pub fn into_inner(self) -> D {
         let Self { descriptors, .. } = self;
         descriptors
     }
@@ -49,13 +52,13 @@ where
 impl<D, A> ErasedSoaContext<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]>,
+    D: FieldDescriptorsOwned,
 {
     #[inline]
     pub fn new(descriptors: D) -> Result<Self, InsufficientAlignError> {
         descriptors
-            .as_ref()
-            .iter()
+            .field_descriptors()
+            .copied_field_descriptors()
             .try_for_each(|desc| check_sufficient_align(desc.layout(), Layout::new::<A>()))?;
 
         let me = unsafe { Self::new_unchecked(descriptors) };
@@ -66,12 +69,12 @@ where
 impl<D, A> ErasedSoaContext<D, A>
 where
     A: AddressableUnit,
-    D: AsRef<[FieldDescriptor]> + ?Sized,
+    D: ?Sized,
 {
     #[inline]
-    pub fn field_descriptors(&self) -> &[FieldDescriptor] {
+    pub fn as_inner(&self) -> &D {
         let Self { descriptors, .. } = self;
-        descriptors.as_ref()
+        descriptors
     }
 }
 
@@ -81,18 +84,17 @@ where
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn of<T>(context: &T::Context) -> Result<Self, InsufficientAlignError>
+    pub fn of<'a, T>(context: &'a T::Context) -> Result<Self, InsufficientAlignError>
     where
         T: RawSoa + ?Sized,
-        T::Context: WithFieldDescriptors,
+        T::Context: FieldDescriptors<'a>,
     {
         let descriptors = context
             .field_descriptors()
-            .into_iter()
+            .copied_field_descriptors()
             .map(|desc| {
-                let desc = desc.as_ref();
                 check_sufficient_align(desc.layout(), Layout::new::<A>())?;
-                Ok(*desc)
+                Ok(desc)
             })
             .collect::<Result<_, _>>()?;
 
@@ -205,5 +207,32 @@ where
 
         phantom.hash(state);
         descriptors.hash(state);
+    }
+}
+
+impl<'a, D, A> FieldDescriptors<'a> for ErasedSoaContext<D, A>
+where
+    A: AddressableUnit,
+    D: FieldDescriptors<'a> + ?Sized,
+{
+    type Output = D::Output;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        let Self { descriptors, .. } = self;
+        descriptors.field_descriptors()
+    }
+}
+
+impl<D, A> CovariantFieldDescriptors for ErasedSoaContext<D, A>
+where
+    A: AddressableUnit,
+    D: CovariantFieldDescriptors + ?Sized,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        D::upcast_field_descriptors(from)
     }
 }

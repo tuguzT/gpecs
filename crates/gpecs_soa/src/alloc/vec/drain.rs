@@ -8,7 +8,7 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, range},
-    traits::{AllocSoa, Ptrs, RawSoaContext, SlicePtrs, Slices, Soa, SoaRead},
+    traits::{AllocSoa, Ptrs, RawSoaContext, SlicePtrs, Slices, Soa, SoaOwned, SoaRead},
 };
 
 use super::SoaVec;
@@ -143,8 +143,7 @@ where
 
 impl<T, U> AsRef<[U]> for Drain<'_, T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     fn as_ref(&self) -> &[U] {
@@ -154,8 +153,7 @@ where
 
 impl<T> Debug for Drain<'_, T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

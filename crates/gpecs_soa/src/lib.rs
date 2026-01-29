@@ -18,6 +18,7 @@ pub mod slice;
 pub mod traits;
 pub mod wrapper;
 
+mod layout;
+
 #[cfg(feature = "alloc")]
 mod alloc;
-mod layout;

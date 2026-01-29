@@ -9,7 +9,7 @@ use crate::{
     soa::{
         traits::{
             AllocSoa, MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
-            SoaCloneToUninit, SoaRead,
+            SoaCloneToUninit, SoaOwned, SoaRead,
         },
         vec,
     },
@@ -394,8 +394,7 @@ where
 
 impl<K, V> Debug for IntoValues<K, V>
 where
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -432,8 +431,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for IntoValues<K, V>
 where
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]
@@ -444,8 +442,7 @@ where
 
 impl<T, K, V> AsMut<[T]> for IntoValues<K, V>
 where
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
 {
     #[inline]
@@ -704,8 +701,7 @@ where
 impl<K, V> Debug for IntoIter<K, V>
 where
     K: Debug,
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -745,8 +741,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for IntoIter<K, V>
 where
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]
@@ -757,8 +752,7 @@ where
 
 impl<T, K, V> AsMut<[T]> for IntoIter<K, V>
 where
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
 {
     #[inline]
@@ -931,8 +925,7 @@ where
 impl<K, V> Debug for Drain<'_, K, V>
 where
     K: Debug,
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -946,8 +939,7 @@ where
 
 impl<T, K, V> AsRef<[T]> for Drain<'_, K, V>
 where
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]

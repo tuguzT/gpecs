@@ -13,7 +13,7 @@ use crate::{
     },
     traits::{
         MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-        SlicesMut, Soa, SoaCloneToUninit, SoaContext,
+        SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,
     },
 };
 
@@ -629,8 +629,7 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
 {
     #[inline]
     pub fn sort_unstable_with_permutation<P>(&mut self, permutation: P)
@@ -759,8 +758,7 @@ where
 
 impl<T> Debug for SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -781,8 +779,7 @@ where
 
 impl<T, U> AsRef<[U]> for SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
@@ -803,8 +800,7 @@ where
 
 impl<T, U> AsMut<[U]> for SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, T>: Into<&'a mut [U]>,
 {
     #[inline]
@@ -815,16 +811,14 @@ where
 
 impl<T> Eq for SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
 }
 
 impl<T> Ord for SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
 {
     #[inline]
@@ -837,8 +831,7 @@ where
 
 impl<T> Hash for SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
 {
     #[inline]
@@ -850,9 +843,8 @@ where
 
 impl<T, U, I> Index<I> for SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
+    T: SoaOwned + ?Sized,
     U: ?Sized,
-    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
 {
     type Output = U;
@@ -865,9 +857,8 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
+    T: SoaOwned + ?Sized,
     U: ?Sized,
-    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelperMut<'ctx, 'a, T, Output = U>,
 {
     #[inline]

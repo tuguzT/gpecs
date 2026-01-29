@@ -8,7 +8,7 @@ use core::{
 use crate::{
     item::{DenseMutPtrs, DenseRefs},
     soa::{
-        traits::{RefsMut, Soa, SoaContext},
+        traits::{RefsMut, Soa, SoaContext, SoaOwned},
         wrapper,
     },
 };
@@ -80,8 +80,7 @@ where
 impl<K, V> Debug for DenseRefsMut<'_, '_, K, V>
 where
     K: Debug,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -96,8 +95,7 @@ where
 impl<K, V> PartialEq for DenseRefsMut<'_, '_, K, V>
 where
     K: PartialEq,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -109,8 +107,7 @@ where
 impl<K, V> Eq for DenseRefsMut<'_, '_, K, V>
 where
     K: Eq,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Eq,
 {
 }
@@ -118,8 +115,7 @@ where
 impl<K, V> PartialOrd for DenseRefsMut<'_, '_, K, V>
 where
     K: PartialOrd,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -135,8 +131,7 @@ where
 impl<K, V> Ord for DenseRefsMut<'_, '_, K, V>
 where
     K: Ord,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -152,8 +147,7 @@ where
 impl<K, V> Hash for DenseRefsMut<'_, '_, K, V>
 where
     K: Hash,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> RefsMut<'ctx, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

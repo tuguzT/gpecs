@@ -1,10 +1,10 @@
-use std::{alloc::Layout, hint::black_box, mem::MaybeUninit};
+use std::{alloc::Layout, hint::black_box, mem::MaybeUninit, ops::Deref};
 
-use arrayvec::ArrayVec;
+use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa_erased::{
-    erased::{BoxedErasedSoa, ErasedSoa},
+    erased::{BoxedErasedSoa, CovariantFieldDescriptors, ErasedSoa},
     soa::{
-        field::FieldDescriptor,
+        field::{FieldDescriptor, FieldDescriptors},
         prelude::*,
         traits::{SoaWrite, TupleContext},
     },
@@ -33,8 +33,6 @@ pub trait Push: SoaVecs<Context: Default> + SoaWrite {
     }
 }
 
-type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
-
 impl Push for Zero {
     #[expect(clippy::let_unit_value, reason = "reference for other manual impls")]
     fn soa_std_push(vecs: &mut Self::Vecs, value: Self) {
@@ -50,8 +48,10 @@ impl Push for Zero {
         let bytes = [MaybeUninit::<u8>::zeroed(); size_of::<Self>() * 2];
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<1>, _>::try_from_storage_value(bytes, context, value)
-                .unwrap();
+            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 1>, _>::try_from_storage_value(
+                bytes, context, value,
+            )
+            .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -80,8 +80,10 @@ impl Push for Tiny {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<1>, _>::try_from_storage_value(bytes, context, value)
-                .unwrap();
+            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 1>, _>::try_from_storage_value(
+                bytes, context, value,
+            )
+            .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -112,8 +114,10 @@ impl Push for Small {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<3>, _>::try_from_storage_value(bytes, context, value)
-                .unwrap();
+            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 3>, _>::try_from_storage_value(
+                bytes, context, value,
+            )
+            .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -144,8 +148,10 @@ impl Push for Medium {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<3>, _>::try_from_storage_value(bytes, context, value)
-                .unwrap();
+            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 3>, _>::try_from_storage_value(
+                bytes, context, value,
+            )
+            .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -179,8 +185,10 @@ impl Push for Big {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<5>, _>::try_from_storage_value(bytes, context, value)
-                .unwrap();
+            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 5>, _>::try_from_storage_value(
+                bytes, context, value,
+            )
+            .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -219,12 +227,85 @@ impl Push for Large {
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
         let value =
-            ErasedSoa::<_, ArrayDescriptors<10>, _>::try_from_storage_value(bytes, context, value)
-                .unwrap();
+            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 10>, _>::try_from_storage_value(
+                bytes, context, value,
+            )
+            .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
             dst.copy_from(&ptrs, 1);
         });
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+struct ArrayDescriptors<T, const CAP: usize>(ArrayVec<T, CAP>);
+
+impl<T, const CAP: usize> Default for ArrayDescriptors<T, CAP> {
+    fn default() -> Self {
+        Self(ArrayVec::default())
+    }
+}
+
+impl<T, const CAP: usize> Deref for ArrayDescriptors<T, CAP> {
+    type Target = ArrayVec<T, CAP>;
+
+    fn deref(&self) -> &Self::Target {
+        let Self(array_vec) = self;
+        array_vec
+    }
+}
+
+impl<T, const CAP: usize> IntoIterator for ArrayDescriptors<T, CAP> {
+    type Item = T;
+    type IntoIter = IntoIter<T, CAP>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let Self(array_vec) = self;
+        array_vec.into_iter()
+    }
+}
+
+impl<A, T, const CAP: usize> FromIterator<A> for ArrayDescriptors<T, CAP>
+where
+    T: From<A>,
+{
+    fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
+        let array_vec = iter.into_iter().map(From::from).collect();
+        Self(array_vec)
+    }
+}
+
+impl<A, T, const CAP: usize> Extend<A> for ArrayDescriptors<T, CAP>
+where
+    T: From<A>,
+{
+    fn extend<I: IntoIterator<Item = A>>(&mut self, iter: I) {
+        let Self(array_vec) = self;
+        array_vec.extend(iter.into_iter().map(From::from));
+    }
+}
+
+impl<'a, T, const CAP: usize> FieldDescriptors<'a> for ArrayDescriptors<T, CAP>
+where
+    T: AsRef<FieldDescriptor> + 'a,
+{
+    type Output = &'a [T];
+
+    fn field_descriptors(&'a self) -> Self::Output {
+        self
+    }
+}
+
+impl<T, const CAP: usize> CovariantFieldDescriptors for ArrayDescriptors<T, CAP>
+where
+    T: AsRef<FieldDescriptor> + 'static,
+{
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from
     }
 }

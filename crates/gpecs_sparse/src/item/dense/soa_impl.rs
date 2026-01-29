@@ -5,10 +5,12 @@ use crate::{
         DenseContext, DenseFieldDescriptors, DenseItem, DenseMutPtrs, DenseNonNullPtrs, DensePtrs,
         DenseRefs, DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
     },
-    soa::traits::{
-        AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
-        SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
-        WithFieldDescriptors,
+    soa::{
+        field::FieldDescriptors,
+        traits::{
+            AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
+            SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+        },
     },
 };
 
@@ -250,22 +252,15 @@ where
     }
 }
 
-impl<K, V> WithFieldDescriptors for DenseContext<K, V>
+impl<'a, K, V> FieldDescriptors<'a> for DenseContext<K, V>
 where
     V: RawSoa + ?Sized,
-    V::Context: WithFieldDescriptors,
+    V::Context: FieldDescriptors<'a>,
 {
-    type FieldDescriptors<'a> = DenseFieldDescriptors<'a, K, V>;
+    type Output = DenseFieldDescriptors<'a, K, V>;
 
     #[inline]
-    fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: Self::FieldDescriptors<'long>,
-    ) -> Self::FieldDescriptors<'short> {
-        from
-    }
-
-    #[inline]
-    fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+    fn field_descriptors(&'a self) -> Self::Output {
         let context = self.as_inner();
         DenseFieldDescriptors::new(context)
     }

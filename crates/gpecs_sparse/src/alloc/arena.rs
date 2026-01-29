@@ -31,7 +31,7 @@ use crate::{
         self,
         traits::{
             AllocSoa, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-            SlicesMut, Soa, SoaContext, SoaRead, SoaWrite,
+            SlicesMut, Soa, SoaContext, SoaOwned, SoaRead, SoaWrite,
         },
         vec::SoaVec,
     },
@@ -1555,8 +1555,7 @@ where
 impl<K, V> EpochSparseArena<K, V>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
 {
     pub fn retain<F>(&mut self, mut f: F)
     where
@@ -1957,8 +1956,7 @@ where
 impl<T, K, V> AsRef<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]
@@ -1970,8 +1968,7 @@ where
 impl<T, K, V> AsMut<[T]> for EpochSparseArena<K, V>
 where
     K: Key,
-    V: AllocSoa + ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
 {
     #[inline]

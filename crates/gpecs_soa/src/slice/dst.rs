@@ -14,7 +14,7 @@ use crate::{
     },
     traits::{
         AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs,
-        Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext,
+        Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,
     },
 };
 
@@ -367,8 +367,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoaTrusted + ?Sized,
 {
     #[inline]
     pub fn sort_unstable_with_permutation<P>(&mut self, permutation: P)
@@ -416,8 +415,7 @@ where
 
 impl<T> Debug for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoaTrusted + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -470,16 +468,14 @@ where
 
 impl<T> Eq for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoaTrusted + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
 }
 
 impl<T> Ord for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoaTrusted + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
 {
     #[inline]
@@ -492,8 +488,7 @@ where
 
 impl<T> Hash for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoaTrusted + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
 {
     #[inline]
@@ -520,9 +515,8 @@ where
 
 impl<T, U, I> Index<I> for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaOwned + AllocSoaTrusted + ?Sized,
     U: ?Sized,
-    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
 {
     type Output = U;
@@ -535,9 +529,8 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
+    T: SoaOwned + AllocSoaTrusted + ?Sized,
     U: ?Sized,
-    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelperMut<'ctx, 'a, T, Output = U>,
 {
     #[inline]

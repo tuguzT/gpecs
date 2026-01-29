@@ -6,7 +6,7 @@ use core::{
 
 use crate::{
     slice::RawIter,
-    traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext},
+    traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
 };
 
 #[repr(transparent)]
@@ -164,8 +164,7 @@ where
 
 impl<T, U> AsRef<[U]> for Iter<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
@@ -176,8 +175,7 @@ where
 
 impl<T> Debug for Iter<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

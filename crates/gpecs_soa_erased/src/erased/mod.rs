@@ -1,5 +1,6 @@
 pub use self::{
     context::ErasedSoaContext,
+    descriptors::CovariantFieldDescriptors,
     fields::ErasedSoaFields,
     mut_ptrs::{ErasedSoaMutPtrs, ErasedSoaMutPtrsIter},
     mut_refs::{ErasedSoaRefsMut, ErasedSoaRefsMutIter},
@@ -20,6 +21,8 @@ pub mod error;
 
 mod assert;
 mod context;
+mod dangling;
+mod descriptors;
 mod fields;
 mod mut_ptrs;
 mod mut_refs;

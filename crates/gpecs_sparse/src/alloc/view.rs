@@ -3,15 +3,14 @@ use core::cmp;
 use crate::{
     assert::unwrap_dense_from_sparse_index,
     key::Key,
-    soa::traits::{Refs, Soa},
+    soa::traits::{Refs, SoaOwned},
     view::EpochSparseViewMut,
 };
 
 impl<K, V> EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
 {
     #[inline]
     pub fn sort(&mut self)

@@ -5,7 +5,9 @@ use std::{ptr, slice};
 
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
-    erased::ErasedSoa, field::ErasedFieldRef, soa::field::FieldDescriptor,
+    erased::ErasedSoa,
+    field::ErasedFieldRef,
+    soa::field::{FieldDescriptor, FieldDescriptors},
     storage::AlignedUninitStorage,
 };
 
@@ -15,7 +17,7 @@ use gpecs_soa_erased::{
     storage::BoxedAlignedUninitStorage,
 };
 
-type ArrayDescriptors<const CAP: usize> = ArrayVec<FieldDescriptor, CAP>;
+use crate::common::ArrayDescriptors;
 
 #[test]
 #[cfg(feature = "alloc")]
@@ -39,8 +41,10 @@ fn value() {
 
     let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Value>()).unwrap();
     let erased_value =
-        ErasedSoa::<_, ArrayDescriptors<5>, _>::try_from_storage_value(bytes, &context, value)
-            .unwrap();
+        ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 5>, _>::try_from_storage_value(
+            bytes, &context, value,
+        )
+        .unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -147,7 +151,7 @@ fn value() {
         str,
     );
 
-    let (descriptors, fields): (ArrayDescriptors<4>, ArrayVec<_, 4>) =
+    let (descriptors, fields): (ArrayDescriptors<FieldDescriptor, 4>, ArrayVec<_, 4>) =
         fields.into_iter().map(ErasedField::into_parts).unzip();
     let erased_value = ErasedSoa::<BoxedAlignedUninitStorage, _, _>::try_from_fields_descriptors(
         fields,
@@ -177,8 +181,10 @@ fn value_zst() {
     let bytes = [MaybeUninit::zeroed(); size_of::<()>() * 2];
     let bytes = AlignedUninitStorage::new(bytes, Layout::new::<()>()).unwrap();
     let erased_value =
-        ErasedSoa::<_, ArrayDescriptors<1>, _>::try_from_storage_value(bytes, &context, value)
-            .unwrap();
+        ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 1>, _>::try_from_storage_value(
+            bytes, &context, value,
+        )
+        .unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(

@@ -8,7 +8,7 @@ use core::{
 use crate::{
     item::DensePtrs,
     soa::{
-        traits::{Refs, Soa, SoaContext},
+        traits::{Refs, Soa, SoaContext, SoaOwned},
         wrapper,
     },
 };
@@ -71,8 +71,7 @@ where
 impl<K, V> Debug for DenseRefs<'_, '_, K, V>
 where
     K: Debug,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -87,8 +86,7 @@ where
 impl<K, V> PartialEq for DenseRefs<'_, '_, K, V>
 where
     K: PartialEq,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -100,8 +98,7 @@ where
 impl<K, V> Eq for DenseRefs<'_, '_, K, V>
 where
     K: Eq,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Eq,
 {
 }
@@ -109,8 +106,7 @@ where
 impl<K, V> PartialOrd for DenseRefs<'_, '_, K, V>
 where
     K: PartialOrd,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -126,8 +122,7 @@ where
 impl<K, V> Ord for DenseRefs<'_, '_, K, V>
 where
     K: Ord,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -143,8 +138,7 @@ where
 impl<K, V> Hash for DenseRefs<'_, '_, K, V>
 where
     K: Hash,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -156,8 +150,7 @@ where
 
 impl<K, V> Clone for DenseRefs<'_, '_, K, V>
 where
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Clone,
 {
     #[inline]
@@ -170,8 +163,7 @@ where
 
 impl<K, V> Copy for DenseRefs<'_, '_, K, V>
 where
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Refs<'ctx, 'a, V>: Copy,
 {
 }

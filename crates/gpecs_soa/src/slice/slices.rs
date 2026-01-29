@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     slice::{IndexHelper, Iter, RawIter, SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlicesIndex},
-    traits::{Ptrs, RawSoa, RawSoaContext, Refs, SlicePtrs, Slices, Soa, SoaContext},
+    traits::{Ptrs, RawSoa, RawSoaContext, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
 };
 
 pub struct SoaSlices<'ctx, 'a, T>
@@ -358,8 +358,7 @@ where
 
 impl<T> Debug for SoaSlices<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -380,8 +379,7 @@ where
 
 impl<T, U> AsRef<[U]> for SoaSlices<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
@@ -392,16 +390,14 @@ where
 
 impl<T> Eq for SoaSlices<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
 }
 
 impl<T> Ord for SoaSlices<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
 {
     #[inline]
@@ -414,8 +410,7 @@ where
 
 impl<T> Hash for SoaSlices<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
 {
     #[inline]
@@ -447,9 +442,8 @@ where
 
 impl<T, U, I> Index<I> for SoaSlices<'_, '_, T>
 where
-    T: ?Sized,
+    T: SoaOwned + ?Sized,
     U: ?Sized,
-    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
 {
     type Output = U;

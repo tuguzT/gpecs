@@ -19,7 +19,7 @@ use crate::{
     key::Key,
     soa::{
         slice::SoaSlices,
-        traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext},
+        traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaContext, SoaOwned},
     },
     view::EpochSparseViewPtr,
 };
@@ -1025,8 +1025,7 @@ where
 impl<T, K, V> AsRef<[T]> for EpochSparseView<'_, '_, K, V>
 where
     K: Key,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]

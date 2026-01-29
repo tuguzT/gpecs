@@ -572,8 +572,7 @@ macro_rules! generate_entry_types {
         impl<K, V> Entry<'_, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + ?Sized,
-            for<'a> V: $crate::soa::traits::Soa<'a>,
+            V: $crate::soa::traits::SoaOwned + $crate::soa::traits::AllocSoa + ?Sized,
         {
             #[inline]
             #[must_use]

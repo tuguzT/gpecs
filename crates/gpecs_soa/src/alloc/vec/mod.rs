@@ -21,7 +21,8 @@ use crate::{
     },
     traits::{
         AllocSoa, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs,
-        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaRead,
+        SoaWrite,
     },
 };
 
@@ -964,8 +965,7 @@ where
 
 impl<T> SoaVec<T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
 {
     #[inline]
     pub fn sort_with_permutation<P>(&mut self, permutation: P)
@@ -1070,8 +1070,7 @@ where
 
 impl<T> Debug for SoaVec<T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1153,16 +1152,14 @@ where
 
 impl<T> Eq for SoaVec<T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Eq,
 {
 }
 
 impl<T> Ord for SoaVec<T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Ord,
 {
     #[inline]
@@ -1175,8 +1172,7 @@ where
 
 impl<T> Hash for SoaVec<T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Hash,
 {
     #[inline]
@@ -1233,9 +1229,8 @@ where
 
 impl<T, U, I> Index<I> for SoaVec<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaOwned + AllocSoa + ?Sized,
     U: ?Sized,
-    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelper<'ctx, 'a, T, Output = U>,
 {
     type Output = U;
@@ -1248,9 +1243,8 @@ where
 
 impl<T, U, I> IndexMut<I> for SoaVec<T>
 where
-    T: AllocSoa + ?Sized,
+    T: SoaOwned + AllocSoa + ?Sized,
     U: ?Sized,
-    for<'a> T: Soa<'a>,
     for<'ctx, 'a> I: IndexHelperMut<'ctx, 'a, T, Output = U>,
 {
     #[inline]

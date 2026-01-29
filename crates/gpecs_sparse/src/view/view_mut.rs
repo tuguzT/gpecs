@@ -32,7 +32,7 @@ use crate::{
         slice::{Iter as SoaIter, SoaSliceMutPtrs, SoaSlices, SoaSlicesMut},
         traits::{
             MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-            SlicesMut, Soa, SoaContext,
+            SlicesMut, Soa, SoaContext, SoaOwned,
         },
     },
     view::{EpochSparseView, EpochSparseViewMutPtr, EpochSparseViewPtr},
@@ -1778,8 +1778,7 @@ where
 impl<K, V> EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
 {
     #[inline]
     pub fn sort_unstable(&mut self)
@@ -2007,8 +2006,7 @@ where
 impl<T, K, V> AsRef<[T]> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
 {
     #[inline]
@@ -2020,8 +2018,7 @@ where
 impl<T, K, V> AsMut<[T]> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key,
-    V: ?Sized,
-    for<'a> V: Soa<'a>,
+    V: SoaOwned + ?Sized,
     for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
 {
     #[inline]

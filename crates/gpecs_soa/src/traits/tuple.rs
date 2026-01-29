@@ -12,9 +12,8 @@ use crate::{
     field::FieldDescriptor,
     ptr::assert_ptr_is_aligned,
     traits::{
-        AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
-        SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
-        WithFieldDescriptors,
+        AllocSoaContext, AllocSoaTrusted, FieldDescriptors, MutPtrs, Ptrs, RawSoa, RawSoaContext,
+        Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
     },
 };
 
@@ -407,18 +406,11 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        impl<$($types,)*> WithFieldDescriptors for TupleContext<($($types,)*)> {
-            type FieldDescriptors<'a> = [FieldDescriptor; count_idents!($($types,)*)];
+        impl<'a, $($types,)*> FieldDescriptors<'a> for TupleContext<($($types,)*)> {
+            type Output = [FieldDescriptor; count_idents!($($types,)*)];
 
             #[inline]
-            fn upcast_field_descriptors<'short, 'long: 'short>(
-                from: Self::FieldDescriptors<'long>,
-            ) -> Self::FieldDescriptors<'short> {
-                from
-            }
-
-            #[inline]
-            fn field_descriptors(&self) -> Self::FieldDescriptors<'_> {
+            fn field_descriptors(&'a self) -> Self::Output {
                 Self::FIELD_DESCRIPTORS
             }
         }

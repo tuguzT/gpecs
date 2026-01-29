@@ -4,7 +4,7 @@ use core_alloc::boxed::Box;
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
     slice::{SoaSlices, SoaSlicesMut},
-    traits::{AllocSoa, RawSoaContext, Refs, Soa, SoaCloneToUninit, SoaContext},
+    traits::{AllocSoa, RawSoaContext, Refs, SoaCloneToUninit, SoaContext, SoaOwned},
     vec::SoaVec,
 };
 
@@ -56,8 +56,7 @@ where
 
 impl<T> SoaSlicesMut<'_, '_, T>
 where
-    T: ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + ?Sized,
 {
     #[inline]
     pub fn sort(&mut self)

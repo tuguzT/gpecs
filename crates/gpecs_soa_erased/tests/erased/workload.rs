@@ -4,7 +4,10 @@ use std::iter;
 
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa},
-    soa::{field::FieldDescriptor, vec::SoaVec},
+    soa::{
+        field::{FieldDescriptor, FieldDescriptors},
+        vec::SoaVec,
+    },
 };
 
 #[test]

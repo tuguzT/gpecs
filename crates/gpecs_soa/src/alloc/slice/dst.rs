@@ -3,7 +3,7 @@ use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
     slice::{Iter, IterMut, SoaSlice},
-    traits::{AllocSoaTrusted, Refs, RefsMut, Soa, SoaCloneToUninit, SoaRead},
+    traits::{AllocSoaTrusted, Refs, RefsMut, Soa, SoaCloneToUninit, SoaOwned, SoaRead},
     vec::{IntoIter, SoaVec},
 };
 
@@ -23,8 +23,7 @@ where
 
 impl<T> SoaSlice<T>
 where
-    T: AllocSoaTrusted + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoaTrusted + ?Sized,
 {
     #[inline]
     pub fn sort_with_permutation<P>(&mut self, permutation: P)

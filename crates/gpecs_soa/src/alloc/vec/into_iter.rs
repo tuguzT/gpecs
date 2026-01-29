@@ -12,7 +12,7 @@ use crate::{
     slice::SoaSlices,
     traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Slices,
-        SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaRead,
+        SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaRead,
     },
     vec::SoaVec,
     wrapper,
@@ -220,8 +220,7 @@ where
 
 impl<T, U> AsRef<[U]> for IntoIter<T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
@@ -232,8 +231,7 @@ where
 
 impl<T> Debug for IntoIter<T>
 where
-    T: AllocSoa + ?Sized,
-    for<'a> T: Soa<'a>,
+    T: SoaOwned + AllocSoa + ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

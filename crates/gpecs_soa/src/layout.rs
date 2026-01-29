@@ -3,7 +3,10 @@ use core::{
     mem::{ManuallyDrop, MaybeUninit, offset_of},
 };
 
-use crate::traits::{AllocSoa, AllocSoaContext, RawSoa, WithFieldDescriptors};
+use crate::{
+    field::{FieldDescriptors, IntoCopiedFieldDescriptors},
+    traits::{AllocSoa, AllocSoaContext, RawSoa},
+};
 
 /// Special type which is used to properly allocate a buffer in memory
 /// with respect to the size and alignment of
@@ -31,15 +34,15 @@ where
 }
 
 #[inline]
-pub fn is_zst<T>(context: &T::Context) -> bool
+pub fn is_zst<'a, T>(context: &'a T::Context) -> bool
 where
     T: RawSoa + ?Sized,
-    T::Context: WithFieldDescriptors,
+    T::Context: FieldDescriptors<'a>,
 {
     let packed_size = context
         .field_descriptors()
-        .into_iter()
-        .map(|desc| desc.as_ref().layout().size())
+        .copied_field_descriptors()
+        .map(|desc| desc.layout().size())
         .sum::<usize>();
     size_of::<T::Fields>() == 0 || packed_size == 0
 }
@@ -54,10 +57,10 @@ where
 }
 
 #[inline]
-pub fn should_allocate<T>(context: &T::Context, capacity: usize) -> bool
+pub fn should_allocate<'a, T>(context: &'a T::Context, capacity: usize) -> bool
 where
     T: RawSoa + ?Sized,
-    T::Context: WithFieldDescriptors + Sized,
+    T::Context: FieldDescriptors<'a> + Sized,
 {
     let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>(context) || capacity == 0);
     !should_not_allocate

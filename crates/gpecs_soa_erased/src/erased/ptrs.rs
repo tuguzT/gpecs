@@ -9,7 +9,7 @@ use core::{
 use crate::{
     erased::{
         CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaRefs,
-        assert::{check_into_value, debug_assert_eq_descriptors},
+        assert::{assert_descriptors, check_into_value},
         dangling::{Dangling, dangling},
         error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset},
     },
@@ -111,8 +111,7 @@ where
     ) -> Result<Self, ErasedSoaPtrsError> {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), capacity);
         offsets.by_ref().try_for_each(|offset| {
-            let desc = offset?.field_descriptor;
-            check_sufficient_align(desc.layout(), Layout::new::<A>())
+            check_sufficient_align(offset?.desc.layout(), Layout::new::<A>())
                 .map_err(ErasedSoaPtrsError::from)
         })?;
 
@@ -211,7 +210,7 @@ where
 
         assert_eq!(buffer, origin.buffer);
         assert_eq!(capacity, origin.capacity);
-        debug_assert_eq_descriptors(descriptors.field_descriptors(), origin.field_descriptors());
+        assert_descriptors(descriptors.field_descriptors(), origin.field_descriptors());
 
         unsafe { (offset - origin.offset).try_into().unwrap_unchecked() }
     }
@@ -462,13 +461,7 @@ where
         } = *self;
 
         let field_ptr = {
-            let BufferOffset {
-                field_descriptor: desc,
-                offset,
-                ..
-            } = inner
-                .next()?
-                .expect("buffer layout should have been checked way earlier");
+            let BufferOffset { desc, offset, .. } = unsafe { inner.next()?.unwrap_unchecked() };
 
             let offset = offset.div_ceil(size_of::<A>());
             let len = desc.layout().size().div_ceil(size_of::<A>());

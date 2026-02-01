@@ -7,8 +7,11 @@ use crate::field::{CopiedFieldDescriptors, FieldDescriptor, repeat_layout};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BufferOffset {
-    pub field_descriptor: FieldDescriptor,
-    pub fields_layout: Layout,
+    /// Descriptor of the processed field.
+    pub desc: FieldDescriptor,
+    /// Layout of fields in the buffer of provided capacity.
+    pub layout: Layout,
+    /// Offset from the start of the buffer, in bytes.
     pub offset: usize,
 }
 
@@ -124,19 +127,18 @@ where
 
 #[inline]
 fn try_create_buffer_offset(
-    field_descriptor: FieldDescriptor,
-    layout: &mut Layout,
+    desc: FieldDescriptor,
+    total_layout: &mut Layout,
     capacity: usize,
 ) -> Result<BufferOffset, LayoutError> {
-    let fields_layout = repeat_layout(field_descriptor.layout(), capacity)?;
+    let layout = repeat_layout(desc.layout(), capacity)?;
 
     let offset;
-    (*layout, offset) = layout.extend(fields_layout)?;
+    (*total_layout, offset) = total_layout.extend(layout)?;
 
-    let buffer_offset = BufferOffset {
-        field_descriptor,
-        fields_layout,
+    Ok(BufferOffset {
+        desc,
+        layout,
         offset,
-    };
-    Ok(buffer_offset)
+    })
 }

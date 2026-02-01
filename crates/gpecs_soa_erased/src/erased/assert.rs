@@ -7,19 +7,32 @@ use crate::{
 };
 
 #[inline]
-pub fn debug_assert_eq_descriptors<I, J>(a: I, b: J)
+pub fn assert_descriptors<I, J>(a: I, b: J) -> usize
 where
     I: IntoIterator<Item: AsRef<FieldDescriptor>>,
     J: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
     #[cfg(debug_assertions)]
-    itertools::assert_equal(
-        a.copied_field_descriptors().map(FieldDescriptor::layout),
-        b.copied_field_descriptors().map(FieldDescriptor::layout),
-    );
+    {
+        let mut len = 0;
+        let a = a.into_iter().inspect(|_| len += 1);
+
+        itertools::assert_equal(
+            a.copied_field_descriptors().map(FieldDescriptor::layout),
+            b.copied_field_descriptors().map(FieldDescriptor::layout),
+        );
+        len
+    }
 
     #[cfg(not(debug_assertions))]
-    let _ = (a, b);
+    {
+        let len = a.into_iter().count();
+        assert!(
+            len == b.into_iter().count(),
+            "descriptors should have the same length"
+        );
+        len
+    }
 }
 
 pub fn check_into_value<I, J>(actual: I, expected: J) -> Result<(), ErasedSoaIntoValueErrorKind>

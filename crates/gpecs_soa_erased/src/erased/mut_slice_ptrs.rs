@@ -106,8 +106,7 @@ where
     ) -> Result<Self, ErasedSoaSlicePtrsError> {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), capacity);
         offsets.by_ref().try_for_each(|offset| {
-            let desc = offset?.field_descriptor;
-            check_sufficient_align(desc.layout(), Layout::new::<A>())
+            check_sufficient_align(offset?.desc.layout(), Layout::new::<A>())
                 .map_err(ErasedSoaSlicePtrsError::from)
         })?;
 

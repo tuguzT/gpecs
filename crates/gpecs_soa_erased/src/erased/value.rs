@@ -91,8 +91,7 @@ where
     {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
-            let desc = offset?.field_descriptor;
-            check_sufficient_align(desc.layout(), Layout::new::<A>())
+            check_sufficient_align(offset?.desc.layout(), Layout::new::<A>())
                 .map_err(ErasedSoaFromStorageFieldsDescriptorsError::from)
         })?;
 
@@ -205,8 +204,7 @@ where
 
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
-            let desc = offset?.field_descriptor;
-            check_sufficient_align(desc.layout(), Layout::new::<A>()).map_err(Error::from)
+            check_sufficient_align(offset?.desc.layout(), Layout::new::<A>()).map_err(Error::from)
         })?;
 
         let layout = offsets.into_layout();
@@ -421,21 +419,15 @@ where
             ..
         } = *self;
 
-        let BufferOffset {
-            field_descriptor,
-            offset,
-            ..
-        } = offsets
-            .next()?
-            .expect("buffer layout should have been checked way earlier");
+        let BufferOffset { desc, offset, .. } = unsafe { offsets.next()?.unwrap_unchecked() };
 
         let offset = offset.div_ceil(size_of::<A>());
-        let len = field_descriptor.layout().size().div_ceil(size_of::<A>());
+        let len = desc.layout().size().div_ceil(size_of::<A>());
 
         let data = unsafe { storage.as_ptr().add(offset) };
         let data = unsafe { slice::from_raw_parts(data, len) };
 
-        let item = ErasedField::try_from_desc_data(field_descriptor, data);
+        let item = ErasedField::try_from_desc_data(desc, data);
         Some(item)
     }
 }
@@ -562,13 +554,9 @@ where
             let error = IterLenMismatch(error).into();
             return Err(error);
         };
-        let BufferOffset {
-            field_descriptor,
-            offset,
-            ..
-        } = offset?;
+        let BufferOffset { desc, offset, .. } = offset?;
 
-        let layout = field_descriptor.layout();
+        let layout = desc.layout();
         check_sufficient_align(layout, Layout::new::<T>())?;
 
         let offset = offset.div_ceil(size_of::<T>());

@@ -4,8 +4,14 @@
 use core::{convert::Infallible, mem::MaybeUninit};
 use spirv_std::{glam::USizeVec3, spirv};
 
-use gpecs_soa_erased::erased::{ErasedSoa, ErasedSoaContext, ErasedSoaSlicesMut};
-use gpecs_sparse::soa::{field::FieldDescriptor, slice::SoaSlicesMut};
+use gpecs_soa_erased::{
+    erased::{ErasedSoa, ErasedSoaContext, ErasedSoaSlicesMut},
+    soa::{field::FieldDescriptor, slice::SoaSlicesMut},
+};
+
+pub use self::descriptors::GpuFieldDescriptors;
+
+mod descriptors;
 
 pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, u32>;
 
@@ -23,6 +29,7 @@ pub fn erased_soa_work(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] dense: &mut [MaybeUninit<u32>],
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] descriptors: &[FieldDescriptor],
 ) {
+    let descriptors = GpuFieldDescriptors::from(descriptors);
     let GpuErasedSoaDesc { len, capacity } = *erased_soa_desc;
     let invocation_id = id.x;
 

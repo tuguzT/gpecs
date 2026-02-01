@@ -405,8 +405,7 @@ impl<T, I, F, A> Iterator for ErasedSoaIntoFields<T, I, F, A>
 where
     A: AddressableUnit,
     T: AlignedStorage<A>,
-    I: Iterator + ?Sized,
-    I::Item: AsRef<FieldDescriptor>,
+    I: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<A>,
 {
     type Item = Result<ErasedField<F, A>, ErasedFieldFromDescDataError<F, A>>;
@@ -436,8 +435,7 @@ impl<T, I, F, A> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, A>
 where
     A: AddressableUnit,
     T: AlignedStorage<A>,
-    I: ExactSizeIterator + ?Sized,
-    I::Item: AsRef<FieldDescriptor>,
+    I: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<A>,
 {
     #[inline]
@@ -451,8 +449,7 @@ impl<T, I, F, A> FusedIterator for ErasedSoaIntoFields<T, I, F, A>
 where
     A: AddressableUnit,
     T: AlignedStorage<A>,
-    I: FusedIterator + ?Sized,
-    I::Item: AsRef<FieldDescriptor>,
+    I: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<A>,
 {
 }

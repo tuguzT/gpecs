@@ -8,7 +8,7 @@ use crate::{
         CovariantFieldDescriptors, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
         ErasedSoaNonNullPtrs, ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut,
         ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs, ErasedSoaSlices, ErasedSoaSlicesMut,
-        assert::assert_descriptors, slice_from_raw_parts, slice_from_raw_parts_mut,
+        slice_from_raw_parts, slice_from_raw_parts_mut,
     },
     soa::{
         field::{FieldDescriptors, FieldDescriptorsOutput},
@@ -43,16 +43,11 @@ where
 
     #[inline]
     unsafe fn ptrs_add<'a>(&'a self, ptrs: Self::Ptrs<'a>, offset: usize) -> Self::Ptrs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         unsafe { ptrs.add(offset) }
     }
 
     #[inline]
     unsafe fn ptrs_offset_from(&self, ptrs: Self::Ptrs<'_>, origin: Self::Ptrs<'_>) -> isize {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-        assert_descriptors(self.field_descriptors(), origin.field_descriptors());
-
         unsafe { ptrs.offset_from(&origin) }
     }
 
@@ -77,8 +72,6 @@ where
         ptrs: Self::MutPtrs<'a>,
         offset: usize,
     ) -> Self::MutPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         unsafe { ptrs.add(offset) }
     }
 
@@ -88,47 +81,31 @@ where
         ptrs: Self::MutPtrs<'_>,
         origin: Self::Ptrs<'_>,
     ) -> isize {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-        assert_descriptors(self.field_descriptors(), origin.field_descriptors());
-
         unsafe { ptrs.offset_from(&origin) }
     }
 
     #[inline]
     fn ptrs_cast_const<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::Ptrs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         ptrs.cast_const()
     }
 
     #[inline]
     fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         ptrs.cast_mut()
     }
 
     #[inline]
     unsafe fn ptrs_swap(&self, mut a: Self::MutPtrs<'_>, mut b: Self::MutPtrs<'_>) {
-        assert_descriptors(self.field_descriptors(), a.field_descriptors());
-        assert_descriptors(self.field_descriptors(), b.field_descriptors());
-
         unsafe { a.swap(&mut b) }
     }
 
     #[inline]
     unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, mut dst: Self::MutPtrs<'_>, len: usize) {
-        assert_descriptors(self.field_descriptors(), src.field_descriptors());
-        assert_descriptors(self.field_descriptors(), dst.field_descriptors());
-
         unsafe { dst.copy_from(&src, len) }
     }
 
     #[inline]
     unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, mut dst: Self::MutPtrs<'_>, len: usize) {
-        assert_descriptors(self.field_descriptors(), src.field_descriptors());
-        assert_descriptors(self.field_descriptors(), dst.field_descriptors());
-
         unsafe { dst.copy_from_rev(&src, len) }
     }
 
@@ -139,9 +116,6 @@ where
         mut dst: Self::MutPtrs<'_>,
         len: usize,
     ) {
-        assert_descriptors(self.field_descriptors(), src.field_descriptors());
-        assert_descriptors(self.field_descriptors(), dst.field_descriptors());
-
         unsafe { dst.copy_from_nonoverlapping(&src, len) }
     }
 
@@ -163,8 +137,6 @@ where
 
     #[inline]
     unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
         let ptr = unsafe { NonNull::new_unchecked(ptr) };
         unsafe { ErasedSoaNonNullPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
@@ -172,8 +144,6 @@ where
 
     #[inline]
     fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
         let ptr = ptr.as_ptr();
         unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
@@ -196,22 +166,16 @@ where
         ptrs: Self::Ptrs<'a>,
         len: usize,
     ) -> Self::SlicePtrs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         unsafe { slice_from_raw_parts(ptrs, len) }
     }
 
     #[inline]
     fn slice_ptrs_len(&self, slices: &Self::SlicePtrs<'_>) -> usize {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.len()
     }
 
     #[inline]
     fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.into_ptrs()
     }
 
@@ -232,36 +196,26 @@ where
         ptrs: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         unsafe { slice_from_raw_parts_mut(ptrs, len) }
     }
 
     #[inline]
     fn mut_slice_ptrs_len(&self, slices: &Self::SliceMutPtrs<'_>) -> usize {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.len()
     }
 
     #[inline]
     fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.into_mut_ptrs()
     }
 
     #[inline]
     fn slice_ptrs_cast_const<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::SlicePtrs<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.cast_const()
     }
 
     #[inline]
     fn slice_ptrs_cast_mut<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::SliceMutPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.cast_mut()
     }
 
@@ -290,8 +244,6 @@ where
 {
     #[inline]
     unsafe fn read(context: &Self::Context, src: Ptrs<'_, Self>) -> Self {
-        assert_descriptors(context.field_descriptors(), src.field_descriptors());
-
         let fields = src
             .into_iter()
             .map(|src| unsafe { src.deref().into_buffer() });
@@ -309,10 +261,7 @@ where
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
 {
     #[inline]
-    unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self) {
-        assert_descriptors(context.field_descriptors(), dst.field_descriptors());
-        assert_descriptors(context.field_descriptors(), value.field_descriptors());
-
+    unsafe fn write(_: &Self::Context, dst: MutPtrs<'_, Self>, value: Self) {
         dst.into_iter()
             .zip(value.as_fields())
             .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) });
@@ -358,15 +307,11 @@ where
 
     #[inline]
     unsafe fn ptrs_to_refs<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::Refs<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         unsafe { ptrs.deref() }
     }
 
     #[inline]
     fn refs_as_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::Ptrs<'a> {
-        assert_descriptors(self.field_descriptors(), refs.field_descriptors());
-
         refs.into_ptrs()
     }
 
@@ -381,22 +326,16 @@ where
 
     #[inline]
     unsafe fn mut_ptrs_to_mut_refs<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::RefsMut<'a> {
-        assert_descriptors(self.field_descriptors(), ptrs.field_descriptors());
-
         unsafe { ptrs.deref_mut() }
     }
 
     #[inline]
     fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), refs.field_descriptors());
-
         refs.into_mut_ptrs()
     }
 
     #[inline]
     fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        assert_descriptors(self.field_descriptors(), refs.field_descriptors());
-
         let (descriptors, buffer, capacity, offset) = refs.into_parts();
         unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, capacity, offset) }
     }
@@ -412,22 +351,16 @@ where
 
     #[inline]
     unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         unsafe { slices.deref() }
     }
 
     #[inline]
     fn slices_as_slice_ptrs<'a>(&'a self, slices: Self::Slices<'a>) -> Self::SlicePtrs<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.into_ptrs()
     }
 
     #[inline]
     fn slices_len(&self, slices: &Self::Slices<'_>) -> usize {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.len()
     }
 
@@ -447,8 +380,6 @@ where
         &'a self,
         slices: Self::SliceMutPtrs<'a>,
     ) -> Self::SlicesMut<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         unsafe { slices.deref_mut() }
     }
 
@@ -457,22 +388,16 @@ where
         &'a self,
         slices: Self::SlicesMut<'a>,
     ) -> Self::SliceMutPtrs<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.into_mut_ptrs()
     }
 
     #[inline]
     fn mut_slices_len(&self, slices: &Self::SlicesMut<'_>) -> usize {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         slices.len()
     }
 
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
-        assert_descriptors(self.field_descriptors(), slices.field_descriptors());
-
         let (descriptors, buffer, capacity, offset, len) = slices.into_parts();
         unsafe { ErasedSoaSlices::new_unchecked(descriptors, buffer, capacity, offset, len) }
     }
@@ -486,9 +411,7 @@ where
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
 {
     #[inline]
-    fn as_refs(&'me self, context: &'me Self::Context) -> Refs<'me, 'me, Self> {
-        assert_descriptors(context.field_descriptors(), self.field_descriptors());
-
+    fn as_refs(&'me self, _: &'me Self::Context) -> Refs<'me, 'me, Self> {
         self.as_fields()
     }
 }
@@ -501,9 +424,7 @@ where
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
 {
     #[inline]
-    fn as_mut_refs(&'me mut self, context: &'me Self::Context) -> RefsMut<'me, 'me, Self> {
-        assert_descriptors(context.field_descriptors(), self.field_descriptors());
-
+    fn as_mut_refs(&'me mut self, _: &'me Self::Context) -> RefsMut<'me, 'me, Self> {
         self.as_mut_fields()
     }
 }

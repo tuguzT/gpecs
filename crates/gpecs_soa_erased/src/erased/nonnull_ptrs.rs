@@ -2,6 +2,7 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem::MaybeUninit,
     ptr::{self, NonNull},
 };
 
@@ -31,7 +32,7 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    buffer: NonNull<[A]>,
+    buffer: NonNull<[MaybeUninit<A>]>,
     capacity: usize,
     offset: usize,
     descriptors: D,
@@ -44,7 +45,7 @@ where
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        buffer: NonNull<[A]>,
+        buffer: NonNull<[MaybeUninit<A>]>,
         capacity: usize,
         offset: usize,
     ) -> Self {
@@ -57,7 +58,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, NonNull<[A]>, usize, usize) {
+    pub fn into_parts(self) -> (D, NonNull<[MaybeUninit<A>]>, usize, usize) {
         let Self {
             descriptors,
             buffer,
@@ -85,7 +86,7 @@ where
     #[inline]
     pub fn new(
         descriptors: D,
-        buffer: NonNull<[A]>,
+        buffer: NonNull<[MaybeUninit<A>]>,
         capacity: usize,
         offset: usize,
     ) -> Result<Self, ErasedSoaPtrsError> {
@@ -157,7 +158,7 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_buffer(&self) -> NonNull<[A]> {
+    pub fn as_buffer(&self) -> NonNull<[MaybeUninit<A>]> {
         let Self { buffer, .. } = *self;
         buffer
     }
@@ -414,7 +415,7 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    buffer: NonNull<[A]>,
+    buffer: NonNull<[MaybeUninit<A>]>,
     offset: usize,
     inner: BufferOffsets<D>,
 }
@@ -426,7 +427,7 @@ where
     #[inline]
     pub(super) unsafe fn new_unchecked(
         inner: BufferOffsets<D>,
-        buffer: NonNull<[A]>,
+        buffer: NonNull<[MaybeUninit<A>]>,
         offset: usize,
     ) -> Self {
         Self {
@@ -443,7 +444,7 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_buffer(&self) -> NonNull<[A]> {
+    pub fn as_buffer(&self) -> NonNull<[MaybeUninit<A>]> {
         let Self { buffer, .. } = *self;
         buffer
     }

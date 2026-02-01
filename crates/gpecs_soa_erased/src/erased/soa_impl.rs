@@ -329,7 +329,7 @@ where
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
         let descriptors = self.field_descriptors();
         let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
-        let buffer = ptr::slice_from_raw_parts(buffer, layout.size());
+        let buffer = ptr::slice_from_raw_parts(buffer.cast(), layout.size());
         unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 
@@ -337,7 +337,7 @@ where
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
         let descriptors = self.field_descriptors();
         let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
-        let buffer = ptr::slice_from_raw_parts_mut(buffer, layout.size());
+        let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), layout.size());
         unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 }

@@ -3,7 +3,7 @@ use core::{
     iter::FusedIterator,
     marker::PhantomData,
     mem::MaybeUninit,
-    ptr, slice,
+    slice,
 };
 
 use crate::{
@@ -39,9 +39,7 @@ where
         capacity: usize,
         offset: usize,
     ) -> Self {
-        let buffer = ptr::from_ref(buffer) as _;
         let ptrs = unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, offset) };
-
         unsafe { Self::from_ptrs(ptrs) }
     }
 
@@ -79,9 +77,7 @@ where
         capacity: usize,
         offset: usize,
     ) -> Result<Self, ErasedSoaPtrsError> {
-        let buffer = ptr::from_ref(buffer) as _;
         let ptrs = ErasedSoaPtrs::new(descriptors, buffer, capacity, offset)?;
-
         let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)
     }

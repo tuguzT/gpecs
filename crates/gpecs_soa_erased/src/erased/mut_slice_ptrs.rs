@@ -2,6 +2,7 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem::MaybeUninit,
 };
 
 use crate::{
@@ -38,7 +39,7 @@ where
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        buffer: *mut [A],
+        buffer: *mut [MaybeUninit<A>],
         capacity: usize,
         offset: usize,
         len: usize,
@@ -54,7 +55,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, *mut [A], usize, usize, usize) {
+    pub fn into_parts(self) -> (D, *mut [MaybeUninit<A>], usize, usize, usize) {
         let Self { ptrs, len } = self;
         let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
         (descriptors, buffer, capacity, offset, len)
@@ -98,7 +99,7 @@ where
     #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
     pub fn new(
         descriptors: D,
-        buffer: *mut [A],
+        buffer: *mut [MaybeUninit<A>],
         capacity: usize,
         offset: usize,
         len: usize,
@@ -150,13 +151,13 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_buffer(&self) -> *const [A] {
+    pub fn as_buffer(&self) -> *const [MaybeUninit<A>] {
         let Self { ptrs, .. } = self;
         ptrs.as_buffer()
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> *mut [A] {
+    pub fn as_mut_buffer(&mut self) -> *mut [MaybeUninit<A>] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut_buffer()
     }
@@ -350,13 +351,13 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_buffer(&self) -> *const [A] {
+    pub fn as_buffer(&self) -> *const [MaybeUninit<A>] {
         let Self { ptrs, .. } = self;
         ptrs.as_buffer()
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> *mut [A] {
+    pub fn as_mut_buffer(&mut self) -> *mut [MaybeUninit<A>] {
         let Self { ptrs, .. } = self;
         ptrs.as_mut_buffer()
     }

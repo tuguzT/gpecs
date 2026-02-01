@@ -2,6 +2,7 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem::MaybeUninit,
     ptr,
 };
 
@@ -32,7 +33,7 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    buffer: *mut [A],
+    buffer: *mut [MaybeUninit<A>],
     capacity: usize,
     offset: usize,
     descriptors: D,
@@ -45,7 +46,7 @@ where
     #[inline]
     pub unsafe fn new_unchecked(
         descriptors: D,
-        buffer: *mut [A],
+        buffer: *mut [MaybeUninit<A>],
         capacity: usize,
         offset: usize,
     ) -> Self {
@@ -58,7 +59,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, *mut [A], usize, usize) {
+    pub fn into_parts(self) -> (D, *mut [MaybeUninit<A>], usize, usize) {
         let Self {
             descriptors,
             buffer,
@@ -110,7 +111,7 @@ where
     #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
     pub fn new(
         descriptors: D,
-        buffer: *mut [A],
+        buffer: *mut [MaybeUninit<A>],
         capacity: usize,
         offset: usize,
     ) -> Result<Self, ErasedSoaPtrsError> {
@@ -178,13 +179,13 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_buffer(&self) -> *const [A] {
+    pub fn as_buffer(&self) -> *const [MaybeUninit<A>] {
         let Self { buffer, .. } = *self;
         buffer
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> *mut [A] {
+    pub fn as_mut_buffer(&mut self) -> *mut [MaybeUninit<A>] {
         let Self { buffer, .. } = *self;
         buffer
     }
@@ -467,7 +468,7 @@ where
     A: AddressableUnit,
     D: ?Sized,
 {
-    buffer: *mut [A],
+    buffer: *mut [MaybeUninit<A>],
     offset: usize,
     inner: BufferOffsets<D>,
 }
@@ -479,7 +480,7 @@ where
     #[inline]
     pub(super) unsafe fn new_unchecked(
         inner: BufferOffsets<D>,
-        buffer: *mut [A],
+        buffer: *mut [MaybeUninit<A>],
         offset: usize,
     ) -> Self {
         Self {
@@ -496,13 +497,13 @@ where
     D: ?Sized,
 {
     #[inline]
-    pub fn as_buffer(&self) -> *const [A] {
+    pub fn as_buffer(&self) -> *const [MaybeUninit<A>] {
         let Self { buffer, .. } = *self;
         buffer
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> *mut [A] {
+    pub fn as_mut_buffer(&mut self) -> *mut [MaybeUninit<A>] {
         let Self { buffer, .. } = *self;
         buffer
     }

@@ -212,7 +212,9 @@ where
         assert_eq!(capacity, origin.capacity);
         assert_descriptors(descriptors.field_descriptors(), origin.field_descriptors());
 
-        unsafe { (offset - origin.offset).try_into().unwrap_unchecked() }
+        let offset = offset.cast_signed();
+        let origin_offset = origin.offset().cast_signed();
+        offset.wrapping_sub(origin_offset)
     }
 
     #[inline]
@@ -462,13 +464,7 @@ where
 
         let field_ptr = {
             let BufferOffset { desc, offset, .. } = unsafe { inner.next()?.unwrap_unchecked() };
-
-            let offset = offset.div_ceil(size_of::<A>());
-            let len = desc.layout().size().div_ceil(size_of::<A>());
-            let data = unsafe { buffer.cast::<A>().add(offset) };
-
-            let buffer = ptr::slice_from_raw_parts(data, len);
-            unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
+            unsafe { ErasedFieldPtr::from_parts(desc, buffer, offset) }
         };
 
         let item = unsafe { field_ptr.add(offset) };

@@ -1,6 +1,7 @@
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
+    mem::MaybeUninit,
     ptr,
 };
 
@@ -28,7 +29,6 @@ where
     A: AddressableUnit,
 {
     #[inline]
-    #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
     pub fn new(
         desc: FieldDescriptor,
         buffer: *const [A],
@@ -38,15 +38,19 @@ where
         check_slice_buffer_len(buffer.len() * size_of::<A>(), desc.layout().size(), len)?;
         check_ptr_align(buffer.cast(), desc.layout())?;
 
-        let ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
-        let me = unsafe { Self::from_ptr(ptr, len) };
+        let buffer = ptr::slice_from_raw_parts(buffer.cast(), buffer.len());
+        let me = unsafe { Self::from_parts(desc, buffer, 0, len) };
         Ok(me)
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: *const [A], len: usize) -> Self {
-        let ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
+    pub unsafe fn from_parts(
+        desc: FieldDescriptor,
+        buffer: *const [MaybeUninit<A>],
+        byte_offset: usize,
+        len: usize,
+    ) -> Self {
+        let ptr = unsafe { ErasedFieldPtr::from_parts(desc, buffer, byte_offset) };
         unsafe { Self::from_ptr(ptr, len) }
     }
 
@@ -84,6 +88,18 @@ where
     }
 
     #[inline]
+    pub fn as_uninit_buffer(self) -> *const [MaybeUninit<A>] {
+        let Self { ptr, .. } = self;
+        ptr.as_uninit_buffer()
+    }
+
+    #[inline]
+    pub fn byte_offset(self) -> usize {
+        let Self { ptr, .. } = self;
+        ptr.byte_offset()
+    }
+
+    #[inline]
     pub fn as_buffer(self) -> *const [A] {
         let Self { ptr, len } = self;
         let buffer = ptr.as_buffer();
@@ -103,11 +119,12 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, *const [A], usize) {
+    pub fn into_parts(self) -> (FieldDescriptor, *const [MaybeUninit<A>], usize, usize) {
         let Self { ptr, len } = self;
-        let (desc, buffer) = ptr.into_parts();
+        let (desc, buffer, byte_offset) = ptr.into_parts();
+
         let buffer = ptr::slice_from_raw_parts(buffer.cast(), len * buffer.len());
-        (desc, buffer, len)
+        (desc, buffer, byte_offset, len)
     }
 }
 
@@ -158,7 +175,7 @@ where
         let buffer_len = desc.layout().size().div_ceil(size_of::<A>()) * len;
         let buffer = ptr::slice_from_raw_parts(ptr.cast(), buffer_len);
 
-        let me = unsafe { Self::new_unchecked(desc, buffer, len) };
+        let me = unsafe { Self::from_parts(desc, buffer, 0, len) };
         Ok(me)
     }
 }

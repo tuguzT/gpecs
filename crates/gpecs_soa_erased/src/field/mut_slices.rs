@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    mem::MaybeUninit,
     ptr, slice,
 };
 
@@ -40,9 +41,13 @@ where
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a mut [A], len: usize) -> Self {
-        let ptr = unsafe { ErasedFieldSliceMutPtr::new_unchecked(desc, buffer, len) };
+    pub unsafe fn from_parts(
+        desc: FieldDescriptor,
+        buffer: &'a mut [MaybeUninit<A>],
+        byte_offset: usize,
+        len: usize,
+    ) -> Self {
+        let ptr = unsafe { ErasedFieldSliceMutPtr::from_parts(desc, buffer, byte_offset, len) };
         unsafe { Self::from_ptr(ptr) }
     }
 
@@ -97,6 +102,26 @@ where
     }
 
     #[inline]
+    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<A>] {
+        let Self { ptr, .. } = self;
+        let buffer = ptr.as_uninit_buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+    }
+
+    #[inline]
+    pub fn as_mut_uninit_buffer(&mut self) -> &mut [MaybeUninit<A>] {
+        let Self { ptr, .. } = self;
+        let buffer = ptr.as_mut_uninit_buffer();
+        unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
+    }
+
+    #[inline]
+    pub fn byte_offset(self) -> usize {
+        let Self { ptr, .. } = self;
+        ptr.byte_offset()
+    }
+
+    #[inline]
     pub fn as_buffer(&self) -> &[A] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
@@ -148,16 +173,18 @@ where
 
     #[inline]
     pub fn into_buffer(self) -> &'a mut [A] {
-        let (_, buffer, _) = self.into_parts();
-        buffer
+        let Self { ptr, .. } = self;
+        let buffer = ptr.as_mut_buffer();
+        unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a mut [A], usize) {
+    pub fn into_parts(self) -> (FieldDescriptor, &'a mut [MaybeUninit<A>], usize, usize) {
         let Self { ptr, .. } = self;
-        let (desc, buffer, len) = ptr.into_parts();
+        let (desc, buffer, byte_offset, len) = ptr.into_parts();
+
         let buffer = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
-        (desc, buffer, len)
+        (desc, buffer, byte_offset, len)
     }
 }
 
@@ -215,8 +242,9 @@ impl<'a, A> From<ErasedFieldSliceMut<'a, A>> for ErasedFieldSlice<'a, A>
 where
     A: AddressableUnit,
 {
+    #[inline]
     fn from(value: ErasedFieldSliceMut<'a, A>) -> Self {
-        let (desc, buffer, len) = value.into_parts();
-        unsafe { ErasedFieldSlice::new_unchecked(desc, buffer, len) }
+        let ptr = value.as_field_slice_ptr();
+        unsafe { ErasedFieldSlice::from_ptr(ptr) }
     }
 }

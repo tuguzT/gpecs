@@ -189,7 +189,7 @@ where
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
         let Self { storage } = self;
-        FieldDescriptor::new(storage.layout())
+        storage_descriptor(storage)
     }
 
     #[inline]
@@ -214,30 +214,30 @@ where
 
     #[inline]
     pub fn as_field(&self) -> ErasedFieldRef<'_, A> {
-        let desc = self.descriptor();
-        let buffer = self.as_slice();
-        unsafe { ErasedFieldRef::new_unchecked(desc, buffer) }
+        let Self { storage } = self;
+
+        let desc = storage_descriptor(storage);
+        let buffer = storage.as_uninit_slice();
+        unsafe { ErasedFieldRef::from_parts(desc, buffer, 0) }
     }
 
     #[inline]
     pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
-        let desc = self.descriptor();
-        let buffer = ptr::from_ref(self.as_slice());
-        unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) }
+        self.as_field().as_field_ptr()
     }
 
     #[inline]
     pub fn as_mut_field(&mut self) -> ErasedFieldRefMut<'_, A> {
-        let desc = self.descriptor();
-        let buffer = self.as_mut_slice();
-        unsafe { ErasedFieldRefMut::new_unchecked(desc, buffer) }
+        let Self { storage } = self;
+
+        let desc = storage_descriptor(storage);
+        let buffer = storage.as_mut_uninit_slice();
+        unsafe { ErasedFieldRefMut::from_parts(desc, buffer, 0) }
     }
 
     #[inline]
     pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<A> {
-        let desc = self.descriptor();
-        let buffer = ptr::from_mut(self.as_mut_slice());
-        unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) }
+        self.as_mut_field().as_mut_field_ptr()
     }
 
     #[inline]
@@ -300,4 +300,13 @@ where
     fn as_mut(&mut self) -> &mut [A] {
         self.as_mut_slice()
     }
+}
+
+#[inline]
+fn storage_descriptor<T, A>(storage: &T) -> FieldDescriptor
+where
+    A: AddressableUnit,
+    T: AlignedStorage<A> + ?Sized,
+{
+    FieldDescriptor::new(storage.layout())
 }

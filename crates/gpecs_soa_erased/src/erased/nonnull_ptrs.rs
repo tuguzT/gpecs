@@ -2,7 +2,7 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
-    ptr::{self, NonNull},
+    ptr::NonNull,
 };
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
         error::ErasedSoaIntoValueError,
     },
     error::InsufficientAlignError,
-    field::{ErasedFieldMutPtr, ErasedFieldNonNullPtr},
+    field::ErasedFieldNonNullPtr,
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
@@ -183,7 +183,9 @@ where
         assert_eq!(capacity, origin.capacity());
         assert_descriptors(descriptors.field_descriptors(), origin.field_descriptors());
 
-        unsafe { (offset - origin.offset).try_into().unwrap_unchecked() }
+        let offset = offset.cast_signed();
+        let origin_offset = origin.offset().cast_signed();
+        offset.wrapping_sub(origin_offset)
     }
 
     #[inline]
@@ -511,14 +513,7 @@ where
 
         let field_ptr = {
             let BufferOffset { desc, offset, .. } = unsafe { inner.next()?.unwrap_unchecked() };
-
-            let offset = offset.div_ceil(size_of::<A>());
-            let len = desc.layout().size().div_ceil(size_of::<A>());
-            let data = unsafe { buffer.as_ptr().cast::<A>().add(offset) };
-            let buffer = ptr::slice_from_raw_parts_mut(data, len);
-
-            let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
-            unsafe { ErasedFieldNonNullPtr::new_unchecked(ptr) }
+            unsafe { ErasedFieldNonNullPtr::from_parts(desc, buffer, offset) }
         };
 
         let item = unsafe { field_ptr.add(offset) };

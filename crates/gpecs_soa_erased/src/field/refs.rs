@@ -1,6 +1,8 @@
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    mem::MaybeUninit,
+    ops::Range,
     ptr, slice,
 };
 
@@ -35,9 +37,12 @@ where
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: &'a [A]) -> Self {
-        let ptr = unsafe { ErasedFieldPtr::new_unchecked(desc, buffer) };
+    pub unsafe fn from_parts(
+        desc: FieldDescriptor,
+        buffer: &'a [MaybeUninit<A>],
+        byte_offset: usize,
+    ) -> Self {
+        let ptr = unsafe { ErasedFieldPtr::from_parts(desc, buffer, byte_offset) };
         unsafe { Self::from_ptr(ptr) }
     }
 
@@ -79,6 +84,25 @@ where
     }
 
     #[inline]
+    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<A>] {
+        let Self { ptr, .. } = self;
+        let buffer = ptr.as_uninit_buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+    }
+
+    #[inline]
+    pub fn byte_offset(&self) -> usize {
+        let Self { ptr, .. } = self;
+        ptr.byte_offset()
+    }
+
+    #[inline]
+    pub fn buffer_init_range(&self) -> Range<usize> {
+        let Self { ptr, .. } = self;
+        ptr.buffer_init_range()
+    }
+
+    #[inline]
     pub fn as_buffer(&self) -> &[A] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
@@ -99,16 +123,18 @@ where
 
     #[inline]
     pub fn into_buffer(self) -> &'a [A] {
-        let (_, buffer) = self.into_parts();
-        buffer
+        let Self { ptr, .. } = self;
+        let buffer = ptr.as_buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a [A]) {
+    pub fn into_parts(self) -> (FieldDescriptor, &'a [MaybeUninit<A>], usize) {
         let Self { ptr, .. } = self;
-        let (desc, buffer) = ptr.into_parts();
+        let (desc, buffer, byte_offset) = ptr.into_parts();
+
         let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
-        (desc, buffer)
+        (desc, buffer, byte_offset)
     }
 }
 

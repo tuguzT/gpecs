@@ -1,6 +1,8 @@
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
+    mem::MaybeUninit,
+    ops::Range,
     ptr::{self, NonNull},
 };
 
@@ -16,7 +18,8 @@ where
     A: AddressableUnit,
 {
     desc: FieldDescriptor,
-    ptr: NonNull<A>,
+    buffer: NonNull<[MaybeUninit<A>]>,
+    byte_offset: usize,
 }
 
 impl<A> ErasedFieldNonNullPtr<A>
@@ -25,22 +28,36 @@ where
 {
     #[inline]
     pub fn new(ptr: ErasedFieldMutPtr<A>) -> Option<Self> {
-        let (desc, buffer) = ptr.into_parts();
-        let ptr = NonNull::new(buffer)?.cast();
-        let me = unsafe { Self::from_parts(desc, ptr) };
+        let desc = ptr.descriptor();
+        let buffer = ptr.as_mut_buffer();
+
+        let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), buffer.len());
+        let buffer = NonNull::new(buffer)?;
+        let me = unsafe { Self::from_parts(desc, buffer, 0) };
         Some(me)
     }
 
     #[inline]
     pub unsafe fn new_unchecked(ptr: ErasedFieldMutPtr<A>) -> Self {
-        let (desc, buffer) = ptr.into_parts();
-        let ptr = unsafe { NonNull::new_unchecked(buffer) }.cast();
-        unsafe { Self::from_parts(desc, ptr) }
+        let desc = ptr.descriptor();
+        let buffer = ptr.as_mut_buffer();
+
+        let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), buffer.len());
+        let buffer = unsafe { NonNull::new_unchecked(buffer) };
+        unsafe { Self::from_parts(desc, buffer, 0) }
     }
 
     #[inline]
-    pub unsafe fn from_parts(desc: FieldDescriptor, ptr: NonNull<A>) -> Self {
-        Self { desc, ptr }
+    pub unsafe fn from_parts(
+        desc: FieldDescriptor,
+        buffer: NonNull<[MaybeUninit<A>]>,
+        byte_offset: usize,
+    ) -> Self {
+        Self {
+            desc,
+            buffer,
+            byte_offset,
+        }
     }
 
     #[inline]
@@ -53,27 +70,35 @@ where
     #[inline]
     #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
-        let Self { desc, ptr } = self;
+        let Self {
+            desc,
+            buffer,
+            byte_offset,
+        } = self;
 
-        let size = desc.layout().size().div_ceil(size_of::<A>());
-        let data = unsafe { ptr.add(count * size) };
-        let buffer = ptr::slice_from_raw_parts_mut(data.as_ptr(), size);
-
-        let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
-        unsafe { Self::new_unchecked(ptr) }
+        let byte_offset = unsafe { byte_offset.unchecked_add(count * desc.layout().size()) };
+        unsafe { Self::from_parts(desc, buffer, byte_offset) }
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn offset_from(self, origin: Self) -> isize {
-        let Self { desc, ptr } = self;
+        let Self {
+            desc,
+            buffer,
+            byte_offset,
+        } = self;
+
+        assert_eq!(buffer, origin.as_uninit_buffer());
         check_layout(origin.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let offset = unsafe { ptr.offset_from(origin.as_ptr()) };
+        let byte_offset = byte_offset.cast_signed();
+        let origin_byte_offset = origin.byte_offset().cast_signed();
+        let offset = byte_offset.wrapping_sub(origin_byte_offset);
+
         let field_size = desc
             .layout()
             .size()
-            .div_ceil(size_of::<A>())
             .try_into()
             .expect("layout size should not exceed `isize::MAX`");
         offset
@@ -126,28 +151,51 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(self) -> NonNull<[A]> {
-        let Self { desc, ptr } = self;
+    pub fn as_uninit_buffer(self) -> NonNull<[MaybeUninit<A>]> {
+        let Self { buffer, .. } = self;
+        buffer
+    }
+
+    #[inline]
+    pub fn byte_offset(self) -> usize {
+        let Self { byte_offset, .. } = self;
+        byte_offset
+    }
+
+    #[inline]
+    pub fn buffer_init_range(self) -> Range<usize> {
+        let (desc, _, byte_offset) = self.into_parts();
 
         let len = desc.layout().size().div_ceil(size_of::<A>());
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), len);
+        let start = byte_offset.div_ceil(size_of::<A>());
+        let end = start + len;
+        start..end
+    }
+
+    #[inline]
+    pub fn as_buffer(self) -> NonNull<[A]> {
+        let data = self.as_ptr().as_ptr();
+        let len = self.buffer_init_range().len();
+        let buffer = ptr::slice_from_raw_parts_mut(data, len);
         unsafe { NonNull::new_unchecked(buffer) }
     }
 
     #[inline]
     pub fn as_ptr(self) -> NonNull<A> {
-        let Self { ptr, .. } = self;
-        ptr
+        let Self { buffer, .. } = self;
+
+        let offset = self.buffer_init_range().start;
+        unsafe { buffer.cast::<A>().add(offset) }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, NonNull<[A]>) {
-        let Self { desc, ptr } = self;
-
-        let len = desc.layout().size().div_ceil(size_of::<A>());
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), len);
-        let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        (desc, buffer)
+    pub fn into_parts(self) -> (FieldDescriptor, NonNull<[MaybeUninit<A>]>, usize) {
+        let Self {
+            desc,
+            buffer,
+            byte_offset,
+        } = self;
+        (desc, buffer, byte_offset)
     }
 }
 
@@ -192,8 +240,8 @@ where
         let len = desc.layout().size().div_ceil(size_of::<A>());
         let buffer = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), len);
 
-        let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
-        let me = unsafe { Self::new_unchecked(ptr) };
+        let buffer = unsafe { NonNull::new_unchecked(buffer) };
+        let me = unsafe { Self::from_parts(desc, buffer, 0) };
         Ok(me)
     }
 }

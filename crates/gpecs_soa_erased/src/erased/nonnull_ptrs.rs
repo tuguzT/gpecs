@@ -1,5 +1,4 @@
 use core::{
-    alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
@@ -8,15 +7,12 @@ use core::{
 
 use crate::{
     erased::{
-        CovariantFieldDescriptors,
+        CovariantFieldDescriptors, ErasedSoaMutPtrs,
         assert::{assert_descriptors, check_into_value},
-        dangling::{Dangling, dangling},
-        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset},
+        error::ErasedSoaIntoValueError,
     },
-    error::{
-        InsufficientAlignError, check_ptr_align, check_sufficient_align, check_sufficient_len,
-    },
-    field::ErasedFieldNonNullPtr,
+    error::InsufficientAlignError,
+    field::{ErasedFieldMutPtr, ErasedFieldNonNullPtr},
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
@@ -43,7 +39,15 @@ where
     A: AddressableUnit,
 {
     #[inline]
-    pub unsafe fn new_unchecked(
+    pub unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrs<D, A>) -> Self {
+        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
+        let buffer = unsafe { NonNull::new_unchecked(buffer) };
+
+        unsafe { Self::from_parts(descriptors, buffer, capacity, offset) }
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(
         descriptors: D,
         buffer: NonNull<[MaybeUninit<A>]>,
         capacity: usize,
@@ -84,36 +88,18 @@ where
     D: FieldDescriptorsOwned,
 {
     #[inline]
-    pub fn new(
-        descriptors: D,
-        buffer: NonNull<[MaybeUninit<A>]>,
-        capacity: usize,
-        offset: usize,
-    ) -> Result<Self, ErasedSoaPtrsError> {
-        let mut offsets = buffer_offsets(descriptors.field_descriptors(), capacity);
-        offsets.by_ref().try_for_each(|offset| {
-            check_sufficient_align(offset?.desc.layout(), Layout::new::<A>())
-                .map_err(ErasedSoaPtrsError::from)
-        })?;
+    pub fn new(ptrs: ErasedSoaMutPtrs<D, A>) -> Option<Self> {
+        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
+        let buffer = NonNull::new(buffer)?;
 
-        let layout = offsets.into_layout();
-        check_sufficient_len(buffer.len() * size_of::<A>(), layout.size())?;
-        check_ptr_align(buffer.as_ptr().cast(), layout)?;
-        check_offset(offset, capacity)?;
-
-        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset) };
-        Ok(me)
+        let me = unsafe { Self::from_parts(descriptors, buffer, capacity, offset) };
+        Some(me)
     }
 
     #[inline]
     pub fn dangling(descriptors: D) -> Result<Self, InsufficientAlignError> {
-        let Dangling { addr, capacity } = dangling::<_, A>(descriptors.field_descriptors())?;
-
-        let data = ptr::without_provenance_mut(addr);
-        let buffer = ptr::slice_from_raw_parts_mut(data, 0);
-        let buffer = unsafe { NonNull::new_unchecked(buffer) };
-
-        let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, 0) };
+        let ptrs = ErasedSoaMutPtrs::dangling(descriptors)?;
+        let me = unsafe { Self::new_unchecked(ptrs) };
         Ok(me)
     }
 }
@@ -330,7 +316,7 @@ where
         } = *self;
 
         let descriptors = descriptors.clone();
-        unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset) }
+        unsafe { Self::from_parts(descriptors, buffer, capacity, offset) }
     }
 }
 
@@ -529,10 +515,10 @@ where
             let offset = offset.div_ceil(size_of::<A>());
             let len = desc.layout().size().div_ceil(size_of::<A>());
             let data = unsafe { buffer.as_ptr().cast::<A>().add(offset) };
-
             let buffer = ptr::slice_from_raw_parts_mut(data, len);
-            let buffer = unsafe { NonNull::new_unchecked(buffer) };
-            unsafe { ErasedFieldNonNullPtr::new_unchecked(desc, buffer) }
+
+            let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
+            unsafe { ErasedFieldNonNullPtr::new_unchecked(ptr) }
         };
 
         let item = unsafe { field_ptr.add(offset) };

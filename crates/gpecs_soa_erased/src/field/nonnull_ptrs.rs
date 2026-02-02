@@ -5,13 +5,8 @@ use core::{
 };
 
 use crate::{
-    error::{
-        InsufficientAlignError, check_layout, check_len, check_ptr_align, check_sufficient_align,
-    },
-    field::{
-        assert::check_into_layout,
-        error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
-    },
+    error::{InsufficientAlignError, check_layout, check_sufficient_align},
+    field::{ErasedFieldMutPtr, assert::check_into_layout, error::ErasedFieldIntoValueError},
     soa::field::FieldDescriptor,
     storage::AddressableUnit,
 };
@@ -29,36 +24,29 @@ where
     A: AddressableUnit,
 {
     #[inline]
-    pub fn new(desc: FieldDescriptor, buffer: NonNull<[A]>) -> Result<Self, ErasedFieldPtrError> {
-        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
-        check_len(buffer.len() * size_of::<A>(), desc.layout().size())?;
-        check_ptr_align(buffer.as_ptr().cast(), desc.layout())?;
-
-        let ptr = buffer.cast();
-        Ok(Self { desc, ptr })
+    pub fn new(ptr: ErasedFieldMutPtr<A>) -> Option<Self> {
+        let (desc, buffer) = ptr.into_parts();
+        let ptr = NonNull::new(buffer)?.cast();
+        let me = unsafe { Self::from_parts(desc, ptr) };
+        Some(me)
     }
 
     #[inline]
-    #[track_caller]
-    pub unsafe fn new_unchecked(desc: FieldDescriptor, buffer: NonNull<[A]>) -> Self {
-        if cfg!(debug_assertions) {
-            return Self::new(desc, buffer).expect("incorrect inputs");
-        }
+    pub unsafe fn new_unchecked(ptr: ErasedFieldMutPtr<A>) -> Self {
+        let (desc, buffer) = ptr.into_parts();
+        let ptr = unsafe { NonNull::new_unchecked(buffer) }.cast();
+        unsafe { Self::from_parts(desc, ptr) }
+    }
 
-        let ptr = buffer.cast();
+    #[inline]
+    pub unsafe fn from_parts(desc: FieldDescriptor, ptr: NonNull<A>) -> Self {
         Self { desc, ptr }
     }
 
     #[inline]
     pub fn dangling(desc: FieldDescriptor) -> Result<Self, InsufficientAlignError> {
-        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
-
-        let data = ptr::without_provenance_mut(desc.layout().align());
-        let len = desc.layout().size().div_ceil(size_of::<A>());
-        let buffer = ptr::slice_from_raw_parts_mut(data, len);
-
-        let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        let me = unsafe { Self::new_unchecked(desc, buffer) };
+        let ptr = ErasedFieldMutPtr::dangling(desc)?;
+        let me = unsafe { Self::new_unchecked(ptr) };
         Ok(me)
     }
 
@@ -70,8 +58,9 @@ where
         let size = desc.layout().size().div_ceil(size_of::<A>());
         let data = unsafe { ptr.add(count * size) };
         let buffer = ptr::slice_from_raw_parts_mut(data.as_ptr(), size);
-        let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        unsafe { Self::new_unchecked(desc, buffer) }
+
+        let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
+        unsafe { Self::new_unchecked(ptr) }
     }
 
     #[inline]
@@ -203,8 +192,8 @@ where
         let len = desc.layout().size().div_ceil(size_of::<A>());
         let buffer = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), len);
 
-        let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        let me = unsafe { Self::new_unchecked(desc, buffer) };
+        let ptr = unsafe { ErasedFieldMutPtr::new_unchecked(desc, buffer) };
+        let me = unsafe { Self::new_unchecked(ptr) };
         Ok(me)
     }
 }

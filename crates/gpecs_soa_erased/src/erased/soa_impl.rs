@@ -1,7 +1,4 @@
-use core::{
-    fmt::Debug,
-    ptr::{self, NonNull},
-};
+use core::{fmt::Debug, ptr};
 
 use crate::{
     erased::{
@@ -132,14 +129,12 @@ where
     ) -> Self::NonNullPtrs<'short> {
         let (descriptors, ptr, capacity, offset) = from.into_parts();
         let descriptors = D::upcast_field_descriptors(descriptors);
-        unsafe { ErasedSoaNonNullPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { ErasedSoaNonNullPtrs::from_parts(descriptors, ptr, capacity, offset) }
     }
 
     #[inline]
     unsafe fn ptrs_to_nonnull<'a>(&'a self, ptrs: Self::MutPtrs<'a>) -> Self::NonNullPtrs<'a> {
-        let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
-        let ptr = unsafe { NonNull::new_unchecked(ptr) };
-        unsafe { ErasedSoaNonNullPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
+        unsafe { ErasedSoaNonNullPtrs::new_unchecked(ptrs) }
     }
 
     #[inline]

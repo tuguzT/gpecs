@@ -99,7 +99,12 @@ where
     }
 
     #[inline]
-    pub unsafe fn copy_from(self, context: &V::Context, from: DensePtrs<'_, K, V>, len: usize) {
+    pub unsafe fn copy_from_forward(
+        self,
+        context: &V::Context,
+        from: DensePtrs<'_, K, V>,
+        len: usize,
+    ) {
         let Self {
             key: dst_key,
             value: dst_value,
@@ -111,12 +116,17 @@ where
 
         unsafe {
             ptr::copy(src_key, dst_key, len);
-            context.ptrs_copy(src_value.into_inner(), dst_value.into_inner(), len);
+            context.ptrs_copy_forward(src_value.into_inner(), dst_value.into_inner(), len);
         }
     }
 
     #[inline]
-    pub unsafe fn copy_from_rev(self, context: &V::Context, from: DensePtrs<'_, K, V>, len: usize) {
+    pub unsafe fn copy_from_backward(
+        self,
+        context: &V::Context,
+        from: DensePtrs<'_, K, V>,
+        len: usize,
+    ) {
         let Self {
             key: dst_key,
             value: dst_value,
@@ -127,7 +137,7 @@ where
         } = from;
 
         unsafe {
-            context.ptrs_copy_rev(src_value.into_inner(), dst_value.into_inner(), len);
+            context.ptrs_copy_backward(src_value.into_inner(), dst_value.into_inner(), len);
             ptr::copy(src_key, dst_key, len);
         }
     }

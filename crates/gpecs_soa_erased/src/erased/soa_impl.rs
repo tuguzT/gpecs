@@ -97,13 +97,23 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, mut dst: Self::MutPtrs<'_>, len: usize) {
-        unsafe { dst.copy_from(&src, len) }
+    unsafe fn ptrs_copy_forward(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        len: usize,
+    ) {
+        unsafe { dst.copy_from_forward(&src, len) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, mut dst: Self::MutPtrs<'_>, len: usize) {
-        unsafe { dst.copy_from_rev(&src, len) }
+    unsafe fn ptrs_copy_backward(
+        &self,
+        src: Self::Ptrs<'_>,
+        mut dst: Self::MutPtrs<'_>,
+        len: usize,
+    ) {
+        unsafe { dst.copy_from_backward(&src, len) }
     }
 
     #[inline]

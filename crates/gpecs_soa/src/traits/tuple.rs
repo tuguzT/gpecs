@@ -230,7 +230,7 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+            unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
                 let permutation = Self::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
@@ -242,7 +242,7 @@ macro_rules! soa_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+            unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
                 let permutation = Self::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);

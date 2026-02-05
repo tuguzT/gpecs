@@ -279,7 +279,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from<'e, E>(&mut self, from: &'e ErasedSoaPtrs<E, A>, count: usize)
+    pub unsafe fn copy_from_forward<'e, E>(&mut self, from: &'e ErasedSoaPtrs<E, A>, count: usize)
     where
         E: FieldDescriptors<'e> + ?Sized,
     {
@@ -292,7 +292,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_rev<'e, E>(&mut self, from: &'e ErasedSoaPtrs<E, A>, count: usize)
+    pub unsafe fn copy_from_backward<'e, E>(&mut self, from: &'e ErasedSoaPtrs<E, A>, count: usize)
     where
         E: FieldDescriptors<'e> + ?Sized,
     {

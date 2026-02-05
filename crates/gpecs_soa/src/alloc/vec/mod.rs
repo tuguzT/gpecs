@@ -267,7 +267,7 @@ where
         let new_ptrs = self.buffer.as_mut_ptrs();
 
         let len = self.len();
-        unsafe { context.ptrs_copy_rev(old_ptrs, new_ptrs, len) }
+        unsafe { context.ptrs_copy_backward(old_ptrs, new_ptrs, len) }
     }
 
     #[inline]
@@ -284,7 +284,7 @@ where
         let new_ptrs = unsafe { ptrs_from_buffer_mut::<T>(context, ptr, new_capacity) };
 
         let len = self.len();
-        unsafe { context.ptrs_copy(old_ptrs, new_ptrs, len) }
+        unsafe { context.ptrs_copy_forward(old_ptrs, new_ptrs, len) }
     }
 
     pub fn reserve(&mut self, additional: usize) {
@@ -470,7 +470,7 @@ where
         unsafe {
             let src = context.ptrs_cast_const(ptrs);
             let src = context.ptrs_add(src, len - 1);
-            context.ptrs_copy(src, dst, 1);
+            context.ptrs_copy_forward(src, dst, 1);
         }
 
         unsafe {
@@ -505,7 +505,7 @@ where
         unsafe {
             let src = context.ptrs_cast_const(dst.clone());
             let src = context.ptrs_add(src, 1);
-            context.ptrs_copy(src, dst, len - index - 1);
+            context.ptrs_copy_forward(src, dst, len - index - 1);
         }
 
         unsafe {
@@ -567,7 +567,7 @@ where
 
             let src = context.ptrs_cast_const(ptrs.clone());
             let dst = unsafe { context.ptrs_add_mut(ptrs, 1) };
-            unsafe { context.ptrs_copy(src, dst, len - index) }
+            unsafe { context.ptrs_copy_forward(src, dst, len - index) }
         }
 
         #[expect(clippy::items_after_statements)]
@@ -594,7 +594,7 @@ where
                 if index < len {
                     let src = context.ptrs_cast_const(dst.clone());
                     let src = unsafe { context.ptrs_add(src, 1) };
-                    unsafe { context.ptrs_copy_rev(src, dst, len - index) }
+                    unsafe { context.ptrs_copy_backward(src, dst, len - index) }
                 }
             }
         }
@@ -865,7 +865,7 @@ where
                         let src = context.ptrs_cast_const(ptrs.clone());
                         let src = context.ptrs_add(src, processed_len);
                         let dst = context.ptrs_add_mut(ptrs, processed_len - deleted_cnt);
-                        context.ptrs_copy(src, dst, original_len - processed_len);
+                        context.ptrs_copy_forward(src, dst, original_len - processed_len);
                     }
                 }
                 // SAFETY: After filling holes, all items are in contiguous memory.

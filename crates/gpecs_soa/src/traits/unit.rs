@@ -83,12 +83,12 @@ unsafe impl RawSoaContext for () {
     }
 
     #[inline]
-    unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
         unsafe { ptr::copy(src, dst, len) }
     }
 
     #[inline]
-    unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
         unsafe { ptr::copy(src, dst, len) }
     }
 

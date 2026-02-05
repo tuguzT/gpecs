@@ -250,7 +250,7 @@ where
                     let src = unsafe { context.ptrs_add(src, tail) };
                     let dst = unsafe { context.ptrs_add_mut(ptrs, start) };
                     unsafe {
-                        context.ptrs_copy(src, dst, tail_len);
+                        context.ptrs_copy_forward(src, dst, tail_len);
                     }
                 }
                 unsafe {

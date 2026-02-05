@@ -85,44 +85,51 @@ pub unsafe trait RawSoaContext {
     fn ptrs_cast_mut<'a>(&'a self, ptrs: Self::Ptrs<'a>) -> Self::MutPtrs<'a>;
 
     /// Swaps the values at two [mutable locations](RawSoaContext::MutPtrs) of the stored fields
-    /// sequentially in the same order as they are stored in the buffer,
+    /// sequentially in the *same* order as they are stored in the buffer,
     /// without deinitializing either.
     ///
-    /// All the safety requirements resulting from applying
+    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
+    /// may not overlap with each other.
+    ///
+    /// Additionally, all the safety requirements resulting from applying
     /// [`ptr::swap()`](core::ptr::swap) method to each pointer
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>);
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
-    /// for each stored field sequentially in the same order as they are stored in the buffer.
-    /// The source and destination may overlap.
+    /// for each stored field sequentially in the *same* order as they are stored in the buffer.
+    ///
+    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
+    /// may not overlap with each other.
+    ///
+    /// Additionally, all the safety requirements resulting from applying
+    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
+    /// should be satisfied to be safe to call this method.
     ///
     /// If the source and destination will never overlap,
     /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
-    ///
-    /// All the safety requirements resulting from applying
-    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
-    /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_copy(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize);
+    unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize);
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in the *reverse* order as they are stored in the buffer.
-    /// The source and destination may overlap.
+    ///
+    /// The source and destination may overlap, but all the pointers corresponding to the same collection of fields
+    /// may not overlap with each other.
+    ///
+    /// Additionally, all the safety requirements resulting from applying
+    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
+    /// should be satisfied to be safe to call this method.
     ///
     /// If the source and destination will never overlap,
     /// [`ptrs_copy_nonoverlapping()`](RawSoaContext::ptrs_copy_nonoverlapping) can be used instead.
-    ///
-    /// All the safety requirements resulting from applying
-    /// [`ptr::copy()`](core::ptr::copy) method to each pointer
-    /// should be satisfied to be safe to call this method.
-    unsafe fn ptrs_copy_rev(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize);
+    unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize);
 
     /// Copies `count * size_of::<fields[0]>() + ...` bytes from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs)
     /// for each stored field sequentially in unspecified order.
-    /// The source and destination must not overlap.
+    /// The source and destination, as well as all the field pointers, must not overlap.
     ///
     /// For regions of memory which might overlap, use
-    /// [`ptrs_copy()`](RawSoaContext::ptrs_copy) or [`ptrs_copy_rev()`](RawSoaContext::ptrs_copy_rev) instead.
+    /// [`ptrs_copy_forward()`](RawSoaContext::ptrs_copy_forward) or [`ptrs_copy_backward()`](RawSoaContext::ptrs_copy_backward) instead.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::copy_nonoverlapping()`](core::ptr::copy_nonoverlapping) method to each pointer
@@ -134,7 +141,7 @@ pub unsafe trait RawSoaContext {
         len: usize,
     );
 
-    /// Executes the destructors (if any) for the each stored field located at ptrs.
+    /// Executes the destructors (if any) for the each stored field located at input [pointers](RawSoaContext::Ptrs).
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::drop_in_place()`](core::ptr::drop_in_place) method to each pointer

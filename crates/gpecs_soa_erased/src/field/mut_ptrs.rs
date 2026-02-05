@@ -1,7 +1,7 @@
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
-    mem::MaybeUninit,
+    mem::{self, MaybeUninit},
     ops::Range,
     ptr,
 };
@@ -121,14 +121,15 @@ where
     #[inline]
     #[track_caller]
     pub unsafe fn swap(self, with: Self) {
-        let Self { desc, .. } = self;
+        let Self { desc, buffer, .. } = self;
         check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let a = self.as_mut_ptr();
-        let b = with.as_mut_ptr();
-        let count = desc.layout().size().div_ceil(size_of::<A>());
-        for i in 0..count {
-            unsafe { ptr::swap(a.add(i), b.add(i)) }
+        let this_buffer_range = self.buffer_init_range();
+        let with_buffer_range = with.buffer_init_range();
+        for i in 0..this_buffer_range.len() {
+            let this = unsafe { &mut (*buffer)[this_buffer_range.start + i] };
+            let with = unsafe { &mut (*with.buffer)[with_buffer_range.start + i] };
+            mem::swap(this, with);
         }
     }
 

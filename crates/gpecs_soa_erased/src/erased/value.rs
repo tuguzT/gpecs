@@ -547,7 +547,7 @@ where
     {
         let Both(offset, src) = item else {
             let descriptors_count = field_index + descriptors.count();
-            let error = LenMismatchError::new(descriptors_count, field_index);
+            let error = unsafe { LenMismatchError::new_unchecked(descriptors_count, field_index) };
             let error = IterLenMismatch(error).into();
             return Err(error);
         };

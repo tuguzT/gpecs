@@ -12,8 +12,7 @@ use crate::{
     },
     field::{
         ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
-        assert::check_into_layout,
-        error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
+        error::{ErasedFieldIntoValueError, ErasedFieldPtrError, check_into_layout},
     },
     soa::field::FieldDescriptor,
     storage::AddressableUnit,

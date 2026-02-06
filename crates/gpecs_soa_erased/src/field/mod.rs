@@ -16,7 +16,6 @@ pub use self::value::BoxedErasedField;
 
 pub mod error;
 
-mod assert;
 mod mut_ptrs;
 mod mut_refs;
 mod mut_slice_ptrs;

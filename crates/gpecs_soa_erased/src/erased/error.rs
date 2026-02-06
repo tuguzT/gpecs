@@ -20,9 +20,17 @@ pub struct InvalidOffsetError {
 
 impl InvalidOffsetError {
     #[inline]
-    #[track_caller]
-    pub fn new(offset: usize, capacity: usize) -> Self {
-        assert!(offset > capacity, "offset should be greater than capacity");
+    pub fn new(offset: usize, capacity: usize) -> Option<Self> {
+        if offset <= capacity {
+            return None;
+        }
+
+        let me = unsafe { Self::new_unchecked(offset, capacity) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(offset: usize, capacity: usize) -> Self {
         Self { offset, capacity }
     }
 
@@ -67,10 +75,7 @@ impl Error for InvalidOffsetError {}
 
 #[inline]
 pub fn check_offset(offset: usize, capacity: usize) -> Result<(), InvalidOffsetError> {
-    if offset > capacity {
-        return Err(InvalidOffsetError::new(offset, capacity));
-    }
-    Ok(())
+    InvalidOffsetError::new(offset, capacity).map_or(Ok(()), Err)
 }
 
 #[derive(Debug, Clone)]
@@ -150,11 +155,17 @@ pub struct InvalidOffsetLenError {
 
 impl InvalidOffsetLenError {
     #[inline]
-    pub fn new(offset: usize, len: usize, capacity: usize) -> Self {
-        assert!(
-            offset + len > capacity,
-            "offset + len should be greater than capacity",
-        );
+    pub fn new(offset: usize, len: usize, capacity: usize) -> Option<Self> {
+        if offset + len <= capacity {
+            return None;
+        }
+
+        let me = unsafe { Self::new_unchecked(offset, len, capacity) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(offset: usize, len: usize, capacity: usize) -> Self {
         Self {
             offset,
             len,
@@ -223,10 +234,7 @@ pub fn check_offset_len(
     len: usize,
     capacity: usize,
 ) -> Result<(), InvalidOffsetLenError> {
-    if offset + len > capacity {
-        return Err(InvalidOffsetLenError::new(offset, len, capacity));
-    }
-    Ok(())
+    InvalidOffsetLenError::new(offset, len, capacity).map_or(Ok(()), Err)
 }
 
 #[derive(Debug, Clone)]

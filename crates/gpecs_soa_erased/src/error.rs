@@ -13,12 +13,17 @@ pub struct LenMismatchError {
 
 impl LenMismatchError {
     #[inline]
-    #[track_caller]
-    pub fn new(expected: usize, actual: usize) -> Self {
-        assert_ne!(
-            expected, actual,
-            "expected and actual lengths should differ from each other",
-        );
+    pub fn new(expected: usize, actual: usize) -> Option<Self> {
+        if expected == actual {
+            return None;
+        }
+
+        let me = unsafe { Self::new_unchecked(expected, actual) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(expected: usize, actual: usize) -> Self {
         Self { expected, actual }
     }
 
@@ -60,10 +65,7 @@ impl Error for LenMismatchError {}
 
 #[inline]
 pub fn check_len(len: usize, expected: usize) -> Result<(), LenMismatchError> {
-    if len != expected {
-        return Err(LenMismatchError::new(expected, len));
-    }
-    Ok(())
+    LenMismatchError::new(expected, len).map_or(Ok(()), Err)
 }
 
 #[derive(Clone)]
@@ -72,14 +74,21 @@ pub struct LayoutMismatchError {
     actual: Layout,
 }
 
+const _: () = assert_npo::<LayoutMismatchError>();
+
 impl LayoutMismatchError {
     #[inline]
-    #[track_caller]
-    pub fn new(expected: Layout, actual: Layout) -> Self {
-        assert_ne!(
-            expected, actual,
-            "expected and actual layouts should differ from each other",
-        );
+    pub fn new(expected: Layout, actual: Layout) -> Option<Self> {
+        if expected == actual {
+            return None;
+        }
+
+        let me = unsafe { Self::new_unchecked(expected, actual) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(expected: Layout, actual: Layout) -> Self {
         Self { expected, actual }
     }
 
@@ -121,10 +130,7 @@ impl Error for LayoutMismatchError {}
 
 #[inline]
 pub fn check_layout(layout: Layout, expected: Layout) -> Result<(), LayoutMismatchError> {
-    if layout != expected {
-        return Err(LayoutMismatchError::new(expected, layout));
-    }
-    Ok(())
+    LayoutMismatchError::new(expected, layout).map_or(Ok(()), Err)
 }
 
 #[derive(Clone)]
@@ -135,12 +141,17 @@ pub struct InsufficientLenError {
 
 impl InsufficientLenError {
     #[inline]
-    #[track_caller]
-    pub fn new(expected: usize, actual: usize) -> Self {
-        assert!(
-            actual < expected,
-            "actual length should be smaller than expected length",
-        );
+    pub fn new(expected: usize, actual: usize) -> Option<Self> {
+        if actual >= expected {
+            return None;
+        }
+
+        let me = unsafe { Self::new_unchecked(expected, actual) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(expected: usize, actual: usize) -> Self {
         Self { expected, actual }
     }
 
@@ -185,10 +196,7 @@ impl Error for InsufficientLenError {}
 
 #[inline]
 pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), InsufficientLenError> {
-    if len < expected {
-        return Err(InsufficientLenError::new(expected, len));
-    }
-    Ok(())
+    InsufficientLenError::new(expected, len).map_or(Ok(()), Err)
 }
 
 #[derive(Clone)]
@@ -201,15 +209,19 @@ const _: () = assert_npo::<InsufficientAlignError>();
 
 impl InsufficientAlignError {
     #[inline]
-    #[track_caller]
-    pub fn new(expected: Layout, actual: Layout) -> Self {
+    pub fn new(expected: Layout, actual: Layout) -> Option<Self> {
         let expected = nonzero_align(expected);
         let actual = nonzero_align(actual);
-        assert!(
-            actual < expected,
-            "actual alignment should be smaller than expected alignment",
-        );
+        if actual >= expected {
+            return None;
+        }
 
+        let me = unsafe { Self::new_unchecked(expected, actual) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(expected: NonZeroUsize, actual: NonZeroUsize) -> Self {
         Self { expected, actual }
     }
 
@@ -257,10 +269,7 @@ pub fn check_sufficient_align(
     actual: Layout,
     expected: Layout,
 ) -> Result<(), InsufficientAlignError> {
-    if actual.align() < expected.align() {
-        return Err(InsufficientAlignError::new(expected, actual));
-    }
-    Ok(())
+    InsufficientAlignError::new(expected, actual).map_or(Ok(()), Err)
 }
 
 #[derive(Clone)]
@@ -273,13 +282,19 @@ const _: () = assert_npo::<NotAlignedError>();
 
 impl NotAlignedError {
     #[inline]
-    pub fn new(ptr: *const u8, target_layout: Layout) -> Self {
+    #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
+    pub fn new(ptr: *const u8, target_layout: Layout) -> Option<Self> {
         let target_align = nonzero_align(target_layout);
-        assert!(
-            ptr.align_offset(target_align.get()) != 0,
-            "the pointer {ptr:p} should not be aligned to {target_align}",
-        );
+        if ptr.align_offset(target_align.get()) == 0 {
+            return None;
+        }
 
+        let me = unsafe { Self::new_unchecked(ptr, target_align) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(ptr: *const u8, target_align: NonZeroUsize) -> Self {
         Self { ptr, target_align }
     }
 
@@ -325,10 +340,7 @@ impl Error for NotAlignedError {}
 
 #[inline]
 pub fn check_ptr_align(ptr: *const u8, target_layout: Layout) -> Result<(), NotAlignedError> {
-    match ptr.align_offset(target_layout.align()) {
-        0 => Ok(()),
-        _ => Err(NotAlignedError::new(ptr, target_layout)),
-    }
+    NotAlignedError::new(ptr, target_layout).map_or(Ok(()), Err)
 }
 
 #[inline]

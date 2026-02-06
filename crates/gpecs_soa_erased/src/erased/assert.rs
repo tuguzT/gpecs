@@ -45,7 +45,7 @@ where
     for (field_index, item) in actual.by_ref().zip_longest(expected).enumerate() {
         let Both(actual, expected) = item else {
             let descriptors_count = field_index + actual.count();
-            let error = LenMismatchError::new(descriptors_count, field_index);
+            let error = unsafe { LenMismatchError::new_unchecked(descriptors_count, field_index) };
             return Err(error.into());
         };
         check_layout(actual.layout(), expected.layout())?;

@@ -10,8 +10,9 @@ use crate::{
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMut,
         ErasedFieldSlicePtr,
-        assert::{check_into_layout, check_slice_buffer_len},
-        error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+        error::{
+            ErasedFieldIntoValueError, ErasedFieldSlicePtrError, check_into_layout, check_slice_len,
+        },
     },
     soa::field::FieldDescriptor,
     storage::AddressableUnit,
@@ -36,7 +37,7 @@ where
         len: usize,
     ) -> Result<Self, ErasedFieldSlicePtrError> {
         check_sufficient_align(desc.layout(), Layout::new::<A>())?;
-        check_slice_buffer_len(buffer.len() * size_of::<A>(), desc.layout().size(), len)?;
+        check_slice_len(buffer.len() * size_of::<A>(), desc.layout().size(), len)?;
         check_ptr_align(buffer.cast(), desc.layout())?;
 
         let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), buffer.len());

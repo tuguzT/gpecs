@@ -8,7 +8,10 @@ use core::{
 
 use crate::{
     error::{InsufficientAlignError, check_layout, check_sufficient_align},
-    field::{ErasedFieldMutPtr, assert::check_into_layout, error::ErasedFieldIntoValueError},
+    field::{
+        ErasedFieldMutPtr,
+        error::{ErasedFieldIntoValueError, check_into_layout},
+    },
     soa::field::FieldDescriptor,
     storage::AddressableUnit,
 };

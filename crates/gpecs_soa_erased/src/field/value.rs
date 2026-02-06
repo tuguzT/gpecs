@@ -9,10 +9,9 @@ use crate::{
     error::{check_layout, check_len, check_sufficient_align},
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
-        assert::check_into_layout,
         error::{
             ErasedFieldFromDescDataError, ErasedFieldFromStorageError, ErasedFieldFromValueError,
-            ErasedFieldFromValueErrorKind, ErasedFieldIntoValueError,
+            ErasedFieldFromValueErrorKind, ErasedFieldIntoValueError, check_into_layout,
         },
     },
     fmt::SliceUpperHex,

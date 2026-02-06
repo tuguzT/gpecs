@@ -1,10 +1,14 @@
 use core::{
+    alloc::Layout,
     error::Error,
     fmt::{self, Debug, Display},
 };
 
 use crate::{
-    error::{InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError},
+    error::{
+        InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError,
+        check_layout,
+    },
     storage::{AddressableUnit, AlignedStorageFromLayout},
 };
 
@@ -17,13 +21,17 @@ pub struct SliceLenMismatchError {
 
 impl SliceLenMismatchError {
     #[inline]
-    #[track_caller]
-    pub(super) fn new(item_size: usize, len: usize, actual: usize) -> Self {
-        assert_ne!(
-            item_size * len,
-            actual,
-            "expected and actual lengths should differ from each other",
-        );
+    pub fn new(item_size: usize, len: usize, actual: usize) -> Option<Self> {
+        if (item_size == 0 && actual == 0) || (item_size * len == actual) {
+            return None;
+        }
+
+        let me = unsafe { Self::new_unchecked(item_size, len, actual) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(item_size: usize, len: usize, actual: usize) -> Self {
         Self {
             item_size,
             len,
@@ -97,6 +105,15 @@ impl Display for SliceLenMismatchError {
 
 impl Error for SliceLenMismatchError {}
 
+#[inline]
+pub fn check_slice_len(
+    len: usize,
+    item_size: usize,
+    expected_len: usize,
+) -> Result<(), SliceLenMismatchError> {
+    SliceLenMismatchError::new(item_size, expected_len, len).map_or(Ok(()), Err)
+}
+
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct ErasedFieldIntoValueError<T>
@@ -109,7 +126,7 @@ where
 
 impl<T> ErasedFieldIntoValueError<T> {
     #[inline]
-    pub(super) fn new(value: T, reason: LayoutMismatchError) -> Self {
+    fn new(value: T, reason: LayoutMismatchError) -> Self {
         Self { reason, value }
     }
 
@@ -140,6 +157,18 @@ where
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         let Self { reason, .. } = self;
         Some(reason)
+    }
+}
+
+#[inline]
+pub(crate) fn check_into_layout<T, U>(
+    layout: Layout,
+    value: U,
+) -> Result<U, ErasedFieldIntoValueError<U>> {
+    let expected = Layout::new::<T>();
+    match check_layout(layout, expected) {
+        Ok(()) => Ok(value),
+        Err(reason) => Err(ErasedFieldIntoValueError::new(value, reason)),
     }
 }
 

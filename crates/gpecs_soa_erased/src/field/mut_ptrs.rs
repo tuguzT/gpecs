@@ -123,6 +123,7 @@ where
         let Self { desc, buffer, .. } = self;
         check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
+        // TODO: move algorithm into `gpecs_shaders` & check for overlapping ranges
         let this_buffer_range = self.buffer_init_range();
         let with_buffer_range = with.buffer_init_range();
         for i in 0..this_buffer_range.len() {

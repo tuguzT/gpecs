@@ -24,6 +24,7 @@ use crate::{
         InsufficientAlignError, LenMismatchError, check_layout, check_len, check_sufficient_align,
     },
     field::{ErasedField, error::ErasedFieldFromDescDataError},
+    slice_item_ptr::SliceItemPtrs,
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
@@ -36,20 +37,24 @@ use crate::{
 };
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedSoa =
-    ErasedSoa<crate::storage::BoxedAlignedUninitStorage, alloc::boxed::Box<[FieldDescriptor]>, u8>;
+pub type BoxedErasedSoa<P> = ErasedSoa<
+    crate::storage::BoxedAlignedUninitStorage,
+    alloc::boxed::Box<[FieldDescriptor]>,
+    P,
+    u8,
+>;
 
-pub struct ErasedSoa<T, D, A>
+pub struct ErasedSoa<T, D, P, A>
 where
     A: AddressableUnit,
     D: ?Sized,
 {
-    phantom: PhantomData<fn() -> A>,
+    phantom: PhantomData<fn() -> (P, A)>,
     storage: T,
     descriptors: D,
 }
 
-impl<T, D, A> ErasedSoa<T, D, A>
+impl<T, D, P, A> ErasedSoa<T, D, P, A>
 where
     A: AddressableUnit,
 {
@@ -73,7 +78,7 @@ where
     }
 }
 
-impl<T, D, A> ErasedSoa<T, D, A>
+impl<T, D, P, A> ErasedSoa<T, D, P, A>
 where
     A: AddressableUnit,
     T: AlignedStorage<A>,
@@ -110,7 +115,7 @@ where
     }
 }
 
-impl<T, D> ErasedSoa<T, D, u8>
+impl<T, D, P> ErasedSoa<T, D, P, u8>
 where
     T: AlignedStorage<u8>,
     D: FieldDescriptorsOwned,
@@ -152,14 +157,15 @@ where
     }
 }
 
-impl<'a, T, D, A> ErasedSoa<T, D, A>
+impl<'a, T, D, P, A> ErasedSoa<T, D, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A>,
     D: FieldDescriptors<'a> + ?Sized,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     #[inline]
-    pub fn as_fields(&'a self) -> ErasedSoaRefs<'a, D::Output, A> {
+    pub fn as_fields(&'a self) -> ErasedSoaRefs<'a, D::Output, P::Const, A> {
         let Self {
             ref storage,
             ref descriptors,
@@ -172,7 +178,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_fields(&'a mut self) -> ErasedSoaRefsMut<'a, D::Output, A> {
+    pub fn as_mut_fields(&'a mut self) -> ErasedSoaRefsMut<'a, D::Output, P::Mut, A> {
         let Self {
             ref mut storage,
             ref descriptors,
@@ -185,7 +191,7 @@ where
     }
 }
 
-impl<T, D, A> ErasedSoa<T, D, A>
+impl<T, D, P, A> ErasedSoa<T, D, P, A>
 where
     A: AddressableUnit,
     T: AlignedStorageFromLayout<A>,
@@ -221,7 +227,7 @@ where
     }
 }
 
-impl<T, D> ErasedSoa<T, D, u8>
+impl<T, D, P> ErasedSoa<T, D, P, u8>
 where
     T: AlignedStorage<u8>,
     D: FromIterator<FieldDescriptor>,
@@ -255,7 +261,7 @@ where
     }
 }
 
-impl<T, D> ErasedSoa<T, D, u8>
+impl<T, D, P> ErasedSoa<T, D, P, u8>
 where
     T: AlignedStorageFromLayout<u8>,
     D: FromIterator<FieldDescriptor>,
@@ -287,14 +293,15 @@ where
     }
 }
 
-impl<T, D, A> ErasedSoa<T, D, A>
+impl<T, D, P, A> ErasedSoa<T, D, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A>,
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     #[inline]
-    pub fn into_fields<F>(self) -> ErasedSoaIntoFields<T, D::IntoIter, F, A>
+    pub fn into_fields<F>(self) -> ErasedSoaIntoFields<T, D::IntoIter, F, P, A>
     where
         F: AlignedStorageFromLayout<A>,
     {
@@ -304,11 +311,12 @@ where
     }
 }
 
-impl<T, D, A> Debug for ErasedSoa<T, D, A>
+impl<T, D, P, A> Debug for ErasedSoa<T, D, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A>,
     D: FieldDescriptorsOwned + ?Sized,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
     for<'a, 'b> FieldDescriptorsIter<'a, D>: FieldDescriptors<'b>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -317,7 +325,7 @@ where
     }
 }
 
-impl<'a, T, D, A> FieldDescriptors<'a> for ErasedSoa<T, D, A>
+impl<'a, T, D, P, A> FieldDescriptors<'a> for ErasedSoa<T, D, P, A>
 where
     A: AddressableUnit,
     D: FieldDescriptors<'a> + ?Sized,
@@ -331,7 +339,7 @@ where
     }
 }
 
-impl<T, D, A> CovariantFieldDescriptors for ErasedSoa<T, D, A>
+impl<T, D, P, A> CovariantFieldDescriptors for ErasedSoa<T, D, P, A>
 where
     A: AddressableUnit,
     D: CovariantFieldDescriptors + ?Sized,
@@ -344,17 +352,17 @@ where
     }
 }
 
-pub struct ErasedSoaIntoFields<T, I, F, A>
+pub struct ErasedSoaIntoFields<T, I, F, P, A>
 where
     A: AddressableUnit,
     I: ?Sized,
 {
-    phantom: PhantomData<fn() -> (F, A)>,
+    phantom: PhantomData<fn() -> (F, P, A)>,
     storage: T,
     offsets: BufferOffsets<I>,
 }
 
-impl<T, I, F, A> ErasedSoaIntoFields<T, I, F, A>
+impl<T, I, F, P, A> ErasedSoaIntoFields<T, I, F, P, A>
 where
     A: AddressableUnit,
 {
@@ -367,7 +375,7 @@ where
     }
 }
 
-impl<T, I, F, A> Debug for ErasedSoaIntoFields<T, I, F, A>
+impl<T, I, F, P, A> Debug for ErasedSoaIntoFields<T, I, F, P, A>
 where
     A: AddressableUnit,
     T: Debug,
@@ -385,7 +393,7 @@ where
     }
 }
 
-impl<T, I, F, A> Clone for ErasedSoaIntoFields<T, I, F, A>
+impl<T, I, F, P, A> Clone for ErasedSoaIntoFields<T, I, F, P, A>
 where
     A: AddressableUnit,
     T: Clone,
@@ -401,14 +409,15 @@ where
     }
 }
 
-impl<T, I, F, A> Iterator for ErasedSoaIntoFields<T, I, F, A>
+impl<T, I, F, P, A> Iterator for ErasedSoaIntoFields<T, I, F, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A>,
     I: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<A>,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
-    type Item = Result<ErasedField<F, A>, ErasedFieldFromDescDataError<F, A>>;
+    type Item = Result<ErasedField<F, P, A>, ErasedFieldFromDescDataError<F, A>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -431,12 +440,13 @@ where
     }
 }
 
-impl<T, I, F, A> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, A>
+impl<T, I, F, P, A> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A>,
     I: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<A>,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -445,12 +455,13 @@ where
     }
 }
 
-impl<T, I, F, A> FusedIterator for ErasedSoaIntoFields<T, I, F, A>
+impl<T, I, F, P, A> FusedIterator for ErasedSoaIntoFields<T, I, F, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A>,
     I: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<A>,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
 }
 

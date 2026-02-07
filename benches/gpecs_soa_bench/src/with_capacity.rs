@@ -2,6 +2,7 @@ use std::hint::black_box;
 
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, ErasedSoaContext},
+    slice_item_ptr::gpu::GpuSliceItemPtrs,
     soa::prelude::*,
 };
 
@@ -15,7 +16,7 @@ pub trait WithCapacity: SoaVecs<Context: Default> + Sized {
         black_box(vec)
     }
 
-    fn soa_ser_with_capacity(capacity: usize) -> SoaVec<BoxedErasedSoa> {
+    fn soa_ser_with_capacity(capacity: usize) -> SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>> {
         let capacity = black_box(capacity);
         let context = Default::default();
         let context = ErasedSoaContext::of::<Self>(&context).expect("descriptors should be valid");

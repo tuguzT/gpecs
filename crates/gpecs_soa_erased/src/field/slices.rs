@@ -12,20 +12,22 @@ use crate::{
         error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
     },
     fmt::SliceUpperHex,
+    slice_item_ptr::ConstSliceItemPtr,
     soa::field::FieldDescriptor,
     storage::AddressableUnit,
 };
 
-pub struct ErasedFieldSlice<'a, A>
+pub struct ErasedFieldSlice<'a, T>
 where
-    A: AddressableUnit,
+    T: ConstSliceItemPtr,
 {
-    ptr: ErasedFieldSlicePtr<A>,
-    phantom: PhantomData<&'a [A]>,
+    ptr: ErasedFieldSlicePtr<T>,
+    phantom: PhantomData<&'a [T::Item]>,
 }
 
-impl<'a, A> ErasedFieldSlice<'a, A>
+impl<'a, T, A> ErasedFieldSlice<'a, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
@@ -40,36 +42,25 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_parts(
-        desc: FieldDescriptor,
-        buffer: &'a [MaybeUninit<A>],
-        byte_offset: usize,
-        len: usize,
-    ) -> Self {
-        let ptr = unsafe { ErasedFieldSlicePtr::from_parts(desc, buffer, byte_offset, len) };
-        unsafe { Self::from_ptr(ptr) }
-    }
-
-    #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedFieldSlicePtr<A>) -> Self {
+    pub unsafe fn from_ptr(ptr: ErasedFieldSlicePtr<T>) -> Self {
         let phantom = PhantomData;
         Self { ptr, phantom }
     }
 
     #[inline]
-    pub unsafe fn try_into<T>(self) -> Result<&'a [T], ErasedFieldIntoValueError<Self>> {
+    pub unsafe fn try_into<V>(self) -> Result<&'a [V], ErasedFieldIntoValueError<Self>> {
         let Self { ptr, .. } = self;
         let into_self = |ptr| unsafe { Self::from_ptr(ptr) };
-        let buffer = <*const [T]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = <*const [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
         Ok(slice)
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&[T], ErasedFieldIntoValueError<&Self>> {
+    pub unsafe fn cast<V>(&self) -> Result<&[V], ErasedFieldIntoValueError<&Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let buffer = <*const [T]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = <*const [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
         Ok(slice)
     }
@@ -118,13 +109,13 @@ where
     }
 
     #[inline]
-    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr<A> {
+    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr<T> {
         let Self { ptr, .. } = *self;
         ptr
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<T> {
         let Self { ptr, .. } = self;
         ptr.as_field_ptr()
     }
@@ -135,19 +126,11 @@ where
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
-
-    #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a [MaybeUninit<A>], usize, usize) {
-        let Self { ptr, .. } = self;
-        let (desc, buffer, byte_offset, len) = ptr.into_parts();
-
-        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
-        (desc, buffer, byte_offset, len)
-    }
 }
 
-impl<A> Debug for ErasedFieldSlice<'_, A>
+impl<T, A> Debug for ErasedFieldSlice<'_, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -162,8 +145,9 @@ where
     }
 }
 
-impl<A> Clone for ErasedFieldSlice<'_, A>
+impl<T, A> Clone for ErasedFieldSlice<'_, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
@@ -172,10 +156,16 @@ where
     }
 }
 
-impl<A> Copy for ErasedFieldSlice<'_, A> where A: AddressableUnit {}
-
-impl<A> AsRef<[A]> for ErasedFieldSlice<'_, A>
+impl<T, A> Copy for ErasedFieldSlice<'_, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
+    A: AddressableUnit,
+{
+}
+
+impl<T, A> AsRef<[A]> for ErasedFieldSlice<'_, T>
+where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
@@ -184,14 +174,15 @@ where
     }
 }
 
-impl<'a, T, A> TryFrom<&'a [T]> for ErasedFieldSlice<'a, A>
+impl<'a, T, V, A> TryFrom<&'a [V]> for ErasedFieldSlice<'a, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 
     #[inline]
-    fn try_from(slice: &'a [T]) -> Result<Self, Self::Error> {
+    fn try_from(slice: &'a [V]) -> Result<Self, Self::Error> {
         let ptr = ptr::from_ref(slice).try_into()?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)

@@ -1,6 +1,5 @@
 use core::{
     alloc::Layout,
-    fmt::{self, Debug},
     mem::MaybeUninit,
     ops::Range,
     ptr::{self, NonNull},
@@ -12,55 +11,48 @@ use crate::{
         ErasedFieldMutPtr,
         error::{ErasedFieldIntoValueError, check_into_layout},
     },
+    slice_item_ptr::{MutSliceItemPtr, NonNullAsPtr, NonNullSliceItemPtr},
     soa::field::FieldDescriptor,
     storage::AddressableUnit,
 };
 
-pub struct ErasedFieldNonNullPtr<A>
-where
-    A: AddressableUnit,
-{
+#[derive(Debug, Clone, Copy)]
+pub struct ErasedFieldNonNullPtr<T> {
     desc: FieldDescriptor,
-    buffer: NonNull<[MaybeUninit<A>]>,
-    byte_offset: usize,
+    ptr: T,
 }
 
-impl<A> ErasedFieldNonNullPtr<A>
+impl<T, A> ErasedFieldNonNullPtr<T>
 where
+    T: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
-    pub fn new(ptr: ErasedFieldMutPtr<A>) -> Option<Self> {
-        let desc = ptr.descriptor();
-        let buffer = ptr.as_mut_buffer();
+    pub fn new(ptr: ErasedFieldMutPtr<NonNullAsPtr<T>>) -> Option<Self> {
+        let (desc, ptr) = ptr.into_parts();
 
-        let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), buffer.len());
+        let buffer = ptr.slice();
         let buffer = NonNull::new(buffer)?;
-        let me = unsafe { Self::from_parts(desc, buffer, 0) };
+        let ptr = unsafe { T::from_slice(buffer, 0) };
+
+        let me = unsafe { Self::from_parts(desc, ptr) };
         Some(me)
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(ptr: ErasedFieldMutPtr<A>) -> Self {
-        let desc = ptr.descriptor();
-        let buffer = ptr.as_mut_buffer();
+    pub unsafe fn new_unchecked(ptr: ErasedFieldMutPtr<NonNullAsPtr<T>>) -> Self {
+        let (desc, ptr) = ptr.into_parts();
 
-        let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), buffer.len());
+        let buffer = ptr.slice();
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        unsafe { Self::from_parts(desc, buffer, 0) }
+        let ptr = unsafe { T::from_slice(buffer, 0) };
+
+        unsafe { Self::from_parts(desc, ptr) }
     }
 
     #[inline]
-    pub unsafe fn from_parts(
-        desc: FieldDescriptor,
-        buffer: NonNull<[MaybeUninit<A>]>,
-        byte_offset: usize,
-    ) -> Self {
-        Self {
-            desc,
-            buffer,
-            byte_offset,
-        }
+    pub unsafe fn from_parts(desc: FieldDescriptor, ptr: T) -> Self {
+        Self { desc, ptr }
     }
 
     #[inline]
@@ -73,37 +65,23 @@ where
     #[inline]
     #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
-        let Self {
-            desc,
-            buffer,
-            byte_offset,
-        } = self;
+        let Self { desc, ptr } = self;
 
-        let byte_offset = unsafe { byte_offset.unchecked_add(count * desc.layout().size()) };
-        unsafe { Self::from_parts(desc, buffer, byte_offset) }
+        let field_size = desc.layout().size().div_ceil(size_of::<A>());
+        let ptr = unsafe { ptr.add(count * field_size) };
+        unsafe { Self::from_parts(desc, ptr) }
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn offset_from(self, origin: Self) -> isize {
-        let Self {
-            desc,
-            buffer,
-            byte_offset,
-        } = self;
+        let Self { desc, ptr } = self;
 
-        assert_eq!(buffer, origin.as_uninit_buffer());
+        assert_eq!(ptr.slice(), origin.as_uninit_buffer());
         check_layout(origin.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let byte_offset = byte_offset.cast_signed();
-        let origin_byte_offset = origin.byte_offset().cast_signed();
-        let offset = byte_offset.wrapping_sub(origin_byte_offset);
-
-        let field_size = desc
-            .layout()
-            .size()
-            .try_into()
-            .expect("layout size should not exceed `isize::MAX`");
+        let offset = unsafe { ptr.offset_from(origin.ptr()) };
+        let field_size = desc.layout().size().div_ceil(size_of::<A>()).cast_signed();
         offset
             .checked_div(field_size)
             .expect("erased field pointer should not be a ZST")
@@ -112,39 +90,37 @@ where
     #[inline]
     #[track_caller]
     pub unsafe fn swap(self, with: Self) {
-        let Self { desc, .. } = self;
+        let Self { desc, ptr } = self;
         check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let a = self.as_ptr().as_ptr();
-        let b = with.as_ptr().as_ptr();
-        let count = desc.layout().size().div_ceil(size_of::<A>());
-        for i in 0..count {
-            unsafe { ptr::swap(a.add(i), b.add(i)) }
+        let this_buffer_range = self.buffer_init_range();
+        for i in 0..this_buffer_range.len() {
+            let this = unsafe { ptr.add(i) }.as_ptr();
+            let with = unsafe { with.ptr.add(i) }.as_ptr();
+            unsafe { this.swap(with) }
         }
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn copy_from(self, from: Self, count: usize) {
-        let Self { desc, .. } = self;
+        let Self { desc, ptr } = self;
         check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let src = from.as_ptr();
-        let dst = self.as_ptr();
+        let src = from.ptr().as_ptr().cast_const();
         let count = count * desc.layout().size().div_ceil(size_of::<A>());
-        unsafe { ptr::copy(src.as_ptr(), dst.as_ptr(), count) }
+        unsafe { ptr.as_ptr().copy_from(src, count) }
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping(self, from: Self, count: usize) {
-        let Self { desc, .. } = self;
+        let Self { desc, ptr } = self;
         check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
-        let src = from.as_ptr();
-        let dst = self.as_ptr();
+        let src = from.ptr().as_ptr().cast_const();
         let count = count * desc.layout().size().div_ceil(size_of::<A>());
-        unsafe { ptr::copy_nonoverlapping(src.as_ptr(), dst.as_ptr(), count) }
+        unsafe { ptr.as_ptr().copy_from_nonoverlapping(src, count) }
     }
 
     #[inline]
@@ -154,23 +130,29 @@ where
     }
 
     #[inline]
+    pub fn ptr(self) -> T {
+        let Self { ptr, .. } = self;
+        ptr
+    }
+
+    #[inline]
     pub fn as_uninit_buffer(self) -> NonNull<[MaybeUninit<A>]> {
-        let Self { buffer, .. } = self;
-        buffer
+        let Self { ptr, .. } = self;
+        ptr.slice()
     }
 
     #[inline]
     pub fn byte_offset(self) -> usize {
-        let Self { byte_offset, .. } = self;
-        byte_offset
+        let Self { ptr, .. } = self;
+        ptr.index() * size_of::<A>()
     }
 
     #[inline]
     pub fn buffer_init_range(self) -> Range<usize> {
-        let (desc, _, byte_offset) = self.into_parts();
+        let Self { desc, ptr } = self;
 
         let len = desc.layout().size().div_ceil(size_of::<A>());
-        let start = byte_offset.div_ceil(size_of::<A>());
+        let start = ptr.index();
         let end = start + len;
         start..end
     }
@@ -185,80 +167,51 @@ where
 
     #[inline]
     pub fn as_ptr(self) -> NonNull<A> {
-        let Self { buffer, .. } = self;
+        let Self { ptr, .. } = self;
 
         let offset = self.buffer_init_range().start;
-        unsafe { buffer.cast::<A>().add(offset) }
+        unsafe { ptr.slice().cast::<A>().add(offset) }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, NonNull<[MaybeUninit<A>]>, usize) {
-        let Self {
-            desc,
-            buffer,
-            byte_offset,
-        } = self;
-        (desc, buffer, byte_offset)
+    pub fn into_parts(self) -> (FieldDescriptor, T) {
+        let Self { desc, ptr } = self;
+        (desc, ptr)
     }
 }
 
-#[expect(clippy::missing_fields_in_debug, reason = "buffer instead of ptr")]
-impl<A> Debug for ErasedFieldNonNullPtr<A>
+impl<T, V, A> TryFrom<NonNull<V>> for ErasedFieldNonNullPtr<T>
 where
-    A: AddressableUnit,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let desc = &self.desc;
-        let buffer = &self.as_buffer();
-        f.debug_struct("ErasedFieldNonNullPtr")
-            .field("desc", desc)
-            .field("buffer", buffer)
-            .finish()
-    }
-}
-
-impl<A> Clone for ErasedFieldNonNullPtr<A>
-where
-    A: AddressableUnit,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<A> Copy for ErasedFieldNonNullPtr<A> where A: AddressableUnit {}
-
-impl<T, A> TryFrom<NonNull<T>> for ErasedFieldNonNullPtr<A>
-where
+    T: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 
     #[inline]
-    fn try_from(ptr: NonNull<T>) -> Result<Self, Self::Error> {
-        let desc = FieldDescriptor::of::<T>();
+    fn try_from(ptr: NonNull<V>) -> Result<Self, Self::Error> {
+        let desc = FieldDescriptor::of::<V>();
         check_sufficient_align(desc.layout(), Layout::new::<A>())?;
 
         let len = desc.layout().size().div_ceil(size_of::<A>());
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.as_ptr().cast(), len);
+        let buffer = NonNull::slice_from_raw_parts(ptr.cast(), len);
+        let ptr = unsafe { T::from_slice(buffer, 0) };
 
-        let buffer = unsafe { NonNull::new_unchecked(buffer) };
-        let me = unsafe { Self::from_parts(desc, buffer, 0) };
+        let me = unsafe { Self::from_parts(desc, ptr) };
         Ok(me)
     }
 }
 
-impl<T, A> TryFrom<ErasedFieldNonNullPtr<A>> for NonNull<T>
+impl<T, V, A> TryFrom<ErasedFieldNonNullPtr<T>> for NonNull<V>
 where
+    T: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
-    type Error = ErasedFieldIntoValueError<ErasedFieldNonNullPtr<A>>;
+    type Error = ErasedFieldIntoValueError<ErasedFieldNonNullPtr<T>>;
 
     #[inline]
-    fn try_from(value: ErasedFieldNonNullPtr<A>) -> Result<Self, Self::Error> {
+    fn try_from(value: ErasedFieldNonNullPtr<T>) -> Result<Self, Self::Error> {
         let ErasedFieldNonNullPtr { desc, .. } = value;
-        let value = check_into_layout::<T, _>(desc.layout(), value)?;
+        let value = check_into_layout::<V, _>(desc.layout(), value)?;
 
         let ptr = value.as_ptr().cast();
         Ok(ptr)

@@ -1,11 +1,12 @@
-use std::iter::zip;
+use std::{iter::zip, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    erased::BoxedErasedSoa,
+    erased::{BoxedErasedSoa, ErasedSoaRefsMut},
     field::{
         BoxedErasedField, ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
         ErasedFieldSliceMut,
     },
+    slice_item_ptr::gpu::{GpuSliceItemPtr, GpuSliceItemPtrs},
 };
 
 use crate::{
@@ -24,6 +25,17 @@ use crate::{
 // TODO: convert this whole very unsafe code into some type which implements `Soa` trait & provides its guarantees
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
+
+pub type ErasedBundle = BoxedErasedSoa<GpuSliceItemPtrs>;
+pub type ErasedBundleRef<'a, D> =
+    ErasedSoaRefsMut<'a, D, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>, u8>;
+
+pub type ErasedComponent = BoxedErasedField<GpuSliceItemPtrs>;
+pub type ErasedComponentRef<'a> = ErasedFieldRef<'a, GpuSliceItemPtr<*const [MaybeUninit<u8>]>>;
+pub type ErasedComponentRefMut<'a> = ErasedFieldRefMut<'a, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>>;
+pub type ErasedComponentSlice<'a> = ErasedFieldSlice<'a, GpuSliceItemPtr<*const [MaybeUninit<u8>]>>;
+pub type ErasedComponentSliceMut<'a> =
+    ErasedFieldSliceMut<'a, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>>;
 
 #[cold]
 #[track_caller]
@@ -95,7 +107,7 @@ pub unsafe fn from_erased_fields<'a, T>(
     components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    fields: ErasedComponents<BoxedErasedField>,
+    fields: ErasedComponents<ErasedComponent>,
 ) -> T
 where
     T: AllocSoa + Soa<'a> + SoaRead,
@@ -104,8 +116,9 @@ where
         reorder_fields::<T, _, _>(components, context, component_ids, fields)
             .map(ErasedField::into_parts)
             .unzip();
-    let erased_value = BoxedErasedSoa::try_from_fields_descriptors(fields, descriptors.into())
-        .expect("all the fields should be valid");
+    let erased_value =
+        BoxedErasedSoa::<GpuSliceItemPtrs>::try_from_fields_descriptors(fields, descriptors.into())
+            .expect("all the fields should be valid");
     unsafe { erased_value.try_into::<T>(context) }.expect("all the fields should be valid")
 }
 
@@ -115,7 +128,7 @@ pub fn into_erased_fields<'a, T>(
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     value: T,
-) -> ErasedComponents<BoxedErasedField>
+) -> ErasedComponents<ErasedComponent>
 where
     T: AllocSoa + Soa<'a> + SoaWrite,
 {
@@ -132,7 +145,7 @@ where
 #[inline]
 pub unsafe fn from_erased_refs<'a, B>(
     components: &ComponentRegistry,
-    fields: ErasedComponents<ErasedFieldRef<'a, u8>>,
+    fields: ErasedComponents<ErasedComponentRef<'a>>,
 ) -> Refs<'static, 'a, B>
 where
     B: Bundle,
@@ -148,7 +161,7 @@ where
 #[inline]
 pub unsafe fn from_erased_refs_mut<'a, B>(
     components: &ComponentRegistry,
-    fields: ErasedComponents<ErasedFieldRefMut<'a, u8>>,
+    fields: ErasedComponents<ErasedComponentRefMut<'a>>,
 ) -> RefsMut<'static, 'a, B>
 where
     B: Bundle,
@@ -164,7 +177,7 @@ where
 pub unsafe fn from_erased_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
-    fields: ErasedComponents<ErasedFieldSlice<'a, u8>>,
+    fields: ErasedComponents<ErasedComponentSlice<'a>>,
 ) -> Slices<'static, 'a, B>
 where
     B: Bundle,
@@ -182,7 +195,7 @@ where
 pub unsafe fn from_erased_mut_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
-    fields: ErasedComponents<ErasedFieldSliceMut<'a, u8>>,
+    fields: ErasedComponents<ErasedComponentSliceMut<'a>>,
 ) -> SlicesMut<'static, 'a, B>
 where
     B: Bundle,

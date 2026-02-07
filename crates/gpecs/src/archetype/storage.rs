@@ -4,12 +4,7 @@ use std::{
 };
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
-use gpecs_soa_erased::{
-    erased::{BoxedErasedSoa, ErasedSoaContext, ErasedSoaRefsMut},
-    field::{
-        BoxedErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice, ErasedFieldSliceMut,
-    },
-};
+use gpecs_soa_erased::erased::{BoxedErasedSoa, ErasedSoaContext};
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 use indexmap::map::Keys as IndexMapKeys;
 
@@ -29,9 +24,10 @@ use crate::{
 
 use super::{
     erased::{
-        ErasedComponents, drop_erased_in_place, from_erased_fields, from_erased_mut_slices,
-        from_erased_refs, from_erased_refs_mut, from_erased_slices, get_component_info_fail,
-        into_erased_fields, validate_components,
+        ErasedBundle, ErasedBundleRef, ErasedComponent, ErasedComponentRef, ErasedComponentRefMut,
+        ErasedComponentSlice, ErasedComponentSliceMut, ErasedComponents, drop_erased_in_place,
+        from_erased_fields, from_erased_mut_slices, from_erased_refs, from_erased_refs_mut,
+        from_erased_slices, get_component_info_fail, into_erased_fields, validate_components,
     },
     error::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
@@ -77,7 +73,7 @@ impl From<NoEpochEntity> for Entity {
 pub type Bundles<'a, B> = (&'a [Entity], Slices<'a, 'a, B>);
 pub type BundlesMut<'a, B> = (&'a [Entity], SlicesMut<'a, 'a, B>);
 
-type ErasedStorage = EpochSparseSet<NoEpochEntity, BoxedErasedSoa>;
+type ErasedStorage = EpochSparseSet<NoEpochEntity, ErasedBundle>;
 type ComponentIdMap = IndexMap<ComponentId, Option<DropFn>>;
 
 pub struct ArchetypeStorage {
@@ -548,10 +544,8 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    fn destroy_refs_mut<A>(
-        component_ids: &ComponentIdMap,
-        erased_refs_mut: ErasedSoaRefsMut<'_, A, u8>,
-    ) where
+    fn destroy_refs_mut<A>(component_ids: &ComponentIdMap, erased_refs_mut: ErasedBundleRef<'_, A>)
+    where
         A: IntoIterator,
         A::Item: AsRef<FieldDescriptor>,
         A::IntoIter: AsRef<[FieldDescriptor]> + ExactSizeIterator,
@@ -569,8 +563,8 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-        fields: ErasedComponents<BoxedErasedField>,
-    ) -> Option<ErasedComponents<BoxedErasedField>> {
+        fields: ErasedComponents<ErasedComponent>,
+    ) -> Option<ErasedComponents<ErasedComponent>> {
         let Self {
             ref component_ids,
             ref mut erased_storage,
@@ -584,7 +578,7 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Option<ErasedComponents<BoxedErasedField>> {
+    ) -> Option<ErasedComponents<ErasedComponent>> {
         let Self {
             ref component_ids,
             ref mut erased_storage,
@@ -597,7 +591,7 @@ impl ArchetypeStorage {
     pub(crate) fn erased_components(
         &self,
         components: &ComponentRegistry,
-    ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_, u8>>) {
+    ) -> (&[Entity], ErasedComponents<ErasedComponentSlice<'_>>) {
         let Self {
             component_ids,
             erased_storage,
@@ -611,7 +605,7 @@ impl ArchetypeStorage {
     pub(crate) fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
-    ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_, u8>>) {
+    ) -> (&[Entity], ErasedComponents<ErasedComponentSliceMut<'_>>) {
         let Self {
             component_ids,
             erased_storage,
@@ -736,42 +730,42 @@ trait ErasedStorageExt {
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_, u8>>);
+    ) -> (&[Entity], ErasedComponents<ErasedComponentSlice<'_>>);
 
     fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_, u8>>);
+    ) -> (&[Entity], ErasedComponents<ErasedComponentSliceMut<'_>>);
 
     fn insert_erased(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-        fields: ErasedComponents<BoxedErasedField>,
-    ) -> Option<ErasedComponents<BoxedErasedField>>;
+        fields: ErasedComponents<ErasedComponent>,
+    ) -> Option<ErasedComponents<ErasedComponent>>;
 
     fn remove_erased(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<BoxedErasedField>>;
+    ) -> Option<ErasedComponents<ErasedComponent>>;
 
     fn get_erased(
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedFieldRef<'_, u8>>>;
+    ) -> Option<ErasedComponents<ErasedComponentRef<'_>>>;
 
     fn get_erased_mut(
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedFieldRefMut<'_, u8>>>;
+    ) -> Option<ErasedComponents<ErasedComponentRefMut<'_>>>;
 }
 
 impl ErasedStorageExt for ErasedStorage {
@@ -786,7 +780,7 @@ impl ErasedStorageExt for ErasedStorage {
         &self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (&[Entity], ErasedComponents<ErasedFieldSlice<'_, u8>>) {
+    ) -> (&[Entity], ErasedComponents<ErasedComponentSlice<'_>>) {
         let (dense, _) = Self::as_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
@@ -794,9 +788,10 @@ impl ErasedStorageExt for ErasedStorage {
 
         let entities = must_cast_slice(entities);
         let component_ids = component_ids.keys().copied();
-        let fields = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
-            .zip(values)
-            .collect();
+        let fields =
+            validate_components::<BoxedErasedSoa<_>, _>(components, context, component_ids)
+                .zip(values)
+                .collect();
         if entities.len() != values_len {
             unreachable!("count of entities should match count of components")
         }
@@ -808,7 +803,7 @@ impl ErasedStorageExt for ErasedStorage {
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (&[Entity], ErasedComponents<ErasedFieldSliceMut<'_, u8>>) {
+    ) -> (&[Entity], ErasedComponents<ErasedComponentSliceMut<'_>>) {
         let (dense, _) = Self::as_mut_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
@@ -816,9 +811,10 @@ impl ErasedStorageExt for ErasedStorage {
 
         let entities = must_cast_slice(entities);
         let component_ids = component_ids.keys().copied();
-        let fields = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
-            .zip(values)
-            .collect();
+        let fields =
+            validate_components::<BoxedErasedSoa<_>, _>(components, context, component_ids)
+                .zip(values)
+                .collect();
         if entities.len() != values_len {
             unreachable!("count of entities should match count of components")
         }
@@ -831,19 +827,18 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-        fields: ErasedComponents<BoxedErasedField>,
-    ) -> Option<ErasedComponents<BoxedErasedField>> {
+        fields: ErasedComponents<ErasedComponent>,
+    ) -> Option<ErasedComponents<ErasedComponent>> {
         let value = unsafe {
             let context = self.context();
             let component_ids = component_ids.keys().copied();
-            from_erased_fields::<BoxedErasedSoa>(components, context, component_ids, fields)
+            from_erased_fields(components, context, component_ids, fields)
         };
         let value = Self::insert(self, entity.into(), value)?;
 
         let component_ids = component_ids.keys().copied();
         let context = self.context();
-        let fields =
-            into_erased_fields::<BoxedErasedSoa>(components, context, component_ids, value);
+        let fields = into_erased_fields(components, context, component_ids, value);
         Some(fields)
     }
 
@@ -853,13 +848,12 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<BoxedErasedField>> {
+    ) -> Option<ErasedComponents<ErasedComponent>> {
         let value = Self::swap_remove(self, entity.into())?;
 
         let component_ids = component_ids.keys().copied();
         let context = self.context();
-        let fields =
-            into_erased_fields::<BoxedErasedSoa>(components, context, component_ids, value);
+        let fields = into_erased_fields(components, context, component_ids, value);
         Some(fields)
     }
 
@@ -869,12 +863,12 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedFieldRef<'_, u8>>> {
+    ) -> Option<ErasedComponents<ErasedComponentRef<'_>>> {
         let view = Self::as_view(self);
         let (context, refs) = view.into_get_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
-        let refs = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
+        let refs = validate_components::<BoxedErasedSoa<_>, _>(components, context, component_ids)
             .zip(refs?)
             .collect();
         Some(refs)
@@ -886,12 +880,12 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedFieldRefMut<'_, u8>>> {
+    ) -> Option<ErasedComponents<ErasedComponentRefMut<'_>>> {
         let view = Self::as_mut_view(self);
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
         let component_ids = component_ids.keys().copied();
-        let refs = validate_components::<BoxedErasedSoa, _>(components, context, component_ids)
+        let refs = validate_components::<BoxedErasedSoa<_>, _>(components, context, component_ids)
             .zip(refs?)
             .collect();
         Some(refs)

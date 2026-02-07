@@ -10,7 +10,6 @@ use std::{
 
 pub use gpecs_types::archetype::ArchetypeId;
 
-use gpecs_soa_erased::field::BoxedErasedField;
 use indexmap::map::{Values as IndexMapValues, ValuesMut as IndexMapValuesMut};
 use itertools::Itertools;
 use petgraph::{
@@ -29,12 +28,17 @@ use crate::{
     },
     entity::Entity,
     hash::{IndexMap, IndexSet},
-    soa::slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
-    soa::traits::{Refs, RefsMut, Slices},
+    soa::{
+        slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
+        traits::{Refs, RefsMut, Slices},
+    },
 };
 
 use super::{
-    erased::{ErasedComponents, drop_erased_in_place, from_erased_fields, into_erased_fields},
+    erased::{
+        ErasedComponent, ErasedComponents, drop_erased_in_place, from_erased_fields,
+        into_erased_fields,
+    },
     error::{
         AlreadyHasComponentError, DuplicateComponentError, GetComponentsError,
         IncompatibleBundleError, InsertBundleError, InsertBundleExactError, MissingComponentError,
@@ -893,7 +897,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-        fields: ErasedComponents<BoxedErasedField>,
+        fields: ErasedComponents<ErasedComponent>,
     ) {
         let Some(archetype_id) = archetype_id else {
             unsafe { Self::drop_erased_in_place(components, fields) }
@@ -915,7 +919,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-    ) -> ErasedComponents<BoxedErasedField> {
+    ) -> ErasedComponents<ErasedComponent> {
         let Some(archetype_id) = archetype_id else {
             return ErasedComponents::default();
         };

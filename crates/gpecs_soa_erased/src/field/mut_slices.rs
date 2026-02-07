@@ -13,20 +13,22 @@ use crate::{
         error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
     },
     fmt::SliceUpperHex,
+    slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
     soa::field::FieldDescriptor,
     storage::AddressableUnit,
 };
 
-pub struct ErasedFieldSliceMut<'a, A>
+pub struct ErasedFieldSliceMut<'a, T>
 where
-    A: AddressableUnit,
+    T: MutSliceItemPtr,
 {
-    ptr: ErasedFieldSliceMutPtr<A>,
-    phantom: PhantomData<&'a mut [A]>,
+    ptr: ErasedFieldSliceMutPtr<T>,
+    phantom: PhantomData<&'a mut [T::Item]>,
 }
 
-impl<'a, A> ErasedFieldSliceMut<'a, A>
+impl<'a, T, A> ErasedFieldSliceMut<'a, T>
 where
+    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
@@ -41,45 +43,34 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_parts(
-        desc: FieldDescriptor,
-        buffer: &'a mut [MaybeUninit<A>],
-        byte_offset: usize,
-        len: usize,
-    ) -> Self {
-        let ptr = unsafe { ErasedFieldSliceMutPtr::from_parts(desc, buffer, byte_offset, len) };
-        unsafe { Self::from_ptr(ptr) }
-    }
-
-    #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedFieldSliceMutPtr<A>) -> Self {
+    pub unsafe fn from_ptr(ptr: ErasedFieldSliceMutPtr<T>) -> Self {
         let phantom = PhantomData;
         Self { ptr, phantom }
     }
 
     #[inline]
-    pub unsafe fn try_into<T>(self) -> Result<&'a mut [T], ErasedFieldIntoValueError<Self>> {
+    pub unsafe fn try_into<V>(self) -> Result<&'a mut [V], ErasedFieldIntoValueError<Self>> {
         let Self { ptr, .. } = self;
         let into_self = |ptr| unsafe { Self::from_ptr(ptr) };
-        let buffer = <*mut [T]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = <*mut [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let slice = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
         Ok(slice)
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&[T], ErasedFieldIntoValueError<&Self>> {
+    pub unsafe fn cast<V>(&self) -> Result<&[V], ErasedFieldIntoValueError<&Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let buffer = <*mut [T]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = <*mut [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
         Ok(slice)
     }
 
     #[inline]
-    pub unsafe fn cast_mut<T>(&mut self) -> Result<&mut [T], ErasedFieldIntoValueError<&mut Self>> {
+    pub unsafe fn cast_mut<V>(&mut self) -> Result<&mut [V], ErasedFieldIntoValueError<&mut Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let buffer = <*mut [T]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = <*mut [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let slice = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
         Ok(slice)
     }
@@ -135,13 +126,13 @@ where
     }
 
     #[inline]
-    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr<A> {
+    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr<CastConstPtr<T>> {
         let Self { ptr, .. } = self;
         ptr.cast_const()
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<CastConstPtr<T>> {
         let Self { ptr, .. } = self;
         ptr.as_field_ptr()
     }
@@ -160,13 +151,13 @@ where
     }
 
     #[inline]
-    pub fn as_mut_field_slice_ptr(&mut self) -> ErasedFieldSliceMutPtr<A> {
+    pub fn as_mut_field_slice_ptr(&mut self) -> ErasedFieldSliceMutPtr<T> {
         let Self { ptr, .. } = *self;
         ptr
     }
 
     #[inline]
-    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<A> {
+    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<T> {
         let Self { ptr, .. } = self;
         ptr.as_mut_field_ptr()
     }
@@ -177,19 +168,11 @@ where
         let buffer = ptr.as_mut_buffer();
         unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
     }
-
-    #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a mut [MaybeUninit<A>], usize, usize) {
-        let Self { ptr, .. } = self;
-        let (desc, buffer, byte_offset, len) = ptr.into_parts();
-
-        let buffer = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
-        (desc, buffer, byte_offset, len)
-    }
 }
 
-impl<A> Debug for ErasedFieldSliceMut<'_, A>
+impl<T, A> Debug for ErasedFieldSliceMut<'_, T>
 where
+    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -204,8 +187,9 @@ where
     }
 }
 
-impl<A> AsRef<[A]> for ErasedFieldSliceMut<'_, A>
+impl<T, A> AsRef<[A]> for ErasedFieldSliceMut<'_, T>
 where
+    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
@@ -214,8 +198,9 @@ where
     }
 }
 
-impl<A> AsMut<[A]> for ErasedFieldSliceMut<'_, A>
+impl<T, A> AsMut<[A]> for ErasedFieldSliceMut<'_, T>
 where
+    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
@@ -224,26 +209,28 @@ where
     }
 }
 
-impl<'a, T, A> TryFrom<&'a mut [T]> for ErasedFieldSliceMut<'a, A>
+impl<'a, T, V, A> TryFrom<&'a mut [V]> for ErasedFieldSliceMut<'a, T>
 where
+    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 
     #[inline]
-    fn try_from(slice: &'a mut [T]) -> Result<Self, Self::Error> {
+    fn try_from(slice: &'a mut [V]) -> Result<Self, Self::Error> {
         let ptr = ptr::from_mut(slice).try_into()?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
     }
 }
 
-impl<'a, A> From<ErasedFieldSliceMut<'a, A>> for ErasedFieldSlice<'a, A>
+impl<'a, T, A> From<ErasedFieldSliceMut<'a, T>> for ErasedFieldSlice<'a, CastConstPtr<T>>
 where
+    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
-    fn from(value: ErasedFieldSliceMut<'a, A>) -> Self {
+    fn from(value: ErasedFieldSliceMut<'a, T>) -> Self {
         let ptr = value.as_field_slice_ptr();
         unsafe { ErasedFieldSlice::from_ptr(ptr) }
     }

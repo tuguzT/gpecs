@@ -19,18 +19,18 @@ use crate::{
 };
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedSoaContext = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>, u8>;
+pub type BoxedErasedSoaContext<P> = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>, P, u8>;
 
-pub struct ErasedSoaContext<D, A>
+pub struct ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: ?Sized,
 {
-    phantom: PhantomData<fn() -> A>,
+    phantom: PhantomData<fn() -> (P, A)>,
     descriptors: D,
 }
 
-impl<D, A> ErasedSoaContext<D, A>
+impl<D, P, A> ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
 {
@@ -49,7 +49,7 @@ where
     }
 }
 
-impl<D, A> ErasedSoaContext<D, A>
+impl<D, P, A> ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: FieldDescriptorsOwned,
@@ -66,7 +66,7 @@ where
     }
 }
 
-impl<D, A> ErasedSoaContext<D, A>
+impl<D, P, A> ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: ?Sized,
@@ -78,7 +78,7 @@ where
     }
 }
 
-impl<D, A> ErasedSoaContext<D, A>
+impl<D, P, A> ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: FromIterator<FieldDescriptor>,
@@ -103,7 +103,7 @@ where
     }
 }
 
-impl<D, A> Debug for ErasedSoaContext<D, A>
+impl<D, P, A> Debug for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: Debug + ?Sized,
@@ -116,7 +116,7 @@ where
     }
 }
 
-impl<D, A> Clone for ErasedSoaContext<D, A>
+impl<D, P, A> Clone for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: Clone,
@@ -128,14 +128,14 @@ where
     }
 }
 
-impl<D, A> Copy for ErasedSoaContext<D, A>
+impl<D, P, A> Copy for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: Copy,
 {
 }
 
-impl<D, A> PartialEq for ErasedSoaContext<D, A>
+impl<D, P, A> PartialEq for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: PartialEq + ?Sized,
@@ -149,14 +149,14 @@ where
     }
 }
 
-impl<D, A> Eq for ErasedSoaContext<D, A>
+impl<D, P, A> Eq for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: Eq + ?Sized,
 {
 }
 
-impl<D, A> PartialOrd for ErasedSoaContext<D, A>
+impl<D, P, A> PartialOrd for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: PartialOrd + ?Sized,
@@ -175,7 +175,7 @@ where
     }
 }
 
-impl<D, A> Ord for ErasedSoaContext<D, A>
+impl<D, P, A> Ord for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: Ord + ?Sized,
@@ -194,7 +194,7 @@ where
     }
 }
 
-impl<D, A> Hash for ErasedSoaContext<D, A>
+impl<D, P, A> Hash for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: Hash + ?Sized,
@@ -210,7 +210,7 @@ where
     }
 }
 
-impl<'a, D, A> FieldDescriptors<'a> for ErasedSoaContext<D, A>
+impl<'a, D, P, A> FieldDescriptors<'a> for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: FieldDescriptors<'a> + ?Sized,
@@ -224,7 +224,7 @@ where
     }
 }
 
-impl<D, A> CovariantFieldDescriptors for ErasedSoaContext<D, A>
+impl<D, P, A> CovariantFieldDescriptors for ErasedSoaContext<D, P, A>
 where
     A: AddressableUnit,
     D: CovariantFieldDescriptors + ?Sized,

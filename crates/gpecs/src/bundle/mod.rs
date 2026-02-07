@@ -1,4 +1,6 @@
-use gpecs_soa_erased::field::ErasedFieldMutPtr;
+use std::mem::MaybeUninit;
+
+use gpecs_soa_erased::{field::ErasedFieldMutPtr, slice_item_ptr::MutSliceItemPtr};
 
 use crate::{
     component::registry::{ComponentId, ComponentRegistry},
@@ -26,7 +28,11 @@ pub unsafe trait Bundle: SoaOwned + AllocSoa + SoaRead + SoaWrite + 'static {
 
     fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds;
 
-    unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> MutPtrs<'static, Self>
+    unsafe fn ptrs_from_iter<I, P>(
+        components: &ComponentRegistry,
+        iter: I,
+    ) -> MutPtrs<'static, Self>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<u8>)>;
+        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
+        P: MutSliceItemPtr<Item = MaybeUninit<u8>>;
 }

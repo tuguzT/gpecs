@@ -4,6 +4,7 @@ use std::iter;
 
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa},
+    slice_item_ptr::gpu::GpuSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         vec::SoaVec,
@@ -13,7 +14,7 @@ use gpecs_soa_erased::{
 #[test]
 fn new() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<BoxedErasedSoa>;
+    type Vec = SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>;
 
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
@@ -71,7 +72,7 @@ fn new() {
 #[test]
 fn new_zst() {
     type Soa = ();
-    type Vec = SoaVec<BoxedErasedSoa>;
+    type Vec = SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>;
 
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
@@ -124,7 +125,7 @@ fn new_zst() {
 #[test]
 fn with_capacity() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<BoxedErasedSoa>;
+    type Vec = SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>;
 
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
@@ -183,7 +184,7 @@ fn with_capacity() {
 #[test]
 fn with_capacity_zst() {
     type Soa = ();
-    type Vec = SoaVec<BoxedErasedSoa>;
+    type Vec = SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>;
 
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
@@ -237,7 +238,7 @@ fn with_capacity_zst() {
 #[test]
 fn one_item() {
     type Soa = (u8, u64, u16, ());
-    type Vec = SoaVec<BoxedErasedSoa>;
+    type Vec = SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>;
 
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
@@ -349,7 +350,7 @@ fn one_item() {
 #[test]
 fn one_item_zst() {
     type Soa = ();
-    type Vec = SoaVec<BoxedErasedSoa>;
+    type Vec = SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>;
 
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
@@ -438,7 +439,7 @@ fn one_item_zst() {
 #[test]
 fn three_items() {
     type Soa = (u8, String, u64, ());
-    type Vec = SoaVec<BoxedErasedSoa>;
+    type Vec = SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>;
 
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
@@ -794,7 +795,7 @@ fn three_items() {
 #[test]
 fn three_items_zst() {
     type Soa = ();
-    type Vec = SoaVec<BoxedErasedSoa>;
+    type Vec = SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>;
 
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();

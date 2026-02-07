@@ -1,7 +1,8 @@
 use core::{
     alloc::Layout,
     fmt::{self, Debug},
-    mem::forget,
+    marker::PhantomData,
+    mem::{MaybeUninit, forget},
     ptr, slice,
 };
 
@@ -15,6 +16,7 @@ use crate::{
         },
     },
     fmt::SliceUpperHex,
+    slice_item_ptr::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
     soa::field::FieldDescriptor,
     storage::{AddressableUnit, AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
     uninit::write_copy_of_slice,
@@ -24,20 +26,22 @@ use crate::{
 use crate::storage::BoxedAlignedUninitStorage;
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedField = ErasedField<BoxedAlignedUninitStorage, u8>;
+pub type BoxedErasedField<P> = ErasedField<BoxedAlignedUninitStorage, P, u8>;
 
-pub struct ErasedField<T, A>
+pub struct ErasedField<T, P, A>
 where
-    A: AddressableUnit,
     T: ?Sized,
+    A: AddressableUnit,
 {
+    phantom: PhantomData<fn() -> P>,
     storage: AlignedInitStorage<T, A>,
 }
 
-impl<T, A> ErasedField<T, A>
+impl<T, P, A> ErasedField<T, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A>,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     #[inline]
     pub fn try_from_storage_desc_data<V>(
@@ -71,8 +75,10 @@ where
             return Err(ErasedFieldFromStorageError::new(err.into(), storage));
         }
 
-        let storage = unsafe { AlignedInitStorage::new_unchecked(storage) };
-        let me = Self { storage };
+        let me = Self {
+            storage: unsafe { AlignedInitStorage::new_unchecked(storage) },
+            phantom: PhantomData,
+        };
         Ok(me)
     }
 
@@ -104,7 +110,7 @@ where
     pub unsafe fn try_into<V>(self) -> Result<V, ErasedFieldIntoValueError<Self>> {
         let desc = self.descriptor();
         let me = check_into_layout::<V, _>(desc.layout(), self)?;
-        let Self { storage } = me;
+        let Self { storage, .. } = me;
 
         let src = storage.as_ptr().cast();
         Ok(unsafe { ptr::read(src) })
@@ -112,23 +118,23 @@ where
 
     #[inline]
     pub fn into_storage(self) -> AlignedInitStorage<T, A> {
-        let Self { storage } = self;
+        let Self { storage, .. } = self;
         storage
     }
 
     #[inline]
     pub fn into_parts(self) -> (FieldDescriptor, AlignedInitStorage<T, A>) {
-        let desc = self.descriptor();
-        let Self { storage } = self;
-
+        let Self { storage, .. } = self;
+        let desc = storage_descriptor(&storage);
         (desc, storage)
     }
 }
 
-impl<T, A> ErasedField<T, A>
+impl<T, P, A> ErasedField<T, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorageFromLayout<A>,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     #[inline]
     pub fn try_from_desc_data<V>(
@@ -148,8 +154,10 @@ where
             T::from_layout(layout).map_err(ErasedFieldFromDescDataError::FromLayout)?;
         write_copy_of_slice(storage.as_mut_uninit_slice(), data)?;
 
-        let storage = unsafe { AlignedInitStorage::new_unchecked(storage) };
-        let me = Self { storage };
+        let me = Self {
+            storage: unsafe { AlignedInitStorage::new_unchecked(storage) },
+            phantom: PhantomData,
+        };
         Ok(me)
     }
 
@@ -180,14 +188,15 @@ where
     }
 }
 
-impl<T, A> ErasedField<T, A>
+impl<T, P, A> ErasedField<T, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A> + ?Sized,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { storage } = self;
+        let Self { storage, .. } = self;
         storage_descriptor(storage)
     }
 
@@ -195,7 +204,7 @@ where
     pub unsafe fn cast<V>(&self) -> Result<&V, ErasedFieldIntoValueError<&Self>> {
         let desc = self.descriptor();
         let me = check_into_layout::<V, _>(desc.layout(), self)?;
-        let Self { storage } = me;
+        let Self { storage, .. } = me;
 
         let ptr = storage.as_ptr().cast();
         Ok(unsafe { &*ptr })
@@ -205,43 +214,45 @@ where
     pub unsafe fn cast_mut<V>(&mut self) -> Result<&mut V, ErasedFieldIntoValueError<&mut Self>> {
         let desc = self.descriptor();
         let me = check_into_layout::<V, _>(desc.layout(), self)?;
-        let Self { storage } = me;
+        let Self { storage, .. } = me;
 
         let ptr = storage.as_mut_ptr().cast();
         Ok(unsafe { &mut *ptr })
     }
 
     #[inline]
-    pub fn as_field(&self) -> ErasedFieldRef<'_, A> {
-        let Self { storage } = self;
+    pub fn as_field(&self) -> ErasedFieldRef<'_, P::Const> {
+        unsafe { self.as_field_ptr().deref() }
+    }
+
+    #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<P::Const> {
+        let Self { storage, .. } = self;
 
         let desc = storage_descriptor(storage);
         let buffer = storage.as_uninit_slice();
-        unsafe { ErasedFieldRef::from_parts(desc, buffer, 0) }
+        let ptr = unsafe { ConstSliceItemPtr::from_slice(buffer, 0) };
+        unsafe { ErasedFieldPtr::from_parts(desc, ptr) }
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
-        self.as_field().as_field_ptr()
+    pub fn as_mut_field(&mut self) -> ErasedFieldRefMut<'_, P::Mut> {
+        unsafe { self.as_mut_field_ptr().deref_mut() }
     }
 
     #[inline]
-    pub fn as_mut_field(&mut self) -> ErasedFieldRefMut<'_, A> {
-        let Self { storage } = self;
+    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<P::Mut> {
+        let Self { storage, .. } = self;
 
         let desc = storage_descriptor(storage);
         let buffer = storage.as_mut_uninit_slice();
-        unsafe { ErasedFieldRefMut::from_parts(desc, buffer, 0) }
-    }
-
-    #[inline]
-    pub fn as_mut_field_ptr(&mut self) -> ErasedFieldMutPtr<A> {
-        self.as_mut_field().as_mut_field_ptr()
+        let ptr = unsafe { MutSliceItemPtr::from_slice(buffer, 0) };
+        unsafe { ErasedFieldMutPtr::from_parts(desc, ptr) }
     }
 
     #[inline]
     pub fn as_slice(&self) -> &[A] {
-        let Self { storage } = self;
+        let Self { storage, .. } = self;
         storage.as_slice()
     }
 
@@ -253,7 +264,7 @@ where
 
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [A] {
-        let Self { storage } = self;
+        let Self { storage, .. } = self;
         storage.as_mut_slice()
     }
 
@@ -264,10 +275,11 @@ where
     }
 }
 
-impl<T, A> Debug for ErasedField<T, A>
+impl<T, P, A> Debug for ErasedField<T, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A> + ?Sized,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
@@ -279,10 +291,11 @@ where
     }
 }
 
-impl<T, A> AsRef<[A]> for ErasedField<T, A>
+impl<T, P, A> AsRef<[A]> for ErasedField<T, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A> + ?Sized,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     #[inline]
     fn as_ref(&self) -> &[A] {
@@ -290,10 +303,11 @@ where
     }
 }
 
-impl<T, A> AsMut<[A]> for ErasedField<T, A>
+impl<T, P, A> AsMut<[A]> for ErasedField<T, P, A>
 where
-    A: AddressableUnit,
     T: AlignedStorage<A> + ?Sized,
+    P: SliceItemPtrs<MaybeUninit<A>>,
+    A: AddressableUnit,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [A] {

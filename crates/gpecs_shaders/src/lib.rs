@@ -6,6 +6,7 @@ use spirv_std::{glam::USizeVec3, spirv};
 
 use gpecs_soa_erased::{
     erased::{ErasedSoa, ErasedSoaContext, ErasedSoaSlicesMut},
+    slice_item_ptr::gpu::GpuSliceItemPtrs,
     soa::{field::FieldDescriptor, slice::SoaSlicesMut},
 };
 
@@ -13,7 +14,7 @@ pub use self::descriptors::GpuFieldDescriptors;
 
 mod descriptors;
 
-pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, u32>;
+pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, GpuSliceItemPtrs, u32>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]

@@ -13,20 +13,22 @@ use crate::{
         error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
     },
     fmt::SliceUpperHex,
+    slice_item_ptr::ConstSliceItemPtr,
     soa::field::FieldDescriptor,
     storage::AddressableUnit,
 };
 
-pub struct ErasedFieldRef<'a, A>
+pub struct ErasedFieldRef<'a, T>
 where
-    A: AddressableUnit,
+    T: ConstSliceItemPtr,
 {
-    ptr: ErasedFieldPtr<A>,
-    phantom: PhantomData<&'a [A]>,
+    ptr: ErasedFieldPtr<T>,
+    phantom: PhantomData<&'a [T::Item]>,
 }
 
-impl<'a, A> ErasedFieldRef<'a, A>
+impl<'a, T, A> ErasedFieldRef<'a, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
@@ -37,42 +39,32 @@ where
     }
 
     #[inline]
-    pub unsafe fn from_parts(
-        desc: FieldDescriptor,
-        buffer: &'a [MaybeUninit<A>],
-        byte_offset: usize,
-    ) -> Self {
-        let ptr = unsafe { ErasedFieldPtr::from_parts(desc, buffer, byte_offset) };
-        unsafe { Self::from_ptr(ptr) }
-    }
-
-    #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedFieldPtr<A>) -> Self {
+    pub unsafe fn from_ptr(ptr: ErasedFieldPtr<T>) -> Self {
         let phantom = PhantomData;
         Self { ptr, phantom }
     }
 
     #[inline]
-    pub fn try_from<T>(r#ref: &'a T) -> Result<Self, InsufficientAlignError> {
+    pub fn try_from<V>(r#ref: &'a V) -> Result<Self, InsufficientAlignError> {
         let ptr = ptr::from_ref(r#ref).try_into()?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
     }
 
     #[inline]
-    pub unsafe fn try_into<T>(self) -> Result<&'a T, ErasedFieldIntoValueError<Self>> {
+    pub unsafe fn try_into<V>(self) -> Result<&'a V, ErasedFieldIntoValueError<Self>> {
         let Self { ptr, .. } = self;
         let into_self = |ptr| unsafe { Self::from_ptr(ptr) };
-        let ptr = <*const T>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let ptr = <*const V>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
         Ok(r#ref)
     }
 
     #[inline]
-    pub unsafe fn cast<T>(&self) -> Result<&T, ErasedFieldIntoValueError<&Self>> {
+    pub unsafe fn cast<V>(&self) -> Result<&V, ErasedFieldIntoValueError<&Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let ptr = <*const T>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let ptr = <*const V>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
         let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
         Ok(r#ref)
     }
@@ -116,7 +108,7 @@ where
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr<A> {
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<T> {
         let Self { ptr, .. } = *self;
         ptr
     }
@@ -127,19 +119,11 @@ where
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
-
-    #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, &'a [MaybeUninit<A>], usize) {
-        let Self { ptr, .. } = self;
-        let (desc, buffer, byte_offset) = ptr.into_parts();
-
-        let buffer = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
-        (desc, buffer, byte_offset)
-    }
 }
 
-impl<A> Debug for ErasedFieldRef<'_, A>
+impl<T, A> Debug for ErasedFieldRef<'_, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -152,8 +136,9 @@ where
     }
 }
 
-impl<A> Clone for ErasedFieldRef<'_, A>
+impl<T, A> Clone for ErasedFieldRef<'_, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]
@@ -162,10 +147,16 @@ where
     }
 }
 
-impl<A> Copy for ErasedFieldRef<'_, A> where A: AddressableUnit {}
-
-impl<A> AsRef<[A]> for ErasedFieldRef<'_, A>
+impl<T, A> Copy for ErasedFieldRef<'_, T>
 where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
+    A: AddressableUnit,
+{
+}
+
+impl<T, A> AsRef<[A]> for ErasedFieldRef<'_, T>
+where
+    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
     A: AddressableUnit,
 {
     #[inline]

@@ -10,6 +10,7 @@ pub use gpecs_soa as soa;
 pub mod erased;
 pub mod error;
 pub mod field;
+pub mod slice_item_ptr;
 pub mod storage;
 
 mod fmt;

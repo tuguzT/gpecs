@@ -1,14 +1,8 @@
 pub use self::{
-    mut_ptrs::ErasedFieldMutPtr,
-    mut_refs::ErasedFieldRefMut,
-    mut_slice_ptrs::{ErasedFieldSliceMutPtr, field_slice_from_raw_parts_mut},
-    mut_slices::ErasedFieldSliceMut,
-    nonnull_ptrs::ErasedFieldNonNullPtr,
-    ptrs::ErasedFieldPtr,
-    refs::ErasedFieldRef,
-    slice_ptrs::{ErasedFieldSlicePtr, field_slice_from_raw_parts},
-    slices::ErasedFieldSlice,
-    value::ErasedField,
+    mut_ptrs::ErasedFieldMutPtr, mut_refs::ErasedFieldRefMut,
+    mut_slice_ptrs::ErasedFieldSliceMutPtr, mut_slices::ErasedFieldSliceMut,
+    nonnull_ptrs::ErasedFieldNonNullPtr, ptrs::ErasedFieldPtr, refs::ErasedFieldRef,
+    slice_ptrs::ErasedFieldSlicePtr, slices::ErasedFieldSlice, value::ErasedField,
 };
 
 #[cfg(feature = "alloc")]

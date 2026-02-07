@@ -1,4 +1,6 @@
-use gpecs_soa_erased::field::ErasedFieldMutPtr;
+use std::mem::MaybeUninit;
+
+use gpecs_soa_erased::{field::ErasedFieldMutPtr, slice_item_ptr::MutSliceItemPtr};
 
 use crate::{
     component::{
@@ -36,9 +38,13 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_iter<I>(components: &ComponentRegistry, iter: I) -> MutPtrs<'static, Self>
+    unsafe fn ptrs_from_iter<I, P>(
+        components: &ComponentRegistry,
+        iter: I,
+    ) -> MutPtrs<'static, Self>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<u8>)>,
+        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
+        P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
     {
         let component_id = unsafe { components.component_id::<T>().unwrap_unchecked() };
         let (_, ptr) = unsafe {
@@ -81,9 +87,13 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_from_iter<Iter>(components: &ComponentRegistry, iter: Iter) -> MutPtrs<'static, Self>
+            unsafe fn ptrs_from_iter<Iter, P>(
+                components: &ComponentRegistry,
+                iter: Iter,
+            ) -> MutPtrs<'static, Self>
             where
-                Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<u8>)>,
+                Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
+                P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
             {
                 let component_ids = [$(unsafe { components.component_id::<$types>().unwrap_unchecked() },)*];
 

@@ -12,19 +12,19 @@ use crate::{
     storage::{AddressableUnit, AlignedStorage},
 };
 
-pub struct AlignedUninitStorage<T, A>
+pub struct AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
     T: ?Sized,
+    U: AddressableUnit,
 {
-    phantom: PhantomData<fn() -> A>,
+    phantom: PhantomData<fn() -> U>,
     layout: Layout,
     inner: T,
 }
 
-impl<T, A> AlignedUninitStorage<T, A>
+impl<T, U> AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
+    U: AddressableUnit,
 {
     #[inline]
     pub unsafe fn new_unchecked(inner: T, layout: Layout) -> Self {
@@ -42,15 +42,15 @@ where
     }
 }
 
-impl<T, A> AlignedUninitStorage<T, A>
+impl<T, U> AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
-    T: AsRef<[MaybeUninit<A>]>,
+    T: AsRef<[MaybeUninit<U>]>,
+    U: AddressableUnit,
 {
     #[inline]
     pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitStorageError> {
         let slice = inner.as_ref();
-        check_sufficient_len(slice.len() * size_of::<A>(), layout.size())?;
+        check_sufficient_len(slice.len() * size_of::<U>(), layout.size())?;
         check_ptr_align(slice.as_ptr().cast(), layout)?;
 
         let me = unsafe { Self::new_unchecked(inner, layout) };
@@ -58,10 +58,10 @@ where
     }
 }
 
-impl<T, A> AlignedUninitStorage<T, A>
+impl<T, U> AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
     T: ?Sized,
+    U: AddressableUnit,
 {
     #[inline]
     pub fn as_inner(&self) -> &T {
@@ -82,56 +82,56 @@ where
     }
 }
 
-impl<T, A> AlignedUninitStorage<T, A>
+impl<T, U> AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
-    T: AsRef<[MaybeUninit<A>]> + ?Sized,
+    T: AsRef<[MaybeUninit<U>]> + ?Sized,
+    U: AddressableUnit,
 {
     #[inline]
-    pub fn as_slice(&self) -> &[MaybeUninit<A>] {
+    pub fn as_slice(&self) -> &[MaybeUninit<U>] {
         let Self { inner, .. } = self;
         inner.as_ref()
     }
 }
 
-impl<T, A> AlignedUninitStorage<T, A>
+impl<T, U> AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
-    T: AsMut<[MaybeUninit<A>]> + ?Sized,
+    T: AsMut<[MaybeUninit<U>]> + ?Sized,
+    U: AddressableUnit,
 {
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<A>] {
+    pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<U>] {
         let Self { inner, .. } = self;
         inner.as_mut()
     }
 }
 
-impl<T, A> AsRef<[MaybeUninit<A>]> for AlignedUninitStorage<T, A>
+impl<T, U> AsRef<[MaybeUninit<U>]> for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
-    T: AsRef<[MaybeUninit<A>]> + ?Sized,
+    T: AsRef<[MaybeUninit<U>]> + ?Sized,
+    U: AddressableUnit,
 {
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<A>] {
+    fn as_ref(&self) -> &[MaybeUninit<U>] {
         self.as_slice()
     }
 }
 
-impl<T, A> AsMut<[MaybeUninit<A>]> for AlignedUninitStorage<T, A>
+impl<T, U> AsMut<[MaybeUninit<U>]> for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
-    T: AsMut<[MaybeUninit<A>]> + ?Sized,
+    T: AsMut<[MaybeUninit<U>]> + ?Sized,
+    U: AddressableUnit,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [MaybeUninit<A>] {
+    fn as_mut(&mut self) -> &mut [MaybeUninit<U>] {
         self.as_mut_slice()
     }
 }
 
-impl<T, A> Debug for AlignedUninitStorage<T, A>
+impl<T, U> Debug for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
     T: Debug + ?Sized,
+    U: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { layout, inner, .. } = self;
@@ -142,10 +142,10 @@ where
     }
 }
 
-impl<T, A> Clone for AlignedUninitStorage<T, A>
+impl<T, U> Clone for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
     T: Clone,
+    U: AddressableUnit,
 {
     fn clone(&self) -> Self {
         let Self {
@@ -162,17 +162,17 @@ where
     }
 }
 
-impl<T, A> Copy for AlignedUninitStorage<T, A>
+impl<T, U> Copy for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
     T: Copy,
+    U: AddressableUnit,
 {
 }
 
-impl<T, A> PartialEq for AlignedUninitStorage<T, A>
+impl<T, U> PartialEq for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
     T: PartialEq + ?Sized,
+    U: AddressableUnit,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -185,17 +185,17 @@ where
     }
 }
 
-impl<T, A> Eq for AlignedUninitStorage<T, A>
+impl<T, U> Eq for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
     T: Eq + ?Sized,
+    U: AddressableUnit,
 {
 }
 
-impl<T, A> Hash for AlignedUninitStorage<T, A>
+impl<T, U> Hash for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
     T: Hash + ?Sized,
+    U: AddressableUnit,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self {
@@ -210,19 +210,21 @@ where
     }
 }
 
-unsafe impl<T, A> AlignedStorage<A> for AlignedUninitStorage<T, A>
+unsafe impl<T, U> AlignedStorage for AlignedUninitStorage<T, U>
 where
-    A: AddressableUnit,
-    T: AsRef<[MaybeUninit<A>]> + AsMut<[MaybeUninit<A>]> + ?Sized,
+    T: AsRef<[MaybeUninit<U>]> + AsMut<[MaybeUninit<U>]> + ?Sized,
+    U: AddressableUnit,
 {
+    type Item = U;
+
     #[inline]
-    fn as_ptr(&self) -> *const A {
+    fn as_ptr(&self) -> *const U {
         let slice = self.as_slice();
         slice.as_ptr().cast()
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut A {
+    fn as_mut_ptr(&mut self) -> *mut U {
         let slice = self.as_mut_slice();
         slice.as_mut_ptr().cast()
     }

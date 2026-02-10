@@ -6,7 +6,7 @@ use gpecs_soa_erased::{
         BoxedErasedField, ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
         ErasedFieldSliceMut,
     },
-    slice_item_ptr::gpu::{GpuSliceItemPtr, GpuSliceItemPtrs},
+    slice_item_ptr::{GpuSliceItemPtr, GpuSliceItemPtrs},
 };
 
 use crate::{
@@ -26,11 +26,10 @@ use crate::{
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
 
-pub type ErasedBundle = BoxedErasedSoa<GpuSliceItemPtrs>;
-pub type ErasedBundleRef<'a, D> =
-    ErasedSoaRefsMut<'a, D, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>, u8>;
+pub type ErasedBundle = BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>;
+pub type ErasedBundleRef<'a, D> = ErasedSoaRefsMut<'a, D, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>>;
 
-pub type ErasedComponent = BoxedErasedField<GpuSliceItemPtrs>;
+pub type ErasedComponent = BoxedErasedField<GpuSliceItemPtrs<MaybeUninit<u8>>>;
 pub type ErasedComponentRef<'a> = ErasedFieldRef<'a, GpuSliceItemPtr<*const [MaybeUninit<u8>]>>;
 pub type ErasedComponentRefMut<'a> = ErasedFieldRefMut<'a, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>>;
 pub type ErasedComponentSlice<'a> = ErasedFieldSlice<'a, GpuSliceItemPtr<*const [MaybeUninit<u8>]>>;
@@ -116,9 +115,8 @@ where
         reorder_fields::<T, _, _>(components, context, component_ids, fields)
             .map(ErasedField::into_parts)
             .unzip();
-    let erased_value =
-        BoxedErasedSoa::<GpuSliceItemPtrs>::try_from_fields_descriptors(fields, descriptors.into())
-            .expect("all the fields should be valid");
+    let erased_value = ErasedBundle::try_from_fields_descriptors(fields, descriptors.into())
+        .expect("all the fields should be valid");
     unsafe { erased_value.try_into::<T>(context) }.expect("all the fields should be valid")
 }
 

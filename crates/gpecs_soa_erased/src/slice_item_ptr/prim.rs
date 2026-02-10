@@ -1,10 +1,20 @@
-use core::ptr::{self, NonNull};
+use core::{
+    marker::PhantomData,
+    ptr::{self, NonNull},
+};
 
 use crate::slice_item_ptr::{
     ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs,
 };
 
-unsafe impl<T> SliceItemPtrs<T> for () {
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CoreSliceItemPtrs<T> {
+    phantom: PhantomData<T>,
+}
+
+unsafe impl<T> SliceItemPtrs for CoreSliceItemPtrs<T> {
+    type Item = T;
+
     type Const = *const T;
     type Mut = *mut T;
     type NonNull = NonNull<T>;
@@ -35,7 +45,7 @@ unsafe impl<T> SliceItemPtr for *const T {
 }
 
 unsafe impl<T> ConstSliceItemPtr for *const T {
-    type Ptrs = ();
+    type Ptrs = CoreSliceItemPtrs<T>;
 
     #[inline]
     unsafe fn from_slice(slice: *const [T], index: usize) -> Self {
@@ -78,7 +88,7 @@ unsafe impl<T> SliceItemPtr for *mut T {
 }
 
 unsafe impl<T> MutSliceItemPtr for *mut T {
-    type Ptrs = ();
+    type Ptrs = CoreSliceItemPtrs<T>;
 
     #[inline]
     unsafe fn from_slice(slice: *mut [T], index: usize) -> Self {
@@ -141,7 +151,7 @@ unsafe impl<T> SliceItemPtr for NonNull<T> {
 }
 
 unsafe impl<T> NonNullSliceItemPtr for NonNull<T> {
-    type Ptrs = ();
+    type Ptrs = CoreSliceItemPtrs<T>;
 
     #[inline]
     unsafe fn from_slice(slice: NonNull<[T]>, index: usize) -> Self {

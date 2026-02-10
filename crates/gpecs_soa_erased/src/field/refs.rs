@@ -26,22 +26,39 @@ where
     phantom: PhantomData<&'a [T::Item]>,
 }
 
-impl<'a, T, A> ErasedFieldRef<'a, T>
+impl<T> ErasedFieldRef<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr,
 {
-    #[inline]
-    pub fn new(desc: FieldDescriptor, buffer: &'a [A]) -> Result<Self, ErasedFieldPtrError> {
-        let ptr = ErasedFieldPtr::new(desc, buffer)?;
-        let me = unsafe { Self::from_ptr(ptr) };
-        Ok(me)
-    }
-
     #[inline]
     pub unsafe fn from_ptr(ptr: ErasedFieldPtr<T>) -> Self {
         let phantom = PhantomData;
         Self { ptr, phantom }
+    }
+
+    #[inline]
+    pub fn descriptor(&self) -> FieldDescriptor {
+        let Self { ptr, .. } = self;
+        ptr.descriptor()
+    }
+
+    #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<T> {
+        let Self { ptr, .. } = *self;
+        ptr
+    }
+}
+
+impl<'a, T, U> ErasedFieldRef<'a, T>
+where
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
+{
+    #[inline]
+    pub fn new(desc: FieldDescriptor, buffer: &'a [U]) -> Result<Self, ErasedFieldPtrError> {
+        let ptr = ErasedFieldPtr::new(desc, buffer)?;
+        let me = unsafe { Self::from_ptr(ptr) };
+        Ok(me)
     }
 
     #[inline]
@@ -70,13 +87,7 @@ where
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { ptr, .. } = self;
-        ptr.descriptor()
-    }
-
-    #[inline]
-    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<A>] {
+    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<U>] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_uninit_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
@@ -95,36 +106,30 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[A] {
+    pub fn as_buffer(&self) -> &[U] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const A {
+    pub fn as_ptr(&self) -> *const U {
         let Self { ptr, .. } = self;
         ptr.as_ptr()
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr<T> {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
-    #[inline]
-    pub fn into_buffer(self) -> &'a [A] {
+    pub fn into_buffer(self) -> &'a [U] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 }
 
-impl<T, A> Debug for ErasedFieldRef<'_, T>
+impl<T, U> Debug for ErasedFieldRef<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
@@ -136,10 +141,9 @@ where
     }
 }
 
-impl<T, A> Clone for ErasedFieldRef<'_, T>
+impl<T> Clone for ErasedFieldRef<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -147,20 +151,15 @@ where
     }
 }
 
-impl<T, A> Copy for ErasedFieldRef<'_, T>
-where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
-{
-}
+impl<T> Copy for ErasedFieldRef<'_, T> where T: ConstSliceItemPtr {}
 
-impl<T, A> AsRef<[A]> for ErasedFieldRef<'_, T>
+impl<T, U> AsRef<[U]> for ErasedFieldRef<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
-    fn as_ref(&self) -> &[A] {
+    fn as_ref(&self) -> &[U] {
         self.as_buffer()
     }
 }

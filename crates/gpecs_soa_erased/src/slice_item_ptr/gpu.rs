@@ -1,16 +1,20 @@
-use core::ptr::NonNull;
+use core::{marker::PhantomData, ptr::NonNull};
 
 use crate::slice_item_ptr::{
     ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct GpuSliceItemPtrs;
+pub struct GpuSliceItemPtrs<T> {
+    phantom: PhantomData<T>,
+}
 
-unsafe impl<T> SliceItemPtrs<T> for GpuSliceItemPtrs
+unsafe impl<T> SliceItemPtrs for GpuSliceItemPtrs<T>
 where
     T: Copy,
 {
+    type Item = T;
+
     type Const = GpuSliceItemPtr<*const [T]>;
     type Mut = GpuSliceItemPtr<*mut [T]>;
     type NonNull = GpuSliceItemPtr<NonNull<[T]>>;
@@ -79,7 +83,7 @@ unsafe impl<T> ConstSliceItemPtr for GpuSliceItemPtr<*const [T]>
 where
     T: Copy,
 {
-    type Ptrs = GpuSliceItemPtrs;
+    type Ptrs = GpuSliceItemPtrs<T>;
 
     #[inline]
     unsafe fn from_slice(slice: *const [T], index: usize) -> Self {
@@ -129,7 +133,7 @@ unsafe impl<T> MutSliceItemPtr for GpuSliceItemPtr<*mut [T]>
 where
     T: Copy,
 {
-    type Ptrs = GpuSliceItemPtrs;
+    type Ptrs = GpuSliceItemPtrs<T>;
 
     #[inline]
     unsafe fn from_slice(slice: *mut [T], index: usize) -> Self {
@@ -229,7 +233,7 @@ unsafe impl<T> NonNullSliceItemPtr for GpuSliceItemPtr<NonNull<[T]>>
 where
     T: Copy,
 {
-    type Ptrs = GpuSliceItemPtrs;
+    type Ptrs = GpuSliceItemPtrs<T>;
 
     #[inline]
     unsafe fn from_slice(slice: NonNull<[T]>, index: usize) -> Self {

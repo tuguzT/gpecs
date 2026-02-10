@@ -26,22 +26,39 @@ where
     phantom: PhantomData<&'a mut [T::Item]>,
 }
 
-impl<'a, T, A> ErasedFieldRefMut<'a, T>
+impl<T> ErasedFieldRefMut<'_, T>
 where
-    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: MutSliceItemPtr,
 {
-    #[inline]
-    pub fn new(desc: FieldDescriptor, buffer: &'a mut [A]) -> Result<Self, ErasedFieldPtrError> {
-        let ptr = ErasedFieldMutPtr::new(desc, buffer)?;
-        let me = unsafe { Self::from_ptr(ptr) };
-        Ok(me)
-    }
-
     #[inline]
     pub unsafe fn from_ptr(ptr: ErasedFieldMutPtr<T>) -> Self {
         let phantom = PhantomData;
         Self { ptr, phantom }
+    }
+
+    #[inline]
+    pub fn descriptor(&self) -> FieldDescriptor {
+        let Self { ptr, .. } = self;
+        ptr.descriptor()
+    }
+
+    #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<CastConstPtr<T>> {
+        let Self { ptr, .. } = *self;
+        ptr.cast_const()
+    }
+}
+
+impl<'a, T, U> ErasedFieldRefMut<'a, T>
+where
+    T: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
+{
+    #[inline]
+    pub fn new(desc: FieldDescriptor, buffer: &'a mut [U]) -> Result<Self, ErasedFieldPtrError> {
+        let ptr = ErasedFieldMutPtr::new(desc, buffer)?;
+        let me = unsafe { Self::from_ptr(ptr) };
+        Ok(me)
     }
 
     #[inline]
@@ -79,20 +96,14 @@ where
     }
 
     #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { ptr, .. } = self;
-        ptr.descriptor()
-    }
-
-    #[inline]
-    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<A>] {
+    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<U>] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_uninit_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_mut_uninit_buffer(&mut self) -> &mut [MaybeUninit<A>] {
+    pub fn as_mut_uninit_buffer(&mut self) -> &mut [MaybeUninit<U>] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_mut_uninit_buffer();
         unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
@@ -111,33 +122,27 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[A] {
+    pub fn as_buffer(&self) -> &[U] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_mut_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const A {
+    pub fn as_ptr(&self) -> *const U {
         let Self { ptr, .. } = self;
         ptr.as_mut_ptr().cast_const()
     }
 
     #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr<CastConstPtr<T>> {
-        let Self { ptr, .. } = *self;
-        ptr.cast_const()
-    }
-
-    #[inline]
-    pub fn as_mut_buffer(&mut self) -> &mut [A] {
+    pub fn as_mut_buffer(&mut self) -> &mut [U] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_mut_buffer();
         unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut A {
+    pub fn as_mut_ptr(&mut self) -> *mut U {
         let Self { ptr, .. } = self;
         ptr.as_mut_ptr()
     }
@@ -149,17 +154,17 @@ where
     }
 
     #[inline]
-    pub fn into_buffer(self) -> &'a mut [A] {
+    pub fn into_buffer(self) -> &'a mut [U] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_mut_buffer();
         unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) }
     }
 }
 
-impl<T, A> Debug for ErasedFieldRefMut<'_, T>
+impl<T, U> Debug for ErasedFieldRefMut<'_, T>
 where
-    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
@@ -171,32 +176,31 @@ where
     }
 }
 
-impl<T, A> AsRef<[A]> for ErasedFieldRefMut<'_, T>
+impl<T, U> AsRef<[U]> for ErasedFieldRefMut<'_, T>
 where
-    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
-    fn as_ref(&self) -> &[A] {
+    fn as_ref(&self) -> &[U] {
         self.as_buffer()
     }
 }
 
-impl<T, A> AsMut<[A]> for ErasedFieldRefMut<'_, T>
+impl<T, U> AsMut<[U]> for ErasedFieldRefMut<'_, T>
 where
-    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [A] {
+    fn as_mut(&mut self) -> &mut [U] {
         self.as_mut_buffer()
     }
 }
 
-impl<'a, T, A> From<ErasedFieldRefMut<'a, T>> for ErasedFieldRef<'a, CastConstPtr<T>>
+impl<'a, T> From<ErasedFieldRefMut<'a, T>> for ErasedFieldRef<'a, CastConstPtr<T>>
 where
-    T: MutSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: MutSliceItemPtr,
 {
     #[inline]
     fn from(value: ErasedFieldRefMut<'a, T>) -> Self {

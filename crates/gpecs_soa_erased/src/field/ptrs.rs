@@ -19,76 +19,10 @@ pub struct ErasedFieldPtr<T> {
     ptr: T,
 }
 
-impl<T, A> ErasedFieldPtr<T>
-where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
-{
-    #[inline]
-    pub fn new(desc: FieldDescriptor, buffer: *const [A]) -> Result<Self, ErasedFieldPtrError> {
-        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
-        check_len(buffer.len() * size_of::<A>(), desc.layout().size())?;
-        check_ptr_align(buffer.cast(), desc.layout())?;
-
-        let buffer = ptr::slice_from_raw_parts(buffer.cast(), buffer.len());
-        let ptr = unsafe { T::from_slice(buffer, 0) };
-
-        let me = unsafe { Self::from_parts(desc, ptr) };
-        Ok(me)
-    }
-
+impl<T> ErasedFieldPtr<T> {
     #[inline]
     pub unsafe fn from_parts(desc: FieldDescriptor, ptr: T) -> Self {
         Self { desc, ptr }
-    }
-
-    #[inline]
-    pub fn dangling(desc: FieldDescriptor) -> Result<Self, InsufficientAlignError> {
-        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
-
-        let data = ptr::without_provenance(desc.layout().align());
-        let buffer = ptr::slice_from_raw_parts(data, 0);
-        let ptr = unsafe { T::from_slice(buffer, 0) };
-
-        let me = unsafe { Self::from_parts(desc, ptr) };
-        Ok(me)
-    }
-
-    #[inline]
-    pub fn cast_mut(self) -> ErasedFieldMutPtr<CastMutPtr<T>> {
-        let Self { desc, ptr } = self;
-        let ptr = ptr.cast_mut();
-        unsafe { ErasedFieldMutPtr::from_parts(desc, ptr) }
-    }
-
-    #[inline]
-    #[must_use]
-    pub unsafe fn add(self, count: usize) -> Self {
-        let Self { desc, ptr } = self;
-
-        let field_size = desc.layout().size().div_ceil(size_of::<A>());
-        let ptr = unsafe { ptr.add(count * field_size) };
-        unsafe { Self::from_parts(desc, ptr) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub unsafe fn offset_from(self, origin: Self) -> isize {
-        let Self { desc, ptr } = self;
-
-        assert_eq!(ptr.slice(), origin.as_uninit_buffer());
-        check_layout(origin.descriptor().layout(), desc.layout()).expect("layouts should match");
-
-        let offset = unsafe { ptr.offset_from(origin.ptr()) };
-        let field_size = desc.layout().size().div_ceil(size_of::<A>()).cast_signed();
-        offset
-            .checked_div(field_size)
-            .expect("erased field pointer should not be a ZST")
-    }
-
-    #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a, T> {
-        unsafe { ErasedFieldRef::from_ptr(self) }
     }
 
     #[inline]
@@ -104,7 +38,86 @@ where
     }
 
     #[inline]
-    pub fn as_uninit_buffer(self) -> *const [MaybeUninit<A>] {
+    pub fn into_parts(self) -> (FieldDescriptor, T) {
+        let Self { desc, ptr } = self;
+        (desc, ptr)
+    }
+}
+
+impl<T> ErasedFieldPtr<T>
+where
+    T: ConstSliceItemPtr,
+{
+    #[inline]
+    pub fn cast_mut(self) -> ErasedFieldMutPtr<CastMutPtr<T>> {
+        let Self { desc, ptr } = self;
+        let ptr = ptr.cast_mut();
+        unsafe { ErasedFieldMutPtr::from_parts(desc, ptr) }
+    }
+
+    #[inline]
+    pub unsafe fn deref<'a>(self) -> ErasedFieldRef<'a, T> {
+        unsafe { ErasedFieldRef::from_ptr(self) }
+    }
+}
+
+impl<T, U> ErasedFieldPtr<T>
+where
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
+{
+    #[inline]
+    pub fn new(desc: FieldDescriptor, buffer: *const [U]) -> Result<Self, ErasedFieldPtrError> {
+        check_sufficient_align(desc.layout(), Layout::new::<U>())?;
+        check_len(buffer.len() * size_of::<U>(), desc.layout().size())?;
+        check_ptr_align(buffer.cast(), desc.layout())?;
+
+        let buffer = ptr::slice_from_raw_parts(buffer.cast(), buffer.len());
+        let ptr = unsafe { T::from_slice(buffer, 0) };
+
+        let me = unsafe { Self::from_parts(desc, ptr) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn dangling(desc: FieldDescriptor) -> Result<Self, InsufficientAlignError> {
+        check_sufficient_align(desc.layout(), Layout::new::<U>())?;
+
+        let data = ptr::without_provenance(desc.layout().align());
+        let buffer = ptr::slice_from_raw_parts(data, 0);
+        let ptr = unsafe { T::from_slice(buffer, 0) };
+
+        let me = unsafe { Self::from_parts(desc, ptr) };
+        Ok(me)
+    }
+
+    #[inline]
+    #[must_use]
+    pub unsafe fn add(self, count: usize) -> Self {
+        let Self { desc, ptr } = self;
+
+        let field_size = desc.layout().size().div_ceil(size_of::<U>());
+        let ptr = unsafe { ptr.add(count * field_size) };
+        unsafe { Self::from_parts(desc, ptr) }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn offset_from(self, origin: Self) -> isize {
+        let Self { desc, ptr } = self;
+
+        assert_eq!(ptr.slice(), origin.as_uninit_buffer());
+        check_layout(origin.descriptor().layout(), desc.layout()).expect("layouts should match");
+
+        let offset = unsafe { ptr.offset_from(origin.ptr()) };
+        let field_size = desc.layout().size().div_ceil(size_of::<U>()).cast_signed();
+        offset
+            .checked_div(field_size)
+            .expect("erased field pointer should not be a ZST")
+    }
+
+    #[inline]
+    pub fn as_uninit_buffer(self) -> *const [MaybeUninit<U>] {
         let Self { ptr, .. } = self;
         ptr.slice()
     }
@@ -112,54 +125,48 @@ where
     #[inline]
     pub fn byte_offset(self) -> usize {
         let Self { ptr, .. } = self;
-        ptr.index() * size_of::<A>()
+        ptr.index() * size_of::<U>()
     }
 
     #[inline]
     pub fn buffer_init_range(self) -> Range<usize> {
         let Self { desc, ptr } = self;
 
-        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let len = desc.layout().size().div_ceil(size_of::<U>());
         let start = ptr.index();
         let end = start + len;
         start..end
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [A] {
+    pub fn as_buffer(self) -> *const [U] {
         let data = self.as_ptr();
         let len = self.buffer_init_range().len();
         ptr::slice_from_raw_parts(data, len)
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const A {
+    pub fn as_ptr(self) -> *const U {
         let Self { ptr, .. } = self;
 
         let offset = self.buffer_init_range().start;
-        unsafe { ptr.slice().cast::<A>().add(offset) }
-    }
-
-    #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, T) {
-        let Self { desc, ptr } = self;
-        (desc, ptr)
+        unsafe { ptr.slice().cast::<U>().add(offset) }
     }
 }
 
-impl<T, V, A> TryFrom<*const V> for ErasedFieldPtr<T>
+impl<T, U, V> TryFrom<*const V> for ErasedFieldPtr<T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 
     #[inline]
     fn try_from(ptr: *const V) -> Result<Self, Self::Error> {
         let desc = FieldDescriptor::of::<V>();
-        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
+        check_sufficient_align(desc.layout(), Layout::new::<U>())?;
 
-        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let len = desc.layout().size().div_ceil(size_of::<U>());
         let buffer = ptr::slice_from_raw_parts(ptr.cast(), len);
         let ptr = unsafe { T::from_slice(buffer, 0) };
 
@@ -168,10 +175,10 @@ where
     }
 }
 
-impl<T, V, A> TryFrom<ErasedFieldPtr<T>> for *const V
+impl<T, U, V> TryFrom<ErasedFieldPtr<T>> for *const V
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     type Error = ErasedFieldIntoValueError<ErasedFieldPtr<T>>;
 

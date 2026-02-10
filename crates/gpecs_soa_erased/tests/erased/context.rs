@@ -1,6 +1,6 @@
 use gpecs_soa_erased::{
     erased::ErasedSoaContext,
-    slice_item_ptr::gpu::GpuSliceItemPtrs,
+    slice_item_ptr::GpuSliceItemPtrs,
     soa::field::{FieldDescriptor, FieldDescriptors},
 };
 
@@ -10,7 +10,7 @@ use crate::common::ArrayDescriptors;
 #[cfg_attr(miri, ignore)]
 fn context() {
     let descriptors = [FieldDescriptor::of::<u8>(), FieldDescriptor::of::<i16>()];
-    let _context = ErasedSoaContext::<_, GpuSliceItemPtrs, u8>::new(descriptors).unwrap();
+    let _context = ErasedSoaContext::<_, GpuSliceItemPtrs<u8>>::new(descriptors).unwrap();
 }
 
 #[test]
@@ -18,7 +18,7 @@ fn context() {
 fn context_of() {
     let context = Default::default();
     let context =
-        ErasedSoaContext::<ArrayDescriptors<FieldDescriptor, 3>, GpuSliceItemPtrs, u8>::of::<(
+        ErasedSoaContext::<ArrayDescriptors<FieldDescriptor, 3>, GpuSliceItemPtrs<u8>>::of::<(
             u32,
             u16,
             u8,
@@ -45,7 +45,7 @@ fn context_of() {
 fn context_of_zst() {
     let context = Default::default();
     let context =
-        ErasedSoaContext::<ArrayDescriptors<FieldDescriptor, 1>, GpuSliceItemPtrs, u8>::of::<()>(
+        ErasedSoaContext::<ArrayDescriptors<FieldDescriptor, 1>, GpuSliceItemPtrs<u8>>::of::<()>(
             &context,
         )
         .unwrap();

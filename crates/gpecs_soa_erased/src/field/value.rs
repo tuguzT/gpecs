@@ -18,7 +18,7 @@ use crate::{
     fmt::SliceUpperHex,
     slice_item_ptr::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
     soa::field::FieldDescriptor,
-    storage::{AddressableUnit, AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
+    storage::{AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
     uninit::write_copy_of_slice,
 };
 
@@ -26,22 +26,20 @@ use crate::{
 use crate::storage::BoxedAlignedUninitStorage;
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedField<P> = ErasedField<BoxedAlignedUninitStorage, P, u8>;
+pub type BoxedErasedField<P> = ErasedField<BoxedAlignedUninitStorage, P>;
 
-pub struct ErasedField<T, P, A>
+pub struct ErasedField<T, P>
 where
     T: ?Sized,
-    A: AddressableUnit,
 {
-    phantom: PhantomData<fn() -> P>,
-    storage: AlignedInitStorage<T, A>,
+    phantom: PhantomData<P>,
+    storage: AlignedInitStorage<T>,
 }
 
-impl<T, P, A> ErasedField<T, P, A>
+impl<T, P> ErasedField<T, P>
 where
-    T: AlignedStorage<A>,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
     pub fn try_from_storage_desc_data<V>(
@@ -50,10 +48,10 @@ where
         data: V,
     ) -> Result<Self, ErasedFieldFromStorageError<T>>
     where
-        V: AsRef<[A]>,
+        V: AsRef<[T::Item]>,
     {
         let layout = storage.layout();
-        if let Err(err) = check_sufficient_align(layout, Layout::new::<A>()) {
+        if let Err(err) = check_sufficient_align(layout, Layout::new::<T::Item>()) {
             return Err(ErasedFieldFromStorageError::new(err.into(), storage));
         }
 
@@ -90,7 +88,7 @@ where
         let desc = FieldDescriptor::of::<V>();
 
         let data = ptr::from_ref(&value).cast();
-        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let len = desc.layout().size().div_ceil(size_of::<T::Item>());
         let data = unsafe { slice::from_raw_parts(data, len) };
 
         match Self::try_from_storage_desc_data(storage, desc, data) {
@@ -117,35 +115,34 @@ where
     }
 
     #[inline]
-    pub fn into_storage(self) -> AlignedInitStorage<T, A> {
+    pub fn into_storage(self) -> AlignedInitStorage<T> {
         let Self { storage, .. } = self;
         storage
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitStorage<T, A>) {
+    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitStorage<T>) {
         let Self { storage, .. } = self;
         let desc = storage_descriptor(&storage);
         (desc, storage)
     }
 }
 
-impl<T, P, A> ErasedField<T, P, A>
+impl<T, P> ErasedField<T, P>
 where
-    T: AlignedStorageFromLayout<A>,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: AlignedStorageFromLayout,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
     pub fn try_from_desc_data<V>(
         desc: FieldDescriptor,
         data: V,
-    ) -> Result<Self, ErasedFieldFromDescDataError<T, A>>
+    ) -> Result<Self, ErasedFieldFromDescDataError<T::Error>>
     where
-        V: AsRef<[A]>,
+        V: AsRef<[T::Item]>,
     {
         let layout = desc.layout();
-        check_sufficient_align(layout, Layout::new::<A>())?;
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let data = data.as_ref();
         check_len(size_of_val(data), layout.size())?;
@@ -162,11 +159,11 @@ where
     }
 
     #[inline]
-    pub fn try_from<V>(value: V) -> Result<Self, ErasedFieldFromValueError<T, V, A>> {
+    pub fn try_from<V>(value: V) -> Result<Self, ErasedFieldFromValueError<T::Error, V>> {
         let desc = FieldDescriptor::of::<V>();
 
         let data = ptr::from_ref(&value).cast();
-        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let len = desc.layout().size().div_ceil(size_of::<T::Item>());
         let data = unsafe { slice::from_raw_parts(data, len) };
 
         match Self::try_from_desc_data(desc, data) {
@@ -188,11 +185,10 @@ where
     }
 }
 
-impl<T, P, A> ErasedField<T, P, A>
+impl<T, P> ErasedField<T, P>
 where
-    T: AlignedStorage<A> + ?Sized,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: AlignedStorage + ?Sized,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
     pub fn descriptor(&self) -> FieldDescriptor {
@@ -251,35 +247,34 @@ where
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[A] {
+    pub fn as_slice(&self) -> &[T::Item] {
         let Self { storage, .. } = self;
         storage.as_slice()
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const A {
+    pub fn as_ptr(&self) -> *const T::Item {
         let Self { storage, .. } = self;
         storage.as_ptr()
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [A] {
+    pub fn as_mut_slice(&mut self) -> &mut [T::Item] {
         let Self { storage, .. } = self;
         storage.as_mut_slice()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut A {
+    pub fn as_mut_ptr(&mut self) -> *mut T::Item {
         let Self { storage, .. } = self;
         storage.as_mut_ptr()
     }
 }
 
-impl<T, P, A> Debug for ErasedField<T, P, A>
+impl<T, P> Debug for ErasedField<T, P>
 where
-    T: AlignedStorage<A> + ?Sized,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: AlignedStorage + ?Sized,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
@@ -291,35 +286,32 @@ where
     }
 }
 
-impl<T, P, A> AsRef<[A]> for ErasedField<T, P, A>
+impl<T, P> AsRef<[T::Item]> for ErasedField<T, P>
 where
-    T: AlignedStorage<A> + ?Sized,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: AlignedStorage + ?Sized,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
-    fn as_ref(&self) -> &[A] {
+    fn as_ref(&self) -> &[T::Item] {
         self.as_slice()
     }
 }
 
-impl<T, P, A> AsMut<[A]> for ErasedField<T, P, A>
+impl<T, P> AsMut<[T::Item]> for ErasedField<T, P>
 where
-    T: AlignedStorage<A> + ?Sized,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: AlignedStorage + ?Sized,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [A] {
+    fn as_mut(&mut self) -> &mut [T::Item] {
         self.as_mut_slice()
     }
 }
 
 #[inline]
-fn storage_descriptor<T, A>(storage: &T) -> FieldDescriptor
+fn storage_descriptor<T>(storage: &T) -> FieldDescriptor
 where
-    A: AddressableUnit,
-    T: AlignedStorage<A> + ?Sized,
+    T: AlignedStorage + ?Sized,
 {
     FieldDescriptor::new(storage.layout())
 }

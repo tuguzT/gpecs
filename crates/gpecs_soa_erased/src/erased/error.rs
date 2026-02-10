@@ -4,12 +4,9 @@ use core::{
     fmt::{self, Debug, Display},
 };
 
-use crate::{
-    error::{
-        InsufficientAlignError, InsufficientLenError, LayoutMismatchError, LenMismatchError,
-        NotAlignedError,
-    },
-    storage::{AddressableUnit, AlignedStorageFromLayout},
+use crate::error::{
+    InsufficientAlignError, InsufficientLenError, LayoutMismatchError, LenMismatchError,
+    NotAlignedError,
 };
 
 #[derive(Clone)]
@@ -401,73 +398,38 @@ impl Error for ErasedSoaFromStorageFieldsDescriptorsError {
     }
 }
 
-pub enum ErasedSoaFromFieldsDescriptorsError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+#[derive(Debug, Clone)]
+pub enum ErasedSoaFromFieldsDescriptorsError<T> {
     LenMismatch(IterOrFieldLenMismatchError),
     InsufficientAlign(InsufficientAlignError),
     InvalidLayout(LayoutError),
-    FromLayout(T::Error),
+    FromLayout(T),
 }
 
-impl<T, A> From<IterOrFieldLenMismatchError> for ErasedSoaFromFieldsDescriptorsError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+impl<T> From<IterOrFieldLenMismatchError> for ErasedSoaFromFieldsDescriptorsError<T> {
     #[inline]
     fn from(value: IterOrFieldLenMismatchError) -> Self {
         Self::LenMismatch(value)
     }
 }
 
-impl<T, A> From<InsufficientAlignError> for ErasedSoaFromFieldsDescriptorsError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+impl<T> From<InsufficientAlignError> for ErasedSoaFromFieldsDescriptorsError<T> {
     #[inline]
     fn from(value: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(value)
     }
 }
 
-impl<T, A> From<LayoutError> for ErasedSoaFromFieldsDescriptorsError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+impl<T> From<LayoutError> for ErasedSoaFromFieldsDescriptorsError<T> {
     #[inline]
     fn from(value: LayoutError) -> Self {
         Self::InvalidLayout(value)
     }
 }
 
-impl<T, A> Debug for ErasedSoaFromFieldsDescriptorsError<T, A>
+impl<T> Display for ErasedSoaFromFieldsDescriptorsError<T>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
-            Self::InsufficientAlign(error) => {
-                f.debug_tuple("InsufficientAlign").field(error).finish()
-            }
-            Self::InvalidLayout(error) => f.debug_tuple("InvalidLayout").field(error).finish(),
-            Self::FromLayout(error) => f.debug_tuple("FromLayout").field(error).finish(),
-        }
-    }
-}
-
-impl<T, A> Display for ErasedSoaFromFieldsDescriptorsError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Display,
+    T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -479,35 +441,18 @@ where
     }
 }
 
-impl<T, A> Clone for ErasedSoaFromFieldsDescriptorsError<T, A>
+impl<T> Error for ErasedSoaFromFieldsDescriptorsError<T>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Clone,
+    T: Error,
 {
-    fn clone(&self) -> Self {
+    fn cause(&self) -> Option<&dyn Error> {
         match self {
-            Self::LenMismatch(error) => Self::LenMismatch(error.clone()),
-            Self::InsufficientAlign(error) => Self::InsufficientAlign(error.clone()),
-            Self::InvalidLayout(error) => Self::InvalidLayout(error.clone()),
-            Self::FromLayout(error) => Self::FromLayout(error.clone()),
+            Self::LenMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
         }
     }
-
-    fn clone_from(&mut self, source: &Self) {
-        match (self, source) {
-            (Self::FromLayout(me), Self::FromLayout(source)) => me.clone_from(source),
-            (me, source) => *me = source.clone(),
-        }
-    }
-}
-
-impl<T, A> Error for ErasedSoaFromFieldsDescriptorsError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug + Display,
-{
 }
 
 #[derive(Clone)]
@@ -560,66 +505,22 @@ impl Error for ErasedSoaFromStorageValueError {
     }
 }
 
-pub enum ErasedSoaFromValueError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+#[derive(Debug, Clone)]
+pub enum ErasedSoaFromValueError<T> {
     InvalidLayout(LayoutError),
-    FromLayout(T::Error),
+    FromLayout(T),
 }
 
-impl<T, A> From<LayoutError> for ErasedSoaFromValueError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+impl<T> From<LayoutError> for ErasedSoaFromValueError<T> {
     #[inline]
     fn from(value: LayoutError) -> Self {
         Self::InvalidLayout(value)
     }
 }
 
-impl<T, A> Clone for ErasedSoaFromValueError<T, A>
+impl<T> Display for ErasedSoaFromValueError<T>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::InvalidLayout(arg0) => Self::InvalidLayout(arg0.clone()),
-            Self::FromLayout(arg0) => Self::FromLayout(arg0.clone()),
-        }
-    }
-
-    fn clone_from(&mut self, source: &Self) {
-        match (self, source) {
-            (Self::FromLayout(me), Self::FromLayout(source)) => me.clone_from(source),
-            (me, source) => *me = source.clone(),
-        }
-    }
-}
-
-impl<T, A> Debug for ErasedSoaFromValueError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidLayout(error) => f.debug_tuple("InvalidLayout").field(error).finish(),
-            Self::FromLayout(error) => f.debug_tuple("FromLayout").field(error).finish(),
-        }
-    }
-}
-
-impl<T, A> Display for ErasedSoaFromValueError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Display,
+    T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -629,12 +530,16 @@ where
     }
 }
 
-impl<T, A> Error for ErasedSoaFromValueError<T, A>
+impl<T> Error for ErasedSoaFromValueError<T>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug + Display,
+    T: Error,
 {
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

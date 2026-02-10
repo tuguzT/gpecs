@@ -3,7 +3,7 @@ use std::{alloc::Layout, hint::black_box, mem::MaybeUninit, ops::Deref};
 use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, CovariantFieldDescriptors, ErasedSoa},
-    slice_item_ptr::gpu::GpuSliceItemPtrs,
+    slice_item_ptr::GpuSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         prelude::*,
@@ -20,7 +20,10 @@ pub trait Push: SoaVecs<Context: Default> + SoaWrite {
         vec.push(value);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>, value: Self) {
+    fn soa_ser_push(
+        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        value: Self,
+    ) {
         let context = Default::default();
         let value = ErasedSoa::try_from(&context, black_box(value)).unwrap();
         vec.push(value);
@@ -42,17 +45,21 @@ impl Push for Zero {
     }
 
     #[expect(clippy::let_unit_value, reason = "reference for other manual impls")]
-    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>, value: Self) {
+    fn soa_ser_push(
+        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        value: Self,
+    ) {
         let context = &Default::default();
         let value = black_box(value);
 
         let bytes = [MaybeUninit::<u8>::zeroed(); size_of::<Self>() * 2];
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
-        let value =
-            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 1>, GpuSliceItemPtrs, _>::try_from_storage_value(
-                bytes, context, value,
-            )
-            .unwrap();
+        let value = ErasedSoa::<
+            _,
+            ArrayDescriptors<FieldDescriptor, 1>,
+            GpuSliceItemPtrs<MaybeUninit<u8>>,
+        >::try_from_storage_value(bytes, context, value)
+        .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -68,7 +75,10 @@ impl Push for Tiny {
         values.push(value);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>, value: Self) {
+    fn soa_ser_push(
+        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        value: Self,
+    ) {
         let context = &TupleContext::default();
         let value = black_box(value);
 
@@ -80,11 +90,12 @@ impl Push for Tiny {
         };
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
-        let value =
-            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 1>, GpuSliceItemPtrs, _>::try_from_storage_value(
-                bytes, context, value,
-            )
-            .unwrap();
+        let value = ErasedSoa::<
+            _,
+            ArrayDescriptors<FieldDescriptor, 1>,
+            GpuSliceItemPtrs<MaybeUninit<u8>>,
+        >::try_from_storage_value(bytes, context, value)
+        .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -102,7 +113,10 @@ impl Push for Small {
         zs.push(z);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>, value: Self) {
+    fn soa_ser_push(
+        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        value: Self,
+    ) {
         let context = &TupleContext::default();
         let value = black_box(value);
 
@@ -114,11 +128,12 @@ impl Push for Small {
         };
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
-        let value =
-            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 3>, GpuSliceItemPtrs, _>::try_from_storage_value(
-                bytes, context, value,
-            )
-            .unwrap();
+        let value = ErasedSoa::<
+            _,
+            ArrayDescriptors<FieldDescriptor, 3>,
+            GpuSliceItemPtrs<MaybeUninit<u8>>,
+        >::try_from_storage_value(bytes, context, value)
+        .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -136,7 +151,10 @@ impl Push for Medium {
         c_s.push(c);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>, value: Self) {
+    fn soa_ser_push(
+        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        value: Self,
+    ) {
         let context = &TupleContext::default();
         let value = black_box(value);
 
@@ -148,11 +166,12 @@ impl Push for Medium {
         };
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
-        let value =
-            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 3>, GpuSliceItemPtrs, _>::try_from_storage_value(
-                bytes, context, value,
-            )
-            .unwrap();
+        let value = ErasedSoa::<
+            _,
+            ArrayDescriptors<FieldDescriptor, 3>,
+            GpuSliceItemPtrs<MaybeUninit<u8>>,
+        >::try_from_storage_value(bytes, context, value)
+        .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -173,7 +192,10 @@ impl Push for Big {
         e_s.push(e);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>, value: Self) {
+    fn soa_ser_push(
+        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        value: Self,
+    ) {
         let context = &TupleContext::default();
         let value = black_box(value);
 
@@ -185,11 +207,12 @@ impl Push for Big {
         };
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
-        let value =
-            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 5>, GpuSliceItemPtrs, _>::try_from_storage_value(
-                bytes, context, value,
-            )
-            .unwrap();
+        let value = ErasedSoa::<
+            _,
+            ArrayDescriptors<FieldDescriptor, 5>,
+            GpuSliceItemPtrs<MaybeUninit<u8>>,
+        >::try_from_storage_value(bytes, context, value)
+        .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();
@@ -215,7 +238,10 @@ impl Push for Large {
         j_s.push(j);
     }
 
-    fn soa_ser_push(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>, value: Self) {
+    fn soa_ser_push(
+        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        value: Self,
+    ) {
         let context = &TupleContext::default();
         let value = black_box(value);
 
@@ -227,11 +253,12 @@ impl Push for Large {
         };
 
         let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Self>()).unwrap();
-        let value =
-            ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 10>, GpuSliceItemPtrs, _>::try_from_storage_value(
-                bytes, context, value,
-            )
-            .unwrap();
+        let value = ErasedSoa::<
+            _,
+            ArrayDescriptors<FieldDescriptor, 10>,
+            GpuSliceItemPtrs<MaybeUninit<u8>>,
+        >::try_from_storage_value(bytes, context, value)
+        .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
             let ptrs = value.as_fields().into_ptrs();

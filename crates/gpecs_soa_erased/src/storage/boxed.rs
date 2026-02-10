@@ -4,6 +4,7 @@ use core::{
     error::Error,
     fmt::{self, Display},
     mem::MaybeUninit,
+    ops::{Deref, DerefMut},
     ptr::{self, NonNull},
     slice,
 };
@@ -140,17 +141,41 @@ impl AsMut<Self> for BoxedAlignedUninitStorage {
     }
 }
 
-impl AsRef<[MaybeUninit<u8>]> for BoxedAlignedUninitStorage {
+impl Deref for BoxedAlignedUninitStorage {
+    type Target = [MaybeUninit<u8>];
+
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<u8>] {
+    fn deref(&self) -> &Self::Target {
         self.as_uninit_slice()
     }
 }
 
-impl AsMut<[MaybeUninit<u8>]> for BoxedAlignedUninitStorage {
+impl DerefMut for BoxedAlignedUninitStorage {
     #[inline]
-    fn as_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_mut_uninit_slice()
+    }
+}
+
+impl<T> AsRef<T> for BoxedAlignedUninitStorage
+where
+    T: ?Sized,
+    <Self as Deref>::Target: AsRef<T>,
+{
+    #[inline]
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl<T> AsMut<T> for BoxedAlignedUninitStorage
+where
+    T: ?Sized,
+    <Self as Deref>::Target: AsMut<T>,
+{
+    #[inline]
+    fn as_mut(&mut self) -> &mut T {
+        self.deref_mut().as_mut()
     }
 }
 
@@ -164,7 +189,9 @@ impl Drop for BoxedAlignedUninitStorage {
     }
 }
 
-unsafe impl AlignedStorage<u8> for BoxedAlignedUninitStorage {
+unsafe impl AlignedStorage for BoxedAlignedUninitStorage {
+    type Item = u8;
+
     #[inline]
     fn as_ptr(&self) -> *const u8 {
         Self::as_ptr(self)
@@ -181,7 +208,7 @@ unsafe impl AlignedStorage<u8> for BoxedAlignedUninitStorage {
     }
 }
 
-unsafe impl AlignedStorageFromLayout<u8> for BoxedAlignedUninitStorage {
+unsafe impl AlignedStorageFromLayout for BoxedAlignedUninitStorage {
     type Error = AllocError;
 
     #[inline]

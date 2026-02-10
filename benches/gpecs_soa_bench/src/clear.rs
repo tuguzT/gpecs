@@ -1,6 +1,6 @@
-use gpecs_soa_erased::{
-    erased::BoxedErasedSoa, slice_item_ptr::gpu::GpuSliceItemPtrs, soa::prelude::*,
-};
+use std::mem::MaybeUninit;
+
+use gpecs_soa_erased::{erased::BoxedErasedSoa, slice_item_ptr::GpuSliceItemPtrs, soa::prelude::*};
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
@@ -9,7 +9,7 @@ pub trait Clear: SoaVecs + Sized {
         vec.clear();
     }
 
-    fn soa_ser_clear(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs>>) {
+    fn soa_ser_clear(vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>) {
         vec.clear();
     }
 

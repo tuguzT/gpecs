@@ -14,7 +14,7 @@ use crate::{
     },
     error::InsufficientAlignError,
     field::ErasedFieldNonNullPtr,
-    slice_item_ptr::NonNullSliceItemPtr,
+    slice_item_ptr::{NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
@@ -25,24 +25,33 @@ use crate::{
     storage::AddressableUnit,
 };
 
-pub struct ErasedSoaNonNullPtrs<D, P, A>
+pub struct ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: ?Sized,
+    P: NonNullSliceItemPtr,
 {
-    phantom: PhantomData<fn() -> P>,
-    buffer: NonNull<[MaybeUninit<A>]>,
+    phantom: PhantomData<P>,
+    buffer: NonNull<[P::Item]>,
     capacity: usize,
     offset: usize,
     descriptors: D,
 }
 
-impl<D, P, A> ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P> ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub unsafe fn new_unchecked<E>(ptrs: ErasedSoaMutPtrs<D, E, A>) -> Self {
+    pub fn new(ptrs: ErasedSoaMutPtrs<D, NonNullAsPtr<P>>) -> Option<Self> {
+        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
+        let buffer = NonNull::new(buffer)?;
+
+        let me = unsafe { Self::from_parts(descriptors, buffer, capacity, offset) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(ptrs: ErasedSoaMutPtrs<D, NonNullAsPtr<P>>) -> Self {
         let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
         let buffer = unsafe { NonNull::new_unchecked(buffer) };
 
@@ -52,7 +61,7 @@ where
     #[inline]
     pub unsafe fn from_parts(
         descriptors: D,
-        buffer: NonNull<[MaybeUninit<A>]>,
+        buffer: NonNull<[P::Item]>,
         capacity: usize,
         offset: usize,
     ) -> Self {
@@ -66,7 +75,7 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (D, NonNull<[MaybeUninit<A>]>, usize, usize) {
+    pub fn into_parts(self) -> (D, NonNull<[P::Item]>, usize, usize) {
         let Self {
             descriptors,
             buffer,
@@ -87,31 +96,23 @@ where
     }
 }
 
-impl<D, P, A> ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P> ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: FieldDescriptorsOwned,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn new<E>(ptrs: ErasedSoaMutPtrs<D, E, A>) -> Option<Self> {
-        let (descriptors, buffer, capacity, offset) = ptrs.into_parts();
-        let buffer = NonNull::new(buffer)?;
-
-        let me = unsafe { Self::from_parts(descriptors, buffer, capacity, offset) };
-        Some(me)
-    }
-
-    #[inline]
     pub fn dangling(descriptors: D) -> Result<Self, InsufficientAlignError> {
-        let ptrs = ErasedSoaMutPtrs::<_, P, _>::dangling(descriptors)?;
+        let ptrs = ErasedSoaMutPtrs::dangling(descriptors)?;
         let me = unsafe { Self::new_unchecked(ptrs) };
         Ok(me)
     }
 }
 
-impl<D, P> ErasedSoaNonNullPtrs<D, P, u8>
+impl<D, P> ErasedSoaNonNullPtrs<D, P>
 where
     D: FieldDescriptorsOwned,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<u8>>,
 {
     #[inline]
     pub unsafe fn try_into<T>(
@@ -143,13 +144,13 @@ where
     }
 }
 
-impl<D, P, A> ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P> ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: ?Sized,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn as_buffer(&self) -> NonNull<[MaybeUninit<A>]> {
+    pub fn as_buffer(&self) -> NonNull<[P::Item]> {
         let Self { buffer, .. } = *self;
         buffer
     }
@@ -167,14 +168,14 @@ where
     }
 }
 
-impl<'a, D, P, A> ErasedSoaNonNullPtrs<D, P, A>
+impl<'a, D, P> ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: FieldDescriptors<'a> + ?Sized,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     #[track_caller]
-    pub unsafe fn offset_from<'e, E>(&'a self, origin: &'e ErasedSoaNonNullPtrs<E, P, A>) -> isize
+    pub unsafe fn offset_from<'e, E>(&'a self, origin: &'e ErasedSoaNonNullPtrs<E, P>) -> isize
     where
         E: FieldDescriptors<'e> + ?Sized,
     {
@@ -196,14 +197,14 @@ where
     }
 }
 
-impl<'a, D, P, A> ErasedSoaNonNullPtrs<D, P, A>
+impl<'a, D, P, U> ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     D: FieldDescriptors<'a> + ?Sized,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
-    pub fn iter(&'a self) -> ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P, A> {
+    pub fn iter(&'a self) -> ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P> {
         let Self {
             ref descriptors,
             buffer,
@@ -218,15 +219,15 @@ where
     }
 }
 
-impl<D, P, A> ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P, U> ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     D: FieldDescriptorsOwned + ?Sized,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
     #[track_caller]
-    pub unsafe fn swap<'e, E>(&mut self, with: &'e mut ErasedSoaNonNullPtrs<E, P, A>)
+    pub unsafe fn swap<'e, E>(&mut self, with: &'e mut ErasedSoaNonNullPtrs<E, P>)
     where
         E: FieldDescriptors<'e> + ?Sized,
     {
@@ -239,7 +240,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from<'e, E>(&mut self, from: &'e ErasedSoaNonNullPtrs<E, P, A>, count: usize)
+    pub unsafe fn copy_from<'e, E>(&mut self, from: &'e ErasedSoaNonNullPtrs<E, P>, count: usize)
     where
         E: FieldDescriptors<'e> + ?Sized,
     {
@@ -254,7 +255,7 @@ where
     #[track_caller]
     pub unsafe fn copy_from_rev<'e, E>(
         &mut self,
-        from: &'e ErasedSoaNonNullPtrs<E, P, A>,
+        from: &'e ErasedSoaNonNullPtrs<E, P>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
@@ -263,11 +264,11 @@ where
 
         #[inline]
         #[expect(clippy::items_after_statements)]
-        fn rec<A, P, I>(iter: I, count: usize)
+        fn rec<I, P, U>(iter: I, count: usize)
         where
-            A: AddressableUnit,
-            P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
             I: IntoIterator<Item = (ErasedFieldNonNullPtr<P>, ErasedFieldNonNullPtr<P>)>,
+            P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+            U: AddressableUnit,
         {
             let mut iter = iter.into_iter();
             let Some((to, from)) = iter.next() else {
@@ -285,7 +286,7 @@ where
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping<'e, E>(
         &mut self,
-        from: &'e ErasedSoaNonNullPtrs<E, P, A>,
+        from: &'e ErasedSoaNonNullPtrs<E, P>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
@@ -298,10 +299,10 @@ where
     }
 }
 
-impl<D, P, A> Debug for ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P> Debug for ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: Debug + ?Sized,
+    P: NonNullSliceItemPtr,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -321,10 +322,10 @@ where
     }
 }
 
-impl<D, P, A> Clone for ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P> Clone for ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: Clone,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -341,21 +342,21 @@ where
     }
 }
 
-impl<D, P, A> Copy for ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P> Copy for ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: Copy,
+    P: NonNullSliceItemPtr,
 {
 }
 
-impl<'a, D, P, A> IntoIterator for &'a ErasedSoaNonNullPtrs<D, P, A>
+impl<'a, D, P, U> IntoIterator for &'a ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     D: FieldDescriptors<'a> + ?Sized,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     type Item = ErasedFieldNonNullPtr<P>;
-    type IntoIter = ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P, A>;
+    type IntoIter = ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -363,14 +364,14 @@ where
     }
 }
 
-impl<D, P, A> IntoIterator for ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P, U> IntoIterator for ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     type Item = ErasedFieldNonNullPtr<P>;
-    type IntoIter = ErasedSoaNonNullPtrsIter<D::IntoIter, P, A>;
+    type IntoIter = ErasedSoaNonNullPtrsIter<D::IntoIter, P>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -388,10 +389,10 @@ where
     }
 }
 
-impl<'a, D, P, A> FieldDescriptors<'a> for ErasedSoaNonNullPtrs<D, P, A>
+impl<'a, D, P> FieldDescriptors<'a> for ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: FieldDescriptors<'a> + ?Sized,
+    P: NonNullSliceItemPtr,
 {
     type Output = D::Output;
 
@@ -402,10 +403,10 @@ where
     }
 }
 
-impl<D, P, A> CovariantFieldDescriptors for ErasedSoaNonNullPtrs<D, P, A>
+impl<D, P> CovariantFieldDescriptors for ErasedSoaNonNullPtrs<D, P>
 where
-    A: AddressableUnit,
     D: CovariantFieldDescriptors + ?Sized,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -415,25 +416,25 @@ where
     }
 }
 
-pub struct ErasedSoaNonNullPtrsIter<D, P, A>
+pub struct ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
     D: ?Sized,
+    P: NonNullSliceItemPtr,
 {
-    phantom: PhantomData<fn() -> P>,
-    buffer: NonNull<[MaybeUninit<A>]>,
+    phantom: PhantomData<P>,
+    buffer: NonNull<[P::Item]>,
     offset: usize,
     inner: BufferOffsets<D>,
 }
 
-impl<D, P, A> ErasedSoaNonNullPtrsIter<D, P, A>
+impl<D, P> ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     pub(super) unsafe fn new_unchecked(
         inner: BufferOffsets<D>,
-        buffer: NonNull<[MaybeUninit<A>]>,
+        buffer: NonNull<[P::Item]>,
         offset: usize,
     ) -> Self {
         Self {
@@ -445,13 +446,13 @@ where
     }
 }
 
-impl<D, P, A> ErasedSoaNonNullPtrsIter<D, P, A>
+impl<D, P> ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
     D: ?Sized,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub fn as_buffer(&self) -> NonNull<[MaybeUninit<A>]> {
+    pub fn as_buffer(&self) -> NonNull<[P::Item]> {
         let Self { buffer, .. } = *self;
         buffer
     }
@@ -469,14 +470,14 @@ where
     }
 }
 
-impl<'a, D, P, A> ErasedSoaNonNullPtrsIter<D, P, A>
+impl<'a, D, P, U> ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     D: FieldDescriptors<'a> + ?Sized,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
-    pub(super) fn entries(&'a self) -> ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P, A> {
+    pub(super) fn entries(&'a self) -> ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P> {
         let Self {
             ref inner,
             buffer,
@@ -493,11 +494,11 @@ where
     }
 }
 
-impl<D, P, A> Debug for ErasedSoaNonNullPtrsIter<D, P, A>
+impl<D, P, U> Debug for ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>> + Debug,
     D: FieldDescriptorsOwned + ?Sized,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>> + Debug,
+    U: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries = self.entries();
@@ -505,10 +506,10 @@ where
     }
 }
 
-impl<D, P, A> Clone for ErasedSoaNonNullPtrsIter<D, P, A>
+impl<D, P> Clone for ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
     D: Clone,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -524,11 +525,11 @@ where
     }
 }
 
-impl<D, P, A> Iterator for ErasedSoaNonNullPtrsIter<D, P, A>
+impl<D, P, U> Iterator for ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     type Item = ErasedFieldNonNullPtr<P>;
 
@@ -543,7 +544,7 @@ where
 
         let field_ptr = {
             let BufferOffset { desc, offset, .. } = unsafe { inner.next()?.unwrap_unchecked() };
-            let index = offset.div_ceil(size_of::<A>());
+            let index = offset.div_ceil(size_of::<U>());
             let ptr = unsafe { P::from_slice(buffer, index) };
             unsafe { ErasedFieldNonNullPtr::from_parts(desc, ptr) }
         };
@@ -559,11 +560,11 @@ where
     }
 }
 
-impl<D, P, A> ExactSizeIterator for ErasedSoaNonNullPtrsIter<D, P, A>
+impl<D, P, U> ExactSizeIterator for ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -572,18 +573,18 @@ where
     }
 }
 
-impl<D, P, A> FusedIterator for ErasedSoaNonNullPtrsIter<D, P, A>
+impl<D, P, U> FusedIterator for ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
-    P: NonNullSliceItemPtr<Item = MaybeUninit<A>>,
     D: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+    P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
 }
 
-impl<'a, D, P, A> FieldDescriptors<'a> for ErasedSoaNonNullPtrsIter<D, P, A>
+impl<'a, D, P> FieldDescriptors<'a> for ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
     D: FieldDescriptors<'a> + ?Sized,
+    P: NonNullSliceItemPtr,
 {
     type Output = D::Output;
 
@@ -594,10 +595,10 @@ where
     }
 }
 
-impl<D, P, A> CovariantFieldDescriptors for ErasedSoaNonNullPtrsIter<D, P, A>
+impl<D, P> CovariantFieldDescriptors for ErasedSoaNonNullPtrsIter<D, P>
 where
-    A: AddressableUnit,
     D: CovariantFieldDescriptors + ?Sized,
+    P: NonNullSliceItemPtr,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(

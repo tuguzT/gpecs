@@ -7,7 +7,7 @@ use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
     erased::ErasedSoa,
     field::ErasedFieldRef,
-    slice_item_ptr::gpu::{GpuSliceItemPtr, GpuSliceItemPtrs},
+    slice_item_ptr::{GpuSliceItemPtr, GpuSliceItemPtrs},
     soa::field::{FieldDescriptor, FieldDescriptors},
     storage::AlignedUninitStorage,
 };
@@ -41,11 +41,12 @@ fn value() {
     };
 
     let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Value>()).unwrap();
-    let erased_value =
-        ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 5>, GpuSliceItemPtrs, _>::try_from_storage_value(
-            bytes, &context, value,
-        )
-        .unwrap();
+    let erased_value = ErasedSoa::<
+        _,
+        ArrayDescriptors<FieldDescriptor, 5>,
+        GpuSliceItemPtrs<MaybeUninit<u8>>,
+    >::try_from_storage_value(bytes, &context, value)
+    .unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -166,10 +167,11 @@ fn value() {
 
     let (descriptors, fields): (ArrayDescriptors<FieldDescriptor, 4>, ArrayVec<_, 4>) =
         fields.into_iter().map(ErasedField::into_parts).unzip();
-    let erased_value = ErasedSoa::<BoxedAlignedUninitStorage, _, GpuSliceItemPtrs, _>::try_from_fields_descriptors(
-        fields,
-        descriptors,
-    )
+    let erased_value = ErasedSoa::<
+        BoxedAlignedUninitStorage,
+        _,
+        GpuSliceItemPtrs<MaybeUninit<u8>>,
+    >::try_from_fields_descriptors(fields, descriptors)
     .expect("all the fields should be valid here");
 
     let erased_value_refs = erased_value.as_fields();
@@ -193,11 +195,12 @@ fn value_zst() {
 
     let bytes = [MaybeUninit::zeroed(); size_of::<()>() * 2];
     let bytes = AlignedUninitStorage::new(bytes, Layout::new::<()>()).unwrap();
-    let erased_value =
-        ErasedSoa::<_, ArrayDescriptors<FieldDescriptor, 1>, GpuSliceItemPtrs, _>::try_from_storage_value(
-            bytes, &context, value,
-        )
-        .unwrap();
+    let erased_value = ErasedSoa::<
+        _,
+        ArrayDescriptors<FieldDescriptor, 1>,
+        GpuSliceItemPtrs<MaybeUninit<u8>>,
+    >::try_from_storage_value(bytes, &context, value)
+    .unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(

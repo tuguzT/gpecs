@@ -32,32 +32,24 @@ use crate::{
         },
         traits::{AllocSoa, AllocSoaContext, SoaRead, SoaWrite},
     },
-    storage::{AddressableUnit, AlignedStorage, AlignedStorageFromLayout},
+    storage::{AlignedStorage, AlignedStorageFromLayout},
     uninit::write_copy_of_slice,
 };
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedSoa<P> = ErasedSoa<
-    crate::storage::BoxedAlignedUninitStorage,
-    alloc::boxed::Box<[FieldDescriptor]>,
-    P,
-    u8,
->;
+pub type BoxedErasedSoa<P> =
+    ErasedSoa<crate::storage::BoxedAlignedUninitStorage, alloc::boxed::Box<[FieldDescriptor]>, P>;
 
-pub struct ErasedSoa<T, D, P, A>
+pub struct ErasedSoa<T, D, P>
 where
-    A: AddressableUnit,
     D: ?Sized,
 {
-    phantom: PhantomData<fn() -> (P, A)>,
+    phantom: PhantomData<P>,
     storage: T,
     descriptors: D,
 }
 
-impl<T, D, P, A> ErasedSoa<T, D, P, A>
-where
-    A: AddressableUnit,
-{
+impl<T, D, P> ErasedSoa<T, D, P> {
     #[inline]
     pub unsafe fn new_unchecked(storage: T, descriptors: D) -> Self {
         Self {
@@ -78,10 +70,9 @@ where
     }
 }
 
-impl<T, D, P, A> ErasedSoa<T, D, P, A>
+impl<T, D, P> ErasedSoa<T, D, P>
 where
-    A: AddressableUnit,
-    T: AlignedStorage<A>,
+    T: AlignedStorage,
     D: FieldDescriptorsOwned,
 {
     #[inline]
@@ -92,11 +83,11 @@ where
     ) -> Result<Self, ErasedSoaFromStorageFieldsDescriptorsError>
     where
         I: IntoIterator<Item = F>,
-        F: AsRef<[A]>,
+        F: AsRef<[T::Item]>,
     {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
-            check_sufficient_align(offset?.desc.layout(), Layout::new::<A>())
+            check_sufficient_align(offset?.desc.layout(), Layout::new::<T::Item>())
                 .map_err(ErasedSoaFromStorageFieldsDescriptorsError::from)
         })?;
 
@@ -115,9 +106,9 @@ where
     }
 }
 
-impl<T, D, P> ErasedSoa<T, D, P, u8>
+impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<u8>,
+    T: AlignedStorage<Item = u8>,
     D: FieldDescriptorsOwned,
 {
     #[inline]
@@ -157,15 +148,14 @@ where
     }
 }
 
-impl<'a, T, D, P, A> ErasedSoa<T, D, P, A>
+impl<'a, T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<A>,
+    T: AlignedStorage,
     D: FieldDescriptors<'a> + ?Sized,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
-    pub fn as_fields(&'a self) -> ErasedSoaRefs<'a, D::Output, P::Const, A> {
+    pub fn as_fields(&'a self) -> ErasedSoaRefs<'a, D::Output, P::Const> {
         let Self {
             ref storage,
             ref descriptors,
@@ -178,7 +168,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_fields(&'a mut self) -> ErasedSoaRefsMut<'a, D::Output, P::Mut, A> {
+    pub fn as_mut_fields(&'a mut self) -> ErasedSoaRefsMut<'a, D::Output, P::Mut> {
         let Self {
             ref mut storage,
             ref descriptors,
@@ -191,26 +181,26 @@ where
     }
 }
 
-impl<T, D, P, A> ErasedSoa<T, D, P, A>
+impl<T, D, P> ErasedSoa<T, D, P>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
+    T: AlignedStorageFromLayout,
     D: FieldDescriptorsOwned,
 {
     #[inline]
     pub fn try_from_fields_descriptors<I, F>(
         fields: I,
         descriptors: D,
-    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<T, A>>
+    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<T::Error>>
     where
         I: IntoIterator<Item = F>,
-        F: AsRef<[A]>,
+        F: AsRef<[T::Item]>,
     {
         use ErasedSoaFromFieldsDescriptorsError as Error;
 
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
-            check_sufficient_align(offset?.desc.layout(), Layout::new::<A>()).map_err(Error::from)
+            check_sufficient_align(offset?.desc.layout(), Layout::new::<T::Item>())
+                .map_err(Error::from)
         })?;
 
         let layout = offsets.into_layout();
@@ -227,9 +217,9 @@ where
     }
 }
 
-impl<T, D, P> ErasedSoa<T, D, P, u8>
+impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<u8>,
+    T: AlignedStorage<Item = u8>,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
@@ -261,16 +251,16 @@ where
     }
 }
 
-impl<T, D, P> ErasedSoa<T, D, P, u8>
+impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorageFromLayout<u8>,
+    T: AlignedStorageFromLayout<Item = u8>,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
     pub fn try_from<V>(
         context: &V::Context,
         value: V,
-    ) -> Result<Self, ErasedSoaFromValueError<T, u8>>
+    ) -> Result<Self, ErasedSoaFromValueError<T::Error>>
     where
         V: AllocSoa + SoaWrite,
     {
@@ -293,17 +283,16 @@ where
     }
 }
 
-impl<T, D, P, A> ErasedSoa<T, D, P, A>
+impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<A>,
+    T: AlignedStorage,
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
-    pub fn into_fields<F>(self) -> ErasedSoaIntoFields<T, D::IntoIter, F, P, A>
+    pub fn into_fields<F>(self) -> ErasedSoaIntoFields<T, D::IntoIter, F, P>
     where
-        F: AlignedStorageFromLayout<A>,
+        F: AlignedStorageFromLayout<Item = T::Item>,
     {
         let (storage, descriptors) = self.into_parts();
         let offsets = buffer_offsets(descriptors, 1);
@@ -311,12 +300,11 @@ where
     }
 }
 
-impl<T, D, P, A> Debug for ErasedSoa<T, D, P, A>
+impl<T, D, P> Debug for ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<A>,
+    T: AlignedStorage,
     D: FieldDescriptorsOwned + ?Sized,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
     for<'a, 'b> FieldDescriptorsIter<'a, D>: FieldDescriptors<'b>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -325,9 +313,8 @@ where
     }
 }
 
-impl<'a, T, D, P, A> FieldDescriptors<'a> for ErasedSoa<T, D, P, A>
+impl<'a, T, D, P> FieldDescriptors<'a> for ErasedSoa<T, D, P>
 where
-    A: AddressableUnit,
     D: FieldDescriptors<'a> + ?Sized,
 {
     type Output = D::Output;
@@ -339,9 +326,8 @@ where
     }
 }
 
-impl<T, D, P, A> CovariantFieldDescriptors for ErasedSoa<T, D, P, A>
+impl<T, D, P> CovariantFieldDescriptors for ErasedSoa<T, D, P>
 where
-    A: AddressableUnit,
     D: CovariantFieldDescriptors + ?Sized,
 {
     #[inline]
@@ -352,20 +338,16 @@ where
     }
 }
 
-pub struct ErasedSoaIntoFields<T, I, F, P, A>
+pub struct ErasedSoaIntoFields<T, I, F, P>
 where
-    A: AddressableUnit,
     I: ?Sized,
 {
-    phantom: PhantomData<fn() -> (F, P, A)>,
+    phantom: PhantomData<fn() -> (F, P)>,
     storage: T,
     offsets: BufferOffsets<I>,
 }
 
-impl<T, I, F, P, A> ErasedSoaIntoFields<T, I, F, P, A>
-where
-    A: AddressableUnit,
-{
+impl<T, I, F, P> ErasedSoaIntoFields<T, I, F, P> {
     fn new(storage: T, offsets: BufferOffsets<I>) -> Self {
         Self {
             phantom: PhantomData,
@@ -375,9 +357,8 @@ where
     }
 }
 
-impl<T, I, F, P, A> Debug for ErasedSoaIntoFields<T, I, F, P, A>
+impl<T, I, F, P> Debug for ErasedSoaIntoFields<T, I, F, P>
 where
-    A: AddressableUnit,
     T: Debug,
     I: Debug + ?Sized,
 {
@@ -393,9 +374,8 @@ where
     }
 }
 
-impl<T, I, F, P, A> Clone for ErasedSoaIntoFields<T, I, F, P, A>
+impl<T, I, F, P> Clone for ErasedSoaIntoFields<T, I, F, P>
 where
-    A: AddressableUnit,
     T: Clone,
     I: Clone,
 {
@@ -409,15 +389,14 @@ where
     }
 }
 
-impl<T, I, F, P, A> Iterator for ErasedSoaIntoFields<T, I, F, P, A>
+impl<T, I, F, P> Iterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage<A>,
+    T: AlignedStorage,
     I: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    F: AlignedStorageFromLayout<A>,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    F: AlignedStorageFromLayout<Item = T::Item>,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
-    type Item = Result<ErasedField<F, P, A>, ErasedFieldFromDescDataError<F, A>>;
+    type Item = Result<ErasedField<F, P>, ErasedFieldFromDescDataError<F::Error>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -429,8 +408,8 @@ where
 
         let BufferOffset { desc, offset, .. } = unsafe { offsets.next()?.unwrap_unchecked() };
 
-        let offset = offset.div_ceil(size_of::<A>());
-        let len = desc.layout().size().div_ceil(size_of::<A>());
+        let offset = offset.div_ceil(size_of::<T::Item>());
+        let len = desc.layout().size().div_ceil(size_of::<T::Item>());
 
         let data = unsafe { storage.as_ptr().add(offset) };
         let data = unsafe { slice::from_raw_parts(data, len) };
@@ -440,13 +419,12 @@ where
     }
 }
 
-impl<T, I, F, P, A> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, P, A>
+impl<T, I, F, P> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage<A>,
+    T: AlignedStorage,
     I: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    F: AlignedStorageFromLayout<A>,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    F: AlignedStorageFromLayout<Item = T::Item>,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -455,13 +433,12 @@ where
     }
 }
 
-impl<T, I, F, P, A> FusedIterator for ErasedSoaIntoFields<T, I, F, P, A>
+impl<T, I, F, P> FusedIterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage<A>,
+    T: AlignedStorage,
     I: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    F: AlignedStorageFromLayout<A>,
-    P: SliceItemPtrs<MaybeUninit<A>>,
-    A: AddressableUnit,
+    F: AlignedStorageFromLayout<Item = T::Item>,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
 }
 
@@ -524,11 +501,7 @@ impl From<WriteCopyOfFieldsError> for ErasedSoaFromStorageFieldsDescriptorsError
     }
 }
 
-impl<T, A> From<WriteCopyOfFieldsError> for ErasedSoaFromFieldsDescriptorsError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+impl<T> From<WriteCopyOfFieldsError> for ErasedSoaFromFieldsDescriptorsError<T> {
     #[inline]
     fn from(error: WriteCopyOfFieldsError) -> Self {
         match error {

@@ -9,30 +9,30 @@ use core::{
 use crate::{
     erased::CovariantFieldDescriptors,
     error::{InsufficientAlignError, check_sufficient_align},
+    slice_item_ptr::SliceItemPtrs,
     soa::{
         field::{
             FieldDescriptor, FieldDescriptors, FieldDescriptorsOwned, IntoCopiedFieldDescriptors,
         },
         traits::RawSoa,
     },
-    storage::AddressableUnit,
 };
 
 #[cfg(feature = "alloc")]
-pub type BoxedErasedSoaContext<P> = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>, P, u8>;
+pub type BoxedErasedSoaContext<P> = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>, P>;
 
-pub struct ErasedSoaContext<D, P, A>
+pub struct ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: ?Sized,
+    P: SliceItemPtrs,
 {
-    phantom: PhantomData<fn() -> (P, A)>,
+    phantom: PhantomData<P>,
     descriptors: D,
 }
 
-impl<D, P, A> ErasedSoaContext<D, P, A>
+impl<D, P> ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
+    P: SliceItemPtrs,
 {
     #[inline]
     pub unsafe fn new_unchecked(descriptors: D) -> Self {
@@ -49,27 +49,27 @@ where
     }
 }
 
-impl<D, P, A> ErasedSoaContext<D, P, A>
+impl<D, P> ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: FieldDescriptorsOwned,
+    P: SliceItemPtrs,
 {
     #[inline]
     pub fn new(descriptors: D) -> Result<Self, InsufficientAlignError> {
         descriptors
             .field_descriptors()
             .copied_field_descriptors()
-            .try_for_each(|desc| check_sufficient_align(desc.layout(), Layout::new::<A>()))?;
+            .try_for_each(|desc| check_sufficient_align(desc.layout(), Layout::new::<P::Item>()))?;
 
         let me = unsafe { Self::new_unchecked(descriptors) };
         Ok(me)
     }
 }
 
-impl<D, P, A> ErasedSoaContext<D, P, A>
+impl<D, P> ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: ?Sized,
+    P: SliceItemPtrs,
 {
     #[inline]
     pub fn as_inner(&self) -> &D {
@@ -78,10 +78,10 @@ where
     }
 }
 
-impl<D, P, A> ErasedSoaContext<D, P, A>
+impl<D, P> ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: FromIterator<FieldDescriptor>,
+    P: SliceItemPtrs,
 {
     #[inline]
     pub fn of<'a, T>(context: &'a T::Context) -> Result<Self, InsufficientAlignError>
@@ -93,7 +93,7 @@ where
             .field_descriptors()
             .copied_field_descriptors()
             .map(|desc| {
-                check_sufficient_align(desc.layout(), Layout::new::<A>())?;
+                check_sufficient_align(desc.layout(), Layout::new::<P::Item>())?;
                 Ok(desc)
             })
             .collect::<Result<_, _>>()?;
@@ -103,10 +103,10 @@ where
     }
 }
 
-impl<D, P, A> Debug for ErasedSoaContext<D, P, A>
+impl<D, P> Debug for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: Debug + ?Sized,
+    P: SliceItemPtrs,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { descriptors, .. } = self;
@@ -116,10 +116,10 @@ where
     }
 }
 
-impl<D, P, A> Clone for ErasedSoaContext<D, P, A>
+impl<D, P> Clone for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: Clone,
+    P: SliceItemPtrs,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -128,17 +128,17 @@ where
     }
 }
 
-impl<D, P, A> Copy for ErasedSoaContext<D, P, A>
+impl<D, P> Copy for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: Copy,
+    P: SliceItemPtrs,
 {
 }
 
-impl<D, P, A> PartialEq for ErasedSoaContext<D, P, A>
+impl<D, P> PartialEq for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: PartialEq + ?Sized,
+    P: SliceItemPtrs,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -149,17 +149,17 @@ where
     }
 }
 
-impl<D, P, A> Eq for ErasedSoaContext<D, P, A>
+impl<D, P> Eq for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: Eq + ?Sized,
+    P: SliceItemPtrs,
 {
 }
 
-impl<D, P, A> PartialOrd for ErasedSoaContext<D, P, A>
+impl<D, P> PartialOrd for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: PartialOrd + ?Sized,
+    P: SliceItemPtrs,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let Self {
@@ -175,10 +175,10 @@ where
     }
 }
 
-impl<D, P, A> Ord for ErasedSoaContext<D, P, A>
+impl<D, P> Ord for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: Ord + ?Sized,
+    P: SliceItemPtrs,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self {
@@ -194,10 +194,10 @@ where
     }
 }
 
-impl<D, P, A> Hash for ErasedSoaContext<D, P, A>
+impl<D, P> Hash for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: Hash + ?Sized,
+    P: SliceItemPtrs,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self {
@@ -210,10 +210,10 @@ where
     }
 }
 
-impl<'a, D, P, A> FieldDescriptors<'a> for ErasedSoaContext<D, P, A>
+impl<'a, D, P> FieldDescriptors<'a> for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: FieldDescriptors<'a> + ?Sized,
+    P: SliceItemPtrs,
 {
     type Output = D::Output;
 
@@ -224,10 +224,10 @@ where
     }
 }
 
-impl<D, P, A> CovariantFieldDescriptors for ErasedSoaContext<D, P, A>
+impl<D, P> CovariantFieldDescriptors for ErasedSoaContext<D, P>
 where
-    A: AddressableUnit,
     D: CovariantFieldDescriptors + ?Sized,
+    P: SliceItemPtrs,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(

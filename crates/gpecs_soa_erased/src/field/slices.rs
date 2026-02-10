@@ -25,26 +25,60 @@ where
     phantom: PhantomData<&'a [T::Item]>,
 }
 
-impl<'a, T, A> ErasedFieldSlice<'a, T>
+impl<T> ErasedFieldSlice<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr,
+{
+    #[inline]
+    pub unsafe fn from_ptr(ptr: ErasedFieldSlicePtr<T>) -> Self {
+        let phantom = PhantomData;
+        Self { ptr, phantom }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { ptr, .. } = self;
+        ptr.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn descriptor(&self) -> FieldDescriptor {
+        let Self { ptr, .. } = self;
+        ptr.descriptor()
+    }
+
+    #[inline]
+    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr<T> {
+        let Self { ptr, .. } = *self;
+        ptr
+    }
+
+    #[inline]
+    pub fn as_field_ptr(&self) -> ErasedFieldPtr<T> {
+        let Self { ptr, .. } = self;
+        ptr.field_ptr()
+    }
+}
+
+impl<'a, T, U> ErasedFieldSlice<'a, T>
+where
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
     pub fn new(
         desc: FieldDescriptor,
-        buffer: &'a [A],
+        buffer: &'a [U],
         len: usize,
     ) -> Result<Self, ErasedFieldSlicePtrError> {
         let ptr = ErasedFieldSlicePtr::new(desc, buffer, len)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
-    }
-
-    #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedFieldSlicePtr<T>) -> Self {
-        let phantom = PhantomData;
-        Self { ptr, phantom }
     }
 
     #[inline]
@@ -66,24 +100,7 @@ where
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        let Self { ptr, .. } = self;
-        ptr.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    pub fn descriptor(&self) -> FieldDescriptor {
-        let Self { ptr, .. } = self;
-        ptr.descriptor()
-    }
-
-    #[inline]
-    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<A>] {
+    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<U>] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_uninit_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
@@ -96,42 +113,30 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[A] {
+    pub fn as_buffer(&self) -> &[U] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const A {
+    pub fn as_ptr(&self) -> *const U {
         let Self { ptr, .. } = self;
         ptr.as_ptr()
     }
 
     #[inline]
-    pub fn as_field_slice_ptr(&self) -> ErasedFieldSlicePtr<T> {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
-    #[inline]
-    pub fn as_field_ptr(&self) -> ErasedFieldPtr<T> {
-        let Self { ptr, .. } = self;
-        ptr.as_field_ptr()
-    }
-
-    #[inline]
-    pub fn into_buffer(self) -> &'a [A] {
+    pub fn into_buffer(self) -> &'a [U] {
         let Self { ptr, .. } = self;
         let buffer = ptr.as_buffer();
         unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
     }
 }
 
-impl<T, A> Debug for ErasedFieldSlice<'_, T>
+impl<T, U> Debug for ErasedFieldSlice<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
@@ -145,10 +150,9 @@ where
     }
 }
 
-impl<T, A> Clone for ErasedFieldSlice<'_, T>
+impl<T> Clone for ErasedFieldSlice<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -156,28 +160,23 @@ where
     }
 }
 
-impl<T, A> Copy for ErasedFieldSlice<'_, T>
-where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
-{
-}
+impl<T> Copy for ErasedFieldSlice<'_, T> where T: ConstSliceItemPtr {}
 
-impl<T, A> AsRef<[A]> for ErasedFieldSlice<'_, T>
+impl<T, U> AsRef<[U]> for ErasedFieldSlice<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     #[inline]
-    fn as_ref(&self) -> &[A] {
+    fn as_ref(&self) -> &[U] {
         self.as_buffer()
     }
 }
 
-impl<'a, T, V, A> TryFrom<&'a [V]> for ErasedFieldSlice<'a, T>
+impl<'a, T, U, V> TryFrom<&'a [V]> for ErasedFieldSlice<'a, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 

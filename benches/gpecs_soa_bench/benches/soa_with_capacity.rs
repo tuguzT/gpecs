@@ -1,4 +1,4 @@
-use std::any::type_name;
+use std::{any::type_name, mem::MaybeUninit};
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use gpecs_soa_bench::{
@@ -6,7 +6,7 @@ use gpecs_soa_bench::{
 };
 use gpecs_soa_erased::{
     erased::BoxedErasedSoaContext,
-    slice_item_ptr::gpu::GpuSliceItemPtrs,
+    slice_item_ptr::GpuSliceItemPtrs,
     soa::field::{FieldDescriptors, IntoCopiedFieldDescriptors, buffer_layout},
 };
 
@@ -20,8 +20,10 @@ where
 
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
-        let context = BoxedErasedSoaContext::<GpuSliceItemPtrs>::of::<T>(&Default::default())
-            .expect("descriptors should be valid");
+        let context = BoxedErasedSoaContext::<GpuSliceItemPtrs<MaybeUninit<u8>>>::of::<T>(
+            &Default::default(),
+        )
+        .expect("descriptors should be valid");
         let fields = context.field_descriptors();
         let buffer_layout = buffer_layout(fields, capacity).unwrap();
         let bytes = buffer_layout.size();

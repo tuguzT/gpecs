@@ -4,12 +4,8 @@ use core::{
     fmt::{self, Debug, Display},
 };
 
-use crate::{
-    error::{
-        InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError,
-        check_layout,
-    },
-    storage::{AddressableUnit, AlignedStorageFromLayout},
+use crate::error::{
+    InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError, check_layout,
 };
 
 #[derive(Clone)]
@@ -235,75 +231,30 @@ impl Error for ErasedFieldPtrError {
     }
 }
 
-pub enum ErasedFieldFromDescDataError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+#[derive(Debug, Clone)]
+pub enum ErasedFieldFromDescDataError<T> {
     LenMismatch(LenMismatchError),
     InsufficientAlign(InsufficientAlignError),
-    FromLayout(T::Error),
+    FromLayout(T),
 }
 
-impl<T, A> From<LenMismatchError> for ErasedFieldFromDescDataError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+impl<T> From<LenMismatchError> for ErasedFieldFromDescDataError<T> {
     #[inline]
     fn from(error: LenMismatchError) -> Self {
         Self::LenMismatch(error)
     }
 }
 
-impl<T, A> From<InsufficientAlignError> for ErasedFieldFromDescDataError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+impl<T> From<InsufficientAlignError> for ErasedFieldFromDescDataError<T> {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl<T, A> Clone for ErasedFieldFromDescDataError<T, A>
+impl<T> Display for ErasedFieldFromDescDataError<T>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::LenMismatch(error) => Self::LenMismatch(error.clone()),
-            Self::InsufficientAlign(error) => Self::InsufficientAlign(error.clone()),
-            Self::FromLayout(error) => Self::FromLayout(error.clone()),
-        }
-    }
-}
-
-impl<T, A> Debug for ErasedFieldFromDescDataError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
-            Self::InsufficientAlign(error) => {
-                f.debug_tuple("InsufficientAlign").field(error).finish()
-            }
-            Self::FromLayout(error) => f.debug_tuple("FromLayout").field(error).finish(),
-        }
-    }
-}
-
-impl<T, A> Display for ErasedFieldFromDescDataError<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Display,
+    T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -314,11 +265,9 @@ where
     }
 }
 
-impl<T, A> Error for ErasedFieldFromDescDataError<T, A>
+impl<T> Error for ErasedFieldFromDescDataError<T>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Error,
+    T: Error,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -327,68 +276,36 @@ where
             Self::FromLayout(_) => None,
         }
     }
-}
 
-#[non_exhaustive]
-pub struct ErasedFieldFromValueError<T, V, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    V: ?Sized,
-{
-    pub reason: ErasedFieldFromValueErrorKind<T, A>,
-    pub value: V,
-}
-
-impl<T, V, A> ErasedFieldFromValueError<T, V, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
-    #[inline]
-    pub(crate) fn new(reason: ErasedFieldFromValueErrorKind<T, A>, value: V) -> Self {
-        Self { reason, value }
-    }
-}
-
-impl<T, V, A> Debug for ErasedFieldFromValueError<T, V, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug,
-    V: Debug + ?Sized,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { reason, value } = self;
-        f.debug_struct("ErasedFieldFromValueError")
-            .field("reason", reason)
-            .field("value", &value)
-            .finish()
-    }
-}
-
-impl<T, V, A> Clone for ErasedFieldFromValueError<T, V, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Clone,
-    V: Clone,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        let Self { reason, value } = self;
-        Self {
-            reason: reason.clone(),
-            value: value.clone(),
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::LenMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
         }
     }
 }
 
-impl<T, V, A> Display for ErasedFieldFromValueError<T, V, A>
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ErasedFieldFromValueError<T, V>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Display,
+    V: ?Sized,
+{
+    pub reason: ErasedFieldFromValueErrorKind<T>,
+    pub value: V,
+}
+
+impl<T, V> ErasedFieldFromValueError<T, V> {
+    #[inline]
+    pub(crate) fn new(reason: ErasedFieldFromValueErrorKind<T>, value: V) -> Self {
+        Self { reason, value }
+    }
+}
+
+impl<T, V> Display for ErasedFieldFromValueError<T, V>
+where
+    T: Display,
     V: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -397,71 +314,33 @@ where
     }
 }
 
-impl<T, V, A> Error for ErasedFieldFromValueError<T, V, A>
+impl<T, V> Error for ErasedFieldFromValueError<T, V>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug + Display,
+    T: Error,
     V: Debug + Display + ?Sized,
 {
+    fn cause(&self) -> Option<&dyn Error> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
 }
 
-pub enum ErasedFieldFromValueErrorKind<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+#[derive(Debug, Clone)]
+pub enum ErasedFieldFromValueErrorKind<T> {
     InsufficientAlign(InsufficientAlignError),
-    FromLayout(T::Error),
+    FromLayout(T),
 }
 
-impl<T, A> From<InsufficientAlignError> for ErasedFieldFromValueErrorKind<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-{
+impl<T> From<InsufficientAlignError> for ErasedFieldFromValueErrorKind<T> {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl<T, A> Debug for ErasedFieldFromValueErrorKind<T, A>
+impl<T> Display for ErasedFieldFromValueErrorKind<T>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InsufficientAlign(error) => {
-                f.debug_tuple("InsufficientAlign").field(error).finish()
-            }
-            Self::FromLayout(error) => f.debug_tuple("FromLayout").field(error).finish(),
-        }
-    }
-}
-
-impl<T, A> Clone for ErasedFieldFromValueErrorKind<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Clone,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        match self {
-            Self::InsufficientAlign(error) => Self::InsufficientAlign(error.clone()),
-            Self::FromLayout(error) => Self::FromLayout(error.clone()),
-        }
-    }
-}
-
-impl<T, A> Display for ErasedFieldFromValueErrorKind<T, A>
-where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Display,
+    T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -471,12 +350,23 @@ where
     }
 }
 
-impl<T, A> Error for ErasedFieldFromValueErrorKind<T, A>
+impl<T> Error for ErasedFieldFromValueErrorKind<T>
 where
-    A: AddressableUnit,
-    T: AlignedStorageFromLayout<A>,
-    T::Error: Debug + Display + Error,
+    T: Error,
 {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InsufficientAlign(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::InsufficientAlign(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

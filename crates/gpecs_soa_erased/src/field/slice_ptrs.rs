@@ -19,44 +19,10 @@ pub struct ErasedFieldSlicePtr<T> {
     ptr: ErasedFieldPtr<T>,
 }
 
-impl<T, A> ErasedFieldSlicePtr<T>
-where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
-{
-    #[inline]
-    pub fn new(
-        desc: FieldDescriptor,
-        buffer: *const [A],
-        len: usize,
-    ) -> Result<Self, ErasedFieldSlicePtrError> {
-        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
-        check_slice_len(buffer.len() * size_of::<A>(), desc.layout().size(), len)?;
-        check_ptr_align(buffer.cast(), desc.layout())?;
-
-        let buffer = ptr::slice_from_raw_parts(buffer.cast(), buffer.len());
-        let ptr = unsafe { T::from_slice(buffer, 0) };
-        let ptr = unsafe { ErasedFieldPtr::from_parts(desc, ptr) };
-
-        let me = unsafe { Self::from_parts(ptr, len) };
-        Ok(me)
-    }
-
+impl<T> ErasedFieldSlicePtr<T> {
     #[inline]
     pub unsafe fn from_parts(ptr: ErasedFieldPtr<T>, len: usize) -> Self {
         Self { len, ptr }
-    }
-
-    #[inline]
-    pub fn cast_mut(self) -> ErasedFieldSliceMutPtr<CastMutPtr<T>> {
-        let Self { ptr, len } = self;
-        let ptr = ptr.cast_mut();
-        unsafe { ErasedFieldSliceMutPtr::from_parts(ptr, len) }
-    }
-
-    #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedFieldSlice<'a, T> {
-        unsafe { ErasedFieldSlice::from_ptr(self) }
     }
 
     #[inline]
@@ -77,7 +43,54 @@ where
     }
 
     #[inline]
-    pub fn as_uninit_buffer(self) -> *const [MaybeUninit<A>] {
+    pub fn field_ptr(self) -> ErasedFieldPtr<T> {
+        let Self { ptr, .. } = self;
+        ptr
+    }
+}
+
+impl<T> ErasedFieldSlicePtr<T>
+where
+    T: ConstSliceItemPtr,
+{
+    #[inline]
+    pub fn cast_mut(self) -> ErasedFieldSliceMutPtr<CastMutPtr<T>> {
+        let Self { ptr, len } = self;
+        let ptr = ptr.cast_mut();
+        unsafe { ErasedFieldSliceMutPtr::from_parts(ptr, len) }
+    }
+
+    #[inline]
+    pub unsafe fn deref<'a>(self) -> ErasedFieldSlice<'a, T> {
+        unsafe { ErasedFieldSlice::from_ptr(self) }
+    }
+}
+
+impl<T, U> ErasedFieldSlicePtr<T>
+where
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
+{
+    #[inline]
+    pub fn new(
+        desc: FieldDescriptor,
+        buffer: *const [U],
+        len: usize,
+    ) -> Result<Self, ErasedFieldSlicePtrError> {
+        check_sufficient_align(desc.layout(), Layout::new::<U>())?;
+        check_slice_len(buffer.len() * size_of::<U>(), desc.layout().size(), len)?;
+        check_ptr_align(buffer.cast(), desc.layout())?;
+
+        let buffer = ptr::slice_from_raw_parts(buffer.cast(), buffer.len());
+        let ptr = unsafe { T::from_slice(buffer, 0) };
+        let ptr = unsafe { ErasedFieldPtr::from_parts(desc, ptr) };
+
+        let me = unsafe { Self::from_parts(ptr, len) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn as_uninit_buffer(self) -> *const [MaybeUninit<U>] {
         let Self { ptr, .. } = self;
         ptr.as_uninit_buffer()
     }
@@ -89,39 +102,33 @@ where
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [A] {
+    pub fn as_buffer(self) -> *const [U] {
         let Self { ptr, len } = self;
         let buffer = ptr.as_buffer();
         ptr::slice_from_raw_parts(buffer.cast(), len * buffer.len())
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const A {
+    pub fn as_ptr(self) -> *const U {
         let Self { ptr, .. } = self;
         ptr.as_ptr()
     }
-
-    #[inline]
-    pub fn as_field_ptr(self) -> ErasedFieldPtr<T> {
-        let Self { ptr, .. } = self;
-        ptr
-    }
 }
 
-impl<T, V, A> TryFrom<*const [V]> for ErasedFieldSlicePtr<T>
+impl<T, U, V> TryFrom<*const [V]> for ErasedFieldSlicePtr<T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 
     #[inline]
     fn try_from(ptr: *const [V]) -> Result<Self, Self::Error> {
         let desc = FieldDescriptor::of::<V>();
-        check_sufficient_align(desc.layout(), Layout::new::<A>())?;
+        check_sufficient_align(desc.layout(), Layout::new::<U>())?;
 
         let len = ptr.len();
-        let buffer_len = desc.layout().size().div_ceil(size_of::<A>()) * len;
+        let buffer_len = desc.layout().size().div_ceil(size_of::<U>()) * len;
         let buffer = ptr::slice_from_raw_parts(ptr.cast(), buffer_len);
         let ptr = unsafe { T::from_slice(buffer, 0) };
         let ptr = unsafe { ErasedFieldPtr::from_parts(desc, ptr) };
@@ -131,10 +138,10 @@ where
     }
 }
 
-impl<T, V, A> TryFrom<ErasedFieldSlicePtr<T>> for *const [V]
+impl<T, U, V> TryFrom<ErasedFieldSlicePtr<T>> for *const [V]
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<A>>,
-    A: AddressableUnit,
+    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: AddressableUnit,
 {
     type Error = ErasedFieldIntoValueError<ErasedFieldSlicePtr<T>>;
 

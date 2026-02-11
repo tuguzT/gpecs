@@ -3,7 +3,7 @@ use std::{alloc::Layout, hint::black_box, mem::MaybeUninit, ops::Deref};
 use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, CovariantFieldDescriptors, ErasedSoa},
-    slice_item_ptr::GpuSliceItemPtrs,
+    slice_item_ptr::CoreSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         prelude::*,
@@ -21,7 +21,7 @@ pub trait Push: SoaVecs<Context: Default> + SoaWrite {
     }
 
     fn soa_ser_push(
-        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
         let context = Default::default();
@@ -46,7 +46,7 @@ impl Push for Zero {
 
     #[expect(clippy::let_unit_value, reason = "reference for other manual impls")]
     fn soa_ser_push(
-        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
         let context = &Default::default();
@@ -57,7 +57,7 @@ impl Push for Zero {
         let value = ErasedSoa::<
             _,
             ArrayDescriptors<FieldDescriptor, 1>,
-            GpuSliceItemPtrs<MaybeUninit<u8>>,
+            CoreSliceItemPtrs<MaybeUninit<u8>>,
         >::try_from_storage_value(bytes, context, value)
         .unwrap();
 
@@ -76,7 +76,7 @@ impl Push for Tiny {
     }
 
     fn soa_ser_push(
-        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
         let context = &TupleContext::default();
@@ -93,7 +93,7 @@ impl Push for Tiny {
         let value = ErasedSoa::<
             _,
             ArrayDescriptors<FieldDescriptor, 1>,
-            GpuSliceItemPtrs<MaybeUninit<u8>>,
+            CoreSliceItemPtrs<MaybeUninit<u8>>,
         >::try_from_storage_value(bytes, context, value)
         .unwrap();
 
@@ -114,7 +114,7 @@ impl Push for Small {
     }
 
     fn soa_ser_push(
-        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
         let context = &TupleContext::default();
@@ -131,7 +131,7 @@ impl Push for Small {
         let value = ErasedSoa::<
             _,
             ArrayDescriptors<FieldDescriptor, 3>,
-            GpuSliceItemPtrs<MaybeUninit<u8>>,
+            CoreSliceItemPtrs<MaybeUninit<u8>>,
         >::try_from_storage_value(bytes, context, value)
         .unwrap();
 
@@ -152,7 +152,7 @@ impl Push for Medium {
     }
 
     fn soa_ser_push(
-        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
         let context = &TupleContext::default();
@@ -169,7 +169,7 @@ impl Push for Medium {
         let value = ErasedSoa::<
             _,
             ArrayDescriptors<FieldDescriptor, 3>,
-            GpuSliceItemPtrs<MaybeUninit<u8>>,
+            CoreSliceItemPtrs<MaybeUninit<u8>>,
         >::try_from_storage_value(bytes, context, value)
         .unwrap();
 
@@ -193,7 +193,7 @@ impl Push for Big {
     }
 
     fn soa_ser_push(
-        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
         let context = &TupleContext::default();
@@ -210,7 +210,7 @@ impl Push for Big {
         let value = ErasedSoa::<
             _,
             ArrayDescriptors<FieldDescriptor, 5>,
-            GpuSliceItemPtrs<MaybeUninit<u8>>,
+            CoreSliceItemPtrs<MaybeUninit<u8>>,
         >::try_from_storage_value(bytes, context, value)
         .unwrap();
 
@@ -239,7 +239,7 @@ impl Push for Large {
     }
 
     fn soa_ser_push(
-        vec: &mut SoaVec<BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>>,
+        vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
         let context = &TupleContext::default();
@@ -256,7 +256,7 @@ impl Push for Large {
         let value = ErasedSoa::<
             _,
             ArrayDescriptors<FieldDescriptor, 10>,
-            GpuSliceItemPtrs<MaybeUninit<u8>>,
+            CoreSliceItemPtrs<MaybeUninit<u8>>,
         >::try_from_storage_value(bytes, context, value)
         .unwrap();
 

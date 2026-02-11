@@ -6,7 +6,7 @@ use gpecs_soa_erased::{
         BoxedErasedField, ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
         ErasedFieldSliceMut,
     },
-    slice_item_ptr::{GpuSliceItemPtr, GpuSliceItemPtrs},
+    slice_item_ptr::CoreSliceItemPtrs,
 };
 
 use crate::{
@@ -26,15 +26,14 @@ use crate::{
 
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
 
-pub type ErasedBundle = BoxedErasedSoa<GpuSliceItemPtrs<MaybeUninit<u8>>>;
-pub type ErasedBundleRef<'a, D> = ErasedSoaRefsMut<'a, D, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>>;
+pub type ErasedBundle = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
+pub type ErasedBundleRef<'a, D> = ErasedSoaRefsMut<'a, D, *mut MaybeUninit<u8>>;
 
-pub type ErasedComponent = BoxedErasedField<GpuSliceItemPtrs<MaybeUninit<u8>>>;
-pub type ErasedComponentRef<'a> = ErasedFieldRef<'a, GpuSliceItemPtr<*const [MaybeUninit<u8>]>>;
-pub type ErasedComponentRefMut<'a> = ErasedFieldRefMut<'a, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>>;
-pub type ErasedComponentSlice<'a> = ErasedFieldSlice<'a, GpuSliceItemPtr<*const [MaybeUninit<u8>]>>;
-pub type ErasedComponentSliceMut<'a> =
-    ErasedFieldSliceMut<'a, GpuSliceItemPtr<*mut [MaybeUninit<u8>]>>;
+pub type ErasedComponent = BoxedErasedField<CoreSliceItemPtrs<MaybeUninit<u8>>>;
+pub type ErasedComponentRef<'a> = ErasedFieldRef<'a, *const MaybeUninit<u8>>;
+pub type ErasedComponentRefMut<'a> = ErasedFieldRefMut<'a, *mut MaybeUninit<u8>>;
+pub type ErasedComponentSlice<'a> = ErasedFieldSlice<'a, *const MaybeUninit<u8>>;
+pub type ErasedComponentSliceMut<'a> = ErasedFieldSliceMut<'a, *mut MaybeUninit<u8>>;
 
 #[cold]
 #[track_caller]

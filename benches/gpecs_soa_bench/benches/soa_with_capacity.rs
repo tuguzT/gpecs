@@ -6,7 +6,7 @@ use gpecs_soa_bench::{
 };
 use gpecs_soa_erased::{
     erased::BoxedErasedSoaContext,
-    slice_item_ptr::GpuSliceItemPtrs,
+    slice_item_ptr::CoreSliceItemPtrs,
     soa::field::{FieldDescriptors, IntoCopiedFieldDescriptors, buffer_layout},
 };
 
@@ -20,7 +20,7 @@ where
 
     let mut group = c.benchmark_group(&group_name);
     for capacity in CAPACITY_RANGE {
-        let context = BoxedErasedSoaContext::<GpuSliceItemPtrs<MaybeUninit<u8>>>::of::<T>(
+        let context = BoxedErasedSoaContext::<CoreSliceItemPtrs<MaybeUninit<u8>>>::of::<T>(
             &Default::default(),
         )
         .expect("descriptors should be valid");

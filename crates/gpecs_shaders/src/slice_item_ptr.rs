@@ -1,6 +1,6 @@
 use core::{marker::PhantomData, ptr::NonNull};
 
-use crate::slice_item_ptr::{
+use gpecs_soa_erased::slice_item_ptr::{
     ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs,
 };
 
@@ -166,20 +166,16 @@ where
 
     #[inline]
     unsafe fn copy_from(self, src: GpuSliceItemPtr<*const [T]>, count: usize) {
-        // // Assuming slices do not overlap or are pointing to the same memory region
-        // // because they can only be obtained from storage buffers / shared memory on Rust-GPU backend...
-        // // And if they do overlap, this is a UB by Rust definitions even when using safe code!
-        // if self.index <= src.index {
-        //     // Copy forwards, as `self` starts before `src`
-        //     unsafe { ordered_copy(src, self, 0..count) }
-        // } else {
-        //     // Copy backwards, as `self` starts after `src`
-        //     unsafe { ordered_copy(src, self, (0..count).rev()) }
-        // }
-
-        let src = unsafe { src.slice.cast::<T>().add(src.index) };
-        let dst = unsafe { self.slice.cast::<T>().add(self.index) };
-        unsafe { dst.copy_from(src, count) }
+        // Assuming slices do not overlap or are pointing to the same memory region
+        // because they can only be obtained from storage buffers / shared memory on Rust-GPU backend...
+        // And if they do overlap, this is a UB by Rust definitions even when using safe code!
+        if self.index <= src.index {
+            // Copy forwards, as `self` starts before `src`
+            unsafe { ordered_copy(src, self, 0..count) }
+        } else {
+            // Copy backwards, as `self` starts after `src`
+            unsafe { ordered_copy(src, self, (0..count).rev()) }
+        }
     }
 
     #[inline]

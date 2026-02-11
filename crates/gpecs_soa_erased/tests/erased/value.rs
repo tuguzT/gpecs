@@ -7,7 +7,7 @@ use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
     erased::ErasedSoa,
     field::ErasedFieldRef,
-    slice_item_ptr::{GpuSliceItemPtr, GpuSliceItemPtrs},
+    slice_item_ptr::CoreSliceItemPtrs,
     soa::field::{FieldDescriptor, FieldDescriptors},
     storage::AlignedUninitStorage,
 };
@@ -44,7 +44,7 @@ fn value() {
     let erased_value = ErasedSoa::<
         _,
         ArrayDescriptors<FieldDescriptor, 5>,
-        GpuSliceItemPtrs<MaybeUninit<u8>>,
+        CoreSliceItemPtrs<MaybeUninit<u8>>,
     >::try_from_storage_value(bytes, &context, value)
     .unwrap();
 
@@ -74,7 +74,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::try_from(&())
+        ErasedFieldRef::<*const _>::try_from(&())
             .unwrap()
             .into_buffer(),
     );
@@ -86,7 +86,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::try_from(&i3)
+        ErasedFieldRef::<*const _>::try_from(&i3)
             .unwrap()
             .into_buffer(),
     );
@@ -98,7 +98,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::try_from(&i2)
+        ErasedFieldRef::<*const _>::try_from(&i2)
             .unwrap()
             .into_buffer(),
     );
@@ -110,7 +110,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::try_from(&i1)
+        ErasedFieldRef::<*const _>::try_from(&i1)
             .unwrap()
             .into_buffer(),
     );
@@ -138,14 +138,10 @@ fn value() {
         slice::from_raw_parts(data, len)
     };
     let field_refs = [
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::new(descriptors[0], unit_bytes)
-            .expect("incorrect inputs"),
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::new(descriptors[1], i3_bytes)
-            .expect("incorrect inputs"),
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::new(descriptors[2], i2_bytes)
-            .expect("incorrect inputs"),
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::new(descriptors[3], i1_bytes)
-            .expect("incorrect inputs"),
+        ErasedFieldRef::<*const _>::new(descriptors[0], unit_bytes).expect("incorrect inputs"),
+        ErasedFieldRef::<*const _>::new(descriptors[1], i3_bytes).expect("incorrect inputs"),
+        ErasedFieldRef::<*const _>::new(descriptors[2], i2_bytes).expect("incorrect inputs"),
+        ErasedFieldRef::<*const _>::new(descriptors[3], i1_bytes).expect("incorrect inputs"),
     ];
     assert!(
         erased_refs
@@ -170,7 +166,7 @@ fn value() {
     let erased_value = ErasedSoa::<
         BoxedAlignedUninitStorage,
         _,
-        GpuSliceItemPtrs<MaybeUninit<u8>>,
+        CoreSliceItemPtrs<MaybeUninit<u8>>,
     >::try_from_fields_descriptors(fields, descriptors)
     .expect("all the fields should be valid here");
 
@@ -198,7 +194,7 @@ fn value_zst() {
     let erased_value = ErasedSoa::<
         _,
         ArrayDescriptors<FieldDescriptor, 1>,
-        GpuSliceItemPtrs<MaybeUninit<u8>>,
+        CoreSliceItemPtrs<MaybeUninit<u8>>,
     >::try_from_storage_value(bytes, &context, value)
     .unwrap();
 
@@ -213,11 +209,8 @@ fn value_zst() {
     );
 
     let field_refs = [
-        ErasedFieldRef::<GpuSliceItemPtr<*const [MaybeUninit<_>]>>::new(
-            FieldDescriptor::of::<()>(),
-            [].as_slice(),
-        )
-        .expect("incorrect inputs"),
+        ErasedFieldRef::<*const _>::new(FieldDescriptor::of::<()>(), [].as_slice())
+            .expect("incorrect inputs"),
     ];
     itertools::assert_equal(
         erased_value

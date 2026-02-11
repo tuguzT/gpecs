@@ -1,5 +1,4 @@
 pub use self::{
-    gpu::{GpuSliceItemPtr, GpuSliceItemPtrs},
     prim::CoreSliceItemPtrs,
     traits::{
         CastConstPtr, CastMutPtr, ConstSliceItemPtr, MutSliceItemPtr, NonNullAsPtr,
@@ -7,6 +6,5 @@ pub use self::{
     },
 };
 
-mod gpu;
 mod prim;
 mod traits;

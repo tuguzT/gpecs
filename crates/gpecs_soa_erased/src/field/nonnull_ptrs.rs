@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{
-    error::{InsufficientAlignError, check_layout, check_sufficient_align},
+    error::{InsufficientAlignError, check_sufficient_align},
     field::{
         ErasedFieldMutPtr,
         error::{ErasedFieldIntoValueError, check_into_layout},
@@ -95,9 +95,6 @@ where
     pub unsafe fn offset_from(self, origin: Self) -> isize {
         let Self { desc, ptr } = self;
 
-        assert_eq!(ptr.slice(), origin.as_uninit_buffer());
-        check_layout(origin.descriptor().layout(), desc.layout()).expect("layouts should match");
-
         let offset = unsafe { ptr.offset_from(origin.ptr()) };
         let field_size = desc.layout().size().div_ceil(size_of::<U>()).cast_signed();
         offset
@@ -108,8 +105,7 @@ where
     #[inline]
     #[track_caller]
     pub unsafe fn swap(self, with: Self) {
-        let Self { desc, ptr } = self;
-        check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
+        let Self { ptr, .. } = self;
 
         let this_buffer_range = self.buffer_init_range();
         for i in 0..this_buffer_range.len() {
@@ -123,7 +119,6 @@ where
     #[track_caller]
     pub unsafe fn copy_from(self, from: Self, count: usize) {
         let Self { desc, ptr } = self;
-        check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let src = from.ptr().as_ptr().cast_const();
         let count = count * desc.layout().size().div_ceil(size_of::<U>());
@@ -134,7 +129,6 @@ where
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping(self, from: Self, count: usize) {
         let Self { desc, ptr } = self;
-        check_layout(from.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let src = from.ptr().as_ptr().cast_const();
         let count = count * desc.layout().size().div_ceil(size_of::<U>());

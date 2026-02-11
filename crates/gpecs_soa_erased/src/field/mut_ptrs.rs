@@ -1,9 +1,7 @@
 use core::{alloc::Layout, mem::MaybeUninit, ops::Range, ptr};
 
 use crate::{
-    error::{
-        InsufficientAlignError, check_layout, check_len, check_ptr_align, check_sufficient_align,
-    },
+    error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     field::{
         ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
         error::{ErasedFieldIntoValueError, ErasedFieldPtrError, check_into_layout},
@@ -109,9 +107,6 @@ where
     pub unsafe fn offset_from(self, origin: ErasedFieldPtr<CastConstPtr<T>>) -> isize {
         let Self { desc, ptr } = self;
 
-        assert_eq!(ptr.slice().cast_const(), origin.as_uninit_buffer());
-        check_layout(origin.descriptor().layout(), desc.layout()).expect("layouts should match");
-
         let offset = unsafe { ptr.cast_const().offset_from(origin.ptr()) };
         let field_size = desc.layout().size().div_ceil(size_of::<U>()).cast_signed();
         offset
@@ -122,8 +117,7 @@ where
     #[inline]
     #[track_caller]
     pub unsafe fn swap(self, with: Self) {
-        let Self { desc, ptr } = self;
-        check_layout(with.descriptor().layout(), desc.layout()).expect("layouts should match");
+        let Self { ptr, .. } = self;
 
         let this_buffer_range = self.buffer_init_range();
         for i in 0..this_buffer_range.len() {
@@ -137,7 +131,6 @@ where
     #[track_caller]
     pub unsafe fn copy_from(self, src: ErasedFieldPtr<CastConstPtr<T>>, count: usize) {
         let Self { desc, ptr } = self;
-        check_layout(src.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let src = src.ptr();
         let count = count * desc.layout().size().div_ceil(size_of::<U>());
@@ -152,7 +145,6 @@ where
         count: usize,
     ) {
         let Self { desc, ptr } = self;
-        check_layout(src.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let src = src.ptr();
         let count = count * desc.layout().size().div_ceil(size_of::<U>());

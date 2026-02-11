@@ -1,9 +1,7 @@
 use core::{alloc::Layout, mem::MaybeUninit, ops::Range, ptr};
 
 use crate::{
-    error::{
-        InsufficientAlignError, check_layout, check_len, check_ptr_align, check_sufficient_align,
-    },
+    error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     field::{
         ErasedFieldMutPtr, ErasedFieldRef,
         error::{ErasedFieldIntoValueError, ErasedFieldPtrError, check_into_layout},
@@ -103,9 +101,6 @@ where
     #[track_caller]
     pub unsafe fn offset_from(self, origin: Self) -> isize {
         let Self { desc, ptr } = self;
-
-        assert_eq!(ptr.slice(), origin.as_uninit_buffer());
-        check_layout(origin.descriptor().layout(), desc.layout()).expect("layouts should match");
 
         let offset = unsafe { ptr.offset_from(origin.ptr()) };
         let field_size = desc.layout().size().div_ceil(size_of::<U>()).cast_signed();

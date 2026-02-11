@@ -48,7 +48,7 @@ where
 
 impl<T> AlignedInitStorage<T>
 where
-    T: AlignedStorage,
+    T: AlignedStorage<Item: Default>,
 {
     #[inline]
     pub fn new(mut slice: T) -> Self {
@@ -59,7 +59,7 @@ where
 
 impl<T> AlignedInitStorage<T>
 where
-    T: AlignedStorageFromLayout,
+    T: AlignedStorageFromLayout<Item: Default>,
 {
     #[inline]
     pub fn from_layout(layout: Layout) -> Result<Self, T::Error> {
@@ -194,7 +194,7 @@ where
 
 unsafe impl<T> AlignedStorageFromLayout for AlignedInitStorage<T>
 where
-    T: AlignedStorageFromLayout,
+    T: AlignedStorageFromLayout<Item: Default>,
 {
     type Error = T::Error;
 

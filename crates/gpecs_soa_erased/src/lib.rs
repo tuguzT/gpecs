@@ -13,5 +13,4 @@ pub mod field;
 pub mod slice_item_ptr;
 pub mod storage;
 
-mod fmt;
 mod uninit;

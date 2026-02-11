@@ -72,7 +72,7 @@ impl<T, D, P> ErasedSoa<T, D, P> {
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage,
+    T: AlignedStorage<Item: Copy>,
     D: FieldDescriptorsOwned,
 {
     #[inline]
@@ -183,7 +183,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorageFromLayout,
+    T: AlignedStorageFromLayout<Item: Copy>,
     D: FieldDescriptorsOwned,
 {
     #[inline]
@@ -285,7 +285,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage,
+    T: AlignedStorage<Item: Copy>,
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
@@ -302,7 +302,7 @@ where
 
 impl<T, D, P> Debug for ErasedSoa<T, D, P>
 where
-    T: AlignedStorage,
+    T: AlignedStorage<Item: Debug>,
     D: FieldDescriptorsOwned + ?Sized,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
     for<'a, 'b> FieldDescriptorsIter<'a, D>: FieldDescriptors<'b>,
@@ -391,7 +391,7 @@ where
 
 impl<T, I, F, P> Iterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage,
+    T: AlignedStorage<Item: Copy>,
     I: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<Item = T::Item>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
@@ -421,7 +421,7 @@ where
 
 impl<T, I, F, P> ExactSizeIterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage,
+    T: AlignedStorage<Item: Copy>,
     I: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<Item = T::Item>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
@@ -435,7 +435,7 @@ where
 
 impl<T, I, F, P> FusedIterator for ErasedSoaIntoFields<T, I, F, P>
 where
-    T: AlignedStorage,
+    T: AlignedStorage<Item: Copy>,
     I: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     F: AlignedStorageFromLayout<Item = T::Item>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,

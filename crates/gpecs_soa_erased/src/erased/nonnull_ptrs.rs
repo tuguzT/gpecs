@@ -22,7 +22,6 @@ use crate::{
         },
         traits::{AllocSoa, AllocSoaContext, NonNullPtrs, RawSoaContext},
     },
-    storage::AddressableUnit,
 };
 
 pub struct ErasedSoaNonNullPtrs<D, P>
@@ -201,7 +200,6 @@ impl<'a, D, P, U> ErasedSoaNonNullPtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn iter(&'a self) -> ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P> {
@@ -223,7 +221,6 @@ impl<D, P, U> ErasedSoaNonNullPtrs<D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     #[track_caller]
@@ -268,7 +265,6 @@ where
         where
             I: IntoIterator<Item = (ErasedFieldNonNullPtr<P>, ErasedFieldNonNullPtr<P>)>,
             P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-            U: AddressableUnit,
         {
             let mut iter = iter.into_iter();
             let Some((to, from)) = iter.next() else {
@@ -353,7 +349,6 @@ impl<'a, D, P, U> IntoIterator for &'a ErasedSoaNonNullPtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldNonNullPtr<P>;
     type IntoIter = ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P>;
@@ -368,7 +363,6 @@ impl<D, P, U> IntoIterator for ErasedSoaNonNullPtrs<D, P>
 where
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldNonNullPtr<P>;
     type IntoIter = ErasedSoaNonNullPtrsIter<D::IntoIter, P>;
@@ -474,7 +468,6 @@ impl<'a, D, P, U> ErasedSoaNonNullPtrsIter<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub(super) fn entries(&'a self) -> ErasedSoaNonNullPtrsIter<FieldDescriptorsIter<'a, D>, P> {
@@ -498,7 +491,6 @@ impl<D, P, U> Debug for ErasedSoaNonNullPtrsIter<D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>> + Debug,
-    U: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries = self.entries();
@@ -529,7 +521,6 @@ impl<D, P, U> Iterator for ErasedSoaNonNullPtrsIter<D, P>
 where
     D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldNonNullPtr<P>;
 
@@ -564,7 +555,6 @@ impl<D, P, U> ExactSizeIterator for ErasedSoaNonNullPtrsIter<D, P>
 where
     D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -577,7 +567,6 @@ impl<D, P, U> FusedIterator for ErasedSoaNonNullPtrsIter<D, P>
 where
     D: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
 }
 

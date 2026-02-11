@@ -12,10 +12,8 @@ use crate::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
         error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
     },
-    fmt::SliceUpperHex,
     slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
     soa::field::FieldDescriptor,
-    storage::AddressableUnit,
 };
 
 pub struct ErasedFieldRefMut<'a, T>
@@ -52,7 +50,6 @@ where
 impl<'a, T, U> ErasedFieldRefMut<'a, T>
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn new(desc: FieldDescriptor, buffer: &'a mut [U]) -> Result<Self, ErasedFieldPtrError> {
@@ -164,14 +161,14 @@ where
 impl<T, U> Debug for ErasedFieldRefMut<'_, T>
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
+    U: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &SliceUpperHex(self.as_buffer());
+        let buffer = self.as_buffer();
         f.debug_struct("ErasedFieldRefMut")
             .field("desc", desc)
-            .field("buffer", buffer)
+            .field("buffer", &buffer)
             .finish()
     }
 }
@@ -179,7 +176,6 @@ where
 impl<T, U> AsRef<[U]> for ErasedFieldRefMut<'_, T>
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -190,7 +186,6 @@ where
 impl<T, U> AsMut<[U]> for ErasedFieldRefMut<'_, T>
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [U] {

@@ -11,10 +11,8 @@ use crate::{
         ErasedFieldPtr, ErasedFieldSlicePtr,
         error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
     },
-    fmt::SliceUpperHex,
     slice_item_ptr::ConstSliceItemPtr,
     soa::field::FieldDescriptor,
-    storage::AddressableUnit,
 };
 
 pub struct ErasedFieldSlice<'a, T>
@@ -68,7 +66,6 @@ where
 impl<'a, T, U> ErasedFieldSlice<'a, T>
 where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn new(
@@ -136,11 +133,11 @@ where
 impl<T, U> Debug for ErasedFieldSlice<'_, T>
 where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
+    U: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let buffer = &SliceUpperHex(self.as_buffer());
+        let buffer = &self.as_buffer();
         let len = &self.len();
         f.debug_struct("ErasedFieldSlice")
             .field("desc", desc)
@@ -165,7 +162,6 @@ impl<T> Copy for ErasedFieldSlice<'_, T> where T: ConstSliceItemPtr {}
 impl<T, U> AsRef<[U]> for ErasedFieldSlice<'_, T>
 where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -176,7 +172,6 @@ where
 impl<'a, T, U, V> TryFrom<&'a [V]> for ErasedFieldSlice<'a, T>
 where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 

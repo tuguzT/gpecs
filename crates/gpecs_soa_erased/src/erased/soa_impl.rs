@@ -14,7 +14,7 @@ use crate::{
             SoaAsRefs, SoaContext, SoaRead, SoaWrite,
         },
     },
-    storage::{AddressableUnit, AlignedStorage, AlignedStorageFromLayout},
+    storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
 unsafe impl<D, P, U> RawSoaContext for ErasedSoaContext<D, P>
@@ -22,7 +22,6 @@ where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Ptrs<'a> = ErasedSoaPtrs<FieldDescriptorsOutput<'a, D>, P::Const>;
 
@@ -236,7 +235,6 @@ where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Context = ErasedSoaContext<D, P>;
     type Fields = ErasedSoaFields<U>;
@@ -248,7 +246,7 @@ where
     D: CovariantFieldDescriptors + Clone,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
+    U: Copy,
 {
     #[inline]
     unsafe fn read(context: &Self::Context, src: Ptrs<'_, Self>) -> Self {
@@ -267,7 +265,6 @@ where
     D: CovariantFieldDescriptors,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     unsafe fn write(_: &Self::Context, dst: MutPtrs<'_, Self>, value: Self) {
@@ -305,7 +302,7 @@ where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
+    U: 'data,
 {
     type Refs<'a> = ErasedSoaRefs<'data, FieldDescriptorsOutput<'a, D>, P::Const>;
 
@@ -420,7 +417,7 @@ where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
+    U: 'me,
 {
     #[inline]
     fn as_refs(&'me self, _: &'me Self::Context) -> Refs<'me, 'me, Self> {
@@ -434,7 +431,7 @@ where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
+    U: 'me,
 {
     #[inline]
     fn as_mut_refs(&'me mut self, _: &'me Self::Context) -> RefsMut<'me, 'me, Self> {

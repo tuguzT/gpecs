@@ -1,7 +1,7 @@
 pub use self::{
     init::AlignedInitStorage,
     slice::{AlignedUninitStorage, AlignedUninitStorageError},
-    traits::{AddressableUnit, AlignedStorage, AlignedStorageFromLayout},
+    traits::{AlignedStorage, AlignedStorageFromLayout},
 };
 
 #[cfg(feature = "alloc")]

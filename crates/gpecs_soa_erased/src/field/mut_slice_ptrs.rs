@@ -10,7 +10,6 @@ use crate::{
     },
     slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
     soa::field::FieldDescriptor,
-    storage::AddressableUnit,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -74,7 +73,6 @@ where
 impl<T, U> ErasedFieldSliceMutPtr<T>
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn new(
@@ -142,7 +140,6 @@ where
 impl<T, U, V> TryFrom<*mut [V]> for ErasedFieldSliceMutPtr<T>
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 
@@ -165,7 +162,6 @@ where
 impl<T, U, V> TryFrom<ErasedFieldSliceMutPtr<T>> for *mut [V]
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Error = ErasedFieldIntoValueError<ErasedFieldSliceMutPtr<T>>;
 

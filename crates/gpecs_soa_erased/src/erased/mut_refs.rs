@@ -18,7 +18,6 @@ use crate::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOwned},
         traits::{AllocSoa, RefsMut, Soa, SoaContext},
     },
-    storage::AddressableUnit,
 };
 
 pub struct ErasedSoaRefsMut<'a, D, P>
@@ -155,7 +154,6 @@ impl<'a, D, P, U> ErasedSoaRefsMut<'_, D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn iter(&'a self) -> ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConstPtr<P>> {
@@ -191,7 +189,6 @@ impl<'a, D, P, U> IntoIterator for &'a ErasedSoaRefsMut<'_, D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldRef<'a, CastConstPtr<P>>;
     type IntoIter = ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConstPtr<P>>;
@@ -206,7 +203,6 @@ impl<'a, D, P, U> IntoIterator for &'a mut ErasedSoaRefsMut<'_, D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldRefMut<'a, P>;
     type IntoIter = ErasedSoaRefsMutIter<'a, FieldDescriptorsIter<'a, D>, P>;
@@ -221,7 +217,6 @@ impl<'a, D, P, U> IntoIterator for ErasedSoaRefsMut<'a, D, P>
 where
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldRefMut<'a, P>;
     type IntoIter = ErasedSoaRefsMutIter<'a, D::IntoIter, P>;
@@ -320,7 +315,6 @@ impl<'a, D, P, U> ErasedSoaRefsMutIter<'_, D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub(super) fn entries(&'a self) -> ErasedSoaRefsMutIter<'a, FieldDescriptorsIter<'a, D>, P> {
@@ -335,7 +329,7 @@ impl<D, P, U> Debug for ErasedSoaRefsMutIter<'_, D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
+    U: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries = self.entries();
@@ -347,7 +341,6 @@ impl<'a, D, P, U> Iterator for ErasedSoaRefsMutIter<'a, D, P>
 where
     D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldRefMut<'a, P>;
 
@@ -370,7 +363,6 @@ impl<D, P, U> ExactSizeIterator for ErasedSoaRefsMutIter<'_, D, P>
 where
     D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -383,7 +375,6 @@ impl<D, P, U> FusedIterator for ErasedSoaRefsMutIter<'_, D, P>
 where
     D: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
 }
 

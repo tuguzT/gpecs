@@ -1,17 +1,8 @@
-use core::{alloc::Layout, fmt::UpperHex, mem::MaybeUninit, slice};
-
-/// Marker trait for an addressible unit of memory for a given target (CPU or GPU).
-pub trait AddressableUnit: UpperHex + Copy + Default + 'static {}
-
-/// The smallest addressible unit for any CPU target.
-impl AddressableUnit for u8 {}
-
-/// The guaranteed addressible unit for any GPU target.
-impl AddressableUnit for u32 {}
+use core::{alloc::Layout, mem::MaybeUninit, slice};
 
 /// [Slice](prim@slice) of dynamically aligned, potentially uninitialized addressible units.
 pub unsafe trait AlignedStorage {
-    type Item: AddressableUnit;
+    type Item;
 
     /// Pointer to the start of [slice](AlignedStorage::as_uninit_slice) of self.
     fn as_ptr(&self) -> *const Self::Item;
@@ -94,15 +85,5 @@ pub unsafe trait AlignedStorageFromLayout: AlignedStorage + Sized {
     /// # Errors
     ///
     /// This function returns an error if the given layout is invalid for this type.
-    fn set_layout(&mut self, layout: Layout) -> Result<(), Self::Error> {
-        let mut new = Self::from_layout(layout)?;
-
-        let src = self.as_uninit_slice();
-        let dst = new.as_mut_uninit_slice();
-        let len = usize::min(src.len(), dst.len());
-        dst[..len].copy_from_slice(&src[..len]);
-
-        *self = new;
-        Ok(())
-    }
+    fn set_layout(&mut self, layout: Layout) -> Result<(), Self::Error>;
 }

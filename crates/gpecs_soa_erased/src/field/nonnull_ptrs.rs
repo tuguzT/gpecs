@@ -13,7 +13,6 @@ use crate::{
     },
     slice_item_ptr::{MutSliceItemPtr, NonNullAsPtr, NonNullSliceItemPtr},
     soa::field::FieldDescriptor,
-    storage::AddressableUnit,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -50,7 +49,6 @@ impl<T> ErasedFieldNonNullPtr<T> {
 impl<T, U> ErasedFieldNonNullPtr<T>
 where
     T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn new(ptr: ErasedFieldMutPtr<NonNullAsPtr<T>>) -> Option<Self> {
@@ -185,7 +183,6 @@ where
 impl<T, U, V> TryFrom<NonNull<V>> for ErasedFieldNonNullPtr<T>
 where
     T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Error = InsufficientAlignError;
 
@@ -206,7 +203,6 @@ where
 impl<T, U, V> TryFrom<ErasedFieldNonNullPtr<T>> for NonNull<V>
 where
     T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Error = ErasedFieldIntoValueError<ErasedFieldNonNullPtr<T>>;
 

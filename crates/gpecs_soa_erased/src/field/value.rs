@@ -15,7 +15,6 @@ use crate::{
             ErasedFieldFromValueErrorKind, ErasedFieldIntoValueError, check_into_layout,
         },
     },
-    fmt::SliceUpperHex,
     slice_item_ptr::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
     soa::field::FieldDescriptor,
     storage::{AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
@@ -38,7 +37,7 @@ where
 
 impl<T, P> ErasedField<T, P>
 where
-    T: AlignedStorage,
+    T: AlignedStorage<Item: Copy>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
@@ -103,7 +102,13 @@ where
             }
         }
     }
+}
 
+impl<T, P> ErasedField<T, P>
+where
+    T: AlignedStorage,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+{
     #[inline]
     pub unsafe fn try_into<V>(self) -> Result<V, ErasedFieldIntoValueError<Self>> {
         let desc = self.descriptor();
@@ -130,7 +135,7 @@ where
 
 impl<T, P> ErasedField<T, P>
 where
-    T: AlignedStorageFromLayout,
+    T: AlignedStorageFromLayout<Item: Copy>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
@@ -273,12 +278,12 @@ where
 
 impl<T, P> Debug for ErasedField<T, P>
 where
-    T: AlignedStorage + ?Sized,
+    T: AlignedStorage<Item: Debug> + ?Sized,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.descriptor();
-        let data = &SliceUpperHex(self.as_slice());
+        let data = &self.as_slice();
         f.debug_struct("ErasedField")
             .field("desc", desc)
             .field("data", data)

@@ -26,7 +26,6 @@ use crate::{
         },
         traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext},
     },
-    storage::AddressableUnit,
 };
 
 pub struct ErasedSoaPtrs<D, P>
@@ -231,7 +230,6 @@ impl<'a, D, P, U> ErasedSoaPtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn iter(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, P> {
@@ -303,7 +301,6 @@ impl<'a, D, P, U> IntoIterator for &'a ErasedSoaPtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldPtr<P>;
     type IntoIter = ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, P>;
@@ -318,7 +315,6 @@ impl<D, P, U> IntoIterator for ErasedSoaPtrs<D, P>
 where
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
     P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldPtr<P>;
     type IntoIter = ErasedSoaPtrsIter<D::IntoIter, P>;
@@ -424,7 +420,6 @@ impl<'a, D, P, U> ErasedSoaPtrsIter<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
     P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     pub(super) fn entries(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, P> {
@@ -448,7 +443,6 @@ impl<D, P, U> Debug for ErasedSoaPtrsIter<D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
     P: ConstSliceItemPtr<Item = MaybeUninit<U>> + Debug,
-    U: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries = self.entries();
@@ -479,7 +473,6 @@ impl<D, P, U> Iterator for ErasedSoaPtrsIter<D, P>
 where
     D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     type Item = ErasedFieldPtr<P>;
 
@@ -514,7 +507,6 @@ impl<D, P, U> ExactSizeIterator for ErasedSoaPtrsIter<D, P>
 where
     D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -527,7 +519,6 @@ impl<D, P, U> FusedIterator for ErasedSoaPtrsIter<D, P>
 where
     D: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
     P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: AddressableUnit,
 {
 }
 

@@ -9,23 +9,19 @@ use core::{
 
 use crate::{
     error::{InsufficientLenError, NotAlignedError, check_ptr_align, check_sufficient_len},
-    storage::{AddressableUnit, AlignedStorage},
+    storage::AlignedStorage,
 };
 
 pub struct AlignedUninitStorage<T, U>
 where
     T: ?Sized,
-    U: AddressableUnit,
 {
     phantom: PhantomData<fn() -> U>,
     layout: Layout,
     inner: T,
 }
 
-impl<T, U> AlignedUninitStorage<T, U>
-where
-    U: AddressableUnit,
-{
+impl<T, U> AlignedUninitStorage<T, U> {
     #[inline]
     pub unsafe fn new_unchecked(inner: T, layout: Layout) -> Self {
         Self {
@@ -45,7 +41,6 @@ where
 impl<T, U> AlignedUninitStorage<T, U>
 where
     T: AsRef<[MaybeUninit<U>]>,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitStorageError> {
@@ -61,7 +56,6 @@ where
 impl<T, U> AlignedUninitStorage<T, U>
 where
     T: ?Sized,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn as_inner(&self) -> &T {
@@ -85,7 +79,6 @@ where
 impl<T, U> AlignedUninitStorage<T, U>
 where
     T: AsRef<[MaybeUninit<U>]> + ?Sized,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn as_slice(&self) -> &[MaybeUninit<U>] {
@@ -97,7 +90,6 @@ where
 impl<T, U> AlignedUninitStorage<T, U>
 where
     T: AsMut<[MaybeUninit<U>]> + ?Sized,
-    U: AddressableUnit,
 {
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<U>] {
@@ -109,7 +101,6 @@ where
 impl<T, U> AsRef<[MaybeUninit<U>]> for AlignedUninitStorage<T, U>
 where
     T: AsRef<[MaybeUninit<U>]> + ?Sized,
-    U: AddressableUnit,
 {
     #[inline]
     fn as_ref(&self) -> &[MaybeUninit<U>] {
@@ -120,7 +111,6 @@ where
 impl<T, U> AsMut<[MaybeUninit<U>]> for AlignedUninitStorage<T, U>
 where
     T: AsMut<[MaybeUninit<U>]> + ?Sized,
-    U: AddressableUnit,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [MaybeUninit<U>] {
@@ -131,7 +121,6 @@ where
 impl<T, U> Debug for AlignedUninitStorage<T, U>
 where
     T: Debug + ?Sized,
-    U: AddressableUnit,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { layout, inner, .. } = self;
@@ -145,7 +134,6 @@ where
 impl<T, U> Clone for AlignedUninitStorage<T, U>
 where
     T: Clone,
-    U: AddressableUnit,
 {
     fn clone(&self) -> Self {
         let Self {
@@ -162,17 +150,11 @@ where
     }
 }
 
-impl<T, U> Copy for AlignedUninitStorage<T, U>
-where
-    T: Copy,
-    U: AddressableUnit,
-{
-}
+impl<T, U> Copy for AlignedUninitStorage<T, U> where T: Copy {}
 
 impl<T, U> PartialEq for AlignedUninitStorage<T, U>
 where
     T: PartialEq + ?Sized,
-    U: AddressableUnit,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -185,17 +167,11 @@ where
     }
 }
 
-impl<T, U> Eq for AlignedUninitStorage<T, U>
-where
-    T: Eq + ?Sized,
-    U: AddressableUnit,
-{
-}
+impl<T, U> Eq for AlignedUninitStorage<T, U> where T: Eq + ?Sized {}
 
 impl<T, U> Hash for AlignedUninitStorage<T, U>
 where
     T: Hash + ?Sized,
-    U: AddressableUnit,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self {
@@ -213,7 +189,6 @@ where
 unsafe impl<T, U> AlignedStorage for AlignedUninitStorage<T, U>
 where
     T: AsRef<[MaybeUninit<U>]> + AsMut<[MaybeUninit<U>]> + ?Sized,
-    U: AddressableUnit,
 {
     type Item = U;
 

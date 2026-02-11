@@ -3,7 +3,7 @@ use core::{
     iter::FusedIterator,
 };
 
-use crate::field::{CopiedFieldDescriptors, FieldDescriptor, repeat_layout};
+use crate::field::{CopiedFieldDescriptors, FieldDescriptor};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BufferOffset {
@@ -95,7 +95,7 @@ where
         } = *self;
 
         let desc = inner.next()?;
-        let item = try_create_buffer_offset(desc, layout, capacity);
+        let item = try_buffer_offset_from_desc(desc, layout, capacity);
         Some(item)
     }
 
@@ -126,19 +126,27 @@ where
 }
 
 #[inline]
-fn try_create_buffer_offset(
+fn try_buffer_offset_from_desc(
     desc: FieldDescriptor,
-    total_layout: &mut Layout,
+    buffer_layout: &mut Layout,
     capacity: usize,
 ) -> Result<BufferOffset, LayoutError> {
-    let layout = repeat_layout(desc.layout(), capacity)?;
+    let layout = desc.layout().pad_to_align();
+    let layout = repeat_packed(layout, capacity)?;
 
     let offset;
-    (*total_layout, offset) = total_layout.extend(layout)?;
+    (*buffer_layout, offset) = buffer_layout.extend(layout)?;
 
     Ok(BufferOffset {
         desc,
         layout,
         offset,
     })
+}
+
+/// Copy of [`Layout::repeat_packed()`] on stable channel.
+#[inline]
+fn repeat_packed(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
+    let size = layout.size().saturating_mul(n);
+    Layout::from_size_align(size, layout.align())
 }

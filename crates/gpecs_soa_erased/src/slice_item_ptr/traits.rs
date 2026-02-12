@@ -26,13 +26,20 @@ pub unsafe trait SliceItemPtr: Copy {
 }
 
 pub unsafe trait ConstSliceItemPtr: SliceItemPtr {
-    type Ptrs: SliceItemPtrs<Item = Self::Item>;
+    type Ptrs: SliceItemPtrs<Item = Self::Item, Const = Self>;
 
     unsafe fn from_slice(slice: *const [Self::Item], index: usize) -> Self;
 
     fn slice(self) -> *const [Self::Item];
 
-    unsafe fn as_ref<'a>(self) -> &'a Self::Item;
+    fn as_item_ptr(self) -> *const Self::Item {
+        let count = self.index();
+        unsafe { self.slice().cast::<Self::Item>().add(count) }
+    }
+
+    unsafe fn as_item<'a>(self) -> &'a Self::Item {
+        unsafe { &*self.as_item_ptr() }
+    }
 
     fn cast_mut(self) -> CastMutPtr<Self> {
         let slice = self.slice().cast_mut();
@@ -42,13 +49,26 @@ pub unsafe trait ConstSliceItemPtr: SliceItemPtr {
 }
 
 pub unsafe trait MutSliceItemPtr: SliceItemPtr {
-    type Ptrs: SliceItemPtrs<Item = Self::Item>;
+    type Ptrs: SliceItemPtrs<Item = Self::Item, Mut = Self>;
 
     unsafe fn from_slice(slice: *mut [Self::Item], index: usize) -> Self;
 
     fn slice(self) -> *mut [Self::Item];
 
-    unsafe fn as_mut<'a>(self) -> &'a mut Self::Item;
+    fn as_mut_item_ptr(self) -> *mut Self::Item {
+        let count = self.index();
+        unsafe { self.slice().cast::<Self::Item>().add(count) }
+    }
+
+    unsafe fn as_mut_item<'a>(self) -> &'a mut Self::Item {
+        unsafe { &mut *self.as_mut_item_ptr() }
+    }
+
+    fn cast_const(self) -> CastConstPtr<Self> {
+        let slice = self.slice().cast_const();
+        let index = self.index();
+        unsafe { ConstSliceItemPtr::from_slice(slice, index) }
+    }
 
     unsafe fn write(self, value: Self::Item);
 
@@ -57,20 +77,19 @@ pub unsafe trait MutSliceItemPtr: SliceItemPtr {
     unsafe fn copy_from(self, src: CastConstPtr<Self>, count: usize);
 
     unsafe fn copy_from_nonoverlapping(self, src: CastConstPtr<Self>, count: usize);
-
-    fn cast_const(self) -> CastConstPtr<Self> {
-        let slice = self.slice().cast_const();
-        let index = self.index();
-        unsafe { ConstSliceItemPtr::from_slice(slice, index) }
-    }
 }
 
 pub unsafe trait NonNullSliceItemPtr: SliceItemPtr {
-    type Ptrs: SliceItemPtrs<Item = Self::Item>;
+    type Ptrs: SliceItemPtrs<Item = Self::Item, NonNull = Self>;
 
     unsafe fn from_slice(slice: NonNull<[Self::Item]>, index: usize) -> Self;
 
     fn slice(self) -> NonNull<[Self::Item]>;
+
+    fn as_item_ptr(self) -> NonNull<Self::Item> {
+        let count = self.index();
+        unsafe { self.slice().cast::<Self::Item>().add(count) }
+    }
 
     fn as_ptr(self) -> NonNullAsPtr<Self> {
         let slice = self.slice().as_ptr();

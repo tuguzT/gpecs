@@ -7,6 +7,7 @@ use core::{
 };
 
 use crate::{
+    bytes_to_items::item_count,
     error::{check_layout, check_len, check_sufficient_align},
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
@@ -87,7 +88,7 @@ where
         let desc = FieldDescriptor::of::<V>();
 
         let data = ptr::from_ref(&value).cast();
-        let len = desc.layout().size().div_ceil(size_of::<T::Item>());
+        let len = item_count::<T::Item>(desc);
         let data = unsafe { slice::from_raw_parts(data, len) };
 
         match Self::try_from_storage_desc_data(storage, desc, data) {
@@ -168,7 +169,7 @@ where
         let desc = FieldDescriptor::of::<V>();
 
         let data = ptr::from_ref(&value).cast();
-        let len = desc.layout().size().div_ceil(size_of::<T::Item>());
+        let len = item_count::<T::Item>(desc);
         let data = unsafe { slice::from_raw_parts(data, len) };
 
         match Self::try_from_desc_data(desc, data) {

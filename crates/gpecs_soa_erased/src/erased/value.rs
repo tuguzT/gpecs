@@ -11,6 +11,7 @@ use core::{
 use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
+    bytes_to_items::{from_bytes_to_items, item_count},
     erased::{
         CovariantFieldDescriptors, ErasedSoaRefs, ErasedSoaRefsMut,
         assert::check_into_value,
@@ -407,9 +408,8 @@ where
         } = *self;
 
         let BufferOffset { desc, offset, .. } = unsafe { offsets.next()?.unwrap_unchecked() };
-
-        let offset = offset.div_ceil(size_of::<T::Item>());
-        let len = desc.layout().size().div_ceil(size_of::<T::Item>());
+        let offset = from_bytes_to_items::<T::Item>(offset);
+        let len = item_count::<T::Item>(desc);
 
         let data = unsafe { storage.as_ptr().add(offset) };
         let data = unsafe { slice::from_raw_parts(data, len) };
@@ -535,13 +535,12 @@ where
             let error = IterLenMismatch(error).into();
             return Err(error);
         };
+
         let BufferOffset { desc, offset, .. } = offset?;
+        check_sufficient_align(desc.layout(), Layout::new::<T>())?;
 
-        let layout = desc.layout();
-        check_sufficient_align(layout, Layout::new::<T>())?;
-
-        let offset = offset.div_ceil(size_of::<T>());
-        let len = layout.size().div_ceil(size_of::<T>());
+        let offset = from_bytes_to_items::<T>(offset);
+        let len = item_count::<T>(desc);
         write_copy_of_slice(&mut dst[offset..offset + len], src.as_ref())
             .map_err(|error| FieldLenMismatch { error, field_index })?;
     }

@@ -8,6 +8,7 @@ use core::{
 };
 
 use crate::{
+    bytes_to_items::from_bytes_to_items,
     erased::{
         CovariantFieldDescriptors, ErasedSoaPtrs, ErasedSoaPtrsIter, ErasedSoaRefs,
         ErasedSoaRefsMut,
@@ -548,6 +549,22 @@ where
     }
 }
 
+impl<D, P, U> ErasedSoaMutPtrsIter<D, P>
+where
+    D: ?Sized,
+    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+{
+    #[inline]
+    unsafe fn field_ptr_from_buffer_offset(&self, offset: BufferOffset) -> ErasedFieldMutPtr<P> {
+        let BufferOffset { desc, offset, .. } = offset;
+        let index = from_bytes_to_items::<U>(offset);
+
+        let Self { buffer, offset, .. } = *self;
+        let ptr = unsafe { P::from_slice(buffer, index) };
+        unsafe { ErasedFieldMutPtr::from_parts(desc, ptr).add(offset) }
+    }
+}
+
 impl<'a, D, P, U> ErasedSoaMutPtrsIter<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
@@ -610,21 +627,11 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self {
-            ref mut inner,
-            buffer,
-            offset,
-            ..
-        } = *self;
+        let Self { inner, .. } = self;
 
-        let field_ptr = {
-            let BufferOffset { desc, offset, .. } = unsafe { inner.next()?.unwrap_unchecked() };
-            let index = offset.div_ceil(size_of::<U>());
-            let ptr = unsafe { P::from_slice(buffer, index) };
-            unsafe { ErasedFieldMutPtr::from_parts(desc, ptr) }
-        };
-
-        let item = unsafe { field_ptr.add(offset) };
+        let offset = inner.next()?;
+        let offset = unsafe { offset.unwrap_unchecked() };
+        let item = unsafe { self.field_ptr_from_buffer_offset(offset) };
         Some(item)
     }
 

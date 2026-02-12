@@ -1,11 +1,7 @@
-use core::{
-    alloc::Layout,
-    mem::MaybeUninit,
-    ops::Range,
-    ptr::{self, NonNull},
-};
+use core::{alloc::Layout, mem::MaybeUninit, ops::Range, ptr::NonNull};
 
 use crate::{
+    bytes_to_items::item_count,
     error::{InsufficientAlignError, check_sufficient_align},
     field::{
         ErasedFieldMutPtr,
@@ -85,8 +81,8 @@ where
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { desc, ptr } = self;
 
-        let field_size = desc.layout().size().div_ceil(size_of::<U>());
-        let ptr = unsafe { ptr.add(count * field_size) };
+        let count = count * item_count::<U>(desc);
+        let ptr = unsafe { ptr.add(count) };
         unsafe { Self::from_parts(desc, ptr) }
     }
 
@@ -96,19 +92,18 @@ where
         let Self { desc, ptr } = self;
 
         let offset = unsafe { ptr.offset_from(origin.ptr()) };
-        let field_size = desc.layout().size().div_ceil(size_of::<U>()).cast_signed();
+        let len = item_count::<U>(desc).cast_signed();
         offset
-            .checked_div(field_size)
+            .checked_div(len)
             .expect("erased field pointer should not be a ZST")
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn swap(self, with: Self) {
-        let Self { ptr, .. } = self;
+        let Self { desc, ptr } = self;
 
-        let this_buffer_range = self.buffer_init_range();
-        for i in 0..this_buffer_range.len() {
+        for i in 0..item_count::<U>(desc) {
             let this = unsafe { ptr.add(i) }.as_ptr();
             let with = unsafe { with.ptr.add(i) }.as_ptr();
             unsafe { this.swap(with) }
@@ -121,7 +116,7 @@ where
         let Self { desc, ptr } = self;
 
         let src = from.ptr().as_ptr().cast_const();
-        let count = count * desc.layout().size().div_ceil(size_of::<U>());
+        let count = count * item_count::<U>(desc);
         unsafe { ptr.as_ptr().copy_from(src, count) }
     }
 
@@ -131,7 +126,7 @@ where
         let Self { desc, ptr } = self;
 
         let src = from.ptr().as_ptr().cast_const();
-        let count = count * desc.layout().size().div_ceil(size_of::<U>());
+        let count = count * item_count::<U>(desc);
         unsafe { ptr.as_ptr().copy_from_nonoverlapping(src, count) }
     }
 
@@ -151,26 +146,24 @@ where
     pub fn buffer_init_range(self) -> Range<usize> {
         let Self { desc, ptr } = self;
 
-        let len = desc.layout().size().div_ceil(size_of::<U>());
         let start = ptr.index();
-        let end = start + len;
+        let end = start + item_count::<U>(desc);
         start..end
     }
 
     #[inline]
     pub fn as_buffer(self) -> NonNull<[U]> {
-        let data = self.as_ptr().as_ptr();
-        let len = self.buffer_init_range().len();
-        let buffer = ptr::slice_from_raw_parts_mut(data, len);
-        unsafe { NonNull::new_unchecked(buffer) }
+        let Self { desc, ptr } = self;
+
+        let data = ptr.as_item_ptr().cast();
+        let len = item_count::<U>(desc);
+        NonNull::slice_from_raw_parts(data, len)
     }
 
     #[inline]
     pub fn as_ptr(self) -> NonNull<U> {
         let Self { ptr, .. } = self;
-
-        let offset = self.buffer_init_range().start;
-        unsafe { ptr.slice().cast::<U>().add(offset) }
+        ptr.as_item_ptr().cast()
     }
 }
 
@@ -185,7 +178,7 @@ where
         let desc = FieldDescriptor::of::<V>();
         check_sufficient_align(desc.layout(), Layout::new::<U>())?;
 
-        let len = desc.layout().size().div_ceil(size_of::<U>());
+        let len = item_count::<U>(desc);
         let buffer = NonNull::slice_from_raw_parts(ptr.cast(), len);
         let ptr = unsafe { T::from_slice(buffer, 0) };
 

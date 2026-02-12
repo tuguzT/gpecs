@@ -1,6 +1,7 @@
 use core::{alloc::Layout, mem::MaybeUninit, ptr};
 
 use crate::{
+    bytes_to_items::item_count,
     error::{InsufficientAlignError, check_ptr_align, check_sufficient_align},
     field::{
         ErasedFieldMutPtr, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSlicePtr,
@@ -149,11 +150,10 @@ where
         check_sufficient_align(desc.layout(), Layout::new::<U>())?;
 
         let len = ptr.len();
-        let buffer_len = desc.layout().size().div_ceil(size_of::<U>()) * len;
-        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), buffer_len);
+        let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), item_count::<U>(desc) * len);
+
         let ptr = unsafe { MutSliceItemPtr::from_slice(buffer, 0) };
         let ptr = unsafe { ErasedFieldMutPtr::from_parts(desc, ptr) };
-
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)
     }

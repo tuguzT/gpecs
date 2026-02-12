@@ -1,4 +1,8 @@
-use core::{marker::PhantomData, ptr::NonNull};
+use core::{
+    marker::PhantomData,
+    ptr::{self, NonNull},
+};
+use spirv_std::arch::IndexUnchecked;
 
 use gpecs_soa_erased::slice_item_ptr::{
     ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs,
@@ -98,7 +102,8 @@ where
     #[inline]
     fn as_item_ptr(self) -> *const Self::Item {
         let Self { index, slice } = self;
-        unsafe { &raw const (*slice)[index] }
+        let item = unsafe { (*slice).index_unchecked(index) };
+        ptr::from_ref(item)
     }
 }
 
@@ -148,7 +153,8 @@ where
     #[inline]
     fn as_mut_item_ptr(self) -> *mut T {
         let Self { index, slice } = self;
-        unsafe { &raw mut (*slice)[index] }
+        let item = unsafe { (*slice).index_unchecked_mut(index) };
+        ptr::from_mut(item)
     }
 
     #[inline]
@@ -243,8 +249,8 @@ where
 
     #[inline]
     fn as_item_ptr(self) -> NonNull<Self::Item> {
-        let Self { index, mut slice } = self;
-        let ptr = unsafe { &raw mut slice.as_mut()[index] };
-        unsafe { NonNull::new_unchecked(ptr) }
+        let Self { index, slice } = self;
+        let item = unsafe { slice.as_ref().index_unchecked(index) };
+        NonNull::from_ref(item)
     }
 }

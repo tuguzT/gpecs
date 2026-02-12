@@ -40,11 +40,8 @@ pub fn erased_soa_work(
     let context = unsafe { ErasedSoaContext::new_unchecked(descriptors) };
     let slices = unsafe { ErasedSoaSlicesMut::new_unchecked(descriptors, dense, capacity, 0, len) };
     let mut dense_soa = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, slices);
-    let _ = &mut dense_soa;
 
-    // TODO: fix all the compilation issues
-    // uncomment the line below to get a compilation error to investigate
-    // dense_soa.swap(invocation_id, invocation_id + 1);
+    dense_soa.swap(invocation_id, invocation_id + 1);
 
     dense[invocation_id].write(42);
 }

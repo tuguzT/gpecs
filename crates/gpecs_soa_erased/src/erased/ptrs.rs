@@ -433,6 +433,20 @@ where
     }
 }
 
+impl<D, P, U> ErasedSoaPtrsIter<D, P>
+where
+    D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+{
+    #[inline]
+    pub(super) unsafe fn next_unchecked(&mut self) -> ErasedFieldPtr<P> {
+        let Self { inner, .. } = self;
+
+        let offset = unsafe { inner.next_unchecked() };
+        unsafe { self.field_ptr_from_buffer_offset(offset) }
+    }
+}
+
 impl<'a, D, P, U> ErasedSoaPtrsIter<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,

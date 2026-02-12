@@ -289,10 +289,13 @@ where
     where
         E: FieldDescriptorsOwned + ?Sized,
     {
-        assert_descriptors(self.field_descriptors(), with.field_descriptors());
+        let n = assert_descriptors(self.field_descriptors(), with.field_descriptors());
 
-        // TODO: rewrite this loop without zip
-        for (this, with) in itertools::zip_eq(self, with) {
+        let mut this = self.iter_mut();
+        let mut with = with.iter_mut();
+        for _ in 0..n {
+            let this = unsafe { this.next_unchecked() };
+            let with = unsafe { with.next_unchecked() };
             unsafe { this.swap(with) }
         }
     }
@@ -301,15 +304,19 @@ where
     #[track_caller]
     pub unsafe fn copy_from_forward<'e, E>(
         &mut self,
-        from: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
+        src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
     {
-        assert_descriptors(self.field_descriptors(), from.field_descriptors());
+        let n = assert_descriptors(self.field_descriptors(), src.field_descriptors());
 
-        for (this, from) in itertools::zip_eq(self, from) {
-            unsafe { this.copy_from(from, count) }
+        let mut dst = self.iter_mut();
+        let mut src = src.iter();
+        for _ in 0..n {
+            let dst = unsafe { dst.next_unchecked() };
+            let src = unsafe { src.next_unchecked() };
+            unsafe { dst.copy_from(src, count) }
         }
     }
 
@@ -317,45 +324,56 @@ where
     #[track_caller]
     pub unsafe fn copy_from_backward<'e, E>(
         &mut self,
-        from: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
+        src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
     {
-        assert_descriptors(self.field_descriptors(), from.field_descriptors());
-
         #[inline]
-        #[expect(clippy::items_after_statements)]
-        fn rec<I, P, U>(iter: I, count: usize)
-        where
-            I: IntoIterator<Item = (ErasedFieldMutPtr<P>, ErasedFieldPtr<CastConstPtr<P>>)>,
+        fn rec<D, E, P, U>(
+            dst_iter: &mut ErasedSoaMutPtrsIter<D, P>,
+            src_iter: &mut ErasedSoaPtrsIter<E, CastConstPtr<P>>,
+            n: usize,
+            count: usize,
+        ) where
+            D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+            E: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
             P: MutSliceItemPtr<Item = MaybeUninit<U>>,
         {
-            let mut iter = iter.into_iter();
-            let Some((to, from)) = iter.next() else {
+            if n == 0 {
                 return;
-            };
+            }
+            let dst = unsafe { dst_iter.next_unchecked() };
+            let src = unsafe { src_iter.next_unchecked() };
 
-            rec(iter, count);
-            unsafe { to.copy_from(from, count) }
+            rec(dst_iter, src_iter, n - 1, count);
+            unsafe { dst.copy_from(src, count) }
         }
 
-        rec(itertools::zip_eq(self, from), count);
+        let n = assert_descriptors(self.field_descriptors(), src.field_descriptors());
+        let mut dst = self.iter_mut();
+        let mut src = src.iter();
+
+        rec(&mut dst, &mut src, n, count);
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping<'e, E>(
         &mut self,
-        from: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
+        src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
     {
-        assert_descriptors(self.field_descriptors(), from.field_descriptors());
+        let n = assert_descriptors(self.field_descriptors(), src.field_descriptors());
 
-        for (this, from) in itertools::zip_eq(self, from) {
-            unsafe { this.copy_from_nonoverlapping(from, count) }
+        let mut dst = self.iter_mut();
+        let mut src = src.iter();
+        for _ in 0..n {
+            let dst = unsafe { dst.next_unchecked() };
+            let src = unsafe { src.next_unchecked() };
+            unsafe { dst.copy_from_nonoverlapping(src, count) }
         }
     }
 }
@@ -562,6 +580,20 @@ where
         let Self { buffer, offset, .. } = *self;
         let ptr = unsafe { P::from_slice(buffer, index) };
         unsafe { ErasedFieldMutPtr::from_parts(desc, ptr).add(offset) }
+    }
+}
+
+impl<D, P, U> ErasedSoaMutPtrsIter<D, P>
+where
+    D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+{
+    #[inline]
+    pub(super) unsafe fn next_unchecked(&mut self) -> ErasedFieldMutPtr<P> {
+        let Self { inner, .. } = self;
+
+        let offset = unsafe { inner.next_unchecked() };
+        unsafe { self.field_ptr_from_buffer_offset(offset) }
     }
 }
 

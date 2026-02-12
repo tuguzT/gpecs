@@ -112,20 +112,20 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from(self, from: Self, count: usize) {
+    pub unsafe fn copy_from(self, src: Self, count: usize) {
         let Self { desc, ptr } = self;
 
-        let src = from.ptr().as_ptr().cast_const();
+        let src = src.ptr().as_ptr().cast_const();
         let count = count * item_count::<U>(desc);
         unsafe { ptr.as_ptr().copy_from(src, count) }
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn copy_from_nonoverlapping(self, from: Self, count: usize) {
+    pub unsafe fn copy_from_nonoverlapping(self, src: Self, count: usize) {
         let Self { desc, ptr } = self;
 
-        let src = from.ptr().as_ptr().cast_const();
+        let src = src.ptr().as_ptr().cast_const();
         let count = count * item_count::<U>(desc);
         unsafe { ptr.as_ptr().copy_from_nonoverlapping(src, count) }
     }

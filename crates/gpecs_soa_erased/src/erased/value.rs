@@ -2,7 +2,7 @@ use core::{
     alloc::{Layout, LayoutError},
     error::Error,
     fmt::{self, Debug, Display},
-    iter::FusedIterator,
+    iter::{self, FusedIterator},
     marker::PhantomData,
     mem::MaybeUninit,
     slice,
@@ -213,6 +213,26 @@ where
             descriptors.field_descriptors(),
         )?;
 
+        let me = unsafe { Self::new_unchecked(storage, descriptors) };
+        Ok(me)
+    }
+}
+
+impl<T, D, P> ErasedSoa<T, D, P>
+where
+    T: AlignedStorageFromLayout<Item: Copy>,
+    D: FromIterator<FieldDescriptor>,
+{
+    #[inline]
+    pub fn try_from_fields_with_descriptors<I, F, E>(
+        fields_with_descriptors: I,
+    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<T::Error>>
+    where
+        I: IntoIterator<Item = (F, E)>,
+        F: AsRef<[T::Item]>,
+        E: AsRef<FieldDescriptor>,
+    {
+        let (storage, descriptors) = storage_from_fields_with_descriptors(fields_with_descriptors)?;
         let me = unsafe { Self::new_unchecked(storage, descriptors) };
         Ok(me)
     }
@@ -541,8 +561,52 @@ where
 
         let offset = from_bytes_to_items::<T>(offset);
         let len = item_count::<T>(desc);
-        write_copy_of_slice(&mut dst[offset..offset + len], src.as_ref())
+        let dst = &mut dst[offset..offset + len];
+        write_copy_of_slice(dst, src.as_ref())
             .map_err(|error| FieldLenMismatch { error, field_index })?;
     }
     Ok(())
+}
+
+fn storage_from_fields_with_descriptors<I, T, F, E, D>(
+    fields_with_descriptors: I,
+) -> Result<(T, D), ErasedSoaFromFieldsDescriptorsError<T::Error>>
+where
+    T: AlignedStorageFromLayout<Item: Copy>,
+    D: FromIterator<FieldDescriptor>,
+    I: IntoIterator<Item = (F, E)>,
+    F: AsRef<[T::Item]>,
+    E: AsRef<FieldDescriptor>,
+{
+    use ErasedSoaFromFieldsDescriptorsError::FromLayout;
+    use IterOrFieldLenMismatchError::FieldLenMismatch;
+
+    let mut storage = T::from_layout(Layout::new::<()>()).map_err(FromLayout)?;
+    let descriptors = fields_with_descriptors
+        .into_iter()
+        .enumerate()
+        .map(|(field_index, (src, desc))| {
+            let mut buffer_offsets =
+                unsafe { BufferOffsets::from_parts(storage.layout(), 1, iter::once(desc)) };
+
+            let BufferOffset { desc, offset, .. } = buffer_offsets
+                .next()
+                .expect("should have exactly one item")?;
+            check_sufficient_align(desc.layout(), Layout::new::<T::Item>())?;
+
+            storage
+                .set_layout(buffer_offsets.into_layout())
+                .map_err(FromLayout)?;
+
+            let offset = from_bytes_to_items::<T::Item>(offset);
+            let len = item_count::<T::Item>(desc);
+            let dst = &mut storage.as_mut_uninit_slice()[offset..offset + len];
+            write_copy_of_slice(dst, src.as_ref())
+                .map_err(|error| FieldLenMismatch { error, field_index })?;
+
+            Ok(desc)
+        })
+        .collect::<Result<_, ErasedSoaFromFieldsDescriptorsError<_>>>()?;
+
+    Ok((storage, descriptors))
 }

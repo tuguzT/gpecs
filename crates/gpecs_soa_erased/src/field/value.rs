@@ -127,10 +127,10 @@ where
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, AlignedInitStorage<T>) {
+    pub fn into_parts(self) -> (AlignedInitStorage<T>, FieldDescriptor) {
         let Self { storage, .. } = self;
         let desc = storage_descriptor(&storage);
-        (desc, storage)
+        (storage, desc)
     }
 }
 

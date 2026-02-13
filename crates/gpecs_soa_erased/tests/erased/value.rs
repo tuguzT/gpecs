@@ -161,14 +161,13 @@ fn value() {
         str,
     );
 
-    let (descriptors, fields): (ArrayDescriptors<FieldDescriptor, 4>, ArrayVec<_, 4>) =
-        fields.into_iter().map(ErasedField::into_parts).unzip();
-    let erased_value = ErasedSoa::<
-        BoxedAlignedUninitStorage,
-        _,
-        CoreSliceItemPtrs<MaybeUninit<u8>>,
-    >::try_from_fields_descriptors(fields, descriptors)
-    .expect("all the fields should be valid here");
+    let erased_value =
+        ErasedSoa::<
+            BoxedAlignedUninitStorage,
+            ArrayDescriptors<FieldDescriptor, 4>,
+            CoreSliceItemPtrs<MaybeUninit<u8>>,
+        >::try_from_fields_with_descriptors(fields.into_iter().map(ErasedField::into_parts))
+        .expect("all the fields should be valid here");
 
     let erased_value_refs = erased_value.as_fields();
     itertools::assert_equal(

@@ -106,7 +106,7 @@ impl BoxedAlignedUninitStorage {
             return Ok(());
         }
 
-        if new_layout.size() != 0 && layout.align() == new_layout.align() {
+        if layout.align() == new_layout.align() && layout.size() != 0 && new_layout.size() != 0 {
             let new_ptr = unsafe { realloc(ptr.as_ptr(), layout, new_layout.size()) };
             let Some(new_ptr) = NonNull::new(new_ptr) else {
                 return Err(AllocError);
@@ -303,5 +303,10 @@ mod tests {
         let ptr = bytes.as_mut_ptr().cast::<()>();
         let value = unsafe { ptr.read() };
         assert_eq!(value, ());
+
+        let layout = Layout::new::<u8>();
+        bytes.set_layout(layout).unwrap();
+        assert_eq!(bytes.layout(), layout);
+        assert_eq!(bytes.as_ptr().align_offset(layout.align()), 0);
     }
 }

@@ -1,6 +1,6 @@
 use core::{alloc::Layout, mem::MaybeUninit, slice};
 
-/// [Slice](prim@slice) of dynamically aligned, potentially uninitialized addressible units.
+/// [Slice](prim@slice) of dynamically aligned, potentially uninitialized data.
 pub unsafe trait AlignedStorage {
     type Item;
 
@@ -14,7 +14,7 @@ pub unsafe trait AlignedStorage {
     fn layout(&self) -> Layout;
 
     /// Retrieve an uninitialized [slice](prim@slice) of self,
-    /// even if such addressible units could be initialized.
+    /// even if such data could be initialized.
     fn as_uninit_slice(&self) -> &[MaybeUninit<Self::Item>] {
         let data = self.as_ptr().cast();
         let len = self.layout().size();
@@ -22,7 +22,7 @@ pub unsafe trait AlignedStorage {
     }
 
     /// Retrieve a mutable uninitialized [slice](prim@slice) of self,
-    /// even if such addressible units could be initialized.
+    /// even if such data could be initialized.
     fn as_mut_uninit_slice(&mut self) -> &mut [MaybeUninit<Self::Item>] {
         let data = self.as_mut_ptr().cast();
         let len = self.layout().size();
@@ -68,7 +68,7 @@ where
 /// # Safety
 ///
 /// - [`set_layout()`](AlignedStorageFromLayout::set_layout()) should preserve old data
-///   by copying it from the old byte slice to the new one.
+///   by copying it from the old slice to the new one.
 pub unsafe trait AlignedStorageFromLayout: AlignedStorage + Sized {
     /// An error type which could occur during construction of self from a given layout.
     type Error;

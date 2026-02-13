@@ -110,11 +110,10 @@ pub unsafe fn from_erased_fields<'a, T>(
 where
     T: AllocSoa + Soa<'a> + SoaRead,
 {
-    let (descriptors, fields): (Vec<_>, Vec<_>) =
+    let fields_with_descriptors =
         reorder_fields::<T, _, _>(components, context, component_ids, fields)
-            .map(ErasedField::into_parts)
-            .unzip();
-    let erased_value = ErasedBundle::try_from_fields_descriptors(fields, descriptors.into())
+            .map(ErasedField::into_parts);
+    let erased_value = ErasedBundle::try_from_fields_with_descriptors(fields_with_descriptors)
         .expect("all the fields should be valid");
     unsafe { erased_value.try_into::<T>(context) }.expect("all the fields should be valid")
 }

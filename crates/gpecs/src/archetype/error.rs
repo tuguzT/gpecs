@@ -3,7 +3,10 @@ use std::{
     fmt::{self, Debug, Display},
 };
 
-use crate::{bundle::Bundle, component::registry::ComponentId};
+use crate::{
+    bundle::Bundle,
+    component::{error::ComponentNotRegisteredError, registry::ComponentId},
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DuplicateComponentError {
@@ -220,18 +223,6 @@ impl Error for RemoveBundleExactError {
         }
     }
 }
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[non_exhaustive]
-pub struct ComponentNotRegisteredError;
-
-impl Display for ComponentNotRegisteredError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "component was not registered")
-    }
-}
-
-impl Error for ComponentNotRegisteredError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum GetComponentsError {

@@ -20,12 +20,8 @@ use petgraph::{
 };
 
 use crate::{
-    archetype::storage::ArchetypeStorage,
     bundle::Bundle,
-    component::{
-        registry::{ComponentId, ComponentRegistry},
-        utils::{try_collect_component_ids, try_collect_maybe_component_ids},
-    },
+    component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
     hash::{IndexMap, IndexSet},
     soa::{
@@ -35,15 +31,17 @@ use crate::{
 };
 
 use super::{
+    collect::{try_collect_component_ids, try_collect_maybe_component_ids},
     erased::{
         ErasedComponent, ErasedComponents, drop_erased_in_place, from_erased_fields,
         into_erased_fields,
     },
     error::{
-        AlreadyHasComponentError, DuplicateComponentError, GetComponentsError,
-        IncompatibleBundleError, InsertBundleError, InsertBundleExactError, MissingComponentError,
-        RemoveBundleExactError,
+        AlreadyHasComponentError, IncompatibleBundleError, InsertBundleError,
+        InsertBundleExactError, MissingComponentError, RemoveBundleExactError,
     },
+    error::{DuplicateComponentError, GetComponentsError},
+    storage::ArchetypeStorage,
 };
 
 /// Archetype [identifier](ArchetypeId) of some [entity](Entity).

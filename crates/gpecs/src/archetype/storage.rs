@@ -10,10 +10,7 @@ use indexmap::map::Keys as IndexMapKeys;
 
 use crate::{
     bundle::Bundle,
-    component::{
-        registry::{ComponentId, ComponentRegistry, DropFn},
-        utils::{try_collect_component_ids, try_collect_maybe_component_ids},
-    },
+    component::registry::{ComponentId, ComponentRegistry, DropFn},
     entity::Entity,
     hash::{IndexMap, IndexSet},
     soa::{
@@ -23,6 +20,7 @@ use crate::{
 };
 
 use super::{
+    collect::{try_collect_component_ids, try_collect_maybe_component_ids},
     erased::{
         ErasedBundle, ErasedBundleRef, ErasedComponent, ErasedComponentRef, ErasedComponentRefMut,
         ErasedComponentSlice, ErasedComponentSliceMut, ErasedComponents, drop_erased_in_place,

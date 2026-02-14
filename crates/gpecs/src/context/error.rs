@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     archetype::error::{
-        AlreadyHasComponentError, ComponentNotRegisteredError, DuplicateComponentError,
+        AlreadyHasComponentError, DuplicateComponentError,
         IncompatibleBundleError as ArchetypeIncompatibleBundleError,
         InsertBundleError as ArchetypeInsertBundleError,
         InsertBundleExactError as ArchetypeInsertBundleExactError,
@@ -13,6 +13,7 @@ use crate::{
         RemoveBundleExactError as ArchetypeRemoveBundleExactError,
     },
     bundle::Bundle,
+    component::error::ComponentNotRegisteredError,
     entity::Entity,
 };
 

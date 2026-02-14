@@ -13,8 +13,8 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::error::DuplicateComponentError,
-    component::{registry::ComponentRegistry, utils::try_collect_component_ids},
+    archetype::{collect::try_collect_component_ids, error::DuplicateComponentError},
+    component::registry::ComponentRegistry,
     entity::Entity,
     executor::gpu::component::registry::GpuComponentId,
     hash::{IndexMap, IndexSet},

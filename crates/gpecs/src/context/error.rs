@@ -13,7 +13,7 @@ use crate::{
         RemoveBundleExactError as ArchetypeRemoveBundleExactError,
     },
     bundle::Bundle,
-    component::error::ComponentNotRegisteredError,
+    component::error::NotRegisteredError,
     entity::Entity,
 };
 
@@ -50,7 +50,7 @@ pub enum IncompatibleBundleError {
     EntityNotFound(EntityNotFoundError),
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
-    ComponentNotRegistered(ComponentNotRegisteredError),
+    ComponentNotRegistered(NotRegisteredError),
 }
 
 impl From<EntityNotFoundError> for IncompatibleBundleError {
@@ -74,9 +74,9 @@ impl From<MissingComponentError> for IncompatibleBundleError {
     }
 }
 
-impl From<ComponentNotRegisteredError> for IncompatibleBundleError {
+impl From<NotRegisteredError> for IncompatibleBundleError {
     #[inline]
-    fn from(error: ComponentNotRegisteredError) -> Self {
+    fn from(error: NotRegisteredError) -> Self {
         Self::ComponentNotRegistered(error)
     }
 }

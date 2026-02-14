@@ -10,7 +10,7 @@ use crate::{
     error::InsufficientAlignError,
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef,
-        error::{ErasedFieldIntoValueError, ErasedFieldPtrError},
+        error::{DowncastError, PtrError},
     },
     slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
     soa::field::FieldDescriptor,
@@ -52,7 +52,7 @@ where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
-    pub fn new(desc: FieldDescriptor, buffer: &'a mut [U]) -> Result<Self, ErasedFieldPtrError> {
+    pub fn new(desc: FieldDescriptor, buffer: &'a mut [U]) -> Result<Self, PtrError> {
         let ptr = ErasedFieldMutPtr::new(desc, buffer)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
@@ -66,28 +66,37 @@ where
     }
 
     #[inline]
-    pub unsafe fn try_into<V>(self) -> Result<&'a mut V, ErasedFieldIntoValueError<Self>> {
+    pub unsafe fn downcast<V>(self) -> Result<&'a mut V, DowncastError<Self>> {
         let Self { ptr, .. } = self;
         let into_self = |ptr| unsafe { Self::from_ptr(ptr) };
-        let ptr = <*mut V>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let ptr = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
         let r#ref = unsafe { ptr.as_mut().unwrap_unchecked() };
         Ok(r#ref)
     }
 
     #[inline]
-    pub unsafe fn cast<V>(&self) -> Result<&V, ErasedFieldIntoValueError<&Self>> {
+    pub unsafe fn downcast_ref<V>(&self) -> Result<&V, DowncastError<&Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let ptr = <*mut V>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let ptr = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
         let r#ref = unsafe { ptr.as_ref().unwrap_unchecked() };
         Ok(r#ref)
     }
 
     #[inline]
-    pub unsafe fn cast_mut<V>(&mut self) -> Result<&mut V, ErasedFieldIntoValueError<&mut Self>> {
+    pub unsafe fn downcast_mut<V>(&mut self) -> Result<&mut V, DowncastError<&mut Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let ptr = <*mut V>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let ptr = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
         let r#ref = unsafe { ptr.as_mut().unwrap_unchecked() };
         Ok(r#ref)
     }

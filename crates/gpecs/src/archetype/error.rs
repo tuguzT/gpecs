@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     bundle::Bundle,
-    component::{error::ComponentNotRegisteredError, registry::ComponentId},
+    component::{error::NotRegisteredError, registry::ComponentId},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -227,7 +227,7 @@ impl Error for RemoveBundleExactError {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum GetComponentsError {
     DuplicateComponent(DuplicateComponentError),
-    ComponentNotRegistered(ComponentNotRegisteredError),
+    ComponentNotRegistered(NotRegisteredError),
 }
 
 impl From<DuplicateComponentError> for GetComponentsError {
@@ -237,9 +237,9 @@ impl From<DuplicateComponentError> for GetComponentsError {
     }
 }
 
-impl From<ComponentNotRegisteredError> for GetComponentsError {
+impl From<NotRegisteredError> for GetComponentsError {
     #[inline]
-    fn from(error: ComponentNotRegisteredError) -> Self {
+    fn from(error: NotRegisteredError) -> Self {
         Self::ComponentNotRegistered(error)
     }
 }
@@ -266,7 +266,7 @@ impl Error for GetComponentsError {
 pub enum IncompatibleBundleError {
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
-    ComponentNotRegistered(ComponentNotRegisteredError),
+    ComponentNotRegistered(NotRegisteredError),
 }
 
 impl From<DuplicateComponentError> for IncompatibleBundleError {
@@ -295,9 +295,9 @@ impl From<GetComponentsError> for IncompatibleBundleError {
     }
 }
 
-impl From<ComponentNotRegisteredError> for IncompatibleBundleError {
+impl From<NotRegisteredError> for IncompatibleBundleError {
     #[inline]
-    fn from(error: ComponentNotRegisteredError) -> Self {
+    fn from(error: NotRegisteredError) -> Self {
         Self::ComponentNotRegistered(error)
     }
 }
@@ -346,7 +346,7 @@ impl Error for TooFewComponentsError {}
 pub enum IncompatibleBundleExactError {
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
-    ComponentNotRegistered(ComponentNotRegisteredError),
+    ComponentNotRegistered(NotRegisteredError),
     TooFewComponents(TooFewComponentsError),
 }
 
@@ -364,9 +364,9 @@ impl From<MissingComponentError> for IncompatibleBundleExactError {
     }
 }
 
-impl From<ComponentNotRegisteredError> for IncompatibleBundleExactError {
+impl From<NotRegisteredError> for IncompatibleBundleExactError {
     #[inline]
-    fn from(error: ComponentNotRegisteredError) -> Self {
+    fn from(error: NotRegisteredError) -> Self {
         Self::ComponentNotRegistered(error)
     }
 }

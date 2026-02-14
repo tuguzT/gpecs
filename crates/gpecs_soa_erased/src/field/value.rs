@@ -12,8 +12,8 @@ use crate::{
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
         error::{
-            ErasedFieldFromDescDataError, ErasedFieldFromStorageError, ErasedFieldFromValueError,
-            ErasedFieldFromValueErrorKind, ErasedFieldIntoValueError, check_into_layout,
+            DowncastError, FromDescDataError, FromStorageError, FromValueError, FromValueErrorKind,
+            check_downcast,
         },
     },
     slice_item_ptr::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
@@ -46,31 +46,31 @@ where
         mut storage: T,
         desc: FieldDescriptor,
         data: V,
-    ) -> Result<Self, ErasedFieldFromStorageError<T>>
+    ) -> Result<Self, FromStorageError<T>>
     where
         V: AsRef<[T::Item]>,
     {
         let layout = storage.layout();
         if let Err(err) = check_sufficient_align(layout, Layout::new::<T::Item>()) {
-            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
+            return Err(FromStorageError::new(err.into(), storage));
         }
 
         let data = data.as_ref();
         let len = size_of_val(data);
         if let Err(err) = check_len(len, layout.size()) {
-            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
+            return Err(FromStorageError::new(err.into(), storage));
         }
 
         let expected_layout = desc.layout();
         if let Err(err) = check_len(len, expected_layout.size()) {
-            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
+            return Err(FromStorageError::new(err.into(), storage));
         }
         if let Err(err) = check_layout(layout, expected_layout) {
-            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
+            return Err(FromStorageError::new(err.into(), storage));
         }
 
         if let Err(err) = write_copy_of_slice(storage.as_mut_uninit_slice(), data) {
-            return Err(ErasedFieldFromStorageError::new(err.into(), storage));
+            return Err(FromStorageError::new(err.into(), storage));
         }
 
         let me = Self {
@@ -84,7 +84,7 @@ where
     pub fn try_from_storage_value<V>(
         storage: T,
         value: V,
-    ) -> Result<Self, ErasedFieldFromStorageError<(T, V)>> {
+    ) -> Result<Self, FromStorageError<(T, V)>> {
         let desc = FieldDescriptor::of::<V>();
 
         let data = ptr::from_ref(&value).cast();
@@ -97,8 +97,8 @@ where
                 Ok(me)
             }
             Err(err) => {
-                let ErasedFieldFromStorageError { reason, storage } = err;
-                let err = ErasedFieldFromStorageError::new(reason, (storage, value));
+                let FromStorageError { reason, storage } = err;
+                let err = FromStorageError::new(reason, (storage, value));
                 Err(err)
             }
         }
@@ -111,10 +111,9 @@ where
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
-    pub unsafe fn try_into<V>(self) -> Result<V, ErasedFieldIntoValueError<Self>> {
-        let desc = self.descriptor();
-        let me = check_into_layout::<V, _>(desc.layout(), self)?;
-        let Self { storage, .. } = me;
+    pub unsafe fn downcast<V>(self) -> Result<V, DowncastError<Self>> {
+        let layout = self.descriptor().layout();
+        let Self { storage, .. } = check_downcast::<V, _>(layout, self)?;
 
         let src = storage.as_ptr().cast();
         Ok(unsafe { ptr::read(src) })
@@ -143,7 +142,7 @@ where
     pub fn try_from_desc_data<V>(
         desc: FieldDescriptor,
         data: V,
-    ) -> Result<Self, ErasedFieldFromDescDataError<T::Error>>
+    ) -> Result<Self, FromDescDataError<T::Error>>
     where
         V: AsRef<[T::Item]>,
     {
@@ -153,8 +152,7 @@ where
         let data = data.as_ref();
         check_len(size_of_val(data), layout.size())?;
 
-        let mut storage =
-            T::from_layout(layout).map_err(ErasedFieldFromDescDataError::FromLayout)?;
+        let mut storage = T::from_layout(layout).map_err(FromDescDataError::FromLayout)?;
         write_copy_of_slice(storage.as_mut_uninit_slice(), data)?;
 
         let me = Self {
@@ -165,7 +163,7 @@ where
     }
 
     #[inline]
-    pub fn try_from<V>(value: V) -> Result<Self, ErasedFieldFromValueError<T::Error, V>> {
+    pub fn try_from<V>(value: V) -> Result<Self, FromValueError<T::Error, V>> {
         let desc = FieldDescriptor::of::<V>();
 
         let data = ptr::from_ref(&value).cast();
@@ -177,14 +175,14 @@ where
                 forget(value);
                 Ok(me)
             }
-            Err(ErasedFieldFromDescDataError::LenMismatch(error)) => unreachable!("{error}"),
-            Err(ErasedFieldFromDescDataError::InsufficientAlign(error)) => {
-                let error = ErasedFieldFromValueError::new(error.into(), value);
+            Err(FromDescDataError::LenMismatch(error)) => unreachable!("{error}"),
+            Err(FromDescDataError::InsufficientAlign(error)) => {
+                let error = FromValueError::new(error.into(), value);
                 Err(error)
             }
-            Err(ErasedFieldFromDescDataError::FromLayout(error)) => {
-                let reason = ErasedFieldFromValueErrorKind::FromLayout(error);
-                let error = ErasedFieldFromValueError::new(reason, value);
+            Err(FromDescDataError::FromLayout(error)) => {
+                let reason = FromValueErrorKind::FromLayout(error);
+                let error = FromValueError::new(reason, value);
                 Err(error)
             }
         }
@@ -203,20 +201,18 @@ where
     }
 
     #[inline]
-    pub unsafe fn cast<V>(&self) -> Result<&V, ErasedFieldIntoValueError<&Self>> {
-        let desc = self.descriptor();
-        let me = check_into_layout::<V, _>(desc.layout(), self)?;
-        let Self { storage, .. } = me;
+    pub unsafe fn downcast_ref<V>(&self) -> Result<&V, DowncastError<&Self>> {
+        let layout = self.descriptor().layout();
+        let Self { storage, .. } = check_downcast::<V, _>(layout, self)?;
 
         let ptr = storage.as_ptr().cast();
         Ok(unsafe { &*ptr })
     }
 
     #[inline]
-    pub unsafe fn cast_mut<V>(&mut self) -> Result<&mut V, ErasedFieldIntoValueError<&mut Self>> {
-        let desc = self.descriptor();
-        let me = check_into_layout::<V, _>(desc.layout(), self)?;
-        let Self { storage, .. } = me;
+    pub unsafe fn downcast_mut<V>(&mut self) -> Result<&mut V, DowncastError<&mut Self>> {
+        let layout = self.descriptor().layout();
+        let Self { storage, .. } = check_downcast::<V, _>(layout, self)?;
 
         let ptr = storage.as_mut_ptr().cast();
         Ok(unsafe { &mut *ptr })

@@ -5,7 +5,7 @@ use crate::{
     error::{InsufficientAlignError, check_sufficient_align},
     field::{
         ErasedFieldMutPtr,
-        error::{ErasedFieldIntoValueError, check_into_layout},
+        error::{DowncastError, check_downcast},
     },
     slice_item_ptr::{MutSliceItemPtr, NonNullAsPtr, NonNullSliceItemPtr},
     soa::field::FieldDescriptor,
@@ -77,6 +77,15 @@ where
     }
 
     #[inline]
+    pub fn downcast<V>(self) -> Result<NonNull<V>, DowncastError<Self>> {
+        let Self { desc, .. } = self;
+        let Self { ptr, .. } = check_downcast::<V, _>(desc.layout(), self)?;
+
+        let ptr = ptr.as_item_ptr().cast();
+        Ok(ptr)
+    }
+
+    #[inline]
     #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { desc, ptr } = self;
@@ -99,7 +108,6 @@ where
     }
 
     #[inline]
-    #[track_caller]
     pub unsafe fn swap(self, with: Self) {
         let Self { desc, ptr } = self;
 
@@ -111,7 +119,6 @@ where
     }
 
     #[inline]
-    #[track_caller]
     pub unsafe fn copy_from(self, src: Self, count: usize) {
         let Self { desc, ptr } = self;
 
@@ -121,7 +128,6 @@ where
     }
 
     #[inline]
-    #[track_caller]
     pub unsafe fn copy_from_nonoverlapping(self, src: Self, count: usize) {
         let Self { desc, ptr } = self;
 
@@ -191,14 +197,10 @@ impl<T, U, V> TryFrom<ErasedFieldNonNullPtr<T>> for NonNull<V>
 where
     T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
 {
-    type Error = ErasedFieldIntoValueError<ErasedFieldNonNullPtr<T>>;
+    type Error = DowncastError<ErasedFieldNonNullPtr<T>>;
 
     #[inline]
-    fn try_from(value: ErasedFieldNonNullPtr<T>) -> Result<Self, Self::Error> {
-        let ErasedFieldNonNullPtr { desc, .. } = value;
-        let value = check_into_layout::<V, _>(desc.layout(), value)?;
-
-        let ptr = value.as_ptr().cast();
-        Ok(ptr)
+    fn try_from(ptr: ErasedFieldNonNullPtr<T>) -> Result<Self, Self::Error> {
+        ptr.downcast()
     }
 }

@@ -69,7 +69,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(0).unwrap();
     assert_eq!(
-        unsafe { field_ref.try_into::<()>() }.expect("layouts should match"),
+        unsafe { field_ref.downcast::<()>() }.expect("layouts should match"),
         &(),
     );
     assert_eq!(
@@ -81,7 +81,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(1).unwrap();
     assert_eq!(
-        unsafe { field_ref.try_into::<u8>() }.expect("layouts should match"),
+        unsafe { field_ref.downcast::<u8>() }.expect("layouts should match"),
         &i3,
     );
     assert_eq!(
@@ -93,7 +93,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(2).unwrap();
     assert_eq!(
-        unsafe { field_ref.try_into::<u16>() }.expect("layouts should match"),
+        unsafe { field_ref.downcast::<u16>() }.expect("layouts should match"),
         &i2,
     );
     assert_eq!(
@@ -105,7 +105,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(3).unwrap();
     assert_eq!(
-        unsafe { field_ref.try_into::<u32>() }.expect("layouts should match"),
+        unsafe { field_ref.downcast::<u32>() }.expect("layouts should match"),
         &i1,
     );
     assert_eq!(
@@ -117,7 +117,7 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(4).unwrap();
     assert_eq!(
-        unsafe { field_ref.try_into::<String>() }.expect("layouts should match"),
+        unsafe { field_ref.downcast::<String>() }.expect("layouts should match"),
         &str,
     );
 
@@ -157,7 +157,7 @@ fn value() {
         .expect("allocation of small byte array should succeed");
     let field: BoxedErasedField<_> = fields.pop().expect("string field should exist");
     assert_eq!(
-        unsafe { field.try_into::<String>() }.expect("layouts should match"),
+        unsafe { field.downcast::<String>() }.expect("layouts should match"),
         str,
     );
 
@@ -178,7 +178,7 @@ fn value() {
     );
 
     let context = Default::default();
-    let value = unsafe { erased_value.try_into::<((), u32, u16, u8)>(&context) }
+    let value = unsafe { erased_value.downcast::<((), u32, u16, u8)>(&context) }
         .expect("all the fields should be valid here");
     assert_eq!(value, ((), i1, i2, i3));
 }
@@ -219,7 +219,7 @@ fn value_zst() {
         field_refs.into_iter().map(ErasedFieldRef::into_buffer),
     );
 
-    let value = unsafe { erased_value.try_into::<()>(&context) }
+    let value = unsafe { erased_value.downcast::<()>(&context) }
         .expect("all the fields should be valid here");
     assert_eq!(value, ());
 }

@@ -43,7 +43,7 @@ fn new() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -51,7 +51,7 @@ fn new() {
     assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -64,7 +64,7 @@ fn new() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        unsafe { into_iter.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { into_iter.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 }
@@ -96,7 +96,7 @@ fn new_zst() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -104,7 +104,7 @@ fn new_zst() {
     assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -117,7 +117,7 @@ fn new_zst() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        unsafe { into_iter.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { into_iter.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 }
@@ -155,7 +155,7 @@ fn with_capacity() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -163,7 +163,7 @@ fn with_capacity() {
     assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -176,7 +176,7 @@ fn with_capacity() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        unsafe { into_iter.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { into_iter.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 }
@@ -209,7 +209,7 @@ fn with_capacity_zst() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -217,7 +217,7 @@ fn with_capacity_zst() {
     assert!(slices.is_empty());
 
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -230,7 +230,7 @@ fn with_capacity_zst() {
     assert!(into_iter.is_empty());
 
     assert_eq!(
-        unsafe { into_iter.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { into_iter.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 }
@@ -269,7 +269,7 @@ fn one_item() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&u8, &u64, &u16, &())),
     );
 
@@ -279,7 +279,7 @@ fn one_item() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -291,7 +291,7 @@ fn one_item() {
     let slices = vec.slices();
     assert_eq!(slices.len(), 1);
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -302,12 +302,12 @@ fn one_item() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&u8, &u64, &u16, &())),
     );
 
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
             [u64].as_slice(),
@@ -320,7 +320,7 @@ fn one_item() {
     assert_eq!(iter.len(), 1);
     assert_eq!(
         iter.next_back()
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&u8, &u64, &u16, &())),
     );
     assert!(iter.next().is_none());
@@ -330,11 +330,11 @@ fn one_item() {
     assert!(vec.capacity() >= 1);
     assert!(vec.slices().into_get(0).is_none());
 
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, (u8, u64, u16, ()));
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         ([].as_slice(), [].as_slice(), [].as_slice(), [].as_slice()),
     );
 
@@ -373,7 +373,7 @@ fn one_item_zst() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
@@ -383,25 +383,25 @@ fn one_item_zst() {
     };
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [()].as_slice(),
     );
 
     let slices = vec.slices();
     assert_eq!(slices.len(), 1);
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [()].as_slice(),
     );
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [()].as_slice(),
     );
 
@@ -409,7 +409,7 @@ fn one_item_zst() {
     assert_eq!(iter.len(), 1);
     assert_eq!(
         iter.next_back()
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert!(iter.next().is_none());
@@ -419,11 +419,11 @@ fn one_item_zst() {
     assert!(vec.capacity() >= 1);
     assert!(vec.slices().into_get(0).is_none());
 
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, ());
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [].as_slice(),
     );
 
@@ -473,24 +473,24 @@ fn three_items() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(1)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(2)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&0, &"0".to_owned(), &0, &())),
     );
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [0; 3].as_slice(),
             ["0".to_owned(), "0".to_owned(), "0".to_owned()].as_slice(),
@@ -502,7 +502,7 @@ fn three_items() {
     // use `drain` instead of `truncate` to drop all the contents,
     // erased vec does not do it automatically
     for erased in vec.drain(..) {
-        let (t, u, v, w) = unsafe { erased.try_into::<Soa>(&context) }.unwrap();
+        let (t, u, v, w) = unsafe { erased.downcast::<Soa>(&context) }.unwrap();
         assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
     }
 
@@ -523,7 +523,7 @@ fn three_items() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [4, 7, 1].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
@@ -541,7 +541,7 @@ fn three_items() {
     assert_eq!(slices.len(), 3);
 
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [4, 7, 1].as_slice(),
             ["5".to_owned(), "8".to_owned(), "2".to_owned()].as_slice(),
@@ -553,24 +553,24 @@ fn three_items() {
     assert_eq!(
         slices
             .get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&4, &"5".to_owned(), &6, &())),
     );
     assert_eq!(
         slices
             .get(1)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&7, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
         slices
             .get(2)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&1, &"2".to_owned(), &3, &())),
     );
 
     for refs in &mut vec {
-        let (t, _, _, _) = unsafe { refs.try_into::<Soa>(&context) }.unwrap();
+        let (t, _, _, _) = unsafe { refs.downcast::<Soa>(&context) }.unwrap();
         *t += 1;
     }
 
@@ -579,21 +579,21 @@ fn three_items() {
 
     assert_eq!(
         iter.next()
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&5, &"5".to_owned(), &6, &())),
     );
     assert_eq!(iter.len(), 2);
 
     assert_eq!(
         iter.next_back()
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
     assert_eq!(iter.len(), 1);
 
     assert_eq!(
         iter.next()
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(iter.len(), 0);
@@ -613,31 +613,31 @@ fn three_items() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&5, &"5".to_owned(), &6, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(1)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(2)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(3)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&8, &"8".to_owned(), &9, &())),
     );
     assert_eq!(
         vec.slices()
             .into_get(4)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some((&2, &"2".to_owned(), &3, &())),
     );
 
@@ -648,12 +648,12 @@ fn three_items() {
         let value = drain
             .next_back()
             .expect("drain iterator should not be empty");
-        let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+        let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
         assert_eq!(value, (8, "8".to_owned(), 9, ()));
         assert_eq!(drain.len(), 1);
 
         let value = drain.next().expect("drain iterator should not be empty");
-        let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+        let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
         assert_eq!(value, (2, "2".to_owned(), 3, ()));
         assert_eq!(drain.len(), 0);
 
@@ -670,7 +670,7 @@ fn three_items() {
     };
 
     let value = vec.swap_remove(1);
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, (8, "8".to_owned(), 9, ()));
 
     assert_eq!(vec.len(), 2);
@@ -682,7 +682,7 @@ fn three_items() {
     };
 
     let value = vec.pop().expect("vector should not be empty");
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, (2, "2".to_owned(), 3, ()));
 
     assert_eq!(vec.len(), 1);
@@ -694,7 +694,7 @@ fn three_items() {
     };
 
     let value = vec.remove(0);
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, (5, "5".to_owned(), 6, ()));
 
     assert!(vec.is_empty());
@@ -724,7 +724,7 @@ fn three_items() {
     // use `drain` instead of `truncate` to drop needed contents,
     // erased vec does not do it automatically
     for erased in vec.drain(1..) {
-        let (t, u, v, w) = unsafe { erased.try_into::<Soa>(&context) }.unwrap();
+        let (t, u, v, w) = unsafe { erased.downcast::<Soa>(&context) }.unwrap();
         assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
     }
     assert_eq!(vec.len(), 1);
@@ -733,7 +733,7 @@ fn three_items() {
     // use `drain` instead of `clear` to drop all the contents,
     // erased vec does not do it automatically
     for erased in vec.drain(..) {
-        let (t, u, v, w) = unsafe { erased.try_into::<Soa>(&context) }.unwrap();
+        let (t, u, v, w) = unsafe { erased.downcast::<Soa>(&context) }.unwrap();
         assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
     }
     assert!(vec.is_empty());
@@ -754,12 +754,12 @@ fn three_items() {
     // erased vec does not do it automatically
     for index in (0..vec.len()).rev() {
         let refs = vec.mut_slices().into_index_mut(index);
-        let (x, _, _, _) = unsafe { refs.try_into::<Soa>(&context) }.unwrap();
+        let (x, _, _, _) = unsafe { refs.downcast::<Soa>(&context) }.unwrap();
         if *x <= 3 {
             *x += 1;
         } else {
             let erased = vec.remove(index);
-            let _ = unsafe { erased.try_into::<Soa>(&context) };
+            let _ = unsafe { erased.downcast::<Soa>(&context) };
         }
     }
 
@@ -767,7 +767,7 @@ fn three_items() {
     assert!(vec.capacity() >= (1 + 2 * 10));
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [2].as_slice(),
             ["2".to_owned()].as_slice(),
@@ -785,7 +785,7 @@ fn three_items() {
     assert_eq!(into_iter.len(), 1);
 
     let value = into_iter.next_back().expect("iterator should not be empty");
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, (2, "2".to_owned(), 3, ()));
 
     assert!(into_iter.next().is_none());
@@ -821,31 +821,31 @@ fn three_items_zst() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(1)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(2)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 
     // use `drain` instead of `truncate` to drop all the contents,
     // erased vec does not do it automatically
     for erased in vec.drain(..) {
-        let () = unsafe { erased.try_into::<Soa>(&context) }.unwrap();
+        let () = unsafe { erased.downcast::<Soa>(&context) }.unwrap();
     }
 
     vec.insert(0, ErasedSoa::try_from::<Soa>(&context, ()).unwrap());
@@ -856,7 +856,7 @@ fn three_items_zst() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 
@@ -869,31 +869,31 @@ fn three_items_zst() {
     assert_eq!(slices.len(), 3);
 
     assert_eq!(
-        unsafe { slices.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 
     assert_eq!(
         slices
             .get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         slices
             .get(1)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         slices
             .get(2)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
     for refs in &mut vec {
-        let () = unsafe { refs.try_into::<Soa>(&context) }.unwrap();
+        let () = unsafe { refs.downcast::<Soa>(&context) }.unwrap();
     }
 
     let mut iter = vec.slices().into_iter();
@@ -901,21 +901,21 @@ fn three_items_zst() {
 
     assert_eq!(
         iter.next()
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(iter.len(), 2);
 
     assert_eq!(
         iter.next_back()
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(iter.len(), 1);
 
     assert_eq!(
         iter.next()
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(iter.len(), 0);
@@ -935,31 +935,31 @@ fn three_items_zst() {
     assert_eq!(
         vec.slices()
             .into_get(0)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(1)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(2)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(3)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
     assert_eq!(
         vec.slices()
             .into_get(4)
-            .map(|refs| unsafe { refs.try_into::<Soa>(&context) }.unwrap()),
+            .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
         Some(&()),
     );
 
@@ -970,12 +970,12 @@ fn three_items_zst() {
         let value = drain
             .next_back()
             .expect("drain iterator should not be empty");
-        let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+        let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
         assert_eq!(value, ());
         assert_eq!(drain.len(), 1);
 
         let value = drain.next().expect("drain iterator should not be empty");
-        let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+        let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
         assert_eq!(value, ());
         assert_eq!(drain.len(), 0);
 
@@ -992,7 +992,7 @@ fn three_items_zst() {
     };
 
     let value = vec.swap_remove(1);
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, ());
 
     assert_eq!(vec.len(), 2);
@@ -1004,7 +1004,7 @@ fn three_items_zst() {
     };
 
     let value = vec.pop().expect("vector should not be empty");
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, ());
 
     assert_eq!(vec.len(), 1);
@@ -1016,7 +1016,7 @@ fn three_items_zst() {
     };
 
     let value = vec.remove(0);
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, ());
 
     assert!(vec.is_empty());
@@ -1043,7 +1043,7 @@ fn three_items_zst() {
     // use `drain` instead of `truncate` to drop needed contents,
     // erased vec does not do it automatically
     for erased in vec.drain(1..) {
-        let () = unsafe { erased.try_into::<Soa>(&context) }.unwrap();
+        let () = unsafe { erased.downcast::<Soa>(&context) }.unwrap();
     }
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 3);
@@ -1051,7 +1051,7 @@ fn three_items_zst() {
     // use `drain` instead of `clear` to drop all the contents,
     // erased vec does not do it automatically
     for erased in vec.drain(..) {
-        let () = unsafe { erased.try_into::<Soa>(&context) }.unwrap();
+        let () = unsafe { erased.downcast::<Soa>(&context) }.unwrap();
     }
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
@@ -1069,7 +1069,7 @@ fn three_items_zst() {
     assert!(vec.capacity() >= 3);
 
     assert_eq!(
-        unsafe { vec.as_slices().try_into::<Soa>(&context) }.unwrap(),
+        unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         [(); 3].as_slice(),
     );
 
@@ -1082,7 +1082,7 @@ fn three_items_zst() {
     assert_eq!(into_iter.len(), 3);
 
     let value = into_iter.next_back().expect("iterator should not be empty");
-    let value = unsafe { value.try_into::<Soa>(&context) }.unwrap();
+    let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
     assert_eq!(value, ());
 
     assert_eq!(into_iter.len(), 2);

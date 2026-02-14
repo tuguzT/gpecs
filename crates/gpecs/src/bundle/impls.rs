@@ -6,12 +6,10 @@ use gpecs_soa_erased::{
 };
 
 use crate::{
-    bundle::{
-        Bundle,
-        error::PtrsFromIterError::{self, MissingComponent},
-    },
+    bundle::{Bundle, error::PtrsFromIterError},
     component::{
         Component,
+        error::NotRegisteredError,
         registry::{ComponentId, ComponentRegistry},
     },
     soa::{
@@ -51,11 +49,11 @@ where
         I: IntoIterator<Item = (ComponentId, ErasedFieldPtr<P>)>,
         P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
     {
-        let component_id = components.component_id::<T>().ok_or(MissingComponent)?;
+        let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
         let (_, ptr) = iter
             .into_iter()
             .find(|(id, _)| *id == component_id)
-            .ok_or(MissingComponent)?;
+            .ok_or(NotRegisteredError)?;
 
         let ptr = ptr.try_into()?;
         Ok(ptr)
@@ -70,11 +68,11 @@ where
         I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
         P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
     {
-        let component_id = components.component_id::<T>().ok_or(MissingComponent)?;
+        let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
         let (_, ptr) = iter
             .into_iter()
             .find(|(id, _)| *id == component_id)
-            .ok_or(MissingComponent)?;
+            .ok_or(NotRegisteredError)?;
 
         let ptr = ptr.try_into()?;
         Ok(ptr)
@@ -120,7 +118,7 @@ macro_rules! bundle_tuple_impl {
                 Iter: IntoIterator<Item = (ComponentId, ErasedFieldPtr<P>)>,
                 P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
             {
-                let component_ids = [$(components.component_id::<$types>().ok_or(MissingComponent)?,)*];
+                let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 
                 let mut ptrs = ($(None::<*const $types>,)*);
                 for (id, ptr) in iter {
@@ -131,7 +129,7 @@ macro_rules! bundle_tuple_impl {
                     )*
                 }
 
-                let ptrs = ($(ptrs.$indices.ok_or(MissingComponent)?,)*);
+                let ptrs = ($(ptrs.$indices.ok_or(NotRegisteredError)?,)*);
                 Ok(ptrs)
             }
 
@@ -144,7 +142,7 @@ macro_rules! bundle_tuple_impl {
                 Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
                 P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
             {
-                let component_ids = [$(components.component_id::<$types>().ok_or(MissingComponent)?,)*];
+                let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 
                 let mut ptrs = ($(None::<*mut $types>,)*);
                 for (id, ptr) in iter {
@@ -155,7 +153,7 @@ macro_rules! bundle_tuple_impl {
                     )*
                 }
 
-                let ptrs = ($(ptrs.$indices.ok_or(MissingComponent)?,)*);
+                let ptrs = ($(ptrs.$indices.ok_or(NotRegisteredError)?,)*);
                 Ok(ptrs)
             }
         }

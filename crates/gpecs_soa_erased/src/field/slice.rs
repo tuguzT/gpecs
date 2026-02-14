@@ -9,7 +9,7 @@ use crate::{
     error::InsufficientAlignError,
     field::{
         ErasedFieldPtr, ErasedFieldSlicePtr,
-        error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+        error::{DowncastError, SlicePtrError},
     },
     slice_item_ptr::ConstSliceItemPtr,
     soa::field::FieldDescriptor,
@@ -27,6 +27,12 @@ impl<T> ErasedFieldSlice<'_, T>
 where
     T: ConstSliceItemPtr,
 {
+    #[inline]
+    pub unsafe fn from_parts(ptr: ErasedFieldPtr<T>, len: usize) -> Self {
+        let ptr = unsafe { ErasedFieldSlicePtr::from_parts(ptr, len) };
+        unsafe { Self::from_ptr(ptr) }
+    }
+
     #[inline]
     pub unsafe fn from_ptr(ptr: ErasedFieldSlicePtr<T>) -> Self {
         let phantom = PhantomData;
@@ -61,6 +67,12 @@ where
         let Self { ptr, .. } = self;
         ptr.field_ptr()
     }
+
+    #[inline]
+    pub fn into_parts(self) -> (ErasedFieldPtr<T>, usize) {
+        let Self { ptr, .. } = self;
+        ptr.into_parts()
+    }
 }
 
 impl<'a, T, U> ErasedFieldSlice<'a, T>
@@ -68,30 +80,32 @@ where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
-    pub fn new(
-        desc: FieldDescriptor,
-        buffer: &'a [U],
-        len: usize,
-    ) -> Result<Self, ErasedFieldSlicePtrError> {
+    pub fn new(desc: FieldDescriptor, buffer: &'a [U], len: usize) -> Result<Self, SlicePtrError> {
         let ptr = ErasedFieldSlicePtr::new(desc, buffer, len)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
     }
 
     #[inline]
-    pub unsafe fn try_into<V>(self) -> Result<&'a [V], ErasedFieldIntoValueError<Self>> {
+    pub unsafe fn downcast<V>(self) -> Result<&'a [V], DowncastError<Self>> {
         let Self { ptr, .. } = self;
         let into_self = |ptr| unsafe { Self::from_ptr(ptr) };
-        let buffer = <*const [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
         let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
         Ok(slice)
     }
 
     #[inline]
-    pub unsafe fn cast<V>(&self) -> Result<&[V], ErasedFieldIntoValueError<&Self>> {
+    pub unsafe fn downcast_ref<V>(&self) -> Result<&[V], DowncastError<&Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let buffer = <*const [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
         let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
         Ok(slice)
     }

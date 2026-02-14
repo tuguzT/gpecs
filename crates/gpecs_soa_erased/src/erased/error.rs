@@ -76,7 +76,7 @@ pub fn check_offset(offset: usize, capacity: usize) -> Result<(), InvalidOffsetE
 }
 
 #[derive(Debug, Clone)]
-pub enum ErasedSoaPtrsError {
+pub enum PtrsError {
     NotAligned(NotAlignedError),
     InvalidLayout(LayoutError),
     InvalidOffset(InvalidOffsetError),
@@ -84,42 +84,42 @@ pub enum ErasedSoaPtrsError {
     InsufficientAlign(InsufficientAlignError),
 }
 
-impl From<NotAlignedError> for ErasedSoaPtrsError {
+impl From<NotAlignedError> for PtrsError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<LayoutError> for ErasedSoaPtrsError {
+impl From<LayoutError> for PtrsError {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl From<InvalidOffsetError> for ErasedSoaPtrsError {
+impl From<InvalidOffsetError> for PtrsError {
     #[inline]
     fn from(error: InvalidOffsetError) -> Self {
         Self::InvalidOffset(error)
     }
 }
 
-impl From<InsufficientLenError> for ErasedSoaPtrsError {
+impl From<InsufficientLenError> for PtrsError {
     #[inline]
     fn from(error: InsufficientLenError) -> Self {
         Self::InsufficientLen(error)
     }
 }
 
-impl From<InsufficientAlignError> for ErasedSoaPtrsError {
+impl From<InsufficientAlignError> for PtrsError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl Display for ErasedSoaPtrsError {
+impl Display for PtrsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotAligned(error) => Display::fmt(error, f),
@@ -131,7 +131,7 @@ impl Display for ErasedSoaPtrsError {
     }
 }
 
-impl Error for ErasedSoaPtrsError {
+impl Error for PtrsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::NotAligned(error) => Some(error),
@@ -235,7 +235,7 @@ pub fn check_offset_len(
 }
 
 #[derive(Debug, Clone)]
-pub enum ErasedSoaSlicePtrsError {
+pub enum SlicePtrsError {
     NotAligned(NotAlignedError),
     InvalidLayout(LayoutError),
     InvalidOffset(InvalidOffsetError),
@@ -244,49 +244,49 @@ pub enum ErasedSoaSlicePtrsError {
     InsufficientAlign(InsufficientAlignError),
 }
 
-impl From<NotAlignedError> for ErasedSoaSlicePtrsError {
+impl From<NotAlignedError> for SlicePtrsError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<LayoutError> for ErasedSoaSlicePtrsError {
+impl From<LayoutError> for SlicePtrsError {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl From<InvalidOffsetError> for ErasedSoaSlicePtrsError {
+impl From<InvalidOffsetError> for SlicePtrsError {
     #[inline]
     fn from(error: InvalidOffsetError) -> Self {
         Self::InvalidOffset(error)
     }
 }
 
-impl From<InvalidOffsetLenError> for ErasedSoaSlicePtrsError {
+impl From<InvalidOffsetLenError> for SlicePtrsError {
     #[inline]
     fn from(error: InvalidOffsetLenError) -> Self {
         Self::InvalidOffsetLen(error)
     }
 }
 
-impl From<InsufficientLenError> for ErasedSoaSlicePtrsError {
+impl From<InsufficientLenError> for SlicePtrsError {
     #[inline]
     fn from(error: InsufficientLenError) -> Self {
         Self::InsufficientLen(error)
     }
 }
 
-impl From<InsufficientAlignError> for ErasedSoaSlicePtrsError {
+impl From<InsufficientAlignError> for SlicePtrsError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl Display for ErasedSoaSlicePtrsError {
+impl Display for SlicePtrsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotAligned(error) => Display::fmt(error, f),
@@ -299,7 +299,7 @@ impl Display for ErasedSoaSlicePtrsError {
     }
 }
 
-impl Error for ErasedSoaSlicePtrsError {
+impl Error for SlicePtrsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::NotAligned(error) => Some(error),
@@ -341,42 +341,42 @@ impl Error for IterOrFieldLenMismatchError {
 }
 
 #[derive(Debug, Clone)]
-pub enum ErasedSoaFromStorageFieldsDescriptorsError {
+pub enum FromStorageFieldsDescriptorsError {
     LenMismatch(IterOrFieldLenMismatchError),
     LayoutMismatch(LayoutMismatchError),
     InsufficientAlign(InsufficientAlignError),
     InvalidLayout(LayoutError),
 }
 
-impl From<IterOrFieldLenMismatchError> for ErasedSoaFromStorageFieldsDescriptorsError {
+impl From<IterOrFieldLenMismatchError> for FromStorageFieldsDescriptorsError {
     #[inline]
     fn from(error: IterOrFieldLenMismatchError) -> Self {
         Self::LenMismatch(error)
     }
 }
 
-impl From<LayoutMismatchError> for ErasedSoaFromStorageFieldsDescriptorsError {
+impl From<LayoutMismatchError> for FromStorageFieldsDescriptorsError {
     #[inline]
     fn from(error: LayoutMismatchError) -> Self {
         Self::LayoutMismatch(error)
     }
 }
 
-impl From<InsufficientAlignError> for ErasedSoaFromStorageFieldsDescriptorsError {
+impl From<InsufficientAlignError> for FromStorageFieldsDescriptorsError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl From<LayoutError> for ErasedSoaFromStorageFieldsDescriptorsError {
+impl From<LayoutError> for FromStorageFieldsDescriptorsError {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl Display for ErasedSoaFromStorageFieldsDescriptorsError {
+impl Display for FromStorageFieldsDescriptorsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LenMismatch(error) => Display::fmt(error, f),
@@ -387,7 +387,7 @@ impl Display for ErasedSoaFromStorageFieldsDescriptorsError {
     }
 }
 
-impl Error for ErasedSoaFromStorageFieldsDescriptorsError {
+impl Error for FromStorageFieldsDescriptorsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::LenMismatch(error) => Some(error),
@@ -399,35 +399,35 @@ impl Error for ErasedSoaFromStorageFieldsDescriptorsError {
 }
 
 #[derive(Debug, Clone)]
-pub enum ErasedSoaFromFieldsDescriptorsError<T> {
+pub enum FromFieldsDescriptorsError<T> {
     LenMismatch(IterOrFieldLenMismatchError),
     InsufficientAlign(InsufficientAlignError),
     InvalidLayout(LayoutError),
     FromLayout(T),
 }
 
-impl<T> From<IterOrFieldLenMismatchError> for ErasedSoaFromFieldsDescriptorsError<T> {
+impl<T> From<IterOrFieldLenMismatchError> for FromFieldsDescriptorsError<T> {
     #[inline]
     fn from(value: IterOrFieldLenMismatchError) -> Self {
         Self::LenMismatch(value)
     }
 }
 
-impl<T> From<InsufficientAlignError> for ErasedSoaFromFieldsDescriptorsError<T> {
+impl<T> From<InsufficientAlignError> for FromFieldsDescriptorsError<T> {
     #[inline]
     fn from(value: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(value)
     }
 }
 
-impl<T> From<LayoutError> for ErasedSoaFromFieldsDescriptorsError<T> {
+impl<T> From<LayoutError> for FromFieldsDescriptorsError<T> {
     #[inline]
     fn from(value: LayoutError) -> Self {
         Self::InvalidLayout(value)
     }
 }
 
-impl<T> Display for ErasedSoaFromFieldsDescriptorsError<T>
+impl<T> Display for FromFieldsDescriptorsError<T>
 where
     T: Display,
 {
@@ -441,7 +441,7 @@ where
     }
 }
 
-impl<T> Error for ErasedSoaFromFieldsDescriptorsError<T>
+impl<T> Error for FromFieldsDescriptorsError<T>
 where
     T: Error,
 {
@@ -456,26 +456,26 @@ where
 }
 
 #[derive(Clone)]
-pub enum ErasedSoaFromStorageValueError {
+pub enum FromStorageValueError {
     LayoutMismatch(LayoutMismatchError),
     InvalidLayout(LayoutError),
 }
 
-impl From<LayoutMismatchError> for ErasedSoaFromStorageValueError {
+impl From<LayoutMismatchError> for FromStorageValueError {
     #[inline]
     fn from(error: LayoutMismatchError) -> Self {
         Self::LayoutMismatch(error)
     }
 }
 
-impl From<LayoutError> for ErasedSoaFromStorageValueError {
+impl From<LayoutError> for FromStorageValueError {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl Debug for ErasedSoaFromStorageValueError {
+impl Debug for FromStorageValueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !f.alternate() {
             return Display::fmt(self, f);
@@ -487,7 +487,7 @@ impl Debug for ErasedSoaFromStorageValueError {
     }
 }
 
-impl Display for ErasedSoaFromStorageValueError {
+impl Display for FromStorageValueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LayoutMismatch(error) => Display::fmt(error, f),
@@ -496,7 +496,7 @@ impl Display for ErasedSoaFromStorageValueError {
     }
 }
 
-impl Error for ErasedSoaFromStorageValueError {
+impl Error for FromStorageValueError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::LayoutMismatch(error) => Some(error),
@@ -506,19 +506,19 @@ impl Error for ErasedSoaFromStorageValueError {
 }
 
 #[derive(Debug, Clone)]
-pub enum ErasedSoaFromValueError<T> {
+pub enum FromValueError<T> {
     InvalidLayout(LayoutError),
     FromLayout(T),
 }
 
-impl<T> From<LayoutError> for ErasedSoaFromValueError<T> {
+impl<T> From<LayoutError> for FromValueError<T> {
     #[inline]
     fn from(value: LayoutError) -> Self {
         Self::InvalidLayout(value)
     }
 }
 
-impl<T> Display for ErasedSoaFromValueError<T>
+impl<T> Display for FromValueError<T>
 where
     T: Display,
 {
@@ -530,7 +530,7 @@ where
     }
 }
 
-impl<T> Error for ErasedSoaFromValueError<T>
+impl<T> Error for FromValueError<T>
 where
     T: Error,
 {
@@ -544,41 +544,41 @@ where
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct ErasedSoaIntoValueError<T>
+pub struct DowncastError<T>
 where
     T: ?Sized,
 {
-    pub reason: ErasedSoaIntoValueErrorKind,
+    pub reason: DowncastErrorKind,
     pub value: T,
 }
 
-impl<T> ErasedSoaIntoValueError<T> {
+impl<T> DowncastError<T> {
     #[inline]
-    pub(crate) fn new(value: T, reason: ErasedSoaIntoValueErrorKind) -> Self {
+    pub(crate) fn new(value: T, reason: DowncastErrorKind) -> Self {
         Self { reason, value }
     }
 
     #[inline]
-    pub fn map_value<U, F>(self, f: F) -> ErasedSoaIntoValueError<U>
+    pub fn map_value<U, F>(self, f: F) -> DowncastError<U>
     where
         F: FnOnce(T) -> U,
     {
         let Self { reason, value } = self;
-        ErasedSoaIntoValueError::new(f(value), reason)
+        DowncastError::new(f(value), reason)
     }
 }
 
-impl<T> Display for ErasedSoaIntoValueError<T>
+impl<T> Display for DowncastError<T>
 where
     T: Display + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { reason, value } = self;
-        write!(f, "failed to convert {value}: {reason}")
+        write!(f, "failed to downcast {value}: {reason}")
     }
 }
 
-impl<T> Error for ErasedSoaIntoValueError<T>
+impl<T> Error for DowncastError<T>
 where
     T: Debug + Display + ?Sized,
 {
@@ -589,34 +589,34 @@ where
 }
 
 #[derive(Clone)]
-pub enum ErasedSoaIntoValueErrorKind {
+pub enum DowncastErrorKind {
     LenMismatch(LenMismatchError),
     LayoutMismatch(LayoutMismatchError),
     InvalidLayout(LayoutError),
 }
 
-impl From<LenMismatchError> for ErasedSoaIntoValueErrorKind {
+impl From<LenMismatchError> for DowncastErrorKind {
     #[inline]
     fn from(error: LenMismatchError) -> Self {
         Self::LenMismatch(error)
     }
 }
 
-impl From<LayoutMismatchError> for ErasedSoaIntoValueErrorKind {
+impl From<LayoutMismatchError> for DowncastErrorKind {
     #[inline]
     fn from(error: LayoutMismatchError) -> Self {
         Self::LayoutMismatch(error)
     }
 }
 
-impl From<LayoutError> for ErasedSoaIntoValueErrorKind {
+impl From<LayoutError> for DowncastErrorKind {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl Debug for ErasedSoaIntoValueErrorKind {
+impl Debug for DowncastErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !f.alternate() {
             return Display::fmt(self, f);
@@ -629,7 +629,7 @@ impl Debug for ErasedSoaIntoValueErrorKind {
     }
 }
 
-impl Display for ErasedSoaIntoValueErrorKind {
+impl Display for DowncastErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LenMismatch(error) => Display::fmt(error, f),
@@ -639,7 +639,7 @@ impl Display for ErasedSoaIntoValueErrorKind {
     }
 }
 
-impl Error for ErasedSoaIntoValueErrorKind {
+impl Error for DowncastErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::LenMismatch(error) => Some(error),

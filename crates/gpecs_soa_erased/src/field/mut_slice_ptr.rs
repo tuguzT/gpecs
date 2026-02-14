@@ -5,9 +5,7 @@ use crate::{
     error::{InsufficientAlignError, check_ptr_align, check_sufficient_align},
     field::{
         ErasedFieldMutPtr, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSlicePtr,
-        error::{
-            ErasedFieldIntoValueError, ErasedFieldSlicePtrError, check_into_layout, check_slice_len,
-        },
+        error::{DowncastError, SlicePtrError, check_downcast, check_slice_len},
     },
     slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
     soa::field::FieldDescriptor,
@@ -47,6 +45,12 @@ impl<T> ErasedFieldSliceMutPtr<T> {
         let Self { ptr, .. } = self;
         ptr
     }
+
+    #[inline]
+    pub fn into_parts(self) -> (ErasedFieldMutPtr<T>, usize) {
+        let Self { ptr, len } = self;
+        (ptr, len)
+    }
 }
 
 impl<T> ErasedFieldSliceMutPtr<T>
@@ -76,11 +80,7 @@ where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
-    pub fn new(
-        desc: FieldDescriptor,
-        buffer: *mut [U],
-        len: usize,
-    ) -> Result<Self, ErasedFieldSlicePtrError> {
+    pub fn new(desc: FieldDescriptor, buffer: *mut [U], len: usize) -> Result<Self, SlicePtrError> {
         check_sufficient_align(desc.layout(), Layout::new::<U>())?;
         check_slice_len(buffer.len() * size_of::<U>(), desc.layout().size(), len)?;
         check_ptr_align(buffer.cast(), desc.layout())?;
@@ -91,6 +91,16 @@ where
 
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)
+    }
+
+    #[inline]
+    pub fn downcast<V>(self) -> Result<*mut [V], DowncastError<Self>> {
+        let layout = self.descriptor().layout();
+        let Self { ptr, len, .. } = check_downcast::<V, _>(layout, self)?;
+
+        let data = ptr.as_mut_ptr().cast();
+        let slice = ptr::slice_from_raw_parts_mut(data, len);
+        Ok(slice)
     }
 
     #[inline]
@@ -163,15 +173,10 @@ impl<T, U, V> TryFrom<ErasedFieldSliceMutPtr<T>> for *mut [V]
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
 {
-    type Error = ErasedFieldIntoValueError<ErasedFieldSliceMutPtr<T>>;
+    type Error = DowncastError<ErasedFieldSliceMutPtr<T>>;
 
     #[inline]
-    fn try_from(value: ErasedFieldSliceMutPtr<T>) -> Result<Self, Self::Error> {
-        let value = check_into_layout::<V, _>(value.descriptor().layout(), value)?;
-        let ErasedFieldSliceMutPtr { ptr, len, .. } = value;
-
-        let data = ptr.as_mut_ptr().cast();
-        let slice = ptr::slice_from_raw_parts_mut(data, len);
-        Ok(slice)
+    fn try_from(ptr: ErasedFieldSliceMutPtr<T>) -> Result<Self, Self::Error> {
+        ptr.downcast()
     }
 }

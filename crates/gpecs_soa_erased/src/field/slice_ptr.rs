@@ -5,9 +5,7 @@ use crate::{
     error::{InsufficientAlignError, check_ptr_align, check_sufficient_align},
     field::{
         ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMutPtr,
-        error::{
-            ErasedFieldIntoValueError, ErasedFieldSlicePtrError, check_into_layout, check_slice_len,
-        },
+        error::{DowncastError, SlicePtrError, check_downcast, check_slice_len},
     },
     slice_item_ptr::{CastMutPtr, ConstSliceItemPtr},
     soa::field::FieldDescriptor,
@@ -47,6 +45,12 @@ impl<T> ErasedFieldSlicePtr<T> {
         let Self { ptr, .. } = self;
         ptr
     }
+
+    #[inline]
+    pub fn into_parts(self) -> (ErasedFieldPtr<T>, usize) {
+        let Self { ptr, len } = self;
+        (ptr, len)
+    }
 }
 
 impl<T> ErasedFieldSlicePtr<T>
@@ -75,7 +79,7 @@ where
         desc: FieldDescriptor,
         buffer: *const [U],
         len: usize,
-    ) -> Result<Self, ErasedFieldSlicePtrError> {
+    ) -> Result<Self, SlicePtrError> {
         check_sufficient_align(desc.layout(), Layout::new::<U>())?;
         check_slice_len(buffer.len() * size_of::<U>(), desc.layout().size(), len)?;
         check_ptr_align(buffer.cast(), desc.layout())?;
@@ -86,6 +90,16 @@ where
 
         let me = unsafe { Self::from_parts(ptr, len) };
         Ok(me)
+    }
+
+    #[inline]
+    pub fn downcast<V>(self) -> Result<*const [V], DowncastError<Self>> {
+        let layout = self.descriptor().layout();
+        let Self { ptr, len, .. } = check_downcast::<V, _>(layout, self)?;
+
+        let data = ptr.as_ptr().cast();
+        let slice = ptr::slice_from_raw_parts(data, len);
+        Ok(slice)
     }
 
     #[inline]
@@ -139,15 +153,10 @@ impl<T, U, V> TryFrom<ErasedFieldSlicePtr<T>> for *const [V]
 where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
 {
-    type Error = ErasedFieldIntoValueError<ErasedFieldSlicePtr<T>>;
+    type Error = DowncastError<ErasedFieldSlicePtr<T>>;
 
     #[inline]
-    fn try_from(value: ErasedFieldSlicePtr<T>) -> Result<Self, Self::Error> {
-        let value = check_into_layout::<V, _>(value.descriptor().layout(), value)?;
-        let ErasedFieldSlicePtr { ptr, len, .. } = value;
-
-        let data = ptr.as_ptr().cast();
-        let slice = ptr::slice_from_raw_parts(data, len);
-        Ok(slice)
+    fn try_from(ptr: ErasedFieldSlicePtr<T>) -> Result<Self, Self::Error> {
+        ptr.downcast()
     }
 }

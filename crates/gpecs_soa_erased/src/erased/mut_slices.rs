@@ -10,7 +10,7 @@ use crate::{
     erased::{
         CovariantFieldDescriptors, ErasedSoaSliceMutPtrs, ErasedSoaSliceMutPtrsIter,
         ErasedSoaSlicePtrs, ErasedSoaSlicesIter,
-        error::{ErasedSoaIntoValueError, ErasedSoaSlicePtrsError},
+        error::{DowncastError, SlicePtrsError},
     },
     field::{ErasedFieldSlice, ErasedFieldSliceMut},
     slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
@@ -87,7 +87,7 @@ where
         capacity: usize,
         offset: usize,
         len: usize,
-    ) -> Result<Self, ErasedSoaSlicePtrsError> {
+    ) -> Result<Self, SlicePtrsError> {
         let ptrs = ErasedSoaSliceMutPtrs::new(descriptors, buffer, capacity, offset, len)?;
 
         let me = unsafe { Self::from_mut_ptrs(ptrs) };
@@ -101,16 +101,16 @@ where
     P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
 {
     #[inline]
-    pub unsafe fn try_into<T>(
+    pub unsafe fn downcast<T>(
         self,
         context: &T::Context,
-    ) -> Result<SlicesMut<'_, 'a, T>, ErasedSoaIntoValueError<Self>>
+    ) -> Result<SlicesMut<'_, 'a, T>, DowncastError<Self>>
     where
         T: AllocSoa + Soa<'a> + ?Sized,
     {
         let Self { ptrs, .. } = self;
 
-        let result = unsafe { ptrs.try_into::<T>(context) };
+        let result = unsafe { ptrs.downcast::<T>(context) };
         let into_self = |ptrs| unsafe { Self::from_mut_ptrs(ptrs) };
         let slices = result.map_err(|err| err.map_value(into_self))?;
 

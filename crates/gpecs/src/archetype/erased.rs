@@ -115,7 +115,7 @@ where
             .map(ErasedField::into_parts);
     let erased_value = ErasedBundle::try_from_fields_with_descriptors(fields_with_descriptors)
         .expect("all the fields should be valid");
-    unsafe { erased_value.try_into::<T>(context) }.expect("all the fields should be valid")
+    unsafe { erased_value.downcast::<T>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]

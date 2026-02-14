@@ -5,7 +5,7 @@ use crate::{
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     field::{
         ErasedFieldMutPtr, ErasedFieldRef,
-        error::{ErasedFieldIntoValueError, ErasedFieldPtrError, check_into_layout},
+        error::{DowncastError, PtrError, check_downcast},
     },
     slice_item_ptr::{CastMutPtr, ConstSliceItemPtr},
     soa::field::FieldDescriptor,
@@ -64,7 +64,7 @@ where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
-    pub fn new(desc: FieldDescriptor, buffer: *const [U]) -> Result<Self, ErasedFieldPtrError> {
+    pub fn new(desc: FieldDescriptor, buffer: *const [U]) -> Result<Self, PtrError> {
         check_sufficient_align(desc.layout(), Layout::new::<U>())?;
         check_len(buffer.len() * size_of::<U>(), desc.layout().size())?;
         check_ptr_align(buffer.cast(), desc.layout())?;
@@ -86,6 +86,15 @@ where
 
         let me = unsafe { Self::from_parts(desc, ptr) };
         Ok(me)
+    }
+
+    #[inline]
+    pub fn downcast<V>(self) -> Result<*const V, DowncastError<Self>> {
+        let Self { desc, .. } = self;
+        let Self { ptr, .. } = check_downcast::<V, _>(desc.layout(), self)?;
+
+        let ptr = ptr.as_item_ptr().cast();
+        Ok(ptr)
     }
 
     #[inline]
@@ -171,14 +180,10 @@ impl<T, U, V> TryFrom<ErasedFieldPtr<T>> for *const V
 where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
 {
-    type Error = ErasedFieldIntoValueError<ErasedFieldPtr<T>>;
+    type Error = DowncastError<ErasedFieldPtr<T>>;
 
     #[inline]
-    fn try_from(value: ErasedFieldPtr<T>) -> Result<Self, Self::Error> {
-        let ErasedFieldPtr { desc, .. } = value;
-        let value = check_into_layout::<V, _>(desc.layout(), value)?;
-
-        let ptr = value.as_ptr().cast();
-        Ok(ptr)
+    fn try_from(ptr: ErasedFieldPtr<T>) -> Result<Self, Self::Error> {
+        ptr.downcast()
     }
 }

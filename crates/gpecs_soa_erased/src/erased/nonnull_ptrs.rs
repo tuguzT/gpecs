@@ -10,8 +10,8 @@ use crate::{
     bytes_to_items::from_bytes_to_items,
     erased::{
         CovariantFieldDescriptors, ErasedSoaMutPtrs,
-        assert::{assert_descriptors, check_into_value},
-        error::ErasedSoaIntoValueError,
+        assert::{assert_descriptors, check_downcast},
+        error::DowncastError,
     },
     error::InsufficientAlignError,
     field::ErasedFieldNonNullPtr,
@@ -115,10 +115,10 @@ where
     P: NonNullSliceItemPtr<Item = MaybeUninit<u8>>,
 {
     #[inline]
-    pub unsafe fn try_into<T>(
+    pub unsafe fn downcast<T>(
         self,
         context: &T::Context,
-    ) -> Result<NonNullPtrs<'_, T>, ErasedSoaIntoValueError<Self>>
+    ) -> Result<NonNullPtrs<'_, T>, DowncastError<Self>>
     where
         T: AllocSoa + ?Sized,
     {
@@ -130,9 +130,9 @@ where
             ..
         } = self;
 
-        let result = check_into_value(descriptors.field_descriptors(), context.field_descriptors());
+        let result = check_downcast(descriptors.field_descriptors(), context.field_descriptors());
         if let Err(error) = result {
-            return Err(ErasedSoaIntoValueError::new(self, error));
+            return Err(DowncastError::new(self, error));
         }
 
         unsafe {

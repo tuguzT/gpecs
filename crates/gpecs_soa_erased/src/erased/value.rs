@@ -14,17 +14,16 @@ use crate::{
     bytes_to_items::{from_bytes_to_items, item_count},
     erased::{
         CovariantFieldDescriptors, ErasedSoaRefs, ErasedSoaRefsMut,
-        assert::check_into_value,
+        assert::check_downcast,
         error::{
-            ErasedSoaFromFieldsDescriptorsError, ErasedSoaFromStorageFieldsDescriptorsError,
-            ErasedSoaFromStorageValueError, ErasedSoaFromValueError, ErasedSoaIntoValueError,
-            IterOrFieldLenMismatchError,
+            DowncastError, FromFieldsDescriptorsError, FromStorageFieldsDescriptorsError,
+            FromStorageValueError, FromValueError, IterOrFieldLenMismatchError,
         },
     },
     error::{
         InsufficientAlignError, LenMismatchError, check_layout, check_len, check_sufficient_align,
     },
-    field::{ErasedField, error::ErasedFieldFromDescDataError},
+    field::{ErasedField, error::FromDescDataError},
     slice_item_ptr::SliceItemPtrs,
     soa::{
         field::{
@@ -81,7 +80,7 @@ where
         mut storage: T,
         fields: I,
         descriptors: D,
-    ) -> Result<Self, ErasedSoaFromStorageFieldsDescriptorsError>
+    ) -> Result<Self, FromStorageFieldsDescriptorsError>
     where
         I: IntoIterator<Item = F>,
         F: AsRef<[T::Item]>,
@@ -89,7 +88,7 @@ where
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
             check_sufficient_align(offset?.desc.layout(), Layout::new::<T::Item>())
-                .map_err(ErasedSoaFromStorageFieldsDescriptorsError::from)
+                .map_err(FromStorageFieldsDescriptorsError::from)
         })?;
 
         let layout = storage.layout();
@@ -113,10 +112,7 @@ where
     D: FieldDescriptorsOwned,
 {
     #[inline]
-    pub unsafe fn try_into<V>(
-        self,
-        context: &V::Context,
-    ) -> Result<V, ErasedSoaIntoValueError<Self>>
+    pub unsafe fn downcast<V>(self, context: &V::Context) -> Result<V, DowncastError<Self>>
     where
         V: AllocSoa + SoaRead,
     {
@@ -126,18 +122,17 @@ where
             ..
         } = self;
 
-        if let Err(error) =
-            check_into_value(descriptors.field_descriptors(), context.field_descriptors())
-        {
-            return Err(ErasedSoaIntoValueError::new(self, error));
+        let descriptors = descriptors.field_descriptors();
+        if let Err(error) = check_downcast(descriptors, context.field_descriptors()) {
+            return Err(DowncastError::new(self, error));
         }
 
         let layout = match context.buffer_layout(1) {
             Ok(layout) => layout,
-            Err(error) => return Err(ErasedSoaIntoValueError::new(self, error.into())),
+            Err(error) => return Err(DowncastError::new(self, error.into())),
         };
         if let Err(error) = check_len(layout.size(), storage.layout().size()) {
-            return Err(ErasedSoaIntoValueError::new(self, error.into()));
+            return Err(DowncastError::new(self, error.into()));
         }
 
         let Self { storage, .. } = self;
@@ -191,12 +186,12 @@ where
     pub fn try_from_fields_descriptors<I, F>(
         fields: I,
         descriptors: D,
-    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<T::Error>>
+    ) -> Result<Self, FromFieldsDescriptorsError<T::Error>>
     where
         I: IntoIterator<Item = F>,
         F: AsRef<[T::Item]>,
     {
-        use ErasedSoaFromFieldsDescriptorsError as Error;
+        use FromFieldsDescriptorsError as Error;
 
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
@@ -226,7 +221,7 @@ where
     #[inline]
     pub fn try_from_fields_with_descriptors<I, F, E>(
         fields_with_descriptors: I,
-    ) -> Result<Self, ErasedSoaFromFieldsDescriptorsError<T::Error>>
+    ) -> Result<Self, FromFieldsDescriptorsError<T::Error>>
     where
         I: IntoIterator<Item = (F, E)>,
         F: AsRef<[T::Item]>,
@@ -248,7 +243,7 @@ where
         mut storage: T,
         context: &V::Context,
         value: V,
-    ) -> Result<Self, ErasedSoaFromStorageValueError>
+    ) -> Result<Self, FromStorageValueError>
     where
         V: AllocSoa + SoaWrite,
     {
@@ -278,10 +273,7 @@ where
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn try_from<V>(
-        context: &V::Context,
-        value: V,
-    ) -> Result<Self, ErasedSoaFromValueError<T::Error>>
+    pub fn try_from<V>(context: &V::Context, value: V) -> Result<Self, FromValueError<T::Error>>
     where
         V: AllocSoa + SoaWrite,
     {
@@ -292,7 +284,7 @@ where
             .collect();
 
         let layout = context.buffer_layout(1)?;
-        let mut storage = T::from_layout(layout).map_err(ErasedSoaFromValueError::FromLayout)?;
+        let mut storage = T::from_layout(layout).map_err(FromValueError::FromLayout)?;
 
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
@@ -417,7 +409,7 @@ where
     F: AlignedStorageFromLayout<Item = T::Item>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
-    type Item = Result<ErasedField<F, P>, ErasedFieldFromDescDataError<F::Error>>;
+    type Item = Result<ErasedField<F, P>, FromDescDataError<F::Error>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -510,7 +502,7 @@ impl Error for WriteCopyOfFieldsError {
     }
 }
 
-impl From<WriteCopyOfFieldsError> for ErasedSoaFromStorageFieldsDescriptorsError {
+impl From<WriteCopyOfFieldsError> for FromStorageFieldsDescriptorsError {
     #[inline]
     fn from(error: WriteCopyOfFieldsError) -> Self {
         match error {
@@ -521,7 +513,7 @@ impl From<WriteCopyOfFieldsError> for ErasedSoaFromStorageFieldsDescriptorsError
     }
 }
 
-impl<T> From<WriteCopyOfFieldsError> for ErasedSoaFromFieldsDescriptorsError<T> {
+impl<T> From<WriteCopyOfFieldsError> for FromFieldsDescriptorsError<T> {
     #[inline]
     fn from(error: WriteCopyOfFieldsError) -> Self {
         match error {
@@ -570,7 +562,7 @@ where
 
 fn storage_from_fields_with_descriptors<I, T, F, E, D>(
     fields_with_descriptors: I,
-) -> Result<(T, D), ErasedSoaFromFieldsDescriptorsError<T::Error>>
+) -> Result<(T, D), FromFieldsDescriptorsError<T::Error>>
 where
     T: AlignedStorageFromLayout<Item: Copy>,
     D: FromIterator<FieldDescriptor>,
@@ -578,7 +570,7 @@ where
     F: AsRef<[T::Item]>,
     E: AsRef<FieldDescriptor>,
 {
-    use ErasedSoaFromFieldsDescriptorsError::FromLayout;
+    use FromFieldsDescriptorsError::FromLayout;
     use IterOrFieldLenMismatchError::FieldLenMismatch;
 
     let mut storage = T::from_layout(Layout::new::<()>()).map_err(FromLayout)?;
@@ -606,7 +598,7 @@ where
 
             Ok(desc)
         })
-        .collect::<Result<_, ErasedSoaFromFieldsDescriptorsError<_>>>()?;
+        .collect::<Result<_, FromFieldsDescriptorsError<_>>>()?;
 
     Ok((storage, descriptors))
 }

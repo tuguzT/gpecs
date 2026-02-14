@@ -12,9 +12,9 @@ use crate::{
     erased::{
         CovariantFieldDescriptors, ErasedSoaPtrs, ErasedSoaPtrsIter, ErasedSoaRefs,
         ErasedSoaRefsMut,
-        assert::{assert_descriptors, check_into_value},
+        assert::{assert_descriptors, check_downcast},
         dangling::{Dangling, dangling},
-        error::{ErasedSoaIntoValueError, ErasedSoaPtrsError, check_offset},
+        error::{DowncastError, PtrsError, check_offset},
     },
     error::{
         InsufficientAlignError, check_ptr_align, check_sufficient_align, check_sufficient_len,
@@ -120,11 +120,11 @@ where
         buffer: *mut [P::Item],
         capacity: usize,
         offset: usize,
-    ) -> Result<Self, ErasedSoaPtrsError> {
+    ) -> Result<Self, PtrsError> {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), capacity);
         offsets.by_ref().try_for_each(|offset| {
             check_sufficient_align(offset?.desc.layout(), Layout::new::<P::Item>())
-                .map_err(ErasedSoaPtrsError::from)
+                .map_err(PtrsError::from)
         })?;
 
         let layout = offsets.into_layout();
@@ -154,10 +154,10 @@ where
     P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
 {
     #[inline]
-    pub unsafe fn try_into<T>(
+    pub unsafe fn downcast<T>(
         self,
         context: &T::Context,
-    ) -> Result<MutPtrs<'_, T>, ErasedSoaIntoValueError<Self>>
+    ) -> Result<MutPtrs<'_, T>, DowncastError<Self>>
     where
         T: AllocSoa + ?Sized,
     {
@@ -169,9 +169,9 @@ where
             ..
         } = self;
 
-        let result = check_into_value(descriptors.field_descriptors(), context.field_descriptors());
+        let result = check_downcast(descriptors.field_descriptors(), context.field_descriptors());
         if let Err(error) = result {
-            return Err(ErasedSoaIntoValueError::new(self, error));
+            return Err(DowncastError::new(self, error));
         }
 
         let ptrs = unsafe { context.ptrs_from_buffer_mut(buffer.cast(), capacity) };

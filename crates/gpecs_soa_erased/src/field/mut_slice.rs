@@ -10,7 +10,7 @@ use crate::{
     field::{
         ErasedFieldMutPtr, ErasedFieldPtr, ErasedFieldSlice, ErasedFieldSliceMutPtr,
         ErasedFieldSlicePtr,
-        error::{ErasedFieldIntoValueError, ErasedFieldSlicePtrError},
+        error::{DowncastError, SlicePtrError},
     },
     slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
     soa::field::FieldDescriptor,
@@ -28,6 +28,12 @@ impl<T> ErasedFieldSliceMut<'_, T>
 where
     T: MutSliceItemPtr,
 {
+    #[inline]
+    pub unsafe fn from_parts(ptr: ErasedFieldMutPtr<T>, len: usize) -> Self {
+        let ptr = unsafe { ErasedFieldSliceMutPtr::from_parts(ptr, len) };
+        unsafe { Self::from_ptr(ptr) }
+    }
+
     #[inline]
     pub unsafe fn from_ptr(ptr: ErasedFieldSliceMutPtr<T>) -> Self {
         let phantom = PhantomData;
@@ -74,6 +80,12 @@ where
         let Self { ptr, .. } = self;
         ptr.field_ptr()
     }
+
+    #[inline]
+    pub fn into_parts(self) -> (ErasedFieldMutPtr<T>, usize) {
+        let Self { ptr, .. } = self;
+        ptr.into_parts()
+    }
 }
 
 impl<'a, T, U> ErasedFieldSliceMut<'a, T>
@@ -85,35 +97,44 @@ where
         desc: FieldDescriptor,
         buffer: &'a mut [U],
         len: usize,
-    ) -> Result<Self, ErasedFieldSlicePtrError> {
+    ) -> Result<Self, SlicePtrError> {
         let ptr = ErasedFieldSliceMutPtr::new(desc, buffer, len)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
     }
 
     #[inline]
-    pub unsafe fn try_into<V>(self) -> Result<&'a mut [V], ErasedFieldIntoValueError<Self>> {
+    pub unsafe fn downcast<V>(self) -> Result<&'a mut [V], DowncastError<Self>> {
         let Self { ptr, .. } = self;
         let into_self = |ptr| unsafe { Self::from_ptr(ptr) };
-        let buffer = <*mut [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
         let slice = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
         Ok(slice)
     }
 
     #[inline]
-    pub unsafe fn cast<V>(&self) -> Result<&[V], ErasedFieldIntoValueError<&Self>> {
+    pub unsafe fn downcast_ref<V>(&self) -> Result<&[V], DowncastError<&Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let buffer = <*mut [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
         let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
         Ok(slice)
     }
 
     #[inline]
-    pub unsafe fn cast_mut<V>(&mut self) -> Result<&mut [V], ErasedFieldIntoValueError<&mut Self>> {
+    pub unsafe fn downcast_mut<V>(&mut self) -> Result<&mut [V], DowncastError<&mut Self>> {
         let Self { ptr, .. } = *self;
         let into_self = |_| self;
-        let buffer = <*mut [V]>::try_from(ptr).map_err(|err| err.map_value(into_self))?;
+        let buffer = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
         let slice = unsafe { slice::from_raw_parts_mut(buffer.cast(), buffer.len()) };
         Ok(slice)
     }

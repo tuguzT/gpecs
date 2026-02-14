@@ -1,6 +1,6 @@
 use crate::{
     archetype::error::{DuplicateComponentError, GetComponentsError},
-    component::{error::ComponentNotRegisteredError, registry::ComponentId},
+    component::{error::NotRegisteredError, registry::ComponentId},
 };
 
 #[inline]
@@ -39,7 +39,7 @@ where
         .into_iter()
         .try_for_each::<_, Result<_, GetComponentsError>>(|item| {
             let Some(item) = item else {
-                return Err(ComponentNotRegisteredError.into());
+                return Err(NotRegisteredError.into());
             };
             let component_id = component_id_fn(&item);
             let is_unique = insert_fn(&mut set, item);

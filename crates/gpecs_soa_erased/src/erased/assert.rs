@@ -1,7 +1,7 @@
 use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
-    erased::error::ErasedSoaIntoValueErrorKind,
+    erased::error::DowncastErrorKind,
     error::{LenMismatchError, check_layout},
     soa::field::{FieldDescriptor, IntoCopiedFieldDescriptors},
 };
@@ -35,7 +35,7 @@ where
     }
 }
 
-pub fn check_into_value<I, J>(actual: I, expected: J) -> Result<(), ErasedSoaIntoValueErrorKind>
+pub fn check_downcast<I, J>(actual: I, expected: J) -> Result<(), DowncastErrorKind>
 where
     I: IntoIterator<Item: AsRef<FieldDescriptor>>,
     J: IntoIterator<Item: AsRef<FieldDescriptor>>,

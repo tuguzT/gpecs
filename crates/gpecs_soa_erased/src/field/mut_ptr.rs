@@ -5,7 +5,7 @@ use crate::{
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     field::{
         ErasedFieldPtr, ErasedFieldRef, ErasedFieldRefMut,
-        error::{ErasedFieldIntoValueError, ErasedFieldPtrError, check_into_layout},
+        error::{DowncastError, PtrError, check_downcast},
     },
     slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
     soa::field::FieldDescriptor,
@@ -69,7 +69,7 @@ where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
-    pub fn new(desc: FieldDescriptor, buffer: *mut [U]) -> Result<Self, ErasedFieldPtrError> {
+    pub fn new(desc: FieldDescriptor, buffer: *mut [U]) -> Result<Self, PtrError> {
         check_sufficient_align(desc.layout(), Layout::new::<U>())?;
         check_len(buffer.len() * size_of::<U>(), desc.layout().size())?;
         check_ptr_align(buffer.cast(), desc.layout())?;
@@ -91,6 +91,15 @@ where
 
         let me = unsafe { Self::from_parts(desc, ptr) };
         Ok(me)
+    }
+
+    #[inline]
+    pub fn downcast<V>(self) -> Result<*mut V, DowncastError<Self>> {
+        let Self { desc, .. } = self;
+        let Self { ptr, .. } = check_downcast::<V, _>(desc.layout(), self)?;
+
+        let ptr = ptr.as_mut_item_ptr().cast();
+        Ok(ptr)
     }
 
     #[inline]
@@ -116,7 +125,6 @@ where
     }
 
     #[inline]
-    #[track_caller]
     pub unsafe fn swap(self, with: Self) {
         let Self { desc, ptr } = self;
 
@@ -128,7 +136,6 @@ where
     }
 
     #[inline]
-    #[track_caller]
     pub unsafe fn copy_from(self, src: ErasedFieldPtr<CastConstPtr<T>>, count: usize) {
         let Self { desc, ptr } = self;
 
@@ -138,7 +145,6 @@ where
     }
 
     #[inline]
-    #[track_caller]
     pub unsafe fn copy_from_nonoverlapping(
         self,
         src: ErasedFieldPtr<CastConstPtr<T>>,
@@ -233,14 +239,10 @@ impl<T, U, V> TryFrom<ErasedFieldMutPtr<T>> for *mut V
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
 {
-    type Error = ErasedFieldIntoValueError<ErasedFieldMutPtr<T>>;
+    type Error = DowncastError<ErasedFieldMutPtr<T>>;
 
     #[inline]
-    fn try_from(value: ErasedFieldMutPtr<T>) -> Result<Self, Self::Error> {
-        let ErasedFieldMutPtr { desc, .. } = value;
-        let value = check_into_layout::<V, _>(desc.layout(), value)?;
-
-        let ptr = value.as_mut_ptr().cast();
-        Ok(ptr)
+    fn try_from(ptr: ErasedFieldMutPtr<T>) -> Result<Self, Self::Error> {
+        ptr.downcast()
     }
 }

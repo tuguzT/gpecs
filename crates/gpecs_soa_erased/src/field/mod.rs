@@ -1,8 +1,8 @@
 pub use self::{
-    mut_ptrs::ErasedFieldMutPtr, mut_refs::ErasedFieldRefMut,
-    mut_slice_ptrs::ErasedFieldSliceMutPtr, mut_slices::ErasedFieldSliceMut,
-    nonnull_ptrs::ErasedFieldNonNullPtr, ptrs::ErasedFieldPtr, refs::ErasedFieldRef,
-    slice_ptrs::ErasedFieldSlicePtr, slices::ErasedFieldSlice, value::ErasedField,
+    mut_ptr::ErasedFieldMutPtr, mut_ref::ErasedFieldRefMut, mut_slice::ErasedFieldSliceMut,
+    mut_slice_ptr::ErasedFieldSliceMutPtr, nonnull_ptr::ErasedFieldNonNullPtr, ptr::ErasedFieldPtr,
+    r#ref::ErasedFieldRef, slice::ErasedFieldSlice, slice_ptr::ErasedFieldSlicePtr,
+    value::ErasedField,
 };
 
 #[cfg(feature = "alloc")]
@@ -10,13 +10,13 @@ pub use self::value::BoxedErasedField;
 
 pub mod error;
 
-mod mut_ptrs;
-mod mut_refs;
-mod mut_slice_ptrs;
-mod mut_slices;
-mod nonnull_ptrs;
-mod ptrs;
-mod refs;
-mod slice_ptrs;
-mod slices;
+mod mut_ptr;
+mod mut_ref;
+mod mut_slice;
+mod mut_slice_ptr;
+mod nonnull_ptr;
+mod ptr;
+mod r#ref;
+mod slice;
+mod slice_ptr;
 mod value;

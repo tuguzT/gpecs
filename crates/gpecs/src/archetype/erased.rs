@@ -148,9 +148,9 @@ where
 {
     let iter = fields
         .into_iter()
-        .map(|(component_id, r#ref)| (component_id, r#ref.as_field_ptr().cast_mut()));
-    let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
-    let ptrs = B::CONTEXT.ptrs_cast_const(ptrs);
+        .map(|(component_id, field)| (component_id, field.as_field_ptr()));
+    let ptrs = B::ptrs_from_erased(components, iter)
+        .expect("all the components should be present in the right order");
     unsafe { B::CONTEXT.ptrs_to_refs(ptrs) }
 }
 
@@ -164,8 +164,9 @@ where
 {
     let iter = fields
         .into_iter()
-        .map(|(component_id, mut r#ref)| (component_id, r#ref.as_mut_field_ptr()));
-    let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
+        .map(|(component_id, mut field)| (component_id, field.as_mut_field_ptr()));
+    let ptrs = B::mut_ptrs_from_erased(components, iter)
+        .expect("all the components should be present in the right order");
     unsafe { B::CONTEXT.mut_ptrs_to_mut_refs(ptrs) }
 }
 
@@ -180,9 +181,9 @@ where
 {
     let iter = fields
         .into_iter()
-        .map(|(component_id, slice)| (component_id, slice.as_field_ptr().cast_mut()));
-    let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
-    let ptrs = B::CONTEXT.ptrs_cast_const(ptrs);
+        .map(|(component_id, slice)| (component_id, slice.as_field_ptr()));
+    let ptrs = B::ptrs_from_erased(components, iter)
+        .expect("all the components should be present in the right order");
     let slices = B::CONTEXT.slice_ptrs_from_raw_parts(ptrs, len);
     unsafe { B::CONTEXT.slice_ptrs_to_slices(slices) }
 }
@@ -199,7 +200,8 @@ where
     let iter = fields
         .into_iter()
         .map(|(component_id, mut slice)| (component_id, slice.as_mut_field_ptr()));
-    let ptrs = unsafe { B::ptrs_from_iter(components, iter) };
+    let ptrs = B::mut_ptrs_from_erased(components, iter)
+        .expect("all the components should be present in the right order");
     let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);
     unsafe { B::CONTEXT.mut_slice_ptrs_to_mut_slices(slices) }
 }

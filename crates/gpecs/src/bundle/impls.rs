@@ -1,19 +1,24 @@
 use std::mem::MaybeUninit;
 
-use gpecs_soa_erased::{field::ErasedFieldMutPtr, slice_item_ptr::MutSliceItemPtr};
+use gpecs_soa_erased::{
+    field::{ErasedFieldMutPtr, ErasedFieldPtr},
+    slice_item_ptr::{ConstSliceItemPtr, MutSliceItemPtr},
+};
 
 use crate::{
+    bundle::{
+        Bundle,
+        error::PtrsFromIterError::{self, MissingComponent},
+    },
     component::{
         Component,
         registry::{ComponentId, ComponentRegistry},
     },
     soa::{
         identity::{Identity, IdentityContext},
-        traits::{MutPtrs, TupleContext, count_idents},
+        traits::{MutPtrs, Ptrs, TupleContext, count_idents},
     },
 };
-
-use super::Bundle;
 
 unsafe impl<T> Bundle for Identity<T>
 where
@@ -38,21 +43,41 @@ where
     }
 
     #[inline]
-    unsafe fn ptrs_from_iter<I, P>(
+    fn ptrs_from_erased<I, P>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> MutPtrs<'static, Self>
+    ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedFieldPtr<P>>>
+    where
+        I: IntoIterator<Item = (ComponentId, ErasedFieldPtr<P>)>,
+        P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
+    {
+        let component_id = components.component_id::<T>().ok_or(MissingComponent)?;
+        let (_, ptr) = iter
+            .into_iter()
+            .find(|(id, _)| *id == component_id)
+            .ok_or(MissingComponent)?;
+
+        let ptr = ptr.try_into()?;
+        Ok(ptr)
+    }
+
+    #[inline]
+    fn mut_ptrs_from_erased<I, P>(
+        components: &ComponentRegistry,
+        iter: I,
+    ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedFieldMutPtr<P>>>
     where
         I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
         P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
     {
-        let component_id = unsafe { components.component_id::<T>().unwrap_unchecked() };
-        let (_, ptr) = unsafe {
-            iter.into_iter()
-                .find(|(id, _)| *id == component_id)
-                .unwrap_unchecked()
-        };
-        unsafe { ptr.try_into().unwrap_unchecked() }
+        let component_id = components.component_id::<T>().ok_or(MissingComponent)?;
+        let (_, ptr) = iter
+            .into_iter()
+            .find(|(id, _)| *id == component_id)
+            .ok_or(MissingComponent)?;
+
+        let ptr = ptr.try_into()?;
+        Ok(ptr)
     }
 }
 
@@ -87,25 +112,51 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            unsafe fn ptrs_from_iter<Iter, P>(
+            fn ptrs_from_erased<Iter, P>(
                 components: &ComponentRegistry,
                 iter: Iter,
-            ) -> MutPtrs<'static, Self>
+            ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedFieldPtr<P>>>
+            where
+                Iter: IntoIterator<Item = (ComponentId, ErasedFieldPtr<P>)>,
+                P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
+            {
+                let component_ids = [$(components.component_id::<$types>().ok_or(MissingComponent)?,)*];
+
+                let mut ptrs = ($(None::<*const $types>,)*);
+                for (id, ptr) in iter {
+                    $(
+                        if id == component_ids[$indices] {
+                            ptrs.$indices = Some(ptr.try_into()?);
+                        }
+                    )*
+                }
+
+                let ptrs = ($(ptrs.$indices.ok_or(MissingComponent)?,)*);
+                Ok(ptrs)
+            }
+
+            #[inline]
+            fn mut_ptrs_from_erased<Iter, P>(
+                components: &ComponentRegistry,
+                iter: Iter,
+            ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedFieldMutPtr<P>>>
             where
                 Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
                 P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
             {
-                let component_ids = [$(unsafe { components.component_id::<$types>().unwrap_unchecked() },)*];
+                let component_ids = [$(components.component_id::<$types>().ok_or(MissingComponent)?,)*];
 
                 let mut ptrs = ($(None::<*mut $types>,)*);
                 for (id, ptr) in iter {
                     $(
                         if id == component_ids[$indices] {
-                            ptrs.$indices = Some(unsafe { ptr.try_into().unwrap_unchecked() });
+                            ptrs.$indices = Some(ptr.try_into()?);
                         }
                     )*
                 }
-                ($(unsafe { ptrs.$indices.unwrap_unchecked() },)*)
+
+                let ptrs = ($(ptrs.$indices.ok_or(MissingComponent)?,)*);
+                Ok(ptrs)
             }
         }
     };

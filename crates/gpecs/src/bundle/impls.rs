@@ -121,10 +121,12 @@ macro_rules! bundle_tuple_impl {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 
                 let mut ptrs = ($(None::<*const $types>,)*);
+                #[expect(clippy::needless_continue)]
                 for (id, ptr) in iter {
                     $(
-                        if id == component_ids[$indices] {
+                        if ptrs.$indices.is_none() && id == component_ids[$indices] {
                             ptrs.$indices = Some(ptr.try_into()?);
+                            continue;
                         }
                     )*
                 }
@@ -145,10 +147,12 @@ macro_rules! bundle_tuple_impl {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 
                 let mut ptrs = ($(None::<*mut $types>,)*);
+                #[expect(clippy::needless_continue)]
                 for (id, ptr) in iter {
                     $(
-                        if id == component_ids[$indices] {
+                        if ptrs.$indices.is_none() && id == component_ids[$indices] {
                             ptrs.$indices = Some(ptr.try_into()?);
+                            continue;
                         }
                     )*
                 }

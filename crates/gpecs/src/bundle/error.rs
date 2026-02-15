@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Debug, Display},
 };
 
-use gpecs_soa_erased::field::error::DowncastError;
+use gpecs_soa_erased::data::error::DowncastError;
 
 use crate::component::error::NotRegisteredError;
 

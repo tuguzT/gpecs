@@ -1,7 +1,7 @@
 use std::{array, hint::black_box, iter::Zip, mem::MaybeUninit, slice};
 
 use gpecs_soa_erased::{
-    erased::BoxedErasedSoa,
+    BoxedErasedSoa,
     ptr::slice::CoreSliceItemPtrs,
     soa::{prelude::*, slice as soa_slice, traits::TupleContext},
 };

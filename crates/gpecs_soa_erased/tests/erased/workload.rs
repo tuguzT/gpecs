@@ -3,7 +3,7 @@
 use std::{iter, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    erased::{BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa},
+    BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa,
     ptr::slice::CoreSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},

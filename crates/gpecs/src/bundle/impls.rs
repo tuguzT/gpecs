@@ -1,7 +1,7 @@
 use std::mem::MaybeUninit;
 
 use gpecs_soa_erased::{
-    field::{ErasedFieldMutPtr, ErasedFieldPtr},
+    data::{ErasedMutPtr, ErasedPtr},
     ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
 };
 
@@ -44,9 +44,9 @@ where
     fn ptrs_from_erased<I, P>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedFieldPtr<P>>>
+    ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedPtr<P>>>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedFieldPtr<P>)>,
+        I: IntoIterator<Item = (ComponentId, ErasedPtr<P>)>,
         P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
     {
         let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
@@ -63,9 +63,9 @@ where
     fn mut_ptrs_from_erased<I, P>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedFieldMutPtr<P>>>
+    ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedMutPtr<P>>>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
+        I: IntoIterator<Item = (ComponentId, ErasedMutPtr<P>)>,
         P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
     {
         let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
@@ -113,9 +113,9 @@ macro_rules! bundle_tuple_impl {
             fn ptrs_from_erased<Iter, P>(
                 components: &ComponentRegistry,
                 iter: Iter,
-            ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedFieldPtr<P>>>
+            ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedPtr<P>>>
             where
-                Iter: IntoIterator<Item = (ComponentId, ErasedFieldPtr<P>)>,
+                Iter: IntoIterator<Item = (ComponentId, ErasedPtr<P>)>,
                 P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
@@ -139,9 +139,9 @@ macro_rules! bundle_tuple_impl {
             fn mut_ptrs_from_erased<Iter, P>(
                 components: &ComponentRegistry,
                 iter: Iter,
-            ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedFieldMutPtr<P>>>
+            ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedMutPtr<P>>>
             where
-                Iter: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
+                Iter: IntoIterator<Item = (ComponentId, ErasedMutPtr<P>)>,
                 P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];

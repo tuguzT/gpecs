@@ -1,7 +1,7 @@
 use core::iter::FusedIterator;
 
 use gpecs_soa_erased::{
-    erased::CovariantFieldDescriptors,
+    CovariantFieldDescriptors,
     soa::field::{FieldDescriptor, FieldDescriptors},
 };
 

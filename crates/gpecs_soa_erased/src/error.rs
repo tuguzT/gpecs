@@ -1,364 +1,647 @@
 use core::{
-    alloc::Layout,
+    alloc::LayoutError,
     error::Error,
     fmt::{self, Debug, Display},
-    num::NonZeroUsize,
 };
 
+pub use gpecs_erased::error::*;
+
 #[derive(Clone)]
-pub struct LenMismatchError {
-    expected: usize,
-    actual: usize,
+pub struct InvalidOffsetError {
+    offset: usize,
+    capacity: usize,
 }
 
-impl LenMismatchError {
+impl InvalidOffsetError {
     #[inline]
-    pub fn new(expected: usize, actual: usize) -> Option<Self> {
-        if expected == actual {
+    pub fn new(offset: usize, capacity: usize) -> Option<Self> {
+        if offset <= capacity {
             return None;
         }
 
-        let me = unsafe { Self::new_unchecked(expected, actual) };
+        let me = unsafe { Self::new_unchecked(offset, capacity) };
         Some(me)
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(expected: usize, actual: usize) -> Self {
-        Self { expected, actual }
+    pub unsafe fn new_unchecked(offset: usize, capacity: usize) -> Self {
+        Self { offset, capacity }
     }
 
     #[inline]
-    pub fn expected(&self) -> usize {
-        let Self { expected, .. } = *self;
-        expected
+    pub fn offset(&self) -> usize {
+        let Self { offset, .. } = *self;
+        offset
     }
 
     #[inline]
-    pub fn actual(&self) -> usize {
-        let Self { actual, .. } = *self;
-        actual
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
     }
 }
 
-impl Debug for LenMismatchError {
+impl Debug for InvalidOffsetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !f.alternate() {
             return Display::fmt(self, f);
         }
 
-        let Self { expected, actual } = self;
-        f.debug_struct("LenMismatchError")
-            .field("expected", expected)
-            .field("actual", actual)
+        let Self { offset, capacity } = self;
+        f.debug_struct("InvalidOffsetError")
+            .field("offset", offset)
+            .field("capacity", capacity)
             .finish()
     }
 }
 
-impl Display for LenMismatchError {
+impl Display for InvalidOffsetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { expected, actual } = self;
-        write!(f, "expected length to be {expected}, but got {actual}")
-    }
-}
-
-impl Error for LenMismatchError {}
-
-#[inline]
-pub fn check_len(len: usize, expected: usize) -> Result<(), LenMismatchError> {
-    LenMismatchError::new(expected, len).map_or(Ok(()), Err)
-}
-
-#[derive(Clone)]
-pub struct LayoutMismatchError {
-    expected: Layout,
-    actual: Layout,
-}
-
-const _: () = assert_npo::<LayoutMismatchError>();
-
-impl LayoutMismatchError {
-    #[inline]
-    pub fn new(expected: Layout, actual: Layout) -> Option<Self> {
-        if expected == actual {
-            return None;
-        }
-
-        let me = unsafe { Self::new_unchecked(expected, actual) };
-        Some(me)
-    }
-
-    #[inline]
-    pub unsafe fn new_unchecked(expected: Layout, actual: Layout) -> Self {
-        Self { expected, actual }
-    }
-
-    #[inline]
-    pub fn expected(&self) -> Layout {
-        let Self { expected, .. } = *self;
-        expected
-    }
-
-    #[inline]
-    pub fn actual(&self) -> Layout {
-        let Self { actual, .. } = *self;
-        actual
-    }
-}
-
-impl Debug for LayoutMismatchError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("LayoutMismatchError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
-    }
-}
-
-impl Display for LayoutMismatchError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { expected, actual } = self;
-        write!(f, "{actual:?} does not match expected {expected:?}")
-    }
-}
-
-impl Error for LayoutMismatchError {}
-
-#[inline]
-pub fn check_layout(layout: Layout, expected: Layout) -> Result<(), LayoutMismatchError> {
-    LayoutMismatchError::new(expected, layout).map_or(Ok(()), Err)
-}
-
-#[derive(Clone)]
-pub struct InsufficientLenError {
-    expected: usize,
-    actual: usize,
-}
-
-impl InsufficientLenError {
-    #[inline]
-    pub fn new(expected: usize, actual: usize) -> Option<Self> {
-        if actual >= expected {
-            return None;
-        }
-
-        let me = unsafe { Self::new_unchecked(expected, actual) };
-        Some(me)
-    }
-
-    #[inline]
-    pub unsafe fn new_unchecked(expected: usize, actual: usize) -> Self {
-        Self { expected, actual }
-    }
-
-    #[inline]
-    pub fn expected(&self) -> usize {
-        let Self { expected, .. } = *self;
-        expected
-    }
-
-    #[inline]
-    pub fn actual(&self) -> usize {
-        let Self { actual, .. } = *self;
-        actual
-    }
-}
-
-impl Debug for InsufficientLenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("InsufficientLenError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
-    }
-}
-
-impl Display for InsufficientLenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { expected, actual } = self;
+        let Self { offset, capacity } = self;
         write!(
             f,
-            "expected length to be greater than or equal to {expected}, but got {actual}"
+            "expected offset to be smaller than or equal to capacity {capacity}, but got {offset}"
         )
     }
 }
 
-impl Error for InsufficientLenError {}
+impl Error for InvalidOffsetError {}
 
 #[inline]
-pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), InsufficientLenError> {
-    InsufficientLenError::new(expected, len).map_or(Ok(()), Err)
+pub fn check_offset(offset: usize, capacity: usize) -> Result<(), InvalidOffsetError> {
+    InvalidOffsetError::new(offset, capacity).map_or(Ok(()), Err)
+}
+
+#[derive(Debug, Clone)]
+pub enum PtrsError {
+    NotAligned(NotAlignedError),
+    InvalidLayout(LayoutError),
+    InvalidOffset(InvalidOffsetError),
+    InsufficientLen(InsufficientLenError),
+    InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<NotAlignedError> for PtrsError {
+    #[inline]
+    fn from(error: NotAlignedError) -> Self {
+        Self::NotAligned(error)
+    }
+}
+
+impl From<LayoutError> for PtrsError {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl From<InvalidOffsetError> for PtrsError {
+    #[inline]
+    fn from(error: InvalidOffsetError) -> Self {
+        Self::InvalidOffset(error)
+    }
+}
+
+impl From<InsufficientLenError> for PtrsError {
+    #[inline]
+    fn from(error: InsufficientLenError) -> Self {
+        Self::InsufficientLen(error)
+    }
+}
+
+impl From<InsufficientAlignError> for PtrsError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl Display for PtrsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::InvalidOffset(error) => Display::fmt(error, f),
+            Self::InsufficientLen(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for PtrsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NotAligned(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::InvalidOffset(error) => Some(error),
+            Self::InsufficientLen(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
+    }
 }
 
 #[derive(Clone)]
-pub struct InsufficientAlignError {
-    expected: NonZeroUsize,
-    actual: NonZeroUsize,
+pub struct InvalidOffsetLenError {
+    offset: usize,
+    len: usize,
+    capacity: usize,
 }
 
-const _: () = assert_npo::<InsufficientAlignError>();
-
-impl InsufficientAlignError {
+impl InvalidOffsetLenError {
     #[inline]
-    pub fn new(expected: Layout, actual: Layout) -> Option<Self> {
-        let expected = nonzero_align(expected);
-        let actual = nonzero_align(actual);
-        if actual >= expected {
+    pub fn new(offset: usize, len: usize, capacity: usize) -> Option<Self> {
+        if offset + len <= capacity {
             return None;
         }
 
-        let me = unsafe { Self::new_unchecked(expected, actual) };
+        let me = unsafe { Self::new_unchecked(offset, len, capacity) };
         Some(me)
     }
 
     #[inline]
-    pub unsafe fn new_unchecked(expected: NonZeroUsize, actual: NonZeroUsize) -> Self {
-        Self { expected, actual }
+    pub unsafe fn new_unchecked(offset: usize, len: usize, capacity: usize) -> Self {
+        Self {
+            offset,
+            len,
+            capacity,
+        }
     }
 
     #[inline]
-    pub fn expected(&self) -> NonZeroUsize {
-        let Self { expected, .. } = *self;
-        expected
+    pub fn offset(&self) -> usize {
+        let Self { offset, .. } = *self;
+        offset
     }
 
     #[inline]
-    pub fn actual(&self) -> NonZeroUsize {
-        let Self { actual, .. } = *self;
-        actual
+    #[expect(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        let Self { len, .. } = *self;
+        len
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let Self { capacity, .. } = *self;
+        capacity
     }
 }
 
-impl Debug for InsufficientAlignError {
+impl Debug for InvalidOffsetLenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !f.alternate() {
             return Display::fmt(self, f);
         }
 
-        let Self { expected, actual } = self;
-        f.debug_struct("InsufficientAlignError")
-            .field("expected", expected)
-            .field("actual", actual)
+        let Self {
+            offset,
+            len,
+            capacity,
+        } = self;
+        f.debug_struct("InvalidOffsetLenError")
+            .field("offset", offset)
+            .field("len", len)
+            .field("capacity", capacity)
             .finish()
     }
 }
 
-impl Display for InsufficientAlignError {
+impl Display for InvalidOffsetLenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { expected, actual } = self;
+        let Self {
+            offset,
+            len,
+            capacity,
+        } = self;
         write!(
             f,
-            "expected alignment to be greater than or equal to {expected}, but got {actual}"
+            "expected offset + len to be smaller than or equal to capacity {capacity}, but got {offset} + {len}",
         )
     }
 }
 
-impl Error for InsufficientAlignError {}
+impl Error for InvalidOffsetLenError {}
 
 #[inline]
-pub fn check_sufficient_align(
-    actual: Layout,
-    expected: Layout,
-) -> Result<(), InsufficientAlignError> {
-    InsufficientAlignError::new(expected, actual).map_or(Ok(()), Err)
+pub fn check_offset_len(
+    offset: usize,
+    len: usize,
+    capacity: usize,
+) -> Result<(), InvalidOffsetLenError> {
+    InvalidOffsetLenError::new(offset, len, capacity).map_or(Ok(()), Err)
+}
+
+#[derive(Debug, Clone)]
+pub enum SlicePtrsError {
+    NotAligned(NotAlignedError),
+    InvalidLayout(LayoutError),
+    InvalidOffset(InvalidOffsetError),
+    InvalidOffsetLen(InvalidOffsetLenError),
+    InsufficientLen(InsufficientLenError),
+    InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<NotAlignedError> for SlicePtrsError {
+    #[inline]
+    fn from(error: NotAlignedError) -> Self {
+        Self::NotAligned(error)
+    }
+}
+
+impl From<LayoutError> for SlicePtrsError {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl From<InvalidOffsetError> for SlicePtrsError {
+    #[inline]
+    fn from(error: InvalidOffsetError) -> Self {
+        Self::InvalidOffset(error)
+    }
+}
+
+impl From<InvalidOffsetLenError> for SlicePtrsError {
+    #[inline]
+    fn from(error: InvalidOffsetLenError) -> Self {
+        Self::InvalidOffsetLen(error)
+    }
+}
+
+impl From<InsufficientLenError> for SlicePtrsError {
+    #[inline]
+    fn from(error: InsufficientLenError) -> Self {
+        Self::InsufficientLen(error)
+    }
+}
+
+impl From<InsufficientAlignError> for SlicePtrsError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl Display for SlicePtrsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::InvalidOffset(error) => Display::fmt(error, f),
+            Self::InvalidOffsetLen(error) => Display::fmt(error, f),
+            Self::InsufficientLen(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for SlicePtrsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NotAligned(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::InvalidOffset(error) => Some(error),
+            Self::InvalidOffsetLen(error) => Some(error),
+            Self::InsufficientLen(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum IterOrFieldLenMismatchError {
+    IterLenMismatch(LenMismatchError),
+    FieldLenMismatch {
+        error: LenMismatchError,
+        field_index: usize,
+    },
+}
+
+impl Display for IterOrFieldLenMismatchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IterLenMismatch(error) => write!(f, "iterator length mismatch: {error}"),
+            Self::FieldLenMismatch { error, field_index } => {
+                write!(f, "field {field_index} length mismatch: {error}")
+            }
+        }
+    }
+}
+
+impl Error for IterOrFieldLenMismatchError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::IterLenMismatch(error) | Self::FieldLenMismatch { error, .. } => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromStorageFieldsDescriptorsError {
+    LenMismatch(IterOrFieldLenMismatchError),
+    LayoutMismatch(LayoutMismatchError),
+    InsufficientAlign(InsufficientAlignError),
+    InvalidLayout(LayoutError),
+}
+
+impl From<IterOrFieldLenMismatchError> for FromStorageFieldsDescriptorsError {
+    #[inline]
+    fn from(error: IterOrFieldLenMismatchError) -> Self {
+        Self::LenMismatch(error)
+    }
+}
+
+impl From<LayoutMismatchError> for FromStorageFieldsDescriptorsError {
+    #[inline]
+    fn from(error: LayoutMismatchError) -> Self {
+        Self::LayoutMismatch(error)
+    }
+}
+
+impl From<InsufficientAlignError> for FromStorageFieldsDescriptorsError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl From<LayoutError> for FromStorageFieldsDescriptorsError {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl Display for FromStorageFieldsDescriptorsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::LayoutMismatch(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for FromStorageFieldsDescriptorsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::LenMismatch(error) => Some(error),
+            Self::LayoutMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromFieldsDescriptorsError<T> {
+    LenMismatch(IterOrFieldLenMismatchError),
+    InsufficientAlign(InsufficientAlignError),
+    InvalidLayout(LayoutError),
+    FromLayout(T),
+}
+
+impl<T> From<IterOrFieldLenMismatchError> for FromFieldsDescriptorsError<T> {
+    #[inline]
+    fn from(value: IterOrFieldLenMismatchError) -> Self {
+        Self::LenMismatch(value)
+    }
+}
+
+impl<T> From<InsufficientAlignError> for FromFieldsDescriptorsError<T> {
+    #[inline]
+    fn from(value: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(value)
+    }
+}
+
+impl<T> From<LayoutError> for FromFieldsDescriptorsError<T> {
+    #[inline]
+    fn from(value: LayoutError) -> Self {
+        Self::InvalidLayout(value)
+    }
+}
+
+impl<T> Display for FromFieldsDescriptorsError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl<T> Error for FromFieldsDescriptorsError<T>
+where
+    T: Error,
+{
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::LenMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
+        }
+    }
 }
 
 #[derive(Clone)]
-pub struct NotAlignedError {
-    ptr: *const u8,
-    target_align: NonZeroUsize,
+pub enum FromStorageValueError {
+    LayoutMismatch(LayoutMismatchError),
+    InvalidLayout(LayoutError),
 }
 
-const _: () = assert_npo::<NotAlignedError>();
-
-impl NotAlignedError {
+impl From<LayoutMismatchError> for FromStorageValueError {
     #[inline]
-    #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "false positive")]
-    pub fn new(ptr: *const u8, target_layout: Layout) -> Option<Self> {
-        let target_align = nonzero_align(target_layout);
-        if ptr.align_offset(target_align.get()) == 0 {
-            return None;
-        }
-
-        let me = unsafe { Self::new_unchecked(ptr, target_align) };
-        Some(me)
-    }
-
-    #[inline]
-    pub unsafe fn new_unchecked(ptr: *const u8, target_align: NonZeroUsize) -> Self {
-        Self { ptr, target_align }
-    }
-
-    #[inline]
-    pub fn ptr(&self) -> *const u8 {
-        let Self { ptr, .. } = *self;
-        ptr
-    }
-
-    #[inline]
-    pub fn target_align(&self) -> NonZeroUsize {
-        let Self { target_align, .. } = *self;
-        target_align
+    fn from(error: LayoutMismatchError) -> Self {
+        Self::LayoutMismatch(error)
     }
 }
 
-impl Debug for NotAlignedError {
+impl From<LayoutError> for FromStorageValueError {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl Debug for FromStorageValueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !f.alternate() {
             return Display::fmt(self, f);
         }
-
-        let Self { ptr, target_align } = self;
-        f.debug_struct("NotAlignedError")
-            .field("ptr", ptr)
-            .field("target_align", target_align)
-            .finish()
+        match self {
+            Self::LayoutMismatch(arg0) => f.debug_tuple("LayoutMismatch").field(arg0).finish(),
+            Self::InvalidLayout(arg0) => f.debug_tuple("InvalidLayout").field(arg0).finish(),
+        }
     }
 }
 
-impl Display for NotAlignedError {
+impl Display for FromStorageValueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { ptr, target_align } = self;
-        let align_offset = ptr.align_offset(target_align.get());
-        write!(
-            f,
-            "pointer {ptr:p} is not aligned to {target_align} (its current align offset is {align_offset})"
-        )
+        match self {
+            Self::LayoutMismatch(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+        }
     }
 }
 
-impl Error for NotAlignedError {}
-
-#[inline]
-pub fn check_ptr_align(ptr: *const u8, target_layout: Layout) -> Result<(), NotAlignedError> {
-    NotAlignedError::new(ptr, target_layout).map_or(Ok(()), Err)
+impl Error for FromStorageValueError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::LayoutMismatch(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+        }
+    }
 }
 
-#[inline]
-const fn assert_npo<T>() {
-    assert!(
-        size_of::<T>() == size_of::<Option<T>>(),
-        "non-zero usize should allow for NPO",
-    );
-    assert!(
-        align_of::<T>() == align_of::<Option<T>>(),
-        "non-zero usize should allow for NPO",
-    );
+#[derive(Debug, Clone)]
+pub enum FromValueError<T> {
+    InvalidLayout(LayoutError),
+    FromLayout(T),
 }
 
-#[inline]
-fn nonzero_align(layout: Layout) -> NonZeroUsize {
-    layout
-        .align()
-        .try_into()
-        .expect("alignment should not be zero because it is power of two")
+impl<T> From<LayoutError> for FromValueError<T> {
+    #[inline]
+    fn from(value: LayoutError) -> Self {
+        Self::InvalidLayout(value)
+    }
+}
+
+impl<T> Display for FromValueError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl<T> Error for FromValueError<T>
+where
+    T: Error,
+{
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct DowncastError<T>
+where
+    T: ?Sized,
+{
+    pub reason: DowncastErrorKind,
+    pub value: T,
+}
+
+impl<T> DowncastError<T> {
+    #[inline]
+    pub(crate) fn new(value: T, reason: DowncastErrorKind) -> Self {
+        Self { reason, value }
+    }
+
+    #[inline]
+    pub fn map_value<U, F>(self, f: F) -> DowncastError<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let Self { reason, value } = self;
+        DowncastError::new(f(value), reason)
+    }
+}
+
+impl<T> Display for DowncastError<T>
+where
+    T: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, value } = self;
+        write!(f, "failed to downcast {value}: {reason}")
+    }
+}
+
+impl<T> Error for DowncastError<T>
+where
+    T: Debug + Display + ?Sized,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[derive(Clone)]
+pub enum DowncastErrorKind {
+    LenMismatch(LenMismatchError),
+    LayoutMismatch(LayoutMismatchError),
+    InvalidLayout(LayoutError),
+}
+
+impl From<LenMismatchError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: LenMismatchError) -> Self {
+        Self::LenMismatch(error)
+    }
+}
+
+impl From<LayoutMismatchError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: LayoutMismatchError) -> Self {
+        Self::LayoutMismatch(error)
+    }
+}
+
+impl From<LayoutError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl Debug for DowncastErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !f.alternate() {
+            return Display::fmt(self, f);
+        }
+        match self {
+            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
+            Self::LayoutMismatch(error) => f.debug_tuple("LayoutMismatch").field(error).finish(),
+            Self::InvalidLayout(error) => f.debug_tuple("InvalidLayout").field(error).finish(),
+        }
+    }
+}
+
+impl Display for DowncastErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::LayoutMismatch(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for DowncastErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::LenMismatch(error) => Some(error),
+            Self::LayoutMismatch(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+        }
+    }
 }

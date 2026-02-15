@@ -1,11 +1,8 @@
 use std::{iter::zip, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    erased::{BoxedErasedSoa, ErasedSoaRefsMut},
-    field::{
-        BoxedErasedField, ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
-        ErasedFieldSliceMut,
-    },
+    BoxedErasedSoa, ErasedSoaMutRefs,
+    data::{BoxedErased, ErasedMutRef, ErasedMutSlice, ErasedRef, ErasedSlice},
     ptr::slice::CoreSliceItemPtrs,
 };
 
@@ -27,13 +24,13 @@ use crate::{
 pub type ErasedComponents<T> = IndexMap<ComponentId, T>;
 
 pub type ErasedBundle = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
-pub type ErasedBundleRef<'a, D> = ErasedSoaRefsMut<'a, D, *mut MaybeUninit<u8>>;
+pub type ErasedBundleRef<'a, D> = ErasedSoaMutRefs<'a, D, *mut MaybeUninit<u8>>;
 
-pub type ErasedComponent = BoxedErasedField<CoreSliceItemPtrs<MaybeUninit<u8>>>;
-pub type ErasedComponentRef<'a> = ErasedFieldRef<'a, *const MaybeUninit<u8>>;
-pub type ErasedComponentRefMut<'a> = ErasedFieldRefMut<'a, *mut MaybeUninit<u8>>;
-pub type ErasedComponentSlice<'a> = ErasedFieldSlice<'a, *const MaybeUninit<u8>>;
-pub type ErasedComponentSliceMut<'a> = ErasedFieldSliceMut<'a, *mut MaybeUninit<u8>>;
+pub type ErasedComponent = BoxedErased<CoreSliceItemPtrs<MaybeUninit<u8>>>;
+pub type ErasedComponentRef<'a> = ErasedRef<'a, *const MaybeUninit<u8>>;
+pub type ErasedComponentMutRef<'a> = ErasedMutRef<'a, *mut MaybeUninit<u8>>;
+pub type ErasedComponentSlice<'a> = ErasedSlice<'a, *const MaybeUninit<u8>>;
+pub type ErasedComponentMutSlice<'a> = ErasedMutSlice<'a, *mut MaybeUninit<u8>>;
 
 #[cold]
 #[track_caller]
@@ -111,8 +108,10 @@ where
     T: AllocSoa + Soa<'a> + SoaRead,
 {
     let fields_with_descriptors =
-        reorder_fields::<T, _, _>(components, context, component_ids, fields)
-            .map(ErasedField::into_parts);
+        reorder_fields::<T, _, _>(components, context, component_ids, fields).map(|field| {
+            let (storage, layout) = field.into_parts();
+            (storage, FieldDescriptor::new(layout))
+        });
     let erased_value = ErasedBundle::try_from_fields_with_descriptors(fields_with_descriptors)
         .expect("all the fields should be valid");
     unsafe { erased_value.downcast::<T>(context) }.expect("all the fields should be valid")
@@ -157,7 +156,7 @@ where
 #[inline]
 pub unsafe fn from_erased_refs_mut<'a, B>(
     components: &ComponentRegistry,
-    fields: ErasedComponents<ErasedComponentRefMut<'a>>,
+    fields: ErasedComponents<ErasedComponentMutRef<'a>>,
 ) -> RefsMut<'static, 'a, B>
 where
     B: Bundle,
@@ -192,7 +191,7 @@ where
 pub unsafe fn from_erased_mut_slices<'a, B>(
     components: &ComponentRegistry,
     len: usize,
-    fields: ErasedComponents<ErasedComponentSliceMut<'a>>,
+    fields: ErasedComponents<ErasedComponentMutSlice<'a>>,
 ) -> SlicesMut<'static, 'a, B>
 where
     B: Bundle,

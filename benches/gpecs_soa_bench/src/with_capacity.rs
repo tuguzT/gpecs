@@ -1,9 +1,7 @@
 use std::{hint::black_box, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    erased::{BoxedErasedSoa, ErasedSoaContext},
-    ptr::slice::CoreSliceItemPtrs,
-    soa::prelude::*,
+    BoxedErasedSoa, ErasedSoaContext, ptr::slice::CoreSliceItemPtrs, soa::prelude::*,
 };
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};

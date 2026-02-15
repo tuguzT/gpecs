@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa::field::{FieldDescriptor, FieldDescriptors};
-use gpecs_soa_erased::erased::CovariantFieldDescriptors;
+use gpecs_soa_erased::CovariantFieldDescriptors;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]

@@ -740,6 +740,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpecs_erased"
+version = "0.0.0"
+dependencies = [
+ "gpecs_ptr",
+]
+
+[[package]]
 name = "gpecs_ptr"
 version = "0.0.0"
 
@@ -811,7 +818,7 @@ name = "gpecs_soa_erased"
 version = "0.0.0"
 dependencies = [
  "arrayvec",
- "gpecs_ptr",
+ "gpecs_erased",
  "gpecs_soa",
  "itertools 0.14.0",
 ]

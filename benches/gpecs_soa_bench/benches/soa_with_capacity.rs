@@ -5,7 +5,7 @@ use gpecs_soa_bench::{
     Big, Large, Medium, Small, Tiny, Zero, names::*, with_capacity::WithCapacity,
 };
 use gpecs_soa_erased::{
-    erased::BoxedErasedSoaContext,
+    BoxedErasedSoaContext,
     ptr::slice::CoreSliceItemPtrs,
     soa::field::{FieldDescriptors, IntoCopiedFieldDescriptors, buffer_layout},
 };

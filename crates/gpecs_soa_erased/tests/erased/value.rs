@@ -5,18 +5,15 @@ use std::{ptr, slice};
 
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
-    erased::ErasedSoa,
-    field::ErasedFieldRef,
+    ErasedSoa,
+    data::ErasedRef,
     ptr::slice::CoreSliceItemPtrs,
     soa::field::{FieldDescriptor, FieldDescriptors},
     storage::AlignedUninitStorage,
 };
 
 #[cfg(feature = "alloc")]
-use gpecs_soa_erased::{
-    field::{BoxedErasedField, ErasedField},
-    storage::BoxedAlignedUninitStorage,
-};
+use gpecs_soa_erased::{data::BoxedErased, storage::BoxedAlignedUninitStorage};
 
 use crate::common::ArrayDescriptors;
 
@@ -74,9 +71,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::<*const _>::try_from(&())
-            .unwrap()
-            .into_buffer(),
+        ErasedRef::<*const _>::try_from(&()).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.into_iter().nth(1).unwrap();
@@ -86,9 +81,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::<*const _>::try_from(&i3)
-            .unwrap()
-            .into_buffer(),
+        ErasedRef::<*const _>::try_from(&i3).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.into_iter().nth(2).unwrap();
@@ -98,9 +91,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::<*const _>::try_from(&i2)
-            .unwrap()
-            .into_buffer(),
+        ErasedRef::<*const _>::try_from(&i2).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.into_iter().nth(3).unwrap();
@@ -110,9 +101,7 @@ fn value() {
     );
     assert_eq!(
         field_ref.into_buffer(),
-        ErasedFieldRef::<*const _>::try_from(&i1)
-            .unwrap()
-            .into_buffer(),
+        ErasedRef::<*const _>::try_from(&i1).unwrap().into_buffer(),
     );
 
     let field_ref = erased_refs.into_iter().nth(4).unwrap();
@@ -138,43 +127,44 @@ fn value() {
         slice::from_raw_parts(data, len)
     };
     let field_refs = [
-        ErasedFieldRef::<*const _>::new(descriptors[0], unit_bytes).expect("incorrect inputs"),
-        ErasedFieldRef::<*const _>::new(descriptors[1], i3_bytes).expect("incorrect inputs"),
-        ErasedFieldRef::<*const _>::new(descriptors[2], i2_bytes).expect("incorrect inputs"),
-        ErasedFieldRef::<*const _>::new(descriptors[3], i1_bytes).expect("incorrect inputs"),
+        ErasedRef::<*const _>::new(descriptors[0].layout(), unit_bytes).expect("incorrect inputs"),
+        ErasedRef::<*const _>::new(descriptors[1].layout(), i3_bytes).expect("incorrect inputs"),
+        ErasedRef::<*const _>::new(descriptors[2].layout(), i2_bytes).expect("incorrect inputs"),
+        ErasedRef::<*const _>::new(descriptors[3].layout(), i1_bytes).expect("incorrect inputs"),
     ];
     assert!(
         erased_refs
             .into_iter()
             .take(4)
-            .map(ErasedFieldRef::into_buffer)
-            .eq(field_refs.into_iter().map(ErasedFieldRef::into_buffer)),
+            .map(ErasedRef::into_buffer)
+            .eq(field_refs.into_iter().map(ErasedRef::into_buffer)),
     );
 
     let mut fields = erased_value
         .into_fields()
         .collect::<Result<ArrayVec<_, 5>, _>>()
         .expect("allocation of small byte array should succeed");
-    let field: BoxedErasedField<_> = fields.pop().expect("string field should exist");
+    let field: BoxedErased<_> = fields.pop().expect("string field should exist");
     assert_eq!(
         unsafe { field.downcast::<String>() }.expect("layouts should match"),
         str,
     );
 
-    let erased_value =
-        ErasedSoa::<
-            BoxedAlignedUninitStorage,
-            ArrayDescriptors<FieldDescriptor, 4>,
-            CoreSliceItemPtrs<MaybeUninit<u8>>,
-        >::try_from_fields_with_descriptors(fields.into_iter().map(ErasedField::into_parts))
-        .expect("all the fields should be valid here");
+    let fields_with_descriptors = fields.into_iter().map(|field| {
+        let (storage, layout) = field.into_parts();
+        (storage, FieldDescriptor::new(layout))
+    });
+    let erased_value = ErasedSoa::<
+        BoxedAlignedUninitStorage,
+        ArrayDescriptors<FieldDescriptor, 4>,
+        CoreSliceItemPtrs<MaybeUninit<u8>>,
+    >::try_from_fields_with_descriptors(fields_with_descriptors)
+    .expect("all the fields should be valid here");
 
     let erased_value_refs = erased_value.as_fields();
     itertools::assert_equal(
-        erased_value_refs
-            .into_iter()
-            .map(ErasedFieldRef::into_buffer),
-        field_refs.into_iter().map(ErasedFieldRef::into_buffer),
+        erased_value_refs.into_iter().map(ErasedRef::into_buffer),
+        field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 
     let context = Default::default();
@@ -208,15 +198,14 @@ fn value_zst() {
     );
 
     let field_refs = [
-        ErasedFieldRef::<*const _>::new(FieldDescriptor::of::<()>(), [].as_slice())
-            .expect("incorrect inputs"),
+        ErasedRef::<*const _>::new(Layout::new::<()>(), [].as_slice()).expect("incorrect inputs"),
     ];
     itertools::assert_equal(
         erased_value
             .as_fields()
             .into_iter()
-            .map(ErasedFieldRef::into_buffer),
-        field_refs.into_iter().map(ErasedFieldRef::into_buffer),
+            .map(ErasedRef::into_buffer),
+        field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 
     let value = unsafe { erased_value.downcast::<()>(&context) }

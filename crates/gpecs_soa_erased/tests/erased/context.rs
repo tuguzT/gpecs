@@ -1,5 +1,5 @@
 use gpecs_soa_erased::{
-    erased::ErasedSoaContext,
+    ErasedSoaContext,
     ptr::slice::CoreSliceItemPtrs,
     soa::field::{FieldDescriptor, FieldDescriptors},
 };

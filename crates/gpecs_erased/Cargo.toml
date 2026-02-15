@@ -1,0 +1,18 @@
+[package]
+name = "gpecs_erased"
+description = "Erased data manipulation for (probably) ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpecs_ptr = { workspace = true }
+
+[features]
+default = ["alloc"]
+alloc = []
+
+[lints]
+workspace = true

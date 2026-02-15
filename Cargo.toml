@@ -7,6 +7,7 @@ members = [
     "crates/gpecs_shaders",
     # utility crates
     "crates/gpecs_ptr",
+    "crates/gpecs_erased",
     "crates/gpecs_soa",
     "crates/gpecs_soa_erased",
     "crates/gpecs_sparse",
@@ -37,6 +38,7 @@ gpecs = { path = "crates/gpecs" }
 gpecs_types = { path = "crates/gpecs_types" }
 # utility crates
 gpecs_ptr = { path = "crates/gpecs_ptr", default-features = false }
+gpecs_erased = { path = "crates/gpecs_erased", default-features = false }
 gpecs_soa = { path = "crates/gpecs_soa", default-features = false }
 gpecs_soa_erased = { path = "crates/gpecs_soa_erased", default-features = false }
 gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }

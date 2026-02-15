@@ -4,7 +4,7 @@ use std::{
 };
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
-use gpecs_soa_erased::erased::{BoxedErasedSoa, ErasedSoaContext};
+use gpecs_soa_erased::{BoxedErasedSoa, ErasedSoaContext};
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 use indexmap::map::Keys as IndexMapKeys;
 
@@ -22,10 +22,11 @@ use crate::{
 use super::{
     collect::{try_collect_component_ids, try_collect_maybe_component_ids},
     erased::{
-        ErasedBundle, ErasedBundleRef, ErasedComponent, ErasedComponentRef, ErasedComponentRefMut,
-        ErasedComponentSlice, ErasedComponentSliceMut, ErasedComponents, drop_erased_in_place,
-        from_erased_fields, from_erased_mut_slices, from_erased_refs, from_erased_refs_mut,
-        from_erased_slices, get_component_info_fail, into_erased_fields, validate_components,
+        ErasedBundle, ErasedBundleRef, ErasedComponent, ErasedComponentMutRef,
+        ErasedComponentMutSlice, ErasedComponentRef, ErasedComponentSlice, ErasedComponents,
+        drop_erased_in_place, from_erased_fields, from_erased_mut_slices, from_erased_refs,
+        from_erased_refs_mut, from_erased_slices, get_component_info_fail, into_erased_fields,
+        validate_components,
     },
     error::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
@@ -603,7 +604,7 @@ impl ArchetypeStorage {
     pub(crate) fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
-    ) -> (&[Entity], ErasedComponents<ErasedComponentSliceMut<'_>>) {
+    ) -> (&[Entity], ErasedComponents<ErasedComponentMutSlice<'_>>) {
         let Self {
             component_ids,
             erased_storage,
@@ -734,7 +735,7 @@ trait ErasedStorageExt {
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (&[Entity], ErasedComponents<ErasedComponentSliceMut<'_>>);
+    ) -> (&[Entity], ErasedComponents<ErasedComponentMutSlice<'_>>);
 
     fn insert_erased(
         &mut self,
@@ -763,7 +764,7 @@ trait ErasedStorageExt {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedComponentRefMut<'_>>>;
+    ) -> Option<ErasedComponents<ErasedComponentMutRef<'_>>>;
 }
 
 impl ErasedStorageExt for ErasedStorage {
@@ -801,7 +802,7 @@ impl ErasedStorageExt for ErasedStorage {
         &mut self,
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
-    ) -> (&[Entity], ErasedComponents<ErasedComponentSliceMut<'_>>) {
+    ) -> (&[Entity], ErasedComponents<ErasedComponentMutSlice<'_>>) {
         let (dense, _) = Self::as_mut_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
@@ -878,7 +879,7 @@ impl ErasedStorageExt for ErasedStorage {
         components: &ComponentRegistry,
         component_ids: &ComponentIdMap,
         entity: Entity,
-    ) -> Option<ErasedComponents<ErasedComponentRefMut<'_>>> {
+    ) -> Option<ErasedComponents<ErasedComponentMutRef<'_>>> {
         let view = Self::as_mut_view(self);
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 

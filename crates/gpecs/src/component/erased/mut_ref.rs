@@ -5,7 +5,7 @@ use std::{
     mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::field::ErasedFieldRefMut;
+use gpecs_soa_erased::data::ErasedMutRef;
 
 use crate::component::{
     Component,
@@ -17,7 +17,7 @@ use crate::component::{
     registry::{ComponentId, ComponentRegistry},
 };
 
-type Field<'a> = ErasedFieldRefMut<'a, *mut MaybeUninit<u8>>;
+type Field<'a> = ErasedMutRef<'a, *mut MaybeUninit<u8>>;
 
 #[derive(Debug)]
 pub struct ErasedComponentRefMut<'a> {

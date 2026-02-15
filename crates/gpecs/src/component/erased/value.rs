@@ -5,7 +5,7 @@ use std::{
     mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::{field::BoxedErasedField, ptr::slice::CoreSliceItemPtrs};
+use gpecs_soa_erased::{data::BoxedErased, ptr::slice::CoreSliceItemPtrs};
 
 use crate::component::{
     Component,
@@ -17,7 +17,7 @@ use crate::component::{
     registry::{ComponentId, ComponentRegistry},
 };
 
-type Field = BoxedErasedField<CoreSliceItemPtrs<MaybeUninit<u8>>>;
+type Field = BoxedErased<CoreSliceItemPtrs<MaybeUninit<u8>>>;
 
 #[derive(Debug)]
 pub struct ErasedComponent {
@@ -40,7 +40,7 @@ impl ErasedComponent {
         };
 
         let field = Field::try_from(component).map_err(|error| {
-            use gpecs_soa_erased::field::error::{
+            use gpecs_soa_erased::data::error::{
                 FromValueError,
                 FromValueErrorKind::{FromLayout, InsufficientAlign},
             };
@@ -147,7 +147,7 @@ impl ErasedComponent {
             component_id,
         } = *self;
 
-        let field = field.as_field_ptr();
+        let field = field.as_erased_ptr();
         unsafe { ErasedComponentPtr::from_parts(component_id, field) }
     }
 
@@ -158,7 +158,7 @@ impl ErasedComponent {
             component_id,
         } = *self;
 
-        let field = field.as_mut_field_ptr();
+        let field = field.as_mut_erased_ptr();
         unsafe { ErasedComponentMutPtr::from_parts(component_id, field) }
     }
 

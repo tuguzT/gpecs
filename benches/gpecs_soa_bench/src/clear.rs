@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
 
-use gpecs_soa_erased::{erased::BoxedErasedSoa, ptr::slice::CoreSliceItemPtrs, soa::prelude::*};
+use gpecs_soa_erased::{BoxedErasedSoa, ptr::slice::CoreSliceItemPtrs, soa::prelude::*};
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 

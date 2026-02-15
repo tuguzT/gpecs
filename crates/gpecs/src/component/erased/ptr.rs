@@ -5,7 +5,7 @@ use std::{
     mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::field::ErasedFieldPtr;
+use gpecs_soa_erased::data::ErasedPtr;
 
 use crate::component::{
     Component,
@@ -17,7 +17,7 @@ use crate::component::{
     registry::{ComponentId, ComponentRegistry},
 };
 
-type Field = ErasedFieldPtr<*const MaybeUninit<u8>>;
+type Field = ErasedPtr<*const MaybeUninit<u8>>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedComponentPtr {
@@ -35,8 +35,8 @@ impl ErasedComponentPtr {
             .get_component_info(component_id)
             .ok_or(NotRegisteredError)?;
 
-        let desc = component_info.descriptor();
-        let field = Field::dangling(desc)
+        let layout = component_info.descriptor().layout();
+        let field = Field::dangling(layout)
             .expect("alignment of bytes should be sufficient for any component");
 
         let me = unsafe { Self::from_parts(component_id, field) };

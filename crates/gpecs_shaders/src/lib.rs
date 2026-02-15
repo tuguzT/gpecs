@@ -5,7 +5,7 @@ use core::{convert::Infallible, mem::MaybeUninit};
 use spirv_std::{glam::USizeVec3, spirv};
 
 use gpecs_soa_erased::{
-    erased::{ErasedSoa, ErasedSoaContext, ErasedSoaSlicesMut},
+    ErasedSoa, ErasedSoaContext, ErasedSoaMutSlices,
     soa::{field::FieldDescriptor, slice::SoaSlicesMut},
 };
 
@@ -38,7 +38,7 @@ pub fn erased_soa_work(
     let invocation_id = id.x;
 
     let context = unsafe { ErasedSoaContext::new_unchecked(descriptors) };
-    let slices = unsafe { ErasedSoaSlicesMut::new_unchecked(descriptors, dense, capacity, 0, len) };
+    let slices = unsafe { ErasedSoaMutSlices::new_unchecked(descriptors, dense, capacity, 0, len) };
     let mut dense_soa = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, slices);
 
     dense_soa.swap(invocation_id, invocation_id + 1);

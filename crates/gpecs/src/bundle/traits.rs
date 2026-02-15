@@ -1,7 +1,7 @@
 use std::mem::MaybeUninit;
 
 use gpecs_soa_erased::{
-    field::{ErasedFieldMutPtr, ErasedFieldPtr},
+    data::{ErasedMutPtr, ErasedPtr},
     ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
 };
 
@@ -33,16 +33,16 @@ pub unsafe trait Bundle: SoaOwned + AllocSoa + SoaRead + SoaWrite + 'static {
     fn ptrs_from_erased<I, P>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedFieldPtr<P>>>
+    ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedPtr<P>>>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedFieldPtr<P>)>,
+        I: IntoIterator<Item = (ComponentId, ErasedPtr<P>)>,
         P: ConstSliceItemPtr<Item = MaybeUninit<u8>>;
 
     fn mut_ptrs_from_erased<I, P>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedFieldMutPtr<P>>>
+    ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedMutPtr<P>>>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedFieldMutPtr<P>)>,
+        I: IntoIterator<Item = (ComponentId, ErasedMutPtr<P>)>,
         P: MutSliceItemPtr<Item = MaybeUninit<u8>>;
 }

@@ -7,7 +7,7 @@ use crate::{
         ErasedFieldMutPtr, ErasedFieldSlice, ErasedFieldSliceMut, ErasedFieldSlicePtr,
         error::{DowncastError, SlicePtrError, check_downcast, check_slice_len},
     },
-    slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConstPtr, MutSliceItemPtr},
     soa::field::FieldDescriptor,
 };
 

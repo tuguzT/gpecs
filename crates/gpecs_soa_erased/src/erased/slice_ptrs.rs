@@ -13,7 +13,7 @@ use crate::{
     },
     error::{check_ptr_align, check_sufficient_align, check_sufficient_len},
     field::ErasedFieldSlicePtr,
-    slice_item_ptr::{CastMutPtr, ConstSliceItemPtr},
+    ptr::slice::{CastMutPtr, ConstSliceItemPtr},
     soa::{
         field::{
             FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOwned,

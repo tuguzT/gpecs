@@ -5,7 +5,7 @@ use std::{
     mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::{field::BoxedErasedField, slice_item_ptr::CoreSliceItemPtrs};
+use gpecs_soa_erased::{field::BoxedErasedField, ptr::slice::CoreSliceItemPtrs};
 
 use crate::component::{
     Component,

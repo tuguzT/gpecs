@@ -6,7 +6,7 @@ use gpecs_soa_bench::{
 };
 use gpecs_soa_erased::{
     erased::BoxedErasedSoaContext,
-    slice_item_ptr::CoreSliceItemPtrs,
+    ptr::slice::CoreSliceItemPtrs,
     soa::field::{FieldDescriptors, IntoCopiedFieldDescriptors, buffer_layout},
 };
 

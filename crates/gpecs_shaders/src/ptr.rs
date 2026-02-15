@@ -4,7 +4,7 @@ use core::{
 };
 use spirv_std::arch::IndexUnchecked;
 
-use gpecs_soa_erased::slice_item_ptr::{
+use gpecs_soa_erased::ptr::slice::{
     ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs,
 };
 

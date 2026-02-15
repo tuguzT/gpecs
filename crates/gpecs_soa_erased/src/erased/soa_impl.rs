@@ -6,7 +6,7 @@ use crate::{
         ErasedSoaNonNullPtrs, ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsMut,
         ErasedSoaSliceMutPtrs, ErasedSoaSlicePtrs, ErasedSoaSlices, ErasedSoaSlicesMut,
     },
-    slice_item_ptr::SliceItemPtrs,
+    ptr::slice::SliceItemPtrs,
     soa::{
         field::{FieldDescriptors, FieldDescriptorsOutput},
         traits::{

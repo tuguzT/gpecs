@@ -9,7 +9,7 @@ use core::{
 use crate::{
     erased::CovariantFieldDescriptors,
     error::{InsufficientAlignError, check_sufficient_align},
-    slice_item_ptr::SliceItemPtrs,
+    ptr::slice::SliceItemPtrs,
     soa::{
         field::{
             FieldDescriptor, FieldDescriptors, FieldDescriptorsOwned, IntoCopiedFieldDescriptors,

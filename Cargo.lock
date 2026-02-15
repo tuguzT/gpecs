@@ -740,6 +740,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpecs_ptr"
+version = "0.0.0"
+
+[[package]]
 name = "gpecs_shaders"
 version = "0.0.0"
 dependencies = [
@@ -807,6 +811,7 @@ name = "gpecs_soa_erased"
 version = "0.0.0"
 dependencies = [
  "arrayvec",
+ "gpecs_ptr",
  "gpecs_soa",
  "itertools 0.14.0",
 ]

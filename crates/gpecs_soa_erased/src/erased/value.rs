@@ -24,7 +24,7 @@ use crate::{
         InsufficientAlignError, LenMismatchError, check_layout, check_len, check_sufficient_align,
     },
     field::{ErasedField, error::FromDescDataError},
-    slice_item_ptr::SliceItemPtrs,
+    ptr::slice::SliceItemPtrs,
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,

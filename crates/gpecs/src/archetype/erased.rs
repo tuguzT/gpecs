@@ -6,7 +6,7 @@ use gpecs_soa_erased::{
         BoxedErasedField, ErasedField, ErasedFieldRef, ErasedFieldRefMut, ErasedFieldSlice,
         ErasedFieldSliceMut,
     },
-    slice_item_ptr::CoreSliceItemPtrs,
+    ptr::slice::CoreSliceItemPtrs,
 };
 
 use crate::{

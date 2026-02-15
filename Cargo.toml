@@ -1,25 +1,26 @@
 [workspace]
 resolver = "3"
 members = [
-    # Main crates
+    # main crates
     "crates/gpecs",
     "crates/gpecs_types",
     "crates/gpecs_shaders",
-    # Utility crates
+    # utility crates
+    "crates/gpecs_ptr",
     "crates/gpecs_soa",
     "crates/gpecs_soa_erased",
     "crates/gpecs_sparse",
     "crates/gpecs_spirv_analysis",
     "crates/gpecs_task_graph",
-    # Standalone benchmarks
+    # standalone examples
+    "examples/gpecs_simple",
+    "examples/gpecs_simple_types",
+    "examples/gpecs_simple_shader",
+    # standalone benchmarks
     "benches/gpecs_soa_bench",
     "benches/gpecs_ecs_benchmark",
     "benches/gpecs_ecs_benchmark_types",
     "benches/gpecs_ecs_benchmark_shader",
-    # Standalone examples
-    "examples/gpecs_simple",
-    "examples/gpecs_simple_types",
-    "examples/gpecs_simple_shader",
 ]
 
 [workspace.package]
@@ -31,13 +32,19 @@ edition = "2024"
 rust-version = "1.89.0"
 
 [workspace.dependencies]
+# main crates
 gpecs = { path = "crates/gpecs" }
-gpecs_soa = { path = "crates/gpecs_soa", default-features = false }
-gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
-gpecs_soa_erased = { path = "crates/gpecs_soa_erased", default-features = false }
 gpecs_types = { path = "crates/gpecs_types" }
+# utility crates
+gpecs_ptr = { path = "crates/gpecs_ptr", default-features = false }
+gpecs_soa = { path = "crates/gpecs_soa", default-features = false }
+gpecs_soa_erased = { path = "crates/gpecs_soa_erased", default-features = false }
+gpecs_sparse = { path = "crates/gpecs_sparse", default-features = false }
+# standalone examples
 gpecs_simple_types = { path = "examples/gpecs_simple_types" }
+# standalone benchmarks
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
+# actual dependencies
 cargo-gpu-install = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "f2244a3f7f9f30998918a543075a1ce17b42af64" }
 spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "79acad1f916d953275c93c16f006543ce18a14b1" }
 indexmap = { version = "2.13", default-features = false }

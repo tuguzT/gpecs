@@ -19,7 +19,7 @@ use crate::{
         InsufficientAlignError, check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
     field::ErasedFieldPtr,
-    slice_item_ptr::{CastMutPtr, ConstSliceItemPtr},
+    ptr::slice::{CastMutPtr, ConstSliceItemPtr},
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,

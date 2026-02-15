@@ -16,7 +16,7 @@ use crate::{
             check_downcast,
         },
     },
-    slice_item_ptr::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
+    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
     soa::field::FieldDescriptor,
     storage::{AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
     uninit::write_copy_of_slice,

@@ -15,7 +15,7 @@ use crate::{
     },
     error::InsufficientAlignError,
     field::ErasedFieldNonNullPtr,
-    slice_item_ptr::{NonNullAsPtr, NonNullSliceItemPtr},
+    ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,

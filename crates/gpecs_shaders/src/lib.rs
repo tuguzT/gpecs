@@ -11,11 +11,11 @@ use gpecs_soa_erased::{
 
 pub use self::{
     descriptors::GpuFieldDescriptors,
-    slice_item_ptr::{GpuSliceItemPtr, GpuSliceItemPtrs},
+    ptr::{GpuSliceItemPtr, GpuSliceItemPtrs},
 };
 
 mod descriptors;
-mod slice_item_ptr;
+mod ptr;
 
 pub type GpuErasedSoa<D> = ErasedSoa<Infallible, D, GpuSliceItemPtrs<MaybeUninit<u32>>>;
 

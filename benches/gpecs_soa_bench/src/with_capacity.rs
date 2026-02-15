@@ -2,7 +2,7 @@ use std::{hint::black_box, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, ErasedSoaContext},
-    slice_item_ptr::CoreSliceItemPtrs,
+    ptr::slice::CoreSliceItemPtrs,
     soa::prelude::*,
 };
 

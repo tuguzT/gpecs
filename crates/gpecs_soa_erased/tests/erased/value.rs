@@ -7,7 +7,7 @@ use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
     erased::ErasedSoa,
     field::ErasedFieldRef,
-    slice_item_ptr::CoreSliceItemPtrs,
+    ptr::slice::CoreSliceItemPtrs,
     soa::field::{FieldDescriptor, FieldDescriptors},
     storage::AlignedUninitStorage,
 };

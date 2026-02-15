@@ -4,7 +4,7 @@ use std::{iter, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa},
-    slice_item_ptr::CoreSliceItemPtrs,
+    ptr::slice::CoreSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         vec::SoaVec,

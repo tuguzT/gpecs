@@ -13,7 +13,7 @@ use crate::{
         error::{DowncastError, PtrsError},
     },
     field::{ErasedFieldRef, ErasedFieldRefMut},
-    slice_item_ptr::{CastConstPtr, MutSliceItemPtr},
+    ptr::slice::{CastConstPtr, MutSliceItemPtr},
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOwned},
         traits::{AllocSoa, RefsMut, Soa, SoaContext},

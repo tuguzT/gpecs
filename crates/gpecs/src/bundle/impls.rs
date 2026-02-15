@@ -2,7 +2,7 @@ use std::mem::MaybeUninit;
 
 use gpecs_soa_erased::{
     field::{ErasedFieldMutPtr, ErasedFieldPtr},
-    slice_item_ptr::{ConstSliceItemPtr, MutSliceItemPtr},
+    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
 };
 
 use crate::{

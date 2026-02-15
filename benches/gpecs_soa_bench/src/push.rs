@@ -3,7 +3,7 @@ use std::{alloc::Layout, hint::black_box, mem::MaybeUninit, ops::Deref};
 use arrayvec::{ArrayVec, IntoIter};
 use gpecs_soa_erased::{
     erased::{BoxedErasedSoa, CovariantFieldDescriptors, ErasedSoa},
-    slice_item_ptr::CoreSliceItemPtrs,
+    ptr::slice::CoreSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         prelude::*,

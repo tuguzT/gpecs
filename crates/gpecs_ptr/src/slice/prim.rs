@@ -3,9 +3,7 @@ use core::{
     ptr::{self, NonNull},
 };
 
-use crate::slice_item_ptr::{
-    ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs,
-};
+use super::{ConstSliceItemPtr, MutSliceItemPtr, NonNullSliceItemPtr, SliceItemPtr, SliceItemPtrs};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CoreSliceItemPtrs<T> {

@@ -12,7 +12,7 @@ use crate::{
         ErasedFieldPtr,
         error::{DowncastError, PtrError},
     },
-    slice_item_ptr::ConstSliceItemPtr,
+    ptr::slice::ConstSliceItemPtr,
     soa::field::FieldDescriptor,
 };
 

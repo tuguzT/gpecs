@@ -1,13 +1,8 @@
-use std::mem::MaybeUninit;
-
-use gpecs_soa_erased::{
-    data::{ErasedMutPtr, ErasedPtr},
-    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
-};
-
 use crate::{
-    bundle::error::PtrsFromIterError,
-    component::registry::{ComponentId, ComponentRegistry},
+    component::{
+        erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind},
+        registry::{ComponentId, ComponentRegistry},
+    },
     soa::traits::{AllocSoa, MutPtrs, Ptrs, SoaOwned, SoaRead, SoaWrite},
 };
 
@@ -30,19 +25,17 @@ pub unsafe trait Bundle: SoaOwned + AllocSoa + SoaRead + SoaWrite + 'static {
 
     fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds;
 
-    fn ptrs_from_erased<I, P>(
+    fn ptrs_from_erased<I>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedPtr<P>>>
+    ) -> Result<Ptrs<'static, Self>, DowncastErrorKind>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedPtr<P>)>,
-        P: ConstSliceItemPtr<Item = MaybeUninit<u8>>;
+        I: IntoIterator<Item = ErasedComponentPtr>;
 
-    fn mut_ptrs_from_erased<I, P>(
+    fn mut_ptrs_from_erased<I>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedMutPtr<P>>>
+    ) -> Result<MutPtrs<'static, Self>, DowncastErrorKind>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedMutPtr<P>)>,
-        P: MutSliceItemPtr<Item = MaybeUninit<u8>>;
+        I: IntoIterator<Item = ErasedComponentMutPtr>;
 }

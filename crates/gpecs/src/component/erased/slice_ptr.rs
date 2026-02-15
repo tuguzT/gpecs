@@ -10,8 +10,7 @@ use gpecs_soa_erased::data::ErasedSlicePtr;
 use crate::component::{
     Component,
     erased::{
-        ErasedComponentMutPtr, ErasedComponentPtr, ErasedComponentSlice,
-        ErasedComponentSliceMutPtr,
+        ErasedComponentMutSlicePtr, ErasedComponentPtr, ErasedComponentSlice,
         error::{DowncastError, check_downcast},
     },
     error::NotRegisteredError,
@@ -39,16 +38,12 @@ impl ErasedComponentSlicePtr {
         let fields = Fields::try_from(component)
             .expect("alignment of bytes should be sufficient for any component");
 
-        Ok(Self {
-            component_id,
-            fields,
-        })
+        let me = unsafe { Self::from_parts(component_id, fields) };
+        Ok(me)
     }
 
     #[inline]
-    pub unsafe fn from_parts(ptr: ErasedComponentPtr, len: usize) -> Self {
-        let (component_id, field) = ptr.into_parts();
-        let fields = unsafe { Fields::from_parts(field, len) };
+    pub unsafe fn from_parts(component_id: ComponentId, fields: Fields) -> Self {
         Self {
             component_id,
             fields,
@@ -73,15 +68,14 @@ impl ErasedComponentSlicePtr {
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedComponentSliceMutPtr {
+    pub fn cast_mut(self) -> ErasedComponentMutSlicePtr {
         let Self {
             component_id,
             fields,
         } = self;
 
-        let (ptr, len) = fields.cast_mut().into_parts();
-        let ptr = unsafe { ErasedComponentMutPtr::from_parts(component_id, ptr) };
-        unsafe { ErasedComponentSliceMutPtr::from_parts(ptr, len) }
+        let fields = fields.cast_mut();
+        unsafe { ErasedComponentMutSlicePtr::from_parts(component_id, fields) }
     }
 
     #[inline]
@@ -136,15 +130,12 @@ impl ErasedComponentSlicePtr {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (ErasedComponentPtr, usize) {
+    pub fn into_parts(self) -> (ComponentId, Fields) {
         let Self {
             component_id,
             fields,
         } = self;
-
-        let (field, len) = fields.into_parts();
-        let ptr = unsafe { ErasedComponentPtr::from_parts(component_id, field) };
-        (ptr, len)
+        (component_id, fields)
     }
 }
 

@@ -10,7 +10,7 @@ use gpecs_soa_erased::data::ErasedMutSlice;
 use crate::component::{
     Component,
     erased::{
-        ErasedComponentMutPtr, ErasedComponentPtr, ErasedComponentSliceMutPtr,
+        ErasedComponentMutPtr, ErasedComponentMutSlicePtr, ErasedComponentPtr,
         ErasedComponentSlicePtr,
         error::{DowncastError, check_downcast},
     },
@@ -21,12 +21,12 @@ use crate::component::{
 type Fields<'a> = ErasedMutSlice<'a, *mut MaybeUninit<u8>>;
 
 #[derive(Debug)]
-pub struct ErasedComponentSliceMut<'a> {
+pub struct ErasedComponentMutSlice<'a> {
     component_id: ComponentId,
     fields: Fields<'a>,
 }
 
-impl<'a> ErasedComponentSliceMut<'a> {
+impl<'a> ErasedComponentMutSlice<'a> {
     #[inline]
     pub fn try_from<C>(
         registry: &ComponentRegistry,
@@ -39,16 +39,12 @@ impl<'a> ErasedComponentSliceMut<'a> {
         let fields = Fields::try_from(component)
             .expect("alignment of bytes should be sufficient for any component");
 
-        Ok(Self {
-            component_id,
-            fields,
-        })
+        let me = unsafe { Self::from_parts(component_id, fields) };
+        Ok(me)
     }
 
     #[inline]
-    pub unsafe fn from_parts(ptr: ErasedComponentMutPtr, len: usize) -> Self {
-        let (component_id, field) = ptr.into_parts();
-        let fields = unsafe { Fields::from_parts(field, len) };
+    pub unsafe fn from_parts(component_id: ComponentId, fields: Fields<'a>) -> Self {
         Self {
             component_id,
             fields,
@@ -56,9 +52,10 @@ impl<'a> ErasedComponentSliceMut<'a> {
     }
 
     #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedComponentSliceMutPtr) -> Self {
-        let (ptr, len) = ptr.into_parts();
-        unsafe { Self::from_parts(ptr, len) }
+    pub unsafe fn from_ptr(ptr: ErasedComponentMutSlicePtr) -> Self {
+        let (component_id, fields) = ptr.into_parts();
+        let fields = unsafe { fields.deref_mut() };
+        unsafe { Self::from_parts(component_id, fields) }
     }
 
     #[inline]
@@ -139,25 +136,19 @@ impl<'a> ErasedComponentSliceMut<'a> {
             component_id,
         } = *self;
 
-        let field = fields.as_field_ptr();
-        let ptr = unsafe { ErasedComponentPtr::from_parts(component_id, field) };
-
-        let len = fields.len();
-        unsafe { ErasedComponentSlicePtr::from_parts(ptr, len) }
+        let fields = fields.as_field_slice_ptr();
+        unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
     }
 
     #[inline]
-    pub fn as_mut_component_slice_ptr(&mut self) -> ErasedComponentSliceMutPtr {
+    pub fn as_mut_component_slice_ptr(&mut self) -> ErasedComponentMutSlicePtr {
         let Self {
             ref mut fields,
             component_id,
         } = *self;
 
-        let field = fields.as_mut_field_ptr();
-        let ptr = unsafe { ErasedComponentMutPtr::from_parts(component_id, field) };
-
-        let len = fields.len();
-        unsafe { ErasedComponentSliceMutPtr::from_parts(ptr, len) }
+        let fields = fields.as_mut_field_slice_ptr();
+        unsafe { ErasedComponentMutSlicePtr::from_parts(component_id, fields) }
     }
 
     #[inline]
@@ -207,19 +198,16 @@ impl<'a> ErasedComponentSliceMut<'a> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (ErasedComponentMutPtr, usize) {
+    pub fn into_parts(self) -> (ComponentId, Fields<'a>) {
         let Self {
             component_id,
             fields,
         } = self;
-
-        let (field, len) = fields.into_parts();
-        let ptr = unsafe { ErasedComponentMutPtr::from_parts(component_id, field) };
-        (ptr, len)
+        (component_id, fields)
     }
 }
 
-impl PartialEq for ErasedComponentSliceMut<'_> {
+impl PartialEq for ErasedComponentMutSlice<'_> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         let Self { component_id, .. } = self;
@@ -227,16 +215,16 @@ impl PartialEq for ErasedComponentSliceMut<'_> {
     }
 }
 
-impl Eq for ErasedComponentSliceMut<'_> {}
+impl Eq for ErasedComponentMutSlice<'_> {}
 
-impl PartialOrd for ErasedComponentSliceMut<'_> {
+impl PartialOrd for ErasedComponentMutSlice<'_> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for ErasedComponentSliceMut<'_> {
+impl Ord for ErasedComponentMutSlice<'_> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { component_id, .. } = self;
@@ -244,7 +232,7 @@ impl Ord for ErasedComponentSliceMut<'_> {
     }
 }
 
-impl Hash for ErasedComponentSliceMut<'_> {
+impl Hash for ErasedComponentMutSlice<'_> {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { component_id, .. } = self;
@@ -252,7 +240,7 @@ impl Hash for ErasedComponentSliceMut<'_> {
     }
 }
 
-impl Borrow<ComponentId> for ErasedComponentSliceMut<'_> {
+impl Borrow<ComponentId> for ErasedComponentMutSlice<'_> {
     #[inline]
     fn borrow(&self) -> &ComponentId {
         let Self { component_id, .. } = self;
@@ -260,14 +248,14 @@ impl Borrow<ComponentId> for ErasedComponentSliceMut<'_> {
     }
 }
 
-impl AsRef<[u8]> for ErasedComponentSliceMut<'_> {
+impl AsRef<[u8]> for ErasedComponentMutSlice<'_> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
         self.as_buffer()
     }
 }
 
-impl AsMut<[u8]> for ErasedComponentSliceMut<'_> {
+impl AsMut<[u8]> for ErasedComponentMutSlice<'_> {
     #[inline]
     fn as_mut(&mut self) -> &mut [u8] {
         self.as_mut_buffer()

@@ -1,6 +1,6 @@
 pub use self::{
-    mut_ptr::ErasedComponentMutPtr, mut_ref::ErasedComponentRefMut,
-    mut_slice::ErasedComponentSliceMut, mut_slice_ptr::ErasedComponentSliceMutPtr,
+    mut_ptr::ErasedComponentMutPtr, mut_ref::ErasedComponentMutRef,
+    mut_slice::ErasedComponentMutSlice, mut_slice_ptr::ErasedComponentMutSlicePtr,
     nonnull_ptr::ErasedComponentNonNullPtr, ptr::ErasedComponentPtr, r#ref::ErasedComponentRef,
     slice::ErasedComponentSlice, slice_ptr::ErasedComponentSlicePtr, value::ErasedComponent,
 };

@@ -10,7 +10,7 @@ use gpecs_soa_erased::data::ErasedMutSlicePtr;
 use crate::component::{
     Component,
     erased::{
-        ErasedComponentMutPtr, ErasedComponentPtr, ErasedComponentSlice, ErasedComponentSliceMut,
+        ErasedComponentMutPtr, ErasedComponentMutSlice, ErasedComponentSlice,
         ErasedComponentSlicePtr,
         error::{DowncastError, check_downcast},
     },
@@ -21,12 +21,12 @@ use crate::component::{
 type Fields = ErasedMutSlicePtr<*mut MaybeUninit<u8>>;
 
 #[derive(Debug, Clone, Copy)]
-pub struct ErasedComponentSliceMutPtr {
+pub struct ErasedComponentMutSlicePtr {
     component_id: ComponentId,
     fields: Fields,
 }
 
-impl ErasedComponentSliceMutPtr {
+impl ErasedComponentMutSlicePtr {
     #[inline]
     pub fn try_from<C>(
         registry: &ComponentRegistry,
@@ -39,16 +39,12 @@ impl ErasedComponentSliceMutPtr {
         let fields = Fields::try_from(component)
             .expect("alignment of bytes should be sufficient for any component");
 
-        Ok(Self {
-            component_id,
-            fields,
-        })
+        let me = unsafe { Self::from_parts(component_id, fields) };
+        Ok(me)
     }
 
     #[inline]
-    pub unsafe fn from_parts(ptr: ErasedComponentMutPtr, len: usize) -> Self {
-        let (component_id, field) = ptr.into_parts();
-        let fields = unsafe { Fields::from_parts(field, len) };
+    pub unsafe fn from_parts(component_id: ComponentId, fields: Fields) -> Self {
         Self {
             component_id,
             fields,
@@ -76,9 +72,8 @@ impl ErasedComponentSliceMutPtr {
             fields,
         } = self;
 
-        let (ptr, len) = fields.cast_const().into_parts();
-        let ptr = unsafe { ErasedComponentPtr::from_parts(component_id, ptr) };
-        unsafe { ErasedComponentSlicePtr::from_parts(ptr, len) }
+        let fields = fields.cast_const();
+        unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
     }
 
     #[inline]
@@ -87,8 +82,8 @@ impl ErasedComponentSliceMutPtr {
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedComponentSliceMut<'a> {
-        unsafe { ErasedComponentSliceMut::from_ptr(self) }
+    pub unsafe fn deref_mut<'a>(self) -> ErasedComponentMutSlice<'a> {
+        unsafe { ErasedComponentMutSlice::from_ptr(self) }
     }
 
     #[inline]
@@ -174,19 +169,16 @@ impl ErasedComponentSliceMutPtr {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (ErasedComponentMutPtr, usize) {
+    pub fn into_parts(self) -> (ComponentId, Fields) {
         let Self {
             component_id,
             fields,
         } = self;
-
-        let (field, len) = fields.into_parts();
-        let ptr = unsafe { ErasedComponentMutPtr::from_parts(component_id, field) };
-        (ptr, len)
+        (component_id, fields)
     }
 }
 
-impl PartialEq for ErasedComponentSliceMutPtr {
+impl PartialEq for ErasedComponentMutSlicePtr {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         let Self { component_id, .. } = self;
@@ -194,16 +186,16 @@ impl PartialEq for ErasedComponentSliceMutPtr {
     }
 }
 
-impl Eq for ErasedComponentSliceMutPtr {}
+impl Eq for ErasedComponentMutSlicePtr {}
 
-impl PartialOrd for ErasedComponentSliceMutPtr {
+impl PartialOrd for ErasedComponentMutSlicePtr {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for ErasedComponentSliceMutPtr {
+impl Ord for ErasedComponentMutSlicePtr {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { component_id, .. } = self;
@@ -211,7 +203,7 @@ impl Ord for ErasedComponentSliceMutPtr {
     }
 }
 
-impl Hash for ErasedComponentSliceMutPtr {
+impl Hash for ErasedComponentMutSlicePtr {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { component_id, .. } = self;
@@ -219,7 +211,7 @@ impl Hash for ErasedComponentSliceMutPtr {
     }
 }
 
-impl Borrow<ComponentId> for ErasedComponentSliceMutPtr {
+impl Borrow<ComponentId> for ErasedComponentMutSlicePtr {
     #[inline]
     fn borrow(&self) -> &ComponentId {
         let Self { component_id, .. } = self;

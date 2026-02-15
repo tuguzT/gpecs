@@ -41,8 +41,8 @@ impl GpuArchetypeStorage {
 
         let component_buffers = erased_components
             .into_iter()
-            .map(|(component_id, slice)| {
-                let component_id = unsafe { GpuComponentId::from_id(component_id) };
+            .map(|slice| {
+                let component_id = unsafe { GpuComponentId::from_id(slice.component_id()) };
                 let components_label =
                     || format!("`gpecs` {archetype_id:#} {component_id:#} storage buffer");
                 let components_contents = slice.as_buffer();

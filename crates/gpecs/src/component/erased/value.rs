@@ -10,7 +10,7 @@ use gpecs_soa_erased::{data::BoxedErased, ptr::slice::CoreSliceItemPtrs};
 use crate::component::{
     Component,
     erased::{
-        ErasedComponentMutPtr, ErasedComponentPtr, ErasedComponentRef, ErasedComponentRefMut,
+        ErasedComponentMutPtr, ErasedComponentMutRef, ErasedComponentPtr, ErasedComponentRef,
         error::{DowncastError, FromComponentError, check_downcast},
     },
     error::NotRegisteredError,
@@ -168,7 +168,7 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn as_mut_erased_component(&mut self) -> ErasedComponentRefMut<'_> {
+    pub fn as_mut_erased_component(&mut self) -> ErasedComponentMutRef<'_> {
         unsafe { self.as_mut_erased_component_ptr().deref_mut() }
     }
 

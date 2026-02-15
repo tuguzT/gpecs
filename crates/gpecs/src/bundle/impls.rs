@@ -1,14 +1,8 @@
-use std::mem::MaybeUninit;
-
-use gpecs_soa_erased::{
-    data::{ErasedMutPtr, ErasedPtr},
-    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr},
-};
-
 use crate::{
-    bundle::{Bundle, error::PtrsFromIterError},
+    bundle::Bundle,
     component::{
         Component,
+        erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind},
         error::NotRegisteredError,
         registry::{ComponentId, ComponentRegistry},
     },
@@ -41,40 +35,44 @@ where
     }
 
     #[inline]
-    fn ptrs_from_erased<I, P>(
+    fn ptrs_from_erased<I>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedPtr<P>>>
+    ) -> Result<Ptrs<'static, Self>, DowncastErrorKind>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedPtr<P>)>,
-        P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
+        I: IntoIterator<Item = ErasedComponentPtr>,
     {
         let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
-        let (_, ptr) = iter
+        let ptr = iter
             .into_iter()
-            .find(|(id, _)| *id == component_id)
+            .find(|ptr| ptr.component_id() == component_id)
             .ok_or(NotRegisteredError)?;
 
-        let ptr = ptr.try_into()?;
+        let ptr = ptr
+            .downcast::<T>(components)
+            .map_err(|error| error.reason)?
+            .cast();
         Ok(ptr)
     }
 
     #[inline]
-    fn mut_ptrs_from_erased<I, P>(
+    fn mut_ptrs_from_erased<I>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedMutPtr<P>>>
+    ) -> Result<MutPtrs<'static, Self>, DowncastErrorKind>
     where
-        I: IntoIterator<Item = (ComponentId, ErasedMutPtr<P>)>,
-        P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
+        I: IntoIterator<Item = ErasedComponentMutPtr>,
     {
         let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
-        let (_, ptr) = iter
+        let ptr = iter
             .into_iter()
-            .find(|(id, _)| *id == component_id)
+            .find(|ptr| ptr.component_id() == component_id)
             .ok_or(NotRegisteredError)?;
 
-        let ptr = ptr.try_into()?;
+        let ptr = ptr
+            .downcast::<T>(components)
+            .map_err(|error| error.reason)?
+            .cast();
         Ok(ptr)
     }
 }
@@ -110,22 +108,22 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_from_erased<Iter, P>(
+            fn ptrs_from_erased<Iter>(
                 components: &ComponentRegistry,
                 iter: Iter,
-            ) -> Result<Ptrs<'static, Self>, PtrsFromIterError<ErasedPtr<P>>>
+            ) -> Result<Ptrs<'static, Self>, DowncastErrorKind>
             where
-                Iter: IntoIterator<Item = (ComponentId, ErasedPtr<P>)>,
-                P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
+                Iter: IntoIterator<Item = ErasedComponentPtr>,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 
                 let mut ptrs = ($(None::<*const $types>,)*);
                 #[expect(clippy::needless_continue)]
-                for (id, ptr) in iter {
+                for ptr in iter {
                     $(
-                        if ptrs.$indices.is_none() && id == component_ids[$indices] {
-                            ptrs.$indices = Some(ptr.try_into()?);
+                        if ptrs.$indices.is_none() && ptr.component_id() == component_ids[$indices] {
+                            let ptr = ptr.downcast(components).map_err(|error| error.reason)?;
+                            ptrs.$indices = Some(ptr);
                             continue;
                         }
                     )*
@@ -136,22 +134,22 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            fn mut_ptrs_from_erased<Iter, P>(
+            fn mut_ptrs_from_erased<Iter>(
                 components: &ComponentRegistry,
                 iter: Iter,
-            ) -> Result<MutPtrs<'static, Self>, PtrsFromIterError<ErasedMutPtr<P>>>
+            ) -> Result<MutPtrs<'static, Self>, DowncastErrorKind>
             where
-                Iter: IntoIterator<Item = (ComponentId, ErasedMutPtr<P>)>,
-                P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
+                Iter: IntoIterator<Item = ErasedComponentMutPtr>,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 
                 let mut ptrs = ($(None::<*mut $types>,)*);
                 #[expect(clippy::needless_continue)]
-                for (id, ptr) in iter {
+                for ptr in iter {
                     $(
-                        if ptrs.$indices.is_none() && id == component_ids[$indices] {
-                            ptrs.$indices = Some(ptr.try_into()?);
+                        if ptrs.$indices.is_none() && ptr.component_id() == component_ids[$indices] {
+                            let ptr = ptr.downcast(components).map_err(|error| error.reason)?;
+                            ptrs.$indices = Some(ptr);
                             continue;
                         }
                     )*

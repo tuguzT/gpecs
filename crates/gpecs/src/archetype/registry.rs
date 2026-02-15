@@ -21,7 +21,10 @@ use petgraph::{
 
 use crate::{
     bundle::Bundle,
-    component::registry::{ComponentId, ComponentRegistry},
+    component::{
+        erased::ErasedComponent,
+        registry::{ComponentId, ComponentRegistry},
+    },
     entity::Entity,
     hash::{IndexMap, IndexSet},
     soa::{
@@ -32,10 +35,7 @@ use crate::{
 
 use super::{
     collect::{try_collect_component_ids, try_collect_maybe_component_ids},
-    erased::{
-        ErasedComponent, ErasedComponents, drop_erased_in_place, from_erased_fields,
-        into_erased_fields,
-    },
+    erased::{from_erased_fields, into_erased_fields},
     error::{
         AlreadyHasComponentError, IncompatibleBundleError, InsertBundleError,
         InsertBundleExactError, MissingComponentError, RemoveBundleExactError,
@@ -632,9 +632,11 @@ impl ArchetypeRegistry {
 
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
-        let fields = into_erased_fields::<B>(components, B::CONTEXT, component_ids, value);
-        fields.into_iter().for_each(|(component_id, field)| {
-            if old_fields.insert(component_id, field).is_some() {
+        let fields =
+            unsafe { into_erased_fields::<B>(components, B::CONTEXT, component_ids, value) };
+        fields.into_iter().for_each(|field| {
+            let component_id = field.component_id();
+            if old_fields.replace(field).is_some() {
                 unreachable!("duplicated {component_id}")
             }
         });
@@ -695,18 +697,24 @@ impl ArchetypeRegistry {
 
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
-        let fields = into_erased_fields::<B>(components, B::CONTEXT, component_ids, value);
+        let fields =
+            unsafe { into_erased_fields::<B>(components, B::CONTEXT, component_ids, value) };
 
-        let mut fields_to_drop = ErasedComponents::default();
-        fields.into_iter().for_each(|(component_id, field)| {
-            let Some(to_drop) = old_fields.insert(component_id, field) else {
+        let mut fields_to_drop = IndexSet::default();
+        fields.into_iter().for_each(|field| {
+            let component_id = field.component_id();
+            let Some(to_drop) = old_fields.replace(field) else {
                 return;
             };
-            if fields_to_drop.insert(component_id, to_drop).is_some() {
+            if fields_to_drop.replace(to_drop).is_some() {
                 unreachable!("duplicated {component_id}")
             }
         });
-        unsafe { Self::drop_erased_in_place(components, fields_to_drop) }
+        fields_to_drop.into_iter().for_each(|field| {
+            field
+                .drop_in_place_consume(components)
+                .expect("component should be registered");
+        });
 
         let new_fields = old_fields;
         let archetype_id = Some(new_archetype);
@@ -777,10 +785,9 @@ impl ArchetypeRegistry {
             .iter()
             .copied()
             .map(|component_id| {
-                let Some(field) = old_fields.swap_remove(&component_id) else {
-                    unreachable!("{component_id} should exist")
-                };
-                (component_id, field)
+                old_fields
+                    .swap_take(&component_id)
+                    .unwrap_or_else(|| unreachable!("{component_id} should exist"))
             })
             .collect();
 
@@ -845,11 +852,14 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
 
-        let fields_to_drop = component_ids.iter().copied().filter_map(|component_id| {
-            let field = old_fields.swap_remove(&component_id)?;
-            Some((component_id, field))
+        let fields_to_drop = component_ids
+            .iter()
+            .filter_map(|component_id| old_fields.swap_take(component_id));
+        fields_to_drop.for_each(|field| {
+            field
+                .drop_in_place_consume(components)
+                .expect("component should be registered");
         });
-        unsafe { Self::drop_erased_in_place(components, fields_to_drop) }
 
         let new_fields = old_fields;
         Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);
@@ -875,30 +885,19 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    unsafe fn drop_erased_in_place<I, F>(components: &ComponentRegistry, fields: I)
-    where
-        I: IntoIterator<Item = (ComponentId, F)>,
-        F: AsMut<[u8]>,
-    {
-        let fields = fields.into_iter().map(|(component_id, field)| {
-            let Some(info) = components.get_component_info(component_id) else {
-                unreachable!("{component_id} should exist")
-            };
-            (field, info.drop_fn())
-        });
-        unsafe { drop_erased_in_place(fields) }
-    }
-
-    #[inline]
     fn set_in_archetype_by_entity(
         components: &ComponentRegistry,
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-        fields: ErasedComponents<ErasedComponent>,
+        fields: IndexSet<ErasedComponent>,
     ) {
         let Some(archetype_id) = archetype_id else {
-            unsafe { Self::drop_erased_in_place(components, fields) }
+            fields.into_iter().for_each(|field| {
+                field
+                    .drop_in_place_consume(components)
+                    .expect("component should be registered");
+            });
             return;
         };
 
@@ -907,7 +906,11 @@ impl ArchetypeRegistry {
         };
         let fields = info.storage.insert_erased(components, entity, fields);
         if let Some(fields) = fields {
-            unsafe { Self::drop_erased_in_place(components, fields) }
+            fields.into_iter().for_each(|field| {
+                field
+                    .drop_in_place_consume(components)
+                    .expect("component should be registered");
+            });
         }
     }
 
@@ -917,9 +920,9 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-    ) -> ErasedComponents<ErasedComponent> {
+    ) -> IndexSet<ErasedComponent> {
         let Some(archetype_id) = archetype_id else {
-            return ErasedComponents::default();
+            return IndexSet::default();
         };
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {

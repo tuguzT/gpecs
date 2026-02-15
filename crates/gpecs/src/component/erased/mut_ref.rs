@@ -20,12 +20,12 @@ use crate::component::{
 type Field<'a> = ErasedMutRef<'a, *mut MaybeUninit<u8>>;
 
 #[derive(Debug)]
-pub struct ErasedComponentRefMut<'a> {
+pub struct ErasedComponentMutRef<'a> {
     component_id: ComponentId,
     field: Field<'a>,
 }
 
-impl<'a> ErasedComponentRefMut<'a> {
+impl<'a> ErasedComponentMutRef<'a> {
     #[inline]
     pub fn try_from<C>(
         registry: &ComponentRegistry,
@@ -167,7 +167,7 @@ impl<'a> ErasedComponentRefMut<'a> {
     }
 }
 
-impl PartialEq for ErasedComponentRefMut<'_> {
+impl PartialEq for ErasedComponentMutRef<'_> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         let Self { component_id, .. } = self;
@@ -175,16 +175,16 @@ impl PartialEq for ErasedComponentRefMut<'_> {
     }
 }
 
-impl Eq for ErasedComponentRefMut<'_> {}
+impl Eq for ErasedComponentMutRef<'_> {}
 
-impl PartialOrd for ErasedComponentRefMut<'_> {
+impl PartialOrd for ErasedComponentMutRef<'_> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for ErasedComponentRefMut<'_> {
+impl Ord for ErasedComponentMutRef<'_> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { component_id, .. } = self;
@@ -192,7 +192,7 @@ impl Ord for ErasedComponentRefMut<'_> {
     }
 }
 
-impl Hash for ErasedComponentRefMut<'_> {
+impl Hash for ErasedComponentMutRef<'_> {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { component_id, .. } = self;
@@ -200,7 +200,7 @@ impl Hash for ErasedComponentRefMut<'_> {
     }
 }
 
-impl Borrow<ComponentId> for ErasedComponentRefMut<'_> {
+impl Borrow<ComponentId> for ErasedComponentMutRef<'_> {
     #[inline]
     fn borrow(&self) -> &ComponentId {
         let Self { component_id, .. } = self;
@@ -208,23 +208,23 @@ impl Borrow<ComponentId> for ErasedComponentRefMut<'_> {
     }
 }
 
-impl AsRef<[u8]> for ErasedComponentRefMut<'_> {
+impl AsRef<[u8]> for ErasedComponentMutRef<'_> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
         self.as_buffer()
     }
 }
 
-impl AsMut<[u8]> for ErasedComponentRefMut<'_> {
+impl AsMut<[u8]> for ErasedComponentMutRef<'_> {
     #[inline]
     fn as_mut(&mut self) -> &mut [u8] {
         self.as_mut_buffer()
     }
 }
 
-impl<'a> From<ErasedComponentRefMut<'a>> for ErasedComponentRef<'a> {
+impl<'a> From<ErasedComponentMutRef<'a>> for ErasedComponentRef<'a> {
     #[inline]
-    fn from(value: ErasedComponentRefMut<'a>) -> Self {
+    fn from(value: ErasedComponentMutRef<'a>) -> Self {
         let (component_id, field) = value.into_parts();
         let field = field.into();
         unsafe { Self::from_parts(component_id, field) }

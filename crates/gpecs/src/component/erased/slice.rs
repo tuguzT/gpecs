@@ -38,16 +38,12 @@ impl<'a> ErasedComponentSlice<'a> {
         let fields = Fields::try_from(component)
             .expect("alignment of bytes should be sufficient for any component");
 
-        Ok(Self {
-            component_id,
-            fields,
-        })
+        let me = unsafe { Self::from_parts(component_id, fields) };
+        Ok(me)
     }
 
     #[inline]
-    pub unsafe fn from_parts(ptr: ErasedComponentPtr, len: usize) -> Self {
-        let (component_id, field) = ptr.into_parts();
-        let fields = unsafe { Fields::from_parts(field, len) };
+    pub unsafe fn from_parts(component_id: ComponentId, fields: Fields<'a>) -> Self {
         Self {
             component_id,
             fields,
@@ -56,8 +52,9 @@ impl<'a> ErasedComponentSlice<'a> {
 
     #[inline]
     pub unsafe fn from_ptr(ptr: ErasedComponentSlicePtr) -> Self {
-        let (ptr, len) = ptr.into_parts();
-        unsafe { Self::from_parts(ptr, len) }
+        let (component_id, fields) = ptr.into_parts();
+        let fields = unsafe { fields.deref() };
+        unsafe { Self::from_parts(component_id, fields) }
     }
 
     #[inline]
@@ -119,11 +116,8 @@ impl<'a> ErasedComponentSlice<'a> {
             component_id,
         } = *self;
 
-        let field = fields.as_field_ptr();
-        let ptr = unsafe { ErasedComponentPtr::from_parts(component_id, field) };
-
-        let len = fields.len();
-        unsafe { ErasedComponentSlicePtr::from_parts(ptr, len) }
+        let fields = fields.as_field_slice_ptr();
+        unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
     }
 
     #[inline]
@@ -150,15 +144,12 @@ impl<'a> ErasedComponentSlice<'a> {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (ErasedComponentPtr, usize) {
+    pub fn into_parts(self) -> (ComponentId, Fields<'a>) {
         let Self {
             component_id,
             fields,
         } = self;
-
-        let (field, len) = fields.into_parts();
-        let ptr = unsafe { ErasedComponentPtr::from_parts(component_id, field) };
-        (ptr, len)
+        (component_id, fields)
     }
 }
 

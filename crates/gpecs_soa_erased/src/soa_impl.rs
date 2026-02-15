@@ -1,5 +1,7 @@
 use core::{fmt::Debug, mem::MaybeUninit, ptr};
 
+use itertools::zip_eq;
+
 use crate::{
     CovariantFieldDescriptors, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
     ErasedSoaMutRefs, ErasedSoaMutSlicePtrs, ErasedSoaMutSlices, ErasedSoaNonNullPtrs,
@@ -266,8 +268,7 @@ where
 {
     #[inline]
     unsafe fn write(_: &Self::Context, dst: MutPtrs<'_, Self>, value: Self) {
-        dst.into_iter()
-            .zip(value.as_fields())
+        zip_eq(dst, value.as_fields())
             .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) });
     }
 }

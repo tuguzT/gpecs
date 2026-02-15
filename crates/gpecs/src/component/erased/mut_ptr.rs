@@ -10,7 +10,7 @@ use gpecs_soa_erased::data::ErasedMutPtr;
 use crate::component::{
     Component,
     erased::{
-        ErasedComponentPtr, ErasedComponentRef, ErasedComponentRefMut,
+        ErasedComponentMutRef, ErasedComponentPtr, ErasedComponentRef,
         error::{DowncastError, check_downcast},
     },
     error::NotRegisteredError,
@@ -109,8 +109,8 @@ impl ErasedComponentMutPtr {
     }
 
     #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedComponentRefMut<'a> {
-        unsafe { ErasedComponentRefMut::from_ptr(self) }
+    pub unsafe fn deref_mut<'a>(self) -> ErasedComponentMutRef<'a> {
+        unsafe { ErasedComponentMutRef::from_ptr(self) }
     }
 
     #[inline]

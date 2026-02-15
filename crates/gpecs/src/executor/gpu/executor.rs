@@ -34,8 +34,6 @@ use super::{
     },
 };
 
-const _SHADER_PATH: &str = env!("gpecs_shaders.spv");
-
 #[derive(Debug)]
 pub struct GpuExecutor<'ctx> {
     context: &'ctx mut Context,

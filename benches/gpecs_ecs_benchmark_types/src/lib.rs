@@ -1,7 +1,7 @@
 //! Nothing too special for now...
 
 #![forbid(unsafe_code)]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 pub mod components;
 pub mod framebuffer;

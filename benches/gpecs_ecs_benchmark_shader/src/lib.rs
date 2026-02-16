@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 use gpecs_ecs_benchmark_types::{
     components::{Damage, Data, Health, Player, Position, Sprite, Velocity},

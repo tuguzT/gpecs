@@ -1,6 +1,6 @@
 //! Nothing too special, too =)
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 pub use gpecs_sparse::soa;
 

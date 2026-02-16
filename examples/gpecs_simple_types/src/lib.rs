@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 use gpecs_types::component::{Component, GpuComponent};
 use spirv_std::glam::Vec3;

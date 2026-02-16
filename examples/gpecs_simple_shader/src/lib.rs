@@ -1,5 +1,5 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 use gpecs_simple_types::{Mass, Position};
 use gpecs_types::entity::Entity;

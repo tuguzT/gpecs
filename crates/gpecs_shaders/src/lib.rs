@@ -1,5 +1,5 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 use core::{convert::Infallible, mem::MaybeUninit};
 use spirv_std::{glam::USizeVec3, spirv};

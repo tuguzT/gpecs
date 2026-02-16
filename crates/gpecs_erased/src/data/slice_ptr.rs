@@ -3,10 +3,10 @@ use core::{alloc::Layout, mem::MaybeUninit, ptr};
 use crate::{
     data::{
         ErasedMutSlicePtr, ErasedPtr, ErasedSlice,
-        error::{DowncastError, SlicePtrError, check_downcast, check_slice_len},
+        error::{DataError, DowncastError, TryFromSlicePtrError, check_downcast},
     },
-    error::{InsufficientAlignError, check_ptr_align, check_sufficient_align},
-    layout::bytes_to_items,
+    error::{check_len, check_ptr_align, check_sufficient_align},
+    layout::{self, bytes_to_items},
     ptr::slice::{CastMutPtr, ConstSliceItemPtr},
 };
 
@@ -74,10 +74,13 @@ where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
-    pub fn new(layout: Layout, buffer: *const [U], len: usize) -> Result<Self, SlicePtrError> {
-        check_sufficient_align(layout, Layout::new::<U>())?;
-        check_slice_len(buffer.len() * size_of::<U>(), layout.size(), len)?;
+    pub fn new(layout: Layout, buffer: *const [U], len: usize) -> Result<Self, DataError> {
         check_ptr_align(buffer.cast(), layout)?;
+        check_sufficient_align(layout, Layout::new::<U>())?;
+
+        let buffer_layout = Layout::array::<U>(buffer.len())?;
+        let (expected_layout, _) = layout::repeat(layout, len)?;
+        check_len(buffer_layout.size(), expected_layout.size())?;
 
         let buffer = ptr::slice_from_raw_parts(buffer.cast(), buffer.len());
         let ptr = unsafe { T::from_slice(buffer, 0) };
@@ -112,8 +115,10 @@ where
     #[inline]
     pub fn as_buffer(self) -> *const [U] {
         let Self { ptr, len } = self;
+
         let buffer = ptr.as_buffer();
-        ptr::slice_from_raw_parts(buffer.cast(), len * buffer.len())
+        let len = buffer.len().wrapping_mul(len);
+        ptr::slice_from_raw_parts(buffer.cast(), len)
     }
 
     #[inline]
@@ -127,15 +132,16 @@ impl<T, U, V> TryFrom<*const [V]> for ErasedSlicePtr<T>
 where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
 {
-    type Error = InsufficientAlignError;
+    type Error = TryFromSlicePtrError;
 
     #[inline]
     fn try_from(ptr: *const [V]) -> Result<Self, Self::Error> {
         let layout = Layout::new::<V>();
+        check_ptr_align(ptr.cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<U>())?;
 
         let len = ptr.len();
-        let buffer_len = bytes_to_items::<U>(layout.size()) * len;
+        let buffer_len = bytes_to_items::<U>(Layout::array::<V>(len)?.size());
         let buffer = ptr::slice_from_raw_parts(ptr.cast(), buffer_len);
 
         let ptr = unsafe { T::from_slice(buffer, 0) };

@@ -3,7 +3,7 @@ use core::{alloc::Layout, mem::MaybeUninit, ops::Range, ptr};
 use crate::{
     data::{
         ErasedMutPtr, ErasedRef,
-        error::{DowncastError, PtrError, check_downcast},
+        error::{DataError, DowncastError, TryFromPtrError, check_downcast},
     },
     error::{InsufficientAlignError, check_len, check_ptr_align, check_sufficient_align},
     layout::bytes_to_items,
@@ -63,7 +63,7 @@ where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
-    pub fn new(layout: Layout, buffer: *const [U]) -> Result<Self, PtrError> {
+    pub fn new(layout: Layout, buffer: *const [U]) -> Result<Self, DataError> {
         check_ptr_align(buffer.cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<U>())?;
 
@@ -161,11 +161,12 @@ impl<T, U, V> TryFrom<*const V> for ErasedPtr<T>
 where
     T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
 {
-    type Error = InsufficientAlignError;
+    type Error = TryFromPtrError;
 
     #[inline]
     fn try_from(ptr: *const V) -> Result<Self, Self::Error> {
         let layout = Layout::new::<V>();
+        check_ptr_align(ptr.cast(), layout)?;
         check_sufficient_align(layout, Layout::new::<U>())?;
 
         let len = bytes_to_items::<U>(layout.size());

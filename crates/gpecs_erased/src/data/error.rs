@@ -9,86 +9,61 @@ use crate::error::{
 };
 
 #[derive(Debug, Clone)]
-pub struct SliceLenMismatchError {
-    item_size: usize,
-    len: usize,
-    actual: usize,
+pub enum DataError {
+    InvalidLayout(LayoutError),
+    NotAligned(NotAlignedError),
+    LenMismatch(LenMismatchError),
+    InsufficientAlign(InsufficientAlignError),
 }
 
-impl SliceLenMismatchError {
+impl From<LayoutError> for DataError {
     #[inline]
-    pub fn new(item_size: usize, len: usize, actual: usize) -> Option<Self> {
-        if item_size * len == actual {
-            return None;
-        }
-
-        let me = unsafe { Self::new_unchecked(item_size, len, actual) };
-        Some(me)
-    }
-
-    #[inline]
-    pub unsafe fn new_unchecked(item_size: usize, len: usize, actual: usize) -> Self {
-        Self {
-            item_size,
-            len,
-            actual,
-        }
-    }
-
-    #[inline]
-    pub fn item_size(&self) -> usize {
-        let Self { item_size, .. } = *self;
-        item_size
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        let Self { len, .. } = *self;
-        len
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    pub fn expected(&self) -> usize {
-        let Self { item_size, len, .. } = *self;
-        item_size * len
-    }
-
-    #[inline]
-    pub fn actual(&self) -> usize {
-        let Self { actual, .. } = *self;
-        actual
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
     }
 }
 
-impl Display for SliceLenMismatchError {
+impl From<NotAlignedError> for DataError {
+    #[inline]
+    fn from(error: NotAlignedError) -> Self {
+        Self::NotAligned(error)
+    }
+}
+
+impl From<LenMismatchError> for DataError {
+    #[inline]
+    fn from(error: LenMismatchError) -> Self {
+        Self::LenMismatch(error)
+    }
+}
+
+impl From<InsufficientAlignError> for DataError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl Display for DataError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            item_size,
-            len,
-            actual,
-        } = self;
-
-        write!(
-            f,
-            "expected length to be item size of {item_size} * {len} items, but got {actual}",
-        )
+        match self {
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
     }
 }
 
-impl Error for SliceLenMismatchError {}
-
-#[inline]
-pub fn check_slice_len(
-    len: usize,
-    item_size: usize,
-    expected_len: usize,
-) -> Result<(), SliceLenMismatchError> {
-    SliceLenMismatchError::new(item_size, expected_len, len).map_or(Ok(()), Err)
+impl Error for DataError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidLayout(error) => Some(error),
+            Self::NotAligned(error) => Some(error),
+            Self::LenMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -147,58 +122,86 @@ pub(super) fn check_downcast<T, U>(layout: Layout, value: U) -> Result<U, Downca
 }
 
 #[derive(Debug, Clone)]
-pub enum PtrError {
-    InvalidLayout(LayoutError),
+pub enum TryFromPtrError {
     NotAligned(NotAlignedError),
-    LenMismatch(LenMismatchError),
     InsufficientAlign(InsufficientAlignError),
 }
 
-impl From<LayoutError> for PtrError {
-    #[inline]
-    fn from(error: LayoutError) -> Self {
-        Self::InvalidLayout(error)
-    }
-}
-
-impl From<NotAlignedError> for PtrError {
+impl From<NotAlignedError> for TryFromPtrError {
     #[inline]
     fn from(error: NotAlignedError) -> Self {
         Self::NotAligned(error)
     }
 }
 
-impl From<LenMismatchError> for PtrError {
-    #[inline]
-    fn from(error: LenMismatchError) -> Self {
-        Self::LenMismatch(error)
-    }
-}
-
-impl From<InsufficientAlignError> for PtrError {
+impl From<InsufficientAlignError> for TryFromPtrError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
     }
 }
 
-impl Display for PtrError {
+impl Display for TryFromPtrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidLayout(error) => Display::fmt(error, f),
             Self::NotAligned(error) => Display::fmt(error, f),
-            Self::LenMismatch(error) => Display::fmt(error, f),
             Self::InsufficientAlign(error) => Display::fmt(error, f),
         }
     }
 }
 
-impl Error for PtrError {
+impl Error for TryFromPtrError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NotAligned(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TryFromSlicePtrError {
+    InvalidLayout(LayoutError),
+    NotAligned(NotAlignedError),
+    InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<LayoutError> for TryFromSlicePtrError {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl From<NotAlignedError> for TryFromSlicePtrError {
+    #[inline]
+    fn from(error: NotAlignedError) -> Self {
+        Self::NotAligned(error)
+    }
+}
+
+impl From<InsufficientAlignError> for TryFromSlicePtrError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl Display for TryFromSlicePtrError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for TryFromSlicePtrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::InvalidLayout(error) => Some(error),
             Self::NotAligned(error) => Some(error),
-            Self::LenMismatch(error) => Some(error),
             Self::InsufficientAlign(error) => Some(error),
         }
     }
@@ -431,54 +434,6 @@ impl Error for FromStorageErrorKind {
             Self::NotAligned(error) => Some(error),
             Self::LenMismatch(error) => Some(error),
             Self::LayoutMismatch(error) => Some(error),
-            Self::InsufficientAlign(error) => Some(error),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum SlicePtrError {
-    NotAligned(NotAlignedError),
-    LenMismatch(SliceLenMismatchError),
-    InsufficientAlign(InsufficientAlignError),
-}
-
-impl From<NotAlignedError> for SlicePtrError {
-    #[inline]
-    fn from(error: NotAlignedError) -> Self {
-        Self::NotAligned(error)
-    }
-}
-
-impl From<SliceLenMismatchError> for SlicePtrError {
-    #[inline]
-    fn from(error: SliceLenMismatchError) -> Self {
-        Self::LenMismatch(error)
-    }
-}
-
-impl From<InsufficientAlignError> for SlicePtrError {
-    #[inline]
-    fn from(error: InsufficientAlignError) -> Self {
-        Self::InsufficientAlign(error)
-    }
-}
-
-impl Display for SlicePtrError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NotAligned(error) => Display::fmt(error, f),
-            Self::LenMismatch(error) => Display::fmt(error, f),
-            Self::InsufficientAlign(error) => Display::fmt(error, f),
-        }
-    }
-}
-
-impl Error for SlicePtrError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::NotAligned(error) => Some(error),
-            Self::LenMismatch(error) => Some(error),
             Self::InsufficientAlign(error) => Some(error),
         }
     }

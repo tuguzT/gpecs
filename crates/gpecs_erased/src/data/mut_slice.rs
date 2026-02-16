@@ -9,9 +9,8 @@ use core::{
 use crate::{
     data::{
         ErasedMutPtr, ErasedMutSlicePtr, ErasedPtr, ErasedSlice, ErasedSlicePtr,
-        error::{DowncastError, SlicePtrError},
+        error::{DataError, DowncastError, TryFromSlicePtrError},
     },
-    error::InsufficientAlignError,
     ptr::slice::{CastConstPtr, MutSliceItemPtr},
 };
 
@@ -92,7 +91,7 @@ where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
-    pub fn new(layout: Layout, buffer: &'a mut [U], len: usize) -> Result<Self, SlicePtrError> {
+    pub fn new(layout: Layout, buffer: &'a mut [U], len: usize) -> Result<Self, DataError> {
         let ptr = ErasedMutSlicePtr::new(layout, buffer, len)?;
         let me = unsafe { Self::from_ptr(ptr) };
         Ok(me)
@@ -229,7 +228,7 @@ impl<'a, T, U, V> TryFrom<&'a mut [V]> for ErasedMutSlice<'a, T>
 where
     T: MutSliceItemPtr<Item = MaybeUninit<U>>,
 {
-    type Error = InsufficientAlignError;
+    type Error = TryFromSlicePtrError;
 
     #[inline]
     fn try_from(slice: &'a mut [V]) -> Result<Self, Self::Error> {

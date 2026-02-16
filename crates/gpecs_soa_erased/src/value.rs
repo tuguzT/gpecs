@@ -13,7 +13,7 @@ use itertools::{EitherOrBoth::Both, Itertools};
 use crate::{
     CovariantFieldDescriptors, ErasedSoaMutRefs, ErasedSoaRefs,
     assert::check_downcast,
-    data::{Erased, error::FromLayoutDataError, try_init_copy_from_slice},
+    data::{Erased, error::FromLayoutDataError},
     error::{
         DowncastError, FromFieldsDescriptorsError, FromStorageFieldsDescriptorsError,
         FromStorageValueError, FromValueError, IterOrFieldLenMismatchError,
@@ -31,6 +31,7 @@ use crate::{
         traits::{AllocSoa, AllocSoaContext, SoaRead, SoaWrite},
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
+    uninit::try_init_copy_from_slice,
 };
 
 #[cfg(feature = "alloc")]

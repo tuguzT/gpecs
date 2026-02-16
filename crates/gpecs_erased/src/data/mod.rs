@@ -1,8 +1,7 @@
 pub use self::{
     mut_ptr::ErasedMutPtr, mut_ref::ErasedMutRef, mut_slice::ErasedMutSlice,
     mut_slice_ptr::ErasedMutSlicePtr, nonnull_ptr::ErasedNonNullPtr, ptr::ErasedPtr,
-    r#ref::ErasedRef, slice::ErasedSlice, slice_ptr::ErasedSlicePtr,
-    uninit::try_init_copy_from_slice, value::Erased,
+    r#ref::ErasedRef, slice::ErasedSlice, slice_ptr::ErasedSlicePtr, value::Erased,
 };
 
 #[cfg(feature = "alloc")]
@@ -19,5 +18,4 @@ mod ptr;
 mod r#ref;
 mod slice;
 mod slice_ptr;
-mod uninit;
 mod value;

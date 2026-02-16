@@ -118,7 +118,7 @@ where
 {
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DenseIndexOutOfBoundsError {
     dense_index: usize,
     dense_len: usize,
@@ -146,23 +146,6 @@ impl DenseIndexOutOfBoundsError {
     }
 }
 
-impl Debug for DenseIndexOutOfBoundsError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self {
-            dense_index,
-            dense_len,
-        } = self;
-        f.debug_struct("DenseIndexOutOfBoundsError")
-            .field("dense_index", dense_index)
-            .field("dense_len", dense_len)
-            .finish()
-    }
-}
-
 impl Display for DenseIndexOutOfBoundsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -178,7 +161,7 @@ impl Display for DenseIndexOutOfBoundsError {
 
 impl Error for DenseIndexOutOfBoundsError {}
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SparseIndexOutOfBoundsError {
     sparse_index: usize,
     sparse_len: usize,
@@ -203,23 +186,6 @@ impl SparseIndexOutOfBoundsError {
     pub fn sparse_len(&self) -> usize {
         let Self { sparse_len, .. } = *self;
         sparse_len
-    }
-}
-
-impl Debug for SparseIndexOutOfBoundsError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self {
-            sparse_index,
-            sparse_len,
-        } = self;
-        f.debug_struct("SparseIndexOutOfBoundsError")
-            .field("sparse_index", sparse_index)
-            .field("sparse_len", sparse_len)
-            .finish()
     }
 }
 

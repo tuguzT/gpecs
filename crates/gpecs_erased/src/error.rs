@@ -5,7 +5,7 @@ use core::{
     num::NonZeroUsize,
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct LenMismatchError {
     expected: usize,
     actual: usize,
@@ -40,20 +40,6 @@ impl LenMismatchError {
     }
 }
 
-impl Debug for LenMismatchError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("LenMismatchError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
-    }
-}
-
 impl Display for LenMismatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { expected, actual } = self;
@@ -68,7 +54,7 @@ pub fn check_len(len: usize, expected: usize) -> Result<(), LenMismatchError> {
     LenMismatchError::new(expected, len).map_or(Ok(()), Err)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct LayoutMismatchError {
     expected: Layout,
     actual: Layout,
@@ -105,20 +91,6 @@ impl LayoutMismatchError {
     }
 }
 
-impl Debug for LayoutMismatchError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("LayoutMismatchError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
-    }
-}
-
 impl Display for LayoutMismatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { expected, actual } = self;
@@ -133,7 +105,7 @@ pub fn check_layout(layout: Layout, expected: Layout) -> Result<(), LayoutMismat
     LayoutMismatchError::new(expected, layout).map_or(Ok(()), Err)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InsufficientLenError {
     expected: usize,
     actual: usize,
@@ -168,20 +140,6 @@ impl InsufficientLenError {
     }
 }
 
-impl Debug for InsufficientLenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("InsufficientLenError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
-    }
-}
-
 impl Display for InsufficientLenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { expected, actual } = self;
@@ -199,7 +157,7 @@ pub fn check_sufficient_len(len: usize, expected: usize) -> Result<(), Insuffici
     InsufficientLenError::new(expected, len).map_or(Ok(()), Err)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InsufficientAlignError {
     expected: NonZeroUsize,
     actual: NonZeroUsize,
@@ -238,20 +196,6 @@ impl InsufficientAlignError {
     }
 }
 
-impl Debug for InsufficientAlignError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("InsufficientAlignError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
-    }
-}
-
 impl Display for InsufficientAlignError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { expected, actual } = self;
@@ -272,7 +216,7 @@ pub fn check_sufficient_align(
     InsufficientAlignError::new(expected, actual).map_or(Ok(()), Err)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct NotAlignedError {
     ptr: *const u8,
     target_align: NonZeroUsize,
@@ -308,20 +252,6 @@ impl NotAlignedError {
     pub fn target_align(&self) -> NonZeroUsize {
         let Self { target_align, .. } = *self;
         target_align
-    }
-}
-
-impl Debug for NotAlignedError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { ptr, target_align } = self;
-        f.debug_struct("NotAlignedError")
-            .field("ptr", ptr)
-            .field("target_align", target_align)
-            .finish()
     }
 }
 

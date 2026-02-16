@@ -6,7 +6,7 @@ use core::{
 
 pub use gpecs_erased::error::*;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InvalidOffsetError {
     offset: usize,
     capacity: usize,
@@ -38,20 +38,6 @@ impl InvalidOffsetError {
     pub fn capacity(&self) -> usize {
         let Self { capacity, .. } = *self;
         capacity
-    }
-}
-
-impl Debug for InvalidOffsetError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { offset, capacity } = self;
-        f.debug_struct("InvalidOffsetError")
-            .field("offset", offset)
-            .field("capacity", capacity)
-            .finish()
     }
 }
 
@@ -140,7 +126,7 @@ impl Error for PtrsError {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InvalidOffsetLenError {
     offset: usize,
     len: usize,
@@ -184,25 +170,6 @@ impl InvalidOffsetLenError {
     pub fn capacity(&self) -> usize {
         let Self { capacity, .. } = *self;
         capacity
-    }
-}
-
-impl Debug for InvalidOffsetLenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self {
-            offset,
-            len,
-            capacity,
-        } = self;
-        f.debug_struct("InvalidOffsetLenError")
-            .field("offset", offset)
-            .field("len", len)
-            .field("capacity", capacity)
-            .finish()
     }
 }
 
@@ -452,7 +419,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum FromStorageValueError {
     LayoutMismatch(LayoutMismatchError),
     InvalidLayout(LayoutError),
@@ -469,18 +436,6 @@ impl From<LayoutError> for FromStorageValueError {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
-    }
-}
-
-impl Debug for FromStorageValueError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-        match self {
-            Self::LayoutMismatch(arg0) => f.debug_tuple("LayoutMismatch").field(arg0).finish(),
-            Self::InvalidLayout(arg0) => f.debug_tuple("InvalidLayout").field(arg0).finish(),
-        }
     }
 }
 
@@ -585,7 +540,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum DowncastErrorKind {
     LenMismatch(LenMismatchError),
     LayoutMismatch(LayoutMismatchError),
@@ -610,19 +565,6 @@ impl From<LayoutError> for DowncastErrorKind {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
-    }
-}
-
-impl Debug for DowncastErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-        match self {
-            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
-            Self::LayoutMismatch(error) => f.debug_tuple("LayoutMismatch").field(error).finish(),
-            Self::InvalidLayout(error) => f.debug_tuple("InvalidLayout").field(error).finish(),
-        }
     }
 }
 

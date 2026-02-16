@@ -11,7 +11,7 @@ use crate::{
     soa::vec::TryReserveError as SoaTryReserveError,
 };
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TryReserveError {
     Sparse(AllocTryReserveError),
     Dense(SoaTryReserveError),
@@ -26,19 +26,6 @@ impl From<AllocTryReserveError> for TryReserveError {
 impl From<SoaTryReserveError> for TryReserveError {
     fn from(value: SoaTryReserveError) -> Self {
         Self::Dense(value)
-    }
-}
-
-impl Debug for TryReserveError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        match self {
-            Self::Sparse(error) => f.debug_tuple("Sparse").field(error).finish(),
-            Self::Dense(error) => f.debug_tuple("Dense").field(error).finish(),
-        }
     }
 }
 

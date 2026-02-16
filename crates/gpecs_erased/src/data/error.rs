@@ -8,7 +8,7 @@ use crate::error::{
     InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError, check_layout,
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SliceLenMismatchError {
     item_size: usize,
     len: usize,
@@ -62,25 +62,6 @@ impl SliceLenMismatchError {
     pub fn actual(&self) -> usize {
         let Self { actual, .. } = *self;
         actual
-    }
-}
-
-impl Debug for SliceLenMismatchError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self {
-            item_size,
-            len,
-            actual,
-        } = self;
-        f.debug_struct("SliceLenMismatchError")
-            .field("item_size", item_size)
-            .field("len", len)
-            .field("actual", actual)
-            .finish()
     }
 }
 
@@ -165,7 +146,7 @@ pub(super) fn check_downcast<T, U>(layout: Layout, value: U) -> Result<U, Downca
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum PtrError {
     NotAligned(NotAlignedError),
     LenMismatch(LenMismatchError),
@@ -190,21 +171,6 @@ impl From<InsufficientAlignError> for PtrError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
-    }
-}
-
-impl Debug for PtrError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-        match self {
-            Self::NotAligned(error) => f.debug_tuple("NotAligned").field(error).finish(),
-            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
-            Self::InsufficientAlign(error) => {
-                f.debug_tuple("InsufficientAlign").field(error).finish()
-            }
-        }
     }
 }
 
@@ -402,7 +368,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum FromStorageErrorKind {
     NotAligned(NotAlignedError),
     LenMismatch(LenMismatchError),
@@ -449,22 +415,6 @@ impl From<PtrError> for FromStorageErrorKind {
     }
 }
 
-impl Debug for FromStorageErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-        match self {
-            Self::NotAligned(error) => f.debug_tuple("NotAligned").field(error).finish(),
-            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
-            Self::LayoutMismatch(error) => f.debug_tuple("LayoutMismatch").field(error).finish(),
-            Self::InsufficientAlign(error) => {
-                f.debug_tuple("InsufficientAlign").field(error).finish()
-            }
-        }
-    }
-}
-
 impl Display for FromStorageErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -487,7 +437,7 @@ impl Error for FromStorageErrorKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum SlicePtrError {
     NotAligned(NotAlignedError),
     LenMismatch(SliceLenMismatchError),
@@ -512,21 +462,6 @@ impl From<InsufficientAlignError> for SlicePtrError {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
-    }
-}
-
-impl Debug for SlicePtrError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-        match self {
-            Self::NotAligned(error) => f.debug_tuple("NotAligned").field(error).finish(),
-            Self::LenMismatch(error) => f.debug_tuple("LenMismatch").field(error).finish(),
-            Self::InsufficientAlign(error) => {
-                f.debug_tuple("InsufficientAlign").field(error).finish()
-            }
-        }
     }
 }
 

@@ -11,7 +11,7 @@ use crate::component::{
     registry::{ComponentId, ComponentRegistry},
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ComponentMismatchError {
     expected: ComponentId,
     actual: ComponentId,
@@ -43,20 +43,6 @@ impl ComponentMismatchError {
     pub fn actual(&self) -> ComponentId {
         let Self { actual, .. } = *self;
         actual
-    }
-}
-
-impl Debug for ComponentMismatchError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !f.alternate() {
-            return Display::fmt(self, f);
-        }
-
-        let Self { expected, actual } = self;
-        f.debug_struct("ComponentMismatchError")
-            .field("expected", expected)
-            .field("actual", actual)
-            .finish()
     }
 }
 

@@ -2,9 +2,9 @@ use std::{any::TypeId, num::NonZeroU32};
 
 use itertools::chain;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferDescriptor,
-    BufferUsages, CommandEncoder, ComputePass, ComputePassDescriptor, Device, Features, QUERY_SIZE,
-    QuerySet, QuerySetDescriptor, QueryType,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, Buffer, BufferAddress,
+    BufferDescriptor, BufferUsages, CommandEncoder, ComputePass, ComputePassDescriptor, Device,
+    Features, QUERY_SIZE, QuerySet, QuerySetDescriptor, QueryType,
 };
 
 use crate::{
@@ -440,9 +440,15 @@ fn timestamp_count_for_system_cache(system_cache: &SystemCache) -> usize {
 }
 
 #[inline]
-fn resolve_buffer_size(query_set_count: NonZeroU32) -> u64 {
+fn resolve_buffer_size(query_set_count: NonZeroU32) -> BufferAddress {
     // cast operands first to avoid potential `u32` overflow
-    u64::from(query_set_count.get()) * u64::from(QUERY_SIZE)
+    let query_set_count = BufferAddress::from(query_set_count.get());
+    let query_size = BufferAddress::from(QUERY_SIZE);
+
+    let Some(size) = query_set_count.checked_mul(query_size) else {
+        unreachable!("{query_set_count} * `wgpu::QUERY_SIZE` (which is {query_size}) overflow")
+    };
+    size
 }
 
 #[derive(Debug, Default)]

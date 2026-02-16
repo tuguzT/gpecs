@@ -401,7 +401,7 @@ where
         }
 
         let required_capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
-        let capacity = cmp::max(self.capacity() * 2, required_capacity);
+        let capacity = cmp::max(self.capacity().saturating_mul(2), required_capacity);
         let capacity = cmp::max(Self::min_non_zero_cap(context), capacity);
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
 

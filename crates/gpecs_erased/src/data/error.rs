@@ -18,7 +18,7 @@ pub struct SliceLenMismatchError {
 impl SliceLenMismatchError {
     #[inline]
     pub fn new(item_size: usize, len: usize, actual: usize) -> Option<Self> {
-        if (item_size == 0 && actual == 0) || (item_size * len == actual) {
+        if item_size * len == actual {
             return None;
         }
 

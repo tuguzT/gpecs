@@ -195,7 +195,7 @@ where
 {
     let buffer = ptr.into_inner();
 
-    let size = buffer.len() * size_of::<BufferData<T>>();
+    let size = buffer.len().saturating_mul(size_of::<BufferData<T>>());
     let align = align_of::<BufferData<T>>();
     Layout::from_size_align(size, align).expect("layout size should not exceed `isize::MAX`")
 }

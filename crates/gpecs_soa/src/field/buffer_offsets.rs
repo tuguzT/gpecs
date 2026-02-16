@@ -186,6 +186,7 @@ unsafe fn buffer_offset_from_desc_unchecked(
 /// Unchecked copy of [`Layout::repeat_packed()`] on stable channel.
 #[inline]
 unsafe fn repeat_packed_unchecked(layout: Layout, n: usize) -> Layout {
+    // FIXME: use `unchecked_mul` instead
     let size = layout.size().wrapping_mul(n);
     unsafe { Layout::from_size_align_unchecked(size, layout.align()) }
 }

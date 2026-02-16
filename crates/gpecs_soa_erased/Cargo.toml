@@ -8,8 +8,8 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-gpecs_erased = { workspace = true }
 gpecs_soa = { workspace = true }
+gpecs_erased = { workspace = true }
 itertools = { workspace = true }
 
 [dev-dependencies]
@@ -17,7 +17,7 @@ arrayvec = { workspace = true }
 
 [features]
 default = ["alloc"]
-alloc = ["gpecs_soa/alloc"]
+alloc = ["gpecs_soa/alloc", "gpecs_erased/alloc"]
 
 [lints]
 workspace = true

@@ -7,6 +7,9 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[dependencies]
+gpecs_layout = { workspace = true }
+
 [dev-dependencies]
 itertools = { workspace = true }
 rustc-hash = { workspace = true }

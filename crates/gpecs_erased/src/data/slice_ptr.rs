@@ -2,10 +2,11 @@ use core::{alloc::Layout, mem::MaybeUninit, ptr};
 
 use crate::{
     data::{
-        ErasedMutSlicePtr, ErasedPtr, ErasedSlice, bytes_to_items,
+        ErasedMutSlicePtr, ErasedPtr, ErasedSlice,
         error::{DowncastError, SlicePtrError, check_downcast, check_slice_len},
     },
     error::{InsufficientAlignError, check_ptr_align, check_sufficient_align},
+    layout::bytes_to_items,
     ptr::slice::{CastMutPtr, ConstSliceItemPtr},
 };
 

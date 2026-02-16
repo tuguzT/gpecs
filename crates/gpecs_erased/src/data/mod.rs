@@ -21,8 +21,3 @@ mod slice;
 mod slice_ptr;
 mod uninit;
 mod value;
-
-#[inline]
-pub fn bytes_to_items<T>(count_in_bytes: usize) -> usize {
-    count_in_bytes.div_ceil(size_of::<T>())
-}

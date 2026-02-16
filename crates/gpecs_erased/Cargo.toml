@@ -9,6 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 gpecs_ptr = { workspace = true }
+gpecs_layout = { workspace = true }
 
 [features]
 default = ["alloc"]

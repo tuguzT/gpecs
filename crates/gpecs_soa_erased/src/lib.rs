@@ -5,7 +5,7 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-pub use gpecs_erased::{data, ptr, storage};
+pub use gpecs_erased::{data, layout, ptr, storage};
 pub use gpecs_soa as soa;
 
 pub use self::{

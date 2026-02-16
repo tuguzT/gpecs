@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     data::{
-        ErasedMutPtr, ErasedMutRef, ErasedPtr, ErasedRef, bytes_to_items,
+        ErasedMutPtr, ErasedMutRef, ErasedPtr, ErasedRef,
         error::{
             DowncastError, FromLayoutDataError, FromStorageError, FromValueError,
             FromValueErrorKind, check_downcast,
@@ -16,6 +16,7 @@ use crate::{
         try_init_copy_from_slice,
     },
     error::{check_layout, check_len, check_sufficient_align},
+    layout::bytes_to_items,
     ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
     storage::{AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
 };

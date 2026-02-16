@@ -11,11 +11,12 @@ use crate::{
     CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaRefs,
     assert::{assert_descriptors, check_downcast},
     dangling::{Dangling, dangling},
-    data::{ErasedPtr, bytes_to_items},
+    data::ErasedPtr,
     error::{DowncastError, PtrsError, check_offset},
     error::{
         InsufficientAlignError, check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
+    layout::bytes_to_items,
     ptr::slice::{CastMutPtr, ConstSliceItemPtr},
     soa::{
         field::{

@@ -5,6 +5,7 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+pub use gpecs_layout as layout;
 pub use gpecs_ptr as ptr;
 
 pub mod data;

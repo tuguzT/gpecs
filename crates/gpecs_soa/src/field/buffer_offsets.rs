@@ -3,6 +3,8 @@ use core::{
     iter::FusedIterator,
 };
 
+use gpecs_layout::repeat_packed;
+
 use crate::field::{CopiedFieldDescriptors, FieldDescriptor};
 
 #[derive(Debug, Clone, Copy)]
@@ -160,13 +162,6 @@ fn try_buffer_offset_from_desc(
         layout,
         offset,
     })
-}
-
-/// Copy of [`Layout::repeat_packed()`] on stable channel.
-#[inline]
-fn repeat_packed(layout: Layout, n: usize) -> Result<Layout, LayoutError> {
-    let size = layout.size().saturating_mul(n);
-    Layout::from_size_align(size, layout.align())
 }
 
 #[inline]

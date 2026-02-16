@@ -743,8 +743,13 @@ dependencies = [
 name = "gpecs_erased"
 version = "0.0.0"
 dependencies = [
+ "gpecs_layout",
  "gpecs_ptr",
 ]
+
+[[package]]
+name = "gpecs_layout"
+version = "0.0.0"
 
 [[package]]
 name = "gpecs_ptr"
@@ -799,6 +804,7 @@ dependencies = [
 name = "gpecs_soa"
 version = "0.0.0"
 dependencies = [
+ "gpecs_layout",
  "itertools 0.14.0",
  "rustc-hash 2.1.1",
 ]

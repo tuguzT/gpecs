@@ -9,9 +9,10 @@ use core::{
 use crate::{
     CovariantFieldDescriptors, ErasedSoaMutPtrs,
     assert::{assert_descriptors, check_downcast},
-    data::{ErasedNonNullPtr, bytes_to_items},
+    data::ErasedNonNullPtr,
     error::DowncastError,
     error::InsufficientAlignError,
+    layout::bytes_to_items,
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
     soa::{
         field::{

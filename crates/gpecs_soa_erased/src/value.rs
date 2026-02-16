@@ -13,7 +13,7 @@ use itertools::{EitherOrBoth::Both, Itertools};
 use crate::{
     CovariantFieldDescriptors, ErasedSoaMutRefs, ErasedSoaRefs,
     assert::check_downcast,
-    data::{Erased, bytes_to_items, error::FromLayoutDataError, try_init_copy_from_slice},
+    data::{Erased, error::FromLayoutDataError, try_init_copy_from_slice},
     error::{
         DowncastError, FromFieldsDescriptorsError, FromStorageFieldsDescriptorsError,
         FromStorageValueError, FromValueError, IterOrFieldLenMismatchError,
@@ -21,6 +21,7 @@ use crate::{
     error::{
         InsufficientAlignError, LenMismatchError, check_layout, check_len, check_sufficient_align,
     },
+    layout::bytes_to_items,
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{

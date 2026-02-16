@@ -88,7 +88,7 @@ where
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { layout, ptr } = self;
 
-        let count = count * bytes_to_items::<U>(layout.size());
+        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
         let ptr = unsafe { ptr.add(count) };
         unsafe { Self::from_parts(layout, ptr) }
     }
@@ -121,7 +121,7 @@ where
         let Self { layout, ptr } = self;
 
         let src = src.ptr().as_ptr().cast_const();
-        let count = count * bytes_to_items::<U>(layout.size());
+        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
         unsafe { ptr.as_ptr().copy_from(src, count) }
     }
 
@@ -130,7 +130,7 @@ where
         let Self { layout, ptr } = self;
 
         let src = src.ptr().as_ptr().cast_const();
-        let count = count * bytes_to_items::<U>(layout.size());
+        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
         unsafe { ptr.as_ptr().copy_from_nonoverlapping(src, count) }
     }
 
@@ -143,7 +143,7 @@ where
     #[inline]
     pub fn byte_offset(self) -> usize {
         let Self { ptr, .. } = self;
-        ptr.index() * size_of::<U>()
+        ptr.index().wrapping_mul(size_of::<U>())
     }
 
     #[inline]

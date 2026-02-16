@@ -45,7 +45,7 @@ where
     #[inline]
     pub fn new(inner: T, layout: Layout) -> Result<Self, AlignedUninitStorageError> {
         let slice = inner.as_ref();
-        check_sufficient_len(slice.len() * size_of::<U>(), layout.size())?;
+        check_sufficient_len(size_of_val(slice), layout.size())?;
         check_ptr_align(slice.as_ptr().cast(), layout)?;
 
         let me = unsafe { Self::new_unchecked(inner, layout) };

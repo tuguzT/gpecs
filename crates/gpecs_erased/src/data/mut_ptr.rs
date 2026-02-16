@@ -68,9 +68,11 @@ where
 {
     #[inline]
     pub fn new(layout: Layout, buffer: *mut [U]) -> Result<Self, PtrError> {
-        check_sufficient_align(layout, Layout::new::<U>())?;
-        check_len(buffer.len() * size_of::<U>(), layout.size())?;
         check_ptr_align(buffer.cast(), layout)?;
+        check_sufficient_align(layout, Layout::new::<U>())?;
+
+        let buffer_layout = Layout::array::<U>(buffer.len())?;
+        check_len(buffer_layout.size(), layout.size())?;
 
         let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), buffer.len());
         let ptr = unsafe { T::from_slice(buffer, 0) };
@@ -105,7 +107,7 @@ where
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { layout, ptr } = self;
 
-        let count = count * bytes_to_items::<U>(layout.size());
+        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
         let ptr = unsafe { ptr.add(count) };
         unsafe { Self::from_parts(layout, ptr) }
     }
@@ -138,7 +140,7 @@ where
         let Self { layout, ptr } = self;
 
         let src = src.ptr();
-        let count = count * bytes_to_items::<U>(layout.size());
+        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
         unsafe { ptr.copy_from(src, count) }
     }
 
@@ -147,7 +149,7 @@ where
         let Self { layout, ptr } = self;
 
         let src = src.ptr();
-        let count = count * bytes_to_items::<U>(layout.size());
+        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
         unsafe { ptr.copy_from_nonoverlapping(src, count) }
     }
 
@@ -166,7 +168,7 @@ where
     #[inline]
     pub fn byte_offset(self) -> usize {
         let Self { ptr, .. } = self;
-        ptr.index() * size_of::<U>()
+        ptr.index().wrapping_mul(size_of::<U>())
     }
 
     #[inline]

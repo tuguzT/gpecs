@@ -1,5 +1,5 @@
 use core::{
-    alloc::Layout,
+    alloc::{Layout, LayoutError},
     error::Error,
     fmt::{self, Debug, Display},
 };
@@ -148,9 +148,17 @@ pub(super) fn check_downcast<T, U>(layout: Layout, value: U) -> Result<U, Downca
 
 #[derive(Debug, Clone)]
 pub enum PtrError {
+    InvalidLayout(LayoutError),
     NotAligned(NotAlignedError),
     LenMismatch(LenMismatchError),
     InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<LayoutError> for PtrError {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
 }
 
 impl From<NotAlignedError> for PtrError {
@@ -177,6 +185,7 @@ impl From<InsufficientAlignError> for PtrError {
 impl Display for PtrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidLayout(error) => Display::fmt(error, f),
             Self::NotAligned(error) => Display::fmt(error, f),
             Self::LenMismatch(error) => Display::fmt(error, f),
             Self::InsufficientAlign(error) => Display::fmt(error, f),
@@ -187,6 +196,7 @@ impl Display for PtrError {
 impl Error for PtrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
+            Self::InvalidLayout(error) => Some(error),
             Self::NotAligned(error) => Some(error),
             Self::LenMismatch(error) => Some(error),
             Self::InsufficientAlign(error) => Some(error),
@@ -401,17 +411,6 @@ impl From<InsufficientAlignError> for FromStorageErrorKind {
     #[inline]
     fn from(error: InsufficientAlignError) -> Self {
         Self::InsufficientAlign(error)
-    }
-}
-
-impl From<PtrError> for FromStorageErrorKind {
-    #[inline]
-    fn from(error: PtrError) -> Self {
-        match error {
-            PtrError::NotAligned(error) => Self::NotAligned(error),
-            PtrError::LenMismatch(error) => Self::LenMismatch(error),
-            PtrError::InsufficientAlign(error) => Self::InsufficientAlign(error),
-        }
     }
 }
 

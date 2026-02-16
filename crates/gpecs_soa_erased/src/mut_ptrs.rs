@@ -117,6 +117,8 @@ where
         capacity: usize,
         offset: usize,
     ) -> Result<Self, PtrsError> {
+        check_offset(offset, capacity)?;
+
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), capacity);
         offsets.by_ref().try_for_each(|offset| {
             check_sufficient_align(offset?.desc.layout(), Layout::new::<P::Item>())
@@ -124,9 +126,10 @@ where
         })?;
 
         let layout = offsets.into_layout();
-        check_sufficient_len(buffer.len() * size_of::<P::Item>(), layout.size())?;
         check_ptr_align(buffer.cast(), layout)?;
-        check_offset(offset, capacity)?;
+
+        let buffer_layout = Layout::array::<P::Item>(buffer.len())?;
+        check_sufficient_len(buffer_layout.size(), layout.size())?;
 
         let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset) };
         Ok(me)

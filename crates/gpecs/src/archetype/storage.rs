@@ -7,7 +7,7 @@ use bytemuck::{Pod, Zeroable, must_cast_slice};
 use gpecs_soa_erased::{BoxedErasedSoa, ErasedSoaContext};
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 use indexmap::map::Keys as IndexMapKeys;
-use itertools::Itertools;
+use itertools::{Itertools, zip_eq};
 
 use crate::{
     bundle::Bundle,
@@ -29,9 +29,9 @@ use crate::{
 use super::{
     collect::{try_collect_component_ids, try_collect_maybe_component_ids},
     erased::{
-        ErasedBundle, ErasedBundleRef, drop_erased_in_place, from_erased_fields,
-        from_erased_mut_slices, from_erased_refs, from_erased_refs_mut, from_erased_slices,
-        get_component_info_fail, into_erased_fields, validate_components,
+        ErasedBundle, from_erased_fields, from_erased_mut_slices, from_erased_refs,
+        from_erased_refs_mut, from_erased_slices, get_component_info_fail, into_erased_fields,
+        validate_components,
     },
     error::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
@@ -539,27 +539,23 @@ impl ArchetypeStorage {
             ref component_ids,
             ref mut erased_storage,
         } = *self;
-        let Some(mut erased_fields) = erased_storage.swap_remove(entity.into()) else {
+
+        let Some(erased_fields) = erased_storage.swap_remove(entity.into()) else {
             return false;
         };
 
-        let erased_refs_mut = erased_fields.as_mut_fields();
-        Self::destroy_refs_mut(component_ids, erased_refs_mut);
+        Self::drop_erased(component_ids, erased_fields);
         true
     }
 
     #[inline]
-    fn destroy_refs_mut<A>(component_ids: &ComponentIdMap, erased_refs_mut: ErasedBundleRef<'_, A>)
-    where
-        A: IntoIterator,
-        A::Item: AsRef<FieldDescriptor>,
-        A::IntoIter: AsRef<[FieldDescriptor]> + ExactSizeIterator,
-    {
-        let fields = erased_refs_mut.into_iter();
-        debug_assert_eq!(fields.len(), component_ids.len());
-
-        let fields = fields.zip_eq(component_ids.values().copied());
-        unsafe { drop_erased_in_place(fields) }
+    fn drop_erased(component_ids: &ComponentIdMap, mut erased_fields: ErasedBundle) {
+        let fields = erased_fields.as_mut_fields();
+        let component_ids = component_ids.values().copied();
+        for (mut field, drop_fn) in zip_eq(fields, component_ids) {
+            let Some(drop_fn) = drop_fn else { continue };
+            unsafe { drop_fn(field.as_mut_ptr()) }
+        }
     }
 
     #[inline]
@@ -638,8 +634,8 @@ impl Drop for ArchetypeStorage {
         } = *self;
 
         erased_storage
-            .values_mut()
-            .for_each(|erased_refs_mut| Self::destroy_refs_mut(component_ids, erased_refs_mut));
+            .drain()
+            .for_each(|(_, erased_fields)| Self::drop_erased(component_ids, erased_fields));
     }
 }
 

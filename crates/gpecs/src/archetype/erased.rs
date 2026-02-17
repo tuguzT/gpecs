@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, mem::MaybeUninit};
 
-use gpecs_soa_erased::{BoxedErasedSoa, ErasedSoaMutRefs, ptr::slice::CoreSliceItemPtrs};
+use gpecs_soa_erased::{BoxedErasedSoa, ptr::slice::CoreSliceItemPtrs};
 use itertools::{Itertools, zip_eq};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
             ErasedComponent, ErasedComponentMutRef, ErasedComponentMutSlice, ErasedComponentRef,
             ErasedComponentSlice,
         },
-        registry::{ComponentId, ComponentRegistry, DropFn},
+        registry::{ComponentId, ComponentRegistry},
     },
     hash::IndexSet,
     soa::{
@@ -25,7 +25,6 @@ use crate::{
 // TODO: convert this whole very unsafe code into some type which implements `Soa` trait & provides its guarantees
 
 pub type ErasedBundle = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
-pub type ErasedBundleRef<'a, D> = ErasedSoaMutRefs<'a, D, *mut MaybeUninit<u8>>;
 
 #[cold]
 #[track_caller]
@@ -201,16 +200,4 @@ where
         .expect("all the components should be present in the right order");
     let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);
     unsafe { B::CONTEXT.mut_slice_ptrs_to_mut_slices(slices) }
-}
-
-#[inline]
-pub unsafe fn drop_erased_in_place<I, F>(fields: I)
-where
-    I: IntoIterator<Item = (F, Option<DropFn>)>,
-    F: AsMut<[u8]>,
-{
-    fields.into_iter().for_each(|(mut field, drop_fn)| {
-        let Some(drop_fn) = drop_fn else { return };
-        unsafe { drop_fn(field.as_mut().as_mut_ptr()) }
-    });
 }

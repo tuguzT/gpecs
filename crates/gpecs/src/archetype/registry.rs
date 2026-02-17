@@ -20,7 +20,10 @@ use petgraph::{
 };
 
 use crate::{
-    bundle::Bundle,
+    bundle::{
+        Bundle,
+        erased::{from_erased_fields, into_erased_fields},
+    },
     component::{
         erased::ErasedComponent,
         registry::{ComponentId, ComponentRegistry},
@@ -35,7 +38,6 @@ use crate::{
 
 use super::{
     collect::{try_collect_component_ids, try_collect_maybe_component_ids},
-    erased::{from_erased_fields, into_erased_fields},
     error::{
         AlreadyHasComponentError, IncompatibleBundleError, InsertBundleError,
         InsertBundleExactError, MissingComponentError, RemoveBundleExactError,

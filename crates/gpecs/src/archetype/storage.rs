@@ -10,7 +10,14 @@ use indexmap::map::Keys as IndexMapKeys;
 use itertools::{Itertools, zip_eq};
 
 use crate::{
-    bundle::Bundle,
+    bundle::{
+        Bundle,
+        erased::{
+            ErasedBundle, from_erased_fields, from_erased_mut_slices, from_erased_refs,
+            from_erased_refs_mut, from_erased_slices, get_component_info_fail, into_erased_fields,
+            validate_components,
+        },
+    },
     component::{
         erased::{
             ErasedComponent, ErasedComponentMutRef, ErasedComponentMutSlice, ErasedComponentRef,
@@ -28,11 +35,6 @@ use crate::{
 
 use super::{
     collect::{try_collect_component_ids, try_collect_maybe_component_ids},
-    erased::{
-        ErasedBundle, from_erased_fields, from_erased_mut_slices, from_erased_refs,
-        from_erased_refs_mut, from_erased_slices, get_component_info_fail, into_erased_fields,
-        validate_components,
-    },
     error::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
         IncompatibleBundleValueError, MissingComponentError, TooFewComponentsError,

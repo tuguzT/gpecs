@@ -699,24 +699,13 @@ impl ArchetypeRegistry {
 
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
+
         let fields =
             unsafe { into_erased_fields::<B>(components, B::CONTEXT, component_ids, value) };
-
-        let mut fields_to_drop = IndexSet::default();
-        fields.into_iter().for_each(|field| {
-            let component_id = field.component_id();
-            let Some(to_drop) = old_fields.replace(field) else {
-                return;
-            };
-            if fields_to_drop.replace(to_drop).is_some() {
-                unreachable!("duplicated {component_id}")
-            }
-        });
-        fields_to_drop.into_iter().for_each(|field| {
-            field
-                .drop_in_place_consume(components)
-                .expect("component should be registered");
-        });
+        fields
+            .into_iter()
+            .map(|field| old_fields.replace(field))
+            .for_each(drop);
 
         let new_fields = old_fields;
         let archetype_id = Some(new_archetype);
@@ -854,14 +843,10 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
 
-        let fields_to_drop = component_ids
+        component_ids
             .iter()
-            .filter_map(|component_id| old_fields.swap_take(component_id));
-        fields_to_drop.for_each(|field| {
-            field
-                .drop_in_place_consume(components)
-                .expect("component should be registered");
-        });
+            .map(|component_id| old_fields.swap_take(component_id))
+            .for_each(drop);
 
         let new_fields = old_fields;
         Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);
@@ -895,25 +880,13 @@ impl ArchetypeRegistry {
         fields: IndexSet<ErasedComponent>,
     ) {
         let Some(archetype_id) = archetype_id else {
-            fields.into_iter().for_each(|field| {
-                field
-                    .drop_in_place_consume(components)
-                    .expect("component should be registered");
-            });
             return;
         };
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("{archetype_id} should exist")
         };
-        let fields = info.storage.insert_erased(components, entity, fields);
-        if let Some(fields) = fields {
-            fields.into_iter().for_each(|field| {
-                field
-                    .drop_in_place_consume(components)
-                    .expect("component should be registered");
-            });
-        }
+        info.storage.insert_erased(components, entity, fields);
     }
 
     #[inline]

@@ -104,7 +104,7 @@ where
 {
     let fields_with_descriptors =
         reorder_fields::<T, _, _>(components, context, component_ids, fields).map(|field| {
-            let (_, field) = field.into_parts();
+            let (_, field, _) = field.into_parts();
             let (storage, layout) = field.into_parts();
             (storage, FieldDescriptor::new(layout))
         });
@@ -130,7 +130,12 @@ where
         .unwrap();
     validate_components::<T, _>(components, context, component_ids)
         .zip_eq(erased_value)
-        .map(|(id, field)| unsafe { ErasedComponent::from_parts(id, field) })
+        .map(|(id, field)| {
+            let info = components
+                .get_component_info(id)
+                .unwrap_or_else(|| get_component_info_fail(id));
+            unsafe { ErasedComponent::from_parts(id, field, info.drop_fn()) }
+        })
         .collect()
 }
 

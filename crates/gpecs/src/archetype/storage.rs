@@ -7,7 +7,7 @@ use bytemuck::{Pod, Zeroable, must_cast_slice};
 use gpecs_soa_erased::{BoxedErasedSoa, ErasedSoaContext};
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 use indexmap::map::Keys as IndexMapKeys;
-use itertools::{Itertools, zip_eq};
+use itertools::Itertools;
 
 use crate::{
     bundle::{
@@ -535,7 +535,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[track_caller]
     pub fn destroy_in_place(&mut self, entity: Entity) -> bool {
         let Self {
             ref component_ids,
@@ -546,18 +545,22 @@ impl ArchetypeStorage {
             return false;
         };
 
-        Self::drop_erased(component_ids, erased_fields);
+        unsafe {
+            Self::drop_erased(component_ids, erased_fields);
+        }
         true
     }
 
     #[inline]
-    fn drop_erased(component_ids: &ComponentIdMap, mut erased_fields: ErasedBundle) {
-        let fields = erased_fields.as_mut_fields();
-        let component_ids = component_ids.values().copied();
-        for (mut field, drop_fn) in zip_eq(fields, component_ids) {
-            let Some(drop_fn) = drop_fn else { continue };
-            unsafe { drop_fn(field.as_mut_ptr()) }
-        }
+    unsafe fn drop_erased(component_ids: &ComponentIdMap, erased_fields: ErasedBundle) {
+        erased_fields
+            .into_fields()
+            .zip_eq(component_ids)
+            .map(|(field, (&component_id, &drop_fn))| {
+                let field = field.unwrap();
+                unsafe { ErasedComponent::from_parts(component_id, field, drop_fn) }
+            })
+            .for_each(drop);
     }
 
     #[inline]
@@ -635,9 +638,9 @@ impl Drop for ArchetypeStorage {
             ref mut erased_storage,
         } = *self;
 
-        erased_storage
-            .drain()
-            .for_each(|(_, erased_fields)| Self::drop_erased(component_ids, erased_fields));
+        for (_, erased_fields) in erased_storage.drain() {
+            unsafe { Self::drop_erased(component_ids, erased_fields) }
+        }
     }
 }
 

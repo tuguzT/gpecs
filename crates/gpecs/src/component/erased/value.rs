@@ -1,8 +1,9 @@
+use core::ptr;
 use std::{
     borrow::Borrow,
     cmp,
     hash::{self, Hash},
-    mem::MaybeUninit,
+    mem::{ManuallyDrop, MaybeUninit},
 };
 
 use gpecs_soa_erased::{data::BoxedErased, ptr::slice::CoreSliceItemPtrs};
@@ -14,7 +15,7 @@ use crate::component::{
         error::{DowncastError, FromComponentError, check_downcast},
     },
     error::NotRegisteredError,
-    registry::{ComponentId, ComponentRegistry},
+    registry::{ComponentId, ComponentRegistry, DropFn},
 };
 
 type Field = BoxedErased<CoreSliceItemPtrs<MaybeUninit<u8>>>;
@@ -23,6 +24,7 @@ type Field = BoxedErased<CoreSliceItemPtrs<MaybeUninit<u8>>>;
 pub struct ErasedComponent {
     component_id: ComponentId,
     field: Field,
+    drop_fn: Option<DropFn>,
 }
 
 impl ErasedComponent {
@@ -54,15 +56,25 @@ impl ErasedComponent {
             }
         })?;
 
-        let me = unsafe { Self::from_parts(component_id, field) };
+        let Some(component_info) = registry.get_component_info(component_id) else {
+            unreachable!("{component_id} should be registered")
+        };
+        let drop_fn = component_info.drop_fn();
+
+        let me = unsafe { Self::from_parts(component_id, field, drop_fn) };
         Ok(me)
     }
 
     #[inline]
-    pub unsafe fn from_parts(component_id: ComponentId, field: Field) -> Self {
+    pub unsafe fn from_parts(
+        component_id: ComponentId,
+        field: Field,
+        drop_fn: Option<DropFn>,
+    ) -> Self {
         Self {
             component_id,
             field,
+            drop_fn,
         }
     }
 
@@ -72,7 +84,7 @@ impl ErasedComponent {
         C: Component,
     {
         let Self { component_id, .. } = self;
-        let Self { field, .. } = check_downcast::<C, _>(registry, component_id, self)?;
+        let (_, field, _) = check_downcast::<C, _>(registry, component_id, self)?.into_parts();
 
         let component = unsafe { field.downcast::<C>() }
             .expect("descriptors of input component and self should be equal");
@@ -109,26 +121,6 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn drop_in_place_consume(
-        mut self,
-        registry: &ComponentRegistry,
-    ) -> Result<(), (Self, NotRegisteredError)> {
-        if let Err(error) = unsafe { self.drop_in_place(registry) } {
-            return Err((self, error));
-        }
-        Ok(())
-    }
-
-    #[inline]
-    pub unsafe fn drop_in_place(
-        &mut self,
-        registry: &ComponentRegistry,
-    ) -> Result<(), NotRegisteredError> {
-        let ptr = self.as_mut_erased_component_ptr();
-        unsafe { ptr.drop_in_place(registry) }
-    }
-
-    #[inline]
     pub fn component_id(&self) -> ComponentId {
         let Self { component_id, .. } = *self;
         component_id
@@ -145,6 +137,7 @@ impl ErasedComponent {
         let Self {
             ref field,
             component_id,
+            ..
         } = *self;
 
         let field = field.as_erased_ptr();
@@ -156,6 +149,7 @@ impl ErasedComponent {
         let Self {
             ref mut field,
             component_id,
+            ..
         } = *self;
 
         let field = field.as_mut_erased_ptr();
@@ -197,12 +191,19 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (ComponentId, Field) {
+    pub fn into_parts(self) -> (ComponentId, Field, Option<DropFn>) {
         let Self {
             component_id,
-            field,
+            drop_fn,
+            ..
         } = self;
-        (component_id, field)
+
+        let field = {
+            let me = ManuallyDrop::new(self);
+            unsafe { ptr::read(&raw const me.field) }
+        };
+
+        (component_id, field, drop_fn)
     }
 }
 
@@ -258,5 +259,19 @@ impl AsMut<[u8]> for ErasedComponent {
     #[inline]
     fn as_mut(&mut self) -> &mut [u8] {
         self.as_mut_slice()
+    }
+}
+
+impl Drop for ErasedComponent {
+    #[inline]
+    fn drop(&mut self) {
+        let Self {
+            ref mut field,
+            drop_fn,
+            ..
+        } = *self;
+
+        let Some(drop_fn) = drop_fn else { return };
+        unsafe { drop_fn(field.as_mut_ptr()) }
     }
 }

@@ -1,7 +1,7 @@
 use gpecs::{
     archetype::{
         error::{
-            AlreadyHasComponentError, IncompatibleBundleError, InsertBundleExactError,
+            AlreadyHasComponentError, IncompatibleArchetypeError, InsertBundleExactError,
             MissingComponentError,
         },
         registry::ArchetypeRegistry,
@@ -339,7 +339,7 @@ fn exchange_components_empty_registry() {
         .expect_err("entity should not have `Mass` and `Tag` components yet");
     assert!(matches!(
         error,
-        IncompatibleBundleError::ComponentNotRegistered(_),
+        IncompatibleArchetypeError::ComponentNotRegistered(_),
     ));
 
     let tag = Tag;
@@ -357,7 +357,7 @@ fn exchange_components_empty_registry() {
         .expect_err("entity should not have `Mass` and `Tag` components yet");
     assert!(matches!(
         error,
-        IncompatibleBundleError::ComponentNotRegistered(_),
+        IncompatibleArchetypeError::ComponentNotRegistered(_),
     ));
 
     let mass = Mass { value: 42 };

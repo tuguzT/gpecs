@@ -1,7 +1,7 @@
 use gpecs::{
     archetype::{
         error::{
-            IncompatibleBundleError, IncompatibleBundleValueError, MissingComponentError,
+            IncompatibleArchetypeError, IncompatibleBundleValueError, MissingComponentError,
             TooFewComponentsError,
         },
         storage::ArchetypeStorage,
@@ -91,7 +91,7 @@ fn storage_tuple() {
         .expect_err("retrieval of slice of `(Position, Name, Tag)` should fail");
     assert!(matches!(
         error,
-        IncompatibleBundleError::ComponentNotRegistered(_),
+        IncompatibleArchetypeError::ComponentNotRegistered(_),
     ));
 
     components.register_component::<Tag>();

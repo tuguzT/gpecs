@@ -39,7 +39,7 @@ use crate::{
 use super::{
     collect::{try_collect_components, try_collect_opt_components},
     error::{
-        AlreadyHasComponentError, IncompatibleBundleError, InsertBundleError,
+        AlreadyHasComponentError, IncompatibleArchetypeError, InsertBundleError,
         InsertBundleExactError, MissingComponentError, RemoveBundleExactError,
     },
     error::{ArchetypeError, DuplicateComponentError},
@@ -397,7 +397,7 @@ impl ArchetypeRegistry {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Refs<'_, '_, B>, IncompatibleBundleError>
+    ) -> Result<Refs<'_, '_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -412,7 +412,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<Refs<'_, '_, B>, IncompatibleBundleError>
+    ) -> Result<Refs<'_, '_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -440,7 +440,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<RefsMut<'_, '_, B>, IncompatibleBundleError>
+    ) -> Result<RefsMut<'_, '_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -455,7 +455,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<RefsMut<'_, '_, B>, IncompatibleBundleError>
+    ) -> Result<RefsMut<'_, '_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -479,7 +479,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    fn make_incompatible_bundle_error<I>(component_ids: I) -> IncompatibleBundleError
+    fn make_incompatible_bundle_error<I>(component_ids: I) -> IncompatibleArchetypeError
     where
         I: IntoIterator<Item = Option<ComponentId>>,
     {
@@ -1684,7 +1684,7 @@ impl FusedIterator for CompatibleArchetypesMut<'_> {}
 fn compatible_archetypes_predicate(info: &ArchetypeInfo, component_ids: &[ComponentId]) -> bool {
     let component_ids = component_ids.iter().copied();
     info.storage()
-        .components_compatibility(component_ids)
+        .check_compatibility_for(component_ids)
         .is_ok()
 }
 

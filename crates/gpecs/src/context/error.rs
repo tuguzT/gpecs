@@ -6,7 +6,7 @@ use std::{
 use crate::{
     archetype::error::{
         AlreadyHasComponentError, DuplicateComponentError,
-        IncompatibleBundleError as ArchetypeIncompatibleBundleError,
+        IncompatibleArchetypeError as ArchetypeIncompatibleBundleError,
         InsertBundleError as ArchetypeInsertBundleError,
         InsertBundleExactError as ArchetypeInsertBundleExactError,
         InsertBundleExactErrorKind as ArchetypeInsertBundleExactErrorKind, MissingComponentError,

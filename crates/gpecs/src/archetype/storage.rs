@@ -6,17 +6,18 @@ use std::{
 use bytemuck::{Pod, Zeroable, must_cast_slice};
 use gpecs_soa_erased::{BoxedErasedSoa, ErasedSoaContext};
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
-use indexmap::map::Keys as IndexMapKeys;
 use itertools::Itertools;
 
 use crate::{
-    archetype::error::ArchetypeError,
+    archetype::{
+        erased::{ErasedArchetype, ErasedArchetypeComponents},
+        error::ArchetypeError,
+    },
     bundle::{
         Bundle,
         erased::{
             ErasedBundle, from_erased_fields, from_erased_mut_slices, from_erased_refs,
-            from_erased_refs_mut, from_erased_slices, get_component_info_fail, into_erased_fields,
-            validate_components,
+            from_erased_refs_mut, from_erased_slices, into_erased_fields, validate_components,
         },
     },
     component::{
@@ -35,10 +36,10 @@ use crate::{
 };
 
 use super::{
-    collect::{try_collect_components, try_collect_opt_components},
+    collect::try_collect_opt_components,
     error::{
-        DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
-        IncompatibleBundleValueError, MissingComponentError, TooFewComponentsError,
+        DuplicateComponentError, IncompatibleArchetypeError, IncompatibleArchetypeExactError,
+        IncompatibleBundleValueError,
     },
 };
 
@@ -81,10 +82,9 @@ pub type Bundles<'a, B> = (&'a [Entity], Slices<'a, 'a, B>);
 pub type BundlesMut<'a, B> = (&'a [Entity], SlicesMut<'a, 'a, B>);
 
 type ErasedStorage = EpochSparseSet<NoEpochEntity, ErasedBundle>;
-type ComponentIdMap = IndexMap<ComponentId, Option<DropFn>>;
 
 pub struct ArchetypeStorage {
-    component_ids: ComponentIdMap,
+    archetype: ErasedArchetype<Option<DropFn>>,
     erased_storage: ErasedStorage,
 }
 
@@ -94,7 +94,7 @@ impl ArchetypeStorage {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids = try_collect_opt_components(
+        let component_infos = try_collect_opt_components(
             component_ids
                 .into_iter()
                 .map(|component_id| components.get_component_info(component_id)),
@@ -102,17 +102,20 @@ impl ArchetypeStorage {
             |info| info.id(),
         )?;
 
-        let (component_ids, descriptors): (_, Vec<_>) = component_ids
-            .into_iter()
-            .map(|(component_id, info)| ((component_id, info.drop_fn()), info.descriptor()))
-            .unzip();
+        let components = component_infos
+            .iter()
+            .map(|(&component_id, info)| (component_id, info.drop_fn()));
+        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(components) };
 
-        let descriptors = descriptors.into();
+        let descriptors = component_infos
+            .iter()
+            .map(|(_, info)| info.descriptor())
+            .collect();
         let context = ErasedSoaContext::new(descriptors).expect("descriptors should be valid");
         let erased_storage = ErasedStorage::with_context(context);
 
         Ok(Self {
-            component_ids,
+            archetype,
             erased_storage,
         })
     }
@@ -122,130 +125,85 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let component_ids = B::register_components(components);
-        let component_ids = try_collect_components(
-            component_ids,
-            |map, component_id| {
-                let info = components
-                    .get_component_info(component_id)
-                    .unwrap_or_else(|| get_component_info_fail(component_id));
-                ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
-            },
-            Clone::clone,
-        )?;
+        let archetype = ErasedArchetype::of::<B>(components)?;
 
         let context = ErasedSoaContext::of::<B>(B::CONTEXT).expect("descriptors should be valid");
         let erased_storage = ErasedStorage::with_context(context);
 
         Ok(Self {
-            component_ids,
+            archetype,
             erased_storage,
         })
     }
 
     #[inline]
     pub fn component_ids(&self) -> ComponentIds<'_> {
-        let Self { component_ids, .. } = self;
-        let inner = component_ids.keys();
+        let Self { archetype, .. } = self;
+        let inner = archetype.components();
         ComponentIds { inner }
     }
 
     #[inline]
-    pub fn bundle_compatibility<B>(
+    pub fn check_compatibility(&self, other: &Self) -> Result<(), IncompatibleArchetypeError> {
+        let Self { archetype, .. } = self;
+        archetype.check_compatibility(&other.archetype)
+    }
+
+    #[inline]
+    pub fn check_compatibility_for<I>(
+        &self,
+        component_ids: I,
+    ) -> Result<(), IncompatibleArchetypeError>
+    where
+        I: IntoIterator<Item = ComponentId>,
+    {
+        let Self { archetype, .. } = self;
+        archetype.check_compatibility_for(component_ids)
+    }
+
+    #[inline]
+    pub fn check_compatibility_of<B>(
         &self,
         components: &ComponentRegistry,
-    ) -> Result<(), IncompatibleBundleError>
+    ) -> Result<(), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(components);
-        let component_ids =
-            try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone)?;
-        self.components_compatibility_inner(component_ids)
+        let Self { archetype, .. } = self;
+        archetype.check_compatibility_of::<B>(components)
     }
 
     #[inline]
-    pub fn components_compatibility<I>(
+    pub fn check_exact_compatibility(
+        &self,
+        other: &Self,
+    ) -> Result<(), IncompatibleArchetypeExactError> {
+        let Self { archetype, .. } = self;
+        archetype.check_exact_compatibility(&other.archetype)
+    }
+
+    #[inline]
+    pub fn check_exact_compatibility_for<I>(
         &self,
         component_ids: I,
-    ) -> Result<(), IncompatibleBundleError>
+    ) -> Result<(), IncompatibleArchetypeExactError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids =
-            try_collect_components(component_ids, IndexSet::<_>::insert, Clone::clone)?;
-        self.components_compatibility_inner(component_ids)
+        let Self { archetype, .. } = self;
+        archetype.check_exact_compatibility_for(component_ids)
     }
 
     #[inline]
-    pub fn bundle_compatibility_exact<B>(
+    pub fn check_exact_compatibility_of<B>(
         &self,
         components: &ComponentRegistry,
-    ) -> Result<(), IncompatibleBundleExactError>
+    ) -> Result<(), IncompatibleArchetypeExactError>
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(components);
-        let component_ids =
-            try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone)?;
-        self.components_compatibility_exact_inner(component_ids)
-    }
-
-    #[inline]
-    pub fn components_compatibility_exact<I>(
-        &self,
-        component_ids: I,
-    ) -> Result<(), IncompatibleBundleExactError>
-    where
-        I: IntoIterator<Item = ComponentId>,
-    {
-        let component_ids =
-            try_collect_components(component_ids, IndexSet::<_>::insert, Clone::clone)?;
-        self.components_compatibility_exact_inner(component_ids)
-    }
-
-    #[inline]
-    fn components_compatibility_inner<I>(
-        &self,
-        bundle_component_ids: I,
-    ) -> Result<(), IncompatibleBundleError>
-    where
-        I: IntoIterator<Item = ComponentId>,
-    {
-        let Self { component_ids, .. } = self;
-
-        if let Some(component_id) = bundle_component_ids
-            .into_iter()
-            .find(|id| !component_ids.contains_key(id))
-        {
-            let error = MissingComponentError::new(component_id);
-            return Err(error.into());
-        }
-        Ok(())
-    }
-
-    #[inline]
-    fn components_compatibility_exact_inner<I>(
-        &self,
-        bundle_component_ids: I,
-    ) -> Result<(), IncompatibleBundleExactError>
-    where
-        I: IntoIterator<Item = ComponentId>,
-    {
-        let Self { component_ids, .. } = self;
-
-        let mut bundle_component_ids_count = 0;
-        let mut bundle_component_ids = bundle_component_ids
-            .into_iter()
-            .inspect(|_| bundle_component_ids_count += 1);
-        self.components_compatibility_inner(bundle_component_ids.by_ref())?;
-
-        bundle_component_ids.for_each(drop);
-        if bundle_component_ids_count != component_ids.len() {
-            return Err(TooFewComponentsError.into());
-        }
-
-        Ok(())
+        let Self { archetype, .. } = self;
+        archetype.check_exact_compatibility_of::<B>(components)
     }
 
     #[inline]
@@ -374,18 +332,20 @@ impl ArchetypeStorage {
     pub fn bundles<B>(
         &self,
         components: &ComponentRegistry,
-    ) -> Result<Bundles<'_, B>, IncompatibleBundleError>
+    ) -> Result<Bundles<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility::<B>(components)?;
+        self.check_compatibility_of::<B>(components)?;
 
         let Self {
-            component_ids,
+            archetype,
             erased_storage,
         } = self;
 
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         let (entities, fields) = erased_storage.erased_components(components, component_ids);
+
         let components = unsafe { from_erased_slices::<B>(components, entities.len(), fields) };
         let components = B::Context::upcast_slices(components);
         Ok((entities, components))
@@ -395,18 +355,20 @@ impl ArchetypeStorage {
     pub fn bundles_mut<B>(
         &mut self,
         components: &ComponentRegistry,
-    ) -> Result<BundlesMut<'_, B>, IncompatibleBundleError>
+    ) -> Result<BundlesMut<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility::<B>(components)?;
+        self.check_compatibility_of::<B>(components)?;
 
         let Self {
-            ref component_ids,
+            ref archetype,
             ref mut erased_storage,
         } = *self;
 
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         let (entities, fields) = erased_storage.erased_components_mut(components, component_ids);
+
         let components = unsafe { from_erased_mut_slices::<B>(components, entities.len(), fields) };
         let components = B::Context::upcast_mut_slices(components);
         Ok((entities, components))
@@ -417,20 +379,22 @@ impl ArchetypeStorage {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<Refs<'_, '_, B>>, IncompatibleBundleError>
+    ) -> Result<Option<Refs<'_, '_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility::<B>(components)?;
+        self.check_compatibility_of::<B>(components)?;
 
         let Self {
-            component_ids,
+            archetype,
             erased_storage,
         } = self;
 
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         let Some(fields) = erased_storage.get_erased(components, component_ids, entity) else {
             return Ok(None);
         };
+
         let refs = unsafe { from_erased_refs::<B>(components, fields) };
         let refs = B::Context::upcast_refs(refs);
         Ok(Some(refs))
@@ -441,20 +405,22 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<RefsMut<'_, '_, B>>, IncompatibleBundleError>
+    ) -> Result<Option<RefsMut<'_, '_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility::<B>(components)?;
+        self.check_compatibility_of::<B>(components)?;
 
         let Self {
-            ref component_ids,
+            ref archetype,
             ref mut erased_storage,
         } = *self;
 
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         let Some(fields) = erased_storage.get_erased_mut(components, component_ids, entity) else {
             return Ok(None);
         };
+
         let refs = unsafe { from_erased_refs_mut::<B>(components, fields) };
         let refs = B::Context::upcast_mut_refs(refs);
         Ok(Some(refs))
@@ -470,12 +436,12 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        if let Err(reason) = self.bundle_compatibility_exact::<B>(components) {
+        if let Err(reason) = self.check_exact_compatibility_of::<B>(components) {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
         let Self {
-            ref component_ids,
+            ref archetype,
             ref mut erased_storage,
         } = *self;
 
@@ -484,10 +450,13 @@ impl ArchetypeStorage {
             .map(|component_id| component_id.expect("all of components should be registered"));
         let fields =
             unsafe { into_erased_fields::<B>(components, B::CONTEXT, bundle_component_ids, value) };
+
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         let Some(fields) = erased_storage.insert_erased(components, component_ids, entity, fields)
         else {
             return Ok(None);
         };
+
         let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
@@ -502,20 +471,22 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<B>, IncompatibleBundleExactError>
+    ) -> Result<Option<B>, IncompatibleArchetypeExactError>
     where
         B: Bundle,
     {
-        self.bundle_compatibility_exact::<B>(components)?;
+        self.check_exact_compatibility_of::<B>(components)?;
 
         let Self {
-            ref component_ids,
+            ref archetype,
             ref mut erased_storage,
         } = *self;
 
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         let Some(fields) = erased_storage.remove_erased(components, component_ids, entity) else {
             return Ok(None);
         };
+
         let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
@@ -528,7 +499,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn destroy_in_place(&mut self, entity: Entity) -> bool {
         let Self {
-            ref component_ids,
+            ref archetype,
             ref mut erased_storage,
         } = *self;
 
@@ -537,17 +508,20 @@ impl ArchetypeStorage {
         };
 
         unsafe {
-            Self::drop_erased(component_ids, erased_fields);
+            Self::drop_erased(archetype, erased_fields);
         }
         true
     }
 
     #[inline]
-    unsafe fn drop_erased(component_ids: &ComponentIdMap, erased_fields: ErasedBundle) {
+    unsafe fn drop_erased(
+        archetype: &ErasedArchetype<Option<DropFn>>,
+        erased_fields: ErasedBundle,
+    ) {
         erased_fields
             .into_fields()
-            .zip_eq(component_ids)
-            .map(|(field, (&component_id, &drop_fn))| {
+            .zip_eq(archetype.components())
+            .map(|(field, (component_id, &drop_fn))| {
                 let field = field.unwrap();
                 unsafe { ErasedComponent::from_parts(component_id, field, drop_fn) }
             })
@@ -563,9 +537,11 @@ impl ArchetypeStorage {
         fields: IndexSet<ErasedComponent>,
     ) -> Option<IndexSet<ErasedComponent>> {
         let Self {
-            ref component_ids,
+            ref archetype,
             ref mut erased_storage,
         } = *self;
+
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         erased_storage.insert_erased(components, component_ids, entity, fields)
     }
 
@@ -577,9 +553,11 @@ impl ArchetypeStorage {
         entity: Entity,
     ) -> Option<IndexSet<ErasedComponent>> {
         let Self {
-            ref component_ids,
+            ref archetype,
             ref mut erased_storage,
         } = *self;
+
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         erased_storage.remove_erased(components, component_ids, entity)
     }
 
@@ -590,9 +568,11 @@ impl ArchetypeStorage {
         components: &ComponentRegistry,
     ) -> (&[Entity], IndexSet<ErasedComponentSlice<'_>>) {
         let Self {
-            component_ids,
+            archetype,
             erased_storage,
         } = self;
+
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         erased_storage.erased_components(components, component_ids)
     }
 
@@ -604,18 +584,18 @@ impl ArchetypeStorage {
         components: &ComponentRegistry,
     ) -> (&[Entity], IndexSet<ErasedComponentMutSlice<'_>>) {
         let Self {
-            component_ids,
-            erased_storage,
-        } = self;
+            ref archetype,
+            ref mut erased_storage,
+        } = *self;
+
+        let component_ids = archetype.components().map(|(component_id, _)| component_id);
         erased_storage.erased_components_mut(components, component_ids)
     }
 }
 
 impl Debug for ArchetypeStorage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { component_ids, .. } = self;
-
-        let component_ids = &component_ids.keys();
+        let component_ids = &self.component_ids();
         f.debug_struct("ArchetypeStorage")
             .field("component_ids", component_ids)
             .finish_non_exhaustive()
@@ -625,19 +605,19 @@ impl Debug for ArchetypeStorage {
 impl Drop for ArchetypeStorage {
     fn drop(&mut self) {
         let Self {
-            ref component_ids,
+            ref archetype,
             ref mut erased_storage,
         } = *self;
 
         for (_, erased_fields) in erased_storage.drain() {
-            unsafe { Self::drop_erased(component_ids, erased_fields) }
+            unsafe { Self::drop_erased(archetype, erased_fields) }
         }
     }
 }
 
 #[derive(Clone)]
 pub struct ComponentIds<'a> {
-    inner: IndexMapKeys<'a, ComponentId, Option<DropFn>>,
+    inner: ErasedArchetypeComponents<'a, Option<DropFn>>,
 }
 
 impl Debug for ComponentIds<'_> {
@@ -653,7 +633,7 @@ impl Iterator for ComponentIds<'_> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().copied()
+        inner.next().map(|(component_id, _)| component_id)
     }
 
     #[inline]
@@ -674,7 +654,7 @@ impl Iterator for ComponentIds<'_> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).copied()
+        inner.nth(n).map(|(component_id, _)| component_id)
     }
 
     #[inline]
@@ -683,7 +663,7 @@ impl Iterator for ComponentIds<'_> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().copied()
+        inner.last().map(|(component_id, _)| component_id)
     }
 
     #[inline]
@@ -692,7 +672,7 @@ impl Iterator for ComponentIds<'_> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.copied().collect()
+        inner.map(|(component_id, _)| component_id).collect()
     }
 }
 
@@ -700,13 +680,13 @@ impl DoubleEndedIterator for ComponentIds<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().copied()
+        inner.next_back().map(|(component_id, _)| component_id)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).copied()
+        inner.nth_back(n).map(|(component_id, _)| component_id)
     }
 }
 
@@ -726,19 +706,19 @@ trait ErasedStorageExt {
     fn erased_components(
         &self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
     ) -> (&[Entity], IndexSet<ErasedComponentSlice<'_>>);
 
     fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
     ) -> (&[Entity], IndexSet<ErasedComponentMutSlice<'_>>);
 
     fn insert_erased(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId> + Clone,
         entity: Entity,
         fields: IndexSet<ErasedComponent>,
     ) -> Option<IndexSet<ErasedComponent>>;
@@ -746,21 +726,21 @@ trait ErasedStorageExt {
     fn remove_erased(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
         entity: Entity,
     ) -> Option<IndexSet<ErasedComponent>>;
 
     fn get_erased(
         &self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
         entity: Entity,
     ) -> Option<IndexSet<ErasedComponentRef<'_>>>;
 
     fn get_erased_mut(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
         entity: Entity,
     ) -> Option<IndexSet<ErasedComponentMutRef<'_>>>;
 }
@@ -776,14 +756,13 @@ impl ErasedStorageExt for ErasedStorage {
     fn erased_components(
         &self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
     ) -> (&[Entity], IndexSet<ErasedComponentSlice<'_>>) {
         let (dense, _) = Self::as_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
 
         let entities = must_cast_slice(entities);
-        let component_ids = component_ids.keys().copied();
         let fields = validate_components::<ErasedBundle, _>(components, context, component_ids)
             .zip_eq(values)
             .map(|(id, slice)| unsafe { ErasedComponentSlice::from_parts(id, slice) })
@@ -795,14 +774,13 @@ impl ErasedStorageExt for ErasedStorage {
     fn erased_components_mut(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
     ) -> (&[Entity], IndexSet<ErasedComponentMutSlice<'_>>) {
         let (dense, _) = Self::as_mut_view(self).into_parts();
         let (context, slices) = dense.into_slices_with_context();
         let (entities, values) = slices.into_parts();
 
         let entities = must_cast_slice(entities);
-        let component_ids = component_ids.keys().copied();
         let fields = validate_components::<ErasedBundle, _>(components, context, component_ids)
             .zip_eq(values)
             .map(|(id, slice)| unsafe { ErasedComponentMutSlice::from_parts(id, slice) })
@@ -814,18 +792,16 @@ impl ErasedStorageExt for ErasedStorage {
     fn insert_erased(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId> + Clone,
         entity: Entity,
         fields: IndexSet<ErasedComponent>,
     ) -> Option<IndexSet<ErasedComponent>> {
         let value = unsafe {
             let context = self.context();
-            let component_ids = component_ids.keys().copied();
-            from_erased_fields(components, context, component_ids, fields)
+            from_erased_fields(components, context, component_ids.clone(), fields)
         };
         let value = Self::insert(self, entity.into(), value)?;
 
-        let component_ids = component_ids.keys().copied();
         let context = self.context();
         let fields = unsafe { into_erased_fields(components, context, component_ids, value) };
         Some(fields)
@@ -835,12 +811,11 @@ impl ErasedStorageExt for ErasedStorage {
     fn remove_erased(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
         entity: Entity,
     ) -> Option<IndexSet<ErasedComponent>> {
         let value = Self::swap_remove(self, entity.into())?;
 
-        let component_ids = component_ids.keys().copied();
         let context = self.context();
         let fields = unsafe { into_erased_fields(components, context, component_ids, value) };
         Some(fields)
@@ -850,13 +825,12 @@ impl ErasedStorageExt for ErasedStorage {
     fn get_erased(
         &self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
         entity: Entity,
     ) -> Option<IndexSet<ErasedComponentRef<'_>>> {
         let view = Self::as_view(self);
         let (context, refs) = view.into_get_with_context(entity.into());
 
-        let component_ids = component_ids.keys().copied();
         let refs = validate_components::<BoxedErasedSoa<_>, _>(components, context, component_ids)
             .zip_eq(refs?)
             .map(|(id, r#ref)| unsafe { ErasedComponentRef::from_parts(id, r#ref) })
@@ -868,13 +842,12 @@ impl ErasedStorageExt for ErasedStorage {
     fn get_erased_mut(
         &mut self,
         components: &ComponentRegistry,
-        component_ids: &ComponentIdMap,
+        component_ids: impl IntoIterator<Item = ComponentId>,
         entity: Entity,
     ) -> Option<IndexSet<ErasedComponentMutRef<'_>>> {
         let view = Self::as_mut_view(self);
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
-        let component_ids = component_ids.keys().copied();
         let refs = validate_components::<BoxedErasedSoa<_>, _>(components, context, component_ids)
             .zip_eq(refs?)
             .map(|(id, r#ref)| unsafe { ErasedComponentMutRef::from_parts(id, r#ref) })

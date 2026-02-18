@@ -263,27 +263,27 @@ impl Error for ArchetypeError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum IncompatibleBundleError {
+pub enum IncompatibleArchetypeError {
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
     ComponentNotRegistered(NotRegisteredError),
 }
 
-impl From<DuplicateComponentError> for IncompatibleBundleError {
+impl From<DuplicateComponentError> for IncompatibleArchetypeError {
     #[inline]
     fn from(error: DuplicateComponentError) -> Self {
         Self::DuplicateComponent(error)
     }
 }
 
-impl From<MissingComponentError> for IncompatibleBundleError {
+impl From<MissingComponentError> for IncompatibleArchetypeError {
     #[inline]
     fn from(error: MissingComponentError) -> Self {
         Self::MissingComponent(error)
     }
 }
 
-impl From<ArchetypeError> for IncompatibleBundleError {
+impl From<ArchetypeError> for IncompatibleArchetypeError {
     #[inline]
     fn from(error: ArchetypeError) -> Self {
         match error {
@@ -293,16 +293,16 @@ impl From<ArchetypeError> for IncompatibleBundleError {
     }
 }
 
-impl From<NotRegisteredError> for IncompatibleBundleError {
+impl From<NotRegisteredError> for IncompatibleArchetypeError {
     #[inline]
     fn from(error: NotRegisteredError) -> Self {
         Self::ComponentNotRegistered(error)
     }
 }
 
-impl Display for IncompatibleBundleError {
+impl Display for IncompatibleArchetypeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "incompatible bundle: ")?;
+        write!(f, "incompatible archetype: ")?;
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
             Self::MissingComponent(error) => Display::fmt(error, f),
@@ -311,7 +311,7 @@ impl Display for IncompatibleBundleError {
     }
 }
 
-impl Error for IncompatibleBundleError {
+impl Error for IncompatibleArchetypeError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::DuplicateComponent(error) => Some(error),
@@ -334,42 +334,42 @@ impl TooFewComponentsError {
 
 impl Display for TooFewComponentsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "too few components in this bundle")
+        write!(f, "too few components in this archetype")
     }
 }
 
 impl Error for TooFewComponentsError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum IncompatibleBundleExactError {
+pub enum IncompatibleArchetypeExactError {
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
     ComponentNotRegistered(NotRegisteredError),
     TooFewComponents(TooFewComponentsError),
 }
 
-impl From<DuplicateComponentError> for IncompatibleBundleExactError {
+impl From<DuplicateComponentError> for IncompatibleArchetypeExactError {
     #[inline]
     fn from(error: DuplicateComponentError) -> Self {
         Self::DuplicateComponent(error)
     }
 }
 
-impl From<MissingComponentError> for IncompatibleBundleExactError {
+impl From<MissingComponentError> for IncompatibleArchetypeExactError {
     #[inline]
     fn from(error: MissingComponentError) -> Self {
         Self::MissingComponent(error)
     }
 }
 
-impl From<NotRegisteredError> for IncompatibleBundleExactError {
+impl From<NotRegisteredError> for IncompatibleArchetypeExactError {
     #[inline]
     fn from(error: NotRegisteredError) -> Self {
         Self::ComponentNotRegistered(error)
     }
 }
 
-impl From<ArchetypeError> for IncompatibleBundleExactError {
+impl From<ArchetypeError> for IncompatibleArchetypeExactError {
     #[inline]
     fn from(error: ArchetypeError) -> Self {
         match error {
@@ -379,29 +379,31 @@ impl From<ArchetypeError> for IncompatibleBundleExactError {
     }
 }
 
-impl From<TooFewComponentsError> for IncompatibleBundleExactError {
+impl From<TooFewComponentsError> for IncompatibleArchetypeExactError {
     #[inline]
     fn from(error: TooFewComponentsError) -> Self {
         Self::TooFewComponents(error)
     }
 }
 
-impl From<IncompatibleBundleError> for IncompatibleBundleExactError {
+impl From<IncompatibleArchetypeError> for IncompatibleArchetypeExactError {
     #[inline]
-    fn from(error: IncompatibleBundleError) -> Self {
+    fn from(error: IncompatibleArchetypeError) -> Self {
         match error {
-            IncompatibleBundleError::DuplicateComponent(error) => Self::DuplicateComponent(error),
-            IncompatibleBundleError::MissingComponent(error) => Self::MissingComponent(error),
-            IncompatibleBundleError::ComponentNotRegistered(error) => {
+            IncompatibleArchetypeError::MissingComponent(error) => Self::MissingComponent(error),
+            IncompatibleArchetypeError::DuplicateComponent(error) => {
+                Self::DuplicateComponent(error)
+            }
+            IncompatibleArchetypeError::ComponentNotRegistered(error) => {
                 Self::ComponentNotRegistered(error)
             }
         }
     }
 }
 
-impl Display for IncompatibleBundleExactError {
+impl Display for IncompatibleArchetypeExactError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "incompatible bundle: ")?;
+        write!(f, "incompatible exact archetype: ")?;
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
             Self::MissingComponent(error) => Display::fmt(error, f),
@@ -411,7 +413,7 @@ impl Display for IncompatibleBundleExactError {
     }
 }
 
-impl Error for IncompatibleBundleExactError {
+impl Error for IncompatibleArchetypeExactError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::DuplicateComponent(error) => Some(error),
@@ -429,7 +431,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub reason: IncompatibleBundleExactError,
+    pub reason: IncompatibleArchetypeExactError,
 }
 
 impl<B> Display for IncompatibleBundleValueError<B>

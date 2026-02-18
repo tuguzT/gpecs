@@ -8,7 +8,7 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::error::{DuplicateComponentError, GetComponentsError},
+    archetype::error::{ArchetypeError, DuplicateComponentError},
     component::registry::ComponentInfo,
     context::Context,
     hash::IndexMap,
@@ -183,7 +183,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn archetype_id<B>(&self) -> Result<Option<GpuArchetypeId>, GetComponentsError>
+    pub fn archetype_id<B>(&self) -> Result<Option<GpuArchetypeId>, ArchetypeError>
     where
         B: GpuBundle,
     {
@@ -204,7 +204,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     pub fn register_system<C, B>(
         &mut self,
         descriptor: GpuSystemDescriptor<C, B>,
-    ) -> Result<GpuSystemId, DuplicateComponentError>
+    ) -> Result<GpuSystemId, ArchetypeError>
     where
         C: IntoIterator<Item = (GpuComponentId, GpuComponentAccess)>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,

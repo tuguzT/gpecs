@@ -8,7 +8,7 @@ use std::{
 use wgpu::{BindGroupLayoutEntry, Device, Label, ShaderModule};
 
 use crate::{
-    archetype::error::DuplicateComponentError, component::registry::ComponentRegistry,
+    archetype::error::ArchetypeError, component::registry::ComponentRegistry,
     executor::gpu::component::registry::GpuComponentId,
 };
 
@@ -114,7 +114,7 @@ impl GpuSystemRegistry {
         components: &ComponentRegistry,
         gpu_device: &Device,
         descriptor: GpuSystemDescriptor<C, B>,
-    ) -> Result<GpuSystemId, DuplicateComponentError>
+    ) -> Result<GpuSystemId, ArchetypeError>
     where
         C: IntoIterator<Item = (GpuComponentId, GpuComponentAccess)>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,

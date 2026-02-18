@@ -10,6 +10,7 @@ use indexmap::map::Keys as IndexMapKeys;
 use itertools::Itertools;
 
 use crate::{
+    archetype::error::ArchetypeError,
     bundle::{
         Bundle,
         erased::{
@@ -34,7 +35,7 @@ use crate::{
 };
 
 use super::{
-    collect::{try_collect_component_ids, try_collect_maybe_component_ids},
+    collect::{try_collect_components, try_collect_opt_components},
     error::{
         DuplicateComponentError, IncompatibleBundleError, IncompatibleBundleExactError,
         IncompatibleBundleValueError, MissingComponentError, TooFewComponentsError,
@@ -89,34 +90,24 @@ pub struct ArchetypeStorage {
 
 impl ArchetypeStorage {
     #[inline]
-    #[track_caller]
-    pub fn new<I>(
-        components: &ComponentRegistry,
-        component_ids: I,
-    ) -> Result<Self, DuplicateComponentError>
+    pub fn new<I>(components: &ComponentRegistry, component_ids: I) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids = try_collect_component_ids(
-            component_ids,
-            |map, component_id| {
-                let info = components
-                    .get_component_info(component_id)
-                    .unwrap_or_else(|| get_component_info_fail(component_id));
-                ComponentIdMap::insert(map, component_id, info.drop_fn()).is_none()
-            },
-            Clone::clone,
+        let component_ids = try_collect_opt_components(
+            component_ids
+                .into_iter()
+                .map(|component_id| components.get_component_info(component_id)),
+            |map, info| IndexMap::insert(map, info.id(), info).is_none(),
+            |info| info.id(),
         )?;
 
-        let descriptors = component_ids
-            .keys()
-            .map(|&component_id| {
-                let info = components
-                    .get_component_info(component_id)
-                    .unwrap_or_else(|| get_component_info_fail(component_id));
-                info.descriptor()
-            })
-            .collect();
+        let (component_ids, descriptors): (_, Vec<_>) = component_ids
+            .into_iter()
+            .map(|(component_id, info)| ((component_id, info.drop_fn()), info.descriptor()))
+            .unzip();
+
+        let descriptors = descriptors.into();
         let context = ErasedSoaContext::new(descriptors).expect("descriptors should be valid");
         let erased_storage = ErasedStorage::with_context(context);
 
@@ -132,7 +123,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let component_ids = B::register_components(components);
-        let component_ids = try_collect_component_ids(
+        let component_ids = try_collect_components(
             component_ids,
             |map, component_id| {
                 let info = components
@@ -169,7 +160,7 @@ impl ArchetypeStorage {
     {
         let component_ids = B::get_components(components);
         let component_ids =
-            try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?;
+            try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone)?;
         self.components_compatibility_inner(component_ids)
     }
 
@@ -182,7 +173,7 @@ impl ArchetypeStorage {
         I: IntoIterator<Item = ComponentId>,
     {
         let component_ids =
-            try_collect_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?;
+            try_collect_components(component_ids, IndexSet::<_>::insert, Clone::clone)?;
         self.components_compatibility_inner(component_ids)
     }
 
@@ -196,7 +187,7 @@ impl ArchetypeStorage {
     {
         let component_ids = B::get_components(components);
         let component_ids =
-            try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?;
+            try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone)?;
         self.components_compatibility_exact_inner(component_ids)
     }
 
@@ -209,7 +200,7 @@ impl ArchetypeStorage {
         I: IntoIterator<Item = ComponentId>,
     {
         let component_ids =
-            try_collect_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?;
+            try_collect_components(component_ids, IndexSet::<_>::insert, Clone::clone)?;
         self.components_compatibility_exact_inner(component_ids)
     }
 

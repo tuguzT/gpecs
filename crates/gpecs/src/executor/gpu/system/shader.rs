@@ -13,11 +13,11 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::{collect::try_collect_component_ids, error::DuplicateComponentError},
-    component::registry::ComponentRegistry,
+    archetype::{collect::try_collect_opt_components, error::ArchetypeError},
+    component::registry::{ComponentInfo, ComponentRegistry},
     entity::Entity,
     executor::gpu::component::registry::GpuComponentId,
-    hash::{IndexMap, IndexSet},
+    hash::IndexMap,
 };
 
 use super::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId};
@@ -42,7 +42,7 @@ impl GpuSystemShader {
         gpu_device: &Device,
         system_id: GpuSystemId,
         descriptor: GpuSystemDescriptor<C, B>,
-    ) -> Result<Self, DuplicateComponentError>
+    ) -> Result<Self, ArchetypeError>
     where
         C: IntoIterator<Item = (GpuComponentId, GpuComponentAccess)>,
         B: IntoIterator<Item = BindGroupLayoutEntry>,
@@ -66,16 +66,15 @@ impl GpuSystemShader {
             min_binding_size: ENTITY_MIN_BINDING_SIZE,
         });
 
-        let component_ids = try_collect_component_ids(
-            bind_components,
-            IndexSet::<_>::insert,
-            |&(component_id, _)| component_id.into(),
+        let component_ids = try_collect_opt_components(
+            bind_components.into_iter().map(|(id, access)| {
+                let info = components.get_component_info(id.into())?;
+                Some((id, info, access))
+            }),
+            |map, (id, info, access)| IndexMap::insert(map, id, (info, access)).is_none(),
+            |&(component_id, _, _)| component_id.into(),
         )?;
-        let component_entry = |index: usize, component_id: GpuComponentId, binding_access| {
-            let Some(info) = components.get_component_info(component_id.into()) else {
-                unreachable!("{component_id} should exist");
-            };
-
+        let component_entry = |index: usize, info: &ComponentInfo, binding_access| {
             let size_of_component = info.descriptor().layout().size();
             let size_of_component = size_of_component
                 .try_into()
@@ -95,8 +94,8 @@ impl GpuSystemShader {
         let component_entries: IndexMap<_, _> = component_ids
             .into_iter()
             .enumerate()
-            .map(|(index, (component_id, access))| {
-                (component_id, component_entry(index, component_id, access))
+            .map(|(index, (component_id, (info, access)))| {
+                (component_id, component_entry(index, info, access))
             })
             .collect();
 

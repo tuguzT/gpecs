@@ -4,7 +4,7 @@ use error::{EntityNotFoundError, RemoveBundleError};
 
 use crate::{
     archetype::{
-        error::{DuplicateComponentError, GetComponentsError},
+        error::{ArchetypeError, DuplicateComponentError},
         registry::{
             ArchetypeId, ArchetypeInfo, ArchetypeRegistry, Bundles, BundlesMut, EntityArchetype,
         },
@@ -230,7 +230,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn archetype_id<B>(&self) -> Result<Option<ArchetypeId>, GetComponentsError>
+    pub fn archetype_id<B>(&self) -> Result<Option<ArchetypeId>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -286,7 +286,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn bundles<B>(&self) -> Result<Bundles<'_, '_, B>, GetComponentsError>
+    pub fn bundles<B>(&self) -> Result<Bundles<'_, '_, B>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -299,7 +299,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn bundles_mut<B>(&mut self) -> Result<BundlesMut<'_, '_, B>, GetComponentsError>
+    pub fn bundles_mut<B>(&mut self) -> Result<BundlesMut<'_, '_, B>, ArchetypeError>
     where
         B: Bundle,
     {

@@ -37,12 +37,12 @@ use crate::{
 };
 
 use super::{
-    collect::{try_collect_component_ids, try_collect_maybe_component_ids},
+    collect::{try_collect_components, try_collect_opt_components},
     error::{
         AlreadyHasComponentError, IncompatibleBundleError, InsertBundleError,
         InsertBundleExactError, MissingComponentError, RemoveBundleExactError,
     },
-    error::{DuplicateComponentError, GetComponentsError},
+    error::{ArchetypeError, DuplicateComponentError},
     storage::ArchetypeStorage,
 };
 
@@ -154,12 +154,11 @@ impl ArchetypeRegistry {
         let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
         let key = {
             let component_ids = component_ids.iter().copied();
-            try_collect_component_ids(component_ids, ArchetypeKey::insert, Clone::clone)?
+            try_collect_components(component_ids, ArchetypeKey::insert, Clone::clone)?
         };
 
         let f = |components| ArchetypeStorage::of::<B>(components);
-        let archetype_id = Self::register(archetypes, graph, components, &component_ids, key, f);
-        Ok(archetype_id)
+        Self::register(archetypes, graph, components, &component_ids, key, f)
     }
 
     #[inline]
@@ -167,7 +166,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &ComponentRegistry,
         component_ids: I,
-    ) -> Result<ArchetypeId, DuplicateComponentError>
+    ) -> Result<ArchetypeId, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
@@ -176,25 +175,24 @@ impl ArchetypeRegistry {
         let component_ids: Vec<_> = component_ids.into_iter().collect();
         let key = {
             let component_ids = component_ids.iter().copied();
-            try_collect_component_ids(component_ids, ArchetypeKey::insert, Clone::clone)?
+            try_collect_components(component_ids, ArchetypeKey::insert, Clone::clone)?
         };
-        let archetype_id =
-            Self::register_from_slice(archetypes, graph, components, &component_ids, key);
-        Ok(archetype_id)
+
+        Self::register_from_slice(archetypes, graph, components, &component_ids, key)
     }
 
     #[inline]
-    fn register<C, F>(
+    fn register<C, F, E>(
         archetypes: &mut Archetypes,
         graph: &mut Graph,
         components: C,
         component_ids: &[ComponentId],
         key: ArchetypeKey,
         f: F,
-    ) -> ArchetypeId
+    ) -> Result<ArchetypeId, E>
     where
         C: Borrow<ComponentRegistry>,
-        F: FnOnce(C) -> Result<ArchetypeStorage, DuplicateComponentError>,
+        F: FnOnce(C) -> Result<ArchetypeStorage, E>,
     {
         let archetype_id = Self::find_archetype(archetypes, &key);
         let (before, archetype_to) = if let Some(archetype_id) = archetype_id {
@@ -202,9 +200,7 @@ impl ArchetypeRegistry {
         } else {
             let borrow = components.borrow();
             let before = Self::register_before(archetypes, graph, borrow, component_ids, &key);
-            let Ok(storage) = f(components) else {
-                unreachable!("components should be unique, but got {component_ids:?}")
-            };
+            let storage = f(components)?;
             let archetype_id = Self::register_one(archetypes, graph, key, storage);
             (before, archetype_id)
         };
@@ -214,7 +210,7 @@ impl ArchetypeRegistry {
             let archetype_to = archetype_to.into_u32().into();
             let _ = graph.update_edge(archetype_from, archetype_to, component_id);
         }
-        archetype_to
+        Ok(archetype_to)
     }
 
     #[inline]
@@ -224,7 +220,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         component_ids: &[ComponentId],
         key: ArchetypeKey,
-    ) -> ArchetypeId {
+    ) -> Result<ArchetypeId, ArchetypeError> {
         let f = |components| ArchetypeStorage::new(components, component_ids.iter().copied());
         Self::register(archetypes, graph, components, component_ids, key, f)
     }
@@ -257,7 +253,8 @@ impl ArchetypeRegistry {
                 .collect_array()
                 .unwrap_or_else(|| difference_fail(key, &sub_key));
             let archetype_id =
-                Self::register_from_slice(archetypes, graph, components, &component_ids, sub_key);
+                Self::register_from_slice(archetypes, graph, components, &component_ids, sub_key)
+                    .expect("components should be unique & registered");
             (archetype_id, component_id)
         };
         component_ids
@@ -337,7 +334,7 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let key = try_collect_component_ids(component_ids, ArchetypeKey::insert, Clone::clone)?;
+        let key = try_collect_components(component_ids, ArchetypeKey::insert, Clone::clone)?;
         let archetype_id = Self::find_archetype(archetypes, &key);
         Ok(archetype_id)
     }
@@ -346,15 +343,14 @@ impl ArchetypeRegistry {
     pub fn archetype_id<B>(
         &self,
         components: &ComponentRegistry,
-    ) -> Result<Option<ArchetypeId>, GetComponentsError>
+    ) -> Result<Option<ArchetypeId>, ArchetypeError>
     where
         B: Bundle,
     {
         let Self { archetypes, .. } = self;
 
         let component_ids = B::get_components(components);
-        let key =
-            try_collect_maybe_component_ids(component_ids, ArchetypeKey::insert, Clone::clone)?;
+        let key = try_collect_opt_components(component_ids, ArchetypeKey::insert, Clone::clone)?;
         let archetype_id = Self::find_archetype(archetypes, &key);
         Ok(archetype_id)
     }
@@ -487,8 +483,7 @@ impl ArchetypeRegistry {
     where
         I: IntoIterator<Item = Option<ComponentId>>,
     {
-        let result =
-            try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone);
+        let result = try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone);
         let component_ids = match result {
             Ok(component_ids) => component_ids,
             Err(error) => return error.into(),
@@ -504,7 +499,7 @@ impl ArchetypeRegistry {
     pub fn bundles<'ctx, B>(
         &self,
         components: &'ctx ComponentRegistry,
-    ) -> Result<Bundles<'_, 'ctx, B>, GetComponentsError>
+    ) -> Result<Bundles<'_, 'ctx, B>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -516,7 +511,7 @@ impl ArchetypeRegistry {
     pub fn bundles_mut<'ctx, B>(
         &mut self,
         components: &'ctx ComponentRegistry,
-    ) -> Result<BundlesMut<'_, 'ctx, B>, GetComponentsError>
+    ) -> Result<BundlesMut<'_, 'ctx, B>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -540,7 +535,7 @@ impl ArchetypeRegistry {
     pub fn compatible_archetypes_of<B>(
         &self,
         components: &ComponentRegistry,
-    ) -> Result<CompatibleArchetypes<'_>, GetComponentsError>
+    ) -> Result<CompatibleArchetypes<'_>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -564,7 +559,7 @@ impl ArchetypeRegistry {
     pub unsafe fn compatible_archetypes_mut_of<B>(
         &mut self,
         components: &ComponentRegistry,
-    ) -> Result<CompatibleArchetypesMut<'_>, GetComponentsError>
+    ) -> Result<CompatibleArchetypesMut<'_>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -602,7 +597,7 @@ impl ArchetypeRegistry {
         let Self { archetypes, graph } = self;
 
         let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        if let Err(error) = try_collect_component_ids(
+        if let Err(error) = try_collect_components(
             component_ids.iter().copied(),
             ArchetypeKey::insert,
             Clone::clone,
@@ -680,7 +675,7 @@ impl ArchetypeRegistry {
         let Self { archetypes, graph } = self;
 
         let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        if let Err(reason) = try_collect_component_ids(
+        if let Err(reason) = try_collect_components(
             component_ids.iter().copied(),
             ArchetypeKey::insert,
             Clone::clone,
@@ -742,7 +737,7 @@ impl ArchetypeRegistry {
         let Self { archetypes, graph } = self;
 
         let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        try_collect_component_ids(
+        try_collect_components(
             component_ids.iter().copied(),
             ArchetypeKey::insert,
             Clone::clone,
@@ -818,7 +813,7 @@ impl ArchetypeRegistry {
         let Self { archetypes, graph } = self;
 
         let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        try_collect_component_ids(
+        try_collect_components(
             component_ids.iter().copied(),
             ArchetypeKey::insert,
             Clone::clone,
@@ -992,7 +987,8 @@ impl ArchetypeRegistry {
     ) -> ArchetypeId {
         let Some(archetype_id) = archetype_id else {
             let key = component_ids.iter().copied().collect();
-            return Self::register_from_slice(archetypes, graph, components, component_ids, key);
+            return Self::register_from_slice(archetypes, graph, components, component_ids, key)
+                .expect("components should be unique & registered");
         };
         if let &[component_id] = component_ids
             && let Some(archetype_id) =
@@ -1017,6 +1013,7 @@ impl ArchetypeRegistry {
             .collect();
         let key = component_ids.iter().copied().collect();
         Self::register_from_slice(archetypes, graph, components, &component_ids, key)
+            .expect("components should be unique & registered")
     }
 
     #[inline]
@@ -1048,7 +1045,8 @@ impl ArchetypeRegistry {
             .collect();
         let key = component_ids.iter().copied().collect();
         let archetype_id =
-            Self::register_from_slice(archetypes, graph, components, &component_ids, key);
+            Self::register_from_slice(archetypes, graph, components, &component_ids, key)
+                .expect("components should be unique & registered");
         Some(archetype_id)
     }
 
@@ -1423,7 +1421,7 @@ impl<'a> CompatibleArchetypes<'a> {
         I: IntoIterator<Item = ComponentId>,
     {
         let component_ids =
-            try_collect_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?
+            try_collect_components(component_ids, IndexSet::<_>::insert, Clone::clone)?
                 .into_iter()
                 .collect();
         let infos = archetypes.values();
@@ -1437,13 +1435,13 @@ impl<'a> CompatibleArchetypes<'a> {
     fn of<B>(
         archetypes: &'a Archetypes,
         components: &ComponentRegistry,
-    ) -> Result<Self, GetComponentsError>
+    ) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
     {
         let component_ids = B::get_components(components);
         let component_ids =
-            try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?
+            try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone)?
                 .into_iter()
                 .collect();
         let infos = archetypes.values();
@@ -1560,7 +1558,7 @@ impl<'a> CompatibleArchetypesMut<'a> {
         I: IntoIterator<Item = ComponentId>,
     {
         let component_ids =
-            try_collect_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?
+            try_collect_components(component_ids, IndexSet::<_>::insert, Clone::clone)?
                 .into_iter()
                 .collect();
         let infos = archetypes.values_mut();
@@ -1574,13 +1572,13 @@ impl<'a> CompatibleArchetypesMut<'a> {
     fn of<B>(
         archetypes: &'a mut Archetypes,
         components: &ComponentRegistry,
-    ) -> Result<Self, GetComponentsError>
+    ) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
     {
         let component_ids = B::get_components(components);
         let component_ids =
-            try_collect_maybe_component_ids(component_ids, IndexSet::<_>::insert, Clone::clone)?
+            try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone)?
                 .into_iter()
                 .collect();
         let infos = archetypes.values_mut();
@@ -1707,7 +1705,7 @@ where
     fn new(
         archetypes: &'a Archetypes,
         components: &'ctx ComponentRegistry,
-    ) -> Result<Self, GetComponentsError> {
+    ) -> Result<Self, ArchetypeError> {
         let archetypes = CompatibleArchetypes::of::<B>(archetypes, components)?;
         Ok(Self {
             archetypes,
@@ -1953,7 +1951,7 @@ where
     fn new(
         archetypes: &'a mut Archetypes,
         components: &'ctx ComponentRegistry,
-    ) -> Result<Self, GetComponentsError> {
+    ) -> Result<Self, ArchetypeError> {
         let archetypes = CompatibleArchetypesMut::of::<B>(archetypes, components)?;
         Ok(Self {
             archetypes,

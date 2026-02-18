@@ -18,18 +18,18 @@ where
 {
     const CONTEXT: &'static Self::Context = &IdentityContext::<T>::new();
 
-    type MaybeComponentIds = [Option<ComponentId>; 1];
+    type GetComponents = [Option<ComponentId>; 1];
 
     #[inline]
-    fn get_components(components: &ComponentRegistry) -> Self::MaybeComponentIds {
+    fn get_components(components: &ComponentRegistry) -> Self::GetComponents {
         let component_id = components.component_id::<T>();
         [component_id]
     }
 
-    type ComponentIds = [ComponentId; 1];
+    type RegisterComponents = [ComponentId; 1];
 
     #[inline]
-    fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds {
+    fn register_components(components: &mut ComponentRegistry) -> Self::RegisterComponents {
         let component_id = components.register_component::<T>();
         [component_id]
     }
@@ -85,10 +85,10 @@ macro_rules! bundle_tuple_impl {
         {
             const CONTEXT: &'static Self::Context = &TupleContext::<($($types,)*)>::new();
 
-            type MaybeComponentIds = [Option<ComponentId>; count_idents!($($types,)*)];
+            type GetComponents = [Option<ComponentId>; count_idents!($($types,)*)];
 
             #[inline]
-            fn get_components(components: &ComponentRegistry) -> Self::MaybeComponentIds {
+            fn get_components(components: &ComponentRegistry) -> Self::GetComponents {
                 let permutation = Self::Context::PERMUTATION;
 
                 let component_ids = [$(components.component_id::<$types>(),)*];
@@ -96,10 +96,10 @@ macro_rules! bundle_tuple_impl {
                 component_ids
             }
 
-            type ComponentIds = [ComponentId; count_idents!($($types,)*)];
+            type RegisterComponents = [ComponentId; count_idents!($($types,)*)];
 
             #[inline]
-            fn register_components(components: &mut ComponentRegistry) -> Self::ComponentIds {
+            fn register_components(components: &mut ComponentRegistry) -> Self::RegisterComponents {
                 let permutation = Self::Context::PERMUTATION;
 
                 let component_ids = [$(components.register_component::<$types>(),)*];

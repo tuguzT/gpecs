@@ -225,26 +225,26 @@ impl Error for RemoveBundleExactError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum GetComponentsError {
+pub enum ArchetypeError {
     DuplicateComponent(DuplicateComponentError),
     ComponentNotRegistered(NotRegisteredError),
 }
 
-impl From<DuplicateComponentError> for GetComponentsError {
+impl From<DuplicateComponentError> for ArchetypeError {
     #[inline]
     fn from(error: DuplicateComponentError) -> Self {
         Self::DuplicateComponent(error)
     }
 }
 
-impl From<NotRegisteredError> for GetComponentsError {
+impl From<NotRegisteredError> for ArchetypeError {
     #[inline]
     fn from(error: NotRegisteredError) -> Self {
         Self::ComponentNotRegistered(error)
     }
 }
 
-impl Display for GetComponentsError {
+impl Display for ArchetypeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DuplicateComponent(error) => Display::fmt(error, f),
@@ -253,7 +253,7 @@ impl Display for GetComponentsError {
     }
 }
 
-impl Error for GetComponentsError {
+impl Error for ArchetypeError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::DuplicateComponent(error) => Some(error),
@@ -283,14 +283,12 @@ impl From<MissingComponentError> for IncompatibleBundleError {
     }
 }
 
-impl From<GetComponentsError> for IncompatibleBundleError {
+impl From<ArchetypeError> for IncompatibleBundleError {
     #[inline]
-    fn from(error: GetComponentsError) -> Self {
+    fn from(error: ArchetypeError) -> Self {
         match error {
-            GetComponentsError::DuplicateComponent(error) => Self::DuplicateComponent(error),
-            GetComponentsError::ComponentNotRegistered(error) => {
-                Self::ComponentNotRegistered(error)
-            }
+            ArchetypeError::DuplicateComponent(error) => Self::DuplicateComponent(error),
+            ArchetypeError::ComponentNotRegistered(error) => Self::ComponentNotRegistered(error),
         }
     }
 }
@@ -371,14 +369,12 @@ impl From<NotRegisteredError> for IncompatibleBundleExactError {
     }
 }
 
-impl From<GetComponentsError> for IncompatibleBundleExactError {
+impl From<ArchetypeError> for IncompatibleBundleExactError {
     #[inline]
-    fn from(error: GetComponentsError) -> Self {
+    fn from(error: ArchetypeError) -> Self {
         match error {
-            GetComponentsError::DuplicateComponent(error) => Self::DuplicateComponent(error),
-            GetComponentsError::ComponentNotRegistered(error) => {
-                Self::ComponentNotRegistered(error)
-            }
+            ArchetypeError::DuplicateComponent(error) => Self::DuplicateComponent(error),
+            ArchetypeError::ComponentNotRegistered(error) => Self::ComponentNotRegistered(error),
         }
     }
 }

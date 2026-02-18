@@ -12,7 +12,7 @@ pub use gpecs_types::archetype::GpuArchetypeId;
 
 use crate::{
     archetype::{
-        error::DuplicateComponentError,
+        error::{ArchetypeError, DuplicateComponentError},
         registry::{ArchetypeId, ArchetypeRegistry},
     },
     component::registry::{ComponentId, ComponentRegistry},
@@ -98,7 +98,7 @@ impl GpuArchetypeRegistry {
         archetypes: &mut ArchetypeRegistry,
         gpu_device: &Device,
         component_ids: I,
-    ) -> Result<GpuArchetypeId, DuplicateComponentError>
+    ) -> Result<GpuArchetypeId, ArchetypeError>
     where
         I: IntoIterator<Item = GpuComponentId>,
     {

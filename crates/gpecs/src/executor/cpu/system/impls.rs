@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     archetype::{
-        error::GetComponentsError,
+        error::ArchetypeError,
         registry::{Bundles, BundlesMut},
     },
     bundle::Bundle,
@@ -120,7 +120,7 @@ where
     B: Bundle,
 {
     type Item<'ctx> = Bundles<'ctx, 'ctx, B>;
-    type Error<'ctx> = GetComponentsError;
+    type Error<'ctx> = ArchetypeError;
 
     #[inline]
     fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {
@@ -133,7 +133,7 @@ where
     B: Bundle,
 {
     type Item<'ctx> = BundlesMut<'ctx, 'ctx, B>;
-    type Error<'ctx> = GetComponentsError;
+    type Error<'ctx> = ArchetypeError;
 
     #[inline]
     fn get_param(context: &mut Context) -> SystemParamResult<'_, Self> {

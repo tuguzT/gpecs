@@ -6,11 +6,11 @@ use std::{
 use bytemuck::{Pod, Zeroable, must_cast_slice};
 use gpecs_soa_erased::{BoxedErasedSoa, ErasedSoaContext};
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
-use itertools::Itertools;
+use itertools::{Itertools, zip_eq};
 
 use crate::{
     archetype::{
-        erased::{ErasedArchetype, ErasedArchetypeComponents},
+        erased::{ErasedArchetype, ErasedArchetypeIter},
         error::ArchetypeError,
     },
     bundle::{
@@ -139,7 +139,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn component_ids(&self) -> ComponentIds<'_> {
         let Self { archetype, .. } = self;
-        let inner = archetype.components();
+        let inner = archetype.iter();
         ComponentIds { inner }
     }
 
@@ -343,7 +343,7 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         let (entities, fields) = erased_storage.erased_components(components, component_ids);
 
         let components = unsafe { from_erased_slices::<B>(components, entities.len(), fields) };
@@ -366,7 +366,7 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = *self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         let (entities, fields) = erased_storage.erased_components_mut(components, component_ids);
 
         let components = unsafe { from_erased_mut_slices::<B>(components, entities.len(), fields) };
@@ -390,7 +390,7 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         let Some(fields) = erased_storage.get_erased(components, component_ids, entity) else {
             return Ok(None);
         };
@@ -416,7 +416,7 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = *self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         let Some(fields) = erased_storage.get_erased_mut(components, component_ids, entity) else {
             return Ok(None);
         };
@@ -451,7 +451,7 @@ impl ArchetypeStorage {
         let fields =
             unsafe { into_erased_fields::<B>(components, B::CONTEXT, bundle_component_ids, value) };
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         let Some(fields) = erased_storage.insert_erased(components, component_ids, entity, fields)
         else {
             return Ok(None);
@@ -482,7 +482,7 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = *self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         let Some(fields) = erased_storage.remove_erased(components, component_ids, entity) else {
             return Ok(None);
         };
@@ -518,9 +518,7 @@ impl ArchetypeStorage {
         archetype: &ErasedArchetype<Option<DropFn>>,
         erased_fields: ErasedBundle,
     ) {
-        erased_fields
-            .into_fields()
-            .zip_eq(archetype.components())
+        zip_eq(erased_fields.into_fields(), archetype)
             .map(|(field, (component_id, &drop_fn))| {
                 let field = field.unwrap();
                 unsafe { ErasedComponent::from_parts(component_id, field, drop_fn) }
@@ -541,7 +539,7 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = *self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         erased_storage.insert_erased(components, component_ids, entity, fields)
     }
 
@@ -557,7 +555,7 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = *self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         erased_storage.remove_erased(components, component_ids, entity)
     }
 
@@ -572,7 +570,7 @@ impl ArchetypeStorage {
             erased_storage,
         } = self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         erased_storage.erased_components(components, component_ids)
     }
 
@@ -588,7 +586,7 @@ impl ArchetypeStorage {
             ref mut erased_storage,
         } = *self;
 
-        let component_ids = archetype.components().map(|(component_id, _)| component_id);
+        let component_ids = archetype.iter().map(|(component_id, _)| component_id);
         erased_storage.erased_components_mut(components, component_ids)
     }
 }
@@ -617,7 +615,7 @@ impl Drop for ArchetypeStorage {
 
 #[derive(Clone)]
 pub struct ComponentIds<'a> {
-    inner: ErasedArchetypeComponents<'a, Option<DropFn>>,
+    inner: ErasedArchetypeIter<'a, Option<DropFn>>,
 }
 
 impl Debug for ComponentIds<'_> {

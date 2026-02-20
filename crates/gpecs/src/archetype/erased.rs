@@ -3,7 +3,8 @@ use std::{
     iter::FusedIterator,
 };
 
-use indexmap::map::Iter as IndexMapIter;
+use gpecs_soa_erased::CovariantFieldDescriptors;
+use indexmap::map::{Iter as IndexMapIter, Values as IndexMapValues};
 
 use crate::{
     archetype::{
@@ -19,7 +20,7 @@ use crate::{
         registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
     },
     hash::IndexMap,
-    soa::field::FieldDescriptor,
+    soa::field::{FieldDescriptor, FieldDescriptors},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -274,49 +275,91 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn components(&self) -> ErasedArchetypeComponents<'_, Meta> {
+    pub fn iter(&self) -> ErasedArchetypeIter<'_, Meta> {
         let Self { components } = self;
 
-        let components = components.iter();
-        ErasedArchetypeComponents { components }
+        let inner = components.iter();
+        ErasedArchetypeIter { inner }
+    }
+
+    #[inline]
+    pub fn metas(&self) -> ErasedArchetypeMetas<'_, Meta> {
+        let Self { components } = self;
+
+        let inner = components.values();
+        ErasedArchetypeMetas { inner }
     }
 }
 
-pub struct ErasedArchetypeComponents<'a, Meta = ()> {
-    components: IndexMapIter<'a, ComponentId, Meta>,
+impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
+    type Item = (ComponentId, &'a Meta);
+    type IntoIter = ErasedArchetypeIter<'a, Meta>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
-impl<Meta> Debug for ErasedArchetypeComponents<'_, Meta>
+impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetype<Meta>
+where
+    Meta: AsRef<FieldDescriptor> + 'a,
+{
+    type Output = ErasedArchetypeMetas<'a, Meta>;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        self.metas()
+    }
+}
+
+impl<Meta> CovariantFieldDescriptors for ErasedArchetype<Meta>
+where
+    Meta: AsRef<FieldDescriptor> + 'static,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from
+    }
+}
+
+pub struct ErasedArchetypeIter<'a, Meta = ()> {
+    inner: IndexMapIter<'a, ComponentId, Meta>,
+}
+
+impl<Meta> Debug for ErasedArchetypeIter<'_, Meta>
 where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { components } = self;
-        Debug::fmt(components, f)
+        let Self { inner } = self;
+        Debug::fmt(inner, f)
     }
 }
 
-impl<Meta> Clone for ErasedArchetypeComponents<'_, Meta> {
+impl<Meta> Clone for ErasedArchetypeIter<'_, Meta> {
     fn clone(&self) -> Self {
-        let Self { components } = self;
-        let components = components.clone();
-        Self { components }
+        let Self { inner } = self;
+        let inner = inner.clone();
+        Self { inner }
     }
 }
 
-impl<'a, Meta> Iterator for ErasedArchetypeComponents<'a, Meta> {
+impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
     type Item = (ComponentId, &'a Meta);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { components } = self;
-        components.next().map(|(&id, meta)| (id, meta))
+        let Self { inner } = self;
+        inner.next().map(|(&id, meta)| (id, meta))
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { components } = self;
-        components.size_hint()
+        let Self { inner } = self;
+        inner.size_hint()
     }
 
     #[inline]
@@ -324,14 +367,14 @@ impl<'a, Meta> Iterator for ErasedArchetypeComponents<'a, Meta> {
     where
         Self: Sized,
     {
-        let Self { components } = self;
-        components.count()
+        let Self { inner } = self;
+        inner.count()
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { components } = self;
-        components.nth(n).map(|(&id, meta)| (id, meta))
+        let Self { inner } = self;
+        inner.nth(n).map(|(&id, meta)| (id, meta))
     }
 
     #[inline]
@@ -339,8 +382,8 @@ impl<'a, Meta> Iterator for ErasedArchetypeComponents<'a, Meta> {
     where
         Self: Sized,
     {
-        let Self { components } = self;
-        components.last().map(|(&id, meta)| (id, meta))
+        let Self { inner } = self;
+        inner.last().map(|(&id, meta)| (id, meta))
     }
 
     #[inline]
@@ -348,31 +391,138 @@ impl<'a, Meta> Iterator for ErasedArchetypeComponents<'a, Meta> {
     where
         Self: Sized,
     {
-        let Self { components } = self;
-        components.map(|(&id, meta)| (id, meta)).collect()
+        let Self { inner } = self;
+        inner.map(|(&id, meta)| (id, meta)).collect()
     }
 }
 
-impl<Meta> DoubleEndedIterator for ErasedArchetypeComponents<'_, Meta> {
+impl<Meta> DoubleEndedIterator for ErasedArchetypeIter<'_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { components } = self;
-        components.next_back().map(|(&id, meta)| (id, meta))
+        let Self { inner } = self;
+        inner.next_back().map(|(&id, meta)| (id, meta))
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { components } = self;
-        components.nth_back(n).map(|(&id, meta)| (id, meta))
+        let Self { inner } = self;
+        inner.nth_back(n).map(|(&id, meta)| (id, meta))
     }
 }
 
-impl<Meta> ExactSizeIterator for ErasedArchetypeComponents<'_, Meta> {
+impl<Meta> ExactSizeIterator for ErasedArchetypeIter<'_, Meta> {
     #[inline]
     fn len(&self) -> usize {
-        let Self { components } = self;
-        components.len()
+        let Self { inner } = self;
+        inner.len()
     }
 }
 
-impl<Meta> FusedIterator for ErasedArchetypeComponents<'_, Meta> {}
+impl<Meta> FusedIterator for ErasedArchetypeIter<'_, Meta> {}
+
+pub struct ErasedArchetypeMetas<'a, Meta> {
+    inner: IndexMapValues<'a, ComponentId, Meta>,
+}
+
+impl<Meta> Debug for ErasedArchetypeMetas<'_, Meta>
+where
+    Meta: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { inner } = self;
+        Debug::fmt(inner, f)
+    }
+}
+
+impl<Meta> Clone for ErasedArchetypeMetas<'_, Meta> {
+    fn clone(&self) -> Self {
+        let Self { inner } = self;
+        let inner = inner.clone();
+        Self { inner }
+    }
+}
+
+impl<'a, Meta> Iterator for ErasedArchetypeMetas<'a, Meta> {
+    type Item = &'a Meta;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { inner } = self;
+        inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.count()
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth(n)
+    }
+
+    #[inline]
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.last()
+    }
+
+    #[inline]
+    fn collect<B: FromIterator<Self::Item>>(self) -> B
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.collect()
+    }
+}
+
+impl<Meta> DoubleEndedIterator for ErasedArchetypeMetas<'_, Meta> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next_back()
+    }
+
+    #[inline]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth_back(n)
+    }
+}
+
+impl<Meta> ExactSizeIterator for ErasedArchetypeMetas<'_, Meta> {
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+}
+
+impl<Meta> FusedIterator for ErasedArchetypeMetas<'_, Meta> {}
+
+impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeMetas<'a, Meta>
+where
+    Meta: AsRef<FieldDescriptor>,
+{
+    type Output = Self;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        self.clone()
+    }
+}

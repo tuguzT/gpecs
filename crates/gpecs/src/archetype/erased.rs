@@ -515,7 +515,7 @@ impl<Meta> ExactSizeIterator for ErasedArchetypeMetas<'_, Meta> {
 
 impl<Meta> FusedIterator for ErasedArchetypeMetas<'_, Meta> {}
 
-impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeMetas<'a, Meta>
+impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeMetas<'_, Meta>
 where
     Meta: AsRef<FieldDescriptor>,
 {

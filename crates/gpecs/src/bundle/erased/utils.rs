@@ -24,8 +24,6 @@ use crate::{
 
 // TODO: convert this whole very unsafe code into some type which implements `Soa` trait & provides its guarantees
 
-pub type ErasedBundle = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
-
 #[cold]
 #[track_caller]
 #[inline(never)]
@@ -102,13 +100,15 @@ pub unsafe fn from_erased_fields<'a, T>(
 where
     T: AllocSoa + Soa<'a> + SoaRead,
 {
+    type ErasedSoa = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
+
     let fields_with_descriptors =
         reorder_fields::<T, _, _>(components, context, component_ids, fields).map(|field| {
             let (_, field, _) = field.into_parts();
             let (storage, layout) = field.into_parts();
             (storage, FieldDescriptor::new(layout))
         });
-    let erased_value = ErasedBundle::try_from_fields_with_descriptors(fields_with_descriptors)
+    let erased_value = ErasedSoa::try_from_fields_with_descriptors(fields_with_descriptors)
         .expect("all the fields should be valid");
     unsafe { erased_value.downcast::<T>(context) }.expect("all the fields should be valid")
 }
@@ -124,13 +124,11 @@ where
     T: AllocSoa + Soa<'a> + SoaWrite,
 {
     let erased_value = BoxedErasedSoa::try_from(context, value)
-        .unwrap()
-        .into_fields()
-        .collect::<Result<Box<[_]>, _>>()
-        .unwrap();
+        .expect("the value should be valid for the given context");
     validate_components::<T, _>(components, context, component_ids)
-        .zip_eq(erased_value)
+        .zip_eq(erased_value.into_fields())
         .map(|(id, field)| {
+            let field = field.expect("field should be created successfully");
             let info = components
                 .get_component_info(id)
                 .unwrap_or_else(|| get_component_info_fail(id));

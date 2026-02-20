@@ -1,23 +1,28 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    mem::MaybeUninit,
 };
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
-use gpecs_soa_erased::{BoxedErasedSoa, ErasedSoaContext};
+use gpecs_soa_erased::{BoxedErasedSoa, ErasedSoaContext, ptr::slice::CoreSliceItemPtrs};
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 use itertools::{Itertools, zip_eq};
 
 use crate::{
     archetype::{
+        collect::try_collect_opt_components,
         erased::{ErasedArchetype, ErasedArchetypeIter},
-        error::ArchetypeError,
+        error::{
+            ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
+            IncompatibleArchetypeExactError, IncompatibleBundleValueError,
+        },
     },
     bundle::{
         Bundle,
         erased::utils::{
-            ErasedBundle, from_erased_fields, from_erased_mut_slices, from_erased_refs,
-            from_erased_refs_mut, from_erased_slices, into_erased_fields, validate_components,
+            from_erased_fields, from_erased_mut_slices, from_erased_refs, from_erased_refs_mut,
+            from_erased_slices, into_erased_fields, validate_components,
         },
     },
     component::{
@@ -35,13 +40,7 @@ use crate::{
     },
 };
 
-use super::{
-    collect::try_collect_opt_components,
-    error::{
-        DuplicateComponentError, IncompatibleArchetypeError, IncompatibleArchetypeExactError,
-        IncompatibleBundleValueError,
-    },
-};
+type ErasedBundle = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -520,7 +519,7 @@ impl ArchetypeStorage {
     ) {
         zip_eq(erased_fields.into_fields(), archetype)
             .map(|(field, (component_id, &drop_fn))| {
-                let field = field.unwrap();
+                let field = field.expect("field should be created successfully");
                 unsafe { ErasedComponent::from_parts(component_id, field, drop_fn) }
             })
             .for_each(drop);
@@ -829,7 +828,7 @@ impl ErasedStorageExt for ErasedStorage {
         let view = Self::as_view(self);
         let (context, refs) = view.into_get_with_context(entity.into());
 
-        let refs = validate_components::<BoxedErasedSoa<_>, _>(components, context, component_ids)
+        let refs = validate_components::<ErasedBundle, _>(components, context, component_ids)
             .zip_eq(refs?)
             .map(|(id, r#ref)| unsafe { ErasedComponentRef::from_parts(id, r#ref) })
             .collect();
@@ -846,7 +845,7 @@ impl ErasedStorageExt for ErasedStorage {
         let view = Self::as_mut_view(self);
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
-        let refs = validate_components::<BoxedErasedSoa<_>, _>(components, context, component_ids)
+        let refs = validate_components::<ErasedBundle, _>(components, context, component_ids)
             .zip_eq(refs?)
             .map(|(id, r#ref)| unsafe { ErasedComponentMutRef::from_parts(id, r#ref) })
             .collect();

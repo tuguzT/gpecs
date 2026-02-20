@@ -20,6 +20,15 @@ use petgraph::{
 };
 
 use crate::{
+    archetype::{
+        collect::{try_collect_components, try_collect_opt_components},
+        error::{
+            AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
+            IncompatibleArchetypeError, InsertBundleError, InsertBundleExactError,
+            MissingComponentError, RemoveBundleExactError,
+        },
+        storage::ArchetypeStorage,
+    },
     bundle::{
         Bundle,
         erased::utils::{from_erased_fields, into_erased_fields},
@@ -34,16 +43,6 @@ use crate::{
         slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
         traits::{Refs, RefsMut, Slices},
     },
-};
-
-use super::{
-    collect::{try_collect_components, try_collect_opt_components},
-    error::{
-        AlreadyHasComponentError, IncompatibleArchetypeError, InsertBundleError,
-        InsertBundleExactError, MissingComponentError, RemoveBundleExactError,
-    },
-    error::{ArchetypeError, DuplicateComponentError},
-    storage::ArchetypeStorage,
 };
 
 /// Archetype [identifier](ArchetypeId) of some [entity](Entity).

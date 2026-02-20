@@ -149,9 +149,7 @@ where
 
     #[inline]
     fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a> {
-        let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
-        let ptr = ptr.as_ptr();
-        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
+        ptrs.into()
     }
 
     type SlicePtrs<'a> = ErasedSoaSlicePtrs<FieldDescriptorsOutput<'a, D>, P::Const>;
@@ -201,7 +199,7 @@ where
         ptrs: Self::MutPtrs<'a>,
         len: usize,
     ) -> Self::SliceMutPtrs<'a> {
-        unsafe { ErasedSoaMutSlicePtrs::from_mut_ptrs(ptrs, len) }
+        unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }
     }
 
     #[inline]
@@ -343,8 +341,7 @@ where
 
     #[inline]
     fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a> {
-        let (descriptors, buffer, capacity, offset) = refs.into_parts();
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, capacity, offset) }
+        refs.into()
     }
 
     type Slices<'a> = ErasedSoaSlices<'data, FieldDescriptorsOutput<'a, D>, P::Const>;
@@ -405,8 +402,7 @@ where
 
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
-        let (descriptors, buffer, capacity, offset, len) = slices.into_parts();
-        unsafe { ErasedSoaSlices::new_unchecked(descriptors, buffer, capacity, offset, len) }
+        slices.into()
     }
 }
 

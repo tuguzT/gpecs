@@ -404,6 +404,18 @@ where
     }
 }
 
+impl<D, P> From<ErasedSoaNonNullPtrs<D, P>> for ErasedSoaMutPtrs<D, NonNullAsPtr<P>>
+where
+    P: NonNullSliceItemPtr,
+{
+    #[inline]
+    fn from(ptrs: ErasedSoaNonNullPtrs<D, P>) -> Self {
+        let (descriptors, ptr, capacity, offset) = ptrs.into_parts();
+        let ptr = ptr.as_ptr();
+        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, ptr, capacity, offset) }
+    }
+}
+
 impl<'a, D, P> FieldDescriptors<'a> for ErasedSoaNonNullPtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,

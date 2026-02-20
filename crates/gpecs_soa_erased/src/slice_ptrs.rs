@@ -68,7 +68,7 @@ where
     pub fn cast_mut(self) -> ErasedSoaMutSlicePtrs<D, CastMutPtr<P>> {
         let Self { ptrs, len } = self;
         let ptrs = ptrs.cast_mut();
-        unsafe { ErasedSoaMutSlicePtrs::from_mut_ptrs(ptrs, len) }
+        unsafe { ErasedSoaMutSlicePtrs::from_ptrs(ptrs, len) }
     }
 
     #[inline]

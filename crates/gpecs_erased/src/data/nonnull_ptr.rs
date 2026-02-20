@@ -203,3 +203,15 @@ where
         ptr.downcast()
     }
 }
+
+impl<T, U> From<ErasedNonNullPtr<T>> for ErasedMutPtr<NonNullAsPtr<T>>
+where
+    T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+{
+    #[inline]
+    fn from(ptr: ErasedNonNullPtr<T>) -> Self {
+        let ErasedNonNullPtr { layout, ptr } = ptr;
+        let ptr = ptr.as_ptr();
+        unsafe { ErasedMutPtr::from_parts(layout, ptr) }
+    }
+}

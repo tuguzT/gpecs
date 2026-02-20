@@ -92,7 +92,7 @@ where
 
     #[inline]
     pub unsafe fn deref_mut<'a>(self) -> ErasedSoaMutRefs<'a, D, P> {
-        unsafe { ErasedSoaMutRefs::from_mut_ptrs(self) }
+        unsafe { ErasedSoaMutRefs::from_ptrs(self) }
     }
 
     #[inline]

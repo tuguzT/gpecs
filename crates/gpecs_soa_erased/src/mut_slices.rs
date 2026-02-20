@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     CovariantFieldDescriptors, ErasedSoaMutSlicePtrs, ErasedSoaMutSlicePtrsIter,
-    ErasedSoaSlicePtrs, ErasedSoaSlicesIter,
+    ErasedSoaSlicePtrs, ErasedSoaSlices, ErasedSoaSlicesIter,
     data::{ErasedMutSlice, ErasedSlice},
     error::{DowncastError, SlicePtrsError},
     ptr::slice::{CastConstPtr, MutSliceItemPtr},
@@ -42,11 +42,11 @@ where
         let ptrs = unsafe {
             ErasedSoaMutSlicePtrs::new_unchecked(descriptors, buffer, capacity, offset, len)
         };
-        unsafe { Self::from_mut_ptrs(ptrs) }
+        unsafe { Self::from_ptrs(ptrs) }
     }
 
     #[inline]
-    pub unsafe fn from_mut_ptrs(ptrs: ErasedSoaMutSlicePtrs<D, P>) -> Self {
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaMutSlicePtrs<D, P>) -> Self {
         let phantom = PhantomData;
         Self { phantom, ptrs }
     }
@@ -88,7 +88,7 @@ where
     ) -> Result<Self, SlicePtrsError> {
         let ptrs = ErasedSoaMutSlicePtrs::new(descriptors, buffer, capacity, offset, len)?;
 
-        let me = unsafe { Self::from_mut_ptrs(ptrs) };
+        let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)
     }
 }
@@ -109,7 +109,7 @@ where
         let Self { ptrs, .. } = self;
 
         let result = unsafe { ptrs.downcast::<T>(context) };
-        let into_self = |ptrs| unsafe { Self::from_mut_ptrs(ptrs) };
+        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let slices = result.map_err(|err| err.map_value(into_self))?;
 
         let slices = unsafe { context.mut_slice_ptrs_to_mut_slices(slices) };
@@ -180,7 +180,7 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.iter_mut();
-        unsafe { ErasedSoaMutSlicesIter::from_mut_ptrs(ptrs) }
+        unsafe { ErasedSoaMutSlicesIter::from_ptrs(ptrs) }
     }
 }
 
@@ -238,7 +238,18 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.into_iter();
-        unsafe { ErasedSoaMutSlicesIter::from_mut_ptrs(ptrs) }
+        unsafe { ErasedSoaMutSlicesIter::from_ptrs(ptrs) }
+    }
+}
+
+impl<'a, D, P> From<ErasedSoaMutSlices<'a, D, P>> for ErasedSoaSlices<'a, D, CastConstPtr<P>>
+where
+    P: MutSliceItemPtr,
+{
+    #[inline]
+    fn from(slices: ErasedSoaMutSlices<'a, D, P>) -> Self {
+        let (descriptors, buffer, capacity, offset, len) = slices.into_parts();
+        unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset, len) }
     }
 }
 
@@ -283,7 +294,7 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub unsafe fn from_mut_ptrs(ptrs: ErasedSoaMutSlicePtrsIter<D, P>) -> Self {
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaMutSlicePtrsIter<D, P>) -> Self {
         let phantom = PhantomData;
         Self { phantom, ptrs }
     }
@@ -333,7 +344,7 @@ where
         let Self { ptrs, .. } = self;
 
         let ptrs = ptrs.entries();
-        unsafe { ErasedSoaMutSlicesIter::from_mut_ptrs(ptrs) }
+        unsafe { ErasedSoaMutSlicesIter::from_ptrs(ptrs) }
     }
 }
 

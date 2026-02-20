@@ -11,7 +11,7 @@ use crate::component::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentMutSlicePtr, ErasedComponentPtr,
-        ErasedComponentSlicePtr,
+        ErasedComponentSlice, ErasedComponentSlicePtr,
         error::{DowncastError, check_downcast},
     },
     error::NotRegisteredError,
@@ -259,5 +259,14 @@ impl AsMut<[u8]> for ErasedComponentMutSlice<'_> {
     #[inline]
     fn as_mut(&mut self) -> &mut [u8] {
         self.as_mut_buffer()
+    }
+}
+
+impl<'a> From<ErasedComponentMutSlice<'a>> for ErasedComponentSlice<'a> {
+    #[inline]
+    fn from(slice: ErasedComponentMutSlice<'a>) -> Self {
+        let (component_id, fields) = slice.into_parts();
+        let fields = fields.into();
+        unsafe { Self::from_parts(component_id, fields) }
     }
 }

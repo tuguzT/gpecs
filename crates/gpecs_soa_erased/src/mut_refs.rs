@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaPtrs,
-    ErasedSoaRefsIter,
+    ErasedSoaRefs, ErasedSoaRefsIter,
     data::{ErasedMutRef, ErasedRef},
     error::{DowncastError, PtrsError},
     ptr::slice::{CastConstPtr, MutSliceItemPtr},
@@ -40,11 +40,11 @@ where
     ) -> Self {
         let ptrs =
             unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, offset) };
-        unsafe { Self::from_mut_ptrs(ptrs) }
+        unsafe { Self::from_ptrs(ptrs) }
     }
 
     #[inline]
-    pub unsafe fn from_mut_ptrs(ptrs: ErasedSoaMutPtrs<D, P>) -> Self {
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaMutPtrs<D, P>) -> Self {
         let phantom = PhantomData;
         Self { phantom, ptrs }
     }
@@ -85,7 +85,7 @@ where
     ) -> Result<Self, PtrsError> {
         let ptrs = ErasedSoaMutPtrs::new(descriptors, buffer, capacity, offset)?;
 
-        let me = unsafe { Self::from_mut_ptrs(ptrs) };
+        let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)
     }
 }
@@ -106,7 +106,7 @@ where
         let Self { ptrs, .. } = self;
 
         let result = unsafe { ptrs.downcast::<T>(context) };
-        let into_self = |ptrs| unsafe { Self::from_mut_ptrs(ptrs) };
+        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs) };
         let ptrs = result.map_err(|err| err.map_value(into_self))?;
 
         let refs = unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
@@ -225,6 +225,17 @@ where
 
         let ptrs = ptrs.into_iter();
         unsafe { ErasedSoaMutRefsIter::from_ptrs(ptrs) }
+    }
+}
+
+impl<'a, D, P> From<ErasedSoaMutRefs<'a, D, P>> for ErasedSoaRefs<'a, D, CastConstPtr<P>>
+where
+    P: MutSliceItemPtr,
+{
+    #[inline]
+    fn from(refs: ErasedSoaMutRefs<'a, D, P>) -> Self {
+        let (descriptors, buffer, capacity, offset) = refs.into_parts();
+        unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset) }
     }
 }
 

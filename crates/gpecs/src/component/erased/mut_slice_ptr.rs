@@ -52,6 +52,13 @@ impl ErasedComponentMutSlicePtr {
     }
 
     #[inline]
+    pub unsafe fn from_ptr(ptr: ErasedComponentMutPtr, len: usize) -> Self {
+        let (component_id, field) = ptr.into_parts();
+        let fields = unsafe { Fields::from_parts(field, len) };
+        unsafe { Self::from_parts(component_id, fields) }
+    }
+
+    #[inline]
     pub fn downcast<C>(self, registry: &ComponentRegistry) -> Result<*mut [C], DowncastError<Self>>
     where
         C: Component,

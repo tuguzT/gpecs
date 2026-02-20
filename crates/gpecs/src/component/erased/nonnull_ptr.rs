@@ -226,3 +226,12 @@ impl Borrow<ComponentId> for ErasedComponentNonNullPtr {
         component_id
     }
 }
+
+impl From<ErasedComponentNonNullPtr> for ErasedComponentMutPtr {
+    #[inline]
+    fn from(ptr: ErasedComponentNonNullPtr) -> Self {
+        let (component_id, field) = ptr.into_parts();
+        let field = field.into();
+        unsafe { Self::from_parts(component_id, field) }
+    }
+}

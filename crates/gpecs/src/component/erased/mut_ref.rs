@@ -224,8 +224,8 @@ impl AsMut<[u8]> for ErasedComponentMutRef<'_> {
 
 impl<'a> From<ErasedComponentMutRef<'a>> for ErasedComponentRef<'a> {
     #[inline]
-    fn from(value: ErasedComponentMutRef<'a>) -> Self {
-        let (component_id, field) = value.into_parts();
+    fn from(r#ref: ErasedComponentMutRef<'a>) -> Self {
+        let (component_id, field) = r#ref.into_parts();
         let field = field.into();
         unsafe { Self::from_parts(component_id, field) }
     }

@@ -44,11 +44,11 @@ where
     ) -> Self {
         let ptrs =
             unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, offset) };
-        unsafe { Self::from_mut_ptrs(ptrs, len) }
+        unsafe { Self::from_ptrs(ptrs, len) }
     }
 
     #[inline]
-    pub unsafe fn from_mut_ptrs(ptrs: ErasedSoaMutPtrs<D, P>, len: usize) -> Self {
+    pub unsafe fn from_ptrs(ptrs: ErasedSoaMutPtrs<D, P>, len: usize) -> Self {
         Self { len, ptrs }
     }
 
@@ -85,7 +85,7 @@ where
 
     #[inline]
     pub unsafe fn deref_mut<'a>(self) -> ErasedSoaMutSlices<'a, D, P> {
-        unsafe { ErasedSoaMutSlices::from_mut_ptrs(self) }
+        unsafe { ErasedSoaMutSlices::from_ptrs(self) }
     }
 }
 
@@ -139,7 +139,7 @@ where
         let Self { ptrs, len } = self;
 
         let result = unsafe { ptrs.downcast::<T>(context) };
-        let into_self = |ptrs| unsafe { Self::from_mut_ptrs(ptrs, len) };
+        let into_self = |ptrs| unsafe { Self::from_ptrs(ptrs, len) };
         let ptrs = result.map_err(|err| err.map_value(into_self))?;
 
         let slices = context.mut_slice_ptrs_from_raw_parts(ptrs, len);

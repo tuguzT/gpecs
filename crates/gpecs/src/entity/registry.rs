@@ -14,10 +14,12 @@ use gpecs_sparse::{
     arena::EpochSparseArena,
     error,
     iter::{Iter as SparseIter, IterMut as SparseIterMut},
-    soa::identity::IdentitySlice,
 };
 
-use crate::{soa::identity::Identity, world::registry::WorldId};
+use crate::{
+    soa::identity::{Identity, IdentitySlice},
+    world::registry::WorldId,
+};
 
 use super::{Entity, EntityEpoch};
 

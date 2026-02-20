@@ -22,7 +22,7 @@ use petgraph::{
 use crate::{
     bundle::{
         Bundle,
-        erased::{from_erased_fields, into_erased_fields},
+        erased::utils::{from_erased_fields, into_erased_fields},
     },
     component::{
         erased::ErasedComponent,

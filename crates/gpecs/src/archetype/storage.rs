@@ -15,7 +15,7 @@ use crate::{
     },
     bundle::{
         Bundle,
-        erased::{
+        erased::utils::{
             ErasedBundle, from_erased_fields, from_erased_mut_slices, from_erased_refs,
             from_erased_refs_mut, from_erased_slices, into_erased_fields, validate_components,
         },

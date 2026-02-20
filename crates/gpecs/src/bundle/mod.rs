@@ -1,6 +1,6 @@
 pub use self::traits::Bundle;
 
-pub(crate) mod erased;
+pub mod erased;
 
 mod impls;
 mod traits;

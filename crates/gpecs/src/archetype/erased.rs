@@ -3,7 +3,6 @@ use std::{
     iter::FusedIterator,
 };
 
-use gpecs_types::soa::field::FieldDescriptor;
 use indexmap::map::Iter as IndexMapIter;
 
 use crate::{
@@ -14,12 +13,13 @@ use crate::{
             IncompatibleArchetypeExactError, MissingComponentError, TooFewComponentsError,
         },
     },
-    bundle::{Bundle, erased::get_component_info_fail},
+    bundle::{Bundle, erased::utils::get_component_info_fail},
     component::{
         Component,
         registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
     },
     hash::IndexMap,
+    soa::field::FieldDescriptor,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,9 +195,8 @@ impl<Meta> ErasedArchetype<Meta> {
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(components);
         let component_ids = try_collect_opt_components(
-            component_ids,
+            B::get_components(components),
             |map, component_id| IndexMap::insert(map, component_id, ()).is_none(),
             Clone::clone,
         )?;

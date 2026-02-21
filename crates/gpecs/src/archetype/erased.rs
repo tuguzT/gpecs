@@ -1,10 +1,11 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    ops::Deref,
 };
 
 use gpecs_soa_erased::CovariantFieldDescriptors;
-use indexmap::map::{IntoIter as IndexMapIntoIter, Iter as IndexMapIter, Values as IndexMapValues};
+use indexmap::map::{IntoIter as IndexMapIntoIter, Iter as IndexMapIter};
 
 use crate::{
     archetype::{
@@ -281,18 +282,10 @@ impl<Meta> ErasedArchetype<Meta> {
         let inner = components.iter();
         ErasedArchetypeIter { inner }
     }
-
-    #[inline]
-    pub fn metas(&self) -> ErasedArchetypeMetas<'_, Meta> {
-        let Self { components } = self;
-
-        let inner = components.values();
-        ErasedArchetypeMetas { inner }
-    }
 }
 
 impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
-    type Item = (ComponentId, &'a Meta);
+    type Item = ErasedArchetypeComponent<&'a Meta>;
     type IntoIter = ErasedArchetypeIter<'a, Meta>;
 
     #[inline]
@@ -302,12 +295,13 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
 }
 
 impl<Meta> IntoIterator for ErasedArchetype<Meta> {
-    type Item = (ComponentId, Meta);
+    type Item = ErasedArchetypeComponent<Meta>;
     type IntoIter = ErasedArchetypeIntoIter<Meta>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let Self { components } = self;
+
         let inner = components.into_iter();
         ErasedArchetypeIntoIter { inner }
     }
@@ -317,11 +311,11 @@ impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + 'a,
 {
-    type Output = ErasedArchetypeMetas<'a, Meta>;
+    type Output = ErasedArchetypeIter<'a, Meta>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        self.metas()
+        self.iter()
     }
 }
 
@@ -334,6 +328,41 @@ where
         from: <Self as FieldDescriptors<'long>>::Output,
     ) -> <Self as FieldDescriptors<'short>>::Output {
         from
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub struct ErasedArchetypeComponent<Meta = ()> {
+    pub id: ComponentId,
+    pub meta: Meta,
+}
+
+impl<Meta> From<ErasedArchetypeComponent<Meta>> for ComponentId {
+    #[inline]
+    fn from(component: ErasedArchetypeComponent<Meta>) -> Self {
+        component.id
+    }
+}
+
+impl<Meta> Deref for ErasedArchetypeComponent<Meta> {
+    type Target = Meta;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        let Self { meta, .. } = self;
+        meta
+    }
+}
+
+impl<Meta, T> AsRef<T> for ErasedArchetypeComponent<Meta>
+where
+    T: ?Sized,
+    <Self as Deref>::Target: AsRef<T>,
+{
+    #[inline]
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
     }
 }
 
@@ -360,12 +389,14 @@ impl<Meta> Clone for ErasedArchetypeIter<'_, Meta> {
 }
 
 impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
-    type Item = (ComponentId, &'a Meta);
+    type Item = ErasedArchetypeComponent<&'a Meta>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(&id, meta)| (id, meta))
+        inner
+            .next()
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -386,7 +417,9 @@ impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(&id, meta)| (id, meta))
+        inner
+            .nth(n)
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -395,7 +428,9 @@ impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|(&id, meta)| (id, meta))
+        inner
+            .last()
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -404,7 +439,9 @@ impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.map(|(&id, meta)| (id, meta)).collect()
+        inner
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
+            .collect()
     }
 }
 
@@ -412,13 +449,17 @@ impl<Meta> DoubleEndedIterator for ErasedArchetypeIter<'_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(&id, meta)| (id, meta))
+        inner
+            .next_back()
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(&id, meta)| (id, meta))
+        inner
+            .nth_back(n)
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 }
 
@@ -432,102 +473,7 @@ impl<Meta> ExactSizeIterator for ErasedArchetypeIter<'_, Meta> {
 
 impl<Meta> FusedIterator for ErasedArchetypeIter<'_, Meta> {}
 
-pub struct ErasedArchetypeMetas<'a, Meta> {
-    inner: IndexMapValues<'a, ComponentId, Meta>,
-}
-
-impl<Meta> Debug for ErasedArchetypeMetas<'_, Meta>
-where
-    Meta: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner } = self;
-        Debug::fmt(inner, f)
-    }
-}
-
-impl<Meta> Clone for ErasedArchetypeMetas<'_, Meta> {
-    fn clone(&self) -> Self {
-        let Self { inner } = self;
-        let inner = inner.clone();
-        Self { inner }
-    }
-}
-
-impl<'a, Meta> Iterator for ErasedArchetypeMetas<'a, Meta> {
-    type Item = &'a Meta;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { inner } = self;
-        inner.size_hint()
-    }
-
-    #[inline]
-    fn count(self) -> usize
-    where
-        Self: Sized,
-    {
-        let Self { inner } = self;
-        inner.count()
-    }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.nth(n)
-    }
-
-    #[inline]
-    fn last(self) -> Option<Self::Item>
-    where
-        Self: Sized,
-    {
-        let Self { inner } = self;
-        inner.last()
-    }
-
-    #[inline]
-    fn collect<B: FromIterator<Self::Item>>(self) -> B
-    where
-        Self: Sized,
-    {
-        let Self { inner } = self;
-        inner.collect()
-    }
-}
-
-impl<Meta> DoubleEndedIterator for ErasedArchetypeMetas<'_, Meta> {
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.next_back()
-    }
-
-    #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.nth_back(n)
-    }
-}
-
-impl<Meta> ExactSizeIterator for ErasedArchetypeMetas<'_, Meta> {
-    #[inline]
-    fn len(&self) -> usize {
-        let Self { inner } = self;
-        inner.len()
-    }
-}
-
-impl<Meta> FusedIterator for ErasedArchetypeMetas<'_, Meta> {}
-
-impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeMetas<'_, Meta>
+impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeIter<'_, Meta>
 where
     Meta: AsRef<FieldDescriptor>,
 {
@@ -565,12 +511,14 @@ where
 }
 
 impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
-    type Item = (ComponentId, Meta);
+    type Item = ErasedArchetypeComponent<Meta>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next()
+        inner
+            .next()
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -591,7 +539,9 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n)
+        inner
+            .nth(n)
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -600,7 +550,9 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last()
+        inner
+            .last()
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -609,7 +561,9 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.collect()
+        inner
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
+            .collect()
     }
 }
 
@@ -617,13 +571,17 @@ impl<Meta> DoubleEndedIterator for ErasedArchetypeIntoIter<Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back()
+        inner
+            .next_back()
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n)
+        inner
+            .nth_back(n)
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 }
 

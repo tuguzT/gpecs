@@ -494,8 +494,8 @@ impl ArchetypeStorage {
         archetype: &ErasedArchetype<ErasedStorageMeta>,
         mut erased_fields: ErasedBundle,
     ) {
-        for (mut field, (_, meta)) in zip_eq(erased_fields.as_mut_fields(), archetype) {
-            let Some(drop_fn) = meta.drop_fn else {
+        for (mut field, component) in zip_eq(erased_fields.as_mut_fields(), archetype) {
+            let Some(drop_fn) = component.meta.drop_fn else {
                 continue;
             };
             unsafe { drop_fn(field.as_mut_ptr()) }
@@ -586,7 +586,7 @@ impl Iterator for ComponentIds<'_> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(component_id, _)| component_id)
+        inner.next().map(From::from)
     }
 
     #[inline]
@@ -607,7 +607,7 @@ impl Iterator for ComponentIds<'_> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(component_id, _)| component_id)
+        inner.nth(n).map(From::from)
     }
 
     #[inline]
@@ -616,7 +616,7 @@ impl Iterator for ComponentIds<'_> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|(component_id, _)| component_id)
+        inner.last().map(From::from)
     }
 
     #[inline]
@@ -625,7 +625,7 @@ impl Iterator for ComponentIds<'_> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.map(|(component_id, _)| component_id).collect()
+        inner.map(From::from).collect()
     }
 }
 
@@ -633,13 +633,13 @@ impl DoubleEndedIterator for ComponentIds<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(component_id, _)| component_id)
+        inner.next_back().map(From::from)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(component_id, _)| component_id)
+        inner.nth_back(n).map(From::from)
     }
 }
 
@@ -710,11 +710,7 @@ impl ErasedStorageExt for ErasedStorage {
 
         let entities = must_cast_slice(entities);
 
-        let component_ids = context
-            .as_inner()
-            .as_inner()
-            .iter()
-            .map(|(component_id, _)| component_id);
+        let component_ids = context.as_inner().as_inner().iter().map(From::from);
         let fields = validate_components::<ErasedBundle, _>(components, context, component_ids)
             .zip_eq(values)
             .map(|(id, slice)| unsafe { ErasedComponentSlice::from_parts(id, slice) })
@@ -734,11 +730,7 @@ impl ErasedStorageExt for ErasedStorage {
 
         let entities = must_cast_slice(entities);
 
-        let component_ids = context
-            .as_inner()
-            .as_inner()
-            .iter()
-            .map(|(component_id, _)| component_id);
+        let component_ids = context.as_inner().as_inner().iter().map(From::from);
         let fields = validate_components::<ErasedBundle, _>(components, context, component_ids)
             .zip_eq(values)
             .map(|(id, slice)| unsafe { ErasedComponentMutSlice::from_parts(id, slice) })
@@ -756,19 +748,13 @@ impl ErasedStorageExt for ErasedStorage {
     ) -> Option<IndexSet<ErasedComponent>> {
         let value = unsafe {
             let context = self.context();
-            let component_ids = context
-                .as_inner()
-                .iter()
-                .map(|(component_id, _)| component_id);
+            let component_ids = context.as_inner().iter().map(From::from);
             from_erased_fields(components, context, component_ids, fields)
         };
         let value = Self::insert(self, entity.into(), value)?;
 
         let context = self.context();
-        let component_ids = context
-            .as_inner()
-            .iter()
-            .map(|(component_id, _)| component_id);
+        let component_ids = context.as_inner().iter().map(From::from);
         let fields = unsafe { into_erased_fields(components, context, component_ids, value) };
         Some(fields)
     }
@@ -782,10 +768,7 @@ impl ErasedStorageExt for ErasedStorage {
         let value = Self::swap_remove(self, entity.into())?;
 
         let context = self.context();
-        let component_ids = context
-            .as_inner()
-            .iter()
-            .map(|(component_id, _)| component_id);
+        let component_ids = context.as_inner().iter().map(From::from);
         let fields = unsafe { into_erased_fields(components, context, component_ids, value) };
         Some(fields)
     }
@@ -799,10 +782,7 @@ impl ErasedStorageExt for ErasedStorage {
         let view = Self::as_view(self);
         let (context, refs) = view.into_get_with_context(entity.into());
 
-        let component_ids = context
-            .as_inner()
-            .iter()
-            .map(|(component_id, _)| component_id);
+        let component_ids = context.as_inner().iter().map(From::from);
         let refs = validate_components::<ErasedBundle, _>(components, context, component_ids)
             .zip_eq(refs?)
             .map(|(id, r#ref)| unsafe { ErasedComponentRef::from_parts(id, r#ref) })
@@ -819,10 +799,7 @@ impl ErasedStorageExt for ErasedStorage {
         let view = Self::as_mut_view(self);
         let (context, refs) = view.into_get_mut_with_context(entity.into());
 
-        let component_ids = context
-            .as_inner()
-            .iter()
-            .map(|(component_id, _)| component_id);
+        let component_ids = context.as_inner().iter().map(From::from);
         let refs = validate_components::<ErasedBundle, _>(components, context, component_ids)
             .zip_eq(refs?)
             .map(|(id, r#ref)| unsafe { ErasedComponentMutRef::from_parts(id, r#ref) })

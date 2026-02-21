@@ -4,7 +4,7 @@ use std::{
 };
 
 use gpecs_soa_erased::CovariantFieldDescriptors;
-use indexmap::map::{Iter as IndexMapIter, Values as IndexMapValues};
+use indexmap::map::{IntoIter as IndexMapIntoIter, Iter as IndexMapIter, Values as IndexMapValues};
 
 use crate::{
     archetype::{
@@ -301,6 +301,18 @@ impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
     }
 }
 
+impl<Meta> IntoIterator for ErasedArchetype<Meta> {
+    type Item = (ComponentId, Meta);
+    type IntoIter = ErasedArchetypeIntoIter<Meta>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { components } = self;
+        let inner = components.into_iter();
+        ErasedArchetypeIntoIter { inner }
+    }
+}
+
 impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + 'a,
@@ -325,7 +337,7 @@ where
     }
 }
 
-pub struct ErasedArchetypeIter<'a, Meta = ()> {
+pub struct ErasedArchetypeIter<'a, Meta> {
     inner: IndexMapIter<'a, ComponentId, Meta>,
 }
 
@@ -526,3 +538,101 @@ where
         self.clone()
     }
 }
+
+pub struct ErasedArchetypeIntoIter<Meta> {
+    inner: IndexMapIntoIter<ComponentId, Meta>,
+}
+
+impl<Meta> Debug for ErasedArchetypeIntoIter<Meta>
+where
+    Meta: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { inner } = self;
+        Debug::fmt(inner, f)
+    }
+}
+
+impl<Meta> Clone for ErasedArchetypeIntoIter<Meta>
+where
+    Meta: Clone,
+{
+    fn clone(&self) -> Self {
+        let Self { inner } = self;
+        let inner = inner.clone();
+        Self { inner }
+    }
+}
+
+impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
+    type Item = (ComponentId, Meta);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { inner } = self;
+        inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.count()
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth(n)
+    }
+
+    #[inline]
+    fn last(self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.last()
+    }
+
+    #[inline]
+    fn collect<B: FromIterator<Self::Item>>(self) -> B
+    where
+        Self: Sized,
+    {
+        let Self { inner } = self;
+        inner.collect()
+    }
+}
+
+impl<Meta> DoubleEndedIterator for ErasedArchetypeIntoIter<Meta> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.next_back()
+    }
+
+    #[inline]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self { inner } = self;
+        inner.nth_back(n)
+    }
+}
+
+impl<Meta> ExactSizeIterator for ErasedArchetypeIntoIter<Meta> {
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+}
+
+impl<Meta> FusedIterator for ErasedArchetypeIntoIter<Meta> {}

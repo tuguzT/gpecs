@@ -341,7 +341,16 @@ pub struct ErasedArchetypeComponent<Meta = ()> {
 impl<Meta> From<ErasedArchetypeComponent<Meta>> for ComponentId {
     #[inline]
     fn from(component: ErasedArchetypeComponent<Meta>) -> Self {
-        component.id
+        let ErasedArchetypeComponent { id, .. } = component;
+        id
+    }
+}
+
+impl<Meta> From<ErasedArchetypeComponent<Meta>> for (ComponentId, Meta) {
+    #[inline]
+    fn from(component: ErasedArchetypeComponent<Meta>) -> Self {
+        let ErasedArchetypeComponent { id, meta } = component;
+        (id, meta)
     }
 }
 

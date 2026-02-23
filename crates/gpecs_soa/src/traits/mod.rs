@@ -335,7 +335,7 @@ pub unsafe trait SoaWrite: RawSoa + Sized {
 /// - Count of such descriptors **MUST** be non-zero & equal to the number of stored fields.
 /// - Order of such descriptors **MUST** resemble their order inside of a buffer in memory.
 ///
-/// Note that an order of [pointers](RawSoaContext::Ptrs) & their derivatives
+/// Note that the order of [pointers](RawSoaContext::Ptrs) & their derivatives
 /// **may not** resemble their order inside of a buffer in memory.
 /// Reordering of such pointers in other methods is up to the implementation of this trait.
 pub unsafe trait AllocSoaContext: RawSoaContext + FieldDescriptorsOwned + Sized {

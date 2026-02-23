@@ -1,7 +1,7 @@
 use gpecs::prelude::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-#[repr(C)]
+#[repr(C, align(16))]
 pub struct Position {
     pub x: f32,
     pub y: f32,

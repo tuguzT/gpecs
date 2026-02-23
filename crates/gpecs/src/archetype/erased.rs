@@ -311,11 +311,11 @@ impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + 'a,
 {
-    type Output = ErasedArchetypeIter<'a, Meta>;
+    type Output = &'a Self;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        self.iter()
+        self
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::{
-    bundle::Bundle,
+    bundle::{Bundle, BundleMutPtrs, BundlePtrs},
     component::{
         Component,
         erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind},
@@ -8,7 +8,7 @@ use crate::{
     },
     soa::{
         identity::{Identity, IdentityContext},
-        traits::{MutPtrs, Ptrs, TupleContext, count_idents},
+        traits::{TupleContext, count_idents},
     },
 };
 
@@ -38,7 +38,7 @@ where
     fn ptrs_from_erased<I>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<Ptrs<'static, Self>, DowncastErrorKind>
+    ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
     where
         I: IntoIterator<Item = ErasedComponentPtr>,
     {
@@ -48,10 +48,7 @@ where
             .find(|ptr| ptr.component_id() == component_id)
             .ok_or(NotRegisteredError)?;
 
-        let ptr = ptr
-            .downcast::<T>(components)
-            .map_err(|error| error.reason)?
-            .cast();
+        let ptr = ptr.downcast::<T>(components)?.cast();
         Ok(ptr)
     }
 
@@ -59,7 +56,7 @@ where
     fn mut_ptrs_from_erased<I>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<MutPtrs<'static, Self>, DowncastErrorKind>
+    ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
     where
         I: IntoIterator<Item = ErasedComponentMutPtr>,
     {
@@ -69,10 +66,7 @@ where
             .find(|ptr| ptr.component_id() == component_id)
             .ok_or(NotRegisteredError)?;
 
-        let ptr = ptr
-            .downcast::<T>(components)
-            .map_err(|error| error.reason)?
-            .cast();
+        let ptr = ptr.downcast::<T>(components)?.cast();
         Ok(ptr)
     }
 }
@@ -111,7 +105,7 @@ macro_rules! bundle_tuple_impl {
             fn ptrs_from_erased<Iter>(
                 components: &ComponentRegistry,
                 iter: Iter,
-            ) -> Result<Ptrs<'static, Self>, DowncastErrorKind>
+            ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
             where
                 Iter: IntoIterator<Item = ErasedComponentPtr>,
             {
@@ -122,8 +116,7 @@ macro_rules! bundle_tuple_impl {
                 for ptr in iter {
                     $(
                         if ptrs.$indices.is_none() && ptr.component_id() == component_ids[$indices] {
-                            let ptr = ptr.downcast(components).map_err(|error| error.reason)?;
-                            ptrs.$indices = Some(ptr);
+                            ptrs.$indices = Some(ptr.downcast(components)?);
                             continue;
                         }
                     )*
@@ -137,7 +130,7 @@ macro_rules! bundle_tuple_impl {
             fn mut_ptrs_from_erased<Iter>(
                 components: &ComponentRegistry,
                 iter: Iter,
-            ) -> Result<MutPtrs<'static, Self>, DowncastErrorKind>
+            ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
             where
                 Iter: IntoIterator<Item = ErasedComponentMutPtr>,
             {
@@ -148,8 +141,7 @@ macro_rules! bundle_tuple_impl {
                 for ptr in iter {
                     $(
                         if ptrs.$indices.is_none() && ptr.component_id() == component_ids[$indices] {
-                            let ptr = ptr.downcast(components).map_err(|error| error.reason)?;
-                            ptrs.$indices = Some(ptr);
+                            ptrs.$indices = Some(ptr.downcast(components)?);
                             continue;
                         }
                     )*

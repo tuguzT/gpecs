@@ -209,7 +209,7 @@ where
 
     #[inline]
     fn mut_slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SliceMutPtrs<'a>) -> Self::MutPtrs<'a> {
-        slices.into_mut_ptrs()
+        slices.into_ptrs()
     }
 
     #[inline]
@@ -336,7 +336,7 @@ where
 
     #[inline]
     fn mut_refs_as_mut_ptrs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::MutPtrs<'a> {
-        refs.into_mut_ptrs()
+        refs.into_ptrs()
     }
 
     #[inline]
@@ -392,7 +392,7 @@ where
         &'a self,
         slices: Self::SlicesMut<'a>,
     ) -> Self::SliceMutPtrs<'a> {
-        slices.into_mut_ptrs()
+        slices.into_ptrs()
     }
 
     #[inline]

@@ -4,21 +4,14 @@ use gpecs_soa_erased::{BoxedErasedSoa, ptr::slice::CoreSliceItemPtrs};
 use itertools::{Itertools, zip_eq};
 
 use crate::{
-    bundle::Bundle,
     component::{
-        erased::{
-            ErasedComponent, ErasedComponentMutRef, ErasedComponentMutSlice, ErasedComponentRef,
-            ErasedComponentSlice,
-        },
+        erased::ErasedComponent,
         registry::{ComponentId, ComponentRegistry},
     },
     hash::IndexSet,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
-        traits::{
-            AllocSoa, RawSoa, RawSoaContext, Refs, RefsMut, Slices, SlicesMut, Soa, SoaContext,
-            SoaRead, SoaWrite,
-        },
+        traits::{AllocSoa, RawSoa, Soa, SoaRead, SoaWrite},
     },
 };
 
@@ -135,72 +128,4 @@ where
             unsafe { ErasedComponent::from_parts(id, field, info.drop_fn()) }
         })
         .collect()
-}
-
-#[inline]
-pub unsafe fn from_erased_refs<'a, B>(
-    components: &ComponentRegistry,
-    fields: IndexSet<ErasedComponentRef<'a>>,
-) -> Refs<'static, 'a, B>
-where
-    B: Bundle,
-{
-    let iter = fields
-        .into_iter()
-        .map(|component| component.as_component_ptr());
-    let ptrs = B::ptrs_from_erased(components, iter)
-        .expect("all the components should be present in the right order");
-    unsafe { B::CONTEXT.ptrs_to_refs(ptrs) }
-}
-
-#[inline]
-pub unsafe fn from_erased_refs_mut<'a, B>(
-    components: &ComponentRegistry,
-    fields: IndexSet<ErasedComponentMutRef<'a>>,
-) -> RefsMut<'static, 'a, B>
-where
-    B: Bundle,
-{
-    let iter = fields
-        .into_iter()
-        .map(|mut component| component.as_mut_component_ptr());
-    let ptrs = B::mut_ptrs_from_erased(components, iter)
-        .expect("all the components should be present in the right order");
-    unsafe { B::CONTEXT.mut_ptrs_to_mut_refs(ptrs) }
-}
-
-#[inline]
-pub unsafe fn from_erased_slices<'a, B>(
-    components: &ComponentRegistry,
-    len: usize,
-    fields: IndexSet<ErasedComponentSlice<'a>>,
-) -> Slices<'static, 'a, B>
-where
-    B: Bundle,
-{
-    let iter = fields
-        .into_iter()
-        .map(|components| components.as_component_ptr());
-    let ptrs = B::ptrs_from_erased(components, iter)
-        .expect("all the components should be present in the right order");
-    let slices = B::CONTEXT.slice_ptrs_from_raw_parts(ptrs, len);
-    unsafe { B::CONTEXT.slice_ptrs_to_slices(slices) }
-}
-
-#[inline]
-pub unsafe fn from_erased_mut_slices<'a, B>(
-    components: &ComponentRegistry,
-    len: usize,
-    fields: IndexSet<ErasedComponentMutSlice<'a>>,
-) -> SlicesMut<'static, 'a, B>
-where
-    B: Bundle,
-{
-    let iter = fields
-        .into_iter()
-        .map(|mut components| components.as_mut_component_ptr());
-    let ptrs = B::mut_ptrs_from_erased(components, iter)
-        .expect("all the components should be present in the right order");
-    let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);
-    unsafe { B::CONTEXT.mut_slice_ptrs_to_mut_slices(slices) }
 }

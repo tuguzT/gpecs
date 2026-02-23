@@ -136,6 +136,12 @@ where
     }
 
     #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { ptrs, .. } = self;
+        ptrs.descriptors()
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.len()
@@ -296,6 +302,12 @@ where
     pub fn offset(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.offset()
+    }
+
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { ptrs, .. } = self;
+        ptrs.descriptors()
     }
 }
 

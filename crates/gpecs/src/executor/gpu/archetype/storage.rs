@@ -11,8 +11,8 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::storage::ArchetypeStorage, component::registry::ComponentRegistry,
-    executor::gpu::component::registry::GpuComponentId, hash::IndexMap,
+    archetype::storage::ArchetypeStorage, executor::gpu::component::registry::GpuComponentId,
+    hash::IndexMap,
 };
 
 use super::registry::GpuArchetypeId;
@@ -27,12 +27,11 @@ pub struct GpuArchetypeStorage {
 impl GpuArchetypeStorage {
     #[inline]
     pub(super) fn new(
-        components: &ComponentRegistry,
         gpu_device: &Device,
         archetype_id: GpuArchetypeId,
         archetype_storage: &ArchetypeStorage,
     ) -> Self {
-        let (entities, erased_components) = archetype_storage.erased_components(components);
+        let (entities, erased_components) = archetype_storage.erased_components();
         let len = archetype_storage.len();
 
         let entities_contents = must_cast_slice(entities);

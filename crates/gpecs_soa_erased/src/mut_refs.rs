@@ -7,8 +7,8 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaPtrs,
-    ErasedSoaRefs, ErasedSoaRefsIter,
+    CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaMutPtrsIter, ErasedSoaRefs,
+    ErasedSoaRefsIter,
     data::{ErasedMutRef, ErasedRef},
     error::{DowncastError, PtrsError},
     ptr::slice::{CastConstPtr, MutSliceItemPtr},
@@ -59,13 +59,7 @@ where
     }
 
     #[inline]
-    pub fn into_ptrs(self) -> ErasedSoaPtrs<D, CastConstPtr<P>> {
-        let Self { ptrs, .. } = self;
-        ptrs.cast_const()
-    }
-
-    #[inline]
-    pub fn into_mut_ptrs(self) -> ErasedSoaMutPtrs<D, P> {
+    pub fn into_ptrs(self) -> ErasedSoaMutPtrs<D, P> {
         let Self { ptrs, .. } = self;
         ptrs
     }
@@ -145,6 +139,12 @@ where
     pub fn offset(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.offset()
+    }
+
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { ptrs, .. } = self;
+        ptrs.descriptors()
     }
 }
 
@@ -317,6 +317,12 @@ where
     pub fn offset(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.offset()
+    }
+
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { ptrs, .. } = self;
+        ptrs.descriptors()
     }
 }
 

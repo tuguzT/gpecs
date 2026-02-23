@@ -3,8 +3,24 @@ use crate::{
         erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind},
         registry::{ComponentId, ComponentRegistry},
     },
-    soa::traits::{AllocSoa, MutPtrs, Ptrs, SoaOwned, SoaRead, SoaWrite},
+    soa::traits::{
+        AllocSoa, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
+        SlicesMut, SoaOwned, SoaRead, SoaWrite,
+    },
 };
+
+pub type BundlePtrs<B> = Ptrs<'static, B>;
+pub type BundleMutPtrs<B> = MutPtrs<'static, B>;
+pub type BundleNonNullPtrs<B> = NonNullPtrs<'static, B>;
+
+pub type BundleSlicePtrs<B> = SlicePtrs<'static, B>;
+pub type BundleSliceMutPtrs<B> = SliceMutPtrs<'static, B>;
+
+pub type BundleRefs<'a, B> = Refs<'static, 'a, B>;
+pub type BundleRefsMut<'a, B> = RefsMut<'static, 'a, B>;
+
+pub type BundleSlices<'a, B> = Slices<'static, 'a, B>;
+pub type BundleSlicesMut<'a, B> = SlicesMut<'static, 'a, B>;
 
 /// Non-empty collection of [components](crate::component::Component).
 ///
@@ -52,7 +68,7 @@ pub unsafe trait Bundle: SoaOwned + AllocSoa + SoaRead + SoaWrite + 'static {
     fn ptrs_from_erased<I>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<Ptrs<'static, Self>, DowncastErrorKind>
+    ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
     where
         I: IntoIterator<Item = ErasedComponentPtr>;
 
@@ -70,7 +86,7 @@ pub unsafe trait Bundle: SoaOwned + AllocSoa + SoaRead + SoaWrite + 'static {
     fn mut_ptrs_from_erased<I>(
         components: &ComponentRegistry,
         iter: I,
-    ) -> Result<MutPtrs<'static, Self>, DowncastErrorKind>
+    ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
     where
         I: IntoIterator<Item = ErasedComponentMutPtr>;
 }

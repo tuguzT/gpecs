@@ -290,9 +290,10 @@ where
 
     #[inline]
     fn clone_from(&mut self, source: &Self) {
-        let Self { inner: this } = self;
+        let Self { inner } = self;
+
         let Self { inner: source } = source;
-        this.clone_from(source);
+        inner.clone_from(source);
     }
 }
 

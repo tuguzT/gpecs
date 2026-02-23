@@ -1,1 +1,21 @@
+pub use self::{
+    mut_ptrs::{ErasedBundleMutPtrs, ErasedBundleMutPtrsIter},
+    mut_refs::{ErasedBundleMutRefs, ErasedBundleMutRefsIter},
+    mut_slice_ptrs::{ErasedBundleMutSlicePtrs, ErasedBundleMutSlicePtrsIter},
+    mut_slices::{ErasedBundleMutSlices, ErasedBundleMutSlicesIter},
+    ptrs::{ErasedBundlePtrs, ErasedBundlePtrsIter},
+    refs::{ErasedBundleRefs, ErasedBundleRefsIter},
+    slice_ptrs::{ErasedBundleSlicePtrs, ErasedBundleSlicePtrsIter},
+    slices::{ErasedBundleSlices, ErasedBundleSlicesIter},
+};
+
 pub(crate) mod utils;
+
+mod mut_ptrs;
+mod mut_refs;
+mod mut_slice_ptrs;
+mod mut_slices;
+mod ptrs;
+mod refs;
+mod slice_ptrs;
+mod slices;

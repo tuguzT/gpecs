@@ -127,6 +127,14 @@ impl<T> DowncastError<T> {
     }
 }
 
+impl<T> From<DowncastError<T>> for DowncastErrorKind {
+    #[inline]
+    fn from(error: DowncastError<T>) -> Self {
+        let DowncastError { reason, .. } = error;
+        reason
+    }
+}
+
 impl<T> Display for DowncastError<T>
 where
     T: Display + ?Sized,

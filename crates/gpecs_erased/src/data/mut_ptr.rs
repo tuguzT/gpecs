@@ -48,6 +48,7 @@ where
     #[inline]
     pub fn cast_const(self) -> ErasedPtr<CastConstPtr<T>> {
         let Self { layout, ptr } = self;
+
         let ptr = ptr.cast_const();
         unsafe { ErasedPtr::from_parts(layout, ptr) }
     }

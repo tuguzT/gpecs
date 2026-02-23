@@ -30,7 +30,7 @@ use crate::{
         storage::ArchetypeStorage,
     },
     bundle::{
-        Bundle,
+        Bundle, BundleRefs, BundleRefsMut,
         erased::utils::{from_erased_fields, into_erased_fields},
     },
     component::{
@@ -39,10 +39,7 @@ use crate::{
     },
     entity::Entity,
     hash::{IndexMap, IndexSet},
-    soa::{
-        slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
-        traits::{Refs, RefsMut, Slices},
-    },
+    soa::slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
 };
 
 /// Archetype [identifier](ArchetypeId) of some [entity](Entity).
@@ -396,7 +393,7 @@ impl ArchetypeRegistry {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Refs<'_, '_, B>, IncompatibleArchetypeError>
+    ) -> Result<BundleRefs<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -411,7 +408,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<Refs<'_, '_, B>, IncompatibleArchetypeError>
+    ) -> Result<BundleRefs<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -439,7 +436,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<RefsMut<'_, '_, B>, IncompatibleArchetypeError>
+    ) -> Result<BundleRefsMut<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -454,7 +451,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<RefsMut<'_, '_, B>, IncompatibleArchetypeError>
+    ) -> Result<BundleRefsMut<'_, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -1761,7 +1758,7 @@ impl<'a, 'ctx, B> IntoIterator for Bundles<'a, 'ctx, B>
 where
     B: Bundle,
 {
-    type Item = (Entity, Refs<'a, 'a, B>);
+    type Item = (Entity, BundleRefs<'a, B>);
 
     // this actually should be just `FlatMap`,
     // but it cannot be returned because `impl Trait` is unstable in associated types
@@ -1783,7 +1780,7 @@ where
 }
 
 type BundlesIntoIterInner<'a, B> =
-    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIter<'a, 'a, B>>;
+    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIter<'static, 'a, B>>;
 
 pub struct BundlesIntoIter<'a, 'ctx, B>
 where
@@ -1815,10 +1812,10 @@ where
     }
 }
 
-impl<B> Debug for BundlesIntoIter<'_, '_, B>
+impl<'a, B> Debug for BundlesIntoIter<'a, '_, B>
 where
     B: Bundle,
-    for<'ctx, 'a> Slices<'ctx, 'a, B>: Debug,
+    BundlesIntoIterInner<'a, B>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -1860,7 +1857,7 @@ impl<'a, B> Iterator for BundlesIntoIter<'a, '_, B>
 where
     B: Bundle,
 {
-    type Item = (Entity, Refs<'a, 'a, B>);
+    type Item = (Entity, BundleRefs<'a, B>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -1994,7 +1991,7 @@ impl<'a, 'ctx, B> IntoIterator for BundlesMut<'a, 'ctx, B>
 where
     B: Bundle,
 {
-    type Item = (Entity, RefsMut<'a, 'a, B>);
+    type Item = (Entity, BundleRefsMut<'a, B>);
 
     // this actually should be just `FlatMap`,
     // but it cannot be returned because `impl Trait` is unstable in associated types
@@ -2016,7 +2013,7 @@ where
 }
 
 type BundlesMutIntoIterInner<'a, B> =
-    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIterMut<'a, 'a, B>>;
+    iter::Zip<iter::Copied<slice::Iter<'a, Entity>>, SoaIterMut<'static, 'a, B>>;
 
 pub struct BundlesMutIntoIter<'a, 'ctx, B>
 where
@@ -2048,10 +2045,10 @@ where
     }
 }
 
-impl<B> Debug for BundlesMutIntoIter<'_, '_, B>
+impl<'a, B> Debug for BundlesMutIntoIter<'a, '_, B>
 where
     B: Bundle,
-    for<'ctx, 'a> Slices<'ctx, 'a, B>: Debug,
+    BundlesMutIntoIterInner<'a, B>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
@@ -2073,7 +2070,7 @@ impl<'a, B> Iterator for BundlesMutIntoIter<'a, '_, B>
 where
     B: Bundle,
 {
-    type Item = (Entity, RefsMut<'a, 'a, B>);
+    type Item = (Entity, BundleRefsMut<'a, B>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

@@ -173,10 +173,10 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let layout = &self.layout();
-        let buffer = self.as_buffer();
+        let buffer = &self.as_buffer();
         f.debug_struct("ErasedFieldRefMut")
             .field("layout", layout)
-            .field("buffer", &buffer)
+            .field("buffer", buffer)
             .finish()
     }
 }

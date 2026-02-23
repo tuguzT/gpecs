@@ -9,7 +9,7 @@ use crate::{
             ArchetypeId, ArchetypeInfo, ArchetypeRegistry, Bundles, BundlesMut, EntityArchetype,
         },
     },
-    bundle::Bundle,
+    bundle::{Bundle, BundleRefs, BundleRefsMut},
     component::{
         Component,
         registry::{ComponentId, ComponentInfo, ComponentRegistry},
@@ -18,7 +18,6 @@ use crate::{
         Entity,
         registry::{self as entities, EntityRegistry},
     },
-    soa::traits::{Refs, RefsMut},
     world::registry::{WorldId, WorldRegistry},
 };
 
@@ -243,7 +242,10 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_bundle<B>(&self, entity: Entity) -> Result<Refs<'_, '_, B>, IncompatibleBundleError>
+    pub fn get_bundle<B>(
+        &self,
+        entity: Entity,
+    ) -> Result<BundleRefs<'_, B>, IncompatibleBundleError>
     where
         B: Bundle,
     {
@@ -266,7 +268,7 @@ impl Context {
     pub fn get_bundle_mut<B>(
         &mut self,
         entity: Entity,
-    ) -> Result<RefsMut<'_, '_, B>, IncompatibleBundleError>
+    ) -> Result<BundleRefsMut<'_, B>, IncompatibleBundleError>
     where
         B: Bundle,
     {

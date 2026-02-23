@@ -9,7 +9,7 @@ use gpecs_soa_erased::{
     ErasedSoa, ErasedSoaContext, ptr::slice::CoreSliceItemPtrs, storage::BoxedAlignedUninitStorage,
 };
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
-use itertools::{Itertools, zip_eq};
+use itertools::zip_eq;
 
 use crate::{
     archetype::{
@@ -20,29 +20,20 @@ use crate::{
         },
     },
     bundle::{
-        Bundle,
-        erased::utils::{
-            from_erased_fields, from_erased_mut_slices, from_erased_refs, from_erased_refs_mut,
-            from_erased_slices, into_erased_fields, validate_components,
+        Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
+        erased::{
+            ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
+            utils::{from_erased_fields, into_erased_fields},
         },
     },
     component::{
-        erased::{
-            ErasedComponent, ErasedComponentMutRef, ErasedComponentMutSlice, ErasedComponentRef,
-            ErasedComponentSlice,
-        },
+        erased::ErasedComponent,
         registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
     },
     entity::Entity,
     hash::IndexSet,
-    soa::{
-        field::FieldDescriptor,
-        traits::{Refs, RefsMut, Slices, SlicesMut, SoaContext},
-    },
+    soa::field::FieldDescriptor,
 };
-
-pub type Bundles<'a, B> = (&'a [Entity], Slices<'a, 'a, B>);
-pub type BundlesMut<'a, B> = (&'a [Entity], SlicesMut<'a, 'a, B>);
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -80,7 +71,7 @@ impl From<NoEpochEntity> for Entity {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ErasedStorageMeta {
+pub struct ErasedStorageMeta {
     descriptor: FieldDescriptor,
     drop_fn: Option<DropFn>,
 }
@@ -143,17 +134,14 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn archetype(&self) -> &ErasedArchetype<impl FromComponentInfo> {
+    pub fn archetype(&self) -> &ErasedArchetype<ErasedStorageMeta> {
         let Self { sparse_set } = self;
         sparse_set.context().as_inner()
     }
 
     #[inline]
     pub fn component_ids(&self) -> ComponentIds<'_> {
-        let Self { sparse_set } = self;
-
-        let archetype = sparse_set.context().as_inner();
-        let inner = archetype.iter();
+        let inner = self.archetype().iter();
         ComponentIds { inner }
     }
 
@@ -344,15 +332,12 @@ impl ArchetypeStorage {
     pub fn bundles<B>(
         &self,
         components: &ComponentRegistry,
-    ) -> Result<Bundles<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<(&[Entity], BundleSlices<'_, B>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        self.check_compatibility_of::<B>(components)?;
-
-        let (entities, fields) = self.erased_components(components);
-        let components = unsafe { from_erased_slices::<B>(components, entities.len(), fields) };
-        let components = B::Context::upcast_slices(components);
+        let (entities, fields) = self.erased_components();
+        let components = fields.downcast::<B>(components)?;
         Ok((entities, components))
     }
 
@@ -360,15 +345,14 @@ impl ArchetypeStorage {
     pub fn bundles_mut<B>(
         &mut self,
         components: &ComponentRegistry,
-    ) -> Result<BundlesMut<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<(&[Entity], BundleSlicesMut<'_, B>), IncompatibleArchetypeError>
     where
         B: Bundle,
     {
         self.check_compatibility_of::<B>(components)?;
 
-        let (entities, fields) = self.erased_components_mut(components);
-        let components = unsafe { from_erased_mut_slices::<B>(components, entities.len(), fields) };
-        let components = B::Context::upcast_mut_slices(components);
+        let (entities, fields) = self.erased_components_mut();
+        let components = fields.downcast::<B>(components)?;
         Ok((entities, components))
     }
 
@@ -377,18 +361,15 @@ impl ArchetypeStorage {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<Refs<'_, '_, B>>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
-        self.check_compatibility_of::<B>(components)?;
-
-        let Some(fields) = self.get_erased(components, entity) else {
+        let Some(fields) = self.get_erased(entity) else {
             return Ok(None);
         };
 
-        let refs = unsafe { from_erased_refs::<B>(components, fields) };
-        let refs = B::Context::upcast_refs(refs);
+        let refs = fields.downcast::<B>(components)?;
         Ok(Some(refs))
     }
 
@@ -397,18 +378,17 @@ impl ArchetypeStorage {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<Option<RefsMut<'_, '_, B>>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
         self.check_compatibility_of::<B>(components)?;
 
-        let Some(fields) = self.get_erased_mut(components, entity) else {
+        let Some(fields) = self.get_erased_mut(entity) else {
             return Ok(None);
         };
 
-        let refs = unsafe { from_erased_refs_mut::<B>(components, fields) };
-        let refs = B::Context::upcast_mut_refs(refs);
+        let refs = fields.downcast::<B>(components)?;
         Ok(Some(refs))
     }
 
@@ -498,17 +478,12 @@ impl ArchetypeStorage {
     #[track_caller]
     pub(super) fn get_erased(
         &self,
-        components: &ComponentRegistry,
         entity: Entity,
-    ) -> Option<IndexSet<ErasedComponentRef<'_>>> {
+    ) -> Option<ErasedBundleRefs<'_, '_, ErasedStorageMeta>> {
         let Self { sparse_set } = self;
-        let (context, refs) = sparse_set.as_view().into_get_with_context(entity.into());
 
-        let component_ids = context.as_inner().iter().map(From::from);
-        let refs = validate_components::<ErasedBundle, _>(components, context, component_ids)
-            .zip_eq(refs?)
-            .map(|(id, r#ref)| unsafe { ErasedComponentRef::from_parts(id, r#ref) })
-            .collect();
+        let refs = sparse_set.as_view().into_get(entity.into());
+        let refs = ErasedBundleRefs::from_inner(refs?);
         Some(refs)
     }
 
@@ -516,19 +491,12 @@ impl ArchetypeStorage {
     #[track_caller]
     pub(super) fn get_erased_mut(
         &mut self,
-        components: &ComponentRegistry,
         entity: Entity,
-    ) -> Option<IndexSet<ErasedComponentMutRef<'_>>> {
+    ) -> Option<ErasedBundleMutRefs<'_, '_, ErasedStorageMeta>> {
         let Self { sparse_set } = self;
-        let (context, refs) = sparse_set
-            .as_mut_view()
-            .into_get_mut_with_context(entity.into());
 
-        let component_ids = context.as_inner().iter().map(From::from);
-        let refs = validate_components::<ErasedBundle, _>(components, context, component_ids)
-            .zip_eq(refs?)
-            .map(|(id, r#ref)| unsafe { ErasedComponentMutRef::from_parts(id, r#ref) })
-            .collect();
+        let refs = sparse_set.as_mut_view().into_get_mut(entity.into());
+        let refs = ErasedBundleMutRefs::from_inner(refs?);
         Some(refs)
     }
 
@@ -576,46 +544,30 @@ impl ArchetypeStorage {
     #[track_caller]
     pub(crate) fn erased_components(
         &self,
-        components: &ComponentRegistry,
-    ) -> (&[Entity], IndexSet<ErasedComponentSlice<'_>>) {
+    ) -> (&[Entity], ErasedBundleSlices<'_, '_, ErasedStorageMeta>) {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_view().into_parts();
-        let (context, slices) = dense.into_slices_with_context();
-        let (entities, values) = slices.into_parts();
+        let (entities, values) = dense.into_slices().into_parts();
 
         let entities = must_cast_slice(entities);
-
-        let component_ids = context.as_inner().as_inner().iter().map(From::from);
-        let fields = validate_components::<ErasedBundle, _>(components, context, component_ids)
-            .zip_eq(values)
-            .map(|(id, slice)| unsafe { ErasedComponentSlice::from_parts(id, slice) })
-            .collect();
-
-        (entities, fields)
+        let slices = ErasedBundleSlices::from_inner(values);
+        (entities, slices)
     }
 
     #[inline]
     #[track_caller]
     pub(crate) fn erased_components_mut(
         &mut self,
-        components: &ComponentRegistry,
-    ) -> (&[Entity], IndexSet<ErasedComponentMutSlice<'_>>) {
+    ) -> (&[Entity], ErasedBundleMutSlices<'_, '_, ErasedStorageMeta>) {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_mut_view().into_parts();
-        let (context, slices) = dense.into_slices_with_context();
-        let (entities, values) = slices.into_parts();
+        let (entities, values) = dense.into_slices().into_parts();
 
         let entities = must_cast_slice(entities);
-
-        let component_ids = context.as_inner().as_inner().iter().map(From::from);
-        let fields = validate_components::<ErasedBundle, _>(components, context, component_ids)
-            .zip_eq(values)
-            .map(|(id, slice)| unsafe { ErasedComponentMutSlice::from_parts(id, slice) })
-            .collect();
-
-        (entities, fields)
+        let slices = ErasedBundleMutSlices::from_inner(values);
+        (entities, slices)
     }
 }
 

@@ -47,9 +47,10 @@ where
 {
     #[inline]
     pub fn cast_mut(self) -> ErasedMutPtr<CastMutPtr<T>> {
-        let Self { layout: desc, ptr } = self;
+        let Self { layout, ptr } = self;
+
         let ptr = ptr.cast_mut();
-        unsafe { ErasedMutPtr::from_parts(desc, ptr) }
+        unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
 
     #[inline]

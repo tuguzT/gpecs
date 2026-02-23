@@ -283,6 +283,13 @@ impl From<MissingComponentError> for IncompatibleArchetypeError {
     }
 }
 
+impl From<NotRegisteredError> for IncompatibleArchetypeError {
+    #[inline]
+    fn from(error: NotRegisteredError) -> Self {
+        Self::ComponentNotRegistered(error)
+    }
+}
+
 impl From<ArchetypeError> for IncompatibleArchetypeError {
     #[inline]
     fn from(error: ArchetypeError) -> Self {
@@ -290,13 +297,6 @@ impl From<ArchetypeError> for IncompatibleArchetypeError {
             ArchetypeError::DuplicateComponent(error) => Self::DuplicateComponent(error),
             ArchetypeError::ComponentNotRegistered(error) => Self::ComponentNotRegistered(error),
         }
-    }
-}
-
-impl From<NotRegisteredError> for IncompatibleArchetypeError {
-    #[inline]
-    fn from(error: NotRegisteredError) -> Self {
-        Self::ComponentNotRegistered(error)
     }
 }
 

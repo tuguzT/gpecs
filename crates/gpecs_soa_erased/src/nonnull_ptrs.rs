@@ -164,6 +164,12 @@ where
         let Self { offset, .. } = *self;
         offset
     }
+
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { descriptors, .. } = self;
+        descriptors
+    }
 }
 
 impl<'a, D, P> ErasedSoaNonNullPtrs<D, P>
@@ -494,6 +500,12 @@ where
     pub fn offset(&self) -> usize {
         let Self { offset, .. } = *self;
         offset
+    }
+
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { inner, .. } = self;
+        inner.as_inner()
     }
 }
 

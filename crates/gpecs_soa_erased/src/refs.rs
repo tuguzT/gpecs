@@ -129,6 +129,12 @@ where
         let Self { ptrs, .. } = self;
         ptrs.offset()
     }
+
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { ptrs, .. } = self;
+        ptrs.descriptors()
+    }
 }
 
 impl<'a, D, P, U> ErasedSoaRefs<'_, D, P>
@@ -280,6 +286,12 @@ where
     pub fn offset(&self) -> usize {
         let Self { ptrs, .. } = self;
         ptrs.offset()
+    }
+
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { ptrs, .. } = self;
+        ptrs.descriptors()
     }
 }
 

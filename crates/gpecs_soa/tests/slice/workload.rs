@@ -8,8 +8,9 @@ use crate::common::{ZST1, ZST2, ZST3};
 
 #[test]
 fn empty() {
-    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, (u8, u64, u16, ())>;
-    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, (u8, u64, u16, ())>;
+    type Item = (u32, u128, u8, ());
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 
     let context = Default::default();
 
@@ -72,8 +73,9 @@ fn empty() {
 
 #[test]
 fn empty_identity() {
-    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Identity<usize>>;
-    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Identity<usize>>;
+    type Item = Identity<u128>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 
     let context = Default::default();
 
@@ -180,8 +182,9 @@ fn empty_zst() {
 
 #[test]
 fn one_item() {
-    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, (u8, u64, u16, ())>;
-    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, (u8, u64, u16, ())>;
+    type Item = (u32, u128, u8, ());
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 
     let context = Default::default();
     let mut u8s = [1];
@@ -325,8 +328,9 @@ fn one_item() {
 
 #[test]
 fn one_item_identity() {
-    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Identity<usize>>;
-    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Identity<usize>>;
+    type Item = Identity<u128>;
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 
     let context = Default::default();
     let mut data = [1.into()];
@@ -520,7 +524,7 @@ fn one_item_zst() {
 
 #[test]
 fn three_items() {
-    type Item = (u8, String, u64, ());
+    type Item = (u16, String, u128, ());
     type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
     type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 
@@ -836,7 +840,7 @@ fn three_items() {
 
 #[test]
 fn three_items_identity() {
-    type Item = Identity<usize>;
+    type Item = Identity<u128>;
     type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
     type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
 

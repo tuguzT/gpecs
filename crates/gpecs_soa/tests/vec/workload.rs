@@ -8,7 +8,7 @@ use crate::common::{ZST1, ZST2, ZST3};
 
 #[test]
 fn empty() {
-    type Vec = SoaVec<(u8, u64, u16, ())>;
+    type Vec = SoaVec<(u32, u128, u8, ())>;
 
     let vec = Vec::from_iter([]);
     assert!(vec.is_empty());
@@ -103,7 +103,7 @@ fn empty_zst() {
 
 #[test]
 fn with_capacity() {
-    type Vec = SoaVec<(u8, u64, u16, ())>;
+    type Vec = SoaVec<(u32, u128, u8, ())>;
 
     let vec = Vec::with_capacity(10);
     assert!(vec.is_empty());
@@ -200,7 +200,7 @@ fn with_capacity_zst() {
 
 #[test]
 fn one_item() {
-    type Vec = SoaVec<(u8, u64, u16, ())>;
+    type Vec = SoaVec<(u32, u128, u8, ())>;
 
     let mut vec = Vec::new();
     vec.push((1, 2, 3, ()));
@@ -449,7 +449,7 @@ fn one_item_zst() {
 
 #[test]
 fn three_items() {
-    type Vec = SoaVec<(u8, String, u64, ())>;
+    type Vec = SoaVec<(u16, String, u128, ())>;
 
     let mut vec = Vec::from_iter(iter::repeat((0, "0".to_owned(), 0, ())).take(3));
     assert_eq!(vec.len(), 3);

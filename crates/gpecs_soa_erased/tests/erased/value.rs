@@ -20,7 +20,7 @@ use crate::common::ArrayDescriptors;
 #[test]
 #[cfg(feature = "alloc")]
 fn value() {
-    type Value = ((), String, u32, u16, u8);
+    type Value = ((), String, u32, u128, u8);
 
     let context = Default::default();
 
@@ -48,9 +48,9 @@ fn value() {
     let descriptors = [
         FieldDescriptor::of::<()>(),
         FieldDescriptor::of::<u8>(),
-        FieldDescriptor::of::<u16>(),
         FieldDescriptor::of::<u32>(),
         FieldDescriptor::of::<String>(),
+        FieldDescriptor::of::<u128>(),
     ];
     itertools::assert_equal(
         erased_value
@@ -86,16 +86,6 @@ fn value() {
 
     let field_ref = erased_refs.into_iter().nth(2).unwrap();
     assert_eq!(
-        unsafe { field_ref.downcast::<u16>() }.expect("layouts should match"),
-        &i2,
-    );
-    assert_eq!(
-        field_ref.into_buffer(),
-        ErasedRef::<*const _>::try_from(&i2).unwrap().into_buffer(),
-    );
-
-    let field_ref = erased_refs.into_iter().nth(3).unwrap();
-    assert_eq!(
         unsafe { field_ref.downcast::<u32>() }.expect("layouts should match"),
         &i1,
     );
@@ -104,10 +94,20 @@ fn value() {
         ErasedRef::<*const _>::try_from(&i1).unwrap().into_buffer(),
     );
 
-    let field_ref = erased_refs.into_iter().nth(4).unwrap();
+    let field_ref = erased_refs.into_iter().nth(3).unwrap();
     assert_eq!(
         unsafe { field_ref.downcast::<String>() }.expect("layouts should match"),
         &str,
+    );
+
+    let field_ref = erased_refs.into_iter().nth(4).unwrap();
+    assert_eq!(
+        unsafe { field_ref.downcast::<u128>() }.expect("layouts should match"),
+        &i2,
+    );
+    assert_eq!(
+        field_ref.into_buffer(),
+        ErasedRef::<*const _>::try_from(&i2).unwrap().into_buffer(),
     );
 
     let unit_bytes = [0u8; size_of::<()>()].as_slice();
@@ -129,22 +129,23 @@ fn value() {
     let field_refs = [
         ErasedRef::<*const _>::new(descriptors[0].layout(), unit_bytes).expect("incorrect inputs"),
         ErasedRef::<*const _>::new(descriptors[1].layout(), i3_bytes).expect("incorrect inputs"),
-        ErasedRef::<*const _>::new(descriptors[2].layout(), i2_bytes).expect("incorrect inputs"),
-        ErasedRef::<*const _>::new(descriptors[3].layout(), i1_bytes).expect("incorrect inputs"),
+        ErasedRef::<*const _>::new(descriptors[2].layout(), i1_bytes).expect("incorrect inputs"),
+        ErasedRef::<*const _>::new(descriptors[4].layout(), i2_bytes).expect("incorrect inputs"),
     ];
-    assert!(
+    itertools::assert_equal(
         erased_refs
             .into_iter()
-            .take(4)
-            .map(ErasedRef::into_buffer)
-            .eq(field_refs.into_iter().map(ErasedRef::into_buffer)),
+            .enumerate()
+            .filter_map(|(i, item)| (i != 3).then_some(item))
+            .map(ErasedRef::into_buffer),
+        field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 
     let mut fields = erased_value
         .into_fields()
         .collect::<Result<ArrayVec<_, 5>, _>>()
         .expect("allocation of small byte array should succeed");
-    let field: BoxedErased<_> = fields.pop().expect("string field should exist");
+    let field: BoxedErased<_> = fields.remove(3);
     assert_eq!(
         unsafe { field.downcast::<String>() }.expect("layouts should match"),
         str,
@@ -168,7 +169,7 @@ fn value() {
     );
 
     let context = Default::default();
-    let value = unsafe { erased_value.downcast::<((), u32, u16, u8)>(&context) }
+    let value = unsafe { erased_value.downcast::<((), u32, u128, u8)>(&context) }
         .expect("all the fields should be valid here");
     assert_eq!(value, ((), i1, i2, i3));
 }

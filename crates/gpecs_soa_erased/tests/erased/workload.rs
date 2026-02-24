@@ -13,7 +13,7 @@ use gpecs_soa_erased::{
 
 #[test]
 fn new() {
-    type Soa = (u8, u64, u16, ());
+    type Soa = (u8, u128, u16, ());
     type Vec = SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
 
     let context = Default::default();
@@ -23,7 +23,7 @@ fn new() {
         FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<()>(),
         FieldDescriptor::of::<u16>(),
-        FieldDescriptor::of::<u64>(),
+        FieldDescriptor::of::<u128>(),
     ];
     itertools::assert_equal(
         erased_context
@@ -124,7 +124,7 @@ fn new_zst() {
 
 #[test]
 fn with_capacity() {
-    type Soa = (u8, u64, u16, ());
+    type Soa = (u8, u128, u16, ());
     type Vec = SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
 
     let context = Default::default();
@@ -134,7 +134,7 @@ fn with_capacity() {
         FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<()>(),
         FieldDescriptor::of::<u16>(),
-        FieldDescriptor::of::<u64>(),
+        FieldDescriptor::of::<u128>(),
     ];
     itertools::assert_equal(
         erased_context

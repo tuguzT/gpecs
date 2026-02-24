@@ -10,7 +10,6 @@ use core::{
 
 use crate::{
     field::FieldDescriptor,
-    ptr::assert_ptr_is_aligned,
     traits::{
         AllocSoaContext, AllocSoaTrusted, FieldDescriptors, MutPtrs, Ptrs, RawSoa, RawSoaContext,
         Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
@@ -439,7 +438,6 @@ macro_rules! soa_tuple_impl {
                 let _ = layout;
 
                 let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
-                $(assert_ptr_is_aligned(ptrs.$indices);)*
                 ptrs
             }
 
@@ -455,7 +453,6 @@ macro_rules! soa_tuple_impl {
                 let _ = layout;
 
                 let ptrs = unsafe { ($(buffer.add(offsets[$indices]).cast(),)*) };
-                $(assert_ptr_is_aligned(ptrs.$indices);)*
                 ptrs
             }
         }

@@ -71,23 +71,7 @@ pub fn buffer_layout<T>(context: &T::Context, capacity: usize) -> Result<Layout,
 where
     T: AllocSoa + ?Sized,
 {
-    if is_zst::<T>(context) || capacity == 0 {
-        if is_context_zst::<T>() {
-            return Ok(Layout::new::<()>());
-        }
-        let item_layout = Layout::new::<BufferData<T>>();
-        let size = size_of::<BufferPrefix<T>>().next_multiple_of(item_layout.size());
-        let layout = Layout::from_size_align(size, item_layout.align())?.pad_to_align();
-        return Ok(layout);
-    }
-
-    let required = buffer_layout_not_padded::<T>(context, capacity)?.pad_to_align();
-    let capacity_in_bytes = required.size();
-
-    let item_layout = Layout::new::<BufferData<T>>();
-    let size = capacity_in_bytes.next_multiple_of(item_layout.size());
-    let layout = Layout::from_size_align(size, item_layout.align())?.pad_to_align();
-
+    let layout = buffer_layout_inner::<T>(context, capacity)?.pad_to_align();
     Ok(layout)
 }
 
@@ -103,7 +87,7 @@ where
     }
 
     let item_layout = Layout::new::<BufferData<T>>();
-    let size = buffer_layout.size().next_multiple_of(item_layout.size());
+    let size = buffer_layout.size();
     let buffer_layout = Layout::from_size_align(size, item_layout.align())
         .expect("layout size should not exceed `isize::MAX`")
         .pad_to_align();
@@ -151,22 +135,29 @@ const _: () = {
 };
 
 #[inline]
-fn buffer_layout_not_padded<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
+fn buffer_layout_inner<T>(context: &T::Context, capacity: usize) -> Result<Layout, LayoutError>
 where
     T: AllocSoa + ?Sized,
 {
-    if is_zst::<T>(context) || capacity == 0 {
-        if is_context_zst::<T>() {
-            return Ok(Layout::new::<()>());
-        }
-        return Ok(Layout::new::<BufferPrefix<T>>());
-    }
+    let (size, align) = if is_zst::<T>(context) || capacity == 0 {
+        let prefix = size_of::<BufferPrefix<T>>();
+        let size = if is_context_zst::<T>() { 0 } else { prefix };
+        let align = context
+            .field_descriptors()
+            .copied_field_descriptors()
+            .map(|desc| desc.layout().align())
+            .max()
+            .unwrap_or(1);
+        (size, align)
+    } else {
+        let buffer = context.buffer_layout(capacity)?;
+        let prefix = Layout::new::<BufferPrefix<T>>();
+        let (layout, _) = prefix.extend(buffer)?;
+        (layout.size(), layout.align())
+    };
 
-    let layout = context.buffer_layout(capacity)?;
-    let prefix_layout = Layout::new::<BufferPrefix<T>>();
-    let (layout, _) = prefix_layout.extend(layout)?;
-
-    Ok(layout)
+    let align = usize::max(align, align_of::<BufferData<T>>());
+    Layout::from_size_align(size, align)
 }
 
 #[inline]
@@ -191,15 +182,14 @@ mod tests {
     use core::alloc::Layout;
 
     use super::{
-        BufferData, BufferPrefix, buffer_layout_not_padded, capacity_from_not_padded,
-        should_allocate,
+        BufferData, BufferPrefix, buffer_layout_inner, capacity_from_not_padded, should_allocate,
     };
 
     #[test]
     #[cfg_attr(miri, ignore)]
     fn u8_u8_u8_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u8, u8, u8)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u8, u8, u8)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -265,7 +255,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn u16_u16_u16_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u16, u16, u16)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u16, u16, u16)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -327,7 +317,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn u32_u32_u32_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u32, u32, u32)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u32, u32, u32)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -388,7 +378,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn u64_u64_u64_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u64, u64, u64)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u64, u64, u64)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -450,7 +440,7 @@ mod tests {
     #[rustfmt::skip::macros(assert_eq)]
     fn u8_u16_u32_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u8, u16, u32)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u8, u16, u32)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -517,12 +507,12 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn u32_u16_u8_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u32, u16, u8)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u32, u16, u8)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
         let efficient_to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u8, u16, u32)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u8, u16, u32)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -564,12 +554,12 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn u8_u16_u8_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u8, u16, u8)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u8, u16, u8)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
         let efficient_to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u8, u8, u16)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u8, u8, u16)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -611,12 +601,12 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn u16_u8_u16_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u16, u8, u16)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u16, u8, u16)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
         let efficient_to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u8, u16, u16)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u8, u16, u16)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -658,12 +648,12 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn u16_u8_u32_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u16, u8, u32)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u16, u8, u32)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
         let efficient_to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u8, u16, u32)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u8, u16, u32)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
@@ -705,12 +695,12 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn u16_u32_u16_to_capacity_in_bytes() {
         let to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u16, u32, u16)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u16, u32, u16)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };
         let efficient_to_capacity_in_bytes = |capacity| {
-            buffer_layout_not_padded::<(u16, u16, u32)>(&Default::default(), capacity)
+            buffer_layout_inner::<(u16, u16, u32)>(&Default::default(), capacity)
                 .unwrap()
                 .size()
         };

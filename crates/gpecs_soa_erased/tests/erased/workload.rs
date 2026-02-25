@@ -237,7 +237,7 @@ fn with_capacity_zst() {
 
 #[test]
 fn one_item() {
-    type Soa = (u8, u64, u16, ());
+    type Soa = (u8, u128, u16, ());
     type Vec = SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
 
     let context = Default::default();
@@ -247,7 +247,7 @@ fn one_item() {
         FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<()>(),
         FieldDescriptor::of::<u16>(),
-        FieldDescriptor::of::<u64>(),
+        FieldDescriptor::of::<u128>(),
     ];
     itertools::assert_equal(
         erased_context
@@ -261,16 +261,16 @@ fn one_item() {
     let mut vec = Vec::with_context(erased_context);
 
     let u8 = 1;
-    let u64 = 2;
+    let u128 = 2;
     let u16 = 3;
-    vec.push(ErasedSoa::try_from(&context, (u8, u64, u16, ())).unwrap());
+    vec.push(ErasedSoa::try_from(&context, (u8, u128, u16, ())).unwrap());
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
         vec.slices()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
-        Some((&u8, &u64, &u16, &())),
+        Some((&u8, &u128, &u16, &())),
     );
 
     let mut vec = {
@@ -282,7 +282,7 @@ fn one_item() {
         unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
-            [u64].as_slice(),
+            [u128].as_slice(),
             [u16].as_slice(),
             [()].as_slice(),
         ),
@@ -294,7 +294,7 @@ fn one_item() {
         unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
-            [u64].as_slice(),
+            [u128].as_slice(),
             [u16].as_slice(),
             [()].as_slice(),
         ),
@@ -303,14 +303,14 @@ fn one_item() {
         vec.slices()
             .into_get(0)
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
-        Some((&u8, &u64, &u16, &())),
+        Some((&u8, &u128, &u16, &())),
     );
 
     assert_eq!(
         unsafe { slices.as_slices().downcast::<Soa>(&context) }.unwrap(),
         (
             [u8].as_slice(),
-            [u64].as_slice(),
+            [u128].as_slice(),
             [u16].as_slice(),
             [()].as_slice(),
         ),
@@ -321,7 +321,7 @@ fn one_item() {
     assert_eq!(
         iter.next_back()
             .map(|refs| unsafe { refs.downcast::<Soa>(&context) }.unwrap()),
-        Some((&u8, &u64, &u16, &())),
+        Some((&u8, &u128, &u16, &())),
     );
     assert!(iter.next().is_none());
 
@@ -331,7 +331,7 @@ fn one_item() {
     assert!(vec.slices().into_get(0).is_none());
 
     let value = unsafe { value.downcast::<Soa>(&context) }.unwrap();
-    assert_eq!(value, (u8, u64, u16, ()));
+    assert_eq!(value, (u8, u128, u16, ()));
 
     assert_eq!(
         unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
@@ -438,17 +438,17 @@ fn one_item_zst() {
 
 #[test]
 fn three_items() {
-    type Soa = (u8, String, u64, ());
+    type Soa = (u16, String, u128, ());
     type Vec = SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>;
 
     let context = Default::default();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
     let descriptors = [
-        FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<()>(),
+        FieldDescriptor::of::<u16>(),
         FieldDescriptor::of::<String>(),
-        FieldDescriptor::of::<u64>(),
+        FieldDescriptor::of::<u128>(),
     ];
     itertools::assert_equal(
         erased_context

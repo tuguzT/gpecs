@@ -4,7 +4,7 @@ use core::{
 };
 
 use crate::{
-    field::{FieldDescriptors, IntoCopiedFieldDescriptors},
+    field::{FieldDescriptor, FieldDescriptors, IntoCopiedFieldDescriptors},
     traits::{AllocSoa, AllocSoaContext, RawSoa},
 };
 
@@ -34,17 +34,37 @@ where
 }
 
 #[inline]
+pub fn packed_size_of_fields<I>(fields: I) -> usize
+where
+    I: IntoIterator<Item: AsRef<FieldDescriptor>>,
+{
+    fields
+        .into_iter()
+        .copied_field_descriptors()
+        .map(|desc| desc.layout().size())
+        .sum()
+}
+
+#[inline]
+pub fn align_of_fields<I>(fields: I) -> usize
+where
+    I: IntoIterator<Item: AsRef<FieldDescriptor>>,
+{
+    fields
+        .into_iter()
+        .copied_field_descriptors()
+        .map(|desc| desc.layout().align())
+        .max()
+        .unwrap_or(1)
+}
+
+#[inline]
 pub fn is_zst<'a, T>(context: &'a T::Context) -> bool
 where
     T: RawSoa + ?Sized,
     T::Context: FieldDescriptors<'a>,
 {
-    let packed_size = context
-        .field_descriptors()
-        .copied_field_descriptors()
-        .map(|desc| desc.layout().size())
-        .sum::<usize>();
-    size_of::<T::Fields>() == 0 || packed_size == 0
+    size_of::<T::Fields>() == 0 || packed_size_of_fields(context.field_descriptors()) == 0
 }
 
 #[inline]
@@ -83,12 +103,7 @@ where
     let (size, align) = if is_zst::<T>(context) || capacity == 0 {
         let prefix = size_of::<BufferPrefix<T>>();
         let size = if is_context_zst::<T>() { 0 } else { prefix };
-        let align = context
-            .field_descriptors()
-            .copied_field_descriptors()
-            .map(|desc| desc.layout().align())
-            .max()
-            .unwrap_or(1);
+        let align = align_of_fields(context.field_descriptors());
         (size, align)
     } else {
         let buffer = context.buffer_layout(capacity)?;
@@ -106,12 +121,19 @@ pub fn capacity_from<T>(context: &T::Context, buffer_layout: Layout) -> usize
 where
     T: AllocSoa + ?Sized,
 {
-    let size_of_prefix = size_of::<BufferPrefix<T>>();
-    if is_zst::<T>(context) || buffer_layout.size() < size_of_prefix {
+    let prefix = Layout::new::<BufferPrefix<T>>();
+    if is_zst::<T>(context) || buffer_layout.size() <= prefix.size() {
         return 0;
     }
 
-    let size = buffer_layout.size() - size_of_prefix;
+    let align = align_of_fields(context.field_descriptors());
+    let next = Layout::from_size_align(0, align)
+        .expect("ZST layout should be valid for any possible alignment");
+    let (_, offset) = prefix
+        .extend(next)
+        .expect("extending prefix with ZST layout should be always possible");
+
+    let size = buffer_layout.size() - offset;
     let buffer_layout = Layout::from_size_align(size, buffer_layout.align())
         .expect("layout size should not exceed `isize::MAX`");
     context.capacity_from(buffer_layout)

@@ -1,7 +1,8 @@
 use core::alloc::{Layout, LayoutError};
 
-use crate::field::{
-    FieldDescriptors, FieldDescriptorsOwned, IntoCopiedFieldDescriptors, buffer_layout,
+use crate::{
+    field::{FieldDescriptors, FieldDescriptorsOwned, buffer_layout},
+    layout::packed_size_of_fields,
 };
 
 pub use self::tuple::*;
@@ -349,11 +350,7 @@ pub unsafe trait AllocSoaContext: RawSoaContext + FieldDescriptorsOwned + Sized 
 
     /// Retrieves maximum number of sets of fields which can be stored inside of a buffer with given layout.
     fn capacity_from(&self, buffer_layout: Layout) -> usize {
-        let packed_size = self
-            .field_descriptors()
-            .copied_field_descriptors()
-            .map(|desc| desc.layout().size())
-            .sum();
+        let packed_size = packed_size_of_fields(self.field_descriptors());
         let buffer_size = buffer_layout.size();
         let max_capacity = buffer_size.checked_div(packed_size).unwrap_or(0);
 

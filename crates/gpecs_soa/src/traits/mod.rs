@@ -305,6 +305,7 @@ pub unsafe trait SoaCloneToUninit: RawSoa {
 
 /// An extension of [SoA](RawSoa) type which allows to read `Self`
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
+// TODO: allow to borrow self from the context (add a lifetime parameter?)
 pub unsafe trait SoaRead: RawSoa + Sized {
     /// Constructs the value from reading each field to which [src](RawSoaContext::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.

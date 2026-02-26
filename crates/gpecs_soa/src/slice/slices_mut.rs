@@ -12,8 +12,8 @@ use crate::{
         SoaSlicePtrs, SoaSlicePtrsIndex, SoaSlices, SoaSlicesIndex, assert::slice_index_usize_fail,
     },
     traits::{
-        MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-        SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,
+        CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SliceMutPtrs,
+        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned,
     },
 };
 
@@ -701,7 +701,7 @@ where
             unsafe { context.ptrs_drop_in_place(dst.clone()) }
 
             let src = unsafe { src.get_unchecked(index) };
-            unsafe { T::clone_to_uninit(context, src, dst) }
+            unsafe { context.clone_to_uninit(src, dst) }
         }
     }
 }

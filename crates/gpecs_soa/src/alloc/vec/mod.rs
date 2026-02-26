@@ -20,9 +20,9 @@ use crate::{
         from_raw_parts_mut, range,
     },
     traits::{
-        AllocSoa, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs,
-        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaRead,
-        SoaWrite,
+        AllocSoa, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoaContext, Refs,
+        RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext,
+        SoaOwned, SoaRead, SoaWrite,
     },
 };
 
@@ -666,7 +666,7 @@ where
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
                 let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
-                T::clone_to_uninit(context, src, dst);
+                context.clone_to_uninit(src, dst);
             }
             set_len_on_drop.local_len += 1;
         }
@@ -724,7 +724,7 @@ where
         for src in RawIter::<T>::new(context, slices) {
             unsafe {
                 let dst = context.ptrs_add_mut(dst.clone(), set_len_on_drop.local_len);
-                T::clone_to_uninit(context, src, dst);
+                context.clone_to_uninit(src, dst);
             }
             set_len_on_drop.local_len += 1;
         }

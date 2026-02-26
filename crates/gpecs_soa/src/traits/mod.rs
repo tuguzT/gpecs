@@ -294,13 +294,25 @@ pub unsafe trait RawSoa {
     type Fields;
 }
 
+/// An extension of [SoA context](RawSoaContext) type which allows to perform copy-assignment of each stored field.
+///
+/// This trait is analogous to the unstable [`CloneToUninit`](core::clone::CloneToUninit) trait.
+pub unsafe trait CloneToUninitSoaContext: RawSoaContext {
+    /// Performs copy-assignment of each stored field from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs).
+    /// Before this function is called, src must point to initialized memory and dst may point to uninitialized memory.
+    unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>);
+}
+
 /// A generalization of [`Clone`] specifically for [SoA](RawSoa) type.
 ///
 /// This trait is analogous to the unstable [`CloneToUninit`](core::clone::CloneToUninit) trait.
-pub unsafe trait SoaCloneToUninit: RawSoa {
-    /// Performs copy-assignment of each stored field from [src](RawSoaContext::Ptrs) to [dst](RawSoaContext::MutPtrs).
-    /// Before this function is called, src must point to initialized memory and dst may point to uninitialized memory.
-    unsafe fn clone_to_uninit(context: &Self::Context, src: Ptrs<'_, Self>, dst: MutPtrs<'_, Self>);
+pub unsafe trait SoaCloneToUninit: RawSoa<Context: CloneToUninitSoaContext> {}
+
+unsafe impl<T> SoaCloneToUninit for T
+where
+    T: RawSoa + ?Sized,
+    T::Context: CloneToUninitSoaContext,
+{
 }
 
 /// An extension of [SoA](RawSoa) type which allows to read `Self`

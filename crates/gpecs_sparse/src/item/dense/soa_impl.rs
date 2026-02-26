@@ -8,8 +8,9 @@ use crate::{
     soa::{
         field::FieldDescriptors,
         traits::{
-            AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
-            SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+            AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoa,
+            RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext,
+            SoaRead, SoaWrite,
         },
     },
 };
@@ -217,18 +218,14 @@ where
     type Fields = (K, V::Fields);
 }
 
-unsafe impl<K, V> SoaCloneToUninit for DenseItem<K, V>
+unsafe impl<K, V> CloneToUninitSoaContext for DenseContext<K, V>
 where
     K: Clone,
     V: SoaCloneToUninit + ?Sized,
 {
     #[inline]
-    unsafe fn clone_to_uninit(
-        context: &Self::Context,
-        src: Ptrs<'_, Self>,
-        dst: MutPtrs<'_, Self>,
-    ) {
-        unsafe { src.clone_to_uninit(context, dst) }
+    unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
+        unsafe { src.clone_to_uninit(self, dst) }
     }
 }
 

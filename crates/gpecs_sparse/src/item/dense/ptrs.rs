@@ -8,7 +8,10 @@ use core::{
 use crate::{
     item::{DenseItem, DenseMutPtrs, DenseRefs},
     soa::{
-        traits::{Ptrs, RawSoa, RawSoaContext, Soa, SoaCloneToUninit, SoaContext, SoaRead},
+        traits::{
+            CloneToUninitSoaContext, Ptrs, RawSoa, RawSoaContext, Soa, SoaCloneToUninit,
+            SoaContext, SoaRead,
+        },
         wrapper,
     },
 };
@@ -100,7 +103,7 @@ where
 
         unsafe {
             dst_key.write((&*key).clone());
-            V::clone_to_uninit(context, value, dst_value);
+            context.clone_to_uninit(value, dst_value);
         }
     }
 }

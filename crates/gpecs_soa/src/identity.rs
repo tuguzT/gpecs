@@ -13,8 +13,8 @@ use core::{
 use crate::{
     field::{FieldDescriptor, FieldDescriptors},
     traits::{
-        AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut,
-        SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoa,
+        RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext, SoaRead, SoaWrite,
     },
 };
 
@@ -545,16 +545,12 @@ unsafe impl<T> RawSoa for Identity<T> {
     type Fields = Identity<T>;
 }
 
-unsafe impl<T> SoaCloneToUninit for Identity<T>
+unsafe impl<T> CloneToUninitSoaContext for IdentityContext<T>
 where
     T: Clone,
 {
     #[inline]
-    unsafe fn clone_to_uninit(
-        _context: &Self::Context,
-        src: Ptrs<'_, Self>,
-        dst: MutPtrs<'_, Self>,
-    ) {
+    unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
         let src = unsafe { &*src }.clone();
         unsafe { ptr::write(dst, src) }
     }

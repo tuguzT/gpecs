@@ -11,8 +11,9 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        AllocSoaContext, AllocSoaTrusted, FieldDescriptors, MutPtrs, Ptrs, RawSoa, RawSoaContext,
-        Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, MutPtrs, Ptrs,
+        RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext, SoaRead,
+        SoaWrite,
     },
 };
 
@@ -376,16 +377,12 @@ macro_rules! soa_tuple_impl {
             type Fields = ($($types,)*);
         }
 
-        unsafe impl<$($types,)*> SoaCloneToUninit for ($($types,)*)
+        unsafe impl<$($types,)*> CloneToUninitSoaContext for TupleContext<($($types,)*)>
         where
             $($types: Clone,)*
         {
             #[inline]
-            unsafe fn clone_to_uninit(
-                _context: &Self::Context,
-                src: Ptrs<'_, Self>,
-                dst: MutPtrs<'_, Self>,
-            ) {
+            unsafe fn clone_to_uninit(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>) {
                 let src = unsafe { ($(&*src.$indices,)*) };
                 unsafe { $(ptr::write(dst.$indices, src.$indices.clone());)* }
             }

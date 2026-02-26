@@ -4,7 +4,10 @@ use core_alloc::boxed::Box;
 use crate::{
     alloc::set_len_on_drop::SetLenOnDrop,
     slice::{SoaSlices, SoaSlicesMut},
-    traits::{AllocSoa, RawSoaContext, Refs, SoaCloneToUninit, SoaContext, SoaOwned},
+    traits::{
+        AllocSoa, CloneToUninitSoaContext, RawSoaContext, Refs, SoaCloneToUninit, SoaContext,
+        SoaOwned,
+    },
     vec::SoaVec,
 };
 
@@ -30,7 +33,7 @@ where
                 set_len_on_drop.local_len = index;
 
                 let dst = unsafe { context.ptrs_add_mut(dst.clone(), index) };
-                unsafe { T::clone_to_uninit(context, src, dst) }
+                unsafe { context.clone_to_uninit(src, dst) }
             }
         }
 

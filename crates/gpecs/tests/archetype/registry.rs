@@ -124,7 +124,6 @@ fn register_archetype() {
 }
 
 #[test]
-#[ignore] // TODO: fix an issue & remove this attribute
 fn exchange_components() {
     let mut entities = EntityRegistry::new();
     let mut components = ComponentRegistry::new();
@@ -323,7 +322,7 @@ fn exchange_components() {
         .expect_err("entity should not have `Position` and `Mass` component");
     assert_eq!(
         error,
-        MissingComponentError::new(components.register_component::<Position>()).into(),
+        MissingComponentError::new(components.register_component::<Mass>()).into(),
     );
 }
 

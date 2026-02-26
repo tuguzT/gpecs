@@ -11,8 +11,8 @@ use crate::{
     ptr::BufferDataPtr,
     slice::SoaSlices,
     traits::{
-        AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, SliceMutPtrs, SlicePtrs, Slices,
-        SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaRead,
+        AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, ReadSoaContext, SliceMutPtrs,
+        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaRead,
     },
     vec::SoaVec,
     wrapper,
@@ -340,7 +340,7 @@ where
         let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { Self::post_inc_start(start, ptrs, context, 1) };
 
-        let item = unsafe { T::read(context, ptrs) };
+        let item = unsafe { context.read(ptrs) };
         Some(item)
     }
 
@@ -422,7 +422,7 @@ where
             let ptrs = context.nonnull_to_ptrs(ptrs);
             let ptrs = context.ptrs_cast_const(ptrs);
             let ptrs = unsafe { context.ptrs_add(ptrs, i) };
-            let item = unsafe { T::read(context, ptrs) };
+            let item = unsafe { context.read(ptrs) };
             acc = f(acc, item);
             // SAFETY: `i` can't overflow since it'll only reach usize::MAX if the
             // slice had that length, in which case we'll break out of the loop
@@ -562,7 +562,7 @@ where
         let ptrs = context.ptrs_cast_const(ptrs);
         let ptrs = unsafe { Self::pre_dec_end(end, ptrs, context, 1) };
 
-        let item = unsafe { T::read(context, ptrs) };
+        let item = unsafe { context.read(ptrs) };
         Some(item)
     }
 

@@ -11,8 +11,8 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, MutPtrs, Ptrs,
-        RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext, SoaRead,
+        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, MutPtrs,
+        RawSoa, RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext,
         SoaWrite,
     },
 };
@@ -388,9 +388,9 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        unsafe impl<$($types,)*> SoaRead for ($($types,)*) {
+        unsafe impl<$($types,)*> ReadSoaContext<($($types,)*)> for TupleContext<($($types,)*)> {
             #[inline]
-            unsafe fn read(_context: &Self::Context, ptrs: Ptrs<'_, Self>) -> Self {
+            unsafe fn read(&self, ptrs: Self::Ptrs<'_>) -> ($($types,)*) {
                 unsafe { ($(ptr::read(ptrs.$indices),)*) }
             }
         }

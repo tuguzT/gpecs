@@ -30,8 +30,8 @@ use crate::{
     soa::{
         self,
         traits::{
-            AllocSoa, MutPtrs, Ptrs, RawSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-            SlicesMut, Soa, SoaContext, SoaOwned, SoaRead, SoaWrite,
+            AllocSoa, MutPtrs, Ptrs, RawSoaContext, ReadSoaContext, Refs, RefsMut, SliceMutPtrs,
+            SlicePtrs, Slices, SlicesMut, Soa, SoaContext, SoaOwned, SoaRead, SoaWrite,
         },
         vec::SoaVec,
     },
@@ -1679,19 +1679,19 @@ where
 {
     #[inline]
     pub fn swap_remove(&mut self, key: K) -> Option<V> {
-        self.swap_remove_into(key, |context, src| unsafe { V::read(context, src?) }.into())
+        self.swap_remove_into(key, |context, src| unsafe { context.read(src?) }.into())
     }
 
     #[inline]
     pub fn remove(&mut self, key: K) -> Option<V> {
-        self.remove_into(key, |context, src| unsafe { V::read(context, src?) }.into())
+        self.remove_into(key, |context, src| unsafe { context.read(src?) }.into())
     }
 
     #[inline]
     pub fn pop(&mut self) -> Option<(K, V)> {
         self.pop_into(|context, src| {
             let (key, value) = src?;
-            let value = unsafe { V::read(context, value) };
+            let value = unsafe { context.read(value) };
             (key, value).into()
         })
     }

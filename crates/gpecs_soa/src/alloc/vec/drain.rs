@@ -8,7 +8,9 @@ use core::{
 use crate::{
     layout::is_zst,
     slice::{Iter, range},
-    traits::{AllocSoa, Ptrs, RawSoaContext, SlicePtrs, Slices, Soa, SoaOwned, SoaRead},
+    traits::{
+        AllocSoa, Ptrs, RawSoaContext, ReadSoaContext, SlicePtrs, Slices, Soa, SoaOwned, SoaRead,
+    },
 };
 
 use super::SoaVec;
@@ -172,10 +174,9 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        iter.as_raw_iter_mut().next().map(|src| {
-            let context = iter.context();
-            unsafe { T::read(context, src) }
-        })
+        iter.as_raw_iter_mut()
+            .next()
+            .map(|src| unsafe { iter.context().read(src) })
     }
 
     #[inline]
@@ -193,10 +194,9 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { iter, .. } = self;
 
-        iter.as_raw_iter_mut().next_back().map(|src| {
-            let context = iter.context();
-            unsafe { T::read(context, src) }
-        })
+        iter.as_raw_iter_mut()
+            .next_back()
+            .map(|src| unsafe { iter.context().read(src) })
     }
 }
 

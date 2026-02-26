@@ -7,8 +7,8 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, MutPtrs, Ptrs,
-        RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext, SoaRead,
+        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, MutPtrs,
+        RawSoa, RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext,
         SoaWrite,
     },
 };
@@ -209,9 +209,9 @@ unsafe impl CloneToUninitSoaContext for () {
     unsafe fn clone_to_uninit(&self, _src: Self::Ptrs<'_>, _dst: Self::MutPtrs<'_>) {}
 }
 
-unsafe impl SoaRead for () {
+unsafe impl ReadSoaContext<()> for () {
     #[inline]
-    unsafe fn read(_context: &Self::Context, ptrs: Ptrs<'_, Self>) -> Self {
+    unsafe fn read(&self, ptrs: Self::Ptrs<'_>) {
         unsafe { ptr::read(ptrs) }
     }
 }

@@ -10,8 +10,8 @@ use crate::{
     soa::{
         field::{FieldDescriptors, FieldDescriptorsOutput},
         traits::{
-            AllocSoaContext, MutPtrs, Ptrs, RawSoa, RawSoaContext, Refs, RefsMut, SoaAsMutRefs,
-            SoaAsRefs, SoaContext, SoaRead, SoaWrite,
+            AllocSoaContext, MutPtrs, RawSoa, RawSoaContext, ReadSoaContext, Refs, RefsMut,
+            SoaAsMutRefs, SoaAsRefs, SoaContext, SoaWrite,
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
@@ -238,21 +238,21 @@ where
     type Fields = ErasedSoaFields<U>;
 }
 
-unsafe impl<T, D, P, U> SoaRead for ErasedSoa<T, D, P>
+unsafe impl<T, D, P, U> ReadSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     T: AlignedStorageFromLayout<Item = U, Error: Debug>,
-    D: CovariantFieldDescriptors + Clone,
+    D: CovariantFieldDescriptors + Clone, // TODO: avoid cloning field descriptors
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
     U: Copy,
 {
     #[inline]
-    unsafe fn read(context: &Self::Context, src: Ptrs<'_, Self>) -> Self {
+    unsafe fn read(&self, src: Self::Ptrs<'_>) -> ErasedSoa<T, D, P> {
         let fields = src
             .into_iter()
             .map(|src| unsafe { src.deref().into_buffer() });
-        let descriptors = context.clone().into_inner();
-        Self::try_from_fields_descriptors(fields, descriptors)
+        let descriptors = self.clone().into_inner();
+        ErasedSoa::try_from_fields_descriptors(fields, descriptors)
             .expect("length of fields should be equal to the length of descriptors")
     }
 }

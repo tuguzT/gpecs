@@ -28,7 +28,7 @@ use crate::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
             FieldDescriptorsOwned, buffer_offsets,
         },
-        traits::{AllocSoa, AllocSoaContext, SoaRead, SoaWrite},
+        traits::{AllocSoa, AllocSoaContext, ReadSoaContext, SoaRead, SoaWrite},
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
     uninit::try_init_copy_from_slice,
@@ -136,7 +136,7 @@ where
         let Self { storage, .. } = self;
         let value = unsafe {
             let src = context.ptrs_from_buffer(storage.as_ptr(), 1);
-            V::read(context, src)
+            context.read(src)
         };
         Ok(value)
     }

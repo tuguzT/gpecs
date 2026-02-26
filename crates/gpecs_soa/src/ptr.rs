@@ -8,7 +8,8 @@ use crate::{
     layout::{BufferData, BufferPrefix, buffer_layout, is_zst, should_allocate},
     slice::SoaSlice,
     traits::{
-        AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, SoaRead, SoaWrite,
+        AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, ReadSoaContext,
+        SoaRead, SoaWrite,
     },
 };
 
@@ -66,7 +67,7 @@ where
     // such that the old value is not duplicated. Nothing is dropped and
     // nothing here can panic.
     unsafe {
-        let result = T::read(context, context.ptrs_cast_const(dest.clone()));
+        let result = context.read(context.ptrs_cast_const(dest.clone()));
         T::write(context, dest, src);
         result
     }

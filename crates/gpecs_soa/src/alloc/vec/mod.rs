@@ -20,9 +20,9 @@ use crate::{
         from_raw_parts_mut, range,
     },
     traits::{
-        AllocSoa, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoaContext, Refs,
-        RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext,
-        SoaOwned, SoaRead, SoaWrite,
+        AllocSoa, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoaContext,
+        ReadSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
+        SoaCloneToUninit, SoaContext, SoaOwned, SoaRead, SoaWrite,
     },
 };
 
@@ -737,17 +737,17 @@ where
 {
     #[inline]
     pub fn swap_remove(&mut self, index: usize) -> T {
-        self.swap_remove_into(index, |context, src| unsafe { T::read(context, src) })
+        self.swap_remove_into(index, |context, src| unsafe { context.read(src) })
     }
 
     #[inline]
     pub fn remove(&mut self, index: usize) -> T {
-        self.remove_into(index, |context, src| unsafe { T::read(context, src) })
+        self.remove_into(index, |context, src| unsafe { context.read(src) })
     }
 
     #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        self.pop_into(|context, src| unsafe { T::read(context, src?).into() })
+        self.pop_into(|context, src| unsafe { context.read(src?).into() })
     }
 }
 

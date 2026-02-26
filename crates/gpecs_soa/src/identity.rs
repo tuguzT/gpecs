@@ -13,8 +13,8 @@ use core::{
 use crate::{
     field::{FieldDescriptor, FieldDescriptors},
     traits::{
-        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoa,
-        RawSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext, SoaRead, SoaWrite,
+        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, RawSoa, RawSoaContext,
+        ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext, SoaWrite,
     },
 };
 
@@ -556,9 +556,9 @@ where
     }
 }
 
-unsafe impl<T> SoaRead for Identity<T> {
+unsafe impl<T> ReadSoaContext<Identity<T>> for IdentityContext<T> {
     #[inline]
-    unsafe fn read(_context: &Self::Context, src: Ptrs<'_, Self>) -> Self {
+    unsafe fn read(&self, src: Self::Ptrs<'_>) -> Identity<T> {
         unsafe { ptr::read(src) }
     }
 }

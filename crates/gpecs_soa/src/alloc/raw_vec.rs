@@ -404,12 +404,11 @@ where
         let capacity = cmp::max(self.capacity().saturating_mul(2), required_capacity);
         let capacity = cmp::max(Self::min_non_zero_cap(context), capacity);
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
+        let capacity = capacity_from::<T>(context, new_layout);
 
         let current_memory = self.current_memory(context);
         let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, current_memory)?.cast();
 
-        let context = unsafe { ptr.as_ptr().context() };
-        let capacity = capacity_from::<T>(context, new_layout);
         unsafe {
             self.set_ptr_and_capacity(ptr, capacity);
         }
@@ -424,12 +423,11 @@ where
 
         let capacity = len.checked_add(additional).ok_or(CapacityOverflow)?;
         let new_layout = buffer_layout::<T>(context, capacity).map_err(|_| CapacityOverflow)?;
+        let capacity = capacity_from::<T>(context, new_layout);
 
         let current_memory = self.current_memory(context);
         let ptr: NonNull<BufferData<_>> = finish_grow(new_layout, current_memory)?.cast();
 
-        let context = unsafe { ptr.as_ptr().context() };
-        let capacity = capacity_from::<T>(context, new_layout);
         unsafe {
             self.set_ptr_and_capacity(ptr, capacity);
         }

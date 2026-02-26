@@ -2,7 +2,9 @@ use crate::{
     bundle::{Bundle, BundleMutPtrs, BundlePtrs},
     component::{
         Component,
-        erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind},
+        erased::{
+            ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
+        },
         error::NotRegisteredError,
         registry::{ComponentId, ComponentRegistry},
     },
@@ -68,6 +70,21 @@ where
 
         let ptr = ptr.downcast::<T>(components)?.cast();
         Ok(ptr)
+    }
+
+    #[inline]
+    fn from_erased<I>(components: &ComponentRegistry, iter: I) -> Result<Self, DowncastErrorKind>
+    where
+        I: IntoIterator<Item = ErasedComponent>,
+    {
+        let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
+        let component = iter
+            .into_iter()
+            .find(|component| component.component_id() == component_id)
+            .ok_or(NotRegisteredError)?;
+
+        let component = component.downcast::<T>(components)?;
+        Ok(component.into())
     }
 }
 
@@ -149,6 +166,28 @@ macro_rules! bundle_tuple_impl {
 
                 let ptrs = ($(ptrs.$indices.ok_or(NotRegisteredError)?,)*);
                 Ok(ptrs)
+            }
+
+            #[inline]
+            fn from_erased<Iter>(components: &ComponentRegistry, iter: Iter) -> Result<Self, DowncastErrorKind>
+            where
+                Iter: IntoIterator<Item = ErasedComponent>,
+            {
+                let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
+
+                let mut fields = ($(None::<$types>,)*);
+                #[expect(clippy::needless_continue)]
+                for field in iter {
+                    $(
+                        if fields.$indices.is_none() && field.component_id() == component_ids[$indices] {
+                            fields.$indices = Some(field.downcast(components)?);
+                            continue;
+                        }
+                    )*
+                }
+
+                let fields = ($(fields.$indices.ok_or(NotRegisteredError)?,)*);
+                Ok(fields)
             }
         }
     };

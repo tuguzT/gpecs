@@ -415,12 +415,8 @@ impl ArchetypeStorage {
             return Ok(None);
         };
 
-        let bundle_component_ids = B::get_components(components)
-            .into_iter()
-            .map(|component_id| component_id.expect("all of components should be registered"));
-        let value = unsafe {
-            from_erased_fields::<B>(components, B::CONTEXT, bundle_component_ids, fields)
-        };
+        let value = B::from_erased(components, fields)
+            .expect("exact archetype compatibility should be already checked");
         Ok(Some(value))
     }
 
@@ -439,12 +435,8 @@ impl ArchetypeStorage {
             return Ok(None);
         };
 
-        let bundle_component_ids = B::get_components(components)
-            .into_iter()
-            .map(|component_id| component_id.expect("all of components should be registered"));
-        let value = unsafe {
-            from_erased_fields::<B>(components, B::CONTEXT, bundle_component_ids, fields)
-        };
+        let value = B::from_erased(components, fields)
+            .expect("exact archetype compatibility should be already checked");
         Ok(Some(value))
     }
 

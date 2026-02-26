@@ -1,6 +1,8 @@
 use crate::{
     component::{
-        erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind},
+        erased::{
+            ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
+        },
         registry::{ComponentId, ComponentRegistry},
     },
     soa::traits::{
@@ -89,4 +91,19 @@ pub unsafe trait Bundle: SoaOwned + AllocSoa + SoaRead + SoaWrite + 'static {
     ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
     where
         I: IntoIterator<Item = ErasedComponentMutPtr>;
+
+    /// Attempts to downcast input collection of erased components
+    /// into the collection of components of this bundle.
+    ///
+    /// Note that the order of input components **may not** match
+    /// with the order of components in this bundle.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if:
+    /// - some of the components of this bundle were not registered,
+    /// - some of the input components cannot be converted to the component of this bundle.
+    fn from_erased<I>(components: &ComponentRegistry, iter: I) -> Result<Self, DowncastErrorKind>
+    where
+        I: IntoIterator<Item = ErasedComponent>;
 }

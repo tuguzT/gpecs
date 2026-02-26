@@ -29,10 +29,7 @@ use crate::{
         },
         storage::ArchetypeStorage,
     },
-    bundle::{
-        Bundle, BundleRefs, BundleRefsMut,
-        erased::utils::{from_erased_fields, into_erased_fields},
-    },
+    bundle::{Bundle, BundleRefs, BundleRefsMut, erased::utils::into_erased_fields},
     component::{
         erased::ErasedComponent,
         registry::{ComponentId, ComponentRegistry},
@@ -763,17 +760,13 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
 
-        let fields = component_ids
-            .iter()
-            .copied()
-            .map(|component_id| {
-                old_fields
-                    .swap_take(&component_id)
-                    .unwrap_or_else(|| unreachable!("{component_id} should exist"))
-            })
-            .collect();
-
-        let value = unsafe { from_erased_fields(components, B::CONTEXT, component_ids, fields) };
+        let fields = component_ids.iter().copied().map(|component_id| {
+            old_fields
+                .swap_take(&component_id)
+                .unwrap_or_else(|| unreachable!("{component_id} should exist"))
+        });
+        let value = B::from_erased(components, fields)
+            .expect("input fields should be compatible with the bundle");
 
         let new_fields = old_fields;
         Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);

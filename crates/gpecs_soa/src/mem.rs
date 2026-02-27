@@ -4,9 +4,9 @@ use crate::{
 };
 
 /// Version of [`core::mem::replace()`] but for [SoA](Soa) types.
-pub fn replace<'a, T>(context: &T::Context, dest: RefsMut<'_, 'a, T>, src: T) -> T
+pub fn replace<'a, T, R>(context: &T::Context, dest: RefsMut<'_, 'a, T>, src: T) -> R
 where
-    T: Soa<'a> + SoaRead + SoaWrite,
+    T: Soa<'a> + SoaRead<R> + SoaWrite,
 {
     let dest = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(dest));
     unsafe { ptr::replace(context, dest, src) }

@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    marker::PhantomData,
     ops::{Range, RangeBounds},
     ptr::NonNull,
 };
@@ -15,9 +16,10 @@ use crate::{
 
 use super::SoaVec;
 
-pub struct Drain<'a, T>
+pub struct Drain<'a, T, R = T>
 where
     T: AllocSoa + ?Sized + 'a,
+    R: ?Sized,
 {
     /// Index of tail to preserve
     tail_start: usize,
@@ -26,18 +28,17 @@ where
     /// Current remaining range to remove
     iter: Iter<'a, 'a, T>,
     vec: NonNull<SoaVec<T>>,
+    phantom: PhantomData<fn() -> R>,
 }
 
-impl<'a, T> Drain<'a, T>
+impl<'a, T, R> Drain<'a, T, R>
 where
     T: AllocSoa + ?Sized,
+    R: ?Sized,
 {
     #[inline]
     #[track_caller]
-    pub(super) fn new<R>(vec: &'a mut SoaVec<T>, range: R) -> Self
-    where
-        R: RangeBounds<usize>,
-    {
+    pub(super) fn new(vec: &'a mut SoaVec<T>, range: impl RangeBounds<usize>) -> Self {
         // Memory safety
         //
         // When the Drain is first created, it shortens the length of
@@ -65,6 +66,7 @@ where
             tail_len: len - end,
             iter: unsafe { Iter::from_parts(context, slices) },
             vec,
+            phantom: PhantomData,
         }
     }
 
@@ -110,9 +112,10 @@ where
     }
 }
 
-impl<'a, T> Drain<'_, T>
+impl<'a, T, R> Drain<'_, T, R>
 where
     T: AllocSoa + Soa<'a> + ?Sized,
+    R: ?Sized,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
@@ -127,25 +130,28 @@ where
     }
 }
 
-unsafe impl<T> Send for Drain<'_, T>
+unsafe impl<T, R> Send for Drain<'_, T, R>
 where
     T: AllocSoa + ?Sized,
     T::Context: Send,
     T::Fields: Send,
+    R: ?Sized,
 {
 }
 
-unsafe impl<T> Sync for Drain<'_, T>
+unsafe impl<T, R> Sync for Drain<'_, T, R>
 where
     T: AllocSoa + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
+    R: ?Sized,
 {
 }
 
-impl<T, U> AsRef<[U]> for Drain<'_, T>
+impl<T, U, R> AsRef<[U]> for Drain<'_, T, R>
 where
     T: SoaOwned + AllocSoa + ?Sized,
+    R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     fn as_ref(&self) -> &[U] {
@@ -153,9 +159,10 @@ where
     }
 }
 
-impl<T> Debug for Drain<'_, T>
+impl<T, R> Debug for Drain<'_, T, R>
 where
     T: SoaOwned + AllocSoa + ?Sized,
+    R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -164,11 +171,11 @@ where
     }
 }
 
-impl<T> Iterator for Drain<'_, T>
+impl<T, R> Iterator for Drain<'_, T, R>
 where
-    T: AllocSoa + SoaRead,
+    T: AllocSoa + SoaRead<R> + ?Sized,
 {
-    type Item = T;
+    type Item = R;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -186,9 +193,9 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for Drain<'_, T>
+impl<T, R> DoubleEndedIterator for Drain<'_, T, R>
 where
-    T: AllocSoa + SoaRead,
+    T: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -200,9 +207,9 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for Drain<'_, T>
+impl<T, R> ExactSizeIterator for Drain<'_, T, R>
 where
-    T: AllocSoa + SoaRead,
+    T: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -210,21 +217,24 @@ where
     }
 }
 
-impl<T> FusedIterator for Drain<'_, T> where T: AllocSoa + SoaRead {}
+impl<T, R> FusedIterator for Drain<'_, T, R> where T: AllocSoa + SoaRead<R> + ?Sized {}
 
-impl<T> Drop for Drain<'_, T>
+impl<T, R> Drop for Drain<'_, T, R>
 where
     T: AllocSoa + ?Sized,
+    R: ?Sized,
 {
     fn drop(&mut self) {
         /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
-        struct DropGuard<'r, 'a, T>(&'r mut Drain<'a, T>)
-        where
-            T: AllocSoa + ?Sized;
-
-        impl<T> Drop for DropGuard<'_, '_, T>
+        struct DropGuard<'r, 'a, T, R>(&'r mut Drain<'a, T, R>)
         where
             T: AllocSoa + ?Sized,
+            R: ?Sized;
+
+        impl<T, R> Drop for DropGuard<'_, '_, T, R>
+        where
+            T: AllocSoa + ?Sized,
+            R: ?Sized,
         {
             fn drop(&mut self) {
                 let Self(drain) = self;

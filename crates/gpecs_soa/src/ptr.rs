@@ -57,9 +57,9 @@ where
 }
 
 /// Version of [`core::ptr::replace()`] but for [SoA](crate::traits::RawSoa) types.
-pub unsafe fn replace<T>(context: &T::Context, dest: MutPtrs<'_, T>, src: T) -> T
+pub unsafe fn replace<T, R>(context: &T::Context, dest: MutPtrs<'_, T>, src: T) -> R
 where
-    T: SoaRead + SoaWrite,
+    T: SoaRead<R> + SoaWrite,
 {
     let dest = T::Context::upcast_mut_ptrs(dest);
 

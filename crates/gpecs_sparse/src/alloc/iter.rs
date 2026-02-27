@@ -263,19 +263,21 @@ where
 impl<K, V> FusedIterator for IntoKeys<K, V> where V: RawSoa + ?Sized {}
 
 #[repr(transparent)]
-pub struct IntoValues<K, V>
+pub struct IntoValues<K, V, R>
 where
     V: AllocSoa + ?Sized,
+    R: ?Sized,
 {
-    inner: vec::IntoIter<DenseItem<K, V>>,
+    inner: vec::IntoIter<DenseItem<K, V>, DenseItem<K, R>>,
 }
 
-impl<K, V> IntoValues<K, V>
+impl<K, V, R> IntoValues<K, V, R>
 where
     V: AllocSoa + ?Sized,
+    R: ?Sized,
 {
     #[inline]
-    pub(super) fn new(inner: vec::IntoIter<DenseItem<K, V>>) -> Self {
+    pub(super) fn new(inner: vec::IntoIter<DenseItem<K, V>, DenseItem<K, R>>) -> Self {
         Self { inner }
     }
 
@@ -357,9 +359,10 @@ where
     }
 }
 
-impl<'a, K, V> IntoValues<K, V>
+impl<'a, K, V, R> IntoValues<K, V, R>
 where
     V: AllocSoa + Soa<'a> + ?Sized,
+    R: ?Sized,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, V> {
@@ -392,9 +395,10 @@ where
     }
 }
 
-impl<K, V> Debug for IntoValues<K, V>
+impl<K, V, R> Debug for IntoValues<K, V, R>
 where
     V: SoaOwned + AllocSoa + ?Sized,
+    R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -403,10 +407,11 @@ where
     }
 }
 
-impl<K, V> Default for IntoValues<K, V>
+impl<K, V, R> Default for IntoValues<K, V, R>
 where
     V: AllocSoa + ?Sized,
     V::Context: Default,
+    R: ?Sized,
 {
     #[inline]
     fn default() -> Self {
@@ -415,11 +420,12 @@ where
     }
 }
 
-impl<K, V> Clone for IntoValues<K, V>
+impl<K, V, R> Clone for IntoValues<K, V, R>
 where
     K: Clone,
     V: AllocSoa + SoaCloneToUninit + ?Sized,
     V::Context: Clone,
+    R: ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -429,33 +435,35 @@ where
     }
 }
 
-impl<T, K, V> AsRef<[T]> for IntoValues<K, V>
+impl<K, V, R, U> AsRef<[U]> for IntoValues<K, V, R>
 where
     V: SoaOwned + AllocSoa + ?Sized,
-    for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
+    R: ?Sized,
+    for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [U]>,
 {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[U] {
         self.as_slices().into()
     }
 }
 
-impl<T, K, V> AsMut<[T]> for IntoValues<K, V>
+impl<K, V, R, U> AsMut<[U]> for IntoValues<K, V, R>
 where
     V: SoaOwned + AllocSoa + ?Sized,
-    for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
+    R: ?Sized,
+    for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [U]>,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [T] {
+    fn as_mut(&mut self) -> &mut [U] {
         self.as_mut_slices().into()
     }
 }
 
-impl<K, V> Iterator for IntoValues<K, V>
+impl<K, V, R> Iterator for IntoValues<K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
-    type Item = V;
+    type Item = R;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -489,9 +497,9 @@ where
     }
 }
 
-impl<K, V> DoubleEndedIterator for IntoValues<K, V>
+impl<K, V, R> DoubleEndedIterator for IntoValues<K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -500,9 +508,9 @@ where
     }
 }
 
-impl<K, V> ExactSizeIterator for IntoValues<K, V>
+impl<K, V, R> ExactSizeIterator for IntoValues<K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -510,22 +518,24 @@ where
     }
 }
 
-impl<K, V> FusedIterator for IntoValues<K, V> where V: AllocSoa + SoaRead {}
+impl<K, V, R> FusedIterator for IntoValues<K, V, R> where V: AllocSoa + SoaRead<R> + ?Sized {}
 
 #[repr(transparent)]
-pub struct IntoIter<K, V>
+pub struct IntoIter<K, V, R>
 where
     V: AllocSoa + ?Sized,
+    R: ?Sized,
 {
-    inner: vec::IntoIter<DenseItem<K, V>>,
+    inner: vec::IntoIter<DenseItem<K, V>, DenseItem<K, R>>,
 }
 
-impl<K, V> IntoIter<K, V>
+impl<K, V, R> IntoIter<K, V, R>
 where
     V: AllocSoa + ?Sized,
+    R: ?Sized,
 {
     #[inline]
-    pub(super) fn new(inner: vec::IntoIter<DenseItem<K, V>>) -> Self {
+    pub(super) fn new(inner: vec::IntoIter<DenseItem<K, V>, DenseItem<K, R>>) -> Self {
         Self { inner }
     }
 
@@ -635,9 +645,10 @@ where
     }
 }
 
-impl<'a, K, V> IntoIter<K, V>
+impl<'a, K, V, R> IntoIter<K, V, R>
 where
     V: AllocSoa + Soa<'a> + ?Sized,
+    R: ?Sized,
 {
     #[inline]
     pub fn as_value_slices(&'a self) -> Slices<'a, 'a, V> {
@@ -698,10 +709,11 @@ where
     }
 }
 
-impl<K, V> Debug for IntoIter<K, V>
+impl<K, V, R> Debug for IntoIter<K, V, R>
 where
     K: Debug,
     V: SoaOwned + AllocSoa + ?Sized,
+    R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -713,10 +725,11 @@ where
     }
 }
 
-impl<K, V> Default for IntoIter<K, V>
+impl<K, V, R> Default for IntoIter<K, V, R>
 where
     V: AllocSoa + ?Sized,
     V::Context: Default,
+    R: ?Sized,
 {
     #[inline]
     fn default() -> Self {
@@ -725,11 +738,12 @@ where
     }
 }
 
-impl<K, V> Clone for IntoIter<K, V>
+impl<K, V, R> Clone for IntoIter<K, V, R>
 where
     K: Clone,
     V: AllocSoa + SoaCloneToUninit + ?Sized,
     V::Context: Clone,
+    R: ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -739,33 +753,35 @@ where
     }
 }
 
-impl<T, K, V> AsRef<[T]> for IntoIter<K, V>
+impl<K, V, R, U> AsRef<[U]> for IntoIter<K, V, R>
 where
     V: SoaOwned + AllocSoa + ?Sized,
-    for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
+    R: ?Sized,
+    for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [U]>,
 {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[U] {
         self.as_value_slices().into()
     }
 }
 
-impl<T, K, V> AsMut<[T]> for IntoIter<K, V>
+impl<K, V, R, U> AsMut<[U]> for IntoIter<K, V, R>
 where
     V: SoaOwned + AllocSoa + ?Sized,
-    for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [T]>,
+    R: ?Sized,
+    for<'ctx, 'a> SlicesMut<'ctx, 'a, V>: Into<&'a mut [U]>,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [T] {
+    fn as_mut(&mut self) -> &mut [U] {
         self.as_mut_value_slices().into()
     }
 }
 
-impl<K, V> Iterator for IntoIter<K, V>
+impl<K, V, R> Iterator for IntoIter<K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
-    type Item = (K, V);
+    type Item = (K, R);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -789,9 +805,9 @@ where
     }
 }
 
-impl<K, V> DoubleEndedIterator for IntoIter<K, V>
+impl<K, V, R> DoubleEndedIterator for IntoIter<K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -800,9 +816,9 @@ where
     }
 }
 
-impl<K, V> ExactSizeIterator for IntoIter<K, V>
+impl<K, V, R> ExactSizeIterator for IntoIter<K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -810,22 +826,24 @@ where
     }
 }
 
-impl<K, V> FusedIterator for IntoIter<K, V> where V: AllocSoa + SoaRead {}
+impl<K, V, R> FusedIterator for IntoIter<K, V, R> where V: AllocSoa + SoaRead<R> + ?Sized {}
 
 #[repr(transparent)]
-pub struct Drain<'a, K, V>
+pub struct Drain<'a, K, V, R>
 where
     V: AllocSoa + ?Sized,
+    R: ?Sized,
 {
-    inner: vec::Drain<'a, DenseItem<K, V>>,
+    inner: vec::Drain<'a, DenseItem<K, V>, DenseItem<K, R>>,
 }
 
-impl<'a, K, V> Drain<'a, K, V>
+impl<'a, K, V, R> Drain<'a, K, V, R>
 where
     V: AllocSoa + ?Sized,
+    R: ?Sized,
 {
     #[inline]
-    pub(super) fn new(inner: vec::Drain<'a, DenseItem<K, V>>) -> Self {
+    pub(super) fn new(inner: vec::Drain<'a, DenseItem<K, V>, DenseItem<K, R>>) -> Self {
         Self { inner }
     }
 
@@ -890,9 +908,10 @@ where
     }
 }
 
-impl<'a, K, V> Drain<'_, K, V>
+impl<'a, K, V, R> Drain<'_, K, V, R>
 where
     V: AllocSoa + Soa<'a> + ?Sized,
+    R: ?Sized,
 {
     #[inline]
     pub fn as_value_slices(&'a self) -> Slices<'a, 'a, V> {
@@ -922,10 +941,11 @@ where
     }
 }
 
-impl<K, V> Debug for Drain<'_, K, V>
+impl<K, V, R> Debug for Drain<'_, K, V, R>
 where
     K: Debug,
     V: SoaOwned + AllocSoa + ?Sized,
+    R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, V>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -937,22 +957,23 @@ where
     }
 }
 
-impl<T, K, V> AsRef<[T]> for Drain<'_, K, V>
+impl<K, V, R, U> AsRef<[U]> for Drain<'_, K, V, R>
 where
     V: SoaOwned + AllocSoa + ?Sized,
-    for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [T]>,
+    R: ?Sized,
+    for<'ctx, 'a> Slices<'ctx, 'a, V>: Into<&'a [U]>,
 {
     #[inline]
-    fn as_ref(&self) -> &[T] {
+    fn as_ref(&self) -> &[U] {
         self.as_value_slices().into()
     }
 }
 
-impl<K, V> Iterator for Drain<'_, K, V>
+impl<K, V, R> Iterator for Drain<'_, K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
-    type Item = (K, V);
+    type Item = (K, R);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -967,9 +988,9 @@ where
     }
 }
 
-impl<K, V> DoubleEndedIterator for Drain<'_, K, V>
+impl<K, V, R> DoubleEndedIterator for Drain<'_, K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -978,9 +999,9 @@ where
     }
 }
 
-impl<K, V> ExactSizeIterator for Drain<'_, K, V>
+impl<K, V, R> ExactSizeIterator for Drain<'_, K, V, R>
 where
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -989,4 +1010,4 @@ where
     }
 }
 
-impl<K, V> FusedIterator for Drain<'_, K, V> where V: AllocSoa + SoaRead {}
+impl<K, V, R> FusedIterator for Drain<'_, K, V, R> where V: AllocSoa + SoaRead<R> + ?Sized {}

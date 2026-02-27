@@ -83,6 +83,18 @@ where
 
         key_offset
     }
+
+    #[inline]
+    pub unsafe fn read<R>(self, context: &V::Context) -> DenseItem<K, R>
+    where
+        V: SoaRead<R>,
+    {
+        let Self { key, value } = self;
+
+        let key = unsafe { ptr::read(key) };
+        let value = unsafe { context.read(value.into_inner()) };
+        DenseItem::new(key, value)
+    }
 }
 
 impl<K, V> DensePtrs<'_, K, V>
@@ -119,20 +131,6 @@ where
         let key = unsafe { &*key };
         let value = unsafe { context.ptrs_to_refs(value.into_inner()) };
         DenseRefs::new(key, value)
-    }
-}
-
-impl<K, V> DensePtrs<'_, K, V>
-where
-    V: SoaRead,
-{
-    #[inline]
-    pub unsafe fn read(self, context: &V::Context) -> DenseItem<K, V> {
-        let Self { key, value } = self;
-
-        let key = unsafe { ptr::read(key) };
-        let value = unsafe { context.read(value.into_inner()) };
-        DenseItem::new(key, value)
     }
 }
 

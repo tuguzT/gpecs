@@ -875,6 +875,14 @@ where
         result
     }
 
+    #[inline]
+    pub fn swap_remove<R>(&mut self, key: K) -> Option<R>
+    where
+        V: SoaRead<R>,
+    {
+        self.swap_remove_into(key, |context, src| unsafe { context.read(src?) }.into())
+    }
+
     pub fn remove_into<F, R>(&mut self, key: K, f: F) -> R
     where
         F: FnOnce(&V::Context, Option<Ptrs<'_, V>>) -> R,
@@ -920,6 +928,14 @@ where
         result
     }
 
+    #[inline]
+    pub fn remove<R>(&mut self, key: K) -> Option<R>
+    where
+        V: SoaRead<R>,
+    {
+        self.remove_into(key, |context, src| unsafe { context.read(src?) }.into())
+    }
+
     pub fn pop_into<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&V::Context, Option<(K, Ptrs<'_, V>)>) -> R,
@@ -950,6 +966,18 @@ where
     }
 
     #[inline]
+    pub fn pop<R>(&mut self) -> Option<(K, R)>
+    where
+        V: SoaRead<R>,
+    {
+        self.pop_into(|context, src| {
+            let (key, value) = src?;
+            let value = unsafe { context.read(value) };
+            (key, value).into()
+        })
+    }
+
+    #[inline]
     #[track_caller]
     pub fn insert_from<F, R>(&mut self, key: K, f: F) -> R
     where
@@ -959,6 +987,16 @@ where
             let dst = dst.unwrap_or_else(|error| try_insert_failed(error));
             f(context, dst)
         })
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn insert<R>(&mut self, key: K, value: V) -> Option<R>
+    where
+        V: SoaRead<R> + SoaWrite,
+    {
+        self.try_insert(key, value)
+            .unwrap_or_else(|error| try_insert_failed(error.kind))
     }
 
     pub fn try_insert_from<F, R>(&mut self, key: K, f: F) -> R
@@ -1061,6 +1099,25 @@ where
                 })
             }
         }
+    }
+
+    #[inline]
+    pub fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
+    where
+        V: SoaRead<R> + SoaWrite,
+    {
+        self.try_insert_from(key, |context, dst| match dst {
+            Ok(Some(TryInsertAccess::ReadWrite(dst))) => {
+                let value = unsafe { soa::ptr::replace(context, dst.into_ptrs(), value) };
+                Ok(Some(value))
+            }
+            Ok(Some(TryInsertAccess::WriteOnly(dst))) => {
+                unsafe { V::write(context, dst.into_inner(), value) }
+                Ok(None)
+            }
+            Ok(None) => Ok(None),
+            Err(error) => Err(TryModifyError::new(error, value)),
+        })
     }
 
     #[inline]
@@ -1283,7 +1340,10 @@ where
     }
 
     #[inline]
-    pub fn drain(&mut self) -> Drain<'_, K, V> {
+    pub fn drain<R>(&mut self) -> Drain<'_, K, V, R>
+    where
+        V: SoaRead<R>,
+    {
         let Self {
             dense,
             sparse,
@@ -1299,6 +1359,27 @@ where
         }
 
         Drain::new(dense.drain(..))
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn into_values<R>(self) -> IntoValues<K, V, R>
+    where
+        V: SoaRead<R>,
+    {
+        let Self { dense, .. } = self;
+        let inner = dense.into_items();
+        IntoValues::new(inner)
+    }
+
+    #[inline]
+    pub fn into_items<R>(self) -> IntoIter<K, V, R>
+    where
+        V: SoaRead<R>,
+    {
+        let Self { dense, .. } = self;
+        let inner = dense.into_items();
+        IntoIter::new(inner)
     }
 }
 
@@ -1675,39 +1756,6 @@ where
 impl<K, V> EpochSparseArena<K, V>
 where
     K: Key,
-    V: AllocSoa + SoaRead,
-{
-    #[inline]
-    pub fn swap_remove(&mut self, key: K) -> Option<V> {
-        self.swap_remove_into(key, |context, src| unsafe { context.read(src?) }.into())
-    }
-
-    #[inline]
-    pub fn remove(&mut self, key: K) -> Option<V> {
-        self.remove_into(key, |context, src| unsafe { context.read(src?) }.into())
-    }
-
-    #[inline]
-    pub fn pop(&mut self) -> Option<(K, V)> {
-        self.pop_into(|context, src| {
-            let (key, value) = src?;
-            let value = unsafe { context.read(value) };
-            (key, value).into()
-        })
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn into_values(self) -> IntoValues<K, V> {
-        let Self { dense, .. } = self;
-        let inner = dense.into_iter();
-        IntoValues::new(inner)
-    }
-}
-
-impl<K, V> EpochSparseArena<K, V>
-where
-    K: Key,
     V: AllocSoa + SoaWrite,
 {
     #[inline]
@@ -1724,35 +1772,6 @@ where
                 unsafe { V::write(context, dst, value) }
                 Ok(key)
             }
-            Err(error) => Err(TryModifyError::new(error, value)),
-        })
-    }
-}
-
-impl<K, V> EpochSparseArena<K, V>
-where
-    K: Key,
-    V: AllocSoa + SoaRead + SoaWrite,
-{
-    #[inline]
-    #[track_caller]
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        self.try_insert(key, value)
-            .unwrap_or_else(|error| try_insert_failed(error.kind))
-    }
-
-    #[inline]
-    pub fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>> {
-        self.try_insert_from(key, |context, dst| match dst {
-            Ok(Some(TryInsertAccess::ReadWrite(dst))) => {
-                let value = unsafe { soa::ptr::replace(context, dst.into_ptrs(), value) };
-                Ok(Some(value))
-            }
-            Ok(Some(TryInsertAccess::WriteOnly(dst))) => {
-                unsafe { V::write(context, dst.into_inner(), value) }
-                Ok(None)
-            }
-            Ok(None) => Ok(None),
             Err(error) => Err(TryModifyError::new(error, value)),
         })
     }
@@ -2030,15 +2049,14 @@ where
 impl<K, V> IntoIterator for EpochSparseArena<K, V>
 where
     K: Key,
-    V: AllocSoa + SoaRead,
+    V: AllocSoa + SoaRead<V>,
 {
     type Item = (K, V);
-    type IntoIter = IntoIter<K, V>;
+    type IntoIter = IntoIter<K, V, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self { dense, .. } = self;
-        IntoIter::new(dense.into_iter())
+        self.into_items()
     }
 }
 

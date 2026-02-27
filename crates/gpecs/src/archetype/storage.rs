@@ -505,9 +505,9 @@ impl ArchetypeStorage {
         let value = unsafe {
             let context = sparse_set.context();
             let component_ids = context.as_inner().iter().map(From::from);
-            from_erased_fields(components, context, component_ids, fields)
+            from_erased_fields::<ErasedBundle, _>(components, context, component_ids, fields)
         };
-        let value = sparse_set.insert(entity.into(), value)?;
+        let value: ErasedBundle = sparse_set.insert(entity.into(), value)?;
 
         let context = sparse_set.context();
         let component_ids = context.as_inner().iter().map(From::from);
@@ -524,7 +524,7 @@ impl ArchetypeStorage {
     ) -> Option<IndexSet<ErasedComponent>> {
         let Self { sparse_set } = self;
 
-        let value = sparse_set.swap_remove(entity.into())?;
+        let value: ErasedBundle = sparse_set.swap_remove(entity.into())?;
 
         let context = sparse_set.context();
         let component_ids = context.as_inner().iter().map(From::from);

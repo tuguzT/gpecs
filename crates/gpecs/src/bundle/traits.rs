@@ -31,7 +31,7 @@ pub type BundleSlicesMut<'a, B> = SlicesMut<'static, 'a, B>;
 /// Order of component identifiers defined by
 /// [`GetComponents`](Bundle::GetComponents) or [`RegisterComponents`](Bundle::RegisterComponents) assotiated types
 /// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
-pub unsafe trait Bundle: SoaOwned + AllocSoa + SoaRead + SoaWrite + 'static {
+pub unsafe trait Bundle: SoaOwned + AllocSoa + SoaRead<Self> + SoaWrite + 'static {
     /// Static [SoA context](crate::soa::traits::SoaContext) instance of this bundle.
     ///
     /// This ensures that components of this bundle are known at compile time.

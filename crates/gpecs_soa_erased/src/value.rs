@@ -110,9 +110,9 @@ where
     D: FieldDescriptorsOwned,
 {
     #[inline]
-    pub unsafe fn downcast<V>(self, context: &V::Context) -> Result<V, DowncastError<Self>>
+    pub unsafe fn downcast<V, R>(self, context: &V::Context) -> Result<R, DowncastError<Self>>
     where
-        V: AllocSoa + SoaRead,
+        V: AllocSoa + SoaRead<R> + ?Sized,
     {
         let Self {
             ref descriptors,

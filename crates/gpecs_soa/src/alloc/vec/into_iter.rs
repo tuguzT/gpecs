@@ -1,6 +1,7 @@
 use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
+    marker::PhantomData,
     mem::{ManuallyDrop, transmute},
     ptr::NonNull,
 };
@@ -18,20 +19,23 @@ use crate::{
     wrapper,
 };
 
-pub struct IntoIter<T>
+pub struct IntoIter<T, R = T>
 where
     T: AllocSoa + ?Sized,
+    R: ?Sized,
 {
     ptrs: wrapper::NonNullPtrs<'static, T>,
     buffer: NonNull<BufferData<T>>,
     capacity: usize,
     start: usize,
     end: usize,
+    phantom: PhantomData<fn() -> R>,
 }
 
-impl<T> IntoIter<T>
+impl<T, R> IntoIter<T, R>
 where
     T: AllocSoa + ?Sized,
+    R: ?Sized,
 {
     #[inline]
     pub(super) fn new(vec: SoaVec<T>) -> Self {
@@ -48,6 +52,7 @@ where
             capacity: vec.capacity(),
             start: 0,
             end: vec.len(),
+            phantom: PhantomData,
         }
     }
 
@@ -171,9 +176,10 @@ where
     }
 }
 
-impl<'a, T> IntoIter<T>
+impl<'a, T, R> IntoIter<T, R>
 where
     T: AllocSoa + Soa<'a> + ?Sized,
+    R: ?Sized,
 {
     #[inline]
     pub fn as_slices(&'a self) -> Slices<'a, 'a, T> {
@@ -202,25 +208,28 @@ where
     }
 }
 
-unsafe impl<T> Send for IntoIter<T>
+unsafe impl<T, R> Send for IntoIter<T, R>
 where
     T: AllocSoa + ?Sized,
     T::Context: Send,
     T::Fields: Send,
+    R: ?Sized,
 {
 }
 
-unsafe impl<T> Sync for IntoIter<T>
+unsafe impl<T, R> Sync for IntoIter<T, R>
 where
     T: AllocSoa + ?Sized,
     T::Context: Sync,
     T::Fields: Sync,
+    R: ?Sized,
 {
 }
 
-impl<T, U> AsRef<[U]> for IntoIter<T>
+impl<T, U, R> AsRef<[U]> for IntoIter<T, R>
 where
     T: SoaOwned + AllocSoa + ?Sized,
+    R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Into<&'a [U]>,
 {
     #[inline]
@@ -229,9 +238,10 @@ where
     }
 }
 
-impl<T> Debug for IntoIter<T>
+impl<T, R> Debug for IntoIter<T, R>
 where
     T: SoaOwned + AllocSoa + ?Sized,
+    R: ?Sized,
     for<'ctx, 'a> Slices<'ctx, 'a, T>: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -240,10 +250,11 @@ where
     }
 }
 
-impl<T> Default for IntoIter<T>
+impl<T, R> Default for IntoIter<T, R>
 where
     T: AllocSoa + ?Sized,
     T::Context: Default,
+    R: ?Sized,
 {
     #[inline]
     fn default() -> Self {
@@ -252,10 +263,11 @@ where
     }
 }
 
-impl<T> Clone for IntoIter<T>
+impl<T, R> Clone for IntoIter<T, R>
 where
     T: AllocSoa + SoaCloneToUninit + ?Sized,
     T::Context: Clone,
+    R: ?Sized,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -268,18 +280,21 @@ where
     }
 }
 
-impl<T> Drop for IntoIter<T>
+impl<T, R> Drop for IntoIter<T, R>
 where
     T: AllocSoa + ?Sized,
+    R: ?Sized,
 {
     fn drop(&mut self) {
-        struct DropGuard<'a, T>(&'a mut IntoIter<T>)
-        where
-            T: AllocSoa + ?Sized;
-
-        impl<T> Drop for DropGuard<'_, T>
+        struct DropGuard<'a, T, R>(&'a mut IntoIter<T, R>)
         where
             T: AllocSoa + ?Sized,
+            R: ?Sized;
+
+        impl<T, R> Drop for DropGuard<'_, T, R>
+        where
+            T: AllocSoa + ?Sized,
+            R: ?Sized,
         {
             fn drop(&mut self) {
                 let Self(iter) = self;
@@ -315,11 +330,11 @@ where
 }
 
 #[expect(clippy::while_let_on_iterator)]
-impl<T> Iterator for IntoIter<T>
+impl<T, R> Iterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaRead,
+    T: AllocSoa + SoaRead<R> + ?Sized,
 {
-    type Item = T;
+    type Item = R;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -539,9 +554,9 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for IntoIter<T>
+impl<T, R> DoubleEndedIterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaRead,
+    T: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -591,9 +606,9 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for IntoIter<T>
+impl<T, R> ExactSizeIterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaRead,
+    T: AllocSoa + SoaRead<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -601,4 +616,4 @@ where
     }
 }
 
-impl<T> FusedIterator for IntoIter<T> where T: AllocSoa + SoaRead {}
+impl<T, R> FusedIterator for IntoIter<T, R> where T: AllocSoa + SoaRead<R> + ?Sized {}

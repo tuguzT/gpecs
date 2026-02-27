@@ -84,14 +84,14 @@ where
 }
 
 #[inline]
-pub unsafe fn from_erased_fields<'a, T>(
+pub unsafe fn from_erased_fields<'a, T, R>(
     components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     fields: IndexSet<ErasedComponent>,
-) -> T
+) -> R
 where
-    T: AllocSoa + Soa<'a> + SoaRead,
+    T: AllocSoa + Soa<'a> + SoaRead<R>,
 {
     type ErasedSoa = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
 
@@ -103,7 +103,7 @@ where
         });
     let erased_value = ErasedSoa::try_from_fields_with_descriptors(fields_with_descriptors)
         .expect("all the fields should be valid");
-    unsafe { erased_value.downcast::<T>(context) }.expect("all the fields should be valid")
+    unsafe { erased_value.downcast::<T, R>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]

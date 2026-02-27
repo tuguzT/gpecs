@@ -438,10 +438,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn drain<R>(&mut self, range: R) -> Drain<'_, T>
-    where
-        R: RangeBounds<usize>,
-    {
+    pub fn drain<R>(&mut self, range: impl RangeBounds<usize>) -> Drain<'_, T, R> {
         Drain::new(self, range)
     }
 
@@ -480,6 +477,14 @@ where
         result
     }
 
+    #[inline]
+    pub fn swap_remove<R>(&mut self, index: usize) -> R
+    where
+        T: SoaRead<R>,
+    {
+        self.swap_remove_into(index, |context, src| unsafe { context.read(src) })
+    }
+
     pub fn remove_into<F, R>(&mut self, index: usize, f: F) -> R
     where
         F: FnOnce(&T::Context, Ptrs<'_, T>) -> R,
@@ -515,6 +520,14 @@ where
         result
     }
 
+    #[inline]
+    pub fn remove<R>(&mut self, index: usize) -> R
+    where
+        T: SoaRead<R>,
+    {
+        self.remove_into(index, |context, src| unsafe { context.read(src) })
+    }
+
     pub fn pop_into<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&T::Context, Option<Ptrs<'_, T>>) -> R,
@@ -533,6 +546,14 @@ where
         }
 
         result
+    }
+
+    #[inline]
+    pub fn pop<R>(&mut self) -> Option<R>
+    where
+        T: SoaRead<R>,
+    {
+        self.pop_into(|context, src| unsafe { context.read(src?).into() })
     }
 
     pub fn insert_from<F, R>(&mut self, index: usize, f: F) -> R
@@ -638,6 +659,14 @@ where
 
         result
     }
+
+    #[inline]
+    pub fn into_items<R>(self) -> IntoIter<T, R>
+    where
+        T: SoaRead<R>,
+    {
+        IntoIter::new(self)
+    }
 }
 
 impl<T> SoaVec<T>
@@ -728,26 +757,6 @@ where
             }
             set_len_on_drop.local_len += 1;
         }
-    }
-}
-
-impl<T> SoaVec<T>
-where
-    T: AllocSoa + SoaRead,
-{
-    #[inline]
-    pub fn swap_remove(&mut self, index: usize) -> T {
-        self.swap_remove_into(index, |context, src| unsafe { context.read(src) })
-    }
-
-    #[inline]
-    pub fn remove(&mut self, index: usize) -> T {
-        self.remove_into(index, |context, src| unsafe { context.read(src) })
-    }
-
-    #[inline]
-    pub fn pop(&mut self) -> Option<T> {
-        self.pop_into(|context, src| unsafe { context.read(src?).into() })
     }
 }
 
@@ -1350,14 +1359,14 @@ where
 
 impl<T> IntoIterator for SoaVec<T>
 where
-    T: AllocSoa + SoaRead,
+    T: AllocSoa + SoaRead<T>,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter::new(self)
+        self.into_items()
     }
 }
 

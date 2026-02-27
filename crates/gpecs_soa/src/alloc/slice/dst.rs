@@ -187,7 +187,7 @@ where
 
 impl<T> IntoIterator for Box<SoaSlice<T>>
 where
-    T: AllocSoaTrusted + SoaRead,
+    T: AllocSoaTrusted + SoaRead<T>,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;

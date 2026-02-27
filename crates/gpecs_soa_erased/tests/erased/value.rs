@@ -169,7 +169,7 @@ fn value() {
     );
 
     let context = Default::default();
-    let value = unsafe { erased_value.downcast::<((), u32, u128, u8)>(&context) }
+    let value = unsafe { erased_value.downcast::<((), u32, u128, u8), _>(&context) }
         .expect("all the fields should be valid here");
     assert_eq!(value, ((), i1, i2, i3));
 }
@@ -209,7 +209,7 @@ fn value_zst() {
         field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 
-    let value = unsafe { erased_value.downcast::<()>(&context) }
+    let value = unsafe { erased_value.downcast::<(), _>(&context) }
         .expect("all the fields should be valid here");
     assert_eq!(value, ());
 }

@@ -229,12 +229,12 @@ where
     }
 }
 
-unsafe impl<K, V> ReadSoaContext<DenseItem<K, V>> for DenseContext<K, V>
+unsafe impl<K, V, R> ReadSoaContext<DenseItem<K, R>> for DenseContext<K, V>
 where
-    V: SoaRead,
+    V: SoaRead<R> + ?Sized,
 {
     #[inline]
-    unsafe fn read(&self, src: Self::Ptrs<'_>) -> DenseItem<K, V> {
+    unsafe fn read(&self, src: Self::Ptrs<'_>) -> DenseItem<K, R> {
         unsafe { src.read(self) }
     }
 }

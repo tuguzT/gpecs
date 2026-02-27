@@ -135,6 +135,69 @@ where
         let ptrs = unwrap_dense(values, dense_index);
         (context, ptrs)
     }
+
+    #[inline]
+    pub fn remove<R>(self) -> R
+    where
+        V: SoaRead<R>,
+    {
+        let Self { key, container, .. } = self;
+
+        let value = container.remove(key);
+        unwrap_entry_value(value)
+    }
+
+    #[inline]
+    pub fn swap_remove<R>(self) -> R
+    where
+        V: SoaRead<R>,
+    {
+        let Self { key, container, .. } = self;
+
+        let value = container.swap_remove(key);
+        unwrap_entry_value(value)
+    }
+
+    #[inline]
+    pub fn insert<R>(&mut self, value: V) -> R
+    where
+        V: SoaRead<R> + SoaWrite,
+    {
+        let Self {
+            dense_index,
+            container,
+            ..
+        } = self;
+
+        let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
+        let previous = unwrap_dense(values, *dense_index);
+        unsafe { soa::ptr::replace(context, previous, value) }
+    }
+
+    #[inline]
+    pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K, V>>
+    where
+        V: SoaRead<V> + SoaWrite,
+    {
+        let new_key = key;
+        let Self { key, container, .. } = self;
+
+        let value = container.remove(*key);
+        let value = unwrap_entry_value(value);
+
+        *key = new_key;
+        container.try_insert(*key, value)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn replace_key(&mut self, key: K) -> Option<V>
+    where
+        V: SoaRead<V> + SoaWrite,
+    {
+        self.try_replace_key(key)
+            .unwrap_or_else(|error| try_replace_key_failed(error.kind))
+    }
 }
 
 impl<'a, K, V, C> OccupiedEntry<'a, K, V, C>
@@ -187,68 +250,6 @@ where
         let (context, ptrs) = self.as_mut_ptrs_with_context();
         let refs = unsafe { context.mut_ptrs_to_mut_refs(ptrs) };
         (context, refs)
-    }
-}
-
-impl<K, V, C> OccupiedEntry<'_, K, V, C>
-where
-    K: Key,
-    V: AllocSoa + SoaRead,
-    C: EpochSparseContainer<K, V> + ?Sized,
-{
-    #[inline]
-    pub fn remove(self) -> V {
-        let Self { key, container, .. } = self;
-
-        let value = container.remove(key);
-        unwrap_entry_value(value)
-    }
-
-    #[inline]
-    pub fn swap_remove(self) -> V {
-        let Self { key, container, .. } = self;
-
-        let value = container.swap_remove(key);
-        unwrap_entry_value(value)
-    }
-}
-
-impl<K, V, C> OccupiedEntry<'_, K, V, C>
-where
-    K: Key,
-    V: AllocSoa + SoaRead + SoaWrite,
-    C: EpochSparseContainer<K, V> + ?Sized,
-{
-    #[inline]
-    pub fn insert(&mut self, value: V) -> V {
-        let Self {
-            dense_index,
-            container,
-            ..
-        } = self;
-
-        let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
-        let previous = unwrap_dense(values, *dense_index);
-        unsafe { soa::ptr::replace(context, previous, value) }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn replace_key(&mut self, key: K) -> Option<V> {
-        self.try_replace_key(key)
-            .unwrap_or_else(|error| try_replace_key_failed(error.kind))
-    }
-
-    #[inline]
-    pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K, V>> {
-        let new_key = key;
-        let Self { key, container, .. } = self;
-
-        let value = container.remove(*key);
-        let value = unwrap_entry_value(value);
-
-        *key = new_key;
-        container.try_insert(*key, value)
     }
 }
 
@@ -313,16 +314,12 @@ where
         let Self { key, .. } = self;
         *key
     }
-}
 
-impl<'a, K, V, C> VacantEntry<'a, K, V, C>
-where
-    K: Key,
-    V: AllocSoa + SoaRead + SoaWrite,
-    C: EpochSparseContainer<K, V> + ?Sized,
-{
     #[inline]
-    pub fn insert(self, value: V) -> OccupiedEntry<'a, K, V, C> {
+    pub fn insert<R>(self, value: V) -> OccupiedEntry<'a, K, V, C>
+    where
+        V: SoaRead<R> + SoaWrite,
+    {
         let Self { key, container, .. } = self;
 
         if container.try_insert(key, value).is_err() {
@@ -373,17 +370,17 @@ where
 
     fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V>;
 
-    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>>
+    fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
     where
-        V: SoaRead + SoaWrite;
+        V: SoaRead<R> + SoaWrite;
 
-    fn remove(&mut self, key: K) -> Option<V>
+    fn remove<R>(&mut self, key: K) -> Option<R>
     where
-        V: SoaRead;
+        V: SoaRead<R>;
 
-    fn swap_remove(&mut self, key: K) -> Option<V>
+    fn swap_remove<R>(&mut self, key: K) -> Option<R>
     where
-        V: SoaRead;
+        V: SoaRead<R>;
 }
 
 impl<K, V> EpochSparseContainer<K, V> for EpochSparseSet<K, V>
@@ -415,25 +412,25 @@ where
     }
 
     #[inline]
-    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>>
+    fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
     where
-        V: SoaRead + SoaWrite,
+        V: SoaRead<R> + SoaWrite,
     {
         Self::try_insert(self, key, value)
     }
 
     #[inline]
-    fn remove(&mut self, key: K) -> Option<V>
+    fn remove<R>(&mut self, key: K) -> Option<R>
     where
-        V: SoaRead,
+        V: SoaRead<R>,
     {
         Self::remove(self, key)
     }
 
     #[inline]
-    fn swap_remove(&mut self, key: K) -> Option<V>
+    fn swap_remove<R>(&mut self, key: K) -> Option<R>
     where
-        V: SoaRead,
+        V: SoaRead<R>,
     {
         Self::swap_remove(self, key)
     }
@@ -468,25 +465,25 @@ where
     }
 
     #[inline]
-    fn try_insert(&mut self, key: K, value: V) -> Result<Option<V>, TryModifyError<K, V>>
+    fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
     where
-        V: SoaRead + SoaWrite,
+        V: SoaRead<R> + SoaWrite,
     {
         Self::try_insert(self, key, value)
     }
 
     #[inline]
-    fn remove(&mut self, key: K) -> Option<V>
+    fn remove<R>(&mut self, key: K) -> Option<R>
     where
-        V: SoaRead,
+        V: SoaRead<R>,
     {
         Self::remove(self, key)
     }
 
     #[inline]
-    fn swap_remove(&mut self, key: K) -> Option<V>
+    fn swap_remove<R>(&mut self, key: K) -> Option<R>
     where
-        V: SoaRead,
+        V: SoaRead<R>,
     {
         Self::swap_remove(self, key)
     }
@@ -567,12 +564,88 @@ macro_rules! generate_entry_types {
                     Self::Vacant(entry) => (entry.context(), None),
                 }
             }
+
+            #[inline]
+            pub fn or_insert<R>(self, default: V) -> OccupiedEntry<'a, K, V>
+            where
+                V: SoaRead<R> + SoaWrite,
+            {
+                match self {
+                    Self::Occupied(entry) => entry,
+                    Self::Vacant(entry) => entry.insert(default),
+                }
+            }
+
+            #[inline]
+            pub fn or_insert_with<R, F>(self, default: F) -> OccupiedEntry<'a, K, V>
+            where
+                V: SoaRead<R> + SoaWrite,
+                F: FnOnce() -> V,
+            {
+                match self {
+                    Self::Occupied(entry) => entry,
+                    Self::Vacant(entry) => entry.insert(default()),
+                }
+            }
+
+            #[inline]
+            pub fn or_default<R>(self) -> OccupiedEntry<'a, K, V>
+            where
+                V: SoaRead<R> + SoaWrite + Default,
+            {
+                match self {
+                    Self::Occupied(entry) => entry,
+                    Self::Vacant(entry) => entry.insert(Default::default()),
+                }
+            }
+
+            #[inline]
+            pub fn insert<R>(self, value: V) -> OccupiedEntry<'a, K, V>
+            where
+                V: SoaRead<R> + SoaWrite,
+            {
+                match self {
+                    Self::Occupied(mut entry) => {
+                        entry.insert(value);
+                        entry
+                    }
+                    Self::Vacant(entry) => entry.insert(value),
+                }
+            }
+
+            #[inline]
+            #[must_use]
+            #[track_caller]
+            pub fn replace_key(self, key: K) -> Self
+            where
+                V: SoaRead<V> + SoaWrite,
+            {
+                self.try_replace_key(key)
+                    .unwrap_or_else(|error| $crate::alloc::assert::try_replace_key_failed(error))
+            }
+
+            #[inline]
+            pub fn try_replace_key(self, key: K) -> Result<Self, TryModifyErrorKind<K>>
+            where
+                V: SoaRead<V> + SoaWrite,
+            {
+                match self {
+                    Self::Occupied(mut entry) => {
+                        entry.try_replace_key(key).map_err(|error| error.kind)?;
+                        Ok(Self::Occupied(entry))
+                    }
+                    Self::Vacant(entry) => {
+                        let container = entry.into_container();
+                        Ok(container.try_entry(key)?)
+                    }
+                }
+            }
         }
 
         impl<K, V> Entry<'_, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::SoaOwned + $crate::soa::traits::AllocSoa + ?Sized,
+            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::SoaOwned + ?Sized,
         {
             #[inline]
             #[must_use]
@@ -634,77 +707,6 @@ macro_rules! generate_entry_types {
                         (context, Some(refs))
                     }
                     Self::Vacant(entry) => (entry.context(), None),
-                }
-            }
-        }
-
-        impl<'a, K, V> Entry<'a, K, V>
-        where
-            K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa
-                + $crate::soa::traits::SoaRead
-                + $crate::soa::traits::SoaWrite,
-        {
-            #[inline]
-            pub fn or_insert(self, default: V) -> OccupiedEntry<'a, K, V> {
-                match self {
-                    Self::Occupied(entry) => entry,
-                    Self::Vacant(entry) => entry.insert(default),
-                }
-            }
-
-            #[inline]
-            pub fn or_insert_with<F>(self, default: F) -> OccupiedEntry<'a, K, V>
-            where
-                F: FnOnce() -> V,
-            {
-                match self {
-                    Self::Occupied(entry) => entry,
-                    Self::Vacant(entry) => entry.insert(default()),
-                }
-            }
-
-            #[inline]
-            pub fn or_default(self) -> OccupiedEntry<'a, K, V>
-            where
-                V: Default,
-            {
-                match self {
-                    Self::Occupied(entry) => entry,
-                    Self::Vacant(entry) => entry.insert(Default::default()),
-                }
-            }
-
-            #[inline]
-            pub fn insert(self, value: V) -> OccupiedEntry<'a, K, V> {
-                match self {
-                    Self::Occupied(mut entry) => {
-                        entry.insert(value);
-                        entry
-                    }
-                    Self::Vacant(entry) => entry.insert(value),
-                }
-            }
-
-            #[inline]
-            #[must_use]
-            #[track_caller]
-            pub fn replace_key(self, key: K) -> Self {
-                self.try_replace_key(key)
-                    .unwrap_or_else(|error| $crate::alloc::assert::try_replace_key_failed(error))
-            }
-
-            #[inline]
-            pub fn try_replace_key(self, key: K) -> Result<Self, TryModifyErrorKind<K>> {
-                match self {
-                    Self::Occupied(mut entry) => {
-                        entry.try_replace_key(key).map_err(|error| error.kind)?;
-                        Ok(Self::Occupied(entry))
-                    }
-                    Self::Vacant(entry) => {
-                        let container = entry.into_container();
-                        Ok(container.try_entry(key)?)
-                    }
                 }
             }
         }
@@ -805,25 +807,51 @@ macro_rules! generate_entry_types {
                 let Self { inner } = self;
                 inner.into_mut_ptrs_with_context()
             }
-        }
 
-        impl<'a, K, V> OccupiedEntry<'a, K, V>
-        where
-            K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
-        {
             #[inline]
-            pub fn into_mut(self) -> $crate::soa::traits::RefsMut<'a, 'a, V> {
+            pub fn swap_remove<R>(self) -> R
+            where
+                V: SoaRead<R>,
+            {
                 let Self { inner } = self;
-                inner.into_mut()
+                inner.swap_remove()
             }
 
             #[inline]
-            pub fn into_mut_with_context(
-                self,
-            ) -> (&'a V::Context, $crate::soa::traits::RefsMut<'a, 'a, V>) {
+            pub fn remove<R>(self) -> R
+            where
+                V: SoaRead<R>,
+            {
                 let Self { inner } = self;
-                inner.into_mut_with_context()
+                inner.remove()
+            }
+
+            #[inline]
+            pub fn insert<R>(&mut self, value: V) -> R
+            where
+                V: SoaRead<R> + SoaWrite,
+            {
+                let Self { inner } = self;
+                inner.insert(value)
+            }
+
+            #[inline]
+            #[track_caller]
+            pub fn replace_key(&mut self, key: K) -> Option<V>
+            where
+                V: SoaRead<V> + SoaWrite,
+            {
+                let Self { inner } = self;
+                inner.replace_key(key)
+            }
+
+            #[inline]
+            pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K, V>>
+            where
+                V: SoaRead<V> + SoaWrite,
+            {
+                let Self { inner } = self;
+                inner.try_replace_key(key)
             }
         }
 
@@ -864,45 +892,20 @@ macro_rules! generate_entry_types {
         impl<'a, K, V> OccupiedEntry<'a, K, V>
         where
             K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::SoaRead,
+            V: $crate::soa::traits::AllocSoa + $crate::soa::traits::Soa<'a> + ?Sized,
         {
             #[inline]
-            pub fn remove(self) -> V {
+            pub fn into_mut(self) -> $crate::soa::traits::RefsMut<'a, 'a, V> {
                 let Self { inner } = self;
-                inner.remove()
+                inner.into_mut()
             }
 
             #[inline]
-            pub fn swap_remove(self) -> V {
+            pub fn into_mut_with_context(
+                self,
+            ) -> (&'a V::Context, $crate::soa::traits::RefsMut<'a, 'a, V>) {
                 let Self { inner } = self;
-                inner.swap_remove()
-            }
-        }
-
-        impl<'a, K, V> OccupiedEntry<'a, K, V>
-        where
-            K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa
-                + $crate::soa::traits::SoaRead
-                + $crate::soa::traits::SoaWrite,
-        {
-            #[inline]
-            pub fn insert(&mut self, value: V) -> V {
-                let Self { inner } = self;
-                inner.insert(value)
-            }
-
-            #[inline]
-            #[track_caller]
-            pub fn replace_key(&mut self, key: K) -> Option<V> {
-                let Self { inner } = self;
-                inner.replace_key(key)
-            }
-
-            #[inline]
-            pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K, V>> {
-                let Self { inner } = self;
-                inner.try_replace_key(key)
+                inner.into_mut_with_context()
             }
         }
 
@@ -958,17 +961,12 @@ macro_rules! generate_entry_types {
                 let Self { inner } = self;
                 inner.key()
             }
-        }
 
-        impl<'a, K, V> VacantEntry<'a, K, V>
-        where
-            K: $crate::key::Key,
-            V: $crate::soa::traits::AllocSoa
-                + $crate::soa::traits::SoaRead
-                + $crate::soa::traits::SoaWrite,
-        {
             #[inline]
-            pub fn insert(self, value: V) -> OccupiedEntry<'a, K, V> {
+            pub fn insert<R>(self, value: V) -> OccupiedEntry<'a, K, V>
+            where
+                V: SoaRead<R> + SoaWrite,
+            {
                 let Self { inner } = self;
                 let inner = inner.insert(value);
                 OccupiedEntry { inner }

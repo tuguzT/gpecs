@@ -9,7 +9,7 @@ use crate::{
     slice::SoaSlice,
     traits::{
         AllocSoa, AllocSoaContext, AllocSoaTrusted, MutPtrs, Ptrs, RawSoaContext, ReadSoaContext,
-        SoaRead, SoaWrite,
+        SoaRead, SoaWrite, WriteSoaContext,
     },
 };
 
@@ -68,7 +68,7 @@ where
     // nothing here can panic.
     unsafe {
         let result = context.read(context.ptrs_cast_const(dest.clone()));
-        T::write(context, dest, src);
+        context.write(dest, src);
         result
     }
 }

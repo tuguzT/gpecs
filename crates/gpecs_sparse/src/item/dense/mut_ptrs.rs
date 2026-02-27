@@ -8,7 +8,7 @@ use core::{
 use crate::{
     item::{DenseItem, DensePtrs, DenseRefs, DenseRefsMut},
     soa::{
-        traits::{MutPtrs, RawSoa, RawSoaContext, Soa, SoaContext, SoaWrite},
+        traits::{MutPtrs, RawSoa, RawSoaContext, Soa, SoaContext, SoaWrite, WriteSoaContext},
         wrapper,
     },
 };
@@ -210,7 +210,7 @@ where
 
         unsafe {
             ptr::write(key_ptr, key);
-            V::write(context, value_ptr.into_inner(), value);
+            context.write(value_ptr.into_inner(), value);
         }
     }
 }

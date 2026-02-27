@@ -28,7 +28,7 @@ use crate::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
             FieldDescriptorsOwned, buffer_offsets,
         },
-        traits::{AllocSoa, AllocSoaContext, ReadSoaContext, SoaRead, SoaWrite},
+        traits::{AllocSoa, AllocSoaContext, ReadSoaContext, SoaRead, SoaWrite, WriteSoaContext},
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
     uninit::try_init_copy_from_slice,
@@ -257,7 +257,7 @@ where
 
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
-            V::write(context, dst, value);
+            context.write(dst, value);
         }
 
         let me = unsafe { Self::new_unchecked(storage, descriptors) };
@@ -286,7 +286,7 @@ where
 
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
-            V::write(context, dst, value);
+            context.write(dst, value);
         }
 
         let me = unsafe { Self::new_unchecked(storage, descriptors) };

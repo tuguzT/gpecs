@@ -7,9 +7,9 @@ use core::{
 use crate::{
     field::FieldDescriptor,
     traits::{
-        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, MutPtrs,
-        RawSoa, RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext,
-        SoaWrite,
+        AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, RawSoa,
+        RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext,
+        WriteSoaContext,
     },
 };
 
@@ -216,9 +216,9 @@ unsafe impl ReadSoaContext<()> for () {
     }
 }
 
-unsafe impl SoaWrite for () {
+unsafe impl WriteSoaContext<()> for () {
     #[inline]
-    unsafe fn write(_context: &Self::Context, ptrs: MutPtrs<'_, Self>, value: Self) {
+    unsafe fn write(&self, ptrs: Self::MutPtrs<'_>, value: ()) {
         unsafe { ptr::write(ptrs, value) }
     }
 }

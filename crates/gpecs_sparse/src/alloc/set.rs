@@ -31,6 +31,7 @@ use crate::{
         traits::{
             AllocSoa, MutPtrs, Ptrs, RawSoaContext, ReadSoaContext, Refs, RefsMut, SliceMutPtrs,
             SlicePtrs, Slices, SlicesMut, Soa, SoaContext, SoaOwned, SoaRead, SoaWrite,
+            WriteSoaContext,
         },
         vec::SoaVec,
     },
@@ -997,7 +998,7 @@ where
                 Ok(Some(value))
             }
             Ok(Some(TryInsertAccess::WriteOnly(dst))) => {
-                unsafe { V::write(context, dst.into_inner(), value) }
+                unsafe { context.write(dst.into_inner(), value) }
                 Ok(None)
             }
             Ok(None) => Ok(None),
@@ -1576,7 +1577,7 @@ where
     pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
         self.try_push_from(|context, dst| match dst {
             Ok((key, dst)) => {
-                unsafe { V::write(context, dst, value) }
+                unsafe { context.write(dst, value) }
                 Ok(key)
             }
             Err(error) => Err(TryModifyError::new(error, value)),

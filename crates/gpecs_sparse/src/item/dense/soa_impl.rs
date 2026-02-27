@@ -8,9 +8,9 @@ use crate::{
     soa::{
         field::FieldDescriptors,
         traits::{
-            AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, RawSoa,
-            RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs,
-            SoaCloneToUninit, SoaContext, SoaRead, SoaWrite,
+            AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, RawSoa, RawSoaContext,
+            ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext,
+            SoaRead, SoaWrite, WriteSoaContext,
         },
     },
 };
@@ -239,13 +239,13 @@ where
     }
 }
 
-unsafe impl<K, V> SoaWrite for DenseItem<K, V>
+unsafe impl<K, V> WriteSoaContext<DenseItem<K, V>> for DenseContext<K, V>
 where
     V: SoaWrite,
 {
     #[inline]
-    unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self) {
-        unsafe { dst.write(context, value) }
+    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: DenseItem<K, V>) {
+        unsafe { dst.write(self, value) }
     }
 }
 

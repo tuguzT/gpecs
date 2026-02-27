@@ -22,7 +22,7 @@ use crate::{
     traits::{
         AllocSoa, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoaContext,
         ReadSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
-        SoaCloneToUninit, SoaContext, SoaOwned, SoaRead, SoaWrite,
+        SoaCloneToUninit, SoaContext, SoaOwned, SoaRead, SoaWrite, WriteSoaContext,
     },
 };
 
@@ -766,16 +766,12 @@ where
 {
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
-        self.insert_from(index, |context, dst| unsafe {
-            T::write(context, dst, value);
-        });
+        self.insert_from(index, |context, dst| unsafe { context.write(dst, value) });
     }
 
     #[inline]
     pub fn push(&mut self, value: T) {
-        self.push_from(|context, dst| unsafe {
-            T::write(context, dst, value);
-        });
+        self.push_from(|context, dst| unsafe { context.write(dst, value) });
     }
 }
 
@@ -1287,7 +1283,7 @@ where
             let (context, ptrs) = self.as_mut_ptrs_with_context();
             unsafe {
                 let dst = context.ptrs_add_mut(ptrs, len);
-                T::write(context, dst, element);
+                context.write(dst, element);
             }
 
             unsafe {
@@ -1397,7 +1393,7 @@ where
         let (context, dst) = vector.as_mut_ptrs_with_context();
         unsafe {
             // SAFETY: We requested capacity at least 1
-            T::write(context, dst, first);
+            context.write(dst, first);
             vector.set_len(1);
         }
 

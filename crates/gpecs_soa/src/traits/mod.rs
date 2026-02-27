@@ -315,8 +315,8 @@ where
 {
 }
 
-/// An extension of [SoA context](RawSoaContext) type which allows
-/// to read a value from [pointers](RawSoaContext::Ptrs) to each stored field.
+/// An extension of [SoA context](RawSoaContext) type which allows to read a value
+/// from [pointers](RawSoaContext::Ptrs) to each stored field.
 pub unsafe trait ReadSoaContext<R>: RawSoaContext {
     /// Constructs the value from reading each field to which [src](RawSoaContext::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.
@@ -327,7 +327,7 @@ pub unsafe trait ReadSoaContext<R>: RawSoaContext {
     unsafe fn read(&self, src: Self::Ptrs<'_>) -> R;
 }
 
-/// An extension of [SoA](RawSoa) type which allows to read `Self`
+/// An extension of [SoA](RawSoa) type which allows to read a value
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
 // TODO: allow to borrow self from the context (add a lifetime parameter?)
 pub unsafe trait SoaRead<R>: RawSoa<Context: ReadSoaContext<R>> {}
@@ -339,16 +339,27 @@ where
 {
 }
 
-/// An extension of [SoA](RawSoa) type which allows to write given value of `Self`
-/// into [mutable pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait SoaWrite: RawSoa + Sized {
+/// An extension of [SoA context](RawSoaContext) type which allows to write a value
+/// into [mutale pointers](RawSoaContext::MutPtrs) to each stored field.
+pub unsafe trait WriteSoaContext<W>: RawSoaContext {
     /// Overwrites a memory [location](RawSoaContext::MutPtrs) of each stored field
     /// with the given value without reading or dropping the old value.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::write()`](core::ptr::write) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn write(context: &Self::Context, dst: MutPtrs<'_, Self>, value: Self);
+    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: W);
+}
+
+/// An extension of [SoA](RawSoa) type which allows to write given value
+/// into [mutable pointers](RawSoaContext::Ptrs) to each stored field.
+pub unsafe trait SoaWrite: RawSoa<Context: WriteSoaContext<Self>> + Sized {}
+
+unsafe impl<T> SoaWrite for T
+where
+    T: RawSoa,
+    T::Context: WriteSoaContext<T>,
+{
 }
 
 /// An extension of [SoA context](RawSoaContext) type which allows

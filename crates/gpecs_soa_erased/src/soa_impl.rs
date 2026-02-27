@@ -10,8 +10,8 @@ use crate::{
     soa::{
         field::{FieldDescriptors, FieldDescriptorsOutput},
         traits::{
-            AllocSoaContext, MutPtrs, RawSoa, RawSoaContext, ReadSoaContext, Refs, RefsMut,
-            SoaAsMutRefs, SoaAsRefs, SoaContext, SoaWrite,
+            AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs,
+            SoaAsRefs, SoaContext, WriteSoaContext,
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
@@ -257,7 +257,7 @@ where
     }
 }
 
-unsafe impl<T, D, P, U> SoaWrite for ErasedSoa<T, D, P>
+unsafe impl<T, D, P, U> WriteSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     T: AlignedStorage<Item = U>,
     D: CovariantFieldDescriptors,
@@ -265,7 +265,7 @@ where
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
 {
     #[inline]
-    unsafe fn write(_: &Self::Context, dst: MutPtrs<'_, Self>, value: Self) {
+    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: ErasedSoa<T, D, P>) {
         zip_eq(dst, value.as_fields())
             .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) });
     }

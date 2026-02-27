@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::soa::{
-    traits::{MutPtrs, RawSoa, RawSoaContext, RefsMut, Soa, SoaContext, SoaWrite},
+    traits::{MutPtrs, RawSoa, RawSoaContext, RefsMut, Soa, SoaContext, SoaWrite, WriteSoaContext},
     wrapper,
 };
 
@@ -297,5 +297,5 @@ where
         }
         TryInsertAccess::WriteOnly(ptrs) => ptrs.into_inner(),
     };
-    unsafe { V::write(context, dst, value) }
+    unsafe { context.write(dst, value) }
 }

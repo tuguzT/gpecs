@@ -1,14 +1,12 @@
 use core::{fmt::Debug, mem::MaybeUninit, ptr};
 
-use itertools::zip_eq;
-
 use crate::{
     CovariantFieldDescriptors, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
     ErasedSoaMutRefs, ErasedSoaMutSlicePtrs, ErasedSoaMutSlices, ErasedSoaNonNullPtrs,
     ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaSlicePtrs, ErasedSoaSlices,
     ptr::slice::SliceItemPtrs,
     soa::{
-        field::{FieldDescriptors, FieldDescriptorsOutput},
+        field::{FieldDescriptors, FieldDescriptorsOutput, FieldDescriptorsOwned},
         traits::{
             AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs,
             SoaAsRefs, SoaContext, WriteSoaContext,
@@ -248,26 +246,26 @@ where
 {
     #[inline]
     unsafe fn read(&self, src: Self::Ptrs<'_>) -> ErasedSoa<T, D, P> {
-        let fields = src
-            .into_iter()
-            .map(|src| unsafe { src.deref().into_buffer() });
+        let fields = unsafe { src.deref() };
         let descriptors = self.clone().into_inner();
         ErasedSoa::try_from_fields_descriptors(fields, descriptors)
             .expect("length of fields should be equal to the length of descriptors")
     }
 }
 
-unsafe impl<T, D, P, U> WriteSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+unsafe impl<T, D, N, P, U> WriteSoaContext<ErasedSoa<T, N, P>> for ErasedSoaContext<D, P>
 where
     T: AlignedStorage<Item = U>,
     D: CovariantFieldDescriptors,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
+    N: FieldDescriptorsOwned,
+    for<'a, 'b> FieldDescriptorsOutput<'a, N>: FieldDescriptors<'b>,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
 {
     #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: ErasedSoa<T, D, P>) {
-        zip_eq(dst, value.as_fields())
-            .for_each(|(dst, src)| unsafe { dst.copy_from_nonoverlapping(src.as_field_ptr(), 1) });
+    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
+        let src = value.as_fields().into_ptrs();
+        unsafe { dst.copy_from_nonoverlapping(&src, 1) }
     }
 }
 

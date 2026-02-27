@@ -409,8 +409,9 @@ impl ArchetypeStorage {
         let bundle_component_ids = B::get_components(components)
             .into_iter()
             .map(|component_id| component_id.expect("all of components should be registered"));
-        let fields =
-            unsafe { into_erased_fields::<B>(components, B::CONTEXT, bundle_component_ids, value) };
+        let fields = unsafe {
+            into_erased_fields::<B, _>(components, B::CONTEXT, bundle_component_ids, value)
+        };
         let Some(fields) = self.insert_erased(components, entity, fields) else {
             return Ok(None);
         };
@@ -502,16 +503,18 @@ impl ArchetypeStorage {
     ) -> Option<IndexSet<ErasedComponent>> {
         let Self { sparse_set } = self;
 
-        let value = unsafe {
+        let value: ErasedBundle = unsafe {
             let context = sparse_set.context();
             let component_ids = context.as_inner().iter().map(From::from);
             from_erased_fields::<ErasedBundle, _>(components, context, component_ids, fields)
         };
         let value: ErasedBundle = sparse_set.insert(entity.into(), value)?;
 
-        let context = sparse_set.context();
-        let component_ids = context.as_inner().iter().map(From::from);
-        let fields = unsafe { into_erased_fields(components, context, component_ids, value) };
+        let fields = unsafe {
+            let context = sparse_set.context();
+            let component_ids = context.as_inner().iter().map(From::from);
+            into_erased_fields::<ErasedBundle, _>(components, context, component_ids, value)
+        };
         Some(fields)
     }
 
@@ -526,9 +529,11 @@ impl ArchetypeStorage {
 
         let value: ErasedBundle = sparse_set.swap_remove(entity.into())?;
 
-        let context = sparse_set.context();
-        let component_ids = context.as_inner().iter().map(From::from);
-        let fields = unsafe { into_erased_fields(components, context, component_ids, value) };
+        let fields = unsafe {
+            let context = sparse_set.context();
+            let component_ids = context.as_inner().iter().map(From::from);
+            into_erased_fields::<ErasedBundle, _>(components, context, component_ids, value)
+        };
         Some(fields)
     }
 

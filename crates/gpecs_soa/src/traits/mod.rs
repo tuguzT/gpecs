@@ -353,12 +353,12 @@ pub unsafe trait WriteSoaContext<W>: RawSoaContext {
 
 /// An extension of [SoA](RawSoa) type which allows to write given value
 /// into [mutable pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait SoaWrite: RawSoa<Context: WriteSoaContext<Self>> + Sized {}
+pub unsafe trait SoaWrite<W>: RawSoa<Context: WriteSoaContext<W>> {}
 
-unsafe impl<T> SoaWrite for T
+unsafe impl<T, W> SoaWrite<W> for T
 where
-    T: RawSoa,
-    T::Context: WriteSoaContext<T>,
+    T: RawSoa + ?Sized,
+    T::Context: WriteSoaContext<W>,
 {
 }
 

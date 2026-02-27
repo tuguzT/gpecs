@@ -285,9 +285,9 @@ where
     }
 }
 
-pub unsafe fn drop_old_then_write<V>(context: &V::Context, dst: TryInsertAccess<V>, value: V)
+pub unsafe fn drop_old_then_write<V, W>(context: &V::Context, dst: TryInsertAccess<V>, value: W)
 where
-    V: SoaWrite,
+    V: SoaWrite<W> + ?Sized,
 {
     let dst = match dst {
         TryInsertAccess::ReadWrite(refs) => {

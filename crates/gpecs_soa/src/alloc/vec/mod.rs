@@ -634,6 +634,14 @@ where
         result
     }
 
+    #[inline]
+    pub fn insert<W>(&mut self, index: usize, value: W)
+    where
+        T: SoaWrite<W>,
+    {
+        self.insert_from(index, |context, dst| unsafe { context.write(dst, value) });
+    }
+
     pub fn push_from<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&T::Context, MutPtrs<'_, T>) -> R,
@@ -658,6 +666,14 @@ where
         }
 
         result
+    }
+
+    #[inline]
+    pub fn push<W>(&mut self, value: W)
+    where
+        T: SoaWrite<W>,
+    {
+        self.push_from(|context, dst| unsafe { context.write(dst, value) });
     }
 
     #[inline]
@@ -757,21 +773,6 @@ where
             }
             set_len_on_drop.local_len += 1;
         }
-    }
-}
-
-impl<T> SoaVec<T>
-where
-    T: AllocSoa + SoaWrite,
-{
-    #[inline]
-    pub fn insert(&mut self, index: usize, value: T) {
-        self.insert_from(index, |context, dst| unsafe { context.write(dst, value) });
-    }
-
-    #[inline]
-    pub fn push(&mut self, value: T) {
-        self.push_from(|context, dst| unsafe { context.write(dst, value) });
     }
 }
 
@@ -1258,13 +1259,13 @@ where
     }
 }
 
-impl<T> Extend<T> for SoaVec<T>
+impl<T, W> Extend<W> for SoaVec<T>
 where
-    T: AllocSoa + SoaWrite,
+    T: AllocSoa + SoaWrite<W> + ?Sized,
 {
     #[inline]
     #[track_caller]
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = W>>(&mut self, iter: I) {
         // This is the case for a general iterator.
         //
         // This function should be the moral equivalent of:
@@ -1366,12 +1367,12 @@ where
     }
 }
 
-impl<T> FromIterator<T> for SoaVec<T>
+impl<T, W> FromIterator<W> for SoaVec<T>
 where
-    T: AllocSoa + SoaWrite,
+    T: AllocSoa + SoaWrite<W> + ?Sized,
     T::Context: Default,
 {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = W>>(iter: I) -> Self {
         // Unroll the first iteration, as the vector is going to be
         // expanded on this iteration in every case when the iterable is not
         // empty, but the loop in extend() is not going to see the

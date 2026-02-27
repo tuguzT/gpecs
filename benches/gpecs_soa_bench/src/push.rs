@@ -7,14 +7,14 @@ use gpecs_soa_erased::{
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         prelude::*,
-        traits::{SoaWrite, TupleContext},
+        traits::SoaWrite,
     },
     storage::AlignedUninitStorage,
 };
 
 use crate::{Big, Large, Medium, Small, Tiny, Zero, soa_vecs::SoaVecs};
 
-pub trait Push: SoaVecs<Context: Default> + SoaWrite {
+pub trait Push: SoaVecs<Context: Default> + SoaWrite<Self> + Sized {
     fn soa_slf_push(vec: &mut SoaVec<Self>, value: Self) {
         let value = black_box(value);
         vec.push(value);
@@ -24,8 +24,8 @@ pub trait Push: SoaVecs<Context: Default> + SoaWrite {
         vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
-        let context = Default::default();
-        let value = ErasedSoa::try_from(&context, black_box(value)).unwrap();
+        let context = Self::Context::default();
+        let value = BoxedErasedSoa::try_from::<Self, _>(&context, black_box(value)).unwrap();
         vec.push(value);
     }
 
@@ -49,7 +49,7 @@ impl Push for Zero {
         vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
-        let context = &Default::default();
+        let context = &Self::Context::default();
         let value = black_box(value);
 
         let bytes = [MaybeUninit::<u8>::zeroed(); size_of::<Self>() * 2];
@@ -58,7 +58,7 @@ impl Push for Zero {
             _,
             ArrayDescriptors<FieldDescriptor, 1>,
             CoreSliceItemPtrs<MaybeUninit<u8>>,
-        >::try_from_storage_value(bytes, context, value)
+        >::try_from_storage_value::<Self, _>(bytes, context, value)
         .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -79,7 +79,7 @@ impl Push for Tiny {
         vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
-        let context = &TupleContext::default();
+        let context = &Self::Context::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -94,7 +94,7 @@ impl Push for Tiny {
             _,
             ArrayDescriptors<FieldDescriptor, 1>,
             CoreSliceItemPtrs<MaybeUninit<u8>>,
-        >::try_from_storage_value(bytes, context, value)
+        >::try_from_storage_value::<Self, _>(bytes, context, value)
         .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -117,7 +117,7 @@ impl Push for Small {
         vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
-        let context = &TupleContext::default();
+        let context = &Self::Context::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -132,7 +132,7 @@ impl Push for Small {
             _,
             ArrayDescriptors<FieldDescriptor, 3>,
             CoreSliceItemPtrs<MaybeUninit<u8>>,
-        >::try_from_storage_value(bytes, context, value)
+        >::try_from_storage_value::<Self, _>(bytes, context, value)
         .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -155,7 +155,7 @@ impl Push for Medium {
         vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
-        let context = &TupleContext::default();
+        let context = &Self::Context::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -170,7 +170,7 @@ impl Push for Medium {
             _,
             ArrayDescriptors<FieldDescriptor, 3>,
             CoreSliceItemPtrs<MaybeUninit<u8>>,
-        >::try_from_storage_value(bytes, context, value)
+        >::try_from_storage_value::<Self, _>(bytes, context, value)
         .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -196,7 +196,7 @@ impl Push for Big {
         vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
-        let context = &TupleContext::default();
+        let context = &Self::Context::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -211,7 +211,7 @@ impl Push for Big {
             _,
             ArrayDescriptors<FieldDescriptor, 5>,
             CoreSliceItemPtrs<MaybeUninit<u8>>,
-        >::try_from_storage_value(bytes, context, value)
+        >::try_from_storage_value::<Self, _>(bytes, context, value)
         .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {
@@ -242,7 +242,7 @@ impl Push for Large {
         vec: &mut SoaVec<BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>>,
         value: Self,
     ) {
-        let context = &TupleContext::default();
+        let context = &Self::Context::default();
         let value = black_box(value);
 
         let mut bytes = [0_u8; size_of::<Self>() * 2];
@@ -257,7 +257,7 @@ impl Push for Large {
             _,
             ArrayDescriptors<FieldDescriptor, 10>,
             CoreSliceItemPtrs<MaybeUninit<u8>>,
-        >::try_from_storage_value(bytes, context, value)
+        >::try_from_storage_value::<Self, _>(bytes, context, value)
         .unwrap();
 
         vec.push_from(|_, mut dst| unsafe {

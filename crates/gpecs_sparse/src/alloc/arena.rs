@@ -992,9 +992,9 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn insert<R>(&mut self, key: K, value: V) -> Option<R>
+    pub fn insert<R, W>(&mut self, key: K, value: W) -> Option<R>
     where
-        V: SoaRead<R> + SoaWrite,
+        V: SoaRead<R> + SoaWrite<W>,
     {
         self.try_insert(key, value)
             .unwrap_or_else(|error| try_insert_failed(error.kind))
@@ -1103,13 +1103,14 @@ where
     }
 
     #[inline]
-    pub fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
+    pub fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite,
+        V: SoaRead<R> + SoaWrite<W>,
     {
         self.try_insert_from(key, |context, dst| match dst {
             Ok(Some(TryInsertAccess::ReadWrite(dst))) => {
-                let value = unsafe { soa::ptr::replace(context, dst.into_ptrs(), value) };
+                let dst = dst.into_ptrs();
+                let value = unsafe { soa::ptr::replace::<V, R, W>(context, dst, value) };
                 Ok(Some(value))
             }
             Ok(Some(TryInsertAccess::WriteOnly(dst))) => {
@@ -1131,6 +1132,16 @@ where
             let (key, dst) = dst.unwrap_or_else(|error| try_insert_failed(error));
             f(context, key, dst)
         })
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn push<W>(&mut self, value: W) -> K
+    where
+        V: SoaWrite<W>,
+    {
+        self.try_push(value)
+            .unwrap_or_else(|error| try_push_failed(error.kind))
     }
 
     pub fn try_push_from<F, R>(&mut self, f: F) -> R
@@ -1228,6 +1239,20 @@ where
             unsafe { ptr::write(key_ptr, key) }
 
             result
+        })
+    }
+
+    #[inline]
+    pub fn try_push<W>(&mut self, value: W) -> Result<K, TryModifyError<K, W>>
+    where
+        V: SoaWrite<W>,
+    {
+        self.try_push_from(|context, dst| match dst {
+            Ok((key, dst)) => {
+                unsafe { context.write(dst, value) }
+                Ok(key)
+            }
+            Err(error) => Err(TryModifyError::new(error, value)),
         })
     }
 
@@ -1754,30 +1779,6 @@ where
     }
 }
 
-impl<K, V> EpochSparseArena<K, V>
-where
-    K: Key,
-    V: AllocSoa + SoaWrite,
-{
-    #[inline]
-    #[track_caller]
-    pub fn push(&mut self, value: V) -> K {
-        self.try_push(value)
-            .unwrap_or_else(|error| try_push_failed(error.kind))
-    }
-
-    #[inline]
-    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
-        self.try_push_from(|context, dst| match dst {
-            Ok((key, dst)) => {
-                unsafe { context.write(dst, value) }
-                Ok(key)
-            }
-            Err(error) => Err(TryModifyError::new(error, value)),
-        })
-    }
-}
-
 impl<K, V> Debug for EpochSparseArena<K, V>
 where
     K: Key,
@@ -2061,13 +2062,13 @@ where
     }
 }
 
-impl<K, V> FromIterator<DenseItem<K, V>> for EpochSparseArena<K, V>
+impl<K, V, W> FromIterator<DenseItem<K, W>> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
+    V: AllocSoa + SoaWrite<W> + ?Sized,
     V::Context: Default,
 {
-    fn from_iter<I: IntoIterator<Item = DenseItem<K, V>>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = DenseItem<K, W>>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let iter_len = {
             let (lower, upper) = iter.size_hint();
@@ -2085,53 +2086,23 @@ where
     }
 }
 
-impl<K, V> FromIterator<(K, V)> for EpochSparseArena<K, V>
+impl<K, V, W> FromIterator<(K, W)> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
+    V: AllocSoa + SoaWrite<W> + ?Sized,
     V::Context: Default,
 {
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = (K, W)>>(iter: T) -> Self {
         iter.into_iter().map(DenseItem::from).collect()
     }
 }
 
-impl<K, V> FromIterator<V> for EpochSparseArena<K, V>
+impl<K, V, W> Extend<DenseItem<K, W>> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
-    V::Context: Default,
+    V: AllocSoa + SoaWrite<W> + ?Sized,
 {
-    fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
-        let dense: SoaVec<_> = iter
-            .into_iter()
-            .enumerate()
-            .map(|(sparse_index, value)| {
-                let key = K::new(sparse_index, Default::default());
-                DenseItem { key, value }
-            })
-            .collect();
-        let len = dense.len();
-
-        let sparse = (0..len)
-            .map(|dense_index| SparseItem::occupied(dense_index, Default::default()))
-            .collect();
-        let sparse_vacant_head = len;
-
-        Self {
-            dense,
-            sparse,
-            sparse_vacant_head,
-        }
-    }
-}
-
-impl<K, V> Extend<DenseItem<K, V>> for EpochSparseArena<K, V>
-where
-    K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
-{
-    fn extend<I: IntoIterator<Item = DenseItem<K, V>>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = DenseItem<K, W>>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
         while let Some(DenseItem { key, value }) = iter.next() {
             if self.len() == self.capacity() {
@@ -2145,30 +2116,13 @@ where
     }
 }
 
-impl<K, V> Extend<(K, V)> for EpochSparseArena<K, V>
+impl<K, V, W> Extend<(K, W)> for EpochSparseArena<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
+    V: AllocSoa + SoaWrite<W> + ?Sized,
 {
-    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = (K, W)>>(&mut self, iter: I) {
         self.extend(iter.into_iter().map(DenseItem::from));
-    }
-}
-
-impl<K, V> Extend<V> for EpochSparseArena<K, V>
-where
-    K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
-{
-    fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
-        let mut iter = iter.into_iter();
-        while let Some(value) = iter.next() {
-            if self.len() == self.capacity() {
-                let (lower, _) = iter.size_hint();
-                self.reserve(lower.saturating_add(1), lower.saturating_add(1));
-            }
-            self.push(value);
-        }
     }
 }
 

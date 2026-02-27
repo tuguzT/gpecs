@@ -44,7 +44,7 @@ pub fn validate_components<'a, 'components, 'ctx, T, I>(
     component_ids: I,
 ) -> impl Iterator<Item = ComponentId> + use<'components, 'ctx, T, I>
 where
-    T: RawSoa + Soa<'a>,
+    T: RawSoa + Soa<'a> + ?Sized,
     T::Context: FieldDescriptors<'ctx>,
     I: IntoIterator<Item = ComponentId>,
 {
@@ -107,16 +107,16 @@ where
 }
 
 #[inline]
-pub unsafe fn into_erased_fields<'a, T>(
+pub unsafe fn into_erased_fields<'a, T, W>(
     components: &ComponentRegistry,
     context: &T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
-    value: T,
+    value: W,
 ) -> IndexSet<ErasedComponent>
 where
-    T: AllocSoa + Soa<'a> + SoaWrite,
+    T: AllocSoa + Soa<'a> + SoaWrite<W> + ?Sized,
 {
-    let erased_value = BoxedErasedSoa::try_from(context, value)
+    let erased_value = BoxedErasedSoa::try_from::<T, W>(context, value)
         .expect("the value should be valid for the given context");
     validate_components::<T, _>(components, context, component_ids)
         .zip_eq(erased_value.into_fields())

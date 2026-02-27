@@ -239,12 +239,12 @@ where
     }
 }
 
-unsafe impl<K, V> WriteSoaContext<DenseItem<K, V>> for DenseContext<K, V>
+unsafe impl<K, V, W> WriteSoaContext<DenseItem<K, W>> for DenseContext<K, V>
 where
-    V: SoaWrite,
+    V: SoaWrite<W>,
 {
     #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: DenseItem<K, V>) {
+    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: DenseItem<K, W>) {
         unsafe { dst.write(self, value) }
     }
 }

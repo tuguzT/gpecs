@@ -114,7 +114,7 @@ fn empty_into_iter() {
 
 #[test]
 fn empty_insert_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     let previous = sparse_set.insert(0, Identity(42));
     assert_eq!(previous, None);
 
@@ -125,7 +125,7 @@ fn empty_insert_one() {
 
 #[test]
 fn with_capacity_insert_one() {
-    let mut sparse_set = SparseSet::with_capacity(10, 10);
+    let mut sparse_set = SparseSet::<Identity<i32>>::with_capacity(10, 10);
     let previous = sparse_set.insert(0, Identity(42));
     assert_eq!(previous, None);
 
@@ -136,7 +136,7 @@ fn with_capacity_insert_one() {
 
 #[test]
 fn empty_insert_one_mutate() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set[0] = 43.into();
 
@@ -147,7 +147,7 @@ fn empty_insert_one_mutate() {
 
 #[test]
 fn with_capacity_insert_one_mutate() {
-    let mut sparse_set = SparseSet::with_capacity(10, 10);
+    let mut sparse_set = SparseSet::<Identity<i32>>::with_capacity(10, 10);
     sparse_set.insert(0, Identity(42));
     sparse_set[0] = 43.into();
 
@@ -158,7 +158,7 @@ fn with_capacity_insert_one_mutate() {
 
 #[test]
 fn empty_insert_far() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
 
     let (key, value) = (3, Identity(42));
     sparse_set.insert(key, value);
@@ -177,7 +177,7 @@ fn empty_insert_far() {
 
 #[test]
 fn empty_insert_far_remove() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(3, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -200,7 +200,7 @@ fn empty_insert_far_remove() {
 
 #[test]
 fn empty_push() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
 
     let key = sparse_set.push(Identity(42));
     assert_eq!(key, 0);
@@ -220,7 +220,7 @@ fn empty_pop() {
 
 #[test]
 fn one_item_insert_remove_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let removed = sparse_set.remove(0);
@@ -233,7 +233,7 @@ fn one_item_insert_remove_one() {
 
 #[test]
 fn one_item_insert_remove_one_epoch() {
-    let mut sparse_set = EpochSparseSet::new();
+    let mut sparse_set = EpochSparseSet::<_, Identity<i32>>::new();
 
     let key = Key::new(0, 1);
     sparse_set.insert(key, Identity(42));
@@ -256,7 +256,7 @@ fn one_item_insert_remove_one_epoch() {
 
 #[test]
 fn one_item_insert_swap_remove_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let removed = sparse_set.swap_remove(0);
@@ -269,7 +269,7 @@ fn one_item_insert_swap_remove_one() {
 
 #[test]
 fn one_item_insert_swap_remove_one_epoch() {
-    let mut sparse_set = EpochSparseSet::new();
+    let mut sparse_set = EpochSparseSet::<_, Identity<i32>>::new();
 
     let key = Key::new(0, 1);
     sparse_set.insert(key, Identity(42));
@@ -292,7 +292,7 @@ fn one_item_insert_swap_remove_one_epoch() {
 
 #[test]
 fn one_item_push_remove_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     let key = sparse_set.push(Identity(42));
 
     let removed = sparse_set.remove(key);
@@ -305,7 +305,7 @@ fn one_item_push_remove_one() {
 
 #[test]
 fn one_item_push_remove_one_epoch() {
-    let mut sparse_set = EpochSparseSet::<Key, _>::new();
+    let mut sparse_set = EpochSparseSet::<Key, Identity<i32>>::new();
     let key = sparse_set.push(Identity(42));
 
     let removed = sparse_set.remove(key);
@@ -326,7 +326,7 @@ fn one_item_push_remove_one_epoch() {
 
 #[test]
 fn one_item_push_swap_remove_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     let key = sparse_set.push(Identity(42));
 
     let removed = sparse_set.swap_remove(key);
@@ -339,7 +339,7 @@ fn one_item_push_swap_remove_one() {
 
 #[test]
 fn one_item_push_swap_remove_one_epoch() {
-    let mut sparse_set = EpochSparseSet::<Key, _>::new();
+    let mut sparse_set = EpochSparseSet::<Key, Identity<i32>>::new();
     let key = sparse_set.push(Identity(42));
 
     let removed = sparse_set.swap_remove(key);
@@ -361,7 +361,7 @@ fn one_item_push_swap_remove_one_epoch() {
 #[test]
 #[should_panic]
 fn one_item_swap() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     sparse_set.swap(0, 0);
@@ -380,7 +380,7 @@ fn one_item_swap() {
 #[test]
 #[should_panic]
 fn one_item_swap_keys() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     sparse_set.swap_keys(0, 0);
@@ -398,7 +398,7 @@ fn one_item_swap_keys() {
 
 #[test]
 fn one_item_parts() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(42));
 
     let (dense, sparse) = sparse_set.into_parts();
@@ -424,7 +424,7 @@ fn one_item_parts() {
 
 #[test]
 fn one_item_keys() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let keys = sparse_set.keys();
@@ -434,7 +434,7 @@ fn one_item_keys() {
 
 #[test]
 fn one_item_into_keys() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let keys = sparse_set.into_keys();
@@ -444,7 +444,7 @@ fn one_item_into_keys() {
 
 #[test]
 fn one_item_values() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let values = sparse_set.values();
@@ -454,7 +454,7 @@ fn one_item_values() {
 
 #[test]
 fn one_item_values_mut() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let values_mut = sparse_set.values_mut();
@@ -464,7 +464,7 @@ fn one_item_values_mut() {
 
 #[test]
 fn one_item_into_values() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let values = sparse_set.into_values();
@@ -474,7 +474,7 @@ fn one_item_into_values() {
 
 #[test]
 fn one_item_iter() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let iter = sparse_set.iter();
@@ -487,7 +487,7 @@ fn one_item_iter() {
 
 #[test]
 fn one_item_iter_mut() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let iter_mut = sparse_set.iter_mut();
@@ -500,7 +500,7 @@ fn one_item_iter_mut() {
 
 #[test]
 fn one_item_into_iter() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
 
     let into_iter = sparse_set.into_iter();
@@ -511,7 +511,7 @@ fn one_item_into_iter() {
 
 #[test]
 fn two_items_insert_first() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -531,7 +531,7 @@ fn two_items_insert_first() {
 
 #[test]
 fn two_items_insert_first_epoch() {
-    let mut sparse_set = EpochSparseSet::new();
+    let mut sparse_set = EpochSparseSet::<_, Identity<i32>>::new();
 
     let first_key = Key::new(0, 3);
     sparse_set.insert(first_key, Identity(42));
@@ -556,7 +556,7 @@ fn two_items_insert_first_epoch() {
 
 #[test]
 fn two_items_insert_second() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -576,7 +576,7 @@ fn two_items_insert_second() {
 
 #[test]
 fn two_items_remove_first() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -596,7 +596,7 @@ fn two_items_remove_first() {
 
 #[test]
 fn two_items_swap_remove_first() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -616,7 +616,7 @@ fn two_items_swap_remove_first() {
 
 #[test]
 fn two_items_remove_second() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -636,7 +636,7 @@ fn two_items_remove_second() {
 
 #[test]
 fn two_items_swap_remove_second() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -656,7 +656,7 @@ fn two_items_swap_remove_second() {
 
 #[test]
 fn two_items_remove_one_insert_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -673,7 +673,7 @@ fn two_items_remove_one_insert_one() {
 
 #[test]
 fn two_items_swap_remove_one_insert_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -690,7 +690,7 @@ fn two_items_swap_remove_one_insert_one() {
 
 #[test]
 fn two_items_remove_one_push_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -709,7 +709,7 @@ fn two_items_remove_one_push_one() {
 
 #[test]
 fn two_items_swap_remove_one_push_one() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -728,7 +728,7 @@ fn two_items_swap_remove_one_push_one() {
 
 #[test]
 fn two_items_swap() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -753,7 +753,7 @@ fn two_items_swap() {
 
 #[test]
 fn two_items_swap_keys() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(42));
     sparse_set.insert(1, Identity(69));
 
@@ -778,7 +778,7 @@ fn two_items_swap_keys() {
 
 #[test]
 fn two_items_insert_pop() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(5, Identity(42));
     sparse_set.insert(2, Identity(69));
 
@@ -791,7 +791,7 @@ fn two_items_insert_pop() {
 
 #[test]
 fn two_items_push_pop() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     let first_key = sparse_set.push(Identity(42));
     let second_key = sparse_set.push(Identity(69));
 
@@ -804,7 +804,7 @@ fn two_items_push_pop() {
 
 #[test]
 fn two_items_insert_pop_epoch() {
-    let mut sparse_set = EpochSparseSet::new();
+    let mut sparse_set = EpochSparseSet::<_, Identity<i32>>::new();
 
     let first_key = Key::new(5, 1);
     sparse_set.insert(first_key, Identity(42));
@@ -826,7 +826,7 @@ fn two_items_insert_pop_epoch() {
 
 #[test]
 fn two_items_push_pop_epoch() {
-    let mut sparse_set = EpochSparseSet::<Key, _>::new();
+    let mut sparse_set = EpochSparseSet::<Key, Identity<i32>>::new();
     let first_key = sparse_set.push(Identity(42));
     let second_key = sparse_set.push(Identity(69));
 
@@ -844,7 +844,7 @@ fn two_items_push_pop_epoch() {
 
 #[test]
 fn two_items_invalidate_epoch() {
-    let mut sparse_set = EpochSparseSet::new();
+    let mut sparse_set = EpochSparseSet::<_, Identity<i32>>::new();
 
     let first_key = Key::new(5, 1);
     sparse_set.insert(first_key, Identity(42));
@@ -873,7 +873,7 @@ fn two_items_invalidate_epoch() {
 
 #[test]
 fn three_items_insert_remove_middle() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -892,7 +892,7 @@ fn three_items_insert_remove_middle() {
 
 #[test]
 fn three_items_push_remove_middle() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     let first_key = sparse_set.push(Identity(34));
     let middle_key = sparse_set.push(Identity(42));
     let last_key = sparse_set.push(Identity(69));
@@ -911,7 +911,7 @@ fn three_items_push_remove_middle() {
 
 #[test]
 fn three_items_swap_remove_middle() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(0, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(2, Identity(69));
@@ -930,7 +930,7 @@ fn three_items_swap_remove_middle() {
 
 #[test]
 fn three_items_parts() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -967,7 +967,7 @@ fn three_items_parts() {
 
 #[test]
 fn three_items_keys() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -979,7 +979,7 @@ fn three_items_keys() {
 
 #[test]
 fn three_items_into_keys() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -991,7 +991,7 @@ fn three_items_into_keys() {
 
 #[test]
 fn three_items_values() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -1003,7 +1003,7 @@ fn three_items_values() {
 
 #[test]
 fn three_items_values_mut() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -1018,7 +1018,7 @@ fn three_items_values_mut() {
 
 #[test]
 fn three_items_into_values() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -1030,7 +1030,7 @@ fn three_items_into_values() {
 
 #[test]
 fn three_items_iter() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -1045,7 +1045,7 @@ fn three_items_iter() {
 
 #[test]
 fn three_items_iter_mut() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -1060,7 +1060,7 @@ fn three_items_iter_mut() {
 
 #[test]
 fn three_items_into_iter() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -1076,7 +1076,7 @@ fn three_items_into_iter() {
 
 #[test]
 fn five_items_remove_insert() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(4, Identity(34));
     sparse_set.insert(2, Identity(42));
     sparse_set.insert(1, Identity(69));
@@ -1126,7 +1126,7 @@ fn five_items_remove_insert() {
 
 #[test]
 fn five_items_swap_remove_insert() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(4, Identity(34));
     sparse_set.insert(2, Identity(42));
     sparse_set.insert(1, Identity(69));
@@ -1176,7 +1176,7 @@ fn five_items_swap_remove_insert() {
 
 #[test]
 fn five_items_remove_push() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     let _key0 = sparse_set.push(Identity(34));
     let key1 = sparse_set.push(Identity(42));
     let key2 = sparse_set.push(Identity(69));
@@ -1213,7 +1213,7 @@ fn five_items_remove_push() {
 
 #[test]
 fn five_items_swap_remove_push() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     let _key0 = sparse_set.push(Identity(34));
     let key1 = sparse_set.push(Identity(42));
     let key2 = sparse_set.push(Identity(69));
@@ -1250,7 +1250,7 @@ fn five_items_swap_remove_push() {
 
 #[test]
 fn five_items_retain() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(8, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(4, Identity(69));
@@ -1285,7 +1285,7 @@ fn five_items_retain() {
 
 #[test]
 fn five_items_drain() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(8, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(4, Identity(69));
@@ -1308,7 +1308,7 @@ fn five_items_drain() {
 
 #[test]
 fn five_items_insert_truncate() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(8, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(4, Identity(69));
@@ -1337,7 +1337,7 @@ fn five_items_insert_truncate() {
 
 #[test]
 fn five_items_push_truncate() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     let key0 = sparse_set.push(Identity(34));
     let key1 = sparse_set.push(Identity(42));
     let key2 = sparse_set.push(Identity(69));
@@ -1368,7 +1368,7 @@ fn five_items_push_truncate() {
 
 #[test]
 fn five_items_sort() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(8, Identity(42));
     sparse_set.insert(1, Identity(228));
     sparse_set.insert(4, Identity(69));
@@ -1391,7 +1391,7 @@ fn five_items_sort() {
 
 #[test]
 fn five_items_sort_keys() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(8, Identity(42));
     sparse_set.insert(1, Identity(228));
     sparse_set.insert(4, Identity(69));
@@ -1414,7 +1414,7 @@ fn five_items_sort_keys() {
 
 #[test]
 fn five_items_sort_by() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(8, Identity(42));
     sparse_set.insert(1, Identity(228));
     sparse_set.insert(4, Identity(69));
@@ -1437,7 +1437,7 @@ fn five_items_sort_by() {
 
 #[test]
 fn five_items_entry() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(8, Identity(42));
     sparse_set.insert(1, Identity(228));
     sparse_set.insert(4, Identity(69));
@@ -1519,13 +1519,13 @@ fn from_keys_values_iter_too_large_key() {
 #[test]
 fn from_values_iter() {
     let values = [
-        Identity(34),
-        Identity(42),
-        Identity(69),
-        Identity(228),
-        Identity(666),
+        (0, Identity(34)),
+        (1, Identity(42)),
+        (2, Identity(69)),
+        (3, Identity(228)),
+        (4, Identity(666)),
     ];
-    let sparse_set: SparseSet<_> = values.into_iter().collect();
+    let sparse_set: SparseSet<Identity<i32>> = values.into_iter().collect();
 
     assert_eq!(sparse_set.len(), 5);
     assert_eq!(sparse_set.keys().as_slice(), &[0, 1, 2, 3, 4]);
@@ -1543,7 +1543,7 @@ fn from_values_iter() {
 
 #[test]
 fn extend_keys_values() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(5, Identity(69));
@@ -1568,12 +1568,12 @@ fn extend_keys_values() {
 
 #[test]
 fn extend_values() {
-    let mut sparse_set = SparseSet::new();
+    let mut sparse_set = SparseSet::<Identity<i32>>::new();
     sparse_set.insert(2, Identity(34));
     sparse_set.insert(1, Identity(42));
     sparse_set.insert(4, Identity(69));
 
-    let values = [Identity(228), Identity(666), Identity(201)];
+    let values = [(0, Identity(228)), (3, Identity(666)), (5, Identity(201))];
     sparse_set.extend(values);
 
     assert_eq!(sparse_set.keys().as_slice(), &[2, 1, 4, 0, 3, 5]);
@@ -1592,7 +1592,7 @@ fn extend_values() {
 
 #[test]
 fn from_arena() {
-    let mut sparse_arena = SparseArena::new();
+    let mut sparse_arena = SparseArena::<Identity<i32>>::new();
     sparse_arena.insert(2, Identity(34));
     sparse_arena.insert(1, Identity(42));
     sparse_arena.insert(5, Identity(69));

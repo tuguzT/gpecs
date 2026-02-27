@@ -3,7 +3,7 @@
 use std::{iter, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa,
+    BoxedErasedSoa, BoxedErasedSoaContext,
     ptr::slice::CoreSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
@@ -265,7 +265,9 @@ fn one_item() {
     let u8 = 1;
     let u128 = 2;
     let u16 = 3;
-    vec.push(ErasedSoa::try_from(&context, (u8, u128, u16, ())).unwrap());
+    let value = (u8, u128, u16, ());
+
+    vec.push(Item::try_from::<Soa, _>(&context, value).unwrap());
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
@@ -369,7 +371,7 @@ fn one_item_zst() {
 
     let mut vec = Vec::with_context(erased_context);
 
-    vec.push(ErasedSoa::try_from(&context, ()).unwrap());
+    vec.push(Item::try_from::<Soa, _>(&context, ()).unwrap());
     assert_eq!(vec.len(), 1);
     assert!(vec.capacity() >= 1);
     assert_eq!(
@@ -464,7 +466,7 @@ fn three_items() {
     let mut vec = Vec::with_context(erased_context);
 
     let iter = iter::repeat_with(|| {
-        ErasedSoa::try_from::<Soa>(&context, (0, "0".to_owned(), 0, ())).unwrap()
+        Item::try_from::<Soa, _>(&context, (0, "0".to_owned(), 0, ())).unwrap()
     })
     .take(3);
     vec.extend(iter);
@@ -510,15 +512,15 @@ fn three_items() {
 
     vec.insert(
         0,
-        ErasedSoa::try_from::<Soa>(&context, (1, "2".to_owned(), 3, ())).unwrap(),
+        Item::try_from::<Soa, _>(&context, (1, "2".to_owned(), 3, ())).unwrap(),
     );
     vec.insert(
         0,
-        ErasedSoa::try_from::<Soa>(&context, (4, "5".to_owned(), 6, ())).unwrap(),
+        Item::try_from::<Soa, _>(&context, (4, "5".to_owned(), 6, ())).unwrap(),
     );
     vec.insert(
         1,
-        ErasedSoa::try_from::<Soa>(&context, (7, "8".to_owned(), 9, ())).unwrap(),
+        Item::try_from::<Soa, _>(&context, (7, "8".to_owned(), 9, ())).unwrap(),
     );
 
     assert_eq!(vec.len(), 3);
@@ -607,8 +609,8 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.push(ErasedSoa::try_from::<Soa>(&context, (8, "8".to_owned(), 9, ())).unwrap());
-    vec.push(ErasedSoa::try_from::<Soa>(&context, (2, "2".to_owned(), 3, ())).unwrap());
+    vec.push(Item::try_from::<Soa, _>(&context, (8, "8".to_owned(), 9, ())).unwrap());
+    vec.push(Item::try_from::<Soa, _>(&context, (2, "2".to_owned(), 3, ())).unwrap());
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
 
@@ -703,7 +705,7 @@ fn three_items() {
     assert!(vec.capacity() >= 3);
 
     let iter = iter::repeat_with(|| {
-        ErasedSoa::try_from::<Soa>(&context, (0, "0".to_owned(), 0, ())).unwrap()
+        Item::try_from::<Soa, _>(&context, (0, "0".to_owned(), 0, ())).unwrap()
     })
     .take(3);
     vec.extend(iter);
@@ -746,10 +748,10 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.push(ErasedSoa::try_from::<Soa>(&context, (1, "2".to_owned(), 3, ())).unwrap());
+    vec.push(Item::try_from::<Soa, _>(&context, (1, "2".to_owned(), 3, ())).unwrap());
     for _ in 0..10 {
-        vec.push(ErasedSoa::try_from::<Soa>(&context, (4, "5".to_owned(), 6, ())).unwrap());
-        vec.push(ErasedSoa::try_from::<Soa>(&context, (7, "8".to_owned(), 9, ())).unwrap());
+        vec.push(Item::try_from::<Soa, _>(&context, (4, "5".to_owned(), 6, ())).unwrap());
+        vec.push(Item::try_from::<Soa, _>(&context, (7, "8".to_owned(), 9, ())).unwrap());
     }
 
     // use this code instead of `retain_mut` to drop needed contents,
@@ -814,7 +816,7 @@ fn three_items_zst() {
 
     let mut vec = Vec::with_context(erased_context);
 
-    let iter = iter::repeat_with(|| ErasedSoa::try_from::<Soa>(&context, ()).unwrap()).take(3);
+    let iter = iter::repeat_with(|| Item::try_from::<Soa, _>(&context, ()).unwrap()).take(3);
     vec.extend(iter);
 
     assert_eq!(vec.len(), 3);
@@ -850,9 +852,9 @@ fn three_items_zst() {
         let () = unsafe { erased.downcast::<Soa, _>(&context) }.unwrap();
     }
 
-    vec.insert(0, ErasedSoa::try_from::<Soa>(&context, ()).unwrap());
-    vec.insert(0, ErasedSoa::try_from::<Soa>(&context, ()).unwrap());
-    vec.insert(1, ErasedSoa::try_from::<Soa>(&context, ()).unwrap());
+    vec.insert(0, Item::try_from::<Soa, _>(&context, ()).unwrap());
+    vec.insert(0, Item::try_from::<Soa, _>(&context, ()).unwrap());
+    vec.insert(1, Item::try_from::<Soa, _>(&context, ()).unwrap());
 
     assert_eq!(vec.len(), 3);
     assert!(vec.capacity() >= 3);
@@ -929,8 +931,8 @@ fn three_items_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    vec.push(ErasedSoa::try_from::<Soa>(&context, ()).unwrap());
-    vec.push(ErasedSoa::try_from::<Soa>(&context, ()).unwrap());
+    vec.push(Item::try_from::<Soa, _>(&context, ()).unwrap());
+    vec.push(Item::try_from::<Soa, _>(&context, ()).unwrap());
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
 
@@ -1024,7 +1026,7 @@ fn three_items_zst() {
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 3);
 
-    let iter = iter::repeat_with(|| ErasedSoa::try_from::<Soa>(&context, ()).unwrap()).take(3);
+    let iter = iter::repeat_with(|| Item::try_from::<Soa, _>(&context, ()).unwrap()).take(3);
     vec.extend(iter);
 
     vec.reserve(1);
@@ -1064,7 +1066,7 @@ fn three_items_zst() {
     };
 
     for _ in 0..3 {
-        vec.push(ErasedSoa::try_from::<Soa>(&context, ()).unwrap());
+        vec.push(Item::try_from::<Soa, _>(&context, ()).unwrap());
     }
 
     assert_eq!(vec.len(), 3);

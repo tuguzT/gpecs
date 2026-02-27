@@ -913,9 +913,9 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn insert<R>(&mut self, key: K, value: V) -> Option<R>
+    pub fn insert<R, W>(&mut self, key: K, value: W) -> Option<R>
     where
-        V: SoaRead<R> + SoaWrite,
+        V: SoaRead<R> + SoaWrite<W>,
     {
         self.try_insert(key, value)
             .unwrap_or_else(|error| try_insert_failed(error.kind))
@@ -988,13 +988,14 @@ where
     }
 
     #[inline]
-    pub fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
+    pub fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite,
+        V: SoaRead<R> + SoaWrite<W>,
     {
         self.try_insert_from(key, |context, dst| match dst {
             Ok(Some(TryInsertAccess::ReadWrite(dst))) => {
-                let value = unsafe { soa::ptr::replace(context, dst.into_ptrs(), value) };
+                let dst = dst.into_ptrs();
+                let value = unsafe { soa::ptr::replace::<V, R, W>(context, dst, value) };
                 Ok(Some(value))
             }
             Ok(Some(TryInsertAccess::WriteOnly(dst))) => {
@@ -1016,6 +1017,16 @@ where
             let (key, dst) = dst.unwrap_or_else(|error| try_insert_failed(error));
             f(context, key, dst)
         })
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn push<W>(&mut self, value: W) -> K
+    where
+        V: SoaWrite<W>,
+    {
+        self.try_push(value)
+            .unwrap_or_else(|error| try_push_failed(error.kind))
     }
 
     pub fn try_push_from<F, R>(&mut self, f: F) -> R
@@ -1048,6 +1059,20 @@ where
             Ok(Some(TryInsertAccess::ReadWrite(_))) => unreachable!("entry should be vacant"),
             Ok(None) => unreachable!("key epoch should be valid"),
             Err(error) => f(context, Err(error)),
+        })
+    }
+
+    #[inline]
+    pub fn try_push<W>(&mut self, value: W) -> Result<K, TryModifyError<K, W>>
+    where
+        V: SoaWrite<W>,
+    {
+        self.try_push_from(|context, dst| match dst {
+            Ok((key, dst)) => {
+                unsafe { context.write(dst, value) }
+                Ok(key)
+            }
+            Err(error) => Err(TryModifyError::new(error, value)),
         })
     }
 
@@ -1561,30 +1586,6 @@ where
     }
 }
 
-impl<K, V> EpochSparseSet<K, V>
-where
-    K: Key,
-    V: AllocSoa + SoaWrite,
-{
-    #[inline]
-    #[track_caller]
-    pub fn push(&mut self, value: V) -> K {
-        self.try_push(value)
-            .unwrap_or_else(|error| try_push_failed(error.kind))
-    }
-
-    #[inline]
-    pub fn try_push(&mut self, value: V) -> Result<K, TryModifyError<K, V>> {
-        self.try_push_from(|context, dst| match dst {
-            Ok((key, dst)) => {
-                unsafe { context.write(dst, value) }
-                Ok(key)
-            }
-            Err(error) => Err(TryModifyError::new(error, value)),
-        })
-    }
-}
-
 impl<K, V> Debug for EpochSparseSet<K, V>
 where
     K: Key,
@@ -1822,13 +1823,13 @@ where
     }
 }
 
-impl<K, V> FromIterator<DenseItem<K, V>> for EpochSparseSet<K, V>
+impl<K, V, W> FromIterator<DenseItem<K, W>> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
+    V: AllocSoa + SoaWrite<W> + ?Sized,
     V::Context: Default,
 {
-    fn from_iter<I: IntoIterator<Item = DenseItem<K, V>>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = DenseItem<K, W>>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let iter_len = {
             let (lower, upper) = iter.size_hint();
@@ -1846,48 +1847,23 @@ where
     }
 }
 
-impl<K, V> FromIterator<(K, V)> for EpochSparseSet<K, V>
+impl<K, V, W> FromIterator<(K, W)> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
+    V: AllocSoa + SoaWrite<W> + ?Sized,
     V::Context: Default,
 {
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = (K, W)>>(iter: T) -> Self {
         iter.into_iter().map(DenseItem::from).collect()
     }
 }
 
-impl<K, V> FromIterator<V> for EpochSparseSet<K, V>
+impl<K, V, W> Extend<DenseItem<K, W>> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
-    V::Context: Default,
+    V: AllocSoa + SoaWrite<W> + ?Sized,
 {
-    fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
-        let dense: SoaVec<_> = iter
-            .into_iter()
-            .enumerate()
-            .map(|(sparse_index, value)| {
-                let key = K::new(sparse_index, Default::default());
-                DenseItem { key, value }
-            })
-            .collect();
-        let len = dense.len();
-
-        let sparse = (0..len)
-            .map(|dense_index| SparseItem::occupied(dense_index, Default::default()))
-            .collect();
-
-        Self { dense, sparse }
-    }
-}
-
-impl<K, V> Extend<DenseItem<K, V>> for EpochSparseSet<K, V>
-where
-    K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
-{
-    fn extend<I: IntoIterator<Item = DenseItem<K, V>>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = DenseItem<K, W>>>(&mut self, iter: I) {
         let mut iter = iter.into_iter();
         while let Some(DenseItem { key, value }) = iter.next() {
             if self.len() == self.capacity() {
@@ -1901,42 +1877,13 @@ where
     }
 }
 
-impl<K, V> Extend<(K, V)> for EpochSparseSet<K, V>
+impl<K, V, W> Extend<(K, W)> for EpochSparseSet<K, V>
 where
     K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
+    V: AllocSoa + SoaWrite<W> + ?Sized,
 {
-    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = (K, W)>>(&mut self, iter: I) {
         self.extend(iter.into_iter().map(DenseItem::from));
-    }
-}
-
-impl<K, V> Extend<V> for EpochSparseSet<K, V>
-where
-    K: Key<SparseIndex = usize>,
-    V: AllocSoa + SoaWrite,
-{
-    // I could have used `push_from` instead of `insert_from` by key, but in that case
-    // it would search for a vacant sparse item multiple times from the beginning of a sparse
-    fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
-        let mut maybe_vacant_keys = 0..self.sparse_len();
-
-        let mut iter = iter.into_iter();
-        while let Some(value) = iter.next() {
-            if self.len() == self.capacity() {
-                let (lower, _) = iter.size_hint();
-                self.reserve(lower.saturating_add(1), lower.saturating_add(1));
-            }
-
-            let sparse_index = maybe_vacant_keys
-                .find(|&key| self.as_sparse_slice()[key].is_vacant())
-                .unwrap_or(self.sparse_len());
-            let key = K::new(sparse_index, Default::default());
-
-            self.insert_from(key, |context, dst| {
-                dst.map(|dst| unsafe { drop_old_then_write(context, dst, value) })
-            });
-        }
     }
 }
 

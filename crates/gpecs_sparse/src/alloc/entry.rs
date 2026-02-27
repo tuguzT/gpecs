@@ -159,9 +159,9 @@ where
     }
 
     #[inline]
-    pub fn insert<R>(&mut self, value: V) -> R
+    pub fn insert<R, W>(&mut self, value: W) -> R
     where
-        V: SoaRead<R> + SoaWrite,
+        V: SoaRead<R> + SoaWrite<W>,
     {
         let Self {
             dense_index,
@@ -171,13 +171,13 @@ where
 
         let (context, values) = container.mut_slices().into_raw_iter_mut_with_context();
         let previous = unwrap_dense(values, *dense_index);
-        unsafe { soa::ptr::replace(context, previous, value) }
+        unsafe { soa::ptr::replace::<V, R, W>(context, previous, value) }
     }
 
     #[inline]
-    pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K, V>>
+    pub fn try_replace_key<W>(&mut self, key: K) -> Result<Option<W>, TryModifyError<K, W>>
     where
-        V: SoaRead<V> + SoaWrite,
+        V: SoaRead<W> + SoaWrite<W>,
     {
         let new_key = key;
         let Self { key, container, .. } = self;
@@ -191,9 +191,9 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn replace_key(&mut self, key: K) -> Option<V>
+    pub fn replace_key<W>(&mut self, key: K) -> Option<W>
     where
-        V: SoaRead<V> + SoaWrite,
+        V: SoaRead<W> + SoaWrite<W>,
     {
         self.try_replace_key(key)
             .unwrap_or_else(|error| try_replace_key_failed(error.kind))
@@ -316,9 +316,9 @@ where
     }
 
     #[inline]
-    pub fn insert<R>(self, value: V) -> OccupiedEntry<'a, K, V, C>
+    pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V, C>
     where
-        V: SoaRead<R> + SoaWrite,
+        V: SoaRead<W> + SoaWrite<W>,
     {
         let Self { key, container, .. } = self;
 
@@ -370,9 +370,9 @@ where
 
     fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V>;
 
-    fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
+    fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite;
+        V: SoaRead<R> + SoaWrite<W>;
 
     fn remove<R>(&mut self, key: K) -> Option<R>
     where
@@ -412,9 +412,9 @@ where
     }
 
     #[inline]
-    fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
+    fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite,
+        V: SoaRead<R> + SoaWrite<W>,
     {
         Self::try_insert(self, key, value)
     }
@@ -465,9 +465,9 @@ where
     }
 
     #[inline]
-    fn try_insert<R>(&mut self, key: K, value: V) -> Result<Option<R>, TryModifyError<K, V>>
+    fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite,
+        V: SoaRead<R> + SoaWrite<W>,
     {
         Self::try_insert(self, key, value)
     }
@@ -566,9 +566,9 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_insert<R>(self, default: V) -> OccupiedEntry<'a, K, V>
+            pub fn or_insert<W>(self, default: W) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<R> + SoaWrite,
+                V: SoaRead<W> + SoaWrite<W>,
             {
                 match self {
                     Self::Occupied(entry) => entry,
@@ -577,10 +577,10 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_insert_with<R, F>(self, default: F) -> OccupiedEntry<'a, K, V>
+            pub fn or_insert_with<W, F>(self, default: F) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<R> + SoaWrite,
-                F: FnOnce() -> V,
+                V: SoaRead<W> + SoaWrite<W>,
+                F: FnOnce() -> W,
             {
                 match self {
                     Self::Occupied(entry) => entry,
@@ -589,9 +589,10 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn or_default<R>(self) -> OccupiedEntry<'a, K, V>
+            pub fn or_default<W>(self) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<R> + SoaWrite + Default,
+                V: SoaRead<W> + SoaWrite<W>,
+                W: Default,
             {
                 match self {
                     Self::Occupied(entry) => entry,
@@ -600,9 +601,9 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn insert<R>(self, value: V) -> OccupiedEntry<'a, K, V>
+            pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<R> + SoaWrite,
+                V: SoaRead<W> + SoaWrite<W>,
             {
                 match self {
                     Self::Occupied(mut entry) => {
@@ -616,18 +617,18 @@ macro_rules! generate_entry_types {
             #[inline]
             #[must_use]
             #[track_caller]
-            pub fn replace_key(self, key: K) -> Self
+            pub fn replace_key<W>(self, key: K) -> Self
             where
-                V: SoaRead<V> + SoaWrite,
+                V: SoaRead<W> + SoaWrite<W>,
             {
                 self.try_replace_key(key)
                     .unwrap_or_else(|error| $crate::alloc::assert::try_replace_key_failed(error))
             }
 
             #[inline]
-            pub fn try_replace_key(self, key: K) -> Result<Self, TryModifyErrorKind<K>>
+            pub fn try_replace_key<W>(self, key: K) -> Result<Self, TryModifyErrorKind<K>>
             where
-                V: SoaRead<V> + SoaWrite,
+                V: SoaRead<W> + SoaWrite<W>,
             {
                 match self {
                     Self::Occupied(mut entry) => {
@@ -827,9 +828,9 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn insert<R>(&mut self, value: V) -> R
+            pub fn insert<R, W>(&mut self, value: W) -> R
             where
-                V: SoaRead<R> + SoaWrite,
+                V: SoaRead<R> + SoaWrite<W>,
             {
                 let Self { inner } = self;
                 inner.insert(value)
@@ -837,18 +838,18 @@ macro_rules! generate_entry_types {
 
             #[inline]
             #[track_caller]
-            pub fn replace_key(&mut self, key: K) -> Option<V>
+            pub fn replace_key<W>(&mut self, key: K) -> Option<W>
             where
-                V: SoaRead<V> + SoaWrite,
+                V: SoaRead<W> + SoaWrite<W>,
             {
                 let Self { inner } = self;
                 inner.replace_key(key)
             }
 
             #[inline]
-            pub fn try_replace_key(&mut self, key: K) -> Result<Option<V>, TryModifyError<K, V>>
+            pub fn try_replace_key<W>(&mut self, key: K) -> Result<Option<W>, TryModifyError<K, W>>
             where
-                V: SoaRead<V> + SoaWrite,
+                V: SoaRead<W> + SoaWrite<W>,
             {
                 let Self { inner } = self;
                 inner.try_replace_key(key)
@@ -963,9 +964,9 @@ macro_rules! generate_entry_types {
             }
 
             #[inline]
-            pub fn insert<R>(self, value: V) -> OccupiedEntry<'a, K, V>
+            pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<R> + SoaWrite,
+                V: SoaRead<W> + SoaWrite<W>,
             {
                 let Self { inner } = self;
                 let inner = inner.insert(value);

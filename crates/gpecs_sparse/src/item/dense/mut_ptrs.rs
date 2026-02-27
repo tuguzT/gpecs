@@ -175,6 +175,23 @@ where
             context.ptrs_drop_in_place(value.into_inner());
         }
     }
+
+    #[inline]
+    pub unsafe fn write<W>(self, context: &V::Context, value: DenseItem<K, W>)
+    where
+        V: SoaWrite<W>,
+    {
+        let Self {
+            key: key_ptr,
+            value: value_ptr,
+        } = self;
+        let DenseItem { key, value } = value;
+
+        unsafe {
+            ptr::write(key_ptr, key);
+            context.write(value_ptr.into_inner(), value);
+        }
+    }
 }
 
 impl<'ctx, 'a, K, V> DenseMutPtrs<'ctx, K, V>
@@ -193,25 +210,6 @@ where
         let key = unsafe { &mut *key };
         let value = unsafe { context.mut_ptrs_to_mut_refs(value.into_inner()) };
         DenseRefsMut::new(key, value)
-    }
-}
-
-impl<K, V> DenseMutPtrs<'_, K, V>
-where
-    V: SoaWrite,
-{
-    #[inline]
-    pub unsafe fn write(self, context: &V::Context, value: DenseItem<K, V>) {
-        let Self {
-            key: key_ptr,
-            value: value_ptr,
-        } = self;
-        let DenseItem { key, value } = value;
-
-        unsafe {
-            ptr::write(key_ptr, key);
-            context.write(value_ptr.into_inner(), value);
-        }
     }
 }
 

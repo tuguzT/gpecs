@@ -623,7 +623,7 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
         let fields =
-            unsafe { into_erased_fields::<B>(components, B::CONTEXT, component_ids, value) };
+            unsafe { into_erased_fields::<B, _>(components, B::CONTEXT, component_ids, value) };
         fields.into_iter().for_each(|field| {
             let component_id = field.component_id();
             if old_fields.replace(field).is_some() {
@@ -689,7 +689,7 @@ impl ArchetypeRegistry {
             Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
 
         let fields =
-            unsafe { into_erased_fields::<B>(components, B::CONTEXT, component_ids, value) };
+            unsafe { into_erased_fields::<B, _>(components, B::CONTEXT, component_ids, value) };
         fields
             .into_iter()
             .map(|field| old_fields.replace(field))

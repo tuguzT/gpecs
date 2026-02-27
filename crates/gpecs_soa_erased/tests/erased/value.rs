@@ -42,7 +42,7 @@ fn value() {
         _,
         ArrayDescriptors<FieldDescriptor, 5>,
         CoreSliceItemPtrs<MaybeUninit<u8>>,
-    >::try_from_storage_value(bytes, &context, value)
+    >::try_from_storage_value::<Value, _>(bytes, &context, value)
     .unwrap();
 
     let descriptors = [
@@ -185,7 +185,7 @@ fn value_zst() {
         _,
         ArrayDescriptors<FieldDescriptor, 1>,
         CoreSliceItemPtrs<MaybeUninit<u8>>,
-    >::try_from_storage_value(bytes, &context, value)
+    >::try_from_storage_value::<(), _>(bytes, &context, value)
     .unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];

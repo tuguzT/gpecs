@@ -237,13 +237,13 @@ where
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn try_from_storage_value<V>(
+    pub fn try_from_storage_value<V, W>(
         mut storage: T,
         context: &V::Context,
-        value: V,
+        value: W,
     ) -> Result<Self, FromStorageValueError>
     where
-        V: AllocSoa + SoaWrite,
+        V: AllocSoa + SoaWrite<W> + ?Sized,
     {
         let descriptors = context
             .field_descriptors()
@@ -271,9 +271,9 @@ where
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn try_from<V>(context: &V::Context, value: V) -> Result<Self, FromValueError<T::Error>>
+    pub fn try_from<V, W>(context: &V::Context, value: W) -> Result<Self, FromValueError<T::Error>>
     where
-        V: AllocSoa + SoaWrite,
+        V: AllocSoa + SoaWrite<W> + ?Sized,
     {
         let descriptors = context
             .field_descriptors()

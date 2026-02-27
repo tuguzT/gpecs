@@ -13,6 +13,23 @@ use crate::{
     },
 };
 
+/// Version of [`core::ptr::replace()`] but for [SoA](crate::traits::RawSoa) types.
+pub unsafe fn replace<T, R, W>(context: &T::Context, dest: MutPtrs<'_, T>, src: W) -> R
+where
+    T: SoaRead<R> + SoaWrite<W> + ?Sized,
+{
+    let dest = T::Context::upcast_mut_ptrs(dest);
+
+    // SAFETY: We read from `dest` but directly write `src` into it afterwards,
+    // such that the old value is not duplicated. Nothing is dropped and
+    // nothing here can panic.
+    unsafe {
+        let result = context.read(context.ptrs_cast_const(dest.clone()));
+        context.write(dest, src);
+        result
+    }
+}
+
 #[inline]
 pub unsafe fn slice_from_raw_parts<T>(
     data: *const BufferData<T>,
@@ -54,23 +71,6 @@ where
         .expect("layout size should not exceed `isize::MAX`")
         .size();
     capacity_in_bytes / size_of::<BufferData<T>>()
-}
-
-/// Version of [`core::ptr::replace()`] but for [SoA](crate::traits::RawSoa) types.
-pub unsafe fn replace<T, R, W>(context: &T::Context, dest: MutPtrs<'_, T>, src: W) -> R
-where
-    T: SoaRead<R> + SoaWrite<W> + ?Sized,
-{
-    let dest = T::Context::upcast_mut_ptrs(dest);
-
-    // SAFETY: We read from `dest` but directly write `src` into it afterwards,
-    // such that the old value is not duplicated. Nothing is dropped and
-    // nothing here can panic.
-    unsafe {
-        let result = context.read(context.ptrs_cast_const(dest.clone()));
-        context.write(dest, src);
-        result
-    }
 }
 
 pub trait SoaSlicePtr<T>: Copy + private::Sealed

@@ -829,19 +829,18 @@ where
         self.sparse.truncate(sparse_len);
     }
 
-    pub fn swap_remove_into<F, R>(&mut self, key: K, f: F) -> R
+    pub fn swap_remove_into<'a, F, R>(&'a mut self, key: K, f: F) -> R
     where
-        F: FnOnce(&V::Context, Option<Ptrs<'_, V>>) -> R,
+        F: FnOnce(&'a V::Context, Option<Ptrs<'a, V>>) -> R,
     {
         let Self {
             dense,
             sparse,
             sparse_vacant_head,
         } = self;
-        let context = dense.context();
 
         let Some(sparse_index) = key.sparse_index().try_into().ok() else {
-            return f(context, None);
+            return f(dense.context(), None);
         };
 
         let dense_index = sparse
@@ -850,18 +849,21 @@ where
             .and_then(SparseItem::dense_index)
             .copied();
         let Some(dense_index) = dense_index else {
-            return f(context, None);
+            return f(dense.context(), None);
         };
         let dense_index_usize = unwrap_into_usize(dense_index);
         assert_dense_index_bounds(dense_index_usize, dense.len());
 
+        let (keys, _) = dense.slice_ptrs().into_slice_ptrs().into_parts();
         let result = dense.swap_remove_into(dense_index_usize, |context, src| {
             let dense_key = unsafe { ptr::read(src.key) };
             assert_equal_key(key, dense_key);
             f(context, Some(src.value.into_inner()))
         });
 
-        if let Some(key) = dense_keys(dense.slices()).get(dense_index_usize) {
+        // SAFETY: `swap_remove_into()` neither shrinks nor enlarges the dense buffer
+        let keys: &[K] = unsafe { slice::from_raw_parts(keys.cast(), keys.len() - 1) };
+        if let Some(key) = keys.get(dense_index_usize) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             match sparse_item.kind_mut() {
@@ -884,19 +886,18 @@ where
         self.swap_remove_into(key, |context, src| unsafe { context.read(src?) }.into())
     }
 
-    pub fn remove_into<F, R>(&mut self, key: K, f: F) -> R
+    pub fn remove_into<'a, F, R>(&'a mut self, key: K, f: F) -> R
     where
-        F: FnOnce(&V::Context, Option<Ptrs<'_, V>>) -> R,
+        F: FnOnce(&'a V::Context, Option<Ptrs<'a, V>>) -> R,
     {
         let Self {
             dense,
             sparse,
             sparse_vacant_head,
         } = self;
-        let context = dense.context();
 
         let Some(sparse_index) = key.sparse_index().try_into().ok() else {
-            return f(context, None);
+            return f(dense.context(), None);
         };
 
         let dense_index = sparse
@@ -905,18 +906,21 @@ where
             .and_then(SparseItem::dense_index)
             .copied();
         let Some(dense_index) = dense_index else {
-            return f(context, None);
+            return f(dense.context(), None);
         };
         let dense_index = unwrap_into_usize(dense_index);
         assert_dense_index_bounds(dense_index, dense.len());
 
+        let (keys, _) = dense.slice_ptrs().into_slice_ptrs().into_parts();
         let result = dense.remove_into(dense_index, |context, src| {
             let dense_key = unsafe { ptr::read(src.key) };
             assert_equal_key(key, dense_key);
             f(context, Some(src.value.into_inner()))
         });
 
-        for key in dense_keys(dense.slices()).iter().skip(dense_index) {
+        // SAFETY: `remove_into()` neither shrinks nor enlarges the dense buffer
+        let keys: &[K] = unsafe { slice::from_raw_parts(keys.cast(), keys.len() - 1) };
+        for key in keys.iter().skip(dense_index) {
             let sparse_index = unwrap_into_usize(key.sparse_index());
             let sparse_item = unwrap_sparse_item_mut(sparse, sparse_index);
             let dense_index = unwrap_dense_index_mut(sparse_item.kind_mut());
@@ -937,9 +941,9 @@ where
         self.remove_into(key, |context, src| unsafe { context.read(src?) }.into())
     }
 
-    pub fn pop_into<F, R>(&mut self, f: F) -> R
+    pub fn pop_into<'a, F, R>(&'a mut self, f: F) -> R
     where
-        F: FnOnce(&V::Context, Option<(K, Ptrs<'_, V>)>) -> R,
+        F: FnOnce(&'a V::Context, Option<(K, Ptrs<'a, V>)>) -> R,
     {
         let Self {
             dense,
@@ -980,9 +984,9 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn insert_from<F, R>(&mut self, key: K, f: F) -> R
+    pub fn insert_from<'a, F, R>(&'a mut self, key: K, f: F) -> R
     where
-        F: FnOnce(&V::Context, Option<TryInsertAccess<V>>) -> R,
+        F: FnOnce(&'a V::Context, Option<TryInsertAccess<'a, 'a, V>>) -> R,
     {
         self.try_insert_from(key, |context, dst| {
             let dst = dst.unwrap_or_else(|error| try_insert_failed(error));
@@ -1000,20 +1004,23 @@ where
             .unwrap_or_else(|error| try_insert_failed(error.kind))
     }
 
-    pub fn try_insert_from<F, R>(&mut self, key: K, f: F) -> R
+    pub fn try_insert_from<'a, F, R>(&'a mut self, key: K, f: F) -> R
     where
-        F: FnOnce(&V::Context, Result<Option<TryInsertAccess<V>>, TryModifyErrorKind<K>>) -> R,
+        F: FnOnce(
+            &'a V::Context,
+            Result<Option<TryInsertAccess<'a, 'a, V>>, TryModifyErrorKind<K>>,
+        ) -> R,
     {
         let Self {
             dense,
             sparse,
             sparse_vacant_head,
         } = self;
-        let context = dense.context();
 
         let sparse_index: usize = match key.sparse_index().try_into() {
             Ok(sparse_index) => sparse_index,
             Err(error) => {
+                let context = dense.context();
                 let error = TooLargeSparseIndexError::new(error).into();
                 return f(context, Err(error));
             }
@@ -1042,6 +1049,7 @@ where
                     let dense_index = match dense.len().try_into() {
                         Ok(dense_index) => dense_index,
                         Err(error) => {
+                            let context = dense.context();
                             let error = TooSmallSparseIndexError::new(error).into();
                             return f(context, Err(error));
                         }
@@ -1063,15 +1071,17 @@ where
                     })
                 }
             },
-            Some(_) => f(context, Ok(None)),
+            Some(_) => f(dense.context(), Ok(None)),
             None => {
                 let new_sparse_len = sparse_index.saturating_add(1);
                 let additional = new_sparse_len.saturating_sub(sparse.len());
                 if let Err(error) = sparse.try_reserve(additional) {
+                    let context = dense.context();
                     let error = TryReserveError::Sparse(error).into();
                     return f(context, Err(error));
                 }
                 if let Err(error) = extend_sparse(sparse, new_sparse_len, sparse_vacant_head) {
+                    let context = dense.context();
                     let error = error.into();
                     return f(context, Err(error));
                 }
@@ -1079,6 +1089,7 @@ where
                 let dense_index: K::SparseIndex = match dense.len().try_into() {
                     Ok(dense_index) => dense_index,
                     Err(error) => {
+                        let context = dense.context();
                         let error = TooSmallSparseIndexError::new(error).into();
                         return f(context, Err(error));
                     }
@@ -1124,9 +1135,9 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn push_from<F, R>(&mut self, f: F) -> R
+    pub fn push_from<'a, F, R>(&'a mut self, f: F) -> R
     where
-        F: FnOnce(&V::Context, K, MutPtrs<'_, V>) -> R,
+        F: FnOnce(&'a V::Context, K, MutPtrs<'a, V>) -> R,
     {
         self.try_push_from(|context, dst| {
             let (key, dst) = dst.unwrap_or_else(|error| try_insert_failed(error));
@@ -1144,21 +1155,21 @@ where
             .unwrap_or_else(|error| try_push_failed(error.kind))
     }
 
-    pub fn try_push_from<F, R>(&mut self, f: F) -> R
+    pub fn try_push_from<'a, F, R>(&'a mut self, f: F) -> R
     where
-        F: FnOnce(&V::Context, Result<(K, MutPtrs<'_, V>), TryModifyErrorKind<K>>) -> R,
+        F: FnOnce(&'a V::Context, Result<(K, MutPtrs<'a, V>), TryModifyErrorKind<K>>) -> R,
     {
         let Self {
             dense,
             sparse,
             sparse_vacant_head,
         } = self;
-        let context = dense.context();
 
         if let Some(sparse_item) = sparse.get_mut(*sparse_vacant_head) {
             let next_vacant = match (*unwrap_next_vacant(sparse_item.kind())).try_into() {
                 Ok(next_vacant) => next_vacant,
                 Err(error) => {
+                    let context = dense.context();
                     let error = TooLargeSparseIndexError::new(error).into();
                     return f(context, Err(error));
                 }
@@ -1167,6 +1178,7 @@ where
             let sparse_index = match (*sparse_vacant_head).try_into() {
                 Ok(sparse_index) => sparse_index,
                 Err(error) => {
+                    let context = dense.context();
                     let error = TooSmallSparseIndexError::new(error).into();
                     return f(context, Err(error));
                 }
@@ -1176,6 +1188,7 @@ where
             let dense_index = match dense.len().try_into() {
                 Ok(dense_index) => dense_index,
                 Err(error) => {
+                    let context = dense.context();
                     let error = TooSmallSparseIndexError::new(error).into();
                     return f(context, Err(error));
                 }
@@ -1203,6 +1216,7 @@ where
         let sparse_index = match (*sparse_vacant_head).try_into() {
             Ok(sparse_index) => sparse_index,
             Err(error) => {
+                let context = dense.context();
                 let error = TooSmallSparseIndexError::new(error).into();
                 return f(context, Err(error));
             }
@@ -1212,6 +1226,7 @@ where
         let dense_index = match dense.len().try_into() {
             Ok(dense_index) => dense_index,
             Err(error) => {
+                let context = dense.context();
                 let error = TooSmallSparseIndexError::new(error).into();
                 return f(context, Err(error));
             }

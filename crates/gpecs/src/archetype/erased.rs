@@ -284,6 +284,13 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 }
 
+impl<Meta> AsRef<Self> for ErasedArchetype<Meta> {
+    #[inline]
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 impl<'a, Meta> IntoIterator for &'a ErasedArchetype<Meta> {
     type Item = ErasedArchetypeComponent<&'a Meta>;
     type IntoIter = ErasedArchetypeIter<'a, Meta>;

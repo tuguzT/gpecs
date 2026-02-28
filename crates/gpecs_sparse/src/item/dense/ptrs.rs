@@ -85,9 +85,9 @@ where
     }
 
     #[inline]
-    pub unsafe fn read<R>(self, context: &V::Context) -> DenseItem<K, R>
+    pub unsafe fn read<R>(self, context: &'ctx V::Context) -> DenseItem<K, R>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'ctx, R>,
     {
         let Self { key, value } = self;
 

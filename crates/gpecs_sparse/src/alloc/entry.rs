@@ -13,7 +13,8 @@ use crate::{
         self,
         slice::{SoaSliceMutPtrs, SoaSlicePtrs, SoaSlices, SoaSlicesMut},
         traits::{
-            AllocSoa, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaRead, SoaWrite,
+            AllocSoa, MutPtrs, Ptrs, RawSoa, Refs, RefsMut, Soa, SoaContext, SoaRead, SoaReadOwned,
+            SoaWrite,
         },
     },
 };
@@ -139,7 +140,7 @@ where
     #[inline]
     pub fn remove<R>(self) -> R
     where
-        V: SoaRead<R>,
+        V: SoaReadOwned<R>,
     {
         let Self { key, container, .. } = self;
 
@@ -150,7 +151,7 @@ where
     #[inline]
     pub fn swap_remove<R>(self) -> R
     where
-        V: SoaRead<R>,
+        V: SoaReadOwned<R>,
     {
         let Self { key, container, .. } = self;
 
@@ -159,9 +160,9 @@ where
     }
 
     #[inline]
-    pub fn insert<R, W>(&mut self, value: W) -> R
+    pub fn insert<'me, R, W>(&'me mut self, value: W) -> R
     where
-        V: SoaRead<R> + SoaWrite<W>,
+        V: SoaRead<'me, R> + SoaWrite<W>,
     {
         let Self {
             dense_index,
@@ -177,7 +178,7 @@ where
     #[inline]
     pub fn try_replace_key<W>(&mut self, key: K) -> Result<Option<W>, TryModifyError<K, W>>
     where
-        V: SoaRead<W> + SoaWrite<W>,
+        V: SoaReadOwned<W> + SoaWrite<W>,
     {
         let new_key = key;
         let Self { key, container, .. } = self;
@@ -193,7 +194,7 @@ where
     #[track_caller]
     pub fn replace_key<W>(&mut self, key: K) -> Option<W>
     where
-        V: SoaRead<W> + SoaWrite<W>,
+        V: SoaReadOwned<W> + SoaWrite<W>,
     {
         self.try_replace_key(key)
             .unwrap_or_else(|error| try_replace_key_failed(error.kind))
@@ -318,7 +319,7 @@ where
     #[inline]
     pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V, C>
     where
-        V: SoaRead<W> + SoaWrite<W>,
+        V: SoaReadOwned<W> + SoaWrite<W>,
     {
         let Self { key, container, .. } = self;
 
@@ -370,17 +371,21 @@ where
 
     fn mut_slices(&mut self) -> SoaSlicesMut<'_, '_, V>;
 
-    fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
+    fn try_insert<'a, R, W>(
+        &'a mut self,
+        key: K,
+        value: W,
+    ) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite<W>;
+        V: SoaRead<'a, R> + SoaWrite<W>;
 
-    fn remove<R>(&mut self, key: K) -> Option<R>
+    fn remove<'a, R>(&'a mut self, key: K) -> Option<R>
     where
-        V: SoaRead<R>;
+        V: SoaRead<'a, R>;
 
-    fn swap_remove<R>(&mut self, key: K) -> Option<R>
+    fn swap_remove<'a, R>(&'a mut self, key: K) -> Option<R>
     where
-        V: SoaRead<R>;
+        V: SoaRead<'a, R>;
 }
 
 impl<K, V> EpochSparseContainer<K, V> for EpochSparseSet<K, V>
@@ -412,25 +417,29 @@ where
     }
 
     #[inline]
-    fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
+    fn try_insert<'a, R, W>(
+        &'a mut self,
+        key: K,
+        value: W,
+    ) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite<W>,
+        V: SoaRead<'a, R> + SoaWrite<W>,
     {
         Self::try_insert(self, key, value)
     }
 
     #[inline]
-    fn remove<R>(&mut self, key: K) -> Option<R>
+    fn remove<'a, R>(&'a mut self, key: K) -> Option<R>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'a, R>,
     {
         Self::remove(self, key)
     }
 
     #[inline]
-    fn swap_remove<R>(&mut self, key: K) -> Option<R>
+    fn swap_remove<'a, R>(&'a mut self, key: K) -> Option<R>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'a, R>,
     {
         Self::swap_remove(self, key)
     }
@@ -465,25 +474,29 @@ where
     }
 
     #[inline]
-    fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
+    fn try_insert<'a, R, W>(
+        &'a mut self,
+        key: K,
+        value: W,
+    ) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite<W>,
+        V: SoaRead<'a, R> + SoaWrite<W>,
     {
         Self::try_insert(self, key, value)
     }
 
     #[inline]
-    fn remove<R>(&mut self, key: K) -> Option<R>
+    fn remove<'a, R>(&'a mut self, key: K) -> Option<R>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'a, R>,
     {
         Self::remove(self, key)
     }
 
     #[inline]
-    fn swap_remove<R>(&mut self, key: K) -> Option<R>
+    fn swap_remove<'a, R>(&'a mut self, key: K) -> Option<R>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'a, R>,
     {
         Self::swap_remove(self, key)
     }
@@ -568,7 +581,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn or_insert<W>(self, default: W) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
                 match self {
                     Self::Occupied(entry) => entry,
@@ -579,7 +592,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn or_insert_with<W, F>(self, default: F) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
                 F: FnOnce() -> W,
             {
                 match self {
@@ -591,7 +604,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn or_default<W>(self) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
                 W: Default,
             {
                 match self {
@@ -603,7 +616,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
                 match self {
                     Self::Occupied(mut entry) => {
@@ -619,7 +632,7 @@ macro_rules! generate_entry_types {
             #[track_caller]
             pub fn replace_key<W>(self, key: K) -> Self
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
                 self.try_replace_key(key)
                     .unwrap_or_else(|error| $crate::alloc::assert::try_replace_key_failed(error))
@@ -628,7 +641,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn try_replace_key<W>(self, key: K) -> Result<Self, TryModifyErrorKind<K>>
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
                 match self {
                     Self::Occupied(mut entry) => {
@@ -812,7 +825,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn swap_remove<R>(self) -> R
             where
-                V: SoaRead<R>,
+                V: $crate::soa::traits::SoaReadOwned<R>,
             {
                 let Self { inner } = self;
                 inner.swap_remove()
@@ -821,16 +834,16 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn remove<R>(self) -> R
             where
-                V: SoaRead<R>,
+                V: $crate::soa::traits::SoaReadOwned<R>,
             {
                 let Self { inner } = self;
                 inner.remove()
             }
 
             #[inline]
-            pub fn insert<R, W>(&mut self, value: W) -> R
+            pub fn insert<'me, R, W>(&'me mut self, value: W) -> R
             where
-                V: SoaRead<R> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaRead<'me, R> + $crate::soa::traits::SoaWrite<W>,
             {
                 let Self { inner } = self;
                 inner.insert(value)
@@ -840,7 +853,7 @@ macro_rules! generate_entry_types {
             #[track_caller]
             pub fn replace_key<W>(&mut self, key: K) -> Option<W>
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
                 let Self { inner } = self;
                 inner.replace_key(key)
@@ -849,7 +862,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn try_replace_key<W>(&mut self, key: K) -> Result<Option<W>, TryModifyError<K, W>>
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
                 let Self { inner } = self;
                 inner.try_replace_key(key)
@@ -966,7 +979,7 @@ macro_rules! generate_entry_types {
             #[inline]
             pub fn insert<W>(self, value: W) -> OccupiedEntry<'a, K, V>
             where
-                V: SoaRead<W> + SoaWrite<W>,
+                V: $crate::soa::traits::SoaReadOwned<W> + $crate::soa::traits::SoaWrite<W>,
             {
                 let Self { inner } = self;
                 let inner = inner.insert(value);

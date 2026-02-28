@@ -4,18 +4,22 @@ use crate::{
 };
 
 /// Version of [`core::mem::replace()`] but for [SoA](Soa) types.
-pub fn replace<'a, T, R, W>(context: &T::Context, dest: RefsMut<'_, 'a, T>, src: W) -> R
+pub fn replace<'a, 'data, T, R, W>(
+    context: &'a T::Context,
+    dest: RefsMut<'a, 'data, T>,
+    src: W,
+) -> R
 where
-    T: Soa<'a> + SoaRead<R> + SoaWrite<W> + ?Sized,
+    T: Soa<'data> + SoaRead<'a, R> + SoaWrite<W> + ?Sized,
 {
-    let dest = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(dest));
+    let dest = context.mut_refs_as_mut_ptrs(dest);
     unsafe { ptr::replace::<T, R, W>(context, dest, src) }
 }
 
 /// Version of [`core::mem::swap()`] but for [SoA](Soa) types.
-pub fn swap<'a, T>(context: &T::Context, x: RefsMut<'_, 'a, T>, y: RefsMut<'_, 'a, T>)
+pub fn swap<'data, T>(context: &T::Context, x: RefsMut<'_, 'data, T>, y: RefsMut<'_, 'data, T>)
 where
-    T: Soa<'a> + ?Sized,
+    T: Soa<'data> + ?Sized,
 {
     let x = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(x));
     let y = context.mut_refs_as_mut_ptrs(T::Context::upcast_mut_refs(y));

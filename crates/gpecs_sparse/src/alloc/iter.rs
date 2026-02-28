@@ -9,7 +9,7 @@ use crate::{
     soa::{
         traits::{
             AllocSoa, MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
-            SoaCloneToUninit, SoaOwned, SoaRead,
+            SoaCloneToUninit, SoaOwned, SoaRead, SoaReadOwned,
         },
         vec,
     },
@@ -461,7 +461,7 @@ where
 
 impl<K, V, R> Iterator for IntoValues<K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     type Item = R;
 
@@ -499,7 +499,7 @@ where
 
 impl<K, V, R> DoubleEndedIterator for IntoValues<K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -510,7 +510,7 @@ where
 
 impl<K, V, R> ExactSizeIterator for IntoValues<K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -518,7 +518,7 @@ where
     }
 }
 
-impl<K, V, R> FusedIterator for IntoValues<K, V, R> where V: AllocSoa + SoaRead<R> + ?Sized {}
+impl<K, V, R> FusedIterator for IntoValues<K, V, R> where V: AllocSoa + SoaReadOwned<R> + ?Sized {}
 
 #[repr(transparent)]
 pub struct IntoIter<K, V, R>
@@ -779,7 +779,7 @@ where
 
 impl<K, V, R> Iterator for IntoIter<K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     type Item = (K, R);
 
@@ -807,7 +807,7 @@ where
 
 impl<K, V, R> DoubleEndedIterator for IntoIter<K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -818,7 +818,7 @@ where
 
 impl<K, V, R> ExactSizeIterator for IntoIter<K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -826,7 +826,7 @@ where
     }
 }
 
-impl<K, V, R> FusedIterator for IntoIter<K, V, R> where V: AllocSoa + SoaRead<R> + ?Sized {}
+impl<K, V, R> FusedIterator for IntoIter<K, V, R> where V: AllocSoa + SoaReadOwned<R> + ?Sized {}
 
 #[repr(transparent)]
 pub struct Drain<'a, K, V, R>
@@ -969,9 +969,9 @@ where
     }
 }
 
-impl<K, V, R> Iterator for Drain<'_, K, V, R>
+impl<'a, K, V, R> Iterator for Drain<'a, K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaRead<'a, R> + ?Sized,
 {
     type Item = (K, R);
 
@@ -988,9 +988,9 @@ where
     }
 }
 
-impl<K, V, R> DoubleEndedIterator for Drain<'_, K, V, R>
+impl<'a, K, V, R> DoubleEndedIterator for Drain<'a, K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaRead<'a, R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -999,9 +999,9 @@ where
     }
 }
 
-impl<K, V, R> ExactSizeIterator for Drain<'_, K, V, R>
+impl<'a, K, V, R> ExactSizeIterator for Drain<'a, K, V, R>
 where
-    V: AllocSoa + SoaRead<R> + ?Sized,
+    V: AllocSoa + SoaRead<'a, R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -1010,4 +1010,4 @@ where
     }
 }
 
-impl<K, V, R> FusedIterator for Drain<'_, K, V, R> where V: AllocSoa + SoaRead<R> + ?Sized {}
+impl<'a, K, V, R> FusedIterator for Drain<'a, K, V, R> where V: AllocSoa + SoaRead<'a, R> + ?Sized {}

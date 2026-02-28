@@ -84,14 +84,14 @@ where
 }
 
 #[inline]
-pub unsafe fn from_erased_fields<'a, T, R>(
+pub unsafe fn from_erased_fields<'ctx, 'a, T, R>(
     components: &ComponentRegistry,
-    context: &T::Context,
+    context: &'ctx T::Context,
     component_ids: impl IntoIterator<Item = ComponentId>,
     fields: IndexSet<ErasedComponent>,
 ) -> R
 where
-    T: AllocSoa + Soa<'a> + SoaRead<R>,
+    T: AllocSoa + Soa<'a> + SoaRead<'ctx, R>,
 {
     type ErasedSoa = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
 

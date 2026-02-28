@@ -388,9 +388,9 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        unsafe impl<$($types,)*> ReadSoaContext<($($types,)*)> for TupleContext<($($types,)*)> {
+        unsafe impl<'a, $($types,)*> ReadSoaContext<'a, ($($types,)*)> for TupleContext<($($types,)*)> {
             #[inline]
-            unsafe fn read(&self, ptrs: Self::Ptrs<'_>) -> ($($types,)*) {
+            unsafe fn read(&'a self, ptrs: Self::Ptrs<'a>) -> ($($types,)*) {
                 unsafe { ($(ptr::read(ptrs.$indices),)*) }
             }
         }

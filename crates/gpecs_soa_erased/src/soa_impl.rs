@@ -236,18 +236,22 @@ where
     type Fields = ErasedSoaFields<U>;
 }
 
-unsafe impl<T, D, P, U> ReadSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+unsafe impl<'a, T, D, P, U> ReadSoaContext<'a, ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P>>
+    for ErasedSoaContext<D, P>
 where
     T: AlignedStorageFromLayout<Item = U, Error: Debug>,
-    D: CovariantFieldDescriptors + Clone, // TODO: avoid cloning field descriptors
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
+    D: CovariantFieldDescriptors,
+    for<'b, 'c> FieldDescriptorsOutput<'b, D>: FieldDescriptors<'c> + Clone,
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
     U: Copy,
 {
     #[inline]
-    unsafe fn read(&self, src: Self::Ptrs<'_>) -> ErasedSoa<T, D, P> {
+    unsafe fn read(
+        &'a self,
+        src: Self::Ptrs<'a>,
+    ) -> ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P> {
         let fields = unsafe { src.deref() };
-        let descriptors = self.clone().into_inner();
+        let descriptors = self.field_descriptors();
         ErasedSoa::try_from_fields_descriptors(fields, descriptors)
             .expect("length of fields should be equal to the length of descriptors")
     }
@@ -263,9 +267,39 @@ where
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
 {
     #[inline]
-    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
+    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
         let src = value.as_fields().into_ptrs();
-        unsafe { dst.copy_from_nonoverlapping(&src, 1) }
+        unsafe { self.write(dst, &src) }
+    }
+}
+
+unsafe impl<T, D, P, U> WriteSoaContext<T> for ErasedSoaContext<D, P>
+where
+    T: AlignedStorage<Item = U>,
+    D: CovariantFieldDescriptors,
+    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
+    P: SliceItemPtrs<Item = MaybeUninit<U>>,
+{
+    #[inline]
+    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: T) {
+        let descriptors = self.field_descriptors();
+        let buffer = value.as_uninit_slice();
+        let src = unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, 1, 0) };
+        unsafe { self.write(dst, &src) }
+    }
+}
+
+unsafe impl<'n, D, N, P, U> WriteSoaContext<&'n ErasedSoaPtrs<N, P::Const>>
+    for ErasedSoaContext<D, P>
+where
+    D: CovariantFieldDescriptors,
+    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
+    N: FieldDescriptors<'n>,
+    P: SliceItemPtrs<Item = MaybeUninit<U>>,
+{
+    #[inline]
+    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, src: &'n ErasedSoaPtrs<N, P::Const>) {
+        unsafe { dst.copy_from_nonoverlapping(src, 1) }
     }
 }
 

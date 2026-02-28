@@ -110,9 +110,12 @@ where
     D: FieldDescriptorsOwned,
 {
     #[inline]
-    pub unsafe fn downcast<V, R>(self, context: &V::Context) -> Result<R, DowncastError<Self>>
+    pub unsafe fn downcast<'a, V, R>(
+        self,
+        context: &'a V::Context,
+    ) -> Result<R, DowncastError<Self>>
     where
-        V: AllocSoa + SoaRead<R> + ?Sized,
+        V: AllocSoa + SoaRead<'a, R> + ?Sized,
     {
         let Self {
             ref descriptors,
@@ -365,6 +368,12 @@ impl<T, I, F, P> ErasedSoaIntoFields<T, I, F, P> {
             storage,
             offsets,
         }
+    }
+
+    #[inline]
+    pub fn descriptors(&self) -> &I {
+        let Self { offsets, .. } = self;
+        offsets.as_inner()
     }
 }
 

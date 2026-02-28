@@ -209,9 +209,9 @@ unsafe impl CloneToUninitSoaContext for () {
     unsafe fn clone_to_uninit(&self, _src: Self::Ptrs<'_>, _dst: Self::MutPtrs<'_>) {}
 }
 
-unsafe impl ReadSoaContext<()> for () {
+unsafe impl<'a> ReadSoaContext<'a, ()> for () {
     #[inline]
-    unsafe fn read(&self, ptrs: Self::Ptrs<'_>) {
+    unsafe fn read(&'a self, ptrs: Self::Ptrs<'a>) {
         unsafe { ptr::read(ptrs) }
     }
 }

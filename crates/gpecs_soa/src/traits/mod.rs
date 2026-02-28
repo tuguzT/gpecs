@@ -315,29 +315,34 @@ where
 {
 }
 
-/// An extension of [SoA context](RawSoaContext) type which allows to read a value
+/// An extension of [SoA context](RawSoaContext) type which allows to read a value borrowed from self
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
-pub unsafe trait ReadSoaContext<R>: RawSoaContext {
+pub unsafe trait ReadSoaContext<'a, R>: RawSoaContext {
     /// Constructs the value from reading each field to which [src](RawSoaContext::Ptrs) points without moving them.
     /// This leaves the memory in src unchanged.
     ///
     /// All the safety requirements resulting from applying
     /// [`ptr::read()`](core::ptr::read) method to each pointer
     /// should be satisfied to be safe to call this method.
-    unsafe fn read(&self, src: Self::Ptrs<'_>) -> R;
+    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> R;
 }
 
-/// An extension of [SoA](RawSoa) type which allows to read a value
+/// An extension of [SoA](RawSoa) type which allows to read a value borrowed from the context
 /// from [pointers](RawSoaContext::Ptrs) to each stored field.
-// TODO: allow to borrow self from the context (add a lifetime parameter?)
-pub unsafe trait SoaRead<R>: RawSoa<Context: ReadSoaContext<R>> {}
+pub unsafe trait SoaRead<'a, R>: RawSoa<Context: ReadSoaContext<'a, R>> {}
 
-unsafe impl<T, R> SoaRead<R> for T
+unsafe impl<'a, T, R> SoaRead<'a, R> for T
 where
     T: RawSoa + ?Sized,
-    T::Context: ReadSoaContext<R>,
+    T::Context: ReadSoaContext<'a, R>,
 {
 }
+
+/// An extension of [SoA](Soa) type which allows to read a value of *any* lifetime
+/// from [pointers](RawSoaContext::Ptrs) to each stored field.
+pub unsafe trait SoaReadOwned<R>: for<'a> SoaRead<'a, R> {}
+
+unsafe impl<T, R> SoaReadOwned<R> for T where T: for<'a> SoaRead<'a, R> + ?Sized {}
 
 /// An extension of [SoA context](RawSoaContext) type which allows to write a value
 /// into [mutale pointers](RawSoaContext::MutPtrs) to each stored field.

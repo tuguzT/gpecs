@@ -3,15 +3,18 @@
 use std::{iter, mem::MaybeUninit};
 
 use gpecs_soa_erased::{
-    BoxedErasedSoa, BoxedErasedSoaContext,
+    BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa,
     ptr::slice::CoreSliceItemPtrs,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         vec::SoaVec,
     },
+    storage::BoxedAlignedUninitStorage,
 };
 
 type Item = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
+type ReadItem<'a> =
+    ErasedSoa<BoxedAlignedUninitStorage, &'a [FieldDescriptor], CoreSliceItemPtrs<MaybeUninit<u8>>>;
 
 #[test]
 fn new() {
@@ -329,13 +332,13 @@ fn one_item() {
     );
     assert!(iter.next().is_none());
 
-    let value = vec.pop::<Item>().expect("vector should not be empty");
+    let value = vec.pop::<ReadItem>().expect("vector should not be empty");
+    let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
+    assert_eq!(value, (u8, u128, u16, ()));
+
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert!(vec.slices().into_get(0).is_none());
-
-    let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
-    assert_eq!(value, (u8, u128, u16, ()));
 
     assert_eq!(
         unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
@@ -418,13 +421,13 @@ fn one_item_zst() {
     );
     assert!(iter.next().is_none());
 
-    let value = vec.pop::<Item>().expect("vector should not be empty");
+    let value = vec.pop::<ReadItem>().expect("vector should not be empty");
+    let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
+    assert_eq!(value, ());
+
     assert!(vec.is_empty());
     assert!(vec.capacity() >= 1);
     assert!(vec.slices().into_get(0).is_none());
-
-    let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
-    assert_eq!(value, ());
 
     assert_eq!(
         unsafe { vec.as_slices().downcast::<Soa>(&context) }.unwrap(),
@@ -505,7 +508,7 @@ fn three_items() {
 
     // use `drain` instead of `truncate` to drop all the contents,
     // erased vec does not do it automatically
-    for erased in vec.drain::<Item>(..) {
+    for erased in vec.drain::<ReadItem>(..) {
         let (t, u, v, w) = unsafe { erased.downcast::<Soa, _>(&context) }.unwrap();
         assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
     }
@@ -646,7 +649,7 @@ fn three_items() {
     );
 
     {
-        let mut drain = vec.drain::<Item>(2..4);
+        let mut drain = vec.drain::<ReadItem>(2..4);
         assert_eq!(drain.len(), 2);
 
         let value = drain
@@ -673,7 +676,7 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let value = vec.swap_remove::<Item>(1);
+    let value = vec.swap_remove::<ReadItem>(1);
     let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
     assert_eq!(value, (8, "8".to_owned(), 9, ()));
 
@@ -685,7 +688,7 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let value = vec.pop::<Item>().expect("vector should not be empty");
+    let value = vec.pop::<ReadItem>().expect("vector should not be empty");
     let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
     assert_eq!(value, (2, "2".to_owned(), 3, ()));
 
@@ -697,7 +700,7 @@ fn three_items() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let value = vec.remove::<Item>(0);
+    let value = vec.remove::<ReadItem>(0);
     let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
     assert_eq!(value, (5, "5".to_owned(), 6, ()));
 
@@ -727,7 +730,7 @@ fn three_items() {
 
     // use `drain` instead of `truncate` to drop needed contents,
     // erased vec does not do it automatically
-    for erased in vec.drain::<Item>(1..) {
+    for erased in vec.drain::<ReadItem>(1..) {
         let (t, u, v, w) = unsafe { erased.downcast::<Soa, _>(&context) }.unwrap();
         assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
     }
@@ -736,7 +739,7 @@ fn three_items() {
 
     // use `drain` instead of `clear` to drop all the contents,
     // erased vec does not do it automatically
-    for erased in vec.drain::<Item>(..) {
+    for erased in vec.drain::<ReadItem>(..) {
         let (t, u, v, w) = unsafe { erased.downcast::<Soa, _>(&context) }.unwrap();
         assert_eq!((t, u, v, w), (0, "0".to_owned(), 0, ()));
     }
@@ -762,7 +765,7 @@ fn three_items() {
         if *x <= 3 {
             *x += 1;
         } else {
-            let erased = vec.remove::<Item>(index);
+            let erased = vec.remove::<ReadItem>(index);
             let _ = unsafe { erased.downcast::<Soa, _>(&context) };
         }
     }
@@ -780,12 +783,12 @@ fn three_items() {
         ),
     );
 
-    let vec = {
+    let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let mut into_iter = vec.into_iter();
+    let mut into_iter = vec.drain::<ReadItem>(..);
     assert_eq!(into_iter.len(), 1);
 
     let value = into_iter.next_back().expect("iterator should not be empty");
@@ -848,7 +851,7 @@ fn three_items_zst() {
 
     // use `drain` instead of `truncate` to drop all the contents,
     // erased vec does not do it automatically
-    for erased in vec.drain::<Item>(..) {
+    for erased in vec.drain::<ReadItem>(..) {
         let () = unsafe { erased.downcast::<Soa, _>(&context) }.unwrap();
     }
 
@@ -968,7 +971,7 @@ fn three_items_zst() {
     );
 
     {
-        let mut drain = vec.drain::<Item>(2..4);
+        let mut drain = vec.drain::<ReadItem>(2..4);
         assert_eq!(drain.len(), 2);
 
         let value = drain
@@ -995,7 +998,7 @@ fn three_items_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let value = vec.swap_remove::<Item>(1);
+    let value = vec.swap_remove::<ReadItem>(1);
     let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
     assert_eq!(value, ());
 
@@ -1007,7 +1010,7 @@ fn three_items_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let value = vec.pop::<Item>().expect("vector should not be empty");
+    let value = vec.pop::<ReadItem>().expect("vector should not be empty");
     let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
     assert_eq!(value, ());
 
@@ -1019,7 +1022,7 @@ fn three_items_zst() {
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let value = vec.remove::<Item>(0);
+    let value = vec.remove::<ReadItem>(0);
     let value = unsafe { value.downcast::<Soa, _>(&context) }.unwrap();
     assert_eq!(value, ());
 
@@ -1046,7 +1049,7 @@ fn three_items_zst() {
 
     // use `drain` instead of `truncate` to drop needed contents,
     // erased vec does not do it automatically
-    for erased in vec.drain::<Item>(1..) {
+    for erased in vec.drain::<ReadItem>(1..) {
         let () = unsafe { erased.downcast::<Soa, _>(&context) }.unwrap();
     }
     assert_eq!(vec.len(), 1);
@@ -1054,7 +1057,7 @@ fn three_items_zst() {
 
     // use `drain` instead of `clear` to drop all the contents,
     // erased vec does not do it automatically
-    for erased in vec.drain::<Item>(..) {
+    for erased in vec.drain::<ReadItem>(..) {
         let () = unsafe { erased.downcast::<Soa, _>(&context) }.unwrap();
     }
     assert!(vec.is_empty());
@@ -1077,12 +1080,12 @@ fn three_items_zst() {
         [(); 3].as_slice(),
     );
 
-    let vec = {
+    let mut vec = {
         let (ptr, len, capacity) = vec.into_raw_parts();
         unsafe { Vec::from_raw_parts(ptr, len, capacity) }
     };
 
-    let mut into_iter = vec.into_iter();
+    let mut into_iter = vec.drain::<ReadItem>(..);
     assert_eq!(into_iter.len(), 3);
 
     let value = into_iter.next_back().expect("iterator should not be empty");

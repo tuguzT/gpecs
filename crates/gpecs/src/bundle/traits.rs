@@ -7,7 +7,7 @@ use crate::{
     },
     soa::traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
-        SlicesMut, SoaOwned, SoaRead, SoaWrite,
+        SlicesMut, SoaOwned, SoaReadOwned, SoaWrite,
     },
 };
 
@@ -32,7 +32,7 @@ pub type BundleSlicesMut<'a, B> = SlicesMut<'static, 'a, B>;
 /// [`GetComponents`](Bundle::GetComponents) or [`RegisterComponents`](Bundle::RegisterComponents) assotiated types
 /// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
 pub unsafe trait Bundle:
-    SoaOwned + AllocSoa + SoaRead<Self> + SoaWrite<Self> + Sized + 'static
+    SoaOwned + AllocSoa + SoaReadOwned<Self> + SoaWrite<Self> + Sized + 'static
 {
     /// Static [SoA context](crate::soa::traits::SoaContext) instance of this bundle.
     ///

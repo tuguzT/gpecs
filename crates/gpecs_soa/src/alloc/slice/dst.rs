@@ -3,7 +3,7 @@ use core_alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
     slice::{Iter, IterMut, SoaSlice},
-    traits::{AllocSoaTrusted, Refs, RefsMut, Soa, SoaCloneToUninit, SoaOwned, SoaRead},
+    traits::{AllocSoaTrusted, Refs, RefsMut, Soa, SoaCloneToUninit, SoaOwned, SoaReadOwned},
     vec::{IntoIter, SoaVec},
 };
 
@@ -187,7 +187,7 @@ where
 
 impl<T> IntoIterator for Box<SoaSlice<T>>
 where
-    T: AllocSoaTrusted + SoaRead<T>,
+    T: AllocSoaTrusted + SoaReadOwned<T>,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;

@@ -22,7 +22,7 @@ use crate::{
     traits::{
         AllocSoa, AllocSoaTrusted, CloneToUninitSoaContext, MutPtrs, Ptrs, RawSoaContext,
         ReadSoaContext, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices, SlicesMut, Soa,
-        SoaCloneToUninit, SoaContext, SoaOwned, SoaRead, SoaWrite, WriteSoaContext,
+        SoaCloneToUninit, SoaContext, SoaOwned, SoaRead, SoaReadOwned, SoaWrite, WriteSoaContext,
     },
 };
 
@@ -504,9 +504,9 @@ where
     }
 
     #[inline]
-    pub fn swap_remove<R>(&mut self, index: usize) -> R
+    pub fn swap_remove<'a, R>(&'a mut self, index: usize) -> R
     where
-        T: SoaRead<R>,
+        T: SoaRead<'a, R>,
     {
         self.swap_remove_into(index, |context, src| unsafe { context.read(src) })
     }
@@ -551,9 +551,9 @@ where
     }
 
     #[inline]
-    pub fn remove<R>(&mut self, index: usize) -> R
+    pub fn remove<'a, R>(&'a mut self, index: usize) -> R
     where
-        T: SoaRead<R>,
+        T: SoaRead<'a, R>,
     {
         self.remove_into(index, |context, src| unsafe { context.read(src) })
     }
@@ -584,9 +584,9 @@ where
     }
 
     #[inline]
-    pub fn pop<R>(&mut self) -> Option<R>
+    pub fn pop<'a, R>(&'a mut self) -> Option<R>
     where
-        T: SoaRead<R>,
+        T: SoaRead<'a, R>,
     {
         self.pop_into(|context, src| unsafe { context.read(src?).into() })
     }
@@ -725,7 +725,7 @@ where
     #[inline]
     pub fn into_items<R>(self) -> IntoIter<T, R>
     where
-        T: SoaRead<R>,
+        T: SoaReadOwned<R>,
     {
         IntoIter::new(self)
     }
@@ -1402,7 +1402,7 @@ where
 
 impl<T> IntoIterator for SoaVec<T>
 where
-    T: AllocSoa + SoaRead<T>,
+    T: AllocSoa + SoaReadOwned<T>,
 {
     type Item = T;
     type IntoIter = IntoIter<T>;

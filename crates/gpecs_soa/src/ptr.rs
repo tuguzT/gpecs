@@ -14,12 +14,10 @@ use crate::{
 };
 
 /// Version of [`core::ptr::replace()`] but for [SoA](crate::traits::RawSoa) types.
-pub unsafe fn replace<T, R, W>(context: &T::Context, dest: MutPtrs<'_, T>, src: W) -> R
+pub unsafe fn replace<'a, T, R, W>(context: &'a T::Context, dest: MutPtrs<'a, T>, src: W) -> R
 where
-    T: SoaRead<R> + SoaWrite<W> + ?Sized,
+    T: SoaRead<'a, R> + SoaWrite<W> + ?Sized,
 {
-    let dest = T::Context::upcast_mut_ptrs(dest);
-
     // SAFETY: We read from `dest` but directly write `src` into it afterwards,
     // such that the old value is not duplicated. Nothing is dropped and
     // nothing here can panic.

@@ -31,8 +31,8 @@ use crate::{
         self,
         traits::{
             AllocSoa, MutPtrs, Ptrs, RawSoaContext, ReadSoaContext, Refs, RefsMut, SliceMutPtrs,
-            SlicePtrs, Slices, SlicesMut, Soa, SoaContext, SoaOwned, SoaRead, SoaWrite,
-            WriteSoaContext,
+            SlicePtrs, Slices, SlicesMut, Soa, SoaContext, SoaOwned, SoaRead, SoaReadOwned,
+            SoaWrite, WriteSoaContext,
         },
         vec::SoaVec,
     },
@@ -879,9 +879,9 @@ where
     }
 
     #[inline]
-    pub fn swap_remove<R>(&mut self, key: K) -> Option<R>
+    pub fn swap_remove<'a, R>(&'a mut self, key: K) -> Option<R>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'a, R>,
     {
         self.swap_remove_into(key, |context, src| unsafe { context.read(src?) }.into())
     }
@@ -934,9 +934,9 @@ where
     }
 
     #[inline]
-    pub fn remove<R>(&mut self, key: K) -> Option<R>
+    pub fn remove<'a, R>(&'a mut self, key: K) -> Option<R>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'a, R>,
     {
         self.remove_into(key, |context, src| unsafe { context.read(src?) }.into())
     }
@@ -971,9 +971,9 @@ where
     }
 
     #[inline]
-    pub fn pop<R>(&mut self) -> Option<(K, R)>
+    pub fn pop<'a, R>(&'a mut self) -> Option<(K, R)>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'a, R>,
     {
         self.pop_into(|context, src| {
             let (key, value) = src?;
@@ -996,9 +996,9 @@ where
 
     #[inline]
     #[track_caller]
-    pub fn insert<R, W>(&mut self, key: K, value: W) -> Option<R>
+    pub fn insert<'a, R, W>(&'a mut self, key: K, value: W) -> Option<R>
     where
-        V: SoaRead<R> + SoaWrite<W>,
+        V: SoaRead<'a, R> + SoaWrite<W>,
     {
         self.try_insert(key, value)
             .unwrap_or_else(|error| try_insert_failed(error.kind))
@@ -1114,9 +1114,13 @@ where
     }
 
     #[inline]
-    pub fn try_insert<R, W>(&mut self, key: K, value: W) -> Result<Option<R>, TryModifyError<K, W>>
+    pub fn try_insert<'a, R, W>(
+        &'a mut self,
+        key: K,
+        value: W,
+    ) -> Result<Option<R>, TryModifyError<K, W>>
     where
-        V: SoaRead<R> + SoaWrite<W>,
+        V: SoaRead<'a, R> + SoaWrite<W>,
     {
         self.try_insert_from(key, |context, dst| match dst {
             Ok(Some(TryInsertAccess::ReadWrite(dst))) => {
@@ -1381,9 +1385,9 @@ where
     }
 
     #[inline]
-    pub fn drain<R>(&mut self) -> Drain<'_, K, V, R>
+    pub fn drain<'a, R>(&'a mut self) -> Drain<'a, K, V, R>
     where
-        V: SoaRead<R>,
+        V: SoaRead<'a, R>,
     {
         let Self {
             dense,
@@ -1406,7 +1410,7 @@ where
     #[must_use]
     pub fn into_values<R>(self) -> IntoValues<K, V, R>
     where
-        V: SoaRead<R>,
+        V: SoaReadOwned<R>,
     {
         let Self { dense, .. } = self;
         let inner = dense.into_items();
@@ -1416,7 +1420,7 @@ where
     #[inline]
     pub fn into_items<R>(self) -> IntoIter<K, V, R>
     where
-        V: SoaRead<R>,
+        V: SoaReadOwned<R>,
     {
         let Self { dense, .. } = self;
         let inner = dense.into_items();
@@ -2066,7 +2070,7 @@ where
 impl<K, V> IntoIterator for EpochSparseArena<K, V>
 where
     K: Key,
-    V: AllocSoa + SoaRead<V>,
+    V: AllocSoa + SoaReadOwned<V>,
 {
     type Item = (K, V);
     type IntoIter = IntoIter<K, V, V>;

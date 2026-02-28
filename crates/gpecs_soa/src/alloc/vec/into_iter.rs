@@ -13,7 +13,7 @@ use crate::{
     slice::SoaSlices,
     traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, RawSoaContext, ReadSoaContext, SliceMutPtrs,
-        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaRead,
+        SlicePtrs, Slices, SlicesMut, Soa, SoaCloneToUninit, SoaContext, SoaOwned, SoaReadOwned,
     },
     vec::SoaVec,
     wrapper,
@@ -332,7 +332,7 @@ where
 #[expect(clippy::while_let_on_iterator)]
 impl<T, R> Iterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaRead<R> + ?Sized,
+    T: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     type Item = R;
 
@@ -556,7 +556,7 @@ where
 
 impl<T, R> DoubleEndedIterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaRead<R> + ?Sized,
+    T: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -608,7 +608,7 @@ where
 
 impl<T, R> ExactSizeIterator for IntoIter<T, R>
 where
-    T: AllocSoa + SoaRead<R> + ?Sized,
+    T: AllocSoa + SoaReadOwned<R> + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -616,4 +616,4 @@ where
     }
 }
 
-impl<T, R> FusedIterator for IntoIter<T, R> where T: AllocSoa + SoaRead<R> + ?Sized {}
+impl<T, R> FusedIterator for IntoIter<T, R> where T: AllocSoa + SoaReadOwned<R> + ?Sized {}

@@ -556,9 +556,9 @@ where
     }
 }
 
-unsafe impl<T> ReadSoaContext<Identity<T>> for IdentityContext<T> {
+unsafe impl<'a, T> ReadSoaContext<'a, Identity<T>> for IdentityContext<T> {
     #[inline]
-    unsafe fn read(&self, src: Self::Ptrs<'_>) -> Identity<T> {
+    unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> Identity<T> {
         unsafe { ptr::read(src) }
     }
 }

@@ -9,11 +9,12 @@ use gpecs_soa_erased::{
     ErasedSoa, ErasedSoaContext, ptr::slice::CoreSliceItemPtrs, storage::BoxedAlignedUninitStorage,
 };
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
-use itertools::zip_eq;
 
 use crate::{
     archetype::{
-        erased::{ErasedArchetype, ErasedArchetypeIter, FromComponentInfo},
+        erased::{
+            ErasedArchetype, ErasedArchetypeComponent, ErasedArchetypeIter, FromComponentInfo,
+        },
         error::{
             ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
             IncompatibleArchetypeExactError, IncompatibleBundleValueError,
@@ -97,6 +98,12 @@ impl FromComponentInfo for ErasedStorageMeta {
 type ErasedBundle = ErasedSoa<
     BoxedAlignedUninitStorage,
     ErasedArchetype<ErasedStorageMeta>,
+    CoreSliceItemPtrs<MaybeUninit<u8>>,
+>;
+
+type ErasedReadBundle<'a> = ErasedSoa<
+    BoxedAlignedUninitStorage,
+    &'a ErasedArchetype<ErasedStorageMeta>,
     CoreSliceItemPtrs<MaybeUninit<u8>>,
 >;
 
@@ -449,18 +456,24 @@ impl ArchetypeStorage {
             return false;
         };
 
-        let archetype = sparse_set.context().as_inner();
-        unsafe { Self::drop_erased(archetype, erased_fields) }
+        unsafe {
+            Self::drop_erased_bundle(erased_fields);
+        }
         true
     }
 
     #[inline]
-    unsafe fn drop_erased(
-        archetype: &ErasedArchetype<ErasedStorageMeta>,
-        mut erased_fields: ErasedBundle,
-    ) {
-        for (mut field, component) in zip_eq(erased_fields.as_mut_fields(), archetype) {
-            let Some(drop_fn) = component.meta.drop_fn else {
+    unsafe fn drop_erased_bundle(mut erased_fields: ErasedReadBundle) {
+        let mut fields = erased_fields.as_mut_fields().into_iter();
+        for _ in 0..fields.len() {
+            let ErasedArchetypeComponent { meta, .. } = fields
+                .descriptors()
+                .clone()
+                .next()
+                .expect("item should be present");
+            let mut field = fields.next().expect("item should be present");
+
+            let Some(drop_fn) = meta.drop_fn else {
                 continue;
             };
             unsafe { drop_fn(field.as_mut_ptr()) }
@@ -503,17 +516,30 @@ impl ArchetypeStorage {
     ) -> Option<IndexSet<ErasedComponent>> {
         let Self { sparse_set } = self;
 
-        let value: ErasedBundle = unsafe {
+        let value: ErasedReadBundle = unsafe {
             let context = sparse_set.context();
             let component_ids = context.as_inner().iter().map(From::from);
             from_erased_fields::<ErasedBundle, _>(components, context, component_ids, fields)
         };
-        let value: ErasedBundle = sparse_set.insert(entity.into(), value)?;
+        let (value, _) = value.into_parts();
+        let value: ErasedReadBundle = sparse_set.insert(entity.into(), value)?;
 
-        let fields = unsafe {
-            let context = sparse_set.context();
-            let component_ids = context.as_inner().iter().map(From::from);
-            into_erased_fields::<ErasedBundle, _>(components, context, component_ids, value)
+        let fields = {
+            let mut fields = value.into_fields();
+            (0..fields.len())
+                .map(|_| {
+                    let ErasedArchetypeComponent { id, meta, .. } = fields
+                        .descriptors()
+                        .clone()
+                        .next()
+                        .expect("item should be present");
+                    let field = fields
+                        .next()
+                        .expect("item should be present")
+                        .expect("field should be successfully allocated");
+                    unsafe { ErasedComponent::from_parts(id, field, meta.drop_fn) }
+                })
+                .collect()
         };
         Some(fields)
     }
@@ -522,17 +548,29 @@ impl ArchetypeStorage {
     #[track_caller]
     pub(super) fn remove_erased(
         &mut self,
-        components: &ComponentRegistry,
+        _components: &ComponentRegistry,
         entity: Entity,
     ) -> Option<IndexSet<ErasedComponent>> {
         let Self { sparse_set } = self;
 
-        let value: ErasedBundle = sparse_set.swap_remove(entity.into())?;
+        let value: ErasedReadBundle = sparse_set.swap_remove(entity.into())?;
 
-        let fields = unsafe {
-            let context = sparse_set.context();
-            let component_ids = context.as_inner().iter().map(From::from);
-            into_erased_fields::<ErasedBundle, _>(components, context, component_ids, value)
+        let fields = {
+            let mut fields = value.into_fields();
+            (0..fields.len())
+                .map(|_| {
+                    let ErasedArchetypeComponent { id, meta, .. } = fields
+                        .descriptors()
+                        .clone()
+                        .next()
+                        .expect("item should be present");
+                    let field = fields
+                        .next()
+                        .expect("item should be present")
+                        .expect("field should be successfully allocated");
+                    unsafe { ErasedComponent::from_parts(id, field, meta.drop_fn) }
+                })
+                .collect()
         };
         Some(fields)
     }
@@ -581,10 +619,8 @@ impl Drop for ArchetypeStorage {
     fn drop(&mut self) {
         let Self { sparse_set } = self;
 
-        let mut drain = sparse_set.drain();
-        while let Some((_, erased_fields)) = drain.next() {
-            let archetype = drain.context().as_inner();
-            unsafe { Self::drop_erased(archetype, erased_fields) }
+        for (_, erased_fields) in sparse_set.drain() {
+            unsafe { Self::drop_erased_bundle(erased_fields) }
         }
     }
 }

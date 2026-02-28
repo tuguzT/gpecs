@@ -621,7 +621,7 @@ impl ArchetypeRegistry {
         );
 
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
+            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
         let fields =
             unsafe { into_erased_fields::<B, _>(components, B::CONTEXT, component_ids, value) };
         fields.into_iter().for_each(|field| {
@@ -686,7 +686,7 @@ impl ArchetypeRegistry {
         );
 
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
+            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
 
         let fields =
             unsafe { into_erased_fields::<B, _>(components, B::CONTEXT, component_ids, value) };
@@ -758,7 +758,7 @@ impl ArchetypeRegistry {
 
         let old_archetype = Some(old_archetype);
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
+            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
 
         let fields = component_ids.iter().copied().map(|component_id| {
             old_fields
@@ -825,7 +825,7 @@ impl ArchetypeRegistry {
 
         let old_archetype = Some(old_archetype);
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(components, archetypes, old_archetype, entity);
+            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
 
         component_ids
             .iter()
@@ -870,12 +870,13 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("{archetype_id} should exist")
         };
-        info.storage.insert_erased(components, entity, fields);
+        if let Err(error) = info.storage.insert_erased(components, entity, fields) {
+            unreachable!("failed to insert {entity} into {archetype_id}: {error}");
+        }
     }
 
     #[inline]
     fn move_out_of_archetype_by_entity(
-        components: &ComponentRegistry,
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
@@ -887,7 +888,7 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("{archetype_id} should exist")
         };
-        let Some(fields) = info.storage.remove_erased(components, entity) else {
+        let Some(fields) = info.storage.remove_erased(entity) else {
             unreachable!("{entity} should exist in {archetype_id}")
         };
         fields

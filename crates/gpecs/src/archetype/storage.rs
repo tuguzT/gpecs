@@ -419,7 +419,11 @@ impl ArchetypeStorage {
         let fields = unsafe {
             into_erased_fields::<B, _>(components, B::CONTEXT, bundle_component_ids, value)
         };
-        let Some(fields) = self.insert_erased(components, entity, fields) else {
+
+        let fields = self
+            .insert_erased(components, entity, fields)
+            .expect("bundle compatibility should have been already checked");
+        let Some(fields) = fields else {
             return Ok(None);
         };
 
@@ -439,7 +443,7 @@ impl ArchetypeStorage {
     {
         self.check_exact_compatibility_of::<B>(components)?;
 
-        let Some(fields) = self.remove_erased(components, entity) else {
+        let Some(fields) = self.remove_erased(entity) else {
             return Ok(None);
         };
 
@@ -513,7 +517,10 @@ impl ArchetypeStorage {
         components: &ComponentRegistry,
         entity: Entity,
         fields: IndexSet<ErasedComponent>,
-    ) -> Option<IndexSet<ErasedComponent>> {
+    ) -> Result<Option<IndexSet<ErasedComponent>>, IncompatibleArchetypeExactError> {
+        let component_ids = fields.iter().map(ErasedComponent::component_id);
+        self.check_exact_compatibility_for(component_ids)?;
+
         let Self { sparse_set } = self;
 
         let value: ErasedReadBundle = unsafe {
@@ -522,7 +529,9 @@ impl ArchetypeStorage {
             from_erased_fields::<ErasedBundle, _>(components, context, component_ids, fields)
         };
         let (value, _) = value.into_parts();
-        let value: ErasedReadBundle = sparse_set.insert(entity.into(), value)?;
+        let Some(value) = sparse_set.insert::<ErasedReadBundle, _>(entity.into(), value) else {
+            return Ok(None);
+        };
 
         let fields = {
             let mut fields = value.into_fields();
@@ -541,16 +550,12 @@ impl ArchetypeStorage {
                 })
                 .collect()
         };
-        Some(fields)
+        Ok(Some(fields))
     }
 
     #[inline]
     #[track_caller]
-    pub(super) fn remove_erased(
-        &mut self,
-        _components: &ComponentRegistry,
-        entity: Entity,
-    ) -> Option<IndexSet<ErasedComponent>> {
+    pub(super) fn remove_erased(&mut self, entity: Entity) -> Option<IndexSet<ErasedComponent>> {
         let Self { sparse_set } = self;
 
         let value: ErasedReadBundle = sparse_set.swap_remove(entity.into())?;

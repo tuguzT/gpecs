@@ -24,7 +24,7 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
             ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
-            utils::{from_erased_fields, into_erased_fields},
+            utils::{into_erased_fields, reorder_fields},
         },
     },
     component::{
@@ -421,7 +421,7 @@ impl ArchetypeStorage {
         };
 
         let fields = self
-            .insert_erased(components, entity, fields)
+            .insert_erased(entity, fields)
             .expect("bundle compatibility should have been already checked");
         let Some(fields) = fields else {
             return Ok(None);
@@ -514,7 +514,6 @@ impl ArchetypeStorage {
     #[track_caller]
     pub(super) fn insert_erased(
         &mut self,
-        components: &ComponentRegistry,
         entity: Entity,
         fields: IndexSet<ErasedComponent>,
     ) -> Result<Option<IndexSet<ErasedComponent>>, IncompatibleArchetypeExactError> {
@@ -523,10 +522,13 @@ impl ArchetypeStorage {
 
         let Self { sparse_set } = self;
 
-        let value: ErasedReadBundle = unsafe {
-            let context = sparse_set.context();
-            let component_ids = context.as_inner().iter().map(From::from);
-            from_erased_fields::<ErasedBundle, _>(components, context, component_ids, fields)
+        // TODO: if order of components is the same, write them without any reordering
+        let value: ErasedReadBundle = {
+            let descriptors = sparse_set.context().as_inner();
+            let order = descriptors.iter().map(From::from);
+            let fields = reorder_fields(fields, order).map(ErasedComponent::into_field);
+            ErasedSoa::try_from_fields_descriptors(fields, descriptors)
+                .expect("all the fields should be valid")
         };
         let (value, _) = value.into_parts();
         let Some(value) = sparse_set.insert::<ErasedReadBundle, _>(entity.into(), value) else {

@@ -191,6 +191,12 @@ impl ErasedComponent {
     }
 
     #[inline]
+    pub fn into_field(self) -> Field {
+        let me = ManuallyDrop::new(self);
+        unsafe { ptr::read(&raw const me.field) }
+    }
+
+    #[inline]
     pub fn into_parts(self) -> (ComponentId, Field, Option<DropFn>) {
         let Self {
             component_id,
@@ -198,11 +204,7 @@ impl ErasedComponent {
             ..
         } = self;
 
-        let field = {
-            let me = ManuallyDrop::new(self);
-            unsafe { ptr::read(&raw const me.field) }
-        };
-
+        let field = self.into_field();
         (component_id, field, drop_fn)
     }
 }

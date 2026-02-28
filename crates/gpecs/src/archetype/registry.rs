@@ -633,7 +633,7 @@ impl ArchetypeRegistry {
 
         let new_fields = old_fields;
         let archetype_id = Some(new_archetype);
-        Self::set_in_archetype_by_entity(components, archetypes, archetype_id, entity, new_fields);
+        Self::set_in_archetype_by_entity(archetypes, archetype_id, entity, new_fields);
 
         Ok(new_archetype)
     }
@@ -697,7 +697,7 @@ impl ArchetypeRegistry {
 
         let new_fields = old_fields;
         let archetype_id = Some(new_archetype);
-        Self::set_in_archetype_by_entity(components, archetypes, archetype_id, entity, new_fields);
+        Self::set_in_archetype_by_entity(archetypes, archetype_id, entity, new_fields);
 
         Ok(new_archetype)
     }
@@ -769,7 +769,7 @@ impl ArchetypeRegistry {
             .expect("input fields should be compatible with the bundle");
 
         let new_fields = old_fields;
-        Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);
+        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, new_fields);
 
         Ok((value, new_archetype))
     }
@@ -833,7 +833,7 @@ impl ArchetypeRegistry {
             .for_each(drop);
 
         let new_fields = old_fields;
-        Self::set_in_archetype_by_entity(components, archetypes, new_archetype, entity, new_fields);
+        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, new_fields);
 
         Ok(new_archetype)
     }
@@ -857,7 +857,6 @@ impl ArchetypeRegistry {
 
     #[inline]
     fn set_in_archetype_by_entity(
-        components: &ComponentRegistry,
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
@@ -870,7 +869,7 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("{archetype_id} should exist")
         };
-        if let Err(error) = info.storage.insert_erased(components, entity, fields) {
+        if let Err(error) = info.storage.insert_erased(entity, fields) {
             unreachable!("failed to insert {entity} into {archetype_id}: {error}");
         }
     }

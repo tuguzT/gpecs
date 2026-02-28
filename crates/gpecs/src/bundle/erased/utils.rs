@@ -1,6 +1,6 @@
-use std::{borrow::Borrow, mem::MaybeUninit};
+use std::borrow::Borrow;
 
-use gpecs_soa_erased::{BoxedErasedSoa, ptr::slice::CoreSliceItemPtrs};
+use gpecs_soa_erased::BoxedErasedSoa;
 use itertools::zip_eq;
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     hash::IndexSet,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
-        traits::{AllocSoa, RawSoa, Soa, SoaRead, SoaWrite},
+        traits::{AllocSoa, RawSoa, Soa, SoaWrite},
     },
 };
 
@@ -55,7 +55,7 @@ where
 
 #[inline]
 #[track_caller]
-fn reorder_fields<I, F>(mut fields: IndexSet<F>, order: I) -> impl Iterator<Item = F>
+pub fn reorder_fields<I, F>(mut fields: IndexSet<F>, order: I) -> impl Iterator<Item = F>
 where
     I: IntoIterator<Item = ComponentId>,
     F: Borrow<ComponentId>,
@@ -72,30 +72,6 @@ where
             .swap_take(&id)
             .unwrap_or_else(|| remove_field_fail(id))
     })
-}
-
-#[inline]
-pub unsafe fn from_erased_fields<'ctx, 'a, T, R>(
-    components: &ComponentRegistry,
-    context: &'ctx T::Context,
-    component_ids: impl IntoIterator<Item = ComponentId>,
-    fields: IndexSet<ErasedComponent>,
-) -> R
-where
-    T: AllocSoa + Soa<'a> + SoaRead<'ctx, R>,
-{
-    type ErasedSoa = BoxedErasedSoa<CoreSliceItemPtrs<MaybeUninit<u8>>>;
-
-    let component_ids = validated_components::<T, _>(components, context, component_ids);
-    let fields_with_descriptors = reorder_fields(fields, component_ids).map(|field| {
-        let (_, field, _) = field.into_parts();
-        let (storage, layout) = field.into_parts();
-        (storage, FieldDescriptor::new(layout))
-    });
-
-    let erased_value = ErasedSoa::try_from_fields_with_descriptors(fields_with_descriptors)
-        .expect("all the fields should be valid");
-    unsafe { erased_value.downcast::<T, R>(context) }.expect("all the fields should be valid")
 }
 
 #[inline]

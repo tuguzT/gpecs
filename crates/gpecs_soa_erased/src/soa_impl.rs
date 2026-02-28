@@ -268,7 +268,7 @@ where
 {
     #[inline]
     unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
-        let src = value.as_fields().into_ptrs();
+        let src = value.as_ptrs();
         unsafe { self.write(dst, &src) }
     }
 }
@@ -448,7 +448,7 @@ where
 {
     #[inline]
     fn as_refs(&'me self, _: &'me Self::Context) -> Refs<'me, 'me, Self> {
-        self.as_fields()
+        self.as_refs()
     }
 }
 
@@ -462,6 +462,6 @@ where
 {
     #[inline]
     fn as_mut_refs(&'me mut self, _: &'me Self::Context) -> RefsMut<'me, 'me, Self> {
-        self.as_mut_fields()
+        self.as_mut_refs()
     }
 }

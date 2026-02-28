@@ -36,7 +36,7 @@ pub struct ErasedBundleMutSlices<'data, 'a, Meta> {
 
 impl<'data, 'a, Meta> ErasedBundleMutSlices<'data, 'a, Meta> {
     #[inline]
-    pub fn from_inner(inner: Inner<'data, 'a, Meta>) -> Self {
+    pub unsafe fn from_inner(inner: Inner<'data, 'a, Meta>) -> Self {
         Self { inner }
     }
 
@@ -44,7 +44,7 @@ impl<'data, 'a, Meta> ErasedBundleMutSlices<'data, 'a, Meta> {
     pub unsafe fn from_ptrs(ptrs: ErasedBundleMutSlicePtrs<'a, Meta>) -> Self {
         let inner = ptrs.into_inner();
         let inner = unsafe { inner.deref_mut() };
-        Self::from_inner(inner)
+        unsafe { Self::from_inner(inner) }
     }
 
     #[inline]
@@ -54,7 +54,7 @@ impl<'data, 'a, Meta> ErasedBundleMutSlices<'data, 'a, Meta> {
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<u8>] {
+    pub unsafe fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<u8>] {
         let Self { inner } = self;
         inner.as_mut_buffer()
     }
@@ -99,7 +99,7 @@ impl<'data, 'a, Meta> ErasedBundleMutSlices<'data, 'a, Meta> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
-        ErasedBundleMutSlicePtrs::from_inner(inner)
+        unsafe { ErasedBundleMutSlicePtrs::from_inner(inner) }
     }
 }
 
@@ -125,7 +125,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.iter();
-        ErasedBundleSlicesIter::from_inner(inner)
+        unsafe { ErasedBundleSlicesIter::from_inner(inner) }
     }
 
     #[inline]
@@ -133,7 +133,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.iter_mut();
-        ErasedBundleMutSlicesIter::from_inner(inner)
+        unsafe { ErasedBundleMutSlicesIter::from_inner(inner) }
     }
 }
 
@@ -175,7 +175,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.into_iter();
-        ErasedBundleMutSlicesIter::from_inner(inner)
+        unsafe { ErasedBundleMutSlicesIter::from_inner(inner) }
     }
 }
 
@@ -186,7 +186,7 @@ impl<'data, 'a, Meta> From<ErasedBundleMutSlices<'data, 'a, Meta>>
     fn from(slices: ErasedBundleMutSlices<'data, 'a, Meta>) -> Self {
         let inner = slices.into_inner();
         let inner = inner.into();
-        Self::from_inner(inner)
+        unsafe { Self::from_inner(inner) }
     }
 }
 
@@ -223,7 +223,7 @@ pub struct ErasedBundleMutSlicesIter<'data, 'a, Meta> {
 
 impl<'data, 'a, Meta> ErasedBundleMutSlicesIter<'data, 'a, Meta> {
     #[inline]
-    pub(super) fn from_inner(inner: InnerIter<'data, 'a, Meta>) -> Self {
+    pub(super) unsafe fn from_inner(inner: InnerIter<'data, 'a, Meta>) -> Self {
         Self { inner }
     }
 
@@ -234,7 +234,7 @@ impl<'data, 'a, Meta> ErasedBundleMutSlicesIter<'data, 'a, Meta> {
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<u8>] {
+    pub unsafe fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<u8>] {
         let Self { inner } = self;
         inner.as_mut_buffer()
     }

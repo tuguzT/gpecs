@@ -86,8 +86,7 @@ where
 {
     let component_ids = validated_components::<T, _>(components, context, component_ids);
     let fields = BoxedErasedSoa::try_from::<T, W>(context, value)
-        .expect("the value should be valid for the given context")
-        .into_fields();
+        .expect("the value should be valid for the given context");
 
     zip_eq(fields, component_ids)
         .map(|(field, id)| {

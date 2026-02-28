@@ -33,7 +33,7 @@ pub struct ErasedBundleMutPtrs<'a, Meta> {
 
 impl<'a, Meta> ErasedBundleMutPtrs<'a, Meta> {
     #[inline]
-    pub fn from_inner(inner: Inner<'a, Meta>) -> Self {
+    pub unsafe fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }
     }
 
@@ -44,7 +44,7 @@ impl<'a, Meta> ErasedBundleMutPtrs<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> *mut [MaybeUninit<u8>] {
+    pub unsafe fn as_mut_buffer(&mut self) -> *mut [MaybeUninit<u8>] {
         let Self { inner } = self;
         inner.as_mut_buffer()
     }
@@ -78,7 +78,7 @@ impl<'a, Meta> ErasedBundleMutPtrs<'a, Meta> {
         let Self { inner } = self;
 
         let inner = inner.cast_const();
-        ErasedBundlePtrs::from_inner(inner)
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 
     #[inline]
@@ -97,7 +97,7 @@ impl<'a, Meta> ErasedBundleMutPtrs<'a, Meta> {
         let Self { inner } = self;
 
         let inner = unsafe { inner.add(count) };
-        Self::from_inner(inner)
+        unsafe { Self::from_inner(inner) }
     }
 }
 
@@ -142,7 +142,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.iter_mut();
-        ErasedBundleMutPtrsIter::from_inner(inner)
+        unsafe { ErasedBundleMutPtrsIter::from_inner(inner) }
     }
 }
 
@@ -154,7 +154,7 @@ where
     pub fn dangling(archetype: &'a ErasedArchetype<Meta>) -> Self {
         let inner = Inner::dangling(archetype)
             .expect("alignment of bytes should be sufficient for any component");
-        Self::from_inner(inner)
+        unsafe { Self::from_inner(inner) }
     }
 
     #[inline]
@@ -245,7 +245,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.into_iter();
-        ErasedBundleMutPtrsIter::from_inner(inner)
+        unsafe { ErasedBundleMutPtrsIter::from_inner(inner) }
     }
 }
 
@@ -282,7 +282,7 @@ pub struct ErasedBundleMutPtrsIter<'a, Meta> {
 
 impl<'a, Meta> ErasedBundleMutPtrsIter<'a, Meta> {
     #[inline]
-    pub(super) fn from_inner(inner: InnerIter<'a, Meta>) -> Self {
+    pub(super) unsafe fn from_inner(inner: InnerIter<'a, Meta>) -> Self {
         Self { inner }
     }
 
@@ -293,7 +293,7 @@ impl<'a, Meta> ErasedBundleMutPtrsIter<'a, Meta> {
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> *mut [MaybeUninit<u8>] {
+    pub unsafe fn as_mut_buffer(&mut self) -> *mut [MaybeUninit<u8>] {
         let Self { inner } = self;
         inner.as_mut_buffer()
     }

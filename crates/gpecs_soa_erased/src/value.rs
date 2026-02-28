@@ -11,15 +11,14 @@ use core::{
 use itertools::{EitherOrBoth::Both, Itertools};
 
 use crate::{
-    CovariantFieldDescriptors, ErasedSoaMutRefs, ErasedSoaRefs,
+    CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaMutRefs, ErasedSoaMutRefsIter,
+    ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsIter,
     assert::check_downcast,
-    data::{Erased, error::FromLayoutDataError},
+    data::{Erased, ErasedMutRef, ErasedRef, error::FromLayoutDataError},
     error::{
         DowncastError, FromFieldsDescriptorsError, FromStorageFieldsDescriptorsError,
-        FromStorageValueError, FromValueError, IterOrFieldLenMismatchError,
-    },
-    error::{
-        InsufficientAlignError, LenMismatchError, check_layout, check_len, check_sufficient_align,
+        FromStorageValueError, FromValueError, InsufficientAlignError, IterOrFieldLenMismatchError,
+        LenMismatchError, check_layout, check_len, check_sufficient_align,
     },
     layout::bytes_to_items,
     ptr::slice::SliceItemPtrs,
@@ -65,6 +64,53 @@ impl<T, D, P> ErasedSoa<T, D, P> {
             ..
         } = self;
         (storage, descriptors)
+    }
+}
+
+impl<T, D, P> ErasedSoa<T, D, P>
+where
+    D: ?Sized,
+{
+    #[inline]
+    pub fn descriptors(&self) -> &D {
+        let Self { descriptors, .. } = self;
+        descriptors
+    }
+}
+
+impl<T, D, P> ErasedSoa<T, D, P>
+where
+    T: AlignedStorage,
+    D: ?Sized,
+{
+    #[inline]
+    pub fn layout(&self) -> Layout {
+        let Self { storage, .. } = self;
+        storage.layout()
+    }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const MaybeUninit<u8> {
+        let Self { storage, .. } = self;
+        storage.as_ptr().cast()
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut MaybeUninit<u8> {
+        let Self { storage, .. } = self;
+        storage.as_mut_ptr().cast()
+    }
+
+    #[inline]
+    pub fn as_buffer(&self) -> &[MaybeUninit<T::Item>] {
+        let Self { storage, .. } = self;
+        storage.as_uninit_slice()
+    }
+
+    #[inline]
+    pub fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<T::Item>] {
+        let Self { storage, .. } = self;
+        storage.as_mut_uninit_slice()
     }
 }
 
@@ -152,7 +198,7 @@ where
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
-    pub fn as_fields(&'a self) -> ErasedSoaRefs<'a, D::Output, P::Const> {
+    pub fn as_ptrs(&'a self) -> ErasedSoaPtrs<D::Output, P::Const> {
         let Self {
             ref storage,
             ref descriptors,
@@ -161,11 +207,11 @@ where
 
         let descriptors = descriptors.field_descriptors();
         let buffer = storage.as_uninit_slice();
-        unsafe { ErasedSoaRefs::new_unchecked(descriptors, buffer, 1, 0) }
+        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, 1, 0) }
     }
 
     #[inline]
-    pub fn as_mut_fields(&'a mut self) -> ErasedSoaMutRefs<'a, D::Output, P::Mut> {
+    pub fn as_mut_ptrs(&'a mut self) -> ErasedSoaMutPtrs<D::Output, P::Mut> {
         let Self {
             ref mut storage,
             ref descriptors,
@@ -174,7 +220,27 @@ where
 
         let descriptors = descriptors.field_descriptors();
         let buffer = storage.as_mut_uninit_slice();
-        unsafe { ErasedSoaMutRefs::new_unchecked(descriptors, buffer, 1, 0) }
+        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, 1, 0) }
+    }
+
+    #[inline]
+    pub fn as_refs(&'a self) -> ErasedSoaRefs<'a, D::Output, P::Const> {
+        unsafe { self.as_ptrs().deref() }
+    }
+
+    #[inline]
+    pub fn as_mut_refs(&'a mut self) -> ErasedSoaMutRefs<'a, D::Output, P::Mut> {
+        unsafe { self.as_mut_ptrs().deref_mut() }
+    }
+
+    #[inline]
+    pub fn iter(&'a self) -> ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, P::Const> {
+        self.as_refs().into_iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&'a mut self) -> ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P::Mut> {
+        self.as_mut_refs().into_iter()
     }
 }
 
@@ -322,8 +388,75 @@ where
     for<'a, 'b> FieldDescriptorsIter<'a, D>: FieldDescriptors<'b>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let fields = &self.as_fields().into_iter();
+        let fields = &self.into_iter();
         f.debug_struct("ErasedSoa").field("fields", fields).finish()
+    }
+}
+
+impl<T, D, P> AsRef<[MaybeUninit<T::Item>]> for ErasedSoa<T, D, P>
+where
+    T: AlignedStorage,
+    D: ?Sized,
+{
+    #[inline]
+    fn as_ref(&self) -> &[MaybeUninit<T::Item>] {
+        self.as_buffer()
+    }
+}
+
+impl<T, D, P> AsMut<[MaybeUninit<T::Item>]> for ErasedSoa<T, D, P>
+where
+    T: AlignedStorage,
+    D: ?Sized,
+{
+    #[inline]
+    fn as_mut(&mut self) -> &mut [MaybeUninit<T::Item>] {
+        self.as_mut_buffer()
+    }
+}
+
+impl<'a, T, D, P> IntoIterator for &'a ErasedSoa<T, D, P>
+where
+    T: AlignedStorage,
+    D: FieldDescriptors<'a> + ?Sized,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+{
+    type Item = ErasedRef<'a, P::Const>;
+    type IntoIter = ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, P::Const>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T, D, P> IntoIterator for &'a mut ErasedSoa<T, D, P>
+where
+    T: AlignedStorage,
+    D: FieldDescriptors<'a> + ?Sized,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+{
+    type Item = ErasedMutRef<'a, P::Mut>;
+    type IntoIter = ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P::Mut>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl<T, D, P> IntoIterator for ErasedSoa<T, D, P>
+where
+    T: AlignedStorageFromLayout<Item: Copy>,
+    D: IntoIterator<Item: AsRef<FieldDescriptor>>,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+{
+    type Item = Result<Erased<T, P>, FromLayoutDataError<T::Error>>;
+    type IntoIter = ErasedSoaIntoFields<T, D::IntoIter, T, P>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_fields()
     }
 }
 
@@ -369,7 +502,12 @@ impl<T, I, F, P> ErasedSoaIntoFields<T, I, F, P> {
             offsets,
         }
     }
+}
 
+impl<T, I, F, P> ErasedSoaIntoFields<T, I, F, P>
+where
+    I: ?Sized,
+{
     #[inline]
     pub fn descriptors(&self) -> &I {
         let Self { offsets, .. } = self;
@@ -460,6 +598,30 @@ where
     F: AlignedStorageFromLayout<Item = T::Item>,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
+}
+
+impl<'a, T, I, F, P> FieldDescriptors<'a> for ErasedSoaIntoFields<T, I, F, P>
+where
+    I: FieldDescriptors<'a> + ?Sized,
+{
+    type Output = I::Output;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        self.descriptors().field_descriptors()
+    }
+}
+
+impl<T, I, F, P> CovariantFieldDescriptors for ErasedSoaIntoFields<T, I, F, P>
+where
+    I: CovariantFieldDescriptors + ?Sized,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        I::upcast_field_descriptors(from)
+    }
 }
 
 #[derive(Debug, Clone)]

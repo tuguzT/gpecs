@@ -140,7 +140,7 @@ impl<'a> ErasedComponentMutRef<'a> {
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub unsafe fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { field, .. } = self;
         field.as_mut_ptr()
     }
@@ -152,7 +152,7 @@ impl<'a> ErasedComponentMutRef<'a> {
     }
 
     #[inline]
-    pub fn as_mut_buffer(&mut self) -> &mut [u8] {
+    pub unsafe fn as_mut_buffer(&mut self) -> &mut [u8] {
         let Self { field, .. } = self;
         field.as_mut_buffer()
     }
@@ -212,13 +212,6 @@ impl AsRef<[u8]> for ErasedComponentMutRef<'_> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
         self.as_buffer()
-    }
-}
-
-impl AsMut<[u8]> for ErasedComponentMutRef<'_> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
-        self.as_mut_buffer()
     }
 }
 

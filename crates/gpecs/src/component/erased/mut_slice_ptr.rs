@@ -158,7 +158,7 @@ impl ErasedComponentMutSlicePtr {
     }
 
     #[inline]
-    pub fn as_mut_ptr(self) -> *mut u8 {
+    pub unsafe fn as_mut_ptr(self) -> *mut u8 {
         let Self { fields, .. } = self;
         fields.as_mut_ptr()
     }
@@ -170,7 +170,7 @@ impl ErasedComponentMutSlicePtr {
     }
 
     #[inline]
-    pub fn as_mut_buffer(self) -> *mut [u8] {
+    pub unsafe fn as_mut_buffer(self) -> *mut [u8] {
         let Self { fields, .. } = self;
         fields.as_mut_buffer()
     }

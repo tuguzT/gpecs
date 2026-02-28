@@ -29,7 +29,7 @@ pub struct ErasedBundleNonNullPtrs<'a, Meta> {
 
 impl<'a, Meta> ErasedBundleNonNullPtrs<'a, Meta> {
     #[inline]
-    pub fn from_inner(inner: Inner<'a, Meta>) -> Self {
+    pub unsafe fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }
     }
 
@@ -69,7 +69,7 @@ impl<'a, Meta> ErasedBundleNonNullPtrs<'a, Meta> {
         let Self { inner } = self;
 
         let inner = unsafe { inner.add(count) };
-        Self::from_inner(inner)
+        unsafe { Self::from_inner(inner) }
     }
 }
 
@@ -104,7 +104,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.iter();
-        ErasedBundleNonNullPtrsIter::from_inner(inner)
+        unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
     }
 }
 
@@ -116,7 +116,7 @@ where
     pub fn dangling(archetype: &'a ErasedArchetype<Meta>) -> Self {
         let inner = Inner::dangling(archetype)
             .expect("alignment of bytes should be sufficient for any component");
-        Self::from_inner(inner)
+        unsafe { Self::from_inner(inner) }
     }
 
     #[inline]
@@ -190,7 +190,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.into_iter();
-        ErasedBundleNonNullPtrsIter::from_inner(inner)
+        unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
     }
 }
 
@@ -199,7 +199,7 @@ impl<'a, Meta> From<ErasedBundleNonNullPtrs<'a, Meta>> for ErasedBundleMutPtrs<'
     fn from(ptrs: ErasedBundleNonNullPtrs<'a, Meta>) -> Self {
         let inner = ptrs.into_inner();
         let inner = inner.into();
-        ErasedBundleMutPtrs::from_inner(inner)
+        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
     }
 }
 
@@ -236,7 +236,7 @@ pub struct ErasedBundleNonNullPtrsIter<'a, Meta> {
 
 impl<'a, Meta> ErasedBundleNonNullPtrsIter<'a, Meta> {
     #[inline]
-    pub(super) fn from_inner(inner: InnerIter<'a, Meta>) -> Self {
+    pub(super) unsafe fn from_inner(inner: InnerIter<'a, Meta>) -> Self {
         Self { inner }
     }
 

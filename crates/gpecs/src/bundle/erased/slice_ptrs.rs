@@ -31,7 +31,7 @@ pub struct ErasedBundleSlicePtrs<'a, Meta> {
 
 impl<'a, Meta> ErasedBundleSlicePtrs<'a, Meta> {
     #[inline]
-    pub fn from_inner(inner: Inner<'a, Meta>) -> Self {
+    pub unsafe fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }
     }
 
@@ -39,7 +39,7 @@ impl<'a, Meta> ErasedBundleSlicePtrs<'a, Meta> {
     pub unsafe fn from_ptrs(ptrs: ErasedBundlePtrs<'a, Meta>, len: usize) -> Self {
         let inner = ptrs.into_inner();
         let inner = unsafe { Inner::from_ptrs(inner, len) };
-        Self::from_inner(inner)
+        unsafe { Self::from_inner(inner) }
     }
 
     #[inline]
@@ -88,7 +88,7 @@ impl<'a, Meta> ErasedBundleSlicePtrs<'a, Meta> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
-        ErasedBundlePtrs::from_inner(inner)
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 
     #[inline]
@@ -96,7 +96,7 @@ impl<'a, Meta> ErasedBundleSlicePtrs<'a, Meta> {
         let Self { inner } = self;
 
         let inner = inner.cast_mut();
-        ErasedBundleMutSlicePtrs::from_inner(inner)
+        unsafe { ErasedBundleMutSlicePtrs::from_inner(inner) }
     }
 
     #[inline]
@@ -128,7 +128,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.iter();
-        ErasedBundleSlicePtrsIter::from_inner(inner)
+        unsafe { ErasedBundleSlicePtrsIter::from_inner(inner) }
     }
 }
 
@@ -166,7 +166,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.into_iter();
-        ErasedBundleSlicePtrsIter::from_inner(inner)
+        unsafe { ErasedBundleSlicePtrsIter::from_inner(inner) }
     }
 }
 
@@ -203,7 +203,7 @@ pub struct ErasedBundleSlicePtrsIter<'a, Meta> {
 
 impl<'a, Meta> ErasedBundleSlicePtrsIter<'a, Meta> {
     #[inline]
-    pub(super) fn from_inner(inner: InnerIter<'a, Meta>) -> Self {
+    pub(super) unsafe fn from_inner(inner: InnerIter<'a, Meta>) -> Self {
         Self { inner }
     }
 

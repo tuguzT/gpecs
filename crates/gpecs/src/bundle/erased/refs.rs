@@ -29,7 +29,7 @@ pub struct ErasedBundleRefs<'data, 'a, Meta> {
 
 impl<'data, 'a, Meta> ErasedBundleRefs<'data, 'a, Meta> {
     #[inline]
-    pub fn from_inner(inner: Inner<'data, 'a, Meta>) -> Self {
+    pub unsafe fn from_inner(inner: Inner<'data, 'a, Meta>) -> Self {
         Self { inner }
     }
 
@@ -37,7 +37,7 @@ impl<'data, 'a, Meta> ErasedBundleRefs<'data, 'a, Meta> {
     pub unsafe fn from_ptrs(ptrs: ErasedBundlePtrs<'a, Meta>) -> Self {
         let inner = ptrs.into_inner();
         let inner = unsafe { inner.deref() };
-        Self::from_inner(inner)
+        unsafe { Self::from_inner(inner) }
     }
 
     #[inline]
@@ -75,7 +75,7 @@ impl<'data, 'a, Meta> ErasedBundleRefs<'data, 'a, Meta> {
         let Self { inner } = self;
 
         let inner = inner.into_ptrs();
-        ErasedBundlePtrs::from_inner(inner)
+        unsafe { ErasedBundlePtrs::from_inner(inner) }
     }
 }
 
@@ -101,7 +101,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.iter();
-        ErasedBundleRefsIter { inner }
+        unsafe { ErasedBundleRefsIter::from_inner(inner) }
     }
 }
 
@@ -139,7 +139,7 @@ where
         let Self { inner } = self;
 
         let inner = inner.into_iter();
-        ErasedBundleRefsIter { inner }
+        unsafe { ErasedBundleRefsIter::from_inner(inner) }
     }
 }
 
@@ -176,7 +176,7 @@ pub struct ErasedBundleRefsIter<'data, 'a, Meta> {
 
 impl<'data, 'a, Meta> ErasedBundleRefsIter<'data, 'a, Meta> {
     #[inline]
-    pub(super) fn from_inner(inner: InnerIter<'data, 'a, Meta>) -> Self {
+    pub(super) unsafe fn from_inner(inner: InnerIter<'data, 'a, Meta>) -> Self {
         Self { inner }
     }
 

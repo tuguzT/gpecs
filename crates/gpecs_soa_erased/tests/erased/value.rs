@@ -61,10 +61,10 @@ fn value() {
         descriptors.map(FieldDescriptor::layout),
     );
 
-    let erased_refs = erased_value.as_fields();
-    assert_eq!(erased_refs.into_iter().len(), 5);
+    let erased_refs = erased_value.as_refs();
+    assert_eq!(erased_refs.iter().len(), 5);
 
-    let field_ref = erased_refs.into_iter().nth(0).unwrap();
+    let field_ref = erased_refs.iter().nth(0).unwrap();
     assert_eq!(
         unsafe { field_ref.downcast::<()>() }.expect("layouts should match"),
         &(),
@@ -74,7 +74,7 @@ fn value() {
         ErasedRef::<*const _>::try_from(&()).unwrap().into_buffer(),
     );
 
-    let field_ref = erased_refs.into_iter().nth(1).unwrap();
+    let field_ref = erased_refs.iter().nth(1).unwrap();
     assert_eq!(
         unsafe { field_ref.downcast::<u8>() }.expect("layouts should match"),
         &i3,
@@ -84,7 +84,7 @@ fn value() {
         ErasedRef::<*const _>::try_from(&i3).unwrap().into_buffer(),
     );
 
-    let field_ref = erased_refs.into_iter().nth(2).unwrap();
+    let field_ref = erased_refs.iter().nth(2).unwrap();
     assert_eq!(
         unsafe { field_ref.downcast::<u32>() }.expect("layouts should match"),
         &i1,
@@ -94,13 +94,13 @@ fn value() {
         ErasedRef::<*const _>::try_from(&i1).unwrap().into_buffer(),
     );
 
-    let field_ref = erased_refs.into_iter().nth(3).unwrap();
+    let field_ref = erased_refs.iter().nth(3).unwrap();
     assert_eq!(
         unsafe { field_ref.downcast::<String>() }.expect("layouts should match"),
         &str,
     );
 
-    let field_ref = erased_refs.into_iter().nth(4).unwrap();
+    let field_ref = erased_refs.iter().nth(4).unwrap();
     assert_eq!(
         unsafe { field_ref.downcast::<u128>() }.expect("layouts should match"),
         &i2,
@@ -134,7 +134,7 @@ fn value() {
     ];
     itertools::assert_equal(
         erased_refs
-            .into_iter()
+            .iter()
             .enumerate()
             .filter_map(|(i, item)| (i != 3).then_some(item))
             .map(ErasedRef::into_buffer),
@@ -162,9 +162,8 @@ fn value() {
     >::try_from_fields_with_descriptors(fields_with_descriptors)
     .expect("all the fields should be valid here");
 
-    let erased_value_refs = erased_value.as_fields();
     itertools::assert_equal(
-        erased_value_refs.into_iter().map(ErasedRef::into_buffer),
+        erased_value.iter().map(ErasedRef::into_buffer),
         field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 
@@ -202,10 +201,7 @@ fn value_zst() {
         ErasedRef::<*const _>::new(Layout::new::<()>(), [].as_slice()).expect("incorrect inputs"),
     ];
     itertools::assert_equal(
-        erased_value
-            .as_fields()
-            .into_iter()
-            .map(ErasedRef::into_buffer),
+        erased_value.iter().map(ErasedRef::into_buffer),
         field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 

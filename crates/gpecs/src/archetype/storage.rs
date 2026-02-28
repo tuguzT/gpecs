@@ -468,14 +468,14 @@ impl ArchetypeStorage {
 
     #[inline]
     unsafe fn drop_erased_bundle(mut erased_fields: ErasedReadBundle) {
-        let mut fields = erased_fields.as_mut_fields().into_iter();
+        let mut fields = erased_fields.as_mut_ptrs().into_iter();
         for _ in 0..fields.len() {
             let ErasedArchetypeComponent { meta, .. } = fields
                 .descriptors()
                 .clone()
                 .next()
                 .expect("item should be present");
-            let mut field = fields.next().expect("item should be present");
+            let field = fields.next().expect("item should be present");
 
             let Some(drop_fn) = meta.drop_fn else {
                 continue;
@@ -493,7 +493,7 @@ impl ArchetypeStorage {
         let Self { sparse_set } = self;
 
         let refs = sparse_set.as_view().into_get(entity.into());
-        let refs = ErasedBundleRefs::from_inner(refs?);
+        let refs = unsafe { ErasedBundleRefs::from_inner(refs?) };
         Some(refs)
     }
 
@@ -506,7 +506,7 @@ impl ArchetypeStorage {
         let Self { sparse_set } = self;
 
         let refs = sparse_set.as_mut_view().into_get_mut(entity.into());
-        let refs = ErasedBundleMutRefs::from_inner(refs?);
+        let refs = unsafe { ErasedBundleMutRefs::from_inner(refs?) };
         Some(refs)
     }
 
@@ -536,7 +536,7 @@ impl ArchetypeStorage {
         };
 
         let fields = {
-            let mut fields = value.into_fields();
+            let mut fields = value.into_iter();
             (0..fields.len())
                 .map(|_| {
                     let ErasedArchetypeComponent { id, meta, .. } = fields
@@ -563,7 +563,7 @@ impl ArchetypeStorage {
         let value: ErasedReadBundle = sparse_set.swap_remove(entity.into())?;
 
         let fields = {
-            let mut fields = value.into_fields();
+            let mut fields = value.into_iter();
             (0..fields.len())
                 .map(|_| {
                     let ErasedArchetypeComponent { id, meta, .. } = fields
@@ -593,7 +593,7 @@ impl ArchetypeStorage {
         let (entities, values) = dense.into_slices().into_parts();
 
         let entities = must_cast_slice(entities);
-        let slices = ErasedBundleSlices::from_inner(values);
+        let slices = unsafe { ErasedBundleSlices::from_inner(values) };
         (entities, slices)
     }
 
@@ -608,7 +608,7 @@ impl ArchetypeStorage {
         let (entities, values) = dense.into_slices().into_parts();
 
         let entities = must_cast_slice(entities);
-        let slices = ErasedBundleMutSlices::from_inner(values);
+        let slices = unsafe { ErasedBundleMutSlices::from_inner(values) };
         (entities, slices)
     }
 }

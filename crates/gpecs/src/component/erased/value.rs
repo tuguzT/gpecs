@@ -127,7 +127,13 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn field(&self) -> &Field {
+    pub fn as_field(&self) -> &Field {
+        let Self { field, .. } = self;
+        field
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_field(&mut self) -> &mut Field {
         let Self { field, .. } = self;
         field
     }
@@ -173,7 +179,7 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub unsafe fn as_mut_ptr(&mut self) -> *mut u8 {
         let Self { field, .. } = self;
         field.as_mut_ptr()
     }
@@ -185,7 +191,7 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
         let Self { field, .. } = self;
         field.as_mut_slice()
     }
@@ -254,13 +260,6 @@ impl AsRef<[u8]> for ErasedComponent {
     #[inline]
     fn as_ref(&self) -> &[u8] {
         self.as_slice()
-    }
-}
-
-impl AsMut<[u8]> for ErasedComponent {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
-        self.as_mut_slice()
     }
 }
 

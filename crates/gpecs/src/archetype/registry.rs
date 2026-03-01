@@ -626,6 +626,8 @@ impl ArchetypeRegistry {
         let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
             .expect("bundle compatibility should have been already checked");
+
+        // TODO: add new method for erased bundle to replace some of the components
         fields
             .into_iter()
             .map(|component| component.expect("component should be allocated successfully"))
@@ -696,6 +698,8 @@ impl ArchetypeRegistry {
         let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
             .expect("bundle compatibility should have been already checked");
+
+        // TODO: add new method for erased bundle to replace some of the components
         fields
             .into_iter()
             .map(|component| component.expect("component should be allocated successfully"))
@@ -767,6 +771,7 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
 
+        // TODO: add new method for erased bundle to take out some of the components
         let fields = component_ids.iter().copied().map(|component_id| {
             old_fields
                 .swap_take(&component_id)
@@ -834,6 +839,7 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
 
+        // TODO: add new method for erased bundle to remove some of the components
         component_ids
             .iter()
             .map(|component_id| old_fields.swap_take(component_id))

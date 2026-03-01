@@ -513,7 +513,8 @@ impl ArchetypeStorage {
 
         let Self { sparse_set } = self;
 
-        // TODO: if order of components is the same, write them without any reordering
+        // TODO: add new method for erased bundle to reorder fields with provided input archetype
+        // if order of components is the same, write them without any reordering
         let value: ErasedReadBundleRaw = {
             let descriptors = sparse_set.context().as_inner();
             let order = descriptors.iter().map(From::from);

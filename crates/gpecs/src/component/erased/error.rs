@@ -231,7 +231,7 @@ pub struct FromComponentError<C> {
 
 impl<C> FromComponentError<C> {
     #[inline]
-    pub fn new(component: C, reason: FromComponentErrorKind) -> Self {
+    pub(super) fn new(component: C, reason: FromComponentErrorKind) -> Self {
         Self { reason, component }
     }
 }

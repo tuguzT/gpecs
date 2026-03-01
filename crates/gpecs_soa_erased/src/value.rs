@@ -5,7 +5,7 @@ use core::{
     iter::{self, FusedIterator},
     marker::PhantomData,
     mem::MaybeUninit,
-    slice,
+    ptr, slice,
 };
 
 use itertools::{EitherOrBoth::Both, Itertools};
@@ -29,7 +29,10 @@ use crate::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
             FieldDescriptorsOwned, buffer_layout, buffer_offsets,
         },
-        traits::{AllocSoa, AllocSoaContext, ReadSoaContext, SoaRead, SoaWrite, WriteSoaContext},
+        traits::{
+            AllocSoa, AllocSoaContext, ReadSoaContext, Refs, RefsMut, Soa, SoaRead, SoaWrite,
+            WriteSoaContext,
+        },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
     uninit::try_init_copy_from_slice,
@@ -243,6 +246,46 @@ where
     #[inline]
     pub fn iter_mut(&'a mut self) -> ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P::Mut> {
         self.as_mut_refs().into_iter()
+    }
+}
+
+impl<'a, T, D, P> ErasedSoa<T, D, P>
+where
+    T: AlignedStorage<Item = u8>,
+    D: FieldDescriptors<'a, Output: FieldDescriptorsOwned> + ?Sized,
+    P: SliceItemPtrs<Item = MaybeUninit<u8>>,
+{
+    #[inline]
+    pub unsafe fn downcast_ref<'ctx, V>(
+        &'a self,
+        context: &'ctx V::Context,
+    ) -> Result<Refs<'ctx, 'a, V>, DowncastError<&'a Self>>
+    where
+        V: AllocSoa + Soa<'a> + ?Sized,
+    {
+        let into_self = |_| self;
+
+        let result = unsafe { self.as_refs().downcast::<V>(context) };
+        let refs = result.map_err(|err| err.map_value(into_self))?;
+
+        Ok(refs)
+    }
+
+    #[inline]
+    pub unsafe fn downcast_mut<'ctx, V>(
+        &'a mut self,
+        context: &'ctx V::Context,
+    ) -> Result<RefsMut<'ctx, 'a, V>, DowncastError<&'a mut Self>>
+    where
+        V: AllocSoa + Soa<'a> + ?Sized,
+    {
+        let ptr = ptr::from_mut(self);
+        let into_self = |_| unsafe { &mut *ptr };
+
+        let result = unsafe { self.as_mut_refs().downcast::<V>(context) };
+        let refs = result.map_err(|err| err.map_value(into_self))?;
+
+        Ok(refs)
     }
 }
 

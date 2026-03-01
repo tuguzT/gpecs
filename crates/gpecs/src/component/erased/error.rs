@@ -113,7 +113,7 @@ where
 
 impl<T> DowncastError<T> {
     #[inline]
-    pub fn new(value: T, reason: DowncastErrorKind) -> Self {
+    pub(super) fn new(value: T, reason: DowncastErrorKind) -> Self {
         Self { reason, value }
     }
 

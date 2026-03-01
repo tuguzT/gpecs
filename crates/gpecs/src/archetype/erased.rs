@@ -501,8 +501,30 @@ where
     }
 }
 
+impl<Meta> CovariantFieldDescriptors for ErasedArchetypeIter<'_, Meta>
+where
+    Meta: AsRef<FieldDescriptor>,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from
+    }
+}
+
 pub struct ErasedArchetypeIntoIter<Meta> {
     inner: IndexMapIntoIter<ComponentId, Meta>,
+}
+
+impl<Meta> ErasedArchetypeIntoIter<Meta> {
+    #[inline]
+    pub fn iter(&self) -> ErasedArchetypeIter<'_, Meta> {
+        let Self { inner } = self;
+
+        let inner = inner.as_slice().into_iter();
+        ErasedArchetypeIter { inner }
+    }
 }
 
 impl<Meta> Debug for ErasedArchetypeIntoIter<Meta>
@@ -523,6 +545,16 @@ where
         let Self { inner } = self;
         let inner = inner.clone();
         Self { inner }
+    }
+}
+
+impl<'a, Meta> IntoIterator for &'a ErasedArchetypeIntoIter<Meta> {
+    type Item = ErasedArchetypeComponent<&'a Meta>;
+    type IntoIter = ErasedArchetypeIter<'a, Meta>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -610,3 +642,27 @@ impl<Meta> ExactSizeIterator for ErasedArchetypeIntoIter<Meta> {
 }
 
 impl<Meta> FusedIterator for ErasedArchetypeIntoIter<Meta> {}
+
+impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeIntoIter<Meta>
+where
+    Meta: AsRef<FieldDescriptor> + 'a,
+{
+    type Output = ErasedArchetypeIter<'a, Meta>;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        self.into_iter()
+    }
+}
+
+impl<Meta> CovariantFieldDescriptors for ErasedArchetypeIntoIter<Meta>
+where
+    Meta: AsRef<FieldDescriptor> + 'static,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from
+    }
+}

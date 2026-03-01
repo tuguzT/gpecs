@@ -17,6 +17,9 @@ use gpecs_soa_erased::{data::BoxedErased, storage::BoxedAlignedUninitStorage};
 
 use crate::common::ArrayDescriptors;
 
+type ArrayErasedSoa<T, const CAP: usize> =
+    ErasedSoa<T, ArrayDescriptors<FieldDescriptor, CAP>, CoreSliceItemPtrs<MaybeUninit<u8>>>;
+
 #[test]
 #[cfg(feature = "alloc")]
 fn value() {
@@ -38,12 +41,8 @@ fn value() {
     };
 
     let bytes = AlignedUninitStorage::new(bytes, Layout::new::<Value>()).unwrap();
-    let erased_value = ErasedSoa::<
-        _,
-        ArrayDescriptors<FieldDescriptor, 5>,
-        CoreSliceItemPtrs<MaybeUninit<u8>>,
-    >::try_from_storage_value::<Value, _>(bytes, &context, value)
-    .unwrap();
+    let erased_value =
+        ArrayErasedSoa::<_, 5>::try_from_storage_value::<Value, _>(bytes, &context, value).unwrap();
 
     let descriptors = [
         FieldDescriptor::of::<()>(),
@@ -155,12 +154,11 @@ fn value() {
         let (storage, layout) = field.into_parts();
         (storage, FieldDescriptor::new(layout))
     });
-    let erased_value = ErasedSoa::<
-        BoxedAlignedUninitStorage,
-        ArrayDescriptors<FieldDescriptor, 4>,
-        CoreSliceItemPtrs<MaybeUninit<u8>>,
-    >::try_from_fields_with_descriptors(fields_with_descriptors)
-    .expect("all the fields should be valid here");
+    let erased_value =
+        ArrayErasedSoa::<BoxedAlignedUninitStorage, 4>::try_from_fields_with_descriptors(
+            fields_with_descriptors,
+        )
+        .expect("all the fields should be valid here");
 
     itertools::assert_equal(
         erased_value.iter().map(ErasedRef::into_buffer),
@@ -180,12 +178,8 @@ fn value_zst() {
 
     let bytes = [MaybeUninit::zeroed(); size_of::<()>() * 2];
     let bytes = AlignedUninitStorage::new(bytes, Layout::new::<()>()).unwrap();
-    let erased_value = ErasedSoa::<
-        _,
-        ArrayDescriptors<FieldDescriptor, 1>,
-        CoreSliceItemPtrs<MaybeUninit<u8>>,
-    >::try_from_storage_value::<(), _>(bytes, &context, value)
-    .unwrap();
+    let erased_value =
+        ArrayErasedSoa::<_, 1>::try_from_storage_value::<(), _>(bytes, &context, value).unwrap();
 
     let descriptors = [FieldDescriptor::of::<()>()];
     itertools::assert_equal(

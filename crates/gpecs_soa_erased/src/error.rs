@@ -420,26 +420,86 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum FromStorageValueError {
+#[non_exhaustive]
+pub struct FromStorageValueError<T>
+where
+    T: ?Sized,
+{
+    pub reason: FromStorageValueErrorKind,
+    pub value: T,
+}
+
+impl<T> FromStorageValueError<T> {
+    #[inline]
+    pub(crate) fn new(value: T, reason: FromStorageValueErrorKind) -> Self {
+        Self { reason, value }
+    }
+
+    #[inline]
+    pub fn map_value<U, F>(self, f: F) -> FromStorageValueError<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let Self { reason, value } = self;
+        FromStorageValueError::new(f(value), reason)
+    }
+}
+
+impl<T> Display for FromStorageValueError<T>
+where
+    T: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, value } = self;
+        write!(f, "failed to create erased SoA from {value}: {reason}")
+    }
+}
+
+impl<T> Error for FromStorageValueError<T>
+where
+    T: Debug + Display + ?Sized,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[inline]
+pub(super) fn check_from_storage_value<F, R, T>(
+    f: F,
+    value: T,
+) -> Result<(T, R), FromStorageValueError<T>>
+where
+    F: FnOnce() -> Result<R, FromStorageValueErrorKind>,
+{
+    match f() {
+        Ok(ok) => Ok((value, ok)),
+        Err(reason) => Err(FromStorageValueError::new(value, reason)),
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromStorageValueErrorKind {
     LayoutMismatch(LayoutMismatchError),
     InvalidLayout(LayoutError),
 }
 
-impl From<LayoutMismatchError> for FromStorageValueError {
+impl From<LayoutMismatchError> for FromStorageValueErrorKind {
     #[inline]
     fn from(error: LayoutMismatchError) -> Self {
         Self::LayoutMismatch(error)
     }
 }
 
-impl From<LayoutError> for FromStorageValueError {
+impl From<LayoutError> for FromStorageValueErrorKind {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl Display for FromStorageValueError {
+impl Display for FromStorageValueErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LayoutMismatch(error) => Display::fmt(error, f),
@@ -448,7 +508,7 @@ impl Display for FromStorageValueError {
     }
 }
 
-impl Error for FromStorageValueError {
+impl Error for FromStorageValueErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::LayoutMismatch(error) => Some(error),
@@ -458,35 +518,97 @@ impl Error for FromStorageValueError {
 }
 
 #[derive(Debug, Clone)]
-pub enum FromDescriptorsValueError<T> {
+#[non_exhaustive]
+pub struct FromDescriptorsValueError<T, E>
+where
+    T: ?Sized,
+{
+    pub reason: FromDescriptorsValueErrorKind<E>,
+    pub value: T,
+}
+
+impl<T, E> FromDescriptorsValueError<T, E> {
+    #[inline]
+    pub(crate) fn new(value: T, reason: FromDescriptorsValueErrorKind<E>) -> Self {
+        Self { reason, value }
+    }
+
+    #[inline]
+    pub fn map_value<U, F>(self, f: F) -> FromDescriptorsValueError<U, E>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let Self { reason, value } = self;
+        FromDescriptorsValueError::new(f(value), reason)
+    }
+}
+
+impl<T, E> Display for FromDescriptorsValueError<T, E>
+where
+    T: Display + ?Sized,
+    E: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, value } = self;
+        write!(f, "failed to create erased SoA from {value}: {reason}")
+    }
+}
+
+impl<T, E> Error for FromDescriptorsValueError<T, E>
+where
+    T: Debug + Display + ?Sized,
+    E: Error,
+{
+    fn cause(&self) -> Option<&dyn Error> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[inline]
+pub(super) fn check_from_descriptors_value<F, R, T, E>(
+    f: F,
+    value: T,
+) -> Result<(T, R), FromDescriptorsValueError<T, E>>
+where
+    F: FnOnce() -> Result<R, FromDescriptorsValueErrorKind<E>>,
+{
+    match f() {
+        Ok(ok) => Ok((value, ok)),
+        Err(reason) => Err(FromDescriptorsValueError::new(value, reason)),
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromDescriptorsValueErrorKind<T> {
     LenMismatch(LenMismatchError),
     LayoutMismatch(LayoutMismatchError),
     InvalidLayout(LayoutError),
     FromLayout(T),
 }
 
-impl<T> From<LenMismatchError> for FromDescriptorsValueError<T> {
+impl<T> From<LenMismatchError> for FromDescriptorsValueErrorKind<T> {
     #[inline]
     fn from(error: LenMismatchError) -> Self {
         Self::LenMismatch(error)
     }
 }
 
-impl<T> From<LayoutMismatchError> for FromDescriptorsValueError<T> {
+impl<T> From<LayoutMismatchError> for FromDescriptorsValueErrorKind<T> {
     #[inline]
     fn from(error: LayoutMismatchError) -> Self {
         Self::LayoutMismatch(error)
     }
 }
 
-impl<T> From<LayoutError> for FromDescriptorsValueError<T> {
+impl<T> From<LayoutError> for FromDescriptorsValueErrorKind<T> {
     #[inline]
     fn from(error: LayoutError) -> Self {
         Self::InvalidLayout(error)
     }
 }
 
-impl<T> Display for FromDescriptorsValueError<T>
+impl<T> Display for FromDescriptorsValueErrorKind<T>
 where
     T: Display,
 {
@@ -500,7 +622,7 @@ where
     }
 }
 
-impl<T> Error for FromDescriptorsValueError<T>
+impl<T> Error for FromDescriptorsValueErrorKind<T>
 where
     T: Error,
 {
@@ -524,19 +646,78 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum FromValueError<T> {
+#[non_exhaustive]
+pub struct FromValueError<T, E>
+where
+    T: ?Sized,
+{
+    pub reason: FromValueErrorKind<E>,
+    pub value: T,
+}
+
+impl<T, E> FromValueError<T, E> {
+    #[inline]
+    pub(crate) fn new(value: T, reason: FromValueErrorKind<E>) -> Self {
+        Self { reason, value }
+    }
+
+    #[inline]
+    pub fn map_value<U, F>(self, f: F) -> FromValueError<U, E>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let Self { reason, value } = self;
+        FromValueError::new(f(value), reason)
+    }
+}
+
+impl<T, E> Display for FromValueError<T, E>
+where
+    T: Display + ?Sized,
+    E: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, value } = self;
+        write!(f, "failed to create erased SoA from {value}: {reason}")
+    }
+}
+
+impl<T, E> Error for FromValueError<T, E>
+where
+    T: Debug + Display + ?Sized,
+    E: Error,
+{
+    fn cause(&self) -> Option<&dyn Error> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[inline]
+pub(super) fn check_from_value<F, R, T, E>(f: F, value: T) -> Result<(T, R), FromValueError<T, E>>
+where
+    F: FnOnce() -> Result<R, FromValueErrorKind<E>>,
+{
+    match f() {
+        Ok(ok) => Ok((value, ok)),
+        Err(reason) => Err(FromValueError::new(value, reason)),
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromValueErrorKind<T> {
     InvalidLayout(LayoutError),
     FromLayout(T),
 }
 
-impl<T> From<LayoutError> for FromValueError<T> {
+impl<T> From<LayoutError> for FromValueErrorKind<T> {
     #[inline]
     fn from(value: LayoutError) -> Self {
         Self::InvalidLayout(value)
     }
 }
 
-impl<T> Display for FromValueError<T>
+impl<T> Display for FromValueErrorKind<T>
 where
     T: Display,
 {
@@ -548,7 +729,7 @@ where
     }
 }
 
-impl<T> Error for FromValueError<T>
+impl<T> Error for FromValueErrorKind<T>
 where
     T: Error,
 {

@@ -16,10 +16,11 @@ use crate::{
     assert::check_downcast,
     data::{Erased, ErasedMutRef, ErasedRef, error::FromLayoutDataError},
     error::{
-        DowncastError, FromDescriptorsValueError, FromFieldsDescriptorsError,
-        FromStorageFieldsDescriptorsError, FromStorageValueError, FromValueError,
-        InsufficientAlignError, IterOrFieldLenMismatchError, LenMismatchError, check_layout,
-        check_len, check_sufficient_align,
+        DowncastError, FromDescriptorsValueError, FromDescriptorsValueErrorKind,
+        FromFieldsDescriptorsError, FromStorageFieldsDescriptorsError, FromStorageValueError,
+        FromValueError, FromValueErrorKind, InsufficientAlignError, IterOrFieldLenMismatchError,
+        LenMismatchError, check_from_descriptors_value, check_from_storage_value, check_from_value,
+        check_layout, check_len, check_sufficient_align,
     },
     layout::bytes_to_items,
     ptr::slice::SliceItemPtrs,
@@ -309,19 +310,21 @@ where
         mut storage: T,
         context: &V::Context,
         value: W,
-    ) -> Result<Self, FromStorageValueError>
+    ) -> Result<Self, FromStorageValueError<W>>
     where
         V: AllocSoa + SoaWrite<W> + ?Sized,
     {
+        let check = || {
+            let expected_layout = context.buffer_layout(1)?;
+            check_layout(storage.layout(), expected_layout).map_err(From::from)
+        };
+        let (value, ()) = check_from_storage_value(check, value)?;
+
         let descriptors = context
             .field_descriptors()
             .into_iter()
             .map(|desc| *desc.as_ref())
             .collect();
-
-        let expected_layout = context.buffer_layout(1)?;
-        let layout = storage.layout();
-        check_layout(layout, expected_layout)?;
 
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
@@ -343,29 +346,33 @@ where
         descriptors: D,
         context: &V::Context,
         value: W,
-    ) -> Result<Self, FromDescriptorsValueError<T::Error>>
+    ) -> Result<Self, FromDescriptorsValueError<W, T::Error>>
     where
         V: AllocSoa + SoaWrite<W> + ?Sized,
     {
-        let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
-        for (field_index, item) in offsets
-            .by_ref()
-            .zip_longest(descriptors.field_descriptors())
-            .enumerate()
-        {
-            let Both(offset, desc) = item else {
-                let count = field_index + offsets.count();
-                let error = unsafe { LenMismatchError::new_unchecked(count, field_index) };
-                return Err(error.into());
-            };
-            check_layout(offset?.desc.layout(), desc.as_ref().layout())?;
-        }
+        let f = || {
+            let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
+            for (field_index, item) in offsets
+                .by_ref()
+                .zip_longest(descriptors.field_descriptors())
+                .enumerate()
+            {
+                let Both(offset, desc) = item else {
+                    let count = field_index + offsets.count();
+                    let error = unsafe { LenMismatchError::new_unchecked(count, field_index) };
+                    return Err(error.into());
+                };
+                check_layout(offset?.desc.layout(), desc.as_ref().layout())?;
+            }
 
-        let expected_layout = offsets.into_layout();
-        let layout = buffer_layout(descriptors.field_descriptors(), 1)?;
-        check_layout(layout, expected_layout)?;
+            let expected_layout = offsets.into_layout();
+            let layout = buffer_layout(descriptors.field_descriptors(), 1)?;
+            check_layout(layout, expected_layout)?;
 
-        let mut storage = T::from_layout(layout).map_err(FromDescriptorsValueError::FromLayout)?;
+            T::from_layout(layout).map_err(FromDescriptorsValueErrorKind::FromLayout)
+        };
+        let (value, mut storage) = check_from_descriptors_value(f, value)?;
+
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
             context.write(dst, value);
@@ -382,18 +389,24 @@ where
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
-    pub fn try_from<V, W>(context: &V::Context, value: W) -> Result<Self, FromValueError<T::Error>>
+    pub fn try_from<V, W>(
+        context: &V::Context,
+        value: W,
+    ) -> Result<Self, FromValueError<W, T::Error>>
     where
         V: AllocSoa + SoaWrite<W> + ?Sized,
     {
+        let f = || {
+            let layout = context.buffer_layout(1)?;
+            T::from_layout(layout).map_err(FromValueErrorKind::FromLayout)
+        };
+        let (value, mut storage) = check_from_value(f, value)?;
+
         let descriptors = context
             .field_descriptors()
             .into_iter()
             .map(|desc| *desc.as_ref())
             .collect();
-
-        let layout = context.buffer_layout(1)?;
-        let mut storage = T::from_layout(layout).map_err(FromValueError::FromLayout)?;
 
         unsafe {
             let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);

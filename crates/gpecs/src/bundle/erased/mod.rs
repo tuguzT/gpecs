@@ -8,7 +8,13 @@ pub use self::{
     refs::{ErasedBundleRefs, ErasedBundleRefsIter},
     slice_ptrs::{ErasedBundleSlicePtrs, ErasedBundleSlicePtrsIter},
     slices::{ErasedBundleSlices, ErasedBundleSlicesIter},
+    value::{
+        ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBorrowedBundleIntoIter, ErasedBundle,
+        ErasedBundleIntoIter,
+    },
 };
+
+pub mod error;
 
 pub(crate) mod utils;
 
@@ -21,3 +27,4 @@ mod ptrs;
 mod refs;
 mod slice_ptrs;
 mod slices;
+mod value;

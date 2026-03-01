@@ -891,6 +891,9 @@ impl ArchetypeRegistry {
             unreachable!("{entity} should exist in {archetype_id}")
         };
         fields
+            .into_iter()
+            .map(|component| component.expect("component should be allocated successfully"))
+            .collect()
     }
 
     #[inline]

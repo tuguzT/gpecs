@@ -458,6 +458,72 @@ impl Error for FromStorageValueError {
 }
 
 #[derive(Debug, Clone)]
+pub enum FromDescriptorsValueError<T> {
+    LenMismatch(LenMismatchError),
+    LayoutMismatch(LayoutMismatchError),
+    InvalidLayout(LayoutError),
+    FromLayout(T),
+}
+
+impl<T> From<LenMismatchError> for FromDescriptorsValueError<T> {
+    #[inline]
+    fn from(error: LenMismatchError) -> Self {
+        Self::LenMismatch(error)
+    }
+}
+
+impl<T> From<LayoutMismatchError> for FromDescriptorsValueError<T> {
+    #[inline]
+    fn from(error: LayoutMismatchError) -> Self {
+        Self::LayoutMismatch(error)
+    }
+}
+
+impl<T> From<LayoutError> for FromDescriptorsValueError<T> {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl<T> Display for FromDescriptorsValueError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::LayoutMismatch(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl<T> Error for FromDescriptorsValueError<T>
+where
+    T: Error,
+{
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::LenMismatch(error) => Some(error),
+            Self::LayoutMismatch(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
+        }
+    }
+
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::LenMismatch(error) => Some(error),
+            Self::LayoutMismatch(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum FromValueError<T> {
     InvalidLayout(LayoutError),
     FromLayout(T),
@@ -490,6 +556,13 @@ where
         match self {
             Self::InvalidLayout(error) => Some(error),
             Self::FromLayout(error) => Some(error),
+        }
+    }
+
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidLayout(error) => Some(error),
+            Self::FromLayout(_) => None,
         }
     }
 }

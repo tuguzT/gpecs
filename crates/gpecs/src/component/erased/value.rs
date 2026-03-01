@@ -51,7 +51,7 @@ impl ErasedComponent {
             match reason {
                 FromLayout(error) => FromComponentError::new(value, error.into()),
                 InsufficientAlign(error) => {
-                    panic!("alignment of bytes should be sufficient for any component: {error:?}")
+                    unreachable!("byte alignment should be sufficient for any component: {error:?}")
                 }
             }
         })?;

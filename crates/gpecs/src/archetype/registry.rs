@@ -27,9 +27,9 @@ use crate::{
             IncompatibleArchetypeError, InsertBundleError, InsertBundleExactError,
             MissingComponentError, RemoveBundleExactError,
         },
-        storage::ArchetypeStorage,
+        storage::{ArchetypeStorage, ErasedStorageMeta},
     },
-    bundle::{Bundle, BundleRefs, BundleRefsMut, erased::utils::into_erased_fields},
+    bundle::{Bundle, BundleRefs, BundleRefsMut, erased::ErasedBundle},
     component::{
         erased::ErasedComponent,
         registry::{ComponentId, ComponentRegistry},
@@ -622,14 +622,19 @@ impl ArchetypeRegistry {
 
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
-        let fields =
-            unsafe { into_erased_fields::<B, _>(components, B::CONTEXT, component_ids, value) };
-        fields.into_iter().for_each(|field| {
-            let component_id = field.component_id();
-            if old_fields.replace(field).is_some() {
-                unreachable!("duplicated {component_id}")
-            }
-        });
+
+        let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
+            .map_err(|error| error.reason)
+            .expect("bundle compatibility should have been already checked");
+        fields
+            .into_iter()
+            .map(|component| component.expect("component should be allocated successfully"))
+            .for_each(|field| {
+                let component_id = field.component_id();
+                if old_fields.replace(field).is_some() {
+                    unreachable!("duplicated {component_id}")
+                }
+            });
 
         let new_fields = old_fields;
         let archetype_id = Some(new_archetype);
@@ -688,10 +693,12 @@ impl ArchetypeRegistry {
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
 
-        let fields =
-            unsafe { into_erased_fields::<B, _>(components, B::CONTEXT, component_ids, value) };
+        let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
+            .map_err(|error| error.reason)
+            .expect("bundle compatibility should have been already checked");
         fields
             .into_iter()
+            .map(|component| component.expect("component should be allocated successfully"))
             .map(|field| old_fields.replace(field))
             .for_each(drop);
 

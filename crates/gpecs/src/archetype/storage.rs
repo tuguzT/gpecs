@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
@@ -23,7 +24,6 @@ use crate::{
         erased::{
             ErasedBorrowedBundle, ErasedBundle, ErasedBundleMutRefs, ErasedBundleMutSlices,
             ErasedBundleRefs, ErasedBundleSlices,
-            utils::{into_erased_fields, reorder_fields},
         },
     },
     component::{
@@ -409,7 +409,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn insert_bundle<B>(
         &mut self,
-        components: &ComponentRegistry,
+        components: &mut ComponentRegistry,
         entity: Entity,
         value: B,
     ) -> Result<Option<B>, IncompatibleBundleValueError<B>>
@@ -420,12 +420,13 @@ impl ArchetypeStorage {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
-        let bundle_component_ids = B::get_components(components)
+        let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
+            .map_err(|error| error.reason)
+            .expect("bundle compatibility should have been already checked");
+        let fields = fields
             .into_iter()
-            .map(|component_id| component_id.expect("all of components should be registered"));
-        let fields = unsafe {
-            into_erased_fields::<B, _>(components, B::CONTEXT, bundle_component_ids, value)
-        };
+            .map(|component| component.expect("component should be allocated successfully"))
+            .collect();
 
         let fields = self
             .insert_erased(entity, fields)
@@ -676,3 +677,24 @@ impl ExactSizeIterator for ComponentIds<'_> {
 }
 
 impl FusedIterator for ComponentIds<'_> {}
+
+#[inline]
+#[track_caller]
+pub fn reorder_fields<I, F>(mut fields: IndexSet<F>, order: I) -> impl Iterator<Item = F>
+where
+    I: IntoIterator<Item = ComponentId>,
+    F: Borrow<ComponentId>,
+{
+    #[cold]
+    #[track_caller]
+    #[inline(never)]
+    fn remove_field_fail(component_id: ComponentId) -> ! {
+        panic!("field of {component_id} should be present")
+    }
+
+    order.into_iter().map(move |id| {
+        fields
+            .swap_take(&id)
+            .unwrap_or_else(|| remove_field_fail(id))
+    })
+}

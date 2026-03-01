@@ -15,7 +15,7 @@ use crate::{
             IncompatibleArchetypeExactError, MissingComponentError, TooFewComponentsError,
         },
     },
-    bundle::{Bundle, erased::utils::get_component_info_fail},
+    bundle::Bundle,
     component::{
         Component,
         registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
@@ -120,9 +120,9 @@ where
             B::register_components(components)
                 .into_iter()
                 .map(|component_id| {
-                    let component_info = components
-                        .get_component_info(component_id)
-                        .unwrap_or_else(|| get_component_info_fail(component_id));
+                    let Some(component_info) = components.get_component_info(component_id) else {
+                        unreachable!("info of {component_id} should be present")
+                    };
                     let meta = Meta::from_component_info(component_info);
                     (component_id, meta)
                 }),

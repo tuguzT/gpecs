@@ -16,7 +16,7 @@ pub use self::{
 
 pub mod error;
 
-pub(crate) mod utils;
+// TODO: add `Soa` trait implementation for all the types of this module
 
 mod mut_ptrs;
 mod mut_refs;

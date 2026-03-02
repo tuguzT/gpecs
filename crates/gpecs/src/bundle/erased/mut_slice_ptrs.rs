@@ -37,6 +37,8 @@ pub struct ErasedBundleMutSlicePtrs<'a, Meta> {
     inner: Inner<'a, Meta>,
 }
 
+// TODO: drop_in_place method
+
 impl<'a, Meta> ErasedBundleMutSlicePtrs<'a, Meta> {
     #[inline]
     pub unsafe fn from_inner(inner: Inner<'a, Meta>) -> Self {

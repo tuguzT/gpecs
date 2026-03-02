@@ -416,6 +416,7 @@ impl ArchetypeStorage {
             return Err(IncompatibleBundleValueError { value, reason });
         }
 
+        // TODO: optimize by reading/writing from/into raw pointers
         let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
             .expect("bundle compatibility should have been already checked");
@@ -447,6 +448,8 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         self.check_exact_compatibility_of::<B>(components)?;
+
+        // TODO: optimize by reading from raw pointers
         let Some(bundle) = self.remove(entity) else {
             return Ok(None);
         };
@@ -459,6 +462,7 @@ impl ArchetypeStorage {
 
     #[inline]
     pub fn destroy_in_place(&mut self, entity: Entity) -> bool {
+        // TODO: optimize by dropping raw pointers in place
         self.remove(entity).is_some()
     }
 

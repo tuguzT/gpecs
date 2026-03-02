@@ -31,6 +31,8 @@ pub struct ErasedBundleMutPtrs<'a, Meta> {
     inner: Inner<'a, Meta>,
 }
 
+// TODO: drop_in_place method
+
 impl<'a, Meta> ErasedBundleMutPtrs<'a, Meta> {
     #[inline]
     pub unsafe fn from_inner(inner: Inner<'a, Meta>) -> Self {

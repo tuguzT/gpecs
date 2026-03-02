@@ -18,7 +18,7 @@ use crate::{
     },
     component::{
         erased::{ErasedComponentMutSlice, ErasedComponentSlice},
-        registry::ComponentRegistry,
+        registry::{ComponentId, ComponentRegistry},
     },
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
@@ -134,6 +134,18 @@ where
 
         let inner = inner.iter_mut();
         unsafe { ErasedBundleMutSlicesIter::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentSlice<'_>> {
+        let index = self.archetype().get_index_of(component_id)?;
+        self.iter().nth(index)
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, component_id: ComponentId) -> Option<ErasedComponentMutSlice<'_>> {
+        let index = self.archetype().get_index_of(component_id)?;
+        self.iter_mut().nth(index)
     }
 }
 

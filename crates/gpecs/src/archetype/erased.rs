@@ -165,6 +165,26 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
+    pub fn get(&self, component_id: ComponentId) -> Option<&Meta> {
+        let Self { components } = self;
+        components.get(&component_id)
+    }
+
+    #[inline]
+    pub fn get_index_of(&self, component_id: ComponentId) -> Option<usize> {
+        let Self { components } = self;
+        components.get_index_of(&component_id)
+    }
+
+    #[inline]
+    pub fn get_by_index(&self, index: usize) -> Option<(ComponentId, &Meta)> {
+        let Self { components } = self;
+
+        let (&component_id, meta) = components.get_index(index)?;
+        Some((component_id, meta))
+    }
+
+    #[inline]
     pub fn check_compatibility<M>(
         &self,
         other: &ErasedArchetype<M>,

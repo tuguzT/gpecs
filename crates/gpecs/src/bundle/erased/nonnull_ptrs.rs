@@ -13,7 +13,10 @@ use crate::{
         error::IncompatibleArchetypeError,
     },
     bundle::{Bundle, BundleNonNullPtrs, erased::ErasedBundleMutPtrs},
-    component::{erased::ErasedComponentNonNullPtr, registry::ComponentRegistry},
+    component::{
+        erased::ErasedComponentNonNullPtr,
+        registry::{ComponentId, ComponentRegistry},
+    },
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         traits::RawSoaContext,
@@ -105,6 +108,12 @@ where
 
         let inner = inner.iter();
         unsafe { ErasedBundleNonNullPtrsIter::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentNonNullPtr> {
+        let index = self.archetype().get_index_of(component_id)?;
+        self.iter().nth(index)
     }
 }
 

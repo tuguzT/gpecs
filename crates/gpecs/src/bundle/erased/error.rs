@@ -1,11 +1,14 @@
 use std::{
+    alloc::LayoutError,
     error::Error,
     fmt::{self, Debug, Display},
 };
 
 use gpecs_soa_erased::storage::AllocError;
 
-use crate::archetype::error::{DuplicateComponentError, IncompatibleArchetypeError};
+use crate::archetype::error::{
+    DuplicateComponentError, IncompatibleArchetypeError, IncompatibleArchetypeExactError,
+};
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -74,6 +77,145 @@ impl Error for FromBundleErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::DuplicateComponent(error) => Some(error),
+            Self::Alloc(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromComponentsError {
+    DuplicateComponent(DuplicateComponentError),
+    InvalidLayout(LayoutError),
+    Alloc(AllocError),
+}
+
+impl From<DuplicateComponentError> for FromComponentsError {
+    #[inline]
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
+    }
+}
+
+impl From<LayoutError> for FromComponentsError {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl From<AllocError> for FromComponentsError {
+    #[inline]
+    fn from(error: AllocError) -> Self {
+        Self::Alloc(error)
+    }
+}
+
+impl Display for FromComponentsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::Alloc(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for FromComponentsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DuplicateComponent(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::Alloc(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ShuffleError<T, A> {
+    pub reason: ShuffleErrorKind,
+    pub bundle: T,
+    pub archetype: A,
+}
+
+impl<T, A> From<ShuffleError<T, A>> for ShuffleErrorKind {
+    #[inline]
+    fn from(error: ShuffleError<T, A>) -> Self {
+        let ShuffleError { reason, .. } = error;
+        reason
+    }
+}
+
+impl<T, A> Display for ShuffleError<T, A>
+where
+    T: Display,
+    A: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            reason,
+            bundle,
+            archetype,
+        } = self;
+
+        write!(f, "failed to shuffle {bundle} by {archetype}: {reason}")
+    }
+}
+
+impl<T, A> Error for ShuffleError<T, A>
+where
+    T: Debug + Display,
+    A: Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ShuffleErrorKind {
+    IncompatibleArchetype(IncompatibleArchetypeExactError),
+    InvalidLayout(LayoutError),
+    Alloc(AllocError),
+}
+
+impl From<IncompatibleArchetypeExactError> for ShuffleErrorKind {
+    #[inline]
+    fn from(error: IncompatibleArchetypeExactError) -> Self {
+        Self::IncompatibleArchetype(error)
+    }
+}
+
+impl From<LayoutError> for ShuffleErrorKind {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl From<AllocError> for ShuffleErrorKind {
+    #[inline]
+    fn from(error: AllocError) -> Self {
+        Self::Alloc(error)
+    }
+}
+
+impl Display for ShuffleErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IncompatibleArchetype(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::Alloc(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for ShuffleErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::IncompatibleArchetype(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
             Self::Alloc(error) => Some(error),
         }
     }

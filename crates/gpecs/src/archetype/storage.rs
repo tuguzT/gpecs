@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     fmt::{self, Debug},
     iter::FusedIterator,
     mem::MaybeUninit,
@@ -23,7 +22,7 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
             ErasedBorrowedBundle, ErasedBundle, ErasedBundleMutRefs, ErasedBundleMutSlices,
-            ErasedBundleRefs, ErasedBundleSlices,
+            ErasedBundleRefs, ErasedBundleSlices, ShuffledBundle,
         },
     },
     component::{
@@ -74,6 +73,16 @@ impl From<NoEpochEntity> for Entity {
 pub struct ErasedStorageMeta {
     descriptor: FieldDescriptor,
     drop_fn: Option<DropFn>,
+}
+
+impl From<&ErasedComponent> for ErasedStorageMeta {
+    #[inline]
+    fn from(component: &ErasedComponent) -> Self {
+        Self {
+            descriptor: FieldDescriptor::new(component.as_field().layout()),
+            drop_fn: component.drop_fn(),
+        }
+    }
 }
 
 impl AsRef<FieldDescriptor> for ErasedStorageMeta {
@@ -500,16 +509,15 @@ impl ArchetypeStorage {
 
         let Self { sparse_set } = self;
 
-        // TODO: add new method for erased bundle to reorder fields with provided input archetype
-        // if order of components is the same, write them without any reordering
-        let value: ErasedReadBundleRaw = {
-            let descriptors = sparse_set.context().as_inner();
-            let order = descriptors.iter().map(From::from);
-            let fields = reorder_fields(fields, order).map(ErasedComponent::into_field);
-            ErasedSoa::try_from_fields_descriptors(fields, descriptors)
-                .expect("all the fields should be valid")
+        let value = ErasedBundle::from_components(fields)
+            .expect("set of erased components was expected to be unique");
+        let value = match value
+            .shuffle(sparse_set.context().as_inner())
+            .expect("exact archetype compatibility should have been already checked")
+        {
+            ShuffledBundle::Original(bundle) => bundle.into_inner().into_parts().0,
+            ShuffledBundle::Other(bundle) => bundle.into_inner().into_parts().0,
         };
-        let (value, _) = value.into_parts();
         let Some(inner) = sparse_set.insert::<ErasedReadBundleRaw, _>(entity.into(), value) else {
             return Ok(None);
         };
@@ -660,24 +668,3 @@ impl ExactSizeIterator for ComponentIds<'_> {
 }
 
 impl FusedIterator for ComponentIds<'_> {}
-
-#[inline]
-#[track_caller]
-pub fn reorder_fields<I, F>(mut fields: IndexSet<F>, order: I) -> impl Iterator<Item = F>
-where
-    I: IntoIterator<Item = ComponentId>,
-    F: Borrow<ComponentId>,
-{
-    #[cold]
-    #[track_caller]
-    #[inline(never)]
-    fn remove_field_fail(component_id: ComponentId) -> ! {
-        panic!("field of {component_id} should be present")
-    }
-
-    order.into_iter().map(move |id| {
-        fields
-            .swap_take(&id)
-            .unwrap_or_else(|| remove_field_fail(id))
-    })
-}

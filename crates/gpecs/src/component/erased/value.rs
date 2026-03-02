@@ -139,6 +139,12 @@ impl ErasedComponent {
     }
 
     #[inline]
+    pub fn drop_fn(&self) -> Option<DropFn> {
+        let Self { drop_fn, .. } = *self;
+        drop_fn
+    }
+
+    #[inline]
     pub fn as_erased_component_ptr(&self) -> ErasedComponentPtr {
         let Self {
             ref field,

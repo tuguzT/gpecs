@@ -10,7 +10,7 @@ pub use self::{
     slices::{ErasedBundleSlices, ErasedBundleSlicesIter},
     value::{
         ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBorrowedBundleIntoIter, ErasedBundle,
-        ErasedBundleIntoIter,
+        ErasedBundleIntoIter, ShuffledBundle,
     },
 };
 

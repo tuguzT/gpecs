@@ -15,7 +15,10 @@ use crate::{
         Bundle, BundlePtrs,
         erased::{ErasedBundleMutPtrs, ErasedBundleRefs},
     },
-    component::{erased::ErasedComponentPtr, registry::ComponentRegistry},
+    component::{
+        erased::ErasedComponentPtr,
+        registry::{ComponentId, ComponentRegistry},
+    },
     soa::field::{FieldDescriptor, FieldDescriptors},
 };
 
@@ -119,6 +122,12 @@ where
 
         let inner = inner.iter();
         ErasedBundlePtrsIter::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentPtr> {
+        let index = self.archetype().get_index_of(component_id)?;
+        self.iter().nth(index)
     }
 }
 

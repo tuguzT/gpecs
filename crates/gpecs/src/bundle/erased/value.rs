@@ -11,22 +11,26 @@ use gpecs_soa_erased::{
     ptr::slice::CoreSliceItemPtrs,
     storage::{AllocError, BoxedAlignedUninitStorage},
 };
-use itertools::zip_eq;
+use itertools::{equal, zip_eq};
 
 use crate::{
-    archetype::erased::{ErasedArchetype, FromComponentInfo},
+    archetype::{
+        collect::try_collect_components,
+        erased::{ErasedArchetype, FromComponentInfo},
+    },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
         erased::{
             ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
             ErasedBundleRefs, ErasedBundleRefsIter,
-            error::{DowncastError, FromBundleError},
+            error::{DowncastError, FromBundleError, FromComponentsError, ShuffleError},
         },
     },
     component::{
         erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef},
         registry::{ComponentId, ComponentRegistry, DropFn},
     },
+    hash::IndexSet,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         traits::ReadSoaContext,
@@ -34,10 +38,11 @@ use crate::{
 };
 
 pub trait ErasedArchetypeKind:
-    for<'a> FieldDescriptors<'a, Output = &'a ErasedArchetype<Self::Meta>>
-    + IntoIterator<
+    private::Sealed
+    + for<'a> FieldDescriptors<'a, Output = &'a ErasedArchetype<Self::Meta>>
+    + for<'a> IntoIterator<
         Item: AsRef<FieldDescriptor>,
-        IntoIter: for<'a> FieldDescriptors<
+        IntoIter: FieldDescriptors<
             'a,
             Output: IntoIterator<
                 Item: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + Into<ComponentId>,
@@ -60,6 +65,15 @@ where
     Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
 {
     type Meta = Meta;
+}
+
+mod private {
+    use super::ErasedArchetype;
+
+    pub trait Sealed {}
+
+    impl<Meta> Sealed for ErasedArchetype<Meta> {}
+    impl<Meta> Sealed for &ErasedArchetype<Meta> {}
 }
 
 pub type ErasedBorrowedBundle<'a, Meta> = ErasedBundle<Meta, &'a ErasedArchetype<Meta>>;
@@ -109,6 +123,42 @@ where
     }
 }
 
+impl<Meta> ErasedBundle<Meta>
+where
+    Meta: AsRef<FieldDescriptor>
+        + AsRef<Option<DropFn>>
+        + for<'a> From<&'a ErasedComponent>
+        + 'static,
+{
+    #[inline]
+    pub fn from_components<I>(components: I) -> Result<Self, FromComponentsError>
+    where
+        I: IntoIterator<Item = ErasedComponent>,
+    {
+        let components =
+            try_collect_components(components, IndexSet::insert, ErasedComponent::component_id)?;
+
+        let iter = components
+            .iter()
+            .map(|component| (component.component_id(), Meta::from(component)));
+        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(iter) };
+
+        let fields = components.into_iter().map(ErasedComponent::into_field);
+        let inner = Inner::try_from_fields_descriptors(fields, archetype).map_err(|error| {
+            use gpecs_soa_erased::error::FromFieldsDescriptorsError::{FromLayout, InvalidLayout};
+
+            match error {
+                InvalidLayout(error) => FromComponentsError::from(error),
+                FromLayout(error) => FromComponentsError::from(error),
+                _ => unreachable!("failed to create erased bundle from components: {error}"),
+            }
+        })?;
+
+        let me = unsafe { Self::from_inner(inner) };
+        Ok(me)
+    }
+}
+
 impl<Meta, Archetype> ErasedBundle<Meta, Archetype>
 where
     Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
@@ -124,18 +174,13 @@ where
     where
         B: Bundle,
     {
-        let inner = self.into_inner();
-        let ptrs = unsafe { ErasedBundlePtrs::from_inner(inner.as_ptrs()) };
-
-        let src = match ptrs.downcast::<B>(registry) {
+        let src = match self.as_ptrs().downcast::<B>(registry) {
             Ok(src) => src,
-            Err(reason) => {
-                let value = unsafe { Self::from_inner(inner) };
-                return Err(DowncastError::new(value, reason));
-            }
+            Err(reason) => return Err(DowncastError::new(self, reason)),
         };
 
         let bundle = unsafe { B::CONTEXT.read(src) };
+        let _ = self.into_inner();
         Ok(bundle)
     }
 
@@ -241,6 +286,87 @@ where
     pub fn into_inner(self) -> Inner<Archetype> {
         let me = ManuallyDrop::new(self);
         unsafe { ptr::read(&raw const me.inner) }
+    }
+}
+
+#[derive(Debug)]
+pub enum ShuffledBundle<Meta, Original, Other>
+where
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
+    Original: ErasedArchetypeKind<Meta = Meta>,
+    Other: ErasedArchetypeKind<Meta = Meta>,
+{
+    Original(ErasedBundle<Meta, Original>),
+    Other(ErasedBundle<Meta, Other>),
+}
+
+impl<Meta, Original> ErasedBundle<Meta, Original>
+where
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
+    Original: ErasedArchetypeKind<Meta = Meta>,
+{
+    #[inline]
+    pub fn shuffle<Other>(
+        self,
+        archetype: Other,
+    ) -> Result<ShuffledBundle<Meta, Original, Other>, ShuffleError<Self, Other>>
+    where
+        Other: ErasedArchetypeKind<Meta = Meta>,
+    {
+        let this = self.archetype();
+        let other = archetype.field_descriptors();
+        if let Err(error) = this.check_exact_compatibility(other) {
+            let error = ShuffleError {
+                bundle: self,
+                archetype,
+                reason: error.into(),
+            };
+            return Err(error);
+        }
+
+        if equal(
+            this.iter().map(ComponentId::from),
+            other.iter().map(ComponentId::from),
+        ) {
+            let shuffled = ShuffledBundle::Original(self);
+            return Ok(shuffled);
+        }
+
+        let refs = self.as_refs();
+        let fields = other.iter().map(|component| {
+            let component_id = component.into();
+            refs.get(component_id).expect("component should be present")
+        });
+        let result = Inner::try_from_fields_descriptors(fields, other);
+
+        let result = result.map_err(|error| {
+            use gpecs_soa_erased::error::FromFieldsDescriptorsError::{FromLayout, InvalidLayout};
+
+            match error {
+                FromLayout(error) => error.into(),
+                InvalidLayout(error) => error.into(),
+                _ => unreachable!("failed to shuffle bundle: {error}"),
+            }
+        });
+        let inner = match result {
+            Ok(inner) => inner,
+            Err(reason) => {
+                let error = ShuffleError {
+                    bundle: self,
+                    archetype,
+                    reason,
+                };
+                return Err(error);
+            }
+        };
+        let _ = self.into_inner();
+
+        let (storage, _) = inner.into_parts();
+        let inner = unsafe { ErasedSoa::from_parts(storage, archetype) };
+        let other = unsafe { ErasedBundle::from_inner(inner) };
+
+        let shuffled = ShuffledBundle::Other(other);
+        Ok(shuffled)
     }
 }
 

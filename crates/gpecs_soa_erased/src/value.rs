@@ -53,7 +53,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P> {
     #[inline]
-    pub unsafe fn new_unchecked(storage: T, descriptors: D) -> Self {
+    pub unsafe fn from_parts(storage: T, descriptors: D) -> Self {
         Self {
             phantom: PhantomData,
             storage,
@@ -150,7 +150,7 @@ where
             descriptors.field_descriptors(),
         )?;
 
-        let me = unsafe { Self::new_unchecked(storage, descriptors) };
+        let me = unsafe { Self::from_parts(storage, descriptors) };
         Ok(me)
     }
 }
@@ -318,7 +318,7 @@ where
             descriptors.field_descriptors(),
         )?;
 
-        let me = unsafe { Self::new_unchecked(storage, descriptors) };
+        let me = unsafe { Self::from_parts(storage, descriptors) };
         Ok(me)
     }
 }
@@ -338,7 +338,7 @@ where
         E: AsRef<FieldDescriptor>,
     {
         let (storage, descriptors) = storage_from_fields_with_descriptors(fields_with_descriptors)?;
-        let me = unsafe { Self::new_unchecked(storage, descriptors) };
+        let me = unsafe { Self::from_parts(storage, descriptors) };
         Ok(me)
     }
 }
@@ -374,7 +374,7 @@ where
             context.write(dst, value);
         }
 
-        let me = unsafe { Self::new_unchecked(storage, descriptors) };
+        let me = unsafe { Self::from_parts(storage, descriptors) };
         Ok(me)
     }
 }
@@ -421,7 +421,7 @@ where
             context.write(dst, value);
         }
 
-        let me = unsafe { Self::new_unchecked(storage, descriptors) };
+        let me = unsafe { Self::from_parts(storage, descriptors) };
         Ok(me)
     }
 }
@@ -456,7 +456,7 @@ where
             context.write(dst, value);
         }
 
-        let me = unsafe { Self::new_unchecked(storage, descriptors) };
+        let me = unsafe { Self::from_parts(storage, descriptors) };
         Ok(me)
     }
 }

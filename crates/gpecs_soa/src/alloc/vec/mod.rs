@@ -466,7 +466,7 @@ where
 
     pub fn swap_remove_into<'a, F, R>(&'a mut self, index: usize, f: F) -> R
     where
-        F: FnOnce(&'a T::Context, Ptrs<'a, T>) -> R,
+        F: FnOnce(&'a T::Context, MutPtrs<'a, T>) -> R,
     {
         #[cold]
         #[inline(never)]
@@ -485,7 +485,7 @@ where
         let ptrs = buffer.as_mut_ptrs();
         let dst = unsafe { context.ptrs_add_mut(ptrs.clone(), index) };
 
-        let ptrs_into = context.ptrs_cast_const(dst.clone());
+        let ptrs_into = dst.clone();
         let result = f(context, ptrs_into);
 
         unsafe {
@@ -508,12 +508,15 @@ where
     where
         T: SoaRead<'a, R>,
     {
-        self.swap_remove_into(index, |context, src| unsafe { context.read(src) })
+        self.swap_remove_into(index, |context, src| {
+            let src = context.ptrs_cast_const(src);
+            unsafe { context.read(src) }
+        })
     }
 
     pub fn remove_into<'a, F, R>(&'a mut self, index: usize, f: F) -> R
     where
-        F: FnOnce(&'a T::Context, Ptrs<'a, T>) -> R,
+        F: FnOnce(&'a T::Context, MutPtrs<'a, T>) -> R,
     {
         #[cold]
         #[inline(never)]
@@ -532,7 +535,7 @@ where
         let ptrs = buffer.as_mut_ptrs();
         let dst = unsafe { context.ptrs_add_mut(ptrs, index) };
 
-        let ptrs_into = context.ptrs_cast_const(dst.clone());
+        let ptrs_into = dst.clone();
         let result = f(context, ptrs_into);
 
         unsafe {
@@ -555,12 +558,15 @@ where
     where
         T: SoaRead<'a, R>,
     {
-        self.remove_into(index, |context, src| unsafe { context.read(src) })
+        self.remove_into(index, |context, src| {
+            let src = context.ptrs_cast_const(src);
+            unsafe { context.read(src) }
+        })
     }
 
     pub fn pop_into<'a, F, R>(&'a mut self, f: F) -> R
     where
-        F: FnOnce(&'a T::Context, Option<Ptrs<'a, T>>) -> R,
+        F: FnOnce(&'a T::Context, Option<MutPtrs<'a, T>>) -> R,
     {
         let len = self.len();
         if len == 0 {
@@ -569,9 +575,9 @@ where
 
         let Self { buffer, .. } = self;
         let context = buffer.context();
-        let ptrs = context.ptrs_cast_const(buffer.as_mut_ptrs());
+        let ptrs = buffer.as_mut_ptrs();
 
-        let ptrs_into = unsafe { context.ptrs_add(ptrs, len - 1) };
+        let ptrs_into = unsafe { context.ptrs_add_mut(ptrs, len - 1) };
         let result = f(context, Some(ptrs_into));
 
         let new_len = len - 1;
@@ -588,7 +594,11 @@ where
     where
         T: SoaRead<'a, R>,
     {
-        self.pop_into(|context, src| unsafe { context.read(src?).into() })
+        self.pop_into(|context, src| {
+            let src = context.ptrs_cast_const(src?);
+            let value = unsafe { context.read(src) };
+            Some(value)
+        })
     }
 
     pub fn insert_from<'a, F, R>(&'a mut self, index: usize, f: F) -> R

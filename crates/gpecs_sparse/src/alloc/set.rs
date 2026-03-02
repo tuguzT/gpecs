@@ -750,10 +750,9 @@ where
     }
 
     pub fn truncate(&mut self, dense_len: usize, sparse_len: usize) {
-        let drop_in_place = |context: &V::Context, src: Option<Ptrs<'_, V>>| {
+        let drop_in_place = |context: &V::Context, src: Option<MutPtrs<'_, V>>| {
             let Some(value) = src else { return };
-            let value = V::Context::upcast_ptrs(value);
-            let value = context.ptrs_cast_mut(value);
+            let value = V::Context::upcast_mut_ptrs(value);
             unsafe { context.ptrs_drop_in_place(value) }
         };
 
@@ -773,7 +772,7 @@ where
 
     pub fn swap_remove_into<'a, F, R>(&'a mut self, key: K, f: F) -> R
     where
-        F: FnOnce(&'a V::Context, Option<Ptrs<'a, V>>) -> R,
+        F: FnOnce(&'a V::Context, Option<MutPtrs<'a, V>>) -> R,
     {
         let Self { dense, sparse } = self;
 
@@ -818,12 +817,16 @@ where
     where
         V: SoaRead<'a, R>,
     {
-        self.swap_remove_into(key, |context, src| unsafe { context.read(src?) }.into())
+        self.swap_remove_into(key, |context, src| {
+            let src = context.ptrs_cast_const(src?);
+            let value = unsafe { context.read(src) };
+            Some(value)
+        })
     }
 
     pub fn remove_into<'a, F, R>(&'a mut self, key: K, f: F) -> R
     where
-        F: FnOnce(&'a V::Context, Option<Ptrs<'a, V>>) -> R,
+        F: FnOnce(&'a V::Context, Option<MutPtrs<'a, V>>) -> R,
     {
         let Self { dense, sparse } = self;
 
@@ -867,17 +870,21 @@ where
     where
         V: SoaRead<'a, R>,
     {
-        self.remove_into(key, |context, src| unsafe { context.read(src?) }.into())
+        self.remove_into(key, |context, src| {
+            let src = context.ptrs_cast_const(src?);
+            let value = unsafe { context.read(src) };
+            Some(value)
+        })
     }
 
     pub fn pop_into<'a, F, R>(&'a mut self, f: F) -> R
     where
-        F: FnOnce(&'a V::Context, Option<(K, Ptrs<'a, V>)>) -> R,
+        F: FnOnce(&'a V::Context, Option<(K, MutPtrs<'a, V>)>) -> R,
     {
         let Self { dense, sparse } = self;
 
         dense.pop_into(|context, src| {
-            let Some(DensePtrs { key, value }) = src else {
+            let Some(DenseMutPtrs { key, value }) = src else {
                 return f(context, None);
             };
             let key = unsafe { ptr::read(key) };
@@ -898,8 +905,9 @@ where
     {
         self.pop_into(|context, src| {
             let (key, value) = src?;
-            let value = unsafe { context.read(value) };
-            (key, value).into()
+            let src = context.ptrs_cast_const(value);
+            let value = unsafe { context.read(src) };
+            Some((key, value))
         })
     }
 

@@ -350,9 +350,9 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let (entities, fields) = self.erased_components();
-        let components = fields.downcast::<B>(components)?;
-        Ok((entities, components))
+        let (entities, bundles) = self.as_slices();
+        let bundles = bundles.downcast::<B>(components)?;
+        Ok((entities, bundles))
     }
 
     #[inline]
@@ -363,11 +363,9 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.check_compatibility_of::<B>(components)?;
-
-        let (entities, fields) = self.erased_components_mut();
-        let components = fields.downcast::<B>(components)?;
-        Ok((entities, components))
+        let (entities, bundles) = self.as_mut_slices();
+        let bundles = bundles.downcast::<B>(components)?;
+        Ok((entities, bundles))
     }
 
     #[inline]
@@ -379,12 +377,12 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        let Some(fields) = self.get_erased(entity) else {
+        let Some(bundle) = self.get(entity) else {
             return Ok(None);
         };
 
-        let refs = fields.downcast::<B>(components)?;
-        Ok(Some(refs))
+        let bundle = bundle.downcast::<B>(components)?;
+        Ok(Some(bundle))
     }
 
     #[inline]
@@ -396,14 +394,12 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.check_compatibility_of::<B>(components)?;
-
-        let Some(fields) = self.get_erased_mut(entity) else {
+        let Some(bundle) = self.get_mut(entity) else {
             return Ok(None);
         };
 
-        let refs = fields.downcast::<B>(components)?;
-        Ok(Some(refs))
+        let bundle = bundle.downcast::<B>(components)?;
+        Ok(Some(bundle))
     }
 
     #[inline]
@@ -429,7 +425,7 @@ impl ArchetypeStorage {
             .collect();
 
         let fields = self
-            .insert_erased(entity, fields)
+            .insert(entity, fields)
             .expect("bundle compatibility should have been already checked");
         let Some(fields) = fields else {
             return Ok(None);
@@ -451,58 +447,45 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         self.check_exact_compatibility_of::<B>(components)?;
-
-        let Some(fields) = self.remove_erased(entity) else {
+        let Some(bundle) = self.remove(entity) else {
             return Ok(None);
         };
 
-        let value = fields
+        let bundle = bundle
             .downcast(components)
             .expect("exact archetype compatibility should be already checked");
-        Ok(Some(value))
+        Ok(Some(bundle))
     }
 
     #[inline]
     pub fn destroy_in_place(&mut self, entity: Entity) -> bool {
-        let Self { sparse_set } = self;
-
-        let Some(erased_fields) = sparse_set.swap_remove(entity.into()) else {
-            return false;
-        };
-
-        let _ = unsafe { ErasedBundle::from_inner(erased_fields) };
-        true
+        self.remove(entity).is_some()
     }
 
     #[inline]
-    #[track_caller]
-    pub(super) fn get_erased(
-        &self,
-        entity: Entity,
-    ) -> Option<ErasedBundleRefs<'_, '_, ErasedStorageMeta>> {
+    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, ErasedStorageMeta>> {
         let Self { sparse_set } = self;
 
-        let refs = sparse_set.as_view().into_get(entity.into());
-        let refs = unsafe { ErasedBundleRefs::from_inner(refs?) };
-        Some(refs)
+        let bundle = sparse_set.get(entity.into());
+        let bundle = unsafe { ErasedBundleRefs::from_inner(bundle?) };
+        Some(bundle)
     }
 
     #[inline]
-    #[track_caller]
-    pub(super) fn get_erased_mut(
+    pub fn get_mut(
         &mut self,
         entity: Entity,
     ) -> Option<ErasedBundleMutRefs<'_, '_, ErasedStorageMeta>> {
         let Self { sparse_set } = self;
 
-        let refs = sparse_set.as_mut_view().into_get_mut(entity.into());
-        let refs = unsafe { ErasedBundleMutRefs::from_inner(refs?) };
-        Some(refs)
+        let bundle = sparse_set.get_mut(entity.into());
+        let bundle = unsafe { ErasedBundleMutRefs::from_inner(bundle?) };
+        Some(bundle)
     }
 
     #[inline]
     #[track_caller]
-    pub(super) fn insert_erased(
+    pub(super) fn insert(
         &mut self,
         entity: Entity,
         fields: IndexSet<ErasedComponent>,
@@ -532,8 +515,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[track_caller]
-    pub(super) fn remove_erased(
+    pub fn remove(
         &mut self,
         entity: Entity,
     ) -> Option<ErasedBorrowedBundle<'_, ErasedStorageMeta>> {
@@ -545,10 +527,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[track_caller]
-    pub(crate) fn erased_components(
-        &self,
-    ) -> (&[Entity], ErasedBundleSlices<'_, '_, ErasedStorageMeta>) {
+    pub fn as_slices(&self) -> (&[Entity], ErasedBundleSlices<'_, '_, ErasedStorageMeta>) {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_view().into_parts();
@@ -560,8 +539,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[track_caller]
-    pub(crate) fn erased_components_mut(
+    pub fn as_mut_slices(
         &mut self,
     ) -> (&[Entity], ErasedBundleMutSlices<'_, '_, ErasedStorageMeta>) {
         let Self { sparse_set } = self;

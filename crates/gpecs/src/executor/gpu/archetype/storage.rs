@@ -31,20 +31,20 @@ impl GpuArchetypeStorage {
         archetype_id: GpuArchetypeId,
         archetype_storage: &ArchetypeStorage,
     ) -> Self {
-        let (entities, erased_components) = archetype_storage.erased_components();
+        let (entities, bundles) = archetype_storage.as_slices();
         let len = archetype_storage.len();
 
         let entities_contents = must_cast_slice(entities);
         let entities_label = || format!("`gpecs` {archetype_id:#} entities storage buffer");
         let entities_buffer = StorageBuffer::new(gpu_device, entities_contents, entities_label);
 
-        let component_buffers = erased_components
+        let component_buffers = bundles
             .into_iter()
-            .map(|slice| {
-                let component_id = unsafe { GpuComponentId::from_id(slice.component_id()) };
+            .map(|components| {
+                let component_id = unsafe { GpuComponentId::from_id(components.component_id()) };
                 let components_label =
                     || format!("`gpecs` {archetype_id:#} {component_id:#} storage buffer");
-                let components_contents = slice.as_buffer();
+                let components_contents = components.as_buffer();
                 let buffer = StorageBuffer::new(gpu_device, components_contents, components_label);
                 (component_id, buffer)
             })

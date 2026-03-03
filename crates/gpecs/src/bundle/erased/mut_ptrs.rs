@@ -19,6 +19,7 @@ use crate::{
     },
     component::{
         erased::{ErasedComponentMutPtr, ErasedComponentPtr},
+        error::NotRegisteredError,
         registry::{ComponentId, ComponentRegistry},
     },
     soa::field::{FieldDescriptor, FieldDescriptors},
@@ -30,8 +31,6 @@ type Inner<'a, Meta> = ErasedSoaMutPtrs<&'a ErasedArchetype<Meta>, *mut MaybeUni
 pub struct ErasedBundleMutPtrs<'a, Meta> {
     inner: Inner<'a, Meta>,
 }
-
-// TODO: drop_in_place method
 
 impl<'a, Meta> ErasedBundleMutPtrs<'a, Meta> {
     #[inline]
@@ -157,6 +156,25 @@ where
     pub fn get_mut(&mut self, component_id: ComponentId) -> Option<ErasedComponentMutPtr> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter_mut().nth(index)
+    }
+
+    #[inline]
+    pub unsafe fn drop_in_place(
+        self,
+        registry: &ComponentRegistry,
+    ) -> Result<(), NotRegisteredError> {
+        self.iter()
+            .map(ErasedComponentPtr::component_id)
+            .try_for_each(|id| {
+                registry
+                    .get_component_info(id)
+                    .map(drop)
+                    .ok_or(NotRegisteredError)
+            })?;
+
+        self.into_iter()
+            .for_each(|ptr| unsafe { ptr.drop_in_place(registry) }.expect("should be registered"));
+        Ok(())
     }
 }
 

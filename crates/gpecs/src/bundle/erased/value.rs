@@ -50,7 +50,7 @@ pub trait ErasedArchetypeKind:
         >,
     >
 {
-    type Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>;
+    type Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static;
 }
 
 impl<Meta> ErasedArchetypeKind for ErasedArchetype<Meta>
@@ -76,18 +76,17 @@ mod private {
     impl<Meta> Sealed for &ErasedArchetype<Meta> {}
 }
 
-pub type ErasedBorrowedBundle<'a, Meta> = ErasedBundle<Meta, &'a ErasedArchetype<Meta>>;
+pub type ErasedBundle<Meta> = ErasedBundleKind<ErasedArchetype<Meta>>;
+pub type ErasedBorrowedBundle<'a, Meta> = ErasedBundleKind<&'a ErasedArchetype<Meta>>;
 
-pub struct ErasedBundle<Meta, Archetype = ErasedArchetype<Meta>>
+pub struct ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
-    inner: Inner<Archetype>,
+    inner: Inner<T>,
 }
 
-type Inner<Archetype> =
-    ErasedSoa<BoxedAlignedUninitStorage, Archetype, CoreSliceItemPtrs<MaybeUninit<u8>>>;
+type Inner<T> = ErasedSoa<BoxedAlignedUninitStorage, T, CoreSliceItemPtrs<MaybeUninit<u8>>>;
 
 impl<Meta> ErasedBundle<Meta>
 where
@@ -123,12 +122,13 @@ where
     }
 }
 
+pub trait FromErasedComponent: Sized {
+    fn from_erased_component(component: &ErasedComponent) -> Self;
+}
+
 impl<Meta> ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor>
-        + AsRef<Option<DropFn>>
-        + for<'a> From<&'a ErasedComponent>
-        + 'static,
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + FromErasedComponent + 'static,
 {
     #[inline]
     pub fn from_components<I>(components: I) -> Result<Self, FromComponentsError>
@@ -138,9 +138,11 @@ where
         let components =
             try_collect_components(components, IndexSet::insert, ErasedComponent::component_id)?;
 
-        let iter = components
-            .iter()
-            .map(|component| (component.component_id(), Meta::from(component)));
+        let iter = components.iter().map(|component| {
+            let id = component.component_id();
+            let meta = Meta::from_erased_component(component);
+            (id, meta)
+        });
         let archetype = unsafe { ErasedArchetype::with_meta_unchecked(iter) };
 
         let fields = components.into_iter().map(ErasedComponent::into_field);
@@ -159,13 +161,12 @@ where
     }
 }
 
-impl<Meta, Archetype> ErasedBundle<Meta, Archetype>
+impl<T> ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
     #[inline]
-    pub unsafe fn from_inner(inner: Inner<Archetype>) -> Self {
+    pub unsafe fn from_inner(inner: Inner<T>) -> Self {
         Self { inner }
     }
 
@@ -217,7 +218,7 @@ where
     }
 
     #[inline]
-    pub fn archetype(&self) -> &ErasedArchetype<Meta> {
+    pub fn archetype(&self) -> &ErasedArchetype<T::Meta> {
         let Self { inner } = self;
         inner.field_descriptors()
     }
@@ -247,7 +248,7 @@ where
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> ErasedBundlePtrs<'_, Meta> {
+    pub fn as_ptrs(&self) -> ErasedBundlePtrs<'_, T::Meta> {
         let Self { inner } = self;
 
         let inner = inner.as_ptrs();
@@ -255,7 +256,7 @@ where
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> ErasedBundleMutPtrs<'_, Meta> {
+    pub fn as_mut_ptrs(&mut self) -> ErasedBundleMutPtrs<'_, T::Meta> {
         let Self { inner } = self;
 
         let inner = inner.as_mut_ptrs();
@@ -263,55 +264,53 @@ where
     }
 
     #[inline]
-    pub fn as_refs(&self) -> ErasedBundleRefs<'_, '_, Meta> {
+    pub fn as_refs(&self) -> ErasedBundleRefs<'_, '_, T::Meta> {
         unsafe { self.as_ptrs().deref() }
     }
 
     #[inline]
-    pub fn as_mut_refs(&mut self) -> ErasedBundleMutRefs<'_, '_, Meta> {
+    pub fn as_mut_refs(&mut self) -> ErasedBundleMutRefs<'_, '_, T::Meta> {
         unsafe { self.as_mut_ptrs().deref_mut() }
     }
 
     #[inline]
-    pub fn iter(&self) -> ErasedBundleRefsIter<'_, '_, Meta> {
+    pub fn iter(&self) -> ErasedBundleRefsIter<'_, '_, T::Meta> {
         self.as_refs().into_iter()
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> ErasedBundleMutRefsIter<'_, '_, Meta> {
+    pub fn iter_mut(&mut self) -> ErasedBundleMutRefsIter<'_, '_, T::Meta> {
         self.as_mut_refs().into_iter()
     }
 
     #[inline]
-    pub fn into_inner(self) -> Inner<Archetype> {
+    pub fn into_inner(self) -> Inner<T> {
         let me = ManuallyDrop::new(self);
         unsafe { ptr::read(&raw const me.inner) }
     }
 }
 
 #[derive(Debug)]
-pub enum ShuffledBundle<Meta, Original, Other>
+pub enum ShuffledBundle<Original, Other>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Original: ErasedArchetypeKind<Meta = Meta>,
-    Other: ErasedArchetypeKind<Meta = Meta>,
+    Original: ErasedArchetypeKind,
+    Other: ErasedArchetypeKind<Meta = Original::Meta>,
 {
-    Original(ErasedBundle<Meta, Original>),
-    Other(ErasedBundle<Meta, Other>),
+    Original(ErasedBundleKind<Original>),
+    Other(ErasedBundleKind<Other>),
 }
 
-impl<Meta, Original> ErasedBundle<Meta, Original>
+impl<Original> ErasedBundleKind<Original>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
-    Original: ErasedArchetypeKind<Meta = Meta>,
+    Original: ErasedArchetypeKind,
 {
     #[inline]
     pub fn shuffle<Other>(
         self,
         archetype: Other,
-    ) -> Result<ShuffledBundle<Meta, Original, Other>, ShuffleError<Self, Other>>
+    ) -> Result<ShuffledBundle<Original, Other>, ShuffleError<Self, Other>>
     where
-        Other: ErasedArchetypeKind<Meta = Meta>,
+        Other: ErasedArchetypeKind<Meta = Original::Meta>,
     {
         let this = self.archetype();
         let other = archetype.field_descriptors();
@@ -363,17 +362,30 @@ where
 
         let (storage, _) = inner.into_parts();
         let inner = unsafe { ErasedSoa::from_parts(storage, archetype) };
-        let other = unsafe { ErasedBundle::from_inner(inner) };
+        let other = unsafe { ErasedBundleKind::from_inner(inner) };
 
         let shuffled = ShuffledBundle::Other(other);
         Ok(shuffled)
     }
 }
 
-impl<Meta, Archetype> Debug for ErasedBundle<Meta, Archetype>
+impl<'a, Meta> From<ErasedBorrowedBundle<'a, Meta>> for ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + Clone + 'static,
+{
+    #[inline]
+    fn from(bundle: ErasedBorrowedBundle<'a, Meta>) -> Self {
+        let (storage, archetype) = bundle.into_inner().into_parts();
+        let archetype = archetype.clone();
+
+        let inner = unsafe { Inner::from_parts(storage, archetype) };
+        unsafe { Self::from_inner(inner) }
+    }
+}
+
+impl<T> Debug for ErasedBundleKind<T>
+where
+    T: ErasedArchetypeKind,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let components = &self.into_iter();
@@ -383,10 +395,9 @@ where
     }
 }
 
-impl<Meta, Archetype> AsRef<[MaybeUninit<u8>]> for ErasedBundle<Meta, Archetype>
+impl<T> AsRef<[MaybeUninit<u8>]> for ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
     #[inline]
     fn as_ref(&self) -> &[MaybeUninit<u8>] {
@@ -394,10 +405,19 @@ where
     }
 }
 
-impl<Meta, Archetype> Drop for ErasedBundle<Meta, Archetype>
+impl<T> AsRef<ErasedArchetype<T::Meta>> for ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
+{
+    #[inline]
+    fn as_ref(&self) -> &ErasedArchetype<T::Meta> {
+        self.archetype()
+    }
+}
+
+impl<T> Drop for ErasedBundleKind<T>
+where
+    T: ErasedArchetypeKind,
 {
     fn drop(&mut self) {
         let Self { inner } = self;
@@ -413,13 +433,12 @@ where
     }
 }
 
-impl<'a, Meta, Archetype> IntoIterator for &'a ErasedBundle<Meta, Archetype>
+impl<'a, T> IntoIterator for &'a ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
     type Item = ErasedComponentRef<'a>;
-    type IntoIter = ErasedBundleRefsIter<'a, 'a, Meta>;
+    type IntoIter = ErasedBundleRefsIter<'a, 'a, T::Meta>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -427,13 +446,12 @@ where
     }
 }
 
-impl<'a, Meta, Archetype> IntoIterator for &'a mut ErasedBundle<Meta, Archetype>
+impl<'a, T> IntoIterator for &'a mut ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
     type Item = ErasedComponentMutRef<'a>;
-    type IntoIter = ErasedBundleMutRefsIter<'a, 'a, Meta>;
+    type IntoIter = ErasedBundleMutRefsIter<'a, 'a, T::Meta>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -441,29 +459,27 @@ where
     }
 }
 
-impl<Meta, Archetype> IntoIterator for ErasedBundle<Meta, Archetype>
+impl<T> IntoIterator for ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>>,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
     type Item = Result<ErasedComponent, AllocError>;
-    type IntoIter = ErasedBundleIntoIter<Meta, Archetype>;
+    type IntoIter = ErasedBundleIntoIterKind<T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let inner = self.into_inner();
 
         let inner = inner.into_iter();
-        ErasedBundleIntoIter { inner }
+        ErasedBundleIntoIterKind { inner }
     }
 }
 
-impl<'a, Meta, Archetype> FieldDescriptors<'a> for ErasedBundle<Meta, Archetype>
+impl<'a, T> FieldDescriptors<'a> for ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'a,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
-    type Output = &'a ErasedArchetype<Meta>;
+    type Output = &'a ErasedArchetype<T::Meta>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
@@ -471,10 +487,9 @@ where
     }
 }
 
-impl<Meta, Archetype> CovariantFieldDescriptors for ErasedBundle<Meta, Archetype>
+impl<T> CovariantFieldDescriptors for ErasedBundleKind<T>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -484,26 +499,27 @@ where
     }
 }
 
+pub type ErasedBundleIntoIter<Meta> = ErasedBundleIntoIterKind<ErasedArchetype<Meta>>;
 pub type ErasedBorrowedBundleIntoIter<'a, Meta> =
-    ErasedBundleIntoIter<Meta, &'a ErasedArchetype<Meta>>;
+    ErasedBundleIntoIterKind<&'a ErasedArchetype<Meta>>;
 
-pub struct ErasedBundleIntoIter<Meta, Archetype = ErasedArchetype<Meta>>
+pub struct ErasedBundleIntoIterKind<T>
 where
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
-    inner: InnerIter<Archetype::IntoIter>,
+    inner: InnerIter<T::IntoIter>,
 }
 
-type InnerIter<Archetype> = ErasedSoaIntoFields<
+type InnerIter<T> = ErasedSoaIntoFields<
     BoxedAlignedUninitStorage,
-    Archetype,
+    T,
     BoxedAlignedUninitStorage,
     CoreSliceItemPtrs<MaybeUninit<u8>>,
 >;
 
-impl<Meta, Archetype> Iterator for ErasedBundleIntoIter<Meta, Archetype>
+impl<T> Iterator for ErasedBundleIntoIterKind<T>
 where
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
+    T: ErasedArchetypeKind,
 {
     type Item = Result<ErasedComponent, AllocError>;
 
@@ -537,10 +553,10 @@ where
     }
 }
 
-impl<Meta, Archetype> ExactSizeIterator for ErasedBundleIntoIter<Meta, Archetype>
+impl<T> ExactSizeIterator for ErasedBundleIntoIterKind<T>
 where
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
-    Archetype::IntoIter: ExactSizeIterator,
+    T: ErasedArchetypeKind,
+    T::IntoIter: ExactSizeIterator,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -549,9 +565,9 @@ where
     }
 }
 
-impl<Meta, Archetype> FusedIterator for ErasedBundleIntoIter<Meta, Archetype>
+impl<T> FusedIterator for ErasedBundleIntoIterKind<T>
 where
-    Archetype: ErasedArchetypeKind<Meta = Meta>,
-    Archetype::IntoIter: FusedIterator,
+    T: ErasedArchetypeKind,
+    T::IntoIter: FusedIterator,
 {
 }

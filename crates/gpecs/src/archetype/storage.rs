@@ -22,7 +22,7 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
             ErasedBorrowedBundle, ErasedBundle, ErasedBundleMutRefs, ErasedBundleMutSlices,
-            ErasedBundleRefs, ErasedBundleSlices, ShuffledBundle,
+            ErasedBundleRefs, ErasedBundleSlices, FromErasedComponent, ShuffledBundle,
         },
     },
     component::{
@@ -75,16 +75,6 @@ pub struct ErasedStorageMeta {
     drop_fn: Option<DropFn>,
 }
 
-impl From<&ErasedComponent> for ErasedStorageMeta {
-    #[inline]
-    fn from(component: &ErasedComponent) -> Self {
-        Self {
-            descriptor: FieldDescriptor::new(component.as_field().layout()),
-            drop_fn: component.drop_fn(),
-        }
-    }
-}
-
 impl AsRef<FieldDescriptor> for ErasedStorageMeta {
     #[inline]
     fn as_ref(&self) -> &FieldDescriptor {
@@ -111,15 +101,19 @@ impl FromComponentInfo for ErasedStorageMeta {
     }
 }
 
+impl FromErasedComponent for ErasedStorageMeta {
+    #[inline]
+    fn from_erased_component(component: &ErasedComponent) -> Self {
+        Self {
+            descriptor: FieldDescriptor::new(component.as_field().layout()),
+            drop_fn: component.drop_fn(),
+        }
+    }
+}
+
 type ErasedBundleRaw = ErasedSoa<
     BoxedAlignedUninitStorage,
     ErasedArchetype<ErasedStorageMeta>,
-    CoreSliceItemPtrs<MaybeUninit<u8>>,
->;
-
-type ErasedReadBundleRaw<'a> = ErasedSoa<
-    BoxedAlignedUninitStorage,
-    &'a ErasedArchetype<ErasedStorageMeta>,
     CoreSliceItemPtrs<MaybeUninit<u8>>,
 >;
 
@@ -509,20 +503,20 @@ impl ArchetypeStorage {
 
         let Self { sparse_set } = self;
 
-        let value = ErasedBundle::from_components(fields)
+        let bundle = ErasedBundle::from_components(fields)
             .expect("set of erased components was expected to be unique");
-        let value = match value
+        let bundle = match bundle
             .shuffle(sparse_set.context().as_inner())
             .expect("exact archetype compatibility should have been already checked")
         {
             ShuffledBundle::Original(bundle) => bundle.into_inner().into_parts().0,
             ShuffledBundle::Other(bundle) => bundle.into_inner().into_parts().0,
         };
-        let Some(inner) = sparse_set.insert::<ErasedReadBundleRaw, _>(entity.into(), value) else {
+        let Some(inner) = sparse_set.insert(entity.into(), bundle) else {
             return Ok(None);
         };
 
-        let bundle = unsafe { ErasedBundle::from_inner(inner) };
+        let bundle = unsafe { ErasedBorrowedBundle::from_inner(inner) };
         Ok(Some(bundle))
     }
 
@@ -534,7 +528,7 @@ impl ArchetypeStorage {
         let Self { sparse_set } = self;
 
         let inner = sparse_set.swap_remove(entity.into())?;
-        let bundle = unsafe { ErasedBundle::from_inner(inner) };
+        let bundle = unsafe { ErasedBorrowedBundle::from_inner(inner) };
         Some(bundle)
     }
 
@@ -579,7 +573,7 @@ impl Drop for ArchetypeStorage {
         let Self { sparse_set } = self;
 
         for (_, erased_fields) in sparse_set.drain() {
-            let _ = unsafe { ErasedBundle::from_inner(erased_fields) };
+            let _ = unsafe { ErasedBorrowedBundle::from_inner(erased_fields) };
         }
     }
 }

@@ -273,22 +273,6 @@ where
     }
 }
 
-unsafe impl<T, D, P, U> WriteSoaContext<T> for ErasedSoaContext<D, P>
-where
-    T: AlignedStorage<Item = U>,
-    D: CovariantFieldDescriptors,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
-{
-    #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: T) {
-        let descriptors = self.field_descriptors();
-        let buffer = value.as_uninit_slice();
-        let src = unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, 1, 0) };
-        unsafe { self.write(dst, &src) }
-    }
-}
-
 unsafe impl<'n, D, N, P, U> WriteSoaContext<&'n ErasedSoaPtrs<N, P::Const>>
     for ErasedSoaContext<D, P>
 where

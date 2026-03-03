@@ -1,13 +1,9 @@
 use std::{
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::MaybeUninit,
 };
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
-use gpecs_soa_erased::{
-    ErasedSoa, ErasedSoaContext, ptr::slice::CoreSliceItemPtrs, storage::BoxedAlignedUninitStorage,
-};
 use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
 
 use crate::{
@@ -22,8 +18,8 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
             ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
-            ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs,
-            ErasedBundleSlices, FromErasedComponent, ShuffledBundle,
+            ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
+            FromErasedComponent, ShuffledBundle,
         },
     },
     component::{
@@ -111,14 +107,8 @@ impl FromErasedComponent for ErasedStorageMeta {
     }
 }
 
-type ErasedBundleRaw = ErasedSoa<
-    BoxedAlignedUninitStorage,
-    ErasedArchetype<ErasedStorageMeta>,
-    CoreSliceItemPtrs<MaybeUninit<u8>>,
->;
-
 pub struct ArchetypeStorage {
-    sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundleRaw>,
+    sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundle<ErasedStorageMeta>>,
 }
 
 impl ArchetypeStorage {
@@ -128,9 +118,7 @@ impl ArchetypeStorage {
         I: IntoIterator<Item = ComponentId>,
     {
         let archetype = ErasedArchetype::new(components, component_ids)?;
-
-        let context = ErasedSoaContext::new(archetype).expect("descriptors should be valid");
-        let sparse_set = EpochSparseSet::with_context(context);
+        let sparse_set = EpochSparseSet::with_context(archetype);
 
         let me = Self { sparse_set };
         Ok(me)
@@ -142,9 +130,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let archetype = ErasedArchetype::of::<B>(components)?;
-
-        let context = ErasedSoaContext::new(archetype).expect("descriptors should be valid");
-        let sparse_set = EpochSparseSet::with_context(context);
+        let sparse_set = EpochSparseSet::with_context(archetype);
 
         let me = Self { sparse_set };
         Ok(me)
@@ -153,7 +139,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn archetype(&self) -> &ErasedArchetype<ErasedStorageMeta> {
         let Self { sparse_set } = self;
-        sparse_set.context().as_inner()
+        sparse_set.context()
     }
 
     #[inline]
@@ -449,8 +435,8 @@ impl ArchetypeStorage {
         self.check_exact_compatibility_of::<B>(components)?;
 
         let Self { sparse_set } = self;
-        let bundle = sparse_set.swap_remove_into(entity.into(), |_, inner| {
-            let src = unsafe { ErasedBundleMutPtrs::from_inner(inner?) }
+        let bundle = sparse_set.swap_remove_into(entity.into(), |_, src| {
+            let src = src?
                 .cast_const()
                 .downcast::<B>(components)
                 .expect("exact archetype compatibility should be already checked");
@@ -463,10 +449,7 @@ impl ArchetypeStorage {
     #[inline]
     pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, ErasedStorageMeta>> {
         let Self { sparse_set } = self;
-
-        let bundle = sparse_set.get(entity.into());
-        let bundle = unsafe { ErasedBundleRefs::from_inner(bundle?) };
-        Some(bundle)
+        sparse_set.get(entity.into())
     }
 
     #[inline]
@@ -475,10 +458,7 @@ impl ArchetypeStorage {
         entity: Entity,
     ) -> Option<ErasedBundleMutRefs<'_, '_, ErasedStorageMeta>> {
         let Self { sparse_set } = self;
-
-        let bundle = sparse_set.get_mut(entity.into());
-        let bundle = unsafe { ErasedBundleMutRefs::from_inner(bundle?) };
-        Some(bundle)
+        sparse_set.get_mut(entity.into())
     }
 
     #[inline]
@@ -493,21 +473,17 @@ impl ArchetypeStorage {
         let archetype = self.archetype();
         archetype.check_exact_compatibility(bundle.archetype())?;
 
-        let storage = match bundle
-            .shuffle(archetype)
-            .expect("exact archetype compatibility should have been already checked")
-        {
-            ShuffledBundle::Original(bundle) => bundle.into_inner().into_parts().0,
-            ShuffledBundle::Other(bundle) => bundle.into_inner().into_parts().0,
-        };
+        let entity = entity.into();
+        let bundle = bundle
+            .shuffle(archetype.clone())
+            .expect("exact archetype compatibility should have been already checked");
 
         let Self { sparse_set } = self;
-        let Some(inner) = sparse_set.insert(entity.into(), storage) else {
-            return Ok(None);
+        let bundle = match bundle {
+            ShuffledBundle::Original(bundle) => sparse_set.insert(entity, bundle),
+            ShuffledBundle::Other(bundle) => sparse_set.insert(entity, bundle),
         };
-
-        let bundle = unsafe { ErasedBorrowedBundle::from_inner(inner) };
-        Ok(Some(bundle))
+        Ok(bundle)
     }
 
     #[inline]
@@ -516,10 +492,7 @@ impl ArchetypeStorage {
         entity: Entity,
     ) -> Option<ErasedBorrowedBundle<'_, ErasedStorageMeta>> {
         let Self { sparse_set } = self;
-
-        let inner = sparse_set.swap_remove(entity.into())?;
-        let bundle = unsafe { ErasedBorrowedBundle::from_inner(inner) };
-        Some(bundle)
+        sparse_set.swap_remove(entity.into())
     }
 
     #[inline]
@@ -533,10 +506,9 @@ impl ArchetypeStorage {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_view().into_parts();
-        let (entities, values) = dense.into_slices().into_parts();
+        let (entities, slices) = dense.into_slices().into_parts();
 
         let entities = must_cast_slice(entities);
-        let slices = unsafe { ErasedBundleSlices::from_inner(values) };
         (entities, slices)
     }
 
@@ -547,10 +519,9 @@ impl ArchetypeStorage {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_mut_view().into_parts();
-        let (entities, values) = dense.into_slices().into_parts();
+        let (entities, slices) = dense.into_slices().into_parts();
 
         let entities = must_cast_slice(entities);
-        let slices = unsafe { ErasedBundleMutSlices::from_inner(values) };
         (entities, slices)
     }
 }
@@ -561,16 +532,6 @@ impl Debug for ArchetypeStorage {
         f.debug_struct("ArchetypeStorage")
             .field("component_ids", component_ids)
             .finish_non_exhaustive()
-    }
-}
-
-impl Drop for ArchetypeStorage {
-    fn drop(&mut self) {
-        let Self { sparse_set } = self;
-
-        for (_, erased_fields) in sparse_set.drain() {
-            let _ = unsafe { ErasedBorrowedBundle::from_inner(erased_fields) };
-        }
     }
 }
 

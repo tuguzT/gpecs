@@ -37,7 +37,7 @@ pub fn erased_soa_work(
     let GpuErasedSoaDesc { len, capacity } = *erased_soa_desc;
     let invocation_id = id.x;
 
-    let context = unsafe { ErasedSoaContext::new_unchecked(descriptors) };
+    let context = unsafe { ErasedSoaContext::from_inner(descriptors) };
     let slices = unsafe { ErasedSoaMutSlices::new_unchecked(descriptors, dense, capacity, 0, len) };
     let mut dense_soa = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, slices);
 

@@ -4,6 +4,7 @@ use core::{
     fmt::{self, Debug},
     hash::{self, Hash},
     marker::PhantomData,
+    ptr,
 };
 
 use crate::{
@@ -21,6 +22,7 @@ use crate::{
 #[cfg(feature = "alloc")]
 pub type BoxedErasedSoaContext<P> = ErasedSoaContext<alloc::boxed::Box<[FieldDescriptor]>, P>;
 
+#[repr(transparent)]
 pub struct ErasedSoaContext<D, P>
 where
     D: ?Sized,
@@ -35,7 +37,7 @@ where
     P: SliceItemPtrs,
 {
     #[inline]
-    pub unsafe fn new_unchecked(descriptors: D) -> Self {
+    pub unsafe fn from_inner(descriptors: D) -> Self {
         Self {
             phantom: PhantomData,
             descriptors,
@@ -61,7 +63,7 @@ where
             .copied_field_descriptors()
             .try_for_each(|desc| check_sufficient_align(desc.layout(), Layout::new::<P::Item>()))?;
 
-        let me = unsafe { Self::new_unchecked(descriptors) };
+        let me = unsafe { Self::from_inner(descriptors) };
         Ok(me)
     }
 }
@@ -72,7 +74,25 @@ where
     P: SliceItemPtrs,
 {
     #[inline]
+    pub unsafe fn from_inner_ref(descriptors: &D) -> &Self {
+        // SAFETY: Self is `#[repr(transparent)]` over `D`.
+        unsafe { &*(ptr::from_ref(descriptors) as *const _) }
+    }
+
+    #[inline]
+    pub unsafe fn from_inner_mut(descriptors: &mut D) -> &mut Self {
+        // SAFETY: Self is `#[repr(transparent)]` over `V::Context`.
+        unsafe { &mut *(ptr::from_mut(descriptors) as *mut _) }
+    }
+
+    #[inline]
     pub fn as_inner(&self) -> &D {
+        let Self { descriptors, .. } = self;
+        descriptors
+    }
+
+    #[inline]
+    pub fn as_inner_mut(&mut self) -> &mut D {
         let Self { descriptors, .. } = self;
         descriptors
     }
@@ -98,7 +118,7 @@ where
             })
             .collect::<Result<_, _>>()?;
 
-        let me = unsafe { Self::new_unchecked(descriptors) };
+        let me = unsafe { Self::from_inner(descriptors) };
         Ok(me)
     }
 }
@@ -124,7 +144,7 @@ where
     #[inline]
     fn clone(&self) -> Self {
         let Self { descriptors, .. } = self;
-        unsafe { Self::new_unchecked(descriptors.clone()) }
+        unsafe { Self::from_inner(descriptors.clone()) }
     }
 }
 

@@ -191,7 +191,7 @@ where
 
     #[inline]
     #[track_caller]
-    pub unsafe fn swap(&mut self, with: &mut Self) {
+    pub unsafe fn swap(&mut self, with: &mut ErasedBundleMutPtrs<'_, Meta>) {
         let Self { inner } = self;
 
         let with = &mut with.into_inner();

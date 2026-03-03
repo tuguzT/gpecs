@@ -17,8 +17,6 @@ pub use self::{
 
 pub mod error;
 
-// TODO: add `Soa` trait implementation for all the types of this module
-
 mod mut_ptrs;
 mod mut_refs;
 mod mut_slice_ptrs;
@@ -28,4 +26,5 @@ mod ptrs;
 mod refs;
 mod slice_ptrs;
 mod slices;
+mod soa_impl;
 mod value;

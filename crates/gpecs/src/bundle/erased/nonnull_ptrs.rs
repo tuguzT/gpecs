@@ -32,6 +32,22 @@ pub struct ErasedBundleNonNullPtrs<'a, Meta> {
 
 impl<'a, Meta> ErasedBundleNonNullPtrs<'a, Meta> {
     #[inline]
+    pub fn new(ptrs: ErasedBundleMutPtrs<'a, Meta>) -> Option<Self> {
+        let ptrs = ptrs.into_inner();
+        let inner = Inner::new(ptrs)?;
+
+        let me = unsafe { Self::from_inner(inner) };
+        Some(me)
+    }
+
+    #[inline]
+    pub unsafe fn new_unchecked(ptrs: ErasedBundleMutPtrs<'a, Meta>) -> Self {
+        let ptrs = ptrs.into_inner();
+        let inner = unsafe { Inner::new_unchecked(ptrs) };
+        unsafe { Self::from_inner(inner) }
+    }
+
+    #[inline]
     pub unsafe fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }
     }

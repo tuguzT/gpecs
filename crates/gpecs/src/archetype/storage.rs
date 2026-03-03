@@ -21,8 +21,9 @@ use crate::{
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
-            ErasedBorrowedBundle, ErasedBundle, ErasedBundleMutRefs, ErasedBundleMutSlices,
-            ErasedBundleRefs, ErasedBundleSlices, FromErasedComponent, ShuffledBundle,
+            ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
+            ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
+            FromErasedComponent, ShuffledBundle,
         },
     },
     component::{
@@ -30,7 +31,6 @@ use crate::{
         registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
     },
     entity::Entity,
-    hash::IndexSet,
     soa::field::FieldDescriptor,
 };
 
@@ -420,25 +420,21 @@ impl ArchetypeStorage {
         }
 
         // TODO: optimize by reading/writing from/into raw pointers
-        let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
+        let bundle = ErasedBundle::try_from(components, value)
             .map_err(|error| error.reason)
             .expect("bundle compatibility should have been already checked");
-        let fields = fields
-            .into_iter()
-            .map(|component| component.expect("component should be allocated successfully"))
-            .collect();
 
-        let fields = self
-            .insert(entity, fields)
+        let bundle = self
+            .insert(entity, bundle)
             .expect("bundle compatibility should have been already checked");
-        let Some(fields) = fields else {
+        let Some(bundle) = bundle else {
             return Ok(None);
         };
 
-        let value = fields
+        let bundle = bundle
             .downcast(components)
             .expect("exact archetype compatibility should be already checked");
-        Ok(Some(value))
+        Ok(Some(bundle))
     }
 
     #[inline]
@@ -464,12 +460,6 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn destroy_in_place(&mut self, entity: Entity) -> bool {
-        // TODO: optimize by dropping raw pointers in place
-        self.remove(entity).is_some()
-    }
-
-    #[inline]
     pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, ErasedStorageMeta>> {
         let Self { sparse_set } = self;
 
@@ -491,27 +481,26 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    #[track_caller]
-    pub(super) fn insert(
+    pub fn insert<T>(
         &mut self,
         entity: Entity,
-        fields: IndexSet<ErasedComponent>,
+        bundle: ErasedBundleKind<T>,
     ) -> Result<Option<ErasedBorrowedBundle<'_, ErasedStorageMeta>>, IncompatibleArchetypeExactError>
+    where
+        T: ErasedArchetypeKind<Meta = ErasedStorageMeta>,
     {
-        let component_ids = fields.iter().map(ErasedComponent::component_id);
-        self.check_exact_compatibility_for(component_ids)?;
+        let archetype = self.archetype();
+        archetype.check_exact_compatibility(bundle.archetype())?;
 
-        let Self { sparse_set } = self;
-
-        let bundle = ErasedBundle::from_components(fields)
-            .expect("set of erased components was expected to be unique");
         let bundle = match bundle
-            .shuffle(sparse_set.context().as_inner())
+            .shuffle(archetype)
             .expect("exact archetype compatibility should have been already checked")
         {
             ShuffledBundle::Original(bundle) => bundle.into_inner().into_parts().0,
             ShuffledBundle::Other(bundle) => bundle.into_inner().into_parts().0,
         };
+
+        let Self { sparse_set } = self;
         let Some(inner) = sparse_set.insert(entity.into(), bundle) else {
             return Ok(None);
         };
@@ -530,6 +519,12 @@ impl ArchetypeStorage {
         let inner = sparse_set.swap_remove(entity.into())?;
         let bundle = unsafe { ErasedBorrowedBundle::from_inner(inner) };
         Some(bundle)
+    }
+
+    #[inline]
+    pub fn destroy(&mut self, entity: Entity) -> bool {
+        // TODO: optimize by dropping raw pointers in place
+        self.remove(entity).is_some()
     }
 
     #[inline]

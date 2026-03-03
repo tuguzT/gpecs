@@ -862,7 +862,7 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("{archetype_id} should exist")
         };
-        if !info.storage.destroy_in_place(entity) {
+        if !info.storage.destroy(entity) {
             unreachable!("{entity} should exist in {archetype_id}");
         }
         true
@@ -882,7 +882,10 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("{archetype_id} should exist")
         };
-        if let Err(error) = info.storage.insert(entity, fields) {
+
+        let bundle = ErasedBundle::from_components(fields)
+            .expect("erased bundle should be created successfully");
+        if let Err(error) = info.storage.insert(entity, bundle) {
             unreachable!("failed to insert {entity} into {archetype_id}: {error}");
         }
     }

@@ -29,11 +29,11 @@ use crate::{
         },
         storage::{ArchetypeStorage, ErasedStorageMeta},
     },
-    bundle::{Bundle, BundleRefs, BundleRefsMut, erased::ErasedBundle},
-    component::{
-        erased::ErasedComponent,
-        registry::{ComponentId, ComponentRegistry},
+    bundle::{
+        Bundle, BundleRefs, BundleRefsMut,
+        erased::{ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind},
     },
+    component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
     hash::{IndexMap, IndexSet},
     soa::slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
@@ -621,26 +621,32 @@ impl ArchetypeRegistry {
         );
 
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
+            match Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity) {
+                Some(bundle) => bundle
+                    .into_iter()
+                    .map(|component| component.expect("component should be allocated successfully"))
+                    .collect(),
+                None => IndexSet::default(),
+            };
 
         let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
-            .expect("bundle compatibility should have been already checked");
+            .expect("bundle compatibility should have been already checked")
+            .into_iter()
+            .map(|component| component.expect("component should be allocated successfully"));
 
         // TODO: add new method for erased bundle to replace some of the components
-        fields
-            .into_iter()
-            .map(|component| component.expect("component should be allocated successfully"))
-            .for_each(|field| {
-                let component_id = field.component_id();
-                if old_fields.replace(field).is_some() {
-                    unreachable!("duplicated {component_id}")
-                }
-            });
+        fields.for_each(|field| {
+            let component_id = field.component_id();
+            if old_fields.replace(field).is_some() {
+                unreachable!("duplicated {component_id}")
+            }
+        });
 
-        let new_fields = old_fields;
         let archetype_id = Some(new_archetype);
-        Self::set_in_archetype_by_entity(archetypes, archetype_id, entity, new_fields);
+        let bundle = ErasedBundle::from_components(old_fields)
+            .expect("erased bundle should be created successfully");
+        Self::set_in_archetype_by_entity(archetypes, archetype_id, entity, bundle);
 
         Ok(new_archetype)
     }
@@ -693,22 +699,27 @@ impl ArchetypeRegistry {
         );
 
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
+            match Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity) {
+                Some(bundle) => bundle
+                    .into_iter()
+                    .map(|component| component.expect("component should be allocated successfully"))
+                    .collect(),
+                None => IndexSet::default(),
+            };
 
         let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
-            .expect("bundle compatibility should have been already checked");
+            .expect("bundle compatibility should have been already checked")
+            .into_iter()
+            .map(|component| component.expect("component should be allocated successfully"));
 
         // TODO: add new method for erased bundle to replace some of the components
-        fields
-            .into_iter()
-            .map(|component| component.expect("component should be allocated successfully"))
-            .map(|field| old_fields.replace(field))
-            .for_each(drop);
+        fields.map(|field| old_fields.replace(field)).for_each(drop);
 
-        let new_fields = old_fields;
         let archetype_id = Some(new_archetype);
-        Self::set_in_archetype_by_entity(archetypes, archetype_id, entity, new_fields);
+        let bundle = ErasedBundle::from_components(old_fields)
+            .expect("erased bundle should be created successfully");
+        Self::set_in_archetype_by_entity(archetypes, archetype_id, entity, bundle);
 
         Ok(new_archetype)
     }
@@ -769,7 +780,13 @@ impl ArchetypeRegistry {
 
         let old_archetype = Some(old_archetype);
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
+            match Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity) {
+                Some(bundle) => bundle
+                    .into_iter()
+                    .map(|component| component.expect("component should be allocated successfully"))
+                    .collect(),
+                None => IndexSet::default(),
+            };
 
         // TODO: add new method for erased bundle to take out some of the components
         let fields = component_ids.iter().copied().map(|component_id| {
@@ -780,8 +797,9 @@ impl ArchetypeRegistry {
         let value = B::from_erased(components, fields)
             .expect("input fields should be compatible with the bundle");
 
-        let new_fields = old_fields;
-        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, new_fields);
+        let bundle = ErasedBundle::from_components(old_fields)
+            .expect("erased bundle should be created successfully");
+        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         Ok((value, new_archetype))
     }
@@ -837,7 +855,13 @@ impl ArchetypeRegistry {
 
         let old_archetype = Some(old_archetype);
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity);
+            match Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity) {
+                Some(bundle) => bundle
+                    .into_iter()
+                    .map(|component| component.expect("component should be allocated successfully"))
+                    .collect(),
+                None => IndexSet::default(),
+            };
 
         // TODO: add new method for erased bundle to remove some of the components
         component_ids
@@ -845,14 +869,15 @@ impl ArchetypeRegistry {
             .map(|component_id| old_fields.swap_take(component_id))
             .for_each(drop);
 
-        let new_fields = old_fields;
-        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, new_fields);
+        let bundle = ErasedBundle::from_components(old_fields)
+            .expect("erased bundle should be created successfully");
+        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         Ok(new_archetype)
     }
 
     #[inline]
-    pub fn destroy_in_place(&mut self, entity: Entity, location: EntityArchetypeLocation) -> bool {
+    pub fn destroy(&mut self, entity: Entity, location: EntityArchetypeLocation) -> bool {
         let Self { archetypes, .. } = self;
 
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
@@ -869,12 +894,14 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    fn set_in_archetype_by_entity(
+    fn set_in_archetype_by_entity<T>(
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-        fields: IndexSet<ErasedComponent>,
-    ) {
+        bundle: ErasedBundleKind<T>,
+    ) where
+        T: ErasedArchetypeKind<Meta = ErasedStorageMeta>,
+    {
         let Some(archetype_id) = archetype_id else {
             return;
         };
@@ -882,9 +909,6 @@ impl ArchetypeRegistry {
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("{archetype_id} should exist")
         };
-
-        let bundle = ErasedBundle::from_components(fields)
-            .expect("erased bundle should be created successfully");
         if let Err(error) = info.storage.insert(entity, bundle) {
             unreachable!("failed to insert {entity} into {archetype_id}: {error}");
         }
@@ -895,10 +919,8 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-    ) -> IndexSet<ErasedComponent> {
-        let Some(archetype_id) = archetype_id else {
-            return IndexSet::default();
-        };
+    ) -> Option<ErasedBorrowedBundle<'_, ErasedStorageMeta>> {
+        let archetype_id = archetype_id?;
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
             unreachable!("{archetype_id} should exist")
@@ -906,10 +928,7 @@ impl ArchetypeRegistry {
         let Some(bundle) = info.storage.remove(entity) else {
             unreachable!("{entity} should exist in {archetype_id}")
         };
-        bundle
-            .into_iter()
-            .map(|component| component.expect("component should be allocated successfully"))
-            .collect()
+        Some(bundle)
     }
 
     #[inline]

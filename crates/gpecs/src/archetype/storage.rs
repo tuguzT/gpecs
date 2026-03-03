@@ -22,8 +22,8 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
         erased::{
             ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
-            ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
-            FromErasedComponent, ShuffledBundle,
+            ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs,
+            ErasedBundleSlices, FromErasedComponent, ShuffledBundle,
         },
     },
     component::{
@@ -31,7 +31,7 @@ use crate::{
         registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
     },
     entity::Entity,
-    soa::field::FieldDescriptor,
+    soa::{field::FieldDescriptor, traits::ReadSoaContext},
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
@@ -448,15 +448,16 @@ impl ArchetypeStorage {
     {
         self.check_exact_compatibility_of::<B>(components)?;
 
-        // TODO: optimize by reading from raw pointers
-        let Some(bundle) = self.remove(entity) else {
-            return Ok(None);
-        };
-
-        let bundle = bundle
-            .downcast(components)
-            .expect("exact archetype compatibility should be already checked");
-        Ok(Some(bundle))
+        let Self { sparse_set } = self;
+        let bundle = sparse_set.swap_remove_into(entity.into(), |_, inner| {
+            let src = unsafe { ErasedBundleMutPtrs::from_inner(inner?) }
+                .cast_const()
+                .downcast::<B>(components)
+                .expect("exact archetype compatibility should be already checked");
+            let bundle = unsafe { B::CONTEXT.read(src) };
+            Some(bundle)
+        });
+        Ok(bundle)
     }
 
     #[inline]
@@ -492,7 +493,7 @@ impl ArchetypeStorage {
         let archetype = self.archetype();
         archetype.check_exact_compatibility(bundle.archetype())?;
 
-        let bundle = match bundle
+        let storage = match bundle
             .shuffle(archetype)
             .expect("exact archetype compatibility should have been already checked")
         {
@@ -501,7 +502,7 @@ impl ArchetypeStorage {
         };
 
         let Self { sparse_set } = self;
-        let Some(inner) = sparse_set.insert(entity.into(), bundle) else {
+        let Some(inner) = sparse_set.insert(entity.into(), storage) else {
             return Ok(None);
         };
 

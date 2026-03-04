@@ -118,7 +118,7 @@ impl Work for Tiny {
         let context = TupleContext::default();
         let mut result = 0;
         for refs in iter {
-            let (i,) = unsafe { refs.downcast::<Self>(&context) }.unwrap();
+            let (i,) = unsafe { refs.downcast::<Self>(&context).unwrap_unchecked() };
             result += *i;
         }
         black_box(result)
@@ -193,7 +193,7 @@ impl Work for Small {
         let context = TupleContext::default();
         let mut result = 0.0;
         for refs in iter {
-            let (x, y, _) = unsafe { refs.downcast::<Self>(&context) }.unwrap();
+            let (x, y, _) = unsafe { refs.downcast::<Self>(&context).unwrap_unchecked() };
             result += *x + *y;
         }
         black_box(result)
@@ -273,7 +273,8 @@ impl Work for Big {
         let context = TupleContext::default();
         let mut result = 0;
         for (index, refs) in iter.enumerate() {
-            let (_, _, array, _, str) = unsafe { refs.downcast::<Self>(&context) }.unwrap();
+            let (_, _, array, _, str) =
+                unsafe { refs.downcast::<Self>(&context).unwrap_unchecked() };
             result += index + array.iter().sum::<usize>() + str.len();
         }
         black_box(result)
@@ -370,7 +371,7 @@ impl Work for Large {
         let mut result = 0;
         for refs in iter {
             let (_, b, _, _, e, f, _, _, i, _) =
-                unsafe { refs.downcast::<Self>(&context) }.unwrap();
+                unsafe { refs.downcast::<Self>(&context).unwrap_unchecked() };
             result += b.iter().max().unwrap() + e.iter().sum::<u32>()
                 - f.iter().min().unwrap()
                 - i.iter().fold(u32::MAX, |acc, item| (acc - item) << 3);

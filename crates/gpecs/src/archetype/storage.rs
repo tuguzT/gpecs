@@ -4,7 +4,7 @@ use std::{
 };
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
-use gpecs_sparse::{error::TryReserveError, key::Key, set::EpochSparseSet};
+use gpecs_sparse::{TryInsertAccess, error::TryReserveError, key::Key, set::EpochSparseSet};
 
 use crate::{
     archetype::{
@@ -27,7 +27,11 @@ use crate::{
         registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
     },
     entity::Entity,
-    soa::{field::FieldDescriptor, traits::ReadSoaContext},
+    soa::{
+        self,
+        field::FieldDescriptor,
+        traits::{RawSoaContext, ReadSoaContext, WriteSoaContext},
+    },
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
@@ -66,12 +70,12 @@ impl From<NoEpochEntity> for Entity {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ErasedStorageMeta {
+pub struct StorageMeta {
     descriptor: FieldDescriptor,
     drop_fn: Option<DropFn>,
 }
 
-impl AsRef<FieldDescriptor> for ErasedStorageMeta {
+impl AsRef<FieldDescriptor> for StorageMeta {
     #[inline]
     fn as_ref(&self) -> &FieldDescriptor {
         let Self { descriptor, .. } = self;
@@ -79,7 +83,7 @@ impl AsRef<FieldDescriptor> for ErasedStorageMeta {
     }
 }
 
-impl AsRef<Option<DropFn>> for ErasedStorageMeta {
+impl AsRef<Option<DropFn>> for StorageMeta {
     #[inline]
     fn as_ref(&self) -> &Option<DropFn> {
         let Self { drop_fn, .. } = self;
@@ -87,7 +91,7 @@ impl AsRef<Option<DropFn>> for ErasedStorageMeta {
     }
 }
 
-impl FromComponentInfo for ErasedStorageMeta {
+impl FromComponentInfo for StorageMeta {
     #[inline]
     fn from_component_info(info: &ComponentInfo) -> Self {
         Self {
@@ -97,7 +101,7 @@ impl FromComponentInfo for ErasedStorageMeta {
     }
 }
 
-impl FromErasedComponent for ErasedStorageMeta {
+impl FromErasedComponent for StorageMeta {
     #[inline]
     fn from_erased_component(component: &ErasedComponent) -> Self {
         Self {
@@ -108,7 +112,7 @@ impl FromErasedComponent for ErasedStorageMeta {
 }
 
 pub struct ArchetypeStorage {
-    sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundle<ErasedStorageMeta>>,
+    sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundle<StorageMeta>>,
 }
 
 impl ArchetypeStorage {
@@ -137,7 +141,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn archetype(&self) -> &ErasedArchetype<ErasedStorageMeta> {
+    pub fn archetype(&self) -> &ErasedArchetype<StorageMeta> {
         let Self { sparse_set } = self;
         sparse_set.context()
     }
@@ -402,25 +406,30 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         if let Err(reason) = self.check_exact_compatibility_of::<B>(components) {
-            return Err(IncompatibleBundleValueError { value, reason });
+            let error = IncompatibleBundleValueError { value, reason };
+            return Err(error);
         }
 
-        // TODO: optimize by reading/writing from/into raw pointers
-        let bundle = ErasedBundle::try_from(components, value)
-            .map_err(|error| error.reason)
-            .expect("bundle compatibility should have been already checked");
-
-        let bundle = self
-            .insert(entity, bundle)
-            .expect("bundle compatibility should have been already checked");
-        let Some(bundle) = bundle else {
-            return Ok(None);
-        };
-
-        let bundle = bundle
-            .downcast(components)
-            .expect("exact archetype compatibility should be already checked");
-        Ok(Some(bundle))
+        let Self { sparse_set } = self;
+        let bundle = sparse_set.insert_from(entity.into(), |_, access| match access? {
+            TryInsertAccess::ReadWrite(dst) => {
+                let dst = dst
+                    .into_ptrs()
+                    .downcast::<B>(components)
+                    .expect("exact archetype compatibility should be already checked");
+                let value = unsafe { soa::ptr::replace::<B, _, _>(B::CONTEXT, dst, value) };
+                Some(value)
+            }
+            TryInsertAccess::WriteOnly(dst) => {
+                let dst = dst
+                    .into_inner()
+                    .downcast::<B>(components)
+                    .expect("exact archetype compatibility should be already checked");
+                unsafe { B::CONTEXT.write(dst, value) };
+                None
+            }
+        });
+        Ok(bundle)
     }
 
     #[inline]
@@ -447,16 +456,13 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, ErasedStorageMeta>> {
+    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, StorageMeta>> {
         let Self { sparse_set } = self;
         sparse_set.get(entity.into())
     }
 
     #[inline]
-    pub fn get_mut(
-        &mut self,
-        entity: Entity,
-    ) -> Option<ErasedBundleMutRefs<'_, '_, ErasedStorageMeta>> {
+    pub fn get_mut(&mut self, entity: Entity) -> Option<ErasedBundleMutRefs<'_, '_, StorageMeta>> {
         let Self { sparse_set } = self;
         sparse_set.get_mut(entity.into())
     }
@@ -466,9 +472,9 @@ impl ArchetypeStorage {
         &mut self,
         entity: Entity,
         bundle: ErasedBundleKind<T>,
-    ) -> Result<Option<ErasedBorrowedBundle<'_, ErasedStorageMeta>>, IncompatibleArchetypeExactError>
+    ) -> Result<Option<ErasedBorrowedBundle<'_, StorageMeta>>, IncompatibleArchetypeExactError>
     where
-        T: ErasedArchetypeKind<Meta = ErasedStorageMeta>,
+        T: ErasedArchetypeKind<Meta = StorageMeta>,
     {
         let archetype = self.archetype();
         archetype.check_exact_compatibility(bundle.archetype())?;
@@ -487,22 +493,24 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn remove(
-        &mut self,
-        entity: Entity,
-    ) -> Option<ErasedBorrowedBundle<'_, ErasedStorageMeta>> {
+    pub fn remove(&mut self, entity: Entity) -> Option<ErasedBorrowedBundle<'_, StorageMeta>> {
         let Self { sparse_set } = self;
         sparse_set.swap_remove(entity.into())
     }
 
     #[inline]
     pub fn destroy(&mut self, entity: Entity) -> bool {
-        // TODO: optimize by dropping raw pointers in place
-        self.remove(entity).is_some()
+        let Self { sparse_set } = self;
+
+        sparse_set.swap_remove_into(entity.into(), |archetype, ptrs| {
+            let Some(ptrs) = ptrs else { return false };
+            unsafe { archetype.ptrs_drop_in_place(ptrs) };
+            true
+        })
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], ErasedBundleSlices<'_, '_, ErasedStorageMeta>) {
+    pub fn as_slices(&self) -> (&[Entity], ErasedBundleSlices<'_, '_, StorageMeta>) {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_view().into_parts();
@@ -513,9 +521,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn as_mut_slices(
-        &mut self,
-    ) -> (&[Entity], ErasedBundleMutSlices<'_, '_, ErasedStorageMeta>) {
+    pub fn as_mut_slices(&mut self) -> (&[Entity], ErasedBundleMutSlices<'_, '_, StorageMeta>) {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_mut_view().into_parts();
@@ -537,7 +543,7 @@ impl Debug for ArchetypeStorage {
 
 #[derive(Clone)]
 pub struct ComponentIds<'a> {
-    inner: ErasedArchetypeIter<'a, ErasedStorageMeta>,
+    inner: ErasedArchetypeIter<'a, StorageMeta>,
 }
 
 impl Debug for ComponentIds<'_> {

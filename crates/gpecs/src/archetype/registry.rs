@@ -27,7 +27,7 @@ use crate::{
             IncompatibleArchetypeError, InsertBundleError, InsertBundleExactError,
             MissingComponentError, RemoveBundleExactError,
         },
-        storage::{ArchetypeStorage, ErasedStorageMeta},
+        storage::{ArchetypeStorage, StorageMeta},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
@@ -629,7 +629,7 @@ impl ArchetypeRegistry {
                 None => IndexSet::default(),
             };
 
-        let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
+        let fields = ErasedBundle::<StorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
             .expect("bundle compatibility should have been already checked")
             .into_iter()
@@ -707,7 +707,7 @@ impl ArchetypeRegistry {
                 None => IndexSet::default(),
             };
 
-        let fields = ErasedBundle::<ErasedStorageMeta>::try_from(components, value)
+        let fields = ErasedBundle::<StorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
             .expect("bundle compatibility should have been already checked")
             .into_iter()
@@ -900,7 +900,7 @@ impl ArchetypeRegistry {
         entity: Entity,
         bundle: ErasedBundleKind<T>,
     ) where
-        T: ErasedArchetypeKind<Meta = ErasedStorageMeta>,
+        T: ErasedArchetypeKind<Meta = StorageMeta>,
     {
         let Some(archetype_id) = archetype_id else {
             return;
@@ -919,7 +919,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         archetype_id: Option<ArchetypeId>,
         entity: Entity,
-    ) -> Option<ErasedBorrowedBundle<'_, ErasedStorageMeta>> {
+    ) -> Option<ErasedBorrowedBundle<'_, StorageMeta>> {
         let archetype_id = archetype_id?;
 
         let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {

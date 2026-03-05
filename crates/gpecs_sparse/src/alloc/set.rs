@@ -1845,7 +1845,7 @@ where
 
 impl<K, V, W> FromIterator<DenseItem<K, W>> for EpochSparseSet<K, V>
 where
-    K: Key<SparseIndex = usize>,
+    K: Key,
     V: AllocSoa + SoaWrite<W> + ?Sized,
     V::Context: Default,
 {
@@ -1869,7 +1869,7 @@ where
 
 impl<K, V, W> FromIterator<(K, W)> for EpochSparseSet<K, V>
 where
-    K: Key<SparseIndex = usize>,
+    K: Key,
     V: AllocSoa + SoaWrite<W> + ?Sized,
     V::Context: Default,
 {
@@ -1880,7 +1880,7 @@ where
 
 impl<K, V, W> Extend<DenseItem<K, W>> for EpochSparseSet<K, V>
 where
-    K: Key<SparseIndex = usize>,
+    K: Key,
     V: AllocSoa + SoaWrite<W> + ?Sized,
 {
     fn extend<I: IntoIterator<Item = DenseItem<K, W>>>(&mut self, iter: I) {
@@ -1899,7 +1899,7 @@ where
 
 impl<K, V, W> Extend<(K, W)> for EpochSparseSet<K, V>
 where
-    K: Key<SparseIndex = usize>,
+    K: Key,
     V: AllocSoa + SoaWrite<W> + ?Sized,
 {
     fn extend<I: IntoIterator<Item = (K, W)>>(&mut self, iter: I) {

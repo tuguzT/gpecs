@@ -114,7 +114,7 @@ impl From<EpochKey<Self, NoEpoch>> for usize {
     }
 }
 
-pub trait SparseIndex: Copy + Ord + Default + TryFrom<usize> + TryInto<usize> {}
+pub trait SparseIndex: Copy + Ord + TryFrom<usize> + TryInto<usize> {}
 
 impl SparseIndex for u8 {}
 impl SparseIndex for u16 {}

@@ -12,6 +12,8 @@ use crate::{
     },
 };
 
+type Inner<'ctx, K, V> = soa::slice::RawIter<'ctx, DenseItem<K, V>>;
+
 #[repr(transparent)]
 pub struct RawValues<'ctx, K, V>
 where
@@ -26,13 +28,13 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(crate) fn from_inner(inner: soa::slice::RawIter<'ctx, DenseItem<K, V>>) -> Self {
+    pub(crate) fn from_inner(inner: Inner<'ctx, K, V>) -> Self {
         let inner = RawIter::from_inner(inner);
         Self { inner }
     }
 
     #[inline]
-    fn into_inner(self) -> soa::slice::RawIter<'ctx, DenseItem<K, V>> {
+    fn into_inner(self) -> Inner<'ctx, K, V> {
         let Self { inner } = self;
         inner.into_inner()
     }

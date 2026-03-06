@@ -6,13 +6,15 @@ use core::{
 };
 
 use crate::{
-    item::DenseItem,
-    iter::RawIter,
+    item::{DenseContext, DenseItem, DenseSlicePtrs, DenseSlices},
+    iter::{Keys, RawIter, Values},
     soa::{
         self,
         traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaOwned},
     },
 };
+
+type Inner<'ctx, 'a, K, V> = soa::slice::Iter<'ctx, 'a, DenseItem<K, V>>;
 
 #[repr(transparent)]
 pub struct Iter<'ctx, 'a, K, V>
@@ -20,7 +22,7 @@ where
     K: 'ctx + 'a,
     V: RawSoa + ?Sized + 'ctx + 'a,
 {
-    inner: soa::slice::Iter<'ctx, 'a, DenseItem<K, V>>,
+    inner: Inner<'ctx, 'a, K, V>,
 }
 
 impl<'ctx, 'a, K, V> Iter<'ctx, 'a, K, V>
@@ -28,12 +30,25 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(super) fn from_inner(inner: soa::slice::Iter<'ctx, 'a, DenseItem<K, V>>) -> Self {
+    #[track_caller]
+    pub unsafe fn from_parts(
+        context: &'ctx V::Context,
+        keys: *const [K],
+        values: SlicePtrs<'ctx, V>,
+    ) -> Self {
+        let slices = DenseSlicePtrs::new(context, keys, values);
+        let context = DenseContext::from_inner_ref(context);
+        let inner = unsafe { Inner::from_parts(context, slices) };
+        Self::from_inner(inner)
+    }
+
+    #[inline]
+    pub(super) fn from_inner(inner: Inner<'ctx, 'a, K, V>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub(super) fn into_inner(self) -> soa::slice::Iter<'ctx, 'a, DenseItem<K, V>> {
+    pub(super) fn into_inner(self) -> Inner<'ctx, 'a, K, V> {
         let Self { inner } = self;
         inner
     }
@@ -129,6 +144,15 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
+    #[track_caller]
+    pub fn new(context: &'ctx V::Context, keys: &'a [K], values: Slices<'ctx, 'a, V>) -> Self {
+        let slices = DenseSlices::new(context, keys, values);
+        let context = DenseContext::from_inner_ref(context);
+        let inner = Inner::new(context, slices);
+        Self::from_inner(inner)
+    }
+
+    #[inline]
     pub fn into_slices(self) -> (&'a [K], Slices<'ctx, 'a, V>) {
         let (_, keys, values) = self.into_slices_with_context();
         (keys, values)
@@ -141,6 +165,17 @@ where
         let (context, slices) = inner.into_slices_with_context();
         let (keys, values) = slices.into_parts();
         (context, keys, values)
+    }
+
+    #[inline]
+    pub fn into_keys(self) -> Keys<'ctx, 'a, K, V> {
+        let inner = self.into_raw_iter().into_raw_keys();
+        unsafe { Keys::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_values(self) -> Values<'ctx, 'a, K, V> {
+        unsafe { Values::from_inner(self) }
     }
 }
 

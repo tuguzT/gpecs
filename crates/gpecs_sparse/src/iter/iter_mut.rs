@@ -4,8 +4,8 @@ use core::{
 };
 
 use crate::{
-    item::DenseItem,
-    iter::{RawIter, RawIterMut},
+    item::{DenseContext, DenseItem, DenseSliceMutPtrs, DenseSlicesMut},
+    iter::{Keys, RawIter, RawIterMut, ValuesMut},
     soa::{
         self,
         traits::{
@@ -15,13 +15,15 @@ use crate::{
     },
 };
 
+type Inner<'ctx, 'a, K, V> = soa::slice::IterMut<'ctx, 'a, DenseItem<K, V>>;
+
 #[repr(transparent)]
 pub struct IterMut<'ctx, 'a, K, V>
 where
     K: 'ctx + 'a,
     V: RawSoa + ?Sized + 'ctx + 'a,
 {
-    inner: soa::slice::IterMut<'ctx, 'a, DenseItem<K, V>>,
+    inner: Inner<'ctx, 'a, K, V>,
 }
 
 impl<'ctx, 'a, K, V> IterMut<'ctx, 'a, K, V>
@@ -29,12 +31,25 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(super) fn from_inner(inner: soa::slice::IterMut<'ctx, 'a, DenseItem<K, V>>) -> Self {
+    #[track_caller]
+    pub unsafe fn from_parts(
+        context: &'ctx V::Context,
+        keys: *mut [K],
+        values: SliceMutPtrs<'ctx, V>,
+    ) -> Self {
+        let slices = DenseSliceMutPtrs::new(context, keys, values);
+        let context = DenseContext::from_inner_ref(context);
+        let inner = unsafe { Inner::from_parts(context, slices) };
+        Self::from_inner(inner)
+    }
+
+    #[inline]
+    pub(super) fn from_inner(inner: Inner<'ctx, 'a, K, V>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub(super) fn into_inner(self) -> soa::slice::IterMut<'ctx, 'a, DenseItem<K, V>> {
+    pub(super) fn into_inner(self) -> Inner<'ctx, 'a, K, V> {
         let Self { inner } = self;
         inner
     }
@@ -200,6 +215,19 @@ where
     V: Soa<'a> + ?Sized,
 {
     #[inline]
+    #[track_caller]
+    pub fn new(
+        context: &'ctx V::Context,
+        keys: &'a mut [K],
+        values: SlicesMut<'ctx, 'a, V>,
+    ) -> Self {
+        let slices = DenseSlicesMut::new(context, keys, values);
+        let context = DenseContext::from_inner_ref(context);
+        let inner = Inner::new(context, slices);
+        Self::from_inner(inner)
+    }
+
+    #[inline]
     pub fn into_slices(self) -> (&'a [K], SlicesMut<'ctx, 'a, V>) {
         let (_, keys, values) = self.into_slices_with_context();
         (keys, values)
@@ -212,6 +240,17 @@ where
         let (context, slices) = inner.into_slices_with_context();
         let (keys, values) = slices.into_parts();
         (context, keys, values)
+    }
+
+    #[inline]
+    pub fn into_keys(self) -> Keys<'ctx, 'a, K, V> {
+        let inner = self.into_raw_iter().into_raw_keys();
+        unsafe { Keys::from_inner(inner) }
+    }
+
+    #[inline]
+    pub fn into_values_mut(self) -> ValuesMut<'ctx, 'a, K, V> {
+        unsafe { ValuesMut::from_inner(self) }
     }
 }
 

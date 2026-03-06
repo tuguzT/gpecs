@@ -4,13 +4,15 @@ use core::{
 };
 
 use crate::{
-    item::DenseItem,
-    iter::{Iter, RawIterMut},
+    item::{DenseContext, DenseItem, DenseSlicePtrs},
+    iter::{Iter, RawIterMut, RawKeys, RawValues},
     soa::{
         self,
         traits::{Ptrs, RawSoa, SlicePtrs},
     },
 };
+
+type Inner<'ctx, K, V> = soa::slice::RawIter<'ctx, DenseItem<K, V>>;
 
 #[repr(transparent)]
 pub struct RawIter<'ctx, K, V>
@@ -18,7 +20,7 @@ where
     K: 'ctx,
     V: RawSoa + ?Sized + 'ctx,
 {
-    inner: soa::slice::RawIter<'ctx, DenseItem<K, V>>,
+    inner: Inner<'ctx, K, V>,
 }
 
 impl<'ctx, K, V> RawIter<'ctx, K, V>
@@ -26,12 +28,21 @@ where
     V: RawSoa + ?Sized,
 {
     #[inline]
-    pub(crate) fn from_inner(inner: soa::slice::RawIter<'ctx, DenseItem<K, V>>) -> Self {
+    #[track_caller]
+    pub fn new(context: &'ctx V::Context, keys: *const [K], values: SlicePtrs<'ctx, V>) -> Self {
+        let slices = DenseSlicePtrs::new(context, keys, values);
+        let context = DenseContext::from_inner_ref(context);
+        let inner = Inner::new(context, slices);
+        Self::from_inner(inner)
+    }
+
+    #[inline]
+    pub(crate) fn from_inner(inner: Inner<'ctx, K, V>) -> Self {
         Self { inner }
     }
 
     #[inline]
-    pub(super) fn into_inner(self) -> soa::slice::RawIter<'ctx, DenseItem<K, V>> {
+    pub(super) fn into_inner(self) -> Inner<'ctx, K, V> {
         let Self { inner } = self;
         inner
     }
@@ -113,6 +124,18 @@ where
         let (context, slices) = inner.into_slice_ptrs_with_context();
         let (keys, values) = slices.into_parts();
         (context, keys, values)
+    }
+
+    #[inline]
+    pub fn into_raw_keys(self) -> RawKeys<'ctx, K, V> {
+        let inner = self.into_inner();
+        RawKeys::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn into_raw_values(self) -> RawValues<'ctx, K, V> {
+        let inner = self.into_inner();
+        RawValues::from_inner(inner)
     }
 
     #[inline]

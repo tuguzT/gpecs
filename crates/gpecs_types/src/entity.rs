@@ -22,7 +22,7 @@ impl Entity {
 
     #[inline]
     pub const fn new(index: u32, epoch: EntityEpoch, world: WorldId) -> Self {
-        let epoch_world = (epoch.into_u32() << Self::BITS) | world.into_u32();
+        let epoch_world = (world.into_u32() << Self::BITS) | epoch.into_u32();
         Self { index, epoch_world }
     }
 
@@ -40,26 +40,26 @@ impl Entity {
     #[inline]
     pub const fn epoch(&self) -> EntityEpoch {
         let Self { epoch_world, .. } = *self;
-        let epoch = epoch_world >> Self::BITS;
+        let epoch = epoch_world & Self::LO_BITS_MASK;
         unsafe { EntityEpoch::from_u32(epoch) }
     }
 
     #[inline]
     pub const fn set_epoch(&mut self, epoch: EntityEpoch) {
-        let world = self.world().into_u32();
-        self.epoch_world = (epoch.into_u32() << Self::BITS) | world;
+        self.epoch_world = (self.epoch_world & Self::HI_BITS_MASK) | epoch.into_u32();
     }
 
     #[inline]
     pub const fn world(&self) -> WorldId {
         let Self { epoch_world, .. } = *self;
-        let world = epoch_world & Self::LO_BITS_MASK;
-        unsafe { WorldId::from_u32(world) }
+        let epoch = epoch_world >> Self::BITS;
+        unsafe { WorldId::from_u32(epoch) }
     }
 
     #[inline]
     pub const fn set_world(&mut self, world: WorldId) {
-        self.epoch_world = (self.epoch_world & Self::HI_BITS_MASK) | world.into_u32();
+        let epoch = Self::epoch(self);
+        self.epoch_world = (world.into_u32() << Self::BITS) | epoch.into_u32();
     }
 }
 

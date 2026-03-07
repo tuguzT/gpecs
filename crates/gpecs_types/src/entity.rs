@@ -90,14 +90,17 @@ impl Key for Entity {
     type SparseIndex = u32;
     type Epoch = EntityEpoch;
 
+    #[inline]
     fn new(sparse_index: Self::SparseIndex, epoch: Self::Epoch) -> Self {
         Self::new(sparse_index, epoch, WorldId::default())
     }
 
+    #[inline]
     fn sparse_index(self) -> Self::SparseIndex {
         Self::index(&self)
     }
 
+    #[inline]
     fn epoch(self) -> Self::Epoch {
         Self::epoch(&self)
     }

@@ -1,6 +1,7 @@
+use bytemuck::{Pod, Zeroable};
 use gpecs_types::component::{Component, GpuComponent};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd, Pod, Zeroable)]
 #[repr(C, align(8))]
 pub struct Position {
     pub x: f32,

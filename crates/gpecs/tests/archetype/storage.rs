@@ -133,6 +133,7 @@ fn storage_tuple() {
         x: 1.0,
         y: 2.0,
         z: 3.0,
+        padding: Default::default(),
     };
     let IncompatibleBundleValueError { value, reason, .. } = storage
         .insert_bundle::<(Position,)>(&mut components, entity, (position,))

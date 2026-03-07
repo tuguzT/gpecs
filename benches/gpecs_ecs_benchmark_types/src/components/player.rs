@@ -1,8 +1,9 @@
+use bytemuck::{NoUninit, Zeroable};
 use gpecs_types::component::{Component, GpuComponent};
 
 use crate::utils::RandomXoshiro128;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Zeroable, NoUninit)]
 #[repr(u32)]
 pub enum PlayerType {
     #[default]
@@ -11,11 +12,12 @@ pub enum PlayerType {
     Hero,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Zeroable, NoUninit)]
 #[repr(C, align(16))]
 pub struct Player {
     pub rng: RandomXoshiro128,
     pub r#type: PlayerType,
+    pub padding: [u32; 3],
 }
 
 impl Component for Player {}

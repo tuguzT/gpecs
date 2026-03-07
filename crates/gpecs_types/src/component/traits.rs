@@ -1,3 +1,3 @@
 pub trait Component: 'static {}
 
-pub trait GpuComponent: Component + Copy + Send + Sync {}
+pub trait GpuComponent: Component + bytemuck::NoUninit + Send + Sync {}

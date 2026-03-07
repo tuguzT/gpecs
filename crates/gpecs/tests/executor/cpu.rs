@@ -66,6 +66,7 @@ fn create_positions(context: &mut Context) {
             x: i.to_f32().unwrap(),
             y: -i.to_f32().unwrap(),
             z: 0.0,
+            padding: Default::default(),
         };
         context.insert_bundle(entity, (position,)).unwrap();
     }

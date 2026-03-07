@@ -1,6 +1,7 @@
+use bytemuck::{Pod, Zeroable};
 use gpecs_types::component::{Component, GpuComponent};
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Pod, Zeroable)]
 #[repr(C, align(8))]
 pub struct Velocity {
     pub x: f32,

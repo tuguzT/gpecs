@@ -29,6 +29,7 @@ fn one_entity() {
         x: 1.0,
         y: 2.0,
         z: 3.0,
+        padding: Default::default(),
     };
     let mass = Mass { value: 42 };
     let tag = Tag;
@@ -55,6 +56,7 @@ fn one_entity() {
         x: 4.0,
         y: 5.0,
         z: 6.0,
+        padding: Default::default(),
     };
 
     let (&tag, position) = context
@@ -69,6 +71,7 @@ fn one_entity() {
         x: 1.0,
         y: 2.0,
         z: 3.0,
+        padding: Default::default(),
     };
     context
         .insert_bundle::<(Position,)>(entity, (position,))
@@ -136,11 +139,14 @@ fn many_entities() {
     for i in 0..12 {
         let entity = context.spawn();
         if i % 2 == 0 {
-            let x = i as f32;
-            let y = -(i as f32);
-            let z = 0.0;
+            let position = Position {
+                x: i as f32,
+                y: -(i as f32),
+                z: 0.0,
+                padding: Default::default(),
+            };
             context
-                .insert_bundle(entity, (Tag, Position { x, y, z }))
+                .insert_bundle(entity, (Tag, position))
                 .expect("entity should exist & archetype of `Tag` and `Position` should be valid");
         } else {
             context

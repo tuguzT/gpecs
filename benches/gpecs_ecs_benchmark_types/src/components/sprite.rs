@@ -1,3 +1,4 @@
+use bytemuck::{Pod, Zeroable};
 use gpecs_types::component::{Component, GpuComponent};
 
 pub const PLAYER_SPRITE: u32 = '@' as u32;
@@ -7,7 +8,7 @@ pub const GRAVE_SPRITE: u32 = '|' as u32;
 pub const SPAWN_SPRITE: u32 = '_' as u32;
 pub const NONE_SPRITE: u32 = ' ' as u32;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct Sprite {
     pub character: u32,

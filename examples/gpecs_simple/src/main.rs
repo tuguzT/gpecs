@@ -242,6 +242,7 @@ fn setup_context(context: &mut Context) {
                 y: -i.to_f32().unwrap(),
                 z: 0.0,
             },
+            padding: Default::default(),
         };
         let mass = Mass { value: i };
         match i % 3 {

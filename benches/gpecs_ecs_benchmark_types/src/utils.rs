@@ -1,10 +1,13 @@
 use core::ops::Range;
 
+use bytemuck::{Pod, Zeroable};
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct TimeDelta(pub f32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+#[repr(transparent)]
 pub struct RandomXoshiro128 {
     state: [u32; 4],
 }

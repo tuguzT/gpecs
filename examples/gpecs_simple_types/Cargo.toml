@@ -11,6 +11,8 @@ publish = false
 [dependencies]
 gpecs_types = { workspace = true }
 spirv-std = { workspace = true }
+bytemuck = { workspace = true, features = ["derive"] }
+glam = { workspace = true, features = ["bytemuck"] }
 
 [lints]
 workspace = true

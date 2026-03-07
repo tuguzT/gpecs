@@ -45,8 +45,7 @@ impl GpuArchetypeStorage {
                 let components_label =
                     || format!("`gpecs` {archetype_id:#} {component_id:#} storage buffer");
 
-                // FIXME: this is technically unsound, should provide `NoUninit` bound on `GpuComponent`,
-                // then create temp zero-initialized buffer & write values into it one-by-one
+                // SAFETY: GPU components implement `NoUninit`, and so all the bytes of their slice should be initialized, too
                 let components_contents = unsafe { components.as_buffer().assume_init_ref() };
                 let buffer = StorageBuffer::new(gpu_device, components_contents, components_label);
                 (component_id, buffer)

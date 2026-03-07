@@ -149,6 +149,7 @@ fn exchange_components() {
         x: 1.0,
         y: 2.0,
         z: 3.0,
+        padding: Default::default(),
     };
     let mass = Mass { value: 42 };
     let mut tag = Tag;
@@ -221,6 +222,7 @@ fn exchange_components() {
         x: -1.0,
         y: -2.0,
         z: -3.0,
+        padding: Default::default(),
     };
     let mut mass = Mass {
         value: u32::MAX - 1024,
@@ -410,6 +412,7 @@ fn components() {
         x: 1.0,
         y: 2.0,
         z: 3.0,
+        padding: Default::default(),
     };
     archetypes
         .insert_bundle::<(Position, Tag)>(&mut components, entity1, (position, Tag))

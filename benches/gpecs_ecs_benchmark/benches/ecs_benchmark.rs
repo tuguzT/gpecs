@@ -338,6 +338,7 @@ fn create_entity(context: &mut Context) -> Entity {
         mingy: 0,
         seed: 0,
         numgy: 0,
+        padding: Default::default(),
     };
     context
         .insert_bundle_exact(entity, (position, velocity, data))
@@ -368,6 +369,7 @@ fn add_components(context: &mut Context, entity: Entity) {
     let player = Player {
         rng: RandomXoshiro128::new(0),
         r#type: Default::default(),
+        padding: Default::default(),
     };
     let health = Health::default();
     let damage = Damage::default();
@@ -404,7 +406,11 @@ fn init_components(
             _ => PlayerType::Monster,
         }
     });
-    *player = Player { rng, r#type };
+    *player = Player {
+        rng,
+        r#type,
+        padding: Default::default(),
+    };
 
     *health = Health {
         hp: 0,
@@ -414,6 +420,7 @@ fn init_components(
             PlayerType::NPC => player.rng.range(6..12) as i32,
         },
         status: Default::default(),
+        padding: Default::default(),
     };
 
     *damage = Damage {

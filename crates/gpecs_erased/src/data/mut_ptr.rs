@@ -1,4 +1,4 @@
-use core::{alloc::Layout, mem::MaybeUninit, ops::Range, ptr};
+use core::{alloc::Layout, ptr};
 
 use crate::{
     data::{
@@ -46,37 +46,17 @@ where
     T: MutSliceItemPtr,
 {
     #[inline]
-    pub fn cast_const(self) -> ErasedPtr<CastConstPtr<T>> {
-        let Self { layout, ptr } = self;
-
-        let ptr = ptr.cast_const();
-        unsafe { ErasedPtr::from_parts(layout, ptr) }
-    }
-
-    #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedRef<'a, CastConstPtr<T>> {
-        unsafe { self.cast_const().deref() }
-    }
-
-    #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedMutRef<'a, T> {
-        unsafe { ErasedMutRef::from_ptr(self) }
-    }
-}
-
-impl<T, U> ErasedMutPtr<T>
-where
-    T: MutSliceItemPtr<Item = MaybeUninit<U>>,
-{
-    #[inline]
-    pub fn new(layout: Layout, buffer: *mut [U]) -> Result<Self, DataError> {
+    #[expect(
+        clippy::not_unsafe_ptr_arg_deref,
+        reason = "`T::from_slice` should not dereference input buffer"
+    )]
+    pub fn new(layout: Layout, buffer: *mut [T::Item]) -> Result<Self, DataError> {
         check_ptr_align(buffer.cast(), layout)?;
-        check_sufficient_align(layout, Layout::new::<U>())?;
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let buffer_layout = Layout::array::<U>(buffer.len())?;
+        let buffer_layout = Layout::array::<T::Item>(buffer.len())?;
         check_len(buffer_layout.size(), layout.size())?;
 
-        let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), buffer.len());
         let ptr = unsafe { T::from_slice(buffer, 0) };
 
         let me = unsafe { Self::from_parts(layout, ptr) };
@@ -85,7 +65,7 @@ where
 
     #[inline]
     pub fn dangling(layout: Layout) -> Result<Self, InsufficientAlignError> {
-        check_sufficient_align(layout, Layout::new::<U>())?;
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
         let data = ptr::without_provenance_mut(layout.align());
         let buffer = ptr::slice_from_raw_parts_mut(data, 0);
@@ -105,11 +85,29 @@ where
     }
 
     #[inline]
+    pub fn cast_const(self) -> ErasedPtr<CastConstPtr<T>> {
+        let Self { layout, ptr } = self;
+
+        let ptr = ptr.cast_const();
+        unsafe { ErasedPtr::from_parts(layout, ptr) }
+    }
+
+    #[inline]
+    pub unsafe fn deref<'a>(self) -> ErasedRef<'a, CastConstPtr<T>> {
+        unsafe { self.cast_const().deref() }
+    }
+
+    #[inline]
+    pub unsafe fn deref_mut<'a>(self) -> ErasedMutRef<'a, T> {
+        unsafe { ErasedMutRef::from_ptr(self) }
+    }
+
+    #[inline]
     #[must_use]
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { layout, ptr } = self;
 
-        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
+        let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
         let ptr = unsafe { ptr.add(count) };
         unsafe { Self::from_parts(layout, ptr) }
     }
@@ -120,7 +118,7 @@ where
         let Self { layout, ptr } = self;
 
         let offset = unsafe { ptr.offset_from(origin.cast_mut().ptr()) };
-        let len = bytes_to_items::<U>(layout.size()).cast_signed();
+        let len = bytes_to_items::<T::Item>(layout.size()).cast_signed();
         offset
             .checked_div(len)
             .expect("erased field pointer should not be a ZST")
@@ -130,7 +128,7 @@ where
     pub unsafe fn swap(self, with: Self) {
         let Self { layout, ptr } = self;
 
-        for i in 0..bytes_to_items::<U>(layout.size()) {
+        for i in 0..bytes_to_items::<T::Item>(layout.size()) {
             let this = unsafe { ptr.add(i) };
             let with = unsafe { with.ptr.add(i) };
             unsafe { this.swap(with) }
@@ -142,7 +140,7 @@ where
         let Self { layout, ptr } = self;
 
         let src = src.ptr();
-        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
+        let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
         unsafe { ptr.copy_from(src, count) }
     }
 
@@ -151,71 +149,44 @@ where
         let Self { layout, ptr } = self;
 
         let src = src.ptr();
-        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
+        let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
         unsafe { ptr.copy_from_nonoverlapping(src, count) }
     }
 
     #[inline]
-    pub fn as_uninit_buffer(self) -> *const [MaybeUninit<U>] {
-        let Self { ptr, .. } = self;
-        ptr.slice().cast_const()
-    }
-
-    #[inline]
-    pub fn as_mut_uninit_buffer(self) -> *mut [MaybeUninit<U>] {
-        let Self { ptr, .. } = self;
-        ptr.slice()
-    }
-
-    #[inline]
-    pub fn byte_offset(self) -> usize {
-        let Self { ptr, .. } = self;
-        ptr.index().wrapping_mul(size_of::<U>())
-    }
-
-    #[inline]
-    pub fn buffer_init_range(self) -> Range<usize> {
-        let Self { layout, ptr } = self;
-
-        let start = ptr.index();
-        let end = start + bytes_to_items::<U>(layout.size());
-        start..end
-    }
-
-    #[inline]
-    pub fn as_buffer(self) -> *const [U] {
+    pub fn as_buffer(self) -> *const [T::Item] {
         let Self { layout, ptr } = self;
 
         let data = ptr.as_mut_item_ptr().cast_const().cast();
-        let len = bytes_to_items::<U>(layout.size());
+        let len = bytes_to_items::<T::Item>(layout.size());
         ptr::slice_from_raw_parts(data, len)
     }
 
     #[inline]
-    pub fn as_mut_buffer(self) -> *mut [U] {
+    pub fn as_mut_buffer(self) -> *mut [T::Item] {
         let Self { layout, ptr } = self;
 
         let data = ptr.as_mut_item_ptr().cast();
-        let len = bytes_to_items::<U>(layout.size());
+        let len = bytes_to_items::<T::Item>(layout.size());
         ptr::slice_from_raw_parts_mut(data, len)
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const U {
+    pub fn as_ptr(self) -> *const T::Item {
         let Self { ptr, .. } = self;
         ptr.as_mut_item_ptr().cast_const().cast()
     }
 
     #[inline]
-    pub fn as_mut_ptr(self) -> *mut U {
+    pub fn as_mut_ptr(self) -> *mut T::Item {
         let Self { ptr, .. } = self;
         ptr.as_mut_item_ptr().cast()
     }
 }
 
-impl<T, U, V> TryFrom<*mut V> for ErasedMutPtr<T>
+impl<T, V> TryFrom<*mut V> for ErasedMutPtr<T>
 where
-    T: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    T: MutSliceItemPtr,
 {
     type Error = TryFromPtrError;
 
@@ -223,9 +194,9 @@ where
     fn try_from(ptr: *mut V) -> Result<Self, Self::Error> {
         let layout = Layout::new::<V>();
         check_ptr_align(ptr.cast(), layout)?;
-        check_sufficient_align(layout, Layout::new::<U>())?;
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let len = bytes_to_items::<U>(layout.size());
+        let len = bytes_to_items::<T::Item>(layout.size());
         let buffer = ptr::slice_from_raw_parts_mut(ptr.cast(), len);
         let ptr = unsafe { T::from_slice(buffer, 0) };
 
@@ -234,9 +205,9 @@ where
     }
 }
 
-impl<T, U, V> TryFrom<ErasedMutPtr<T>> for *mut V
+impl<T, V> TryFrom<ErasedMutPtr<T>> for *mut V
 where
-    T: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    T: MutSliceItemPtr,
 {
     type Error = DowncastError<ErasedMutPtr<T>>;
 

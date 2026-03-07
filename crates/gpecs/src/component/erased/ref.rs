@@ -107,13 +107,13 @@ impl<'a> ErasedComponentRef<'a> {
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> *const MaybeUninit<u8> {
         let Self { field, .. } = self;
         field.as_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[u8] {
+    pub fn as_buffer(&self) -> &[MaybeUninit<u8>] {
         let Self { field, .. } = self;
         field.as_buffer()
     }
@@ -169,9 +169,9 @@ impl Borrow<ComponentId> for ErasedComponentRef<'_> {
     }
 }
 
-impl AsRef<[u8]> for ErasedComponentRef<'_> {
+impl AsRef<[MaybeUninit<u8>]> for ErasedComponentRef<'_> {
     #[inline]
-    fn as_ref(&self) -> &[u8] {
+    fn as_ref(&self) -> &[MaybeUninit<u8>] {
         self.as_buffer()
     }
 }

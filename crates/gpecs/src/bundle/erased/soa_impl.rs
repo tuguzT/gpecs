@@ -125,7 +125,9 @@ where
             let Some(drop_fn) = component.meta.as_ref() else {
                 continue;
             };
-            unsafe { drop_fn(ptr.as_mut_ptr()) }
+
+            let ptr = unsafe { ptr.as_mut_ptr().cast() };
+            unsafe { drop_fn(ptr) }
         }
     }
 
@@ -223,7 +225,8 @@ where
 
             for i in 0..slice.len() {
                 let ptr = unsafe { slice.component_ptr().add(i) };
-                unsafe { drop_fn(ptr.as_mut_ptr()) }
+                let ptr = unsafe { ptr.as_mut_ptr().cast() };
+                unsafe { drop_fn(ptr) }
             }
         }
     }

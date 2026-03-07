@@ -14,7 +14,7 @@ use crate::{
     CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaMutRefs, ErasedSoaMutRefsIter,
     ErasedSoaPtrs, ErasedSoaRefs, ErasedSoaRefsIter,
     assert::check_downcast,
-    data::{Erased, ErasedMutRef, ErasedRef, error::FromLayoutDataError},
+    data::{Erased, ErasedMutRef, ErasedRef, error::FromLayoutDataError, try_copy_from_slice},
     error::{
         DowncastError, FromDescriptorsValueError, FromDescriptorsValueErrorKind,
         FromFieldsDescriptorsError, FromStorageFieldsDescriptorsError, FromStorageValueError,
@@ -35,7 +35,6 @@ use crate::{
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
-    uninit::try_init_copy_from_slice,
 };
 
 #[cfg(feature = "alloc")]
@@ -132,7 +131,7 @@ where
     ) -> Result<Self, FromStorageFieldsDescriptorsError>
     where
         I: IntoIterator<Item = F>,
-        F: AsRef<[T::Item]>,
+        F: AsRef<[MaybeUninit<T::Item>]>,
     {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
@@ -301,7 +300,7 @@ where
     ) -> Result<Self, FromFieldsDescriptorsError<T::Error>>
     where
         I: IntoIterator<Item = F>,
-        F: AsRef<[T::Item]>,
+        F: AsRef<[MaybeUninit<T::Item>]>,
     {
         let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
         offsets.by_ref().try_for_each(|offset| {
@@ -334,7 +333,7 @@ where
     ) -> Result<Self, FromFieldsDescriptorsError<T::Error>>
     where
         I: IntoIterator<Item = (F, E)>,
-        F: AsRef<[T::Item]>,
+        F: AsRef<[MaybeUninit<T::Item>]>,
         E: AsRef<FieldDescriptor>,
     {
         let (storage, descriptors) = storage_from_fields_with_descriptors(fields_with_descriptors)?;
@@ -667,7 +666,7 @@ where
 
         let offset = bytes_to_items::<T::Item>(offset);
         let len = bytes_to_items::<T::Item>(layout.size());
-        let data = unsafe { storage.as_ptr().add(offset) };
+        let data = unsafe { storage.as_ptr().add(offset).cast() };
         let data = unsafe { slice::from_raw_parts(data, len) };
 
         let item = Erased::try_from_layout_data(layout, data);
@@ -799,7 +798,7 @@ fn write_copy_of_fields<T, F, D>(
 ) -> Result<(), WriteCopyOfFieldsError>
 where
     T: Copy,
-    F: IntoIterator<Item: AsRef<[T]>>,
+    F: IntoIterator<Item: AsRef<[MaybeUninit<T>]>>,
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
     use IterOrFieldLenMismatchError::{FieldLenMismatch, IterLenMismatch};
@@ -823,7 +822,7 @@ where
         let offset = bytes_to_items::<T>(offset);
         let len = bytes_to_items::<T>(layout.size());
         let dst = &mut dst[offset..offset + len];
-        try_init_copy_from_slice(dst, src.as_ref())
+        try_copy_from_slice(dst, src.as_ref())
             .map_err(|error| FieldLenMismatch { error, field_index })?;
     }
     Ok(())
@@ -836,7 +835,7 @@ where
     T: AlignedStorageFromLayout<Item: Copy>,
     D: FromIterator<FieldDescriptor>,
     I: IntoIterator<Item = (F, E)>,
-    F: AsRef<[T::Item]>,
+    F: AsRef<[MaybeUninit<T::Item>]>,
     E: AsRef<FieldDescriptor>,
 {
     use FromFieldsDescriptorsError::FromLayout;
@@ -863,7 +862,7 @@ where
             let offset = bytes_to_items::<T::Item>(offset);
             let len = bytes_to_items::<T::Item>(layout.size());
             let dst = &mut storage.as_mut_uninit_slice()[offset..offset + len];
-            try_init_copy_from_slice(dst, src.as_ref())
+            try_copy_from_slice(dst, src.as_ref())
                 .map_err(|error| FieldLenMismatch { error, field_index })?;
 
             Ok(desc)

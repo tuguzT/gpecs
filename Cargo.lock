@@ -823,6 +823,7 @@ name = "gpecs_soa_erased"
 version = "0.0.0"
 dependencies = [
  "arrayvec",
+ "bytemuck",
  "gpecs_erased",
  "gpecs_soa",
  "itertools 0.14.0",

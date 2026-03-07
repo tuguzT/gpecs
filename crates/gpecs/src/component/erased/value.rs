@@ -191,13 +191,13 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[u8] {
+    pub fn as_slice(&self) -> &[MaybeUninit<u8>] {
         let Self { field, .. } = self;
         field.as_slice()
     }
 
     #[inline]
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
+    pub unsafe fn as_mut_slice(&mut self) -> &mut [MaybeUninit<u8>] {
         let Self { field, .. } = self;
         field.as_mut_slice()
     }
@@ -262,9 +262,9 @@ impl Borrow<ComponentId> for ErasedComponent {
     }
 }
 
-impl AsRef<[u8]> for ErasedComponent {
+impl AsRef<[MaybeUninit<u8>]> for ErasedComponent {
     #[inline]
-    fn as_ref(&self) -> &[u8] {
+    fn as_ref(&self) -> &[MaybeUninit<u8>] {
         self.as_slice()
     }
 }

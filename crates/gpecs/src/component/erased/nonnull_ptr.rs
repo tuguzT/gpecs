@@ -171,7 +171,7 @@ impl ErasedComponentNonNullPtr {
     }
 
     #[inline]
-    pub fn as_ptr(self) -> NonNull<u8> {
+    pub fn as_ptr(self) -> NonNull<MaybeUninit<u8>> {
         let Self { field, .. } = self;
         field.as_ptr()
     }

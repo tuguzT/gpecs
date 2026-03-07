@@ -142,13 +142,13 @@ impl ErasedComponentPtr {
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const u8 {
+    pub fn as_ptr(self) -> *const MaybeUninit<u8> {
         let Self { field, .. } = self;
         field.as_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [u8] {
+    pub fn as_buffer(self) -> *const [MaybeUninit<u8>] {
         let Self { field, .. } = self;
         field.as_buffer()
     }

@@ -428,7 +428,9 @@ where
             let Some(drop_fn) = component.as_ref() else {
                 continue;
             };
-            unsafe { drop_fn(ptr.as_mut_ptr()) }
+
+            let ptr = ptr.as_mut_ptr().cast();
+            unsafe { drop_fn(ptr) }
         }
     }
 }

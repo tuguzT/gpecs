@@ -1,8 +1,5 @@
 use std::{alloc::Layout, mem::MaybeUninit};
 
-#[cfg(feature = "alloc")]
-use std::{ptr, slice};
-
 use arrayvec::ArrayVec;
 use gpecs_soa_erased::{
     ErasedSoa,
@@ -68,8 +65,10 @@ fn value() {
         unsafe { field_ref.downcast::<()>() }.expect("layouts should match"),
         &(),
     );
+
+    let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
     assert_eq!(
-        field_ref.into_buffer(),
+        field_ref_bytes,
         ErasedRef::<*const _>::try_from(&()).unwrap().into_buffer(),
     );
 
@@ -78,8 +77,10 @@ fn value() {
         unsafe { field_ref.downcast::<u8>() }.expect("layouts should match"),
         &i3,
     );
+
+    let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
     assert_eq!(
-        field_ref.into_buffer(),
+        field_ref_bytes,
         ErasedRef::<*const _>::try_from(&i3).unwrap().into_buffer(),
     );
 
@@ -88,8 +89,10 @@ fn value() {
         unsafe { field_ref.downcast::<u32>() }.expect("layouts should match"),
         &i1,
     );
+
+    let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
     assert_eq!(
-        field_ref.into_buffer(),
+        field_ref_bytes,
         ErasedRef::<*const _>::try_from(&i1).unwrap().into_buffer(),
     );
 
@@ -104,39 +107,25 @@ fn value() {
         unsafe { field_ref.downcast::<u128>() }.expect("layouts should match"),
         &i2,
     );
+
+    let (_, field_ref_bytes, _) = unsafe { field_ref.into_buffer().align_to::<u8>() };
     assert_eq!(
-        field_ref.into_buffer(),
+        field_ref_bytes,
         ErasedRef::<*const _>::try_from(&i2).unwrap().into_buffer(),
     );
 
-    let unit_bytes = [0u8; size_of::<()>()].as_slice();
-    let i1_bytes = unsafe {
-        let data = ptr::from_ref(&i1).cast();
-        let len = size_of_val(&i1);
-        slice::from_raw_parts(data, len)
-    };
-    let i2_bytes = unsafe {
-        let data = ptr::from_ref(&i2).cast();
-        let len = size_of_val(&i2);
-        slice::from_raw_parts(data, len)
-    };
-    let i3_bytes = unsafe {
-        let data = ptr::from_ref(&i3).cast();
-        let len = size_of_val(&i3);
-        slice::from_raw_parts(data, len)
-    };
     let field_refs = [
-        ErasedRef::<*const _>::new(descriptors[0].layout(), unit_bytes).expect("incorrect inputs"),
-        ErasedRef::<*const _>::new(descriptors[1].layout(), i3_bytes).expect("incorrect inputs"),
-        ErasedRef::<*const _>::new(descriptors[2].layout(), i1_bytes).expect("incorrect inputs"),
-        ErasedRef::<*const _>::new(descriptors[4].layout(), i2_bytes).expect("incorrect inputs"),
+        ErasedRef::<*const _>::new(descriptors[0].layout(), bytemuck::bytes_of(&())).unwrap(),
+        ErasedRef::<*const _>::new(descriptors[1].layout(), bytemuck::bytes_of(&i3)).unwrap(),
+        ErasedRef::<*const _>::new(descriptors[2].layout(), bytemuck::bytes_of(&i1)).unwrap(),
+        ErasedRef::<*const _>::new(descriptors[4].layout(), bytemuck::bytes_of(&i2)).unwrap(),
     ];
     itertools::assert_equal(
         erased_refs
             .iter()
             .enumerate()
             .filter_map(|(i, item)| (i != 3).then_some(item))
-            .map(ErasedRef::into_buffer),
+            .map(|item| unsafe { item.into_buffer().align_to::<u8>().1 }),
         field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 
@@ -161,7 +150,9 @@ fn value() {
         .expect("all the fields should be valid here");
 
     itertools::assert_equal(
-        erased_value.iter().map(ErasedRef::into_buffer),
+        erased_value
+            .iter()
+            .map(|item| unsafe { item.into_buffer().align_to::<u8>().1 }),
         field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 
@@ -195,7 +186,9 @@ fn value_zst() {
         ErasedRef::<*const _>::new(Layout::new::<()>(), [].as_slice()).expect("incorrect inputs"),
     ];
     itertools::assert_equal(
-        erased_value.iter().map(ErasedRef::into_buffer),
+        erased_value
+            .iter()
+            .map(|item| unsafe { item.into_buffer().align_to::<u8>().1 }),
         field_refs.into_iter().map(ErasedRef::into_buffer),
     );
 

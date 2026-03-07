@@ -2,7 +2,6 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     marker::PhantomData,
-    mem::MaybeUninit,
     ptr, slice,
 };
 
@@ -22,10 +21,17 @@ where
     phantom: PhantomData<&'a [T::Item]>,
 }
 
-impl<T> ErasedSlice<'_, T>
+impl<'a, T> ErasedSlice<'a, T>
 where
     T: ConstSliceItemPtr,
 {
+    #[inline]
+    pub fn new(layout: Layout, buffer: &'a [T::Item], len: usize) -> Result<Self, DataError> {
+        let ptr = ErasedSlicePtr::new(layout, buffer, len)?;
+        let me = unsafe { Self::from_ptr(ptr) };
+        Ok(me)
+    }
+
     #[inline]
     pub unsafe fn from_parts(ptr: ErasedPtr<T>, len: usize) -> Self {
         let ptr = unsafe { ErasedSlicePtr::from_parts(ptr, len) };
@@ -36,6 +42,30 @@ where
     pub unsafe fn from_ptr(ptr: ErasedSlicePtr<T>) -> Self {
         let phantom = PhantomData;
         Self { ptr, phantom }
+    }
+
+    #[inline]
+    pub unsafe fn downcast<V>(self) -> Result<&'a [V], DowncastError<Self>> {
+        let Self { ptr, .. } = self;
+        let into_self = |ptr| unsafe { Self::from_ptr(ptr) };
+        let buffer = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
+        let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
+        Ok(slice)
+    }
+
+    #[inline]
+    pub unsafe fn downcast_ref<V>(&self) -> Result<&[V], DowncastError<&Self>> {
+        let Self { ptr, .. } = *self;
+        let into_self = |_| self;
+        let buffer = ptr
+            .downcast::<V>()
+            .map_err(|err| err.map_value(into_self))?;
+
+        let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
+        Ok(slice)
     }
 
     #[inline]
@@ -68,85 +98,35 @@ where
     }
 
     #[inline]
+    pub fn as_buffer(&self) -> &[T::Item] {
+        let Self { ptr, .. } = self;
+        let buffer = ptr.as_buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+    }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const T::Item {
+        let Self { ptr, .. } = self;
+        ptr.as_ptr()
+    }
+
+    #[inline]
+    pub fn into_buffer(self) -> &'a [T::Item] {
+        let Self { ptr, .. } = self;
+        let buffer = ptr.as_buffer();
+        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
+    }
+
+    #[inline]
     pub fn into_parts(self) -> (ErasedPtr<T>, usize) {
         let Self { ptr, .. } = self;
         ptr.into_parts()
     }
 }
 
-impl<'a, T, U> ErasedSlice<'a, T>
+impl<T> Debug for ErasedSlice<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-{
-    #[inline]
-    pub fn new(layout: Layout, buffer: &'a [U], len: usize) -> Result<Self, DataError> {
-        let ptr = ErasedSlicePtr::new(layout, buffer, len)?;
-        let me = unsafe { Self::from_ptr(ptr) };
-        Ok(me)
-    }
-
-    #[inline]
-    pub unsafe fn downcast<V>(self) -> Result<&'a [V], DowncastError<Self>> {
-        let Self { ptr, .. } = self;
-        let into_self = |ptr| unsafe { Self::from_ptr(ptr) };
-        let buffer = ptr
-            .downcast::<V>()
-            .map_err(|err| err.map_value(into_self))?;
-
-        let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
-        Ok(slice)
-    }
-
-    #[inline]
-    pub unsafe fn downcast_ref<V>(&self) -> Result<&[V], DowncastError<&Self>> {
-        let Self { ptr, .. } = *self;
-        let into_self = |_| self;
-        let buffer = ptr
-            .downcast::<V>()
-            .map_err(|err| err.map_value(into_self))?;
-
-        let slice = unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) };
-        Ok(slice)
-    }
-
-    #[inline]
-    pub fn as_uninit_buffer(&self) -> &[MaybeUninit<U>] {
-        let Self { ptr, .. } = self;
-        let buffer = ptr.as_uninit_buffer();
-        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
-    }
-
-    #[inline]
-    pub fn byte_offset(self) -> usize {
-        let Self { ptr, .. } = self;
-        ptr.byte_offset()
-    }
-
-    #[inline]
-    pub fn as_buffer(&self) -> &[U] {
-        let Self { ptr, .. } = self;
-        let buffer = ptr.as_buffer();
-        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
-    }
-
-    #[inline]
-    pub fn as_ptr(&self) -> *const U {
-        let Self { ptr, .. } = self;
-        ptr.as_ptr()
-    }
-
-    #[inline]
-    pub fn into_buffer(self) -> &'a [U] {
-        let Self { ptr, .. } = self;
-        let buffer = ptr.as_buffer();
-        unsafe { slice::from_raw_parts(buffer.cast(), buffer.len()) }
-    }
-}
-
-impl<T, U> Debug for ErasedSlice<'_, T>
-where
-    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
-    U: Debug,
+    T: ConstSliceItemPtr<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.layout();
@@ -172,19 +152,19 @@ where
 
 impl<T> Copy for ErasedSlice<'_, T> where T: ConstSliceItemPtr {}
 
-impl<T, U> AsRef<[U]> for ErasedSlice<'_, T>
+impl<T> AsRef<[T::Item]> for ErasedSlice<'_, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    T: ConstSliceItemPtr,
 {
     #[inline]
-    fn as_ref(&self) -> &[U] {
+    fn as_ref(&self) -> &[T::Item] {
         self.as_buffer()
     }
 }
 
-impl<'a, T, U, V> TryFrom<&'a [V]> for ErasedSlice<'a, T>
+impl<'a, T, V> TryFrom<&'a [V]> for ErasedSlice<'a, T>
 where
-    T: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    T: ConstSliceItemPtr,
 {
     type Error = TryFromSlicePtrError;
 

@@ -134,25 +134,25 @@ impl<'a> ErasedComponentMutRef<'a> {
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> *const MaybeUninit<u8> {
         let Self { field, .. } = self;
         field.as_ptr()
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub unsafe fn as_mut_ptr(&mut self) -> *mut MaybeUninit<u8> {
         let Self { field, .. } = self;
         field.as_mut_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[u8] {
+    pub fn as_buffer(&self) -> &[MaybeUninit<u8>] {
         let Self { field, .. } = self;
         field.as_buffer()
     }
 
     #[inline]
-    pub unsafe fn as_mut_buffer(&mut self) -> &mut [u8] {
+    pub unsafe fn as_mut_buffer(&mut self) -> &mut [MaybeUninit<u8>] {
         let Self { field, .. } = self;
         field.as_mut_buffer()
     }
@@ -208,9 +208,9 @@ impl Borrow<ComponentId> for ErasedComponentMutRef<'_> {
     }
 }
 
-impl AsRef<[u8]> for ErasedComponentMutRef<'_> {
+impl AsRef<[MaybeUninit<u8>]> for ErasedComponentMutRef<'_> {
     #[inline]
-    fn as_ref(&self) -> &[u8] {
+    fn as_ref(&self) -> &[MaybeUninit<u8>] {
         self.as_buffer()
     }
 }

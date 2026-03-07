@@ -1,4 +1,4 @@
-use core::{alloc::Layout, mem::MaybeUninit, ops::Range, ptr::NonNull};
+use core::{alloc::Layout, ptr::NonNull};
 
 use crate::{
     data::{
@@ -41,9 +41,9 @@ impl<T> ErasedNonNullPtr<T> {
     }
 }
 
-impl<T, U> ErasedNonNullPtr<T>
+impl<T> ErasedNonNullPtr<T>
 where
-    T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    T: NonNullSliceItemPtr,
 {
     #[inline]
     pub fn new(ptr: ErasedMutPtr<NonNullAsPtr<T>>) -> Option<Self> {
@@ -89,7 +89,7 @@ where
     pub unsafe fn add(self, count: usize) -> Self {
         let Self { layout, ptr } = self;
 
-        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
+        let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
         let ptr = unsafe { ptr.add(count) };
         unsafe { Self::from_parts(layout, ptr) }
     }
@@ -100,7 +100,7 @@ where
         let Self { layout, ptr } = self;
 
         let offset = unsafe { ptr.offset_from(origin.ptr()) };
-        let len = bytes_to_items::<U>(layout.size()).cast_signed();
+        let len = bytes_to_items::<T::Item>(layout.size()).cast_signed();
         offset
             .checked_div(len)
             .expect("erased field pointer should not be a ZST")
@@ -110,7 +110,7 @@ where
     pub unsafe fn swap(self, with: Self) {
         let Self { layout, ptr } = self;
 
-        for i in 0..bytes_to_items::<U>(layout.size()) {
+        for i in 0..bytes_to_items::<T::Item>(layout.size()) {
             let this = unsafe { ptr.add(i) }.as_ptr();
             let with = unsafe { with.ptr.add(i) }.as_ptr();
             unsafe { this.swap(with) }
@@ -122,7 +122,7 @@ where
         let Self { layout, ptr } = self;
 
         let src = src.ptr().as_ptr().cast_const();
-        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
+        let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
         unsafe { ptr.as_ptr().copy_from(src, count) }
     }
 
@@ -131,59 +131,38 @@ where
         let Self { layout, ptr } = self;
 
         let src = src.ptr().as_ptr().cast_const();
-        let count = bytes_to_items::<U>(layout.size()).wrapping_mul(count);
+        let count = bytes_to_items::<T::Item>(layout.size()).wrapping_mul(count);
         unsafe { ptr.as_ptr().copy_from_nonoverlapping(src, count) }
     }
 
     #[inline]
-    pub fn as_uninit_buffer(self) -> NonNull<[MaybeUninit<U>]> {
-        let Self { ptr, .. } = self;
-        ptr.slice()
-    }
-
-    #[inline]
-    pub fn byte_offset(self) -> usize {
-        let Self { ptr, .. } = self;
-        ptr.index().wrapping_mul(size_of::<U>())
-    }
-
-    #[inline]
-    pub fn buffer_init_range(self) -> Range<usize> {
-        let Self { layout, ptr } = self;
-
-        let start = ptr.index();
-        let end = start + bytes_to_items::<U>(layout.size());
-        start..end
-    }
-
-    #[inline]
-    pub fn as_buffer(self) -> NonNull<[U]> {
+    pub fn as_buffer(self) -> NonNull<[T::Item]> {
         let Self { layout, ptr } = self;
 
         let data = ptr.as_item_ptr().cast();
-        let len = bytes_to_items::<U>(layout.size());
+        let len = bytes_to_items::<T::Item>(layout.size());
         NonNull::slice_from_raw_parts(data, len)
     }
 
     #[inline]
-    pub fn as_ptr(self) -> NonNull<U> {
+    pub fn as_ptr(self) -> NonNull<T::Item> {
         let Self { ptr, .. } = self;
         ptr.as_item_ptr().cast()
     }
 }
 
-impl<T, U, V> TryFrom<NonNull<V>> for ErasedNonNullPtr<T>
+impl<T, V> TryFrom<NonNull<V>> for ErasedNonNullPtr<T>
 where
-    T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    T: NonNullSliceItemPtr,
 {
     type Error = InsufficientAlignError;
 
     #[inline]
     fn try_from(ptr: NonNull<V>) -> Result<Self, Self::Error> {
         let layout = Layout::new::<V>();
-        check_sufficient_align(layout, Layout::new::<U>())?;
+        check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
-        let len = bytes_to_items::<U>(layout.size());
+        let len = bytes_to_items::<T::Item>(layout.size());
         let buffer = NonNull::slice_from_raw_parts(ptr.cast(), len);
         let ptr = unsafe { T::from_slice(buffer, 0) };
 
@@ -192,9 +171,9 @@ where
     }
 }
 
-impl<T, U, V> TryFrom<ErasedNonNullPtr<T>> for NonNull<V>
+impl<T, V> TryFrom<ErasedNonNullPtr<T>> for NonNull<V>
 where
-    T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    T: NonNullSliceItemPtr,
 {
     type Error = DowncastError<ErasedNonNullPtr<T>>;
 
@@ -204,9 +183,9 @@ where
     }
 }
 
-impl<T, U> From<ErasedNonNullPtr<T>> for ErasedMutPtr<NonNullAsPtr<T>>
+impl<T> From<ErasedNonNullPtr<T>> for ErasedMutPtr<NonNullAsPtr<T>>
 where
-    T: NonNullSliceItemPtr<Item = MaybeUninit<U>>,
+    T: NonNullSliceItemPtr,
 {
     #[inline]
     fn from(ptr: ErasedNonNullPtr<T>) -> Self {

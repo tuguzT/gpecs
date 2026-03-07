@@ -175,7 +175,9 @@ impl ErasedComponentMutPtr {
             return Ok(());
         };
 
-        unsafe { drop_fn(field.as_mut_ptr()) }
+        let ptr = field.as_mut_ptr().cast();
+        unsafe { drop_fn(ptr) }
+
         Ok(())
     }
 
@@ -192,25 +194,25 @@ impl ErasedComponentMutPtr {
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const u8 {
+    pub fn as_ptr(self) -> *const MaybeUninit<u8> {
         let Self { field, .. } = self;
         field.as_ptr()
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(self) -> *mut u8 {
+    pub unsafe fn as_mut_ptr(self) -> *mut MaybeUninit<u8> {
         let Self { field, .. } = self;
         field.as_mut_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [u8] {
+    pub fn as_buffer(self) -> *const [MaybeUninit<u8>] {
         let Self { field, .. } = self;
         field.as_buffer()
     }
 
     #[inline]
-    pub unsafe fn as_mut_buffer(self) -> *mut [u8] {
+    pub unsafe fn as_mut_buffer(self) -> *mut [MaybeUninit<u8>] {
         let Self { field, .. } = self;
         field.as_mut_buffer()
     }

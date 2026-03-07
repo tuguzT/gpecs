@@ -11,4 +11,3 @@ pub use gpecs_ptr as ptr;
 pub mod data;
 pub mod error;
 pub mod storage;
-pub mod uninit;

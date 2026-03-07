@@ -14,11 +14,10 @@ use crate::{
             FromValueErrorKind, check_downcast,
         },
     },
-    error::{check_layout, check_len, check_sufficient_align},
+    error::{LenMismatchError, check_layout, check_len, check_sufficient_align},
     layout::bytes_to_items,
     ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
-    storage::{AlignedInitStorage, AlignedStorage, AlignedStorageFromLayout},
-    uninit::try_init_copy_from_slice,
+    storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
 #[cfg(feature = "alloc")]
@@ -32,13 +31,13 @@ where
     T: ?Sized,
 {
     phantom: PhantomData<P>,
-    storage: AlignedInitStorage<T>,
+    storage: T,
 }
 
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorage<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs,
 {
     #[inline]
     pub fn try_from_storage_layout_data<V>(
@@ -47,7 +46,7 @@ where
         data: V,
     ) -> Result<Self, FromStorageError<T>>
     where
-        V: AsRef<[T::Item]>,
+        V: AsRef<[MaybeUninit<T::Item>]>,
     {
         let expected_layout = layout;
         let layout = storage.layout();
@@ -68,12 +67,12 @@ where
             return Err(FromStorageError::new(err.into(), storage));
         }
 
-        if let Err(err) = try_init_copy_from_slice(storage.as_mut_uninit_slice(), data) {
+        if let Err(err) = try_copy_from_slice(storage.as_mut_uninit_slice(), data) {
             return Err(FromStorageError::new(err.into(), storage));
         }
 
         let me = Self {
-            storage: unsafe { AlignedInitStorage::new_unchecked(storage) },
+            storage,
             phantom: PhantomData,
         };
         Ok(me)
@@ -107,7 +106,7 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorage,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs,
 {
     #[inline]
     pub unsafe fn downcast<V>(self) -> Result<V, DowncastError<Self>> {
@@ -119,13 +118,13 @@ where
     }
 
     #[inline]
-    pub fn into_storage(self) -> AlignedInitStorage<T> {
+    pub fn into_storage(self) -> T {
         let Self { storage, .. } = self;
         storage
     }
 
     #[inline]
-    pub fn into_parts(self) -> (AlignedInitStorage<T>, Layout) {
+    pub fn into_parts(self) -> (T, Layout) {
         let Self { storage, .. } = self;
         let layout = storage.layout();
         (storage, layout)
@@ -135,7 +134,7 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorageFromLayout<Item: Copy>,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs,
 {
     #[inline]
     pub fn try_from_layout_data<V>(
@@ -143,7 +142,7 @@ where
         data: V,
     ) -> Result<Self, FromLayoutDataError<T::Error>>
     where
-        V: AsRef<[T::Item]>,
+        V: AsRef<[MaybeUninit<T::Item>]>,
     {
         check_sufficient_align(layout, Layout::new::<T::Item>())?;
 
@@ -151,10 +150,10 @@ where
         check_len(size_of_val(data), layout.size())?;
 
         let mut storage = T::from_layout(layout).map_err(FromLayoutDataError::FromLayout)?;
-        try_init_copy_from_slice(storage.as_mut_uninit_slice(), data)?;
+        try_copy_from_slice(storage.as_mut_uninit_slice(), data)?;
 
         let me = Self {
-            storage: unsafe { AlignedInitStorage::new_unchecked(storage) },
+            storage,
             phantom: PhantomData,
         };
         Ok(me)
@@ -190,12 +189,36 @@ where
 impl<T, P> Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs,
 {
     #[inline]
     pub fn layout(&self) -> Layout {
         let Self { storage, .. } = self;
         storage.layout()
+    }
+
+    #[inline]
+    pub fn as_slice(&self) -> &[MaybeUninit<T::Item>] {
+        let Self { storage, .. } = self;
+        storage.as_uninit_slice()
+    }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const T::Item {
+        let Self { storage, .. } = self;
+        storage.as_ptr()
+    }
+
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<T::Item>] {
+        let Self { storage, .. } = self;
+        storage.as_mut_uninit_slice()
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut T::Item {
+        let Self { storage, .. } = self;
+        storage.as_mut_ptr()
     }
 
     #[inline]
@@ -215,7 +238,13 @@ where
         let ptr = storage.as_mut_ptr().cast();
         Ok(unsafe { &mut *ptr })
     }
+}
 
+impl<T, P> Erased<T, P>
+where
+    T: AlignedStorage + ?Sized,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+{
     #[inline]
     pub fn as_erased(&self) -> ErasedRef<'_, P::Const> {
         unsafe { self.as_erased_ptr().deref() }
@@ -245,36 +274,12 @@ where
         let ptr = unsafe { MutSliceItemPtr::from_slice(buffer, 0) };
         unsafe { ErasedMutPtr::from_parts(layout, ptr) }
     }
-
-    #[inline]
-    pub fn as_slice(&self) -> &[T::Item] {
-        let Self { storage, .. } = self;
-        storage.as_slice()
-    }
-
-    #[inline]
-    pub fn as_ptr(&self) -> *const T::Item {
-        let Self { storage, .. } = self;
-        storage.as_ptr()
-    }
-
-    #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [T::Item] {
-        let Self { storage, .. } = self;
-        storage.as_mut_slice()
-    }
-
-    #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut T::Item {
-        let Self { storage, .. } = self;
-        storage.as_mut_ptr()
-    }
 }
 
 impl<T, P> Debug for Erased<T, P>
 where
     T: AlignedStorage<Item: Debug> + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let desc = &self.layout();
@@ -286,24 +291,37 @@ where
     }
 }
 
-impl<T, P> AsRef<[T::Item]> for Erased<T, P>
+impl<T, P> AsRef<[MaybeUninit<T::Item>]> for Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs,
 {
     #[inline]
-    fn as_ref(&self) -> &[T::Item] {
+    fn as_ref(&self) -> &[MaybeUninit<T::Item>] {
         self.as_slice()
     }
 }
 
-impl<T, P> AsMut<[T::Item]> for Erased<T, P>
+impl<T, P> AsMut<[MaybeUninit<T::Item>]> for Erased<T, P>
 where
     T: AlignedStorage + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
+    P: SliceItemPtrs,
 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [T::Item] {
+    fn as_mut(&mut self) -> &mut [MaybeUninit<T::Item>] {
         self.as_mut_slice()
     }
+}
+
+#[inline]
+pub fn try_copy_from_slice<T>(dst: &mut [T], src: &[T]) -> Result<(), LenMismatchError>
+where
+    T: Copy,
+{
+    let expected = dst.len();
+    let len = src.len();
+    check_len(len, expected)?;
+
+    dst.copy_from_slice(src);
+    Ok(())
 }

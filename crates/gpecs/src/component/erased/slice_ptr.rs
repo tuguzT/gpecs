@@ -125,13 +125,13 @@ impl ErasedComponentSlicePtr {
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const u8 {
+    pub fn as_ptr(self) -> *const MaybeUninit<u8> {
         let Self { fields, .. } = self;
         fields.as_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [u8] {
+    pub fn as_buffer(self) -> *const [MaybeUninit<u8>] {
         let Self { fields, .. } = self;
         fields.as_buffer()
     }

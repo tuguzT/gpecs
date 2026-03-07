@@ -1,7 +1,14 @@
 pub use self::{
-    mut_ptr::ErasedMutPtr, mut_ref::ErasedMutRef, mut_slice::ErasedMutSlice,
-    mut_slice_ptr::ErasedMutSlicePtr, nonnull_ptr::ErasedNonNullPtr, ptr::ErasedPtr,
-    r#ref::ErasedRef, slice::ErasedSlice, slice_ptr::ErasedSlicePtr, value::Erased,
+    mut_ptr::ErasedMutPtr,
+    mut_ref::ErasedMutRef,
+    mut_slice::ErasedMutSlice,
+    mut_slice_ptr::ErasedMutSlicePtr,
+    nonnull_ptr::ErasedNonNullPtr,
+    ptr::ErasedPtr,
+    r#ref::ErasedRef,
+    slice::ErasedSlice,
+    slice_ptr::ErasedSlicePtr,
+    value::{Erased, try_copy_from_slice},
 };
 
 #[cfg(feature = "alloc")]

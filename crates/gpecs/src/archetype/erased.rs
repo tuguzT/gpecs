@@ -5,10 +5,7 @@ use std::{
 };
 
 use gpecs_soa_erased::CovariantFieldDescriptors;
-use gpecs_sparse::{
-    arena::EpochSparseArena,
-    iter::{IntoIter as SparseIntoIter, Iter as SparseIter},
-};
+use indexmap::map::{IntoIter as IndexMapIntoIter, Iter as IndexMapIter};
 
 use crate::{
     archetype::{
@@ -23,17 +20,13 @@ use crate::{
         Component,
         registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
     },
-    soa::{
-        field::{FieldDescriptor, FieldDescriptors},
-        identity::Identity,
-    },
+    hash::IndexMap,
+    soa::field::{FieldDescriptor, FieldDescriptors},
 };
 
-type Inner<Meta> = EpochSparseArena<u32, Identity<Meta>>;
-
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErasedArchetype<Meta = ()> {
-    components: Inner<Meta>,
+    components: IndexMap<ComponentId, Meta>,
 }
 
 impl<Meta> ErasedArchetype<Meta> {
@@ -43,12 +36,12 @@ impl<Meta> ErasedArchetype<Meta> {
         I: IntoIterator<Item = (ComponentId, Meta)>,
     {
         let components = try_collect_opt_components(
-            iter.into_iter().map(|(id, meta)| {
-                let _ = components.get_component_info(id)?;
-                Some((id, meta))
+            iter.into_iter().map(|(component_id, meta)| {
+                let _ = components.get_component_info(component_id)?;
+                Some((component_id, meta))
             }),
-            |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
-            |&(id, _)| id,
+            |map, (component_id, meta)| IndexMap::insert(map, component_id, meta).is_none(),
+            |&(component_id, _)| component_id,
         )?;
 
         let me = Self { components };
@@ -60,10 +53,7 @@ impl<Meta> ErasedArchetype<Meta> {
     where
         I: IntoIterator<Item = (ComponentId, Meta)>,
     {
-        let components = iter
-            .into_iter()
-            .map(|(id, meta)| (id.into_u32(), meta.into()))
-            .collect();
+        let components = FromIterator::from_iter(iter);
         Self { components }
     }
 }
@@ -108,13 +98,13 @@ where
         I: IntoIterator<Item = ComponentId>,
     {
         let components = try_collect_opt_components(
-            component_ids.into_iter().map(|id| {
-                let info = components.get_component_info(id)?;
-                let meta = Meta::from_component_info(info);
-                Some((id, meta))
+            component_ids.into_iter().map(|component_id| {
+                let component_info = components.get_component_info(component_id)?;
+                let meta = Meta::from_component_info(component_info);
+                Some((component_id, meta))
             }),
-            |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
-            |&(id, _)| id,
+            |map, (component_id, meta)| IndexMap::insert(map, component_id, meta).is_none(),
+            |&(component_id, _)| component_id,
         )?;
 
         let me = Self { components };
@@ -127,15 +117,17 @@ where
         B: Bundle,
     {
         let components = try_collect_components(
-            B::register_components(components).into_iter().map(|id| {
-                let Some(info) = components.get_component_info(id) else {
-                    unreachable!("info of {id} should be present")
-                };
-                let meta = Meta::from_component_info(info);
-                (id, meta)
-            }),
-            |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
-            |&(id, _)| id,
+            B::register_components(components)
+                .into_iter()
+                .map(|component_id| {
+                    let Some(component_info) = components.get_component_info(component_id) else {
+                        unreachable!("info of {component_id} should be present")
+                    };
+                    let meta = Meta::from_component_info(component_info);
+                    (component_id, meta)
+                }),
+            |map, (component_id, meta)| IndexMap::insert(map, component_id, meta).is_none(),
+            |&(component_id, _)| component_id,
         )?;
 
         let me = Self { components };
@@ -158,7 +150,7 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn contains(&self, component_id: ComponentId) -> bool {
         let Self { components } = self;
-        components.contains_key(component_id.into_u32())
+        components.contains_key(&component_id)
     }
 
     #[inline]
@@ -175,30 +167,21 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<&Meta> {
         let Self { components } = self;
-
-        let meta = components.get(component_id.into_u32())?.as_inner();
-        Some(meta)
+        components.get(&component_id)
     }
 
     #[inline]
     pub fn get_index_of(&self, component_id: ComponentId) -> Option<usize> {
         let Self { components } = self;
-
-        let index: usize = component_id.into_u32().try_into().ok()?;
-        let sparse_item = components.as_sparse_slice().get(index)?;
-        let index_of = sparse_item.dense_index().copied()?;
-        index_of.try_into().ok()
+        components.get_index_of(&component_id)
     }
 
     #[inline]
     pub fn get_by_index(&self, index: usize) -> Option<(ComponentId, &Meta)> {
         let Self { components } = self;
 
-        let index = index.try_into().ok()?;
-        let (id, meta) = components.get_with_key(index)?;
-
-        let id = unsafe { ComponentId::from_u32(id) };
-        Some((id, meta))
+        let (&component_id, meta) = components.get_index(index)?;
+        Some((component_id, meta))
     }
 
     #[inline]
@@ -220,7 +203,7 @@ impl<Meta> ErasedArchetype<Meta> {
     {
         let component_ids = try_collect_components(
             component_ids,
-            |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
+            |map, component_id| IndexMap::insert(map, component_id, ()).is_none(),
             Clone::clone,
         )?;
         self.check_compatibility_inner(&component_ids)
@@ -236,7 +219,7 @@ impl<Meta> ErasedArchetype<Meta> {
     {
         let component_ids = try_collect_opt_components(
             B::get_components(components),
-            |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
+            |map, component_id| IndexMap::insert(map, component_id, ()).is_none(),
             Clone::clone,
         )?;
         self.check_compatibility_inner(&component_ids)
@@ -245,14 +228,13 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     fn check_compatibility_inner<M>(
         &self,
-        components: &Inner<M>,
+        components: &IndexMap<ComponentId, M>,
     ) -> Result<(), IncompatibleArchetypeError> {
         let mut component_ids = components.keys().copied();
         let Self { components } = self;
 
-        if let Some(id) = component_ids.find(|&id| !components.contains_key(id)) {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let error = MissingComponentError::new(id);
+        if let Some(component_id) = component_ids.find(|id| !components.contains_key(id)) {
+            let error = MissingComponentError::new(component_id);
             return Err(error.into());
         }
         Ok(())
@@ -277,7 +259,7 @@ impl<Meta> ErasedArchetype<Meta> {
     {
         let components = try_collect_components(
             component_ids,
-            |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
+            |map, component_id| IndexMap::insert(map, component_id, ()).is_none(),
             Clone::clone,
         )?;
         self.check_exact_compatibility_inner(&components)
@@ -294,7 +276,7 @@ impl<Meta> ErasedArchetype<Meta> {
         let components = B::get_components(components);
         let components = try_collect_opt_components(
             components,
-            |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
+            |map, component_id| IndexMap::insert(map, component_id, ()).is_none(),
             Clone::clone,
         )?;
         self.check_exact_compatibility_inner(&components)
@@ -303,7 +285,7 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     fn check_exact_compatibility_inner<M>(
         &self,
-        components: &Inner<M>,
+        components: &IndexMap<ComponentId, M>,
     ) -> Result<(), IncompatibleArchetypeExactError> {
         self.check_compatibility_inner(components)?;
 
@@ -321,29 +303,6 @@ impl<Meta> ErasedArchetype<Meta> {
         ErasedArchetypeIter { inner }
     }
 }
-
-impl<Meta> Debug for ErasedArchetype<Meta>
-where
-    Meta: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let components = &self.iter();
-        f.debug_struct("ErasedArchetype")
-            .field("components", components)
-            .finish()
-    }
-}
-
-impl<Meta> PartialEq for ErasedArchetype<Meta>
-where
-    Meta: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        itertools::equal(self, other)
-    }
-}
-
-impl<Meta> Eq for ErasedArchetype<Meta> where Meta: Eq {}
 
 impl<Meta> AsRef<Self> for ErasedArchetype<Meta> {
     #[inline]
@@ -444,7 +403,7 @@ where
 }
 
 pub struct ErasedArchetypeIter<'a, Meta> {
-    inner: SparseIter<'a, 'a, u32, Identity<Meta>>,
+    inner: IndexMapIter<'a, ComponentId, Meta>,
 }
 
 impl<Meta> Debug for ErasedArchetypeIter<'_, Meta>
@@ -452,8 +411,8 @@ where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone();
-        f.debug_set().entries(entries).finish()
+        let Self { inner } = self;
+        Debug::fmt(inner, f)
     }
 }
 
@@ -471,11 +430,9 @@ impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(&id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.as_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .next()
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -496,11 +453,9 @@ impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(&id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.as_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .nth(n)
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -509,11 +464,9 @@ impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|(&id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.as_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .last()
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -523,11 +476,7 @@ impl<'a, Meta> Iterator for ErasedArchetypeIter<'a, Meta> {
     {
         let Self { inner } = self;
         inner
-            .map(|(&id, meta)| {
-                let id = unsafe { ComponentId::from_u32(id) };
-                let meta = meta.as_inner();
-                ErasedArchetypeComponent { id, meta }
-            })
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
             .collect()
     }
 }
@@ -536,21 +485,17 @@ impl<Meta> DoubleEndedIterator for ErasedArchetypeIter<'_, Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(&id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.as_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .next_back()
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(&id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.as_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .nth_back(n)
+            .map(|(&id, meta)| ErasedArchetypeComponent { id, meta })
     }
 }
 
@@ -589,7 +534,7 @@ where
 }
 
 pub struct ErasedArchetypeIntoIter<Meta> {
-    inner: SparseIntoIter<u32, Identity<Meta>, Identity<Meta>>,
+    inner: IndexMapIntoIter<ComponentId, Meta>,
 }
 
 impl<Meta> ErasedArchetypeIntoIter<Meta> {
@@ -597,8 +542,7 @@ impl<Meta> ErasedArchetypeIntoIter<Meta> {
     pub fn iter(&self) -> ErasedArchetypeIter<'_, Meta> {
         let Self { inner } = self;
 
-        let (context, components, metas) = inner.as_slices_with_context();
-        let inner = SparseIter::new(context, components, metas);
+        let inner = inner.as_slice().into_iter();
         ErasedArchetypeIter { inner }
     }
 }
@@ -608,8 +552,8 @@ where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.iter();
-        f.debug_set().entries(entries).finish()
+        let Self { inner } = self;
+        Debug::fmt(inner, f)
     }
 }
 
@@ -640,11 +584,9 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().map(|(id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.into_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .next()
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -665,11 +607,9 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).map(|(id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.into_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .nth(n)
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -678,11 +618,9 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
         Self: Sized,
     {
         let Self { inner } = self;
-        inner.last().map(|(id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.into_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .last()
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
@@ -692,11 +630,7 @@ impl<Meta> Iterator for ErasedArchetypeIntoIter<Meta> {
     {
         let Self { inner } = self;
         inner
-            .map(|(id, meta)| {
-                let id = unsafe { ComponentId::from_u32(id) };
-                let meta = meta.into_inner();
-                ErasedArchetypeComponent { id, meta }
-            })
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
             .collect()
     }
 }
@@ -705,21 +639,17 @@ impl<Meta> DoubleEndedIterator for ErasedArchetypeIntoIter<Meta> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().map(|(id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.into_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .next_back()
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).map(|(id, meta)| {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let meta = meta.into_inner();
-            ErasedArchetypeComponent { id, meta }
-        })
+        inner
+            .nth_back(n)
+            .map(|(id, meta)| ErasedArchetypeComponent { id, meta })
     }
 }
 
@@ -742,5 +672,17 @@ where
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
         self.into_iter()
+    }
+}
+
+impl<Meta> CovariantFieldDescriptors for ErasedArchetypeIntoIter<Meta>
+where
+    Meta: AsRef<FieldDescriptor> + 'static,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: <Self as FieldDescriptors<'long>>::Output,
+    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from
     }
 }

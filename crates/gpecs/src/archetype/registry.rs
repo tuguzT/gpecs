@@ -776,15 +776,12 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
-        let old_archetype = Some(old_archetype);
         let mut old_fields =
-            match Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity) {
-                Some(bundle) => bundle
-                    .into_iter()
-                    .map(|component| component.expect("component should be allocated successfully"))
-                    .collect(),
-                None => IndexSet::default(),
-            };
+            Self::move_out_of_archetype_by_entity(archetypes, Some(old_archetype), entity)
+                .expect("old archetype should exist")
+                .into_iter()
+                .map(|component| component.expect("component should be allocated successfully"))
+                .collect::<IndexSet<_>>();
 
         // TODO: add new method for erased bundle to take out some of the components
         let fields = component_ids.iter().copied().map(|component_id| {
@@ -851,15 +848,20 @@ impl ArchetypeRegistry {
             return Ok(new_archetype);
         }
 
-        let old_archetype = Some(old_archetype);
+        if new_archetype.is_none() {
+            let info = unwrap_archetype_info_mut(archetypes, old_archetype);
+            if !info.storage.destroy(entity) {
+                unreachable!("{entity} should exist in {old_archetype}")
+            }
+            return Ok(new_archetype);
+        }
+
         let mut old_fields =
-            match Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity) {
-                Some(bundle) => bundle
-                    .into_iter()
-                    .map(|component| component.expect("component should be allocated successfully"))
-                    .collect(),
-                None => IndexSet::default(),
-            };
+            Self::move_out_of_archetype_by_entity(archetypes, Some(old_archetype), entity)
+                .expect("old archetype should exist")
+                .into_iter()
+                .map(|component| component.expect("component should be allocated successfully"))
+                .collect::<IndexSet<_>>();
 
         // TODO: add new method for erased bundle to remove some of the components
         component_ids

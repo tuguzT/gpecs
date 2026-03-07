@@ -296,25 +296,13 @@ impl ArchetypeRegistry {
     #[inline]
     pub fn get_archetype_info(&self, id: ArchetypeId) -> Option<&ArchetypeInfo> {
         let Self { archetypes, .. } = self;
-        Self::get_info(archetypes, id)
-    }
-
-    #[inline]
-    fn get_info(archetypes: &Archetypes, id: ArchetypeId) -> Option<&ArchetypeInfo> {
-        let index = archetype_id_into_usize(id);
-        archetypes.get_index(index).map(|(_, info)| info)
+        get_archetype_info(archetypes, id)
     }
 
     #[inline]
     pub unsafe fn get_archetype_info_mut(&mut self, id: ArchetypeId) -> Option<&mut ArchetypeInfo> {
         let Self { archetypes, .. } = self;
-        Self::get_info_mut(archetypes, id)
-    }
-
-    #[inline]
-    fn get_info_mut(archetypes: &mut Archetypes, id: ArchetypeId) -> Option<&mut ArchetypeInfo> {
-        let index = archetype_id_into_usize(id);
-        archetypes.get_index_mut(index).map(|(_, info)| info)
+        get_archetype_info_mut(archetypes, id)
     }
 
     #[inline]
@@ -417,9 +405,7 @@ impl ArchetypeRegistry {
             return Err(error);
         };
 
-        let Some(info) = Self::get_info(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info(archetypes, archetype_id);
         let Some(refs) = info.storage().get_bundle::<B>(components, entity)? else {
             let component_ids = B::get_components(components);
             let error = Self::make_incompatible_bundle_error(component_ids);
@@ -460,9 +446,7 @@ impl ArchetypeRegistry {
             return Err(error);
         };
 
-        let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         let Some(refs) = info.storage.get_bundle_mut::<B>(components, entity)? else {
             let component_ids = B::get_components(components);
             let error = Self::make_incompatible_bundle_error(component_ids);
@@ -620,14 +604,21 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
-        let mut old_fields =
-            match Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity) {
-                Some(bundle) => bundle
+        let old_fields = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+            .map(|bundle| {
+                bundle
                     .into_iter()
                     .map(|component| component.expect("component should be allocated successfully"))
-                    .collect(),
-                None => IndexSet::default(),
-            };
+                    .collect::<IndexSet<_>>()
+            });
+        let Some(mut old_fields) = old_fields else {
+            let info = unwrap_archetype_info_mut(archetypes, new_archetype);
+            if let Err(error) = info.storage.insert_bundle(components, entity, value) {
+                let error = error.reason;
+                unreachable!("failed to insert {entity} into {new_archetype}: {error}")
+            }
+            return Ok(new_archetype);
+        };
 
         let fields = ErasedBundle::<StorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
@@ -698,14 +689,21 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
-        let mut old_fields =
-            match Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity) {
-                Some(bundle) => bundle
+        let old_fields = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+            .map(|bundle| {
+                bundle
                     .into_iter()
                     .map(|component| component.expect("component should be allocated successfully"))
-                    .collect(),
-                None => IndexSet::default(),
-            };
+                    .collect::<IndexSet<_>>()
+            });
+        let Some(mut old_fields) = old_fields else {
+            let info = unwrap_archetype_info_mut(archetypes, new_archetype);
+            if let Err(error) = info.storage.insert_bundle(components, entity, value) {
+                let error = error.reason;
+                unreachable!("failed to insert {entity} into {new_archetype}: {error}")
+            }
+            return Ok(new_archetype);
+        };
 
         let fields = ErasedBundle::<StorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
@@ -884,9 +882,7 @@ impl ArchetypeRegistry {
         else {
             return false;
         };
-        let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         if !info.storage.destroy(entity) {
             unreachable!("{entity} should exist in {archetype_id}");
         }
@@ -906,9 +902,7 @@ impl ArchetypeRegistry {
             return;
         };
 
-        let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         if let Err(error) = info.storage.insert(entity, bundle) {
             unreachable!("failed to insert {entity} into {archetype_id}: {error}");
         }
@@ -922,9 +916,7 @@ impl ArchetypeRegistry {
     ) -> Option<ErasedBorrowedBundle<'_, StorageMeta>> {
         let archetype_id = archetype_id?;
 
-        let Some(info) = Self::get_info_mut(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         let Some(bundle) = info.storage.remove(entity) else {
             unreachable!("{entity} should exist in {archetype_id}")
         };
@@ -943,10 +935,7 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let index = archetype_id_into_usize(archetype_id);
-        let Some((key, _)) = archetypes.get_index(index) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let key = unwrap_archetype_key(archetypes, archetype_id);
         for &component_id in component_ids {
             if key.contains(&component_id) {
                 return Err(AlreadyHasComponentError::new(component_id));
@@ -968,10 +957,7 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let index = archetype_id_into_usize(archetype_id);
-        let Some((key, _)) = archetypes.get_index(index) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let key = unwrap_archetype_key(archetypes, archetype_id);
         for &component_id in component_ids {
             if !key.contains(&component_id) {
                 return Err(MissingComponentError::new(component_id));
@@ -989,9 +975,7 @@ impl ArchetypeRegistry {
     ) -> Option<ArchetypeId> {
         if let EntityArchetypeLocation::Known(archetype_id) = location {
             let archetype_id = archetype_id?;
-            let Some(info) = Self::get_info(archetypes, archetype_id) else {
-                unreachable!("{archetype_id} should exist")
-            };
+            let info = unwrap_archetype_info(archetypes, archetype_id);
             if !info.storage().contains(entity) {
                 unreachable!("{archetype_id} should contain {entity}");
             }
@@ -1024,9 +1008,7 @@ impl ArchetypeRegistry {
             return archetype_id;
         }
 
-        let Some(info) = Self::get_info(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info(archetypes, archetype_id);
         let component_ids: Vec<_> = info
             .storage()
             .component_ids()
@@ -1058,9 +1040,7 @@ impl ArchetypeRegistry {
             return Some(archetype_id);
         }
 
-        let Some(info) = Self::get_info(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info(archetypes, archetype_id);
         let archetype_component_ids = info.storage().component_ids();
         if archetype_component_ids.len() <= 1 {
             return None;
@@ -1127,9 +1107,7 @@ where
     ];
     let node_attrs = |_, (index, &()): (NodeIndex<_>, _)| {
         let archetype_id = archetype_id_from_usize(index.index());
-        let Some((_, info)) = archetypes.get_index(index.index()) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info(archetypes, archetype_id);
         let component_ids = info.storage().component_ids();
         format!(r#"shape=box label="{archetype_id:?}\n{component_ids:?}" "#)
     };
@@ -1321,9 +1299,7 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
         }?;
 
         let archetype_id = archetype_id_from_usize(index.index());
-        let Some(info) = ArchetypeRegistry::get_info(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info(archetypes, archetype_id);
         Some(info)
     }
 
@@ -1415,9 +1391,7 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
         }?;
 
         let archetype_id = archetype_id_from_usize(index.index());
-        let Some(info) = ArchetypeRegistry::get_info(archetypes, archetype_id) else {
-            unreachable!("{archetype_id} should exist")
-        };
+        let info = unwrap_archetype_info(archetypes, archetype_id);
         Some(info)
     }
 
@@ -2198,4 +2172,52 @@ fn archetype_id_into_usize(id: ArchetypeId) -> usize {
 #[inline]
 fn archetype_id_trusted(id: u32) -> ArchetypeId {
     unsafe { ArchetypeId::from_u32(id) }
+}
+
+#[inline]
+fn get_archetype_key(archetypes: &Archetypes, id: ArchetypeId) -> Option<&ArchetypeKey> {
+    let index = archetype_id_into_usize(id);
+    archetypes.get_index(index).map(|(key, _)| key)
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_archetype_key(archetypes: &Archetypes, id: ArchetypeId) -> &ArchetypeKey {
+    let Some(key) = get_archetype_key(archetypes, id) else {
+        unreachable!("{id} should exist")
+    };
+    key
+}
+
+#[inline]
+fn get_archetype_info(archetypes: &Archetypes, id: ArchetypeId) -> Option<&ArchetypeInfo> {
+    let index = archetype_id_into_usize(id);
+    archetypes.get_index(index).map(|(_, info)| info)
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_archetype_info(archetypes: &Archetypes, id: ArchetypeId) -> &ArchetypeInfo {
+    let Some(info) = get_archetype_info(archetypes, id) else {
+        unreachable!("{id} should exist")
+    };
+    info
+}
+
+#[inline]
+fn get_archetype_info_mut(
+    archetypes: &mut Archetypes,
+    id: ArchetypeId,
+) -> Option<&mut ArchetypeInfo> {
+    let index = archetype_id_into_usize(id);
+    archetypes.get_index_mut(index).map(|(_, info)| info)
+}
+
+#[inline]
+#[track_caller]
+fn unwrap_archetype_info_mut(archetypes: &mut Archetypes, id: ArchetypeId) -> &mut ArchetypeInfo {
+    let Some(info) = get_archetype_info_mut(archetypes, id) else {
+        unreachable!("{id} should exist")
+    };
+    info
 }

@@ -869,9 +869,6 @@ impl ArchetypeRegistry {
             old_archetype,
             &component_ids,
         );
-        if Some(old_archetype) == new_archetype {
-            return Ok(new_archetype);
-        }
 
         if new_archetype.is_none() {
             let info = unwrap_archetype_info_mut(archetypes, old_archetype);

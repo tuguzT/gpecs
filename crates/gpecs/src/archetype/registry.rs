@@ -609,14 +609,7 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
-        let old_fields = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
-            .map(|bundle| {
-                bundle
-                    .into_iter()
-                    .map(|component| component.expect("component should be allocated successfully"))
-                    .collect::<IndexSet<_>>()
-            });
-        let Some(mut old_fields) = old_fields else {
+        let Some(old_archetype) = old_archetype else {
             let info = unwrap_archetype_info_mut(archetypes, new_archetype);
             if let Err(error) = info.storage.insert_bundle(components, entity, value) {
                 let error = error.reason;
@@ -624,6 +617,12 @@ impl ArchetypeRegistry {
             }
             return Ok(new_archetype);
         };
+
+        let mut old_fields =
+            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+                .into_iter()
+                .map(|component| component.expect("component should be allocated successfully"))
+                .collect::<IndexSet<_>>();
 
         let fields = ErasedBundle::<StorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
@@ -645,7 +644,7 @@ impl ArchetypeRegistry {
         );
         let bundle = ErasedBundle::from_components(old_fields)
             .expect("erased bundle should be created successfully");
-        Self::set_in_archetype_by_entity(archetypes, Some(new_archetype), entity, bundle);
+        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         Ok(new_archetype)
     }
@@ -697,14 +696,7 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
-        let old_fields = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
-            .map(|bundle| {
-                bundle
-                    .into_iter()
-                    .map(|component| component.expect("component should be allocated successfully"))
-                    .collect::<IndexSet<_>>()
-            });
-        let Some(mut old_fields) = old_fields else {
+        let Some(old_archetype) = old_archetype else {
             let info = unwrap_archetype_info_mut(archetypes, new_archetype);
             if let Err(error) = info.storage.insert_bundle(components, entity, value) {
                 let error = error.reason;
@@ -712,6 +704,12 @@ impl ArchetypeRegistry {
             }
             return Ok(new_archetype);
         };
+
+        let mut old_fields =
+            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+                .into_iter()
+                .map(|component| component.expect("component should be allocated successfully"))
+                .collect::<IndexSet<_>>();
 
         let fields = ErasedBundle::<StorageMeta>::try_from(components, value)
             .map_err(|error| error.reason)
@@ -728,7 +726,7 @@ impl ArchetypeRegistry {
         );
         let bundle = ErasedBundle::from_components(old_fields)
             .expect("erased bundle should be created successfully");
-        Self::set_in_archetype_by_entity(archetypes, Some(new_archetype), entity, bundle);
+        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         Ok(new_archetype)
     }
@@ -779,6 +777,7 @@ impl ArchetypeRegistry {
             };
             return Err(MissingComponentError::new(component_id).into());
         };
+
         let new_archetype = Self::register_archetype_without_components(
             graph,
             archetypes,
@@ -786,20 +785,18 @@ impl ArchetypeRegistry {
             old_archetype,
             &component_ids,
         );
-
-        if new_archetype.is_none() {
+        let Some(new_archetype) = new_archetype else {
             let info = unwrap_archetype_info_mut(archetypes, old_archetype);
             let value = info
                 .storage
                 .remove_bundle::<B>(components, entity)
                 .expect("archetype should be compatible")
                 .expect("storage should contain data of given entity");
-            return Ok((value, new_archetype));
-        }
+            return Ok((value, None));
+        };
 
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, Some(old_archetype), entity)
-                .expect("old archetype should exist")
+            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
                 .into_iter()
                 .map(|component| component.expect("component should be allocated successfully"))
                 .collect::<IndexSet<_>>();
@@ -821,7 +818,7 @@ impl ArchetypeRegistry {
             .expect("erased bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
-        Ok((value, new_archetype))
+        Ok((value, Some(new_archetype)))
     }
 
     #[inline]
@@ -862,6 +859,7 @@ impl ArchetypeRegistry {
         let Some(old_archetype) = old_archetype else {
             return Ok(None);
         };
+
         let new_archetype = Self::register_archetype_without_components(
             graph,
             archetypes,
@@ -869,18 +867,16 @@ impl ArchetypeRegistry {
             old_archetype,
             &component_ids,
         );
-
-        if new_archetype.is_none() {
+        let Some(new_archetype) = new_archetype else {
             let info = unwrap_archetype_info_mut(archetypes, old_archetype);
             if !info.storage.destroy(entity) {
                 unreachable!("{entity} should exist in {old_archetype}")
             }
-            return Ok(new_archetype);
-        }
+            return Ok(None);
+        };
 
         let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, Some(old_archetype), entity)
-                .expect("old archetype should exist")
+            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
                 .into_iter()
                 .map(|component| component.expect("component should be allocated successfully"))
                 .collect::<IndexSet<_>>();
@@ -899,7 +895,7 @@ impl ArchetypeRegistry {
             .expect("erased bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
-        Ok(new_archetype)
+        Ok(Some(new_archetype))
     }
 
     #[inline]
@@ -912,7 +908,7 @@ impl ArchetypeRegistry {
         };
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         if !info.storage.destroy(entity) {
-            unreachable!("{entity} should exist in {archetype_id}");
+            unreachable!("{entity} should exist in {archetype_id}")
         }
         true
     }
@@ -920,35 +916,29 @@ impl ArchetypeRegistry {
     #[inline]
     fn set_in_archetype_by_entity<T>(
         archetypes: &mut Archetypes,
-        archetype_id: Option<ArchetypeId>,
+        archetype_id: ArchetypeId,
         entity: Entity,
         bundle: ErasedBundleKind<T>,
     ) where
         T: ErasedArchetypeKind<Meta = StorageMeta>,
     {
-        let Some(archetype_id) = archetype_id else {
-            return;
-        };
-
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         if let Err(error) = info.storage.insert(entity, bundle) {
-            unreachable!("failed to insert {entity} into {archetype_id}: {error}");
+            unreachable!("failed to insert {entity} into {archetype_id}: {error}")
         }
     }
 
     #[inline]
     fn move_out_of_archetype_by_entity(
         archetypes: &mut Archetypes,
-        archetype_id: Option<ArchetypeId>,
+        archetype_id: ArchetypeId,
         entity: Entity,
-    ) -> Option<ErasedBorrowedBundle<'_, StorageMeta>> {
-        let archetype_id = archetype_id?;
-
+    ) -> ErasedBorrowedBundle<'_, StorageMeta> {
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         let Some(bundle) = info.storage.remove(entity) else {
             unreachable!("{entity} should exist in {archetype_id}")
         };
-        Some(bundle)
+        bundle
     }
 
     #[inline]
@@ -1005,7 +995,7 @@ impl ArchetypeRegistry {
             let archetype_id = archetype_id?;
             let info = unwrap_archetype_info(archetypes, archetype_id);
             if !info.storage().contains(entity) {
-                unreachable!("{archetype_id} should contain {entity}");
+                unreachable!("{archetype_id} should contain {entity}")
             }
             return Some(archetype_id);
         }

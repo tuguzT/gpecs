@@ -787,6 +787,16 @@ impl ArchetypeRegistry {
             &component_ids,
         );
 
+        if new_archetype.is_none() {
+            let info = unwrap_archetype_info_mut(archetypes, old_archetype);
+            let value = info
+                .storage
+                .remove_bundle::<B>(components, entity)
+                .expect("archetype should be compatible")
+                .expect("storage should contain data of given entity");
+            return Ok((value, new_archetype));
+        }
+
         let mut old_fields =
             Self::move_out_of_archetype_by_entity(archetypes, Some(old_archetype), entity)
                 .expect("old archetype should exist")
@@ -803,11 +813,10 @@ impl ArchetypeRegistry {
         let value = B::from_erased(components, fields)
             .expect("input fields should be compatible with the bundle");
 
-        // TODO: uncomment assert below
-        // assert!(
-        //     !old_fields.is_empty(),
-        //     "bundle should contain at least one component",
-        // );
+        assert!(
+            !old_fields.is_empty(),
+            "bundle should contain at least one component",
+        );
         let bundle = ErasedBundle::from_components(old_fields)
             .expect("erased bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
@@ -885,11 +894,10 @@ impl ArchetypeRegistry {
             .map(|component_id| old_fields.swap_take(component_id))
             .for_each(drop);
 
-        // TODO: uncomment assert below
-        // assert!(
-        //     !old_fields.is_empty(),
-        //     "bundle should contain at least one component",
-        // );
+        assert!(
+            !old_fields.is_empty(),
+            "bundle should contain at least one component",
+        );
         let bundle = ErasedBundle::from_components(old_fields)
             .expect("erased bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);

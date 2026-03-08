@@ -634,10 +634,13 @@ impl ArchetypeRegistry {
             }
         });
 
-        let archetype_id = Some(new_archetype);
+        assert!(
+            !old_fields.is_empty(),
+            "bundle should contain at least one component",
+        );
         let bundle = ErasedBundle::from_components(old_fields)
             .expect("erased bundle should be created successfully");
-        Self::set_in_archetype_by_entity(archetypes, archetype_id, entity, bundle);
+        Self::set_in_archetype_by_entity(archetypes, Some(new_archetype), entity, bundle);
 
         Ok(new_archetype)
     }
@@ -714,10 +717,13 @@ impl ArchetypeRegistry {
         // TODO: add new method for erased bundle to replace some of the components
         fields.map(|field| old_fields.replace(field)).for_each(drop);
 
-        let archetype_id = Some(new_archetype);
+        assert!(
+            !old_fields.is_empty(),
+            "bundle should contain at least one component",
+        );
         let bundle = ErasedBundle::from_components(old_fields)
             .expect("erased bundle should be created successfully");
-        Self::set_in_archetype_by_entity(archetypes, archetype_id, entity, bundle);
+        Self::set_in_archetype_by_entity(archetypes, Some(new_archetype), entity, bundle);
 
         Ok(new_archetype)
     }
@@ -792,6 +798,11 @@ impl ArchetypeRegistry {
         let value = B::from_erased(components, fields)
             .expect("input fields should be compatible with the bundle");
 
+        // TODO: uncomment assert below
+        // assert!(
+        //     !old_fields.is_empty(),
+        //     "bundle should contain at least one component",
+        // );
         let bundle = ErasedBundle::from_components(old_fields)
             .expect("erased bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
@@ -869,6 +880,11 @@ impl ArchetypeRegistry {
             .map(|component_id| old_fields.swap_take(component_id))
             .for_each(drop);
 
+        // TODO: uncomment assert below
+        // assert!(
+        //     !old_fields.is_empty(),
+        //     "bundle should contain at least one component",
+        // );
         let bundle = ErasedBundle::from_components(old_fields)
             .expect("erased bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);

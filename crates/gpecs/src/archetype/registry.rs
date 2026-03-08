@@ -187,6 +187,11 @@ impl ArchetypeRegistry {
         C: Borrow<ComponentRegistry>,
         F: FnOnce(C) -> Result<ArchetypeStorage, E>,
     {
+        assert!(
+            !component_ids.is_empty(),
+            "archetype should contain at least one component",
+        );
+
         let archetype_id = Self::find_archetype(archetypes, &key);
         let (before, archetype_to) = if let Some(archetype_id) = archetype_id {
             (Vec::new(), archetype_id)
@@ -1068,6 +1073,10 @@ impl ArchetypeRegistry {
         let component_ids: Vec<_> = archetype_component_ids
             .filter(|component_id| !component_ids.contains(component_id))
             .collect();
+        if component_ids.is_empty() {
+            return None;
+        }
+
         let key = component_ids.iter().copied().collect();
         let archetype_id =
             Self::register_from_slice(archetypes, graph, components, &component_ids, key)

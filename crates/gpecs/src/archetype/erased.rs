@@ -1,5 +1,7 @@
 use std::{
+    cmp,
     fmt::{self, Debug},
+    hash::{self, Hash},
     iter::FusedIterator,
     ops::Deref,
 };
@@ -339,16 +341,37 @@ where
     Meta: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        itertools::equal(self, other)
+        self.len() == other.len() && self.iter().eq(other)
     }
 }
 
 impl<Meta> Eq for ErasedArchetype<Meta> where Meta: Eq {}
 
-impl<Meta> AsRef<Self> for ErasedArchetype<Meta> {
-    #[inline]
-    fn as_ref(&self) -> &Self {
-        self
+impl<Meta> PartialOrd for ErasedArchetype<Meta>
+where
+    Meta: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.iter().partial_cmp(other)
+    }
+}
+
+impl<Meta> Ord for ErasedArchetype<Meta>
+where
+    Meta: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.iter().cmp(other)
+    }
+}
+
+impl<Meta> Hash for ErasedArchetype<Meta>
+where
+    Meta: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.len().hash(state);
+        self.iter().for_each(|component| component.hash(state));
     }
 }
 
@@ -452,8 +475,8 @@ where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone();
-        f.debug_set().entries(entries).finish()
+        let entries = self.clone().map(From::from);
+        f.debug_map().entries(entries).finish()
     }
 }
 
@@ -608,8 +631,7 @@ where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.iter();
-        f.debug_set().entries(entries).finish()
+        self.iter().fmt(f)
     }
 }
 

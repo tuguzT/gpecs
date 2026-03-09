@@ -1246,10 +1246,12 @@ impl ExactSizeIterator for ArchetypeIds {
 
 impl FusedIterator for ArchetypeIds {}
 
+type GraphWalker<G> = WalkerIter<Bfs<NodeIndex<u32>, <Graph as Visitable>::Map>, G>;
+
 #[derive(Clone)]
 pub struct ArchetypesBefore<'a> {
     archetypes: &'a Archetypes,
-    walker: WalkerIter<Bfs<NodeIndex<u32>, <Graph as Visitable>::Map>, Reversed<&'a Graph>>,
+    walker: GraphWalker<Reversed<&'a Graph>>,
     archetype_id: ArchetypeId,
     exclusive: bool,
 }
@@ -1271,6 +1273,12 @@ impl<'a> ArchetypesBefore<'a> {
             archetype_id,
             exclusive,
         }
+    }
+
+    #[inline]
+    pub fn archetype_id(&self) -> ArchetypeId {
+        let Self { archetype_id, .. } = *self;
+        archetype_id
     }
 
     #[inline]
@@ -1342,7 +1350,7 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
 #[derive(Clone)]
 pub struct ArchetypesAfter<'a> {
     archetypes: &'a Archetypes,
-    walker: WalkerIter<Bfs<NodeIndex<u32>, <Graph as Visitable>::Map>, &'a Graph>,
+    walker: GraphWalker<&'a Graph>,
     archetype_id: ArchetypeId,
     exclusive: bool,
 }
@@ -1363,6 +1371,12 @@ impl<'a> ArchetypesAfter<'a> {
             archetype_id,
             exclusive,
         }
+    }
+
+    #[inline]
+    pub fn archetype_id(&self) -> ArchetypeId {
+        let Self { archetype_id, .. } = *self;
+        archetype_id
     }
 
     #[inline]

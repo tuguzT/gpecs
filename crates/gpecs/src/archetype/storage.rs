@@ -565,8 +565,8 @@ pub struct ComponentIds<'a> {
 
 impl Debug for ComponentIds<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner } = self;
-        Debug::fmt(inner, f)
+        let entries = self.clone();
+        f.debug_set().entries(entries).finish()
     }
 }
 

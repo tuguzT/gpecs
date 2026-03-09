@@ -17,7 +17,7 @@ use crate::common::{Name, Position, Tag};
 #[test]
 fn storage_tag() {
     let mut components = ComponentRegistry::new();
-    let mut storage = ArchetypeStorage::of::<(Tag,)>(&mut components)
+    let mut storage = ArchetypeStorage::register::<(Tag,)>(&mut components)
         .expect("creation of storage for tag archetype should succeed");
     assert_eq!(storage.entities(), []);
 
@@ -57,14 +57,14 @@ fn storage_tag() {
 fn storage_tuple() {
     let mut components = ComponentRegistry::new();
 
-    let error = ArchetypeStorage::of::<(Position, Position)>(&mut components)
+    let error = ArchetypeStorage::register::<(Position, Position)>(&mut components)
         .expect_err("creation of storage for bundle `(Position, Position)` should fail");
     assert_eq!(
         error.component_id(),
         components.register_component::<Position>(),
     );
 
-    let mut storage = ArchetypeStorage::of::<(Position, Name)>(&mut components)
+    let mut storage = ArchetypeStorage::register::<(Position, Name)>(&mut components)
         .expect("creation of storage for bundle `(Position, Name)` should succeed");
     assert_eq!(storage.entities(), []);
 

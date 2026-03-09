@@ -100,7 +100,7 @@ where
     where
         B: Bundle,
     {
-        let archetype = match ErasedArchetype::of::<B>(registry) {
+        let archetype = match ErasedArchetype::register::<B>(registry) {
             Ok(archetype) => archetype,
             Err(reason) => return Err(FromBundleError::new(bundle, reason.into())),
         };

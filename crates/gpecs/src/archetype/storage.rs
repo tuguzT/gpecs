@@ -11,7 +11,7 @@ use crate::{
         erased::{ErasedArchetype, ErasedArchetypeIter, FromComponentInfo},
         error::{
             ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-            IncompatibleArchetypeExactError, IncompatibleBundleValueError,
+            IncompatibleArchetypeExactError, IncompatibleBundleValueError, MissingComponentError,
         },
     },
     bundle::{
@@ -134,11 +134,23 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn of<B>(components: &mut ComponentRegistry) -> Result<Self, DuplicateComponentError>
+    pub fn of<B>(components: &ComponentRegistry) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
     {
         let archetype = ErasedArchetype::of::<B>(components)?;
+        let sparse_set = EpochSparseSet::with_context(archetype);
+
+        let me = Self { sparse_set };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn register<B>(components: &mut ComponentRegistry) -> Result<Self, DuplicateComponentError>
+    where
+        B: Bundle,
+    {
+        let archetype = ErasedArchetype::register::<B>(components)?;
         let sparse_set = EpochSparseSet::with_context(archetype);
 
         let me = Self { sparse_set };
@@ -158,7 +170,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn check_compatibility(&self, other: &Self) -> Result<(), IncompatibleArchetypeError> {
+    pub fn check_compatibility(&self, other: &Self) -> Result<(), MissingComponentError> {
         let archetype = self.archetype();
         let other = other.archetype();
         archetype.check_compatibility(other)

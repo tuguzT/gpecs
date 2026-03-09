@@ -126,7 +126,27 @@ where
     }
 
     #[inline]
-    pub fn of<B>(components: &mut ComponentRegistry) -> Result<Self, DuplicateComponentError>
+    pub fn of<B>(components: &ComponentRegistry) -> Result<Self, ArchetypeError>
+    where
+        B: Bundle,
+    {
+        let components = try_collect_opt_components(
+            B::get_components(components).into_iter().map(|id| {
+                let id = id?;
+                let info = components.get_component_info(id)?;
+                let meta = Meta::from_component_info(info);
+                Some((id, meta))
+            }),
+            |map, (id, meta)| Inner::insert(map, id.into_u32(), meta.into()).is_none(),
+            |&(id, _)| id,
+        )?;
+
+        let me = Self { components };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn register<B>(components: &mut ComponentRegistry) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
     {
@@ -209,7 +229,7 @@ impl<Meta> ErasedArchetype<Meta> {
     pub fn check_compatibility<M>(
         &self,
         other: &ErasedArchetype<M>,
-    ) -> Result<(), IncompatibleArchetypeError> {
+    ) -> Result<(), MissingComponentError> {
         let ErasedArchetype { components } = other;
         self.check_compatibility_inner(components)
     }
@@ -227,7 +247,8 @@ impl<Meta> ErasedArchetype<Meta> {
             |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
             Clone::clone,
         )?;
-        self.check_compatibility_inner(&component_ids)
+        self.check_compatibility_inner(&component_ids)?;
+        Ok(())
     }
 
     #[inline]
@@ -243,21 +264,22 @@ impl<Meta> ErasedArchetype<Meta> {
             |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
             Clone::clone,
         )?;
-        self.check_compatibility_inner(&component_ids)
+        self.check_compatibility_inner(&component_ids)?;
+        Ok(())
     }
 
     #[inline]
     fn check_compatibility_inner<M>(
         &self,
         components: &Inner<M>,
-    ) -> Result<(), IncompatibleArchetypeError> {
+    ) -> Result<(), MissingComponentError> {
         let mut component_ids = components.keys().copied();
         let Self { components } = self;
 
         if let Some(id) = component_ids.find(|&id| !components.contains_key(id)) {
             let id = unsafe { ComponentId::from_u32(id) };
             let error = MissingComponentError::new(id);
-            return Err(error.into());
+            return Err(error);
         }
         Ok(())
     }

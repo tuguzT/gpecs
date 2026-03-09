@@ -150,7 +150,7 @@ impl ArchetypeRegistry {
             try_collect_components(component_ids, ArchetypeKey::insert, Clone::clone)?
         };
 
-        let f = |components| ArchetypeStorage::of::<B>(components);
+        let f = |components| ArchetypeStorage::register::<B>(components);
         Self::register(archetypes, graph, components, &component_ids, key, f)
     }
 

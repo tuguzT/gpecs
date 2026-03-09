@@ -1029,6 +1029,7 @@ impl ArchetypeRegistry {
         let info = unwrap_archetype_info(archetypes, archetype_id);
         let component_ids: Vec<_> = info
             .storage()
+            .archetype()
             .component_ids()
             .chain(component_ids.iter().copied())
             .sorted_unstable_by_key(|&component_id| {
@@ -1059,7 +1060,7 @@ impl ArchetypeRegistry {
         }
 
         let info = unwrap_archetype_info(archetypes, archetype_id);
-        let archetype_component_ids = info.storage().component_ids();
+        let archetype_component_ids = info.storage().archetype().component_ids();
         if archetype_component_ids.len() <= 1 {
             return None;
         }
@@ -1130,7 +1131,7 @@ where
     let node_attrs = |_, (index, &()): (NodeIndex<_>, _)| {
         let archetype_id = archetype_id_from_usize(index.index());
         let info = unwrap_archetype_info(archetypes, archetype_id);
-        let component_ids = info.storage().component_ids();
+        let component_ids = info.storage().archetype().component_ids();
         format!(r#"shape=box label="{archetype_id:?}\n{component_ids:?}" "#)
     };
     let edge_attrs = |_, edge: EdgeReference<'_, _, _>| {

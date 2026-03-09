@@ -22,11 +22,14 @@ fn storage_tag() {
     assert_eq!(storage.entities(), []);
 
     let component_ids = <(Tag,)>::register_components(&mut components);
-    assert!(storage.component_ids().eq(component_ids));
+    itertools::assert_equal(storage.archetype().component_ids(), component_ids);
 
     let storage_from_ids = ArchetypeStorage::new(&components, component_ids)
         .expect("tag component should be already registered");
-    assert!(storage_from_ids.component_ids().eq(storage.component_ids()));
+    itertools::assert_equal(
+        storage_from_ids.archetype().component_ids(),
+        storage.archetype().component_ids(),
+    );
 
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();
@@ -69,11 +72,14 @@ fn storage_tuple() {
     assert_eq!(storage.entities(), []);
 
     let component_ids = <(Position, Name)>::register_components(&mut components);
-    assert!(storage.component_ids().eq(component_ids));
+    itertools::assert_equal(storage.archetype().component_ids(), component_ids);
 
     let storage_from_ids = ArchetypeStorage::new(&components, component_ids)
         .expect("`Position` and `Name` components should be already registered");
-    assert!(storage_from_ids.component_ids().eq(storage.component_ids()));
+    itertools::assert_equal(
+        storage_from_ids.archetype().component_ids(),
+        storage.archetype().component_ids(),
+    );
 
     let mut worlds = WorldRegistry::new();
     let world = worlds.spawn();

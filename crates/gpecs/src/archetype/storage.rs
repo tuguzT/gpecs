@@ -1,14 +1,11 @@
-use std::{
-    fmt::{self, Debug},
-    iter::FusedIterator,
-};
+use std::fmt::{self, Debug};
 
 use bytemuck::{Pod, Zeroable, must_cast_slice};
 use gpecs_sparse::{TryInsertAccess, error::TryReserveError, key::Key, set::EpochSparseSet};
 
 use crate::{
     archetype::{
-        erased::{ErasedArchetype, ErasedArchetypeIter, FromComponentInfo},
+        erased::{ErasedArchetype, FromComponentInfo},
         error::{
             ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
             IncompatibleArchetypeExactError, IncompatibleBundleValueError, MissingComponentError,
@@ -161,12 +158,6 @@ impl ArchetypeStorage {
     pub fn archetype(&self) -> &ErasedArchetype<StorageMeta> {
         let Self { sparse_set } = self;
         sparse_set.context()
-    }
-
-    #[inline]
-    pub fn component_ids(&self) -> ComponentIds<'_> {
-        let inner = self.archetype().iter();
-        ComponentIds { inner }
     }
 
     #[inline]
@@ -551,94 +542,9 @@ impl ArchetypeStorage {
 
 impl Debug for ArchetypeStorage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let component_ids = &self.component_ids();
+        let component_ids = &self.archetype().component_ids();
         f.debug_struct("ArchetypeStorage")
             .field("component_ids", component_ids)
             .finish_non_exhaustive()
     }
 }
-
-#[derive(Clone)]
-pub struct ComponentIds<'a> {
-    inner: ErasedArchetypeIter<'a, StorageMeta>,
-}
-
-impl Debug for ComponentIds<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let entries = self.clone();
-        f.debug_set().entries(entries).finish()
-    }
-}
-
-impl Iterator for ComponentIds<'_> {
-    type Item = ComponentId;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.next().map(From::from)
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self { inner } = self;
-        inner.size_hint()
-    }
-
-    #[inline]
-    fn count(self) -> usize
-    where
-        Self: Sized,
-    {
-        let Self { inner } = self;
-        inner.count()
-    }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.nth(n).map(From::from)
-    }
-
-    #[inline]
-    fn last(self) -> Option<Self::Item>
-    where
-        Self: Sized,
-    {
-        let Self { inner } = self;
-        inner.last().map(From::from)
-    }
-
-    #[inline]
-    fn collect<B: FromIterator<Self::Item>>(self) -> B
-    where
-        Self: Sized,
-    {
-        let Self { inner } = self;
-        inner.map(From::from).collect()
-    }
-}
-
-impl DoubleEndedIterator for ComponentIds<'_> {
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.next_back().map(From::from)
-    }
-
-    #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        let Self { inner } = self;
-        inner.nth_back(n).map(From::from)
-    }
-}
-
-impl ExactSizeIterator for ComponentIds<'_> {
-    #[inline]
-    fn len(&self) -> usize {
-        let Self { inner } = self;
-        inner.len()
-    }
-}
-
-impl FusedIterator for ComponentIds<'_> {}

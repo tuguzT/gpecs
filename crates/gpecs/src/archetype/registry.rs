@@ -5,7 +5,7 @@ use std::{
     iter::{self, FusedIterator},
     marker::PhantomData,
     ops::Range,
-    slice,
+    ptr, slice,
 };
 
 pub use gpecs_types::archetype::ArchetypeId;
@@ -361,9 +361,24 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
+    pub unsafe fn archetypes_before_mut(&mut self, id: ArchetypeId) -> ArchetypesBeforeMut<'_> {
+        let Self { archetypes, graph } = self;
+        ArchetypesBeforeMut::new(archetypes, graph, id, true)
+    }
+
+    #[inline]
     pub fn archetypes_before_inclusive(&self, id: ArchetypeId) -> ArchetypesBefore<'_> {
         let Self { archetypes, graph } = self;
         ArchetypesBefore::new(archetypes, graph, id, false)
+    }
+
+    #[inline]
+    pub unsafe fn archetypes_before_inclusive_mut(
+        &mut self,
+        id: ArchetypeId,
+    ) -> ArchetypesBeforeMut<'_> {
+        let Self { archetypes, graph } = self;
+        ArchetypesBeforeMut::new(archetypes, graph, id, false)
     }
 
     #[inline]
@@ -373,9 +388,24 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
+    pub unsafe fn archetypes_after_mut(&mut self, id: ArchetypeId) -> ArchetypesAfterMut<'_> {
+        let Self { archetypes, graph } = self;
+        ArchetypesAfterMut::new(archetypes, graph, id, true)
+    }
+
+    #[inline]
     pub fn archetypes_after_inclusive(&self, id: ArchetypeId) -> ArchetypesAfter<'_> {
         let Self { archetypes, graph } = self;
         ArchetypesAfter::new(archetypes, graph, id, false)
+    }
+
+    #[inline]
+    pub unsafe fn archetypes_after_inclusive_mut(
+        &mut self,
+        id: ArchetypeId,
+    ) -> ArchetypesAfterMut<'_> {
+        let Self { archetypes, graph } = self;
+        ArchetypesAfterMut::new(archetypes, graph, id, false)
     }
 
     #[inline]
@@ -1421,6 +1451,83 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
     }
 }
 
+pub struct ArchetypesBeforeMut<'a> {
+    archetypes: &'a mut Archetypes,
+    walker: ArchetypeWalker<Reversed<&'a Graph>>,
+}
+
+impl<'a> ArchetypesBeforeMut<'a> {
+    #[inline]
+    fn new(
+        archetypes: &'a mut Archetypes,
+        graph: &'a Graph,
+        start: ArchetypeId,
+        exclusive: bool,
+    ) -> Self {
+        let graph = Reversed(graph);
+        let walker = ArchetypeWalker::new(graph, start, exclusive);
+        Self { archetypes, walker }
+    }
+
+    #[inline]
+    pub fn start(&self) -> ArchetypeId {
+        let Self { walker, .. } = self;
+        walker.start()
+    }
+
+    #[inline]
+    pub fn is_exclusive(&self) -> bool {
+        let Self { walker, .. } = self;
+        walker.is_exclusive()
+    }
+
+    #[inline]
+    pub fn is_inclusive(&self) -> bool {
+        let Self { walker, .. } = self;
+        walker.is_inclusive()
+    }
+}
+
+impl Debug for ArchetypesBeforeMut<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { archetypes, walker } = self;
+
+        graph_dot_scoped(archetypes, walker.graph().0, |graph| {
+            f.debug_struct("ArchetypesBeforeMut")
+                .field("archetypes", archetypes)
+                .field("graph", graph)
+                .field("start", &walker.start())
+                .field("inclusive", &walker.is_inclusive())
+                .finish()
+        })
+    }
+}
+
+impl<'a> Iterator for ArchetypesBeforeMut<'a> {
+    type Item = &'a mut ArchetypeInfo;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { walker, archetypes } = self;
+
+        let archetype_id = walker.next()?;
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
+
+        // SAFETY: BFS walker is non-recursive, so it must not yield the same node twice
+        let info = unsafe { &mut *ptr::from_mut(info) };
+        Some(info)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { archetypes, walker } = self;
+
+        let skip_count = usize::from(walker.is_exclusive());
+        let upper = archetypes.len().saturating_sub(skip_count);
+        (0, Some(upper))
+    }
+}
+
 #[derive(Clone)]
 pub struct ArchetypesAfter<'a> {
     archetypes: &'a Archetypes,
@@ -1485,6 +1592,82 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
 
         let archetype_id = walker.next()?;
         let info = unwrap_archetype_info(archetypes, archetype_id);
+        Some(info)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let Self { archetypes, walker } = self;
+
+        let skip_count = usize::from(walker.is_exclusive());
+        let upper = archetypes.len().saturating_sub(skip_count);
+        (0, Some(upper))
+    }
+}
+
+pub struct ArchetypesAfterMut<'a> {
+    archetypes: &'a mut Archetypes,
+    walker: ArchetypeWalker<&'a Graph>,
+}
+
+impl<'a> ArchetypesAfterMut<'a> {
+    #[inline]
+    fn new(
+        archetypes: &'a mut Archetypes,
+        graph: &'a Graph,
+        start: ArchetypeId,
+        exclusive: bool,
+    ) -> Self {
+        let walker = ArchetypeWalker::new(graph, start, exclusive);
+        Self { archetypes, walker }
+    }
+
+    #[inline]
+    pub fn start(&self) -> ArchetypeId {
+        let Self { walker, .. } = self;
+        walker.start()
+    }
+
+    #[inline]
+    pub fn is_exclusive(&self) -> bool {
+        let Self { walker, .. } = self;
+        walker.is_exclusive()
+    }
+
+    #[inline]
+    pub fn is_inclusive(&self) -> bool {
+        let Self { walker, .. } = self;
+        walker.is_inclusive()
+    }
+}
+
+impl Debug for ArchetypesAfterMut<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { archetypes, walker } = self;
+
+        graph_dot_scoped(archetypes, walker.graph(), |graph| {
+            f.debug_struct("ArchetypesAfterMut")
+                .field("archetypes", archetypes)
+                .field("graph", graph)
+                .field("start", &walker.start())
+                .field("inclusive", &walker.is_inclusive())
+                .finish()
+        })
+    }
+}
+
+impl<'a> Iterator for ArchetypesAfterMut<'a> {
+    type Item = &'a mut ArchetypeInfo;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { walker, archetypes } = self;
+
+        let archetype_id = walker.next()?;
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
+
+        // SAFETY: BFS walker is non-recursive, so it must not yield the same node twice
+        let info = unsafe { &mut *ptr::from_mut(info) };
         Some(info)
     }
 

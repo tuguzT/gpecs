@@ -16,7 +16,7 @@ use petgraph::{
     Direction,
     dot::{Config as DotConfig, Dot, RankDir},
     graph::{DiGraph, EdgeReference, NodeIndex},
-    visit::{Bfs, EdgeRef, Reversed, Visitable, Walker, WalkerIter},
+    visit::{Bfs, EdgeRef, GraphBase, GraphRef, Reversed, Visitable, Walker, WalkerIter},
 };
 
 use crate::{
@@ -1247,14 +1247,106 @@ impl ExactSizeIterator for ArchetypeIds {
 
 impl FusedIterator for ArchetypeIds {}
 
-type GraphWalker<G> = WalkerIter<Bfs<NodeIndex<u32>, <Graph as Visitable>::Map>, G>;
+type GraphWalker<G> = Bfs<<G as GraphBase>::NodeId, <G as Visitable>::Map>;
+
+struct ArchetypeWalker<G>
+where
+    G: GraphRef<NodeId = NodeIndex<u32>> + Visitable,
+    GraphWalker<G>: Walker<G, Item = NodeIndex<u32>>,
+{
+    walker: WalkerIter<GraphWalker<G>, G>,
+    start: ArchetypeId,
+    exclusive: bool,
+}
+
+impl<G> ArchetypeWalker<G>
+where
+    G: GraphRef<NodeId = NodeIndex<u32>> + Visitable,
+    GraphWalker<G>: Walker<G, Item = NodeIndex<u32>>,
+{
+    fn new(graph: G, start: ArchetypeId, exclusive: bool) -> Self {
+        let walker = GraphWalker::<G>::new(graph, start.into_u32().into()).iter(graph);
+        Self {
+            walker,
+            start,
+            exclusive,
+        }
+    }
+
+    #[inline]
+    fn graph(&self) -> G {
+        let Self { walker, .. } = self;
+        walker.context()
+    }
+
+    #[inline]
+    fn start(&self) -> ArchetypeId {
+        let Self { start, .. } = *self;
+        start
+    }
+
+    #[inline]
+    fn is_exclusive(&self) -> bool {
+        let Self { exclusive, .. } = *self;
+        exclusive
+    }
+
+    #[inline]
+    fn is_inclusive(&self) -> bool {
+        !self.is_exclusive()
+    }
+}
+
+impl<G> Clone for ArchetypeWalker<G>
+where
+    G: GraphRef<NodeId = NodeIndex<u32>> + Visitable<Map: Clone>,
+    GraphWalker<G>: Walker<G, Item = NodeIndex<u32>>,
+{
+    fn clone(&self) -> Self {
+        let Self {
+            ref walker,
+            start,
+            exclusive,
+        } = *self;
+
+        Self {
+            walker: walker.clone(),
+            start,
+            exclusive,
+        }
+    }
+}
+
+impl<G> Iterator for ArchetypeWalker<G>
+where
+    G: GraphRef<NodeId = NodeIndex<u32>> + Visitable,
+    GraphWalker<G>: Walker<G, Item = NodeIndex<u32>>,
+{
+    type Item = ArchetypeId;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self {
+            ref mut walker,
+            start,
+            exclusive,
+        } = *self;
+
+        let index = if exclusive {
+            walker.find(|index| index.index() != archetype_id_into_usize(start))
+        } else {
+            walker.next()
+        }?;
+
+        let archetype_id = archetype_id_from_usize(index.index());
+        Some(archetype_id)
+    }
+}
 
 #[derive(Clone)]
 pub struct ArchetypesBefore<'a> {
     archetypes: &'a Archetypes,
-    walker: GraphWalker<Reversed<&'a Graph>>,
-    archetype_id: ArchetypeId,
-    exclusive: bool,
+    walker: ArchetypeWalker<Reversed<&'a Graph>>,
 }
 
 impl<'a> ArchetypesBefore<'a> {
@@ -1262,50 +1354,43 @@ impl<'a> ArchetypesBefore<'a> {
     fn new(
         archetypes: &'a Archetypes,
         graph: &'a Graph,
-        archetype_id: ArchetypeId,
+        start: ArchetypeId,
         exclusive: bool,
     ) -> Self {
-        let start = archetype_id.into_u32().into();
         let graph = Reversed(graph);
-        let walker = Bfs::new(graph, start).iter(graph);
-        Self {
-            archetypes,
-            walker,
-            archetype_id,
-            exclusive,
-        }
+        let walker = ArchetypeWalker::new(graph, start, exclusive);
+        Self { archetypes, walker }
     }
 
     #[inline]
-    pub fn archetype_id(&self) -> ArchetypeId {
-        let Self { archetype_id, .. } = *self;
-        archetype_id
+    pub fn start(&self) -> ArchetypeId {
+        let Self { walker, .. } = self;
+        walker.start()
+    }
+
+    #[inline]
+    pub fn is_exclusive(&self) -> bool {
+        let Self { walker, .. } = self;
+        walker.is_exclusive()
     }
 
     #[inline]
     pub fn is_inclusive(&self) -> bool {
-        let Self { exclusive, .. } = self;
-        !exclusive
+        let Self { walker, .. } = self;
+        walker.is_inclusive()
     }
 }
 
 impl Debug for ArchetypesBefore<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            archetypes,
-            walker,
-            archetype_id,
-            exclusive,
-        } = self;
+        let Self { archetypes, walker } = self;
 
-        let graph = walker.context().0;
-        let inclusive = &!exclusive;
-        graph_dot_scoped(archetypes, graph, |graph| {
+        graph_dot_scoped(archetypes, walker.graph().0, |graph| {
             f.debug_struct("ArchetypesBefore")
                 .field("archetypes", archetypes)
                 .field("graph", graph)
-                .field("archetype_id", archetype_id)
-                .field("inclusive", inclusive)
+                .field("start", &walker.start())
+                .field("inclusive", &walker.is_inclusive())
                 .finish()
         })
     }
@@ -1319,30 +1404,18 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
         let Self {
             ref mut walker,
             archetypes,
-            archetype_id,
-            exclusive,
         } = *self;
 
-        let index = if exclusive {
-            walker.find(|index| index.index() != archetype_id_into_usize(archetype_id))
-        } else {
-            walker.next()
-        }?;
-
-        let archetype_id = archetype_id_from_usize(index.index());
+        let archetype_id = walker.next()?;
         let info = unwrap_archetype_info(archetypes, archetype_id);
         Some(info)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self {
-            archetypes,
-            exclusive,
-            ..
-        } = *self;
+        let Self { archetypes, walker } = self;
 
-        let skip_count = usize::from(exclusive);
+        let skip_count = usize::from(walker.is_exclusive());
         let upper = archetypes.len().saturating_sub(skip_count);
         (0, Some(upper))
     }
@@ -1351,9 +1424,7 @@ impl<'a> Iterator for ArchetypesBefore<'a> {
 #[derive(Clone)]
 pub struct ArchetypesAfter<'a> {
     archetypes: &'a Archetypes,
-    walker: GraphWalker<&'a Graph>,
-    archetype_id: ArchetypeId,
-    exclusive: bool,
+    walker: ArchetypeWalker<&'a Graph>,
 }
 
 impl<'a> ArchetypesAfter<'a> {
@@ -1361,49 +1432,42 @@ impl<'a> ArchetypesAfter<'a> {
     fn new(
         archetypes: &'a Archetypes,
         graph: &'a Graph,
-        archetype_id: ArchetypeId,
+        start: ArchetypeId,
         exclusive: bool,
     ) -> Self {
-        let start = archetype_id.into_u32().into();
-        let walker = Bfs::new(graph, start).iter(graph);
-        Self {
-            archetypes,
-            walker,
-            archetype_id,
-            exclusive,
-        }
+        let walker = ArchetypeWalker::new(graph, start, exclusive);
+        Self { archetypes, walker }
     }
 
     #[inline]
-    pub fn archetype_id(&self) -> ArchetypeId {
-        let Self { archetype_id, .. } = *self;
-        archetype_id
+    pub fn start(&self) -> ArchetypeId {
+        let Self { walker, .. } = self;
+        walker.start()
+    }
+
+    #[inline]
+    pub fn is_exclusive(&self) -> bool {
+        let Self { walker, .. } = self;
+        walker.is_exclusive()
     }
 
     #[inline]
     pub fn is_inclusive(&self) -> bool {
-        let Self { exclusive, .. } = self;
-        !exclusive
+        let Self { walker, .. } = self;
+        walker.is_inclusive()
     }
 }
 
 impl Debug for ArchetypesAfter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            archetypes,
-            walker,
-            archetype_id,
-            exclusive,
-        } = self;
+        let Self { archetypes, walker } = self;
 
-        let graph = walker.context();
-        let inclusive = &!exclusive;
-        graph_dot_scoped(archetypes, graph, |graph| {
-            f.debug_struct("ArchetypesBefore")
+        graph_dot_scoped(archetypes, walker.graph(), |graph| {
+            f.debug_struct("ArchetypesAfter")
                 .field("archetypes", archetypes)
                 .field("graph", graph)
-                .field("archetype_id", archetype_id)
-                .field("inclusive", inclusive)
+                .field("start", &walker.start())
+                .field("inclusive", &walker.is_inclusive())
                 .finish()
         })
     }
@@ -1417,30 +1481,18 @@ impl<'a> Iterator for ArchetypesAfter<'a> {
         let Self {
             ref mut walker,
             archetypes,
-            archetype_id,
-            exclusive,
         } = *self;
 
-        let index = if exclusive {
-            walker.find(|index| index.index() != archetype_id_into_usize(archetype_id))
-        } else {
-            walker.next()
-        }?;
-
-        let archetype_id = archetype_id_from_usize(index.index());
+        let archetype_id = walker.next()?;
         let info = unwrap_archetype_info(archetypes, archetype_id);
         Some(info)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let Self {
-            archetypes,
-            exclusive,
-            ..
-        } = *self;
+        let Self { archetypes, walker } = self;
 
-        let skip_count = usize::from(exclusive);
+        let skip_count = usize::from(walker.is_exclusive());
         let upper = archetypes.len().saturating_sub(skip_count);
         (0, Some(upper))
     }

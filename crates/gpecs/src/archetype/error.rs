@@ -105,7 +105,7 @@ where
     B: Bundle,
 {
     pub value: B,
-    pub kind: InsertBundleExactErrorKind,
+    pub reason: InsertBundleExactErrorKind,
 }
 
 impl<B> Display for InsertBundleExactError<B>
@@ -113,8 +113,8 @@ where
     B: Bundle + Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { value, kind } = self;
-        write!(f, "exact bundle {value} cannot be inserted: {kind}")
+        let Self { value, reason } = self;
+        write!(f, "exact bundle {value} cannot be inserted: {reason}")
     }
 }
 
@@ -123,8 +123,8 @@ where
     B: Bundle + Debug + Display,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        let Self { kind, .. } = self;
-        kind.source()
+        let Self { reason, .. } = self;
+        reason.source()
     }
 }
 

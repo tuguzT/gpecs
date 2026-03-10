@@ -124,9 +124,7 @@ impl ArchetypeStorage {
         I: IntoIterator<Item = ComponentId>,
     {
         let archetype = ErasedArchetype::new(components, component_ids)?;
-        let sparse_set = EpochSparseSet::with_context(archetype);
-
-        let me = Self { sparse_set };
+        let me = Self::from_archetype(archetype);
         Ok(me)
     }
 
@@ -136,9 +134,7 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let archetype = ErasedArchetype::of::<B>(components)?;
-        let sparse_set = EpochSparseSet::with_context(archetype);
-
-        let me = Self { sparse_set };
+        let me = Self::from_archetype(archetype);
         Ok(me)
     }
 
@@ -148,16 +144,28 @@ impl ArchetypeStorage {
         B: Bundle,
     {
         let archetype = ErasedArchetype::register::<B>(components)?;
-        let sparse_set = EpochSparseSet::with_context(archetype);
-
-        let me = Self { sparse_set };
+        let me = Self::from_archetype(archetype);
         Ok(me)
+    }
+
+    #[inline]
+    pub fn from_archetype(archetype: ErasedArchetype<StorageMeta>) -> Self {
+        let sparse_set = EpochSparseSet::with_context(archetype);
+        Self { sparse_set }
     }
 
     #[inline]
     pub fn archetype(&self) -> &ErasedArchetype<StorageMeta> {
         let Self { sparse_set } = self;
         sparse_set.context()
+    }
+
+    #[inline]
+    pub fn into_archetype(self) -> ErasedArchetype<StorageMeta> {
+        let Self { sparse_set } = self;
+
+        let (dense, _) = sparse_set.into_parts();
+        dense.into_context().into_inner()
     }
 
     #[inline]

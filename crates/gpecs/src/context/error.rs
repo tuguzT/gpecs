@@ -199,8 +199,8 @@ where
 {
     #[inline]
     fn from(error: ArchetypeInsertBundleExactError<B>) -> Self {
-        let ArchetypeInsertBundleExactError { value, kind } = error;
-        let kind = kind.into();
+        let ArchetypeInsertBundleExactError { value, reason } = error;
+        let kind = reason.into();
         Self { value, kind }
     }
 }

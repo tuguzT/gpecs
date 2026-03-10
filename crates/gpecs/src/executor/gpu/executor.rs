@@ -505,8 +505,9 @@ impl ScheduleCache {
                 .bind_group_layout_entries()
                 .components
                 .map(|(component_id, _)| component_id.into());
-            let Ok(compatible_archetypes) =
-                context.archetypes().compatible_archetypes(component_ids)
+            let Ok(compatible_archetypes) = context
+                .archetypes()
+                .compatible_archetypes(context.components(), component_ids)
             else {
                 unreachable!("{system_id} should have compatible archetypes");
             };

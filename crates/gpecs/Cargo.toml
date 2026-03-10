@@ -14,7 +14,7 @@ bytemuck = { workspace = true, features = ["derive", "must_cast"] }
 indexmap = { workspace = true }
 rustc-hash = { workspace = true }
 petgraph = { workspace = true }
-itertools = { workspace = true, features = ["use_alloc"] }
+itertools = { workspace = true, features = ["use_std"] }
 wgpu = { workspace = true }
 
 [build-dependencies]

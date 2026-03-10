@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     collections::BTreeSet,
     fmt::{self, Debug},
     iter::{self, FusedIterator},
@@ -21,7 +20,7 @@ use petgraph::{
 
 use crate::{
     archetype::{
-        collect::{try_collect_components, try_collect_opt_components},
+        erased::ErasedArchetype,
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
             IncompatibleArchetypeError, InsertBundleError, InsertBundleExactError,
@@ -115,6 +114,7 @@ impl ArchetypeInfo {
     }
 }
 
+// TODO: replace BTreeSet with a newtype of erased archetype
 type ArchetypeKey = BTreeSet<ComponentId>;
 type Archetypes = IndexMap<ArchetypeKey, ArchetypeInfo>;
 type Graph = DiGraph<(), ComponentId, u32>;
@@ -144,14 +144,9 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        let key = {
-            let component_ids = component_ids.iter().copied();
-            try_collect_components(component_ids, ArchetypeKey::insert, Clone::clone)?
-        };
-
-        let f = |components| ArchetypeStorage::register::<B>(components);
-        Self::register(archetypes, graph, components, &component_ids, key, f)
+        let archetype = ErasedArchetype::register::<B>(components)?;
+        let archetype_id = Self::register(archetypes, graph, components, archetype);
+        Ok(archetype_id)
     }
 
     #[inline]
@@ -165,41 +160,30 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = component_ids.into_iter().collect();
-        let key = {
-            let component_ids = component_ids.iter().copied();
-            try_collect_components(component_ids, ArchetypeKey::insert, Clone::clone)?
-        };
-
-        Self::register_from_slice(archetypes, graph, components, &component_ids, key)
+        let archetype = ErasedArchetype::new(components, component_ids)?;
+        let archetype_id = Self::register(archetypes, graph, components, archetype);
+        Ok(archetype_id)
     }
 
     #[inline]
-    fn register<C, F, E>(
+    fn register(
         archetypes: &mut Archetypes,
         graph: &mut Graph,
-        components: C,
-        component_ids: &[ComponentId],
-        key: ArchetypeKey,
-        f: F,
-    ) -> Result<ArchetypeId, E>
-    where
-        C: Borrow<ComponentRegistry>,
-        F: FnOnce(C) -> Result<ArchetypeStorage, E>,
-    {
+        components: &ComponentRegistry,
+        archetype: ErasedArchetype<StorageMeta>,
+    ) -> ArchetypeId {
         assert!(
-            !component_ids.is_empty(),
+            !archetype.is_empty(),
             "archetype should contain at least one component",
         );
 
-        let archetype_id = Self::find_archetype(archetypes, &key);
+        let archetype_id = Self::find_archetype(archetypes, &archetype);
         let (before, archetype_to) = if let Some(archetype_id) = archetype_id {
             (Vec::new(), archetype_id)
         } else {
-            let borrow = components.borrow();
-            let before = Self::register_before(archetypes, graph, borrow, component_ids, &key);
-            let storage = f(components)?;
-            let archetype_id = Self::register_one(archetypes, graph, key, storage);
+            let before = Self::register_before(archetypes, graph, components, &archetype);
+            let storage = ArchetypeStorage::from_archetype(archetype);
+            let archetype_id = Self::register_one(archetypes, graph, storage);
             (before, archetype_id)
         };
 
@@ -208,19 +192,7 @@ impl ArchetypeRegistry {
             let archetype_to = archetype_to.into_u32().into();
             let _ = graph.update_edge(archetype_from, archetype_to, component_id);
         }
-        Ok(archetype_to)
-    }
-
-    #[inline]
-    fn register_from_slice(
-        archetypes: &mut Archetypes,
-        graph: &mut Graph,
-        components: &ComponentRegistry,
-        component_ids: &[ComponentId],
-        key: ArchetypeKey,
-    ) -> Result<ArchetypeId, ArchetypeError> {
-        let f = |components| ArchetypeStorage::new(components, component_ids.iter().copied());
-        Self::register(archetypes, graph, components, component_ids, key, f)
+        archetype_to
     }
 
     #[inline]
@@ -228,8 +200,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         graph: &mut Graph,
         components: &ComponentRegistry,
-        component_ids: &[ComponentId],
-        key: &ArchetypeKey,
+        archetype: &ErasedArchetype<impl Sized>,
     ) -> Vec<(ArchetypeId, ComponentId)> {
         #[cold]
         #[inline(never)]
@@ -238,26 +209,27 @@ impl ArchetypeRegistry {
             unreachable!("difference of {key:?} from {sub_key:?} should have exactly one element")
         }
 
-        let len = component_ids.len();
+        let len = archetype.len();
         if len <= 1 {
             return Vec::new();
         }
 
+        let key: ArchetypeKey = archetype.component_ids().collect();
         let register_subset = |component_ids: Vec<_>| {
             let sub_key = component_ids.iter().copied().collect();
             let [component_id] = key
                 .difference(&sub_key)
                 .copied()
                 .collect_array()
-                .unwrap_or_else(|| difference_fail(key, &sub_key));
-            let archetype_id =
-                Self::register_from_slice(archetypes, graph, components, &component_ids, sub_key)
-                    .expect("components should be unique & registered");
+                .unwrap_or_else(|| difference_fail(&key, &sub_key));
+
+            let archetype = ErasedArchetype::new(components, component_ids)
+                .expect("components should be unique & registered");
+            let archetype_id = Self::register(archetypes, graph, components, archetype);
             (archetype_id, component_id)
         };
-        component_ids
-            .iter()
-            .copied()
+        archetype
+            .component_ids()
             .combinations(len - 1)
             .map(register_subset)
             .collect()
@@ -267,21 +239,22 @@ impl ArchetypeRegistry {
     fn register_one(
         archetypes: &mut Archetypes,
         graph: &mut Graph,
-        key: ArchetypeKey,
         storage: ArchetypeStorage,
     ) -> ArchetypeId {
         let index = archetypes.len();
         let id = archetype_id_from_usize(index);
 
+        let key = storage.archetype().component_ids().collect();
         let info = ArchetypeInfo { id, storage };
         if archetypes.insert(key, info).is_some() {
             unreachable!("duplicate archetype registration")
         }
 
         let node_index = graph.add_node(()).index();
-        if index != node_index {
-            unreachable!("archetype index {index} must be equal to node index {node_index}")
-        }
+        assert_eq!(
+            index, node_index,
+            "archetype index {index} must be equal to node index {node_index}",
+        );
 
         id
     }
@@ -313,15 +286,16 @@ impl ArchetypeRegistry {
     #[inline]
     pub fn archetype_id_from<I>(
         &self,
+        components: &ComponentRegistry,
         component_ids: I,
-    ) -> Result<Option<ArchetypeId>, DuplicateComponentError>
+    ) -> Result<Option<ArchetypeId>, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
         let Self { archetypes, .. } = self;
 
-        let key = try_collect_components(component_ids, ArchetypeKey::insert, Clone::clone)?;
-        let archetype_id = Self::find_archetype(archetypes, &key);
+        let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
+        let archetype_id = Self::find_archetype(archetypes, &archetype);
         Ok(archetype_id)
     }
 
@@ -335,15 +309,18 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, .. } = self;
 
-        let component_ids = B::get_components(components);
-        let key = try_collect_opt_components(component_ids, ArchetypeKey::insert, Clone::clone)?;
-        let archetype_id = Self::find_archetype(archetypes, &key);
+        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
+        let archetype_id = Self::find_archetype(archetypes, &archetype);
         Ok(archetype_id)
     }
 
     #[inline]
-    fn find_archetype(archetypes: &Archetypes, key: &ArchetypeKey) -> Option<ArchetypeId> {
-        let (index, _, _) = archetypes.get_full(key)?;
+    fn find_archetype(
+        archetypes: &Archetypes,
+        archetype: &ErasedArchetype<impl Sized>,
+    ) -> Option<ArchetypeId> {
+        let key: ArchetypeKey = archetype.component_ids().collect();
+        let (index, _, _) = archetypes.get_full(&key)?;
         Some(archetype_id_from_usize(index))
     }
 
@@ -435,15 +412,13 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
-            let component_ids = B::get_components(components);
-            let error = Self::make_incompatible_bundle_error(component_ids);
+            let error = Self::make_incompatible_bundle_error::<B>(components);
             return Err(error);
         };
 
         let info = unwrap_archetype_info(archetypes, archetype_id);
         let Some(refs) = info.storage().get_bundle::<B>(components, entity)? else {
-            let component_ids = B::get_components(components);
-            let error = Self::make_incompatible_bundle_error(component_ids);
+            let error = Self::make_incompatible_bundle_error::<B>(components);
             return Err(error);
         };
         Ok(refs)
@@ -476,32 +451,32 @@ impl ArchetypeRegistry {
         let Self { archetypes, .. } = self;
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
-            let component_ids = B::get_components(components);
-            let error = Self::make_incompatible_bundle_error(component_ids);
+            let error = Self::make_incompatible_bundle_error::<B>(components);
             return Err(error);
         };
 
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         let Some(refs) = info.storage.get_bundle_mut::<B>(components, entity)? else {
-            let component_ids = B::get_components(components);
-            let error = Self::make_incompatible_bundle_error(component_ids);
+            let error = Self::make_incompatible_bundle_error::<B>(components);
             return Err(error);
         };
         Ok(refs)
     }
 
     #[inline]
-    fn make_incompatible_bundle_error<I>(component_ids: I) -> IncompatibleArchetypeError
+    fn make_incompatible_bundle_error<B>(
+        components: &ComponentRegistry,
+    ) -> IncompatibleArchetypeError
     where
-        I: IntoIterator<Item = Option<ComponentId>>,
+        B: Bundle,
     {
-        let result = try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone);
+        let result = ErasedArchetype::<()>::of::<B>(components);
         let component_ids = match result {
             Ok(component_ids) => component_ids,
             Err(error) => return error.into(),
         };
 
-        let Some(component_id) = component_ids.into_iter().next() else {
+        let Some(component_id) = component_ids.component_ids().next() else {
             unreachable!("bundle should contain at least one component")
         };
         MissingComponentError::new(component_id).into()
@@ -534,13 +509,14 @@ impl ArchetypeRegistry {
     #[inline]
     pub fn compatible_archetypes<I>(
         &self,
+        components: &ComponentRegistry,
         component_ids: I,
-    ) -> Result<CompatibleArchetypes<'_>, DuplicateComponentError>
+    ) -> Result<CompatibleArchetypes<'_>, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
         let Self { archetypes, .. } = self;
-        CompatibleArchetypes::new(archetypes, component_ids)
+        CompatibleArchetypes::new(archetypes, components, component_ids)
     }
 
     #[inline]
@@ -558,13 +534,14 @@ impl ArchetypeRegistry {
     #[inline]
     pub unsafe fn compatible_archetypes_mut<I>(
         &mut self,
+        components: &ComponentRegistry,
         component_ids: I,
-    ) -> Result<CompatibleArchetypesMut<'_>, DuplicateComponentError>
+    ) -> Result<CompatibleArchetypesMut<'_>, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
         let Self { archetypes, .. } = self;
-        CompatibleArchetypesMut::new(archetypes, component_ids)
+        CompatibleArchetypesMut::new(archetypes, components, component_ids)
     }
 
     #[inline]
@@ -608,27 +585,25 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        if let Err(error) = try_collect_components(
-            component_ids.iter().copied(),
-            ArchetypeKey::insert,
-            Clone::clone,
-        ) {
-            let kind = error.into();
-            return Err(InsertBundleExactError { value, kind });
-        }
+        let bundle_components = match ErasedArchetype::register::<B>(components) {
+            Ok(archetype) => archetype,
+            Err(error) => {
+                let reason = error.into();
+                return Err(InsertBundleExactError { value, reason });
+            }
+        };
 
         let old_archetype = Self::find_archetype_with_entity_and_without_components(
             archetypes,
-            &component_ids,
+            &bundle_components,
             entity,
             location,
         );
         let old_archetype = match old_archetype {
             Ok(old_archetype) => old_archetype,
             Err(error) => {
-                let kind = error.into();
-                return Err(InsertBundleExactError { value, kind });
+                let reason = error.into();
+                return Err(InsertBundleExactError { value, reason });
             }
         };
         let new_archetype = Self::register_archetype_with_components(
@@ -636,7 +611,7 @@ impl ArchetypeRegistry {
             archetypes,
             components,
             old_archetype,
-            &component_ids,
+            &bundle_components,
         );
 
         let Some(old_archetype) = old_archetype else {
@@ -708,14 +683,10 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        if let Err(reason) = try_collect_components(
-            component_ids.iter().copied(),
-            ArchetypeKey::insert,
-            Clone::clone,
-        ) {
-            return Err(InsertBundleError { value, reason });
-        }
+        let bundle_components = match ErasedArchetype::register::<B>(components) {
+            Ok(archetype) => archetype,
+            Err(reason) => return Err(InsertBundleError { value, reason }),
+        };
 
         let old_archetype = Self::find_archetype_with_entity(archetypes, entity, location);
         let new_archetype = Self::register_archetype_with_components(
@@ -723,7 +694,7 @@ impl ArchetypeRegistry {
             archetypes,
             components,
             old_archetype,
-            &component_ids,
+            &bundle_components,
         );
 
         let Some(old_archetype) = old_archetype else {
@@ -788,21 +759,16 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        try_collect_components(
-            component_ids.iter().copied(),
-            ArchetypeKey::insert,
-            Clone::clone,
-        )?;
+        let bundle_components = ErasedArchetype::<()>::register::<B>(components)?;
 
         let old_archetype = Self::find_archetype_with_entity_and_with_components(
             archetypes,
-            &component_ids,
+            &bundle_components,
             entity,
             location,
         )?;
         let Some(old_archetype) = old_archetype else {
-            let &[component_id, ..] = component_ids.as_slice() else {
+            let Some(component_id) = bundle_components.component_ids().next() else {
                 unreachable!("bundle should contain at least one component")
             };
             return Err(MissingComponentError::new(component_id).into());
@@ -813,7 +779,7 @@ impl ArchetypeRegistry {
             archetypes,
             components,
             old_archetype,
-            &component_ids,
+            &bundle_components,
         );
         let Some(new_archetype) = new_archetype else {
             let info = unwrap_archetype_info_mut(archetypes, old_archetype);
@@ -832,7 +798,7 @@ impl ArchetypeRegistry {
                 .collect::<IndexSet<_>>();
 
         // TODO: add new method for erased bundle to take out some of the components
-        let fields = component_ids.iter().copied().map(|component_id| {
+        let fields = bundle_components.component_ids().map(|component_id| {
             old_fields
                 .swap_take(&component_id)
                 .unwrap_or_else(|| unreachable!("{component_id} should exist"))
@@ -878,12 +844,7 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let component_ids: Vec<_> = B::register_components(components).into_iter().collect();
-        try_collect_components(
-            component_ids.iter().copied(),
-            ArchetypeKey::insert,
-            Clone::clone,
-        )?;
+        let bundle_components = ErasedArchetype::<()>::register::<B>(components)?;
 
         let old_archetype = Self::find_archetype_with_entity(archetypes, entity, location);
         let Some(old_archetype) = old_archetype else {
@@ -895,7 +856,7 @@ impl ArchetypeRegistry {
             archetypes,
             components,
             old_archetype,
-            &component_ids,
+            &bundle_components,
         );
         let Some(new_archetype) = new_archetype else {
             let info = unwrap_archetype_info_mut(archetypes, old_archetype);
@@ -912,9 +873,9 @@ impl ArchetypeRegistry {
                 .collect::<IndexSet<_>>();
 
         // TODO: add new method for erased bundle to remove some of the components
-        component_ids
-            .iter()
-            .map(|component_id| old_fields.swap_take(component_id))
+        bundle_components
+            .component_ids()
+            .map(|component_id| old_fields.swap_take(&component_id))
             .for_each(drop);
 
         assert!(
@@ -974,7 +935,7 @@ impl ArchetypeRegistry {
     #[inline]
     fn find_archetype_with_entity_and_without_components(
         archetypes: &Archetypes,
-        component_ids: &[ComponentId],
+        without_components: &ErasedArchetype<impl Sized>,
         entity: Entity,
         location: EntityArchetypeLocation,
     ) -> Result<Option<ArchetypeId>, AlreadyHasComponentError> {
@@ -984,7 +945,7 @@ impl ArchetypeRegistry {
         };
 
         let key = unwrap_archetype_key(archetypes, archetype_id);
-        for &component_id in component_ids {
+        for component_id in without_components.component_ids() {
             if key.contains(&component_id) {
                 return Err(AlreadyHasComponentError::new(component_id));
             }
@@ -996,7 +957,7 @@ impl ArchetypeRegistry {
     #[inline]
     fn find_archetype_with_entity_and_with_components(
         archetypes: &Archetypes,
-        component_ids: &[ComponentId],
+        with_components: &ErasedArchetype<impl Sized>,
         entity: Entity,
         location: EntityArchetypeLocation,
     ) -> Result<Option<ArchetypeId>, MissingComponentError> {
@@ -1006,7 +967,7 @@ impl ArchetypeRegistry {
         };
 
         let key = unwrap_archetype_key(archetypes, archetype_id);
-        for &component_id in component_ids {
+        for component_id in with_components.component_ids() {
             if !key.contains(&component_id) {
                 return Err(MissingComponentError::new(component_id));
             }
@@ -1042,14 +1003,14 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         components: &ComponentRegistry,
         archetype_id: Option<ArchetypeId>,
-        component_ids: &[ComponentId],
+        with_components: &ErasedArchetype<StorageMeta>,
     ) -> ArchetypeId {
         let Some(archetype_id) = archetype_id else {
-            let key = component_ids.iter().copied().collect();
-            return Self::register_from_slice(archetypes, graph, components, component_ids, key)
-                .expect("components should be unique & registered");
+            let archetype = with_components.clone();
+            return Self::register(archetypes, graph, components, archetype);
         };
-        if let &[component_id] = component_ids
+        if with_components.len() == 1
+            && let Some(component_id) = with_components.component_ids().next()
             && let Some(archetype_id) =
                 Self::find_archetype_after(graph, archetype_id, component_id)
         {
@@ -1057,21 +1018,20 @@ impl ArchetypeRegistry {
         }
 
         let info = unwrap_archetype_info(archetypes, archetype_id);
-        let component_ids: Vec<_> = info
+        let component_ids = info
             .storage()
             .archetype()
             .component_ids()
-            .chain(component_ids.iter().copied())
+            .chain(with_components.component_ids())
             .sorted_unstable_by_key(|&component_id| {
                 components
                     .get_component_info(component_id)
                     .map(|info| info.descriptor().layout().align())
             })
-            .dedup()
-            .collect();
-        let key = component_ids.iter().copied().collect();
-        Self::register_from_slice(archetypes, graph, components, &component_ids, key)
-            .expect("components should be unique & registered")
+            .unique();
+        let archetype = ErasedArchetype::new(components, component_ids)
+            .expect("components should be unique & registered");
+        Self::register(archetypes, graph, components, archetype)
     }
 
     #[inline]
@@ -1080,9 +1040,10 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         components: &ComponentRegistry,
         archetype_id: ArchetypeId,
-        component_ids: &[ComponentId],
+        without_components: &ErasedArchetype<impl Sized>,
     ) -> Option<ArchetypeId> {
-        if let &[component_id] = component_ids
+        if without_components.len() == 1
+            && let Some(component_id) = without_components.component_ids().next()
             && let Some(archetype_id) =
                 Self::find_archetype_before(graph, archetype_id, component_id)
         {
@@ -1095,18 +1056,15 @@ impl ArchetypeRegistry {
             return None;
         }
 
-        let component_ids: ArchetypeKey = component_ids.iter().copied().collect();
-        let component_ids: Vec<_> = archetype_component_ids
-            .filter(|component_id| !component_ids.contains(component_id))
-            .collect();
-        if component_ids.is_empty() {
+        let component_ids = archetype_component_ids
+            .filter(|&component_id| !without_components.contains(component_id));
+        let archetype = ErasedArchetype::new(components, component_ids)
+            .expect("components should be unique & registered");
+        if archetype.is_empty() {
             return None;
         }
 
-        let key = component_ids.iter().copied().collect();
-        let archetype_id =
-            Self::register_from_slice(archetypes, graph, components, &component_ids, key)
-                .expect("components should be unique & registered");
+        let archetype_id = Self::register(archetypes, graph, components, archetype);
         Some(archetype_id)
     }
 
@@ -1682,6 +1640,7 @@ impl<'a> Iterator for ArchetypesAfterMut<'a> {
 }
 
 #[derive(Clone)]
+// TODO: try to use archetype after iterator instead of filtering all archetypes
 pub struct CompatibleArchetypes<'a> {
     component_ids: Box<[ComponentId]>,
     infos: IndexMapValues<'a, ArchetypeKey, ArchetypeInfo>,
@@ -1689,19 +1648,24 @@ pub struct CompatibleArchetypes<'a> {
 
 impl<'a> CompatibleArchetypes<'a> {
     #[inline]
-    fn new<I>(archetypes: &'a Archetypes, component_ids: I) -> Result<Self, DuplicateComponentError>
+    fn new<I>(
+        archetypes: &'a Archetypes,
+        components: &ComponentRegistry,
+        component_ids: I,
+    ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids =
-            try_collect_components(component_ids, IndexSet::<_>::insert, Clone::clone)?
-                .into_iter()
-                .collect();
+        let component_ids = ErasedArchetype::<()>::new(components, component_ids)?
+            .component_ids()
+            .collect();
         let infos = archetypes.values();
-        Ok(Self {
+
+        let me = Self {
             component_ids,
             infos,
-        })
+        };
+        Ok(me)
     }
 
     #[inline]
@@ -1712,16 +1676,16 @@ impl<'a> CompatibleArchetypes<'a> {
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(components);
-        let component_ids =
-            try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone)?
-                .into_iter()
-                .collect();
+        let component_ids = ErasedArchetype::<()>::of::<B>(components)?
+            .component_ids()
+            .collect();
         let infos = archetypes.values();
-        Ok(Self {
+
+        let me = Self {
             component_ids,
             infos,
-        })
+        };
+        Ok(me)
     }
 
     #[inline]
@@ -1816,6 +1780,7 @@ impl DoubleEndedIterator for CompatibleArchetypes<'_> {
 
 impl FusedIterator for CompatibleArchetypes<'_> {}
 
+// TODO: try to use archetype after iterator instead of filtering all archetypes
 pub struct CompatibleArchetypesMut<'a> {
     component_ids: Box<[ComponentId]>,
     infos: IndexMapValuesMut<'a, ArchetypeKey, ArchetypeInfo>,
@@ -1825,20 +1790,22 @@ impl<'a> CompatibleArchetypesMut<'a> {
     #[inline]
     fn new<I>(
         archetypes: &'a mut Archetypes,
+        components: &ComponentRegistry,
         component_ids: I,
-    ) -> Result<Self, DuplicateComponentError>
+    ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids =
-            try_collect_components(component_ids, IndexSet::<_>::insert, Clone::clone)?
-                .into_iter()
-                .collect();
+        let component_ids = ErasedArchetype::<()>::new(components, component_ids)?
+            .component_ids()
+            .collect();
         let infos = archetypes.values_mut();
-        Ok(Self {
+
+        let me = Self {
             component_ids,
             infos,
-        })
+        };
+        Ok(me)
     }
 
     #[inline]
@@ -1849,16 +1816,16 @@ impl<'a> CompatibleArchetypesMut<'a> {
     where
         B: Bundle,
     {
-        let component_ids = B::get_components(components);
-        let component_ids =
-            try_collect_opt_components(component_ids, IndexSet::<_>::insert, Clone::clone)?
-                .into_iter()
-                .collect();
+        let component_ids = ErasedArchetype::<()>::of::<B>(components)?
+            .component_ids()
+            .collect();
         let infos = archetypes.values_mut();
-        Ok(Self {
+
+        let me = Self {
             component_ids,
             infos,
-        })
+        };
+        Ok(me)
     }
 
     #[inline]

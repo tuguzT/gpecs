@@ -332,19 +332,22 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn archetypes_before(&self, id: ArchetypeId) -> ArchetypesBefore<'_> {
+    pub fn archetypes_before(&self, id: ArchetypeId) -> Option<ArchetypesBefore<'_>> {
         let Self { archetypes, graph } = self;
         ArchetypesBefore::new(archetypes, graph, id, true)
     }
 
     #[inline]
-    pub unsafe fn archetypes_before_mut(&mut self, id: ArchetypeId) -> ArchetypesBeforeMut<'_> {
+    pub unsafe fn archetypes_before_mut(
+        &mut self,
+        id: ArchetypeId,
+    ) -> Option<ArchetypesBeforeMut<'_>> {
         let Self { archetypes, graph } = self;
         ArchetypesBeforeMut::new(archetypes, graph, id, true)
     }
 
     #[inline]
-    pub fn archetypes_before_inclusive(&self, id: ArchetypeId) -> ArchetypesBefore<'_> {
+    pub fn archetypes_before_inclusive(&self, id: ArchetypeId) -> Option<ArchetypesBefore<'_>> {
         let Self { archetypes, graph } = self;
         ArchetypesBefore::new(archetypes, graph, id, false)
     }
@@ -353,25 +356,28 @@ impl ArchetypeRegistry {
     pub unsafe fn archetypes_before_inclusive_mut(
         &mut self,
         id: ArchetypeId,
-    ) -> ArchetypesBeforeMut<'_> {
+    ) -> Option<ArchetypesBeforeMut<'_>> {
         let Self { archetypes, graph } = self;
         ArchetypesBeforeMut::new(archetypes, graph, id, false)
     }
 
     #[inline]
-    pub fn archetypes_after(&self, id: ArchetypeId) -> ArchetypesAfter<'_> {
+    pub fn archetypes_after(&self, id: ArchetypeId) -> Option<ArchetypesAfter<'_>> {
         let Self { archetypes, graph } = self;
         ArchetypesAfter::new(archetypes, graph, id, true)
     }
 
     #[inline]
-    pub unsafe fn archetypes_after_mut(&mut self, id: ArchetypeId) -> ArchetypesAfterMut<'_> {
+    pub unsafe fn archetypes_after_mut(
+        &mut self,
+        id: ArchetypeId,
+    ) -> Option<ArchetypesAfterMut<'_>> {
         let Self { archetypes, graph } = self;
         ArchetypesAfterMut::new(archetypes, graph, id, true)
     }
 
     #[inline]
-    pub fn archetypes_after_inclusive(&self, id: ArchetypeId) -> ArchetypesAfter<'_> {
+    pub fn archetypes_after_inclusive(&self, id: ArchetypeId) -> Option<ArchetypesAfter<'_>> {
         let Self { archetypes, graph } = self;
         ArchetypesAfter::new(archetypes, graph, id, false)
     }
@@ -380,7 +386,7 @@ impl ArchetypeRegistry {
     pub unsafe fn archetypes_after_inclusive_mut(
         &mut self,
         id: ArchetypeId,
-    ) -> ArchetypesAfterMut<'_> {
+    ) -> Option<ArchetypesAfterMut<'_>> {
         let Self { archetypes, graph } = self;
         ArchetypesAfterMut::new(archetypes, graph, id, false)
     }
@@ -1344,10 +1350,13 @@ impl<'a> ArchetypesBefore<'a> {
         graph: &'a Graph,
         start: ArchetypeId,
         exclusive: bool,
-    ) -> Self {
+    ) -> Option<Self> {
+        let _ = get_archetype_info(archetypes, start)?;
         let graph = Reversed(graph);
         let walker = ArchetypeWalker::new(graph, start, exclusive);
-        Self { archetypes, walker }
+
+        let me = Self { archetypes, walker };
+        Some(me)
     }
 
     #[inline]
@@ -1421,10 +1430,13 @@ impl<'a> ArchetypesBeforeMut<'a> {
         graph: &'a Graph,
         start: ArchetypeId,
         exclusive: bool,
-    ) -> Self {
+    ) -> Option<Self> {
+        let _ = get_archetype_info(archetypes, start)?;
         let graph = Reversed(graph);
         let walker = ArchetypeWalker::new(graph, start, exclusive);
-        Self { archetypes, walker }
+
+        let me = Self { archetypes, walker };
+        Some(me)
     }
 
     #[inline]
@@ -1499,9 +1511,12 @@ impl<'a> ArchetypesAfter<'a> {
         graph: &'a Graph,
         start: ArchetypeId,
         exclusive: bool,
-    ) -> Self {
+    ) -> Option<Self> {
+        let _ = get_archetype_info(archetypes, start)?;
         let walker = ArchetypeWalker::new(graph, start, exclusive);
-        Self { archetypes, walker }
+
+        let me = Self { archetypes, walker };
+        Some(me)
     }
 
     #[inline]
@@ -1575,9 +1590,12 @@ impl<'a> ArchetypesAfterMut<'a> {
         graph: &'a Graph,
         start: ArchetypeId,
         exclusive: bool,
-    ) -> Self {
+    ) -> Option<Self> {
+        let _ = get_archetype_info(archetypes, start)?;
         let walker = ArchetypeWalker::new(graph, start, exclusive);
-        Self { archetypes, walker }
+
+        let me = Self { archetypes, walker };
+        Some(me)
     }
 
     #[inline]

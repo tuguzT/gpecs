@@ -136,10 +136,17 @@ fn exchange_components() {
         .register_archetype::<(Position, Mass)>(&mut components)
         .expect("archetype of `Position` and `Mass` should contain unique component ids");
 
-    for info in archetypes.archetypes_before(archetype_subset) {
+    let archetypes_before = archetypes
+        .archetypes_before(archetype_subset)
+        .expect("archetype subset should have already been registered");
+    for info in archetypes_before {
         println!("archetype before {archetype_subset:?}: {info:?}");
     }
-    for info in archetypes.archetypes_after(archetype_subset) {
+
+    let archetypes_after = archetypes
+        .archetypes_after(archetype_subset)
+        .expect("archetype subset should have already been registered");
+    for info in archetypes_after {
         println!("archetype after  {archetype_subset:?}: {info:?}");
     }
 

@@ -1865,11 +1865,11 @@ where
             components,
             ..
         } = self;
+
         BundlesIntoIter {
             archetypes,
             components,
             inner_front: None,
-            inner_back: None,
         }
     }
 }
@@ -1884,7 +1884,6 @@ where
     archetypes: CompatibleArchetypes<'a>,
     components: &'ctx ComponentRegistry,
     inner_front: Option<BundlesIntoIterInner<'a, B>>,
-    inner_back: Option<BundlesIntoIterInner<'a, B>>,
 }
 
 impl<'a, 'ctx, B> BundlesIntoIter<'a, 'ctx, B>
@@ -1916,14 +1915,12 @@ where
         let Self {
             archetypes,
             inner_front,
-            inner_back,
             ..
         } = self;
 
         f.debug_struct("BundlesIntoIter")
             .field("archetypes", archetypes)
             .field("inner_front", inner_front)
-            .field("inner_back", inner_back)
             .finish_non_exhaustive()
     }
 }
@@ -1937,13 +1934,12 @@ where
             archetypes,
             components,
             inner_front,
-            inner_back,
         } = self;
+
         Self {
             archetypes: archetypes.clone(),
             components,
             inner_front: inner_front.clone(),
-            inner_back: inner_back.clone(),
         }
     }
 }
@@ -1960,7 +1956,6 @@ where
             archetypes,
             components,
             inner_front,
-            inner_back,
         } = self;
 
         loop {
@@ -1968,7 +1963,7 @@ where
                 return item;
             }
             match archetypes.next() {
-                None => return and_then_or_clear(inner_back, Iterator::next),
+                None => return None,
                 Some(info) => *inner_front = Self::new_inner(info, components).into(),
             }
         }
@@ -1979,49 +1974,20 @@ where
         let Self {
             archetypes,
             inner_front,
-            inner_back,
             ..
         } = self;
 
         let (flo, fhi) = inner_front
             .as_ref()
             .map_or((0, Some(0)), Iterator::size_hint);
-        let (blo, bhi) = inner_back
-            .as_ref()
-            .map_or((0, Some(0)), Iterator::size_hint);
-        let lo = flo.saturating_add(blo);
+        let lo = flo;
 
-        match (archetypes.size_hint(), fhi, bhi) {
-            ((0, Some(0)), Some(a), Some(b)) => (lo, a.checked_add(b)),
+        match (archetypes.size_hint(), fhi) {
+            ((0, Some(0)), Some(a)) => (lo, Some(a)),
             _ => (lo, None),
         }
     }
 }
-
-// impl<B> DoubleEndedIterator for BundlesIntoIter<'_, '_, B>
-// where
-//     B: Bundle,
-// {
-//     #[inline]
-//     fn next_back(&mut self) -> Option<Self::Item> {
-//         let Self {
-//             archetypes,
-//             components,
-//             inner_front,
-//             inner_back,
-//         } = self;
-
-//         loop {
-//             if let item @ Some(_) = and_then_or_clear(inner_back, DoubleEndedIterator::next_back) {
-//                 return item;
-//             }
-//             match archetypes.next_back() {
-//                 None => return and_then_or_clear(inner_front, DoubleEndedIterator::next_back),
-//                 Some(info) => *inner_back = Self::new_inner(info, components).into(),
-//             }
-//         }
-//     }
-// }
 
 impl<B> FusedIterator for BundlesIntoIter<'_, '_, B> where B: Bundle {}
 
@@ -2099,11 +2065,11 @@ where
             components,
             ..
         } = self;
+
         BundlesMutIntoIter {
             archetypes,
             components,
             inner_front: None,
-            inner_back: None,
         }
     }
 }
@@ -2118,7 +2084,6 @@ where
     archetypes: CompatibleArchetypesMut<'a>,
     components: &'ctx ComponentRegistry,
     inner_front: Option<BundlesMutIntoIterInner<'a, B>>,
-    inner_back: Option<BundlesMutIntoIterInner<'a, B>>,
 }
 
 impl<'a, 'ctx, B> BundlesMutIntoIter<'a, 'ctx, B>
@@ -2150,14 +2115,12 @@ where
         let Self {
             archetypes,
             inner_front,
-            inner_back,
             ..
         } = self;
 
         f.debug_struct("BundlesIntoIter")
             .field("archetypes", archetypes)
             .field("inner_front", inner_front)
-            .field("inner_back", inner_back)
             .finish_non_exhaustive()
     }
 }
@@ -2174,7 +2137,6 @@ where
             archetypes,
             components,
             inner_front,
-            inner_back,
         } = self;
 
         loop {
@@ -2182,7 +2144,7 @@ where
                 return item;
             }
             match archetypes.next() {
-                None => return and_then_or_clear(inner_back, Iterator::next),
+                None => return None,
                 Some(info) => *inner_front = Self::new_inner(info, components).into(),
             }
         }
@@ -2193,49 +2155,20 @@ where
         let Self {
             archetypes,
             inner_front,
-            inner_back,
             ..
         } = self;
 
         let (flo, fhi) = inner_front
             .as_ref()
             .map_or((0, Some(0)), Iterator::size_hint);
-        let (blo, bhi) = inner_back
-            .as_ref()
-            .map_or((0, Some(0)), Iterator::size_hint);
-        let lo = flo.saturating_add(blo);
+        let lo = flo;
 
-        match (archetypes.size_hint(), fhi, bhi) {
-            ((0, Some(0)), Some(a), Some(b)) => (lo, a.checked_add(b)),
+        match (archetypes.size_hint(), fhi) {
+            ((0, Some(0)), Some(a)) => (lo, Some(a)),
             _ => (lo, None),
         }
     }
 }
-
-// impl<B> DoubleEndedIterator for BundlesMutIntoIter<'_, '_, B>
-// where
-//     B: Bundle,
-// {
-//     #[inline]
-//     fn next_back(&mut self) -> Option<Self::Item> {
-//         let Self {
-//             archetypes,
-//             components,
-//             inner_front,
-//             inner_back,
-//         } = self;
-
-//         loop {
-//             if let item @ Some(_) = and_then_or_clear(inner_back, DoubleEndedIterator::next_back) {
-//                 return item;
-//             }
-//             match archetypes.next_back() {
-//                 None => return and_then_or_clear(inner_front, DoubleEndedIterator::next_back),
-//                 Some(info) => *inner_back = Self::new_inner(info, components).into(),
-//             }
-//         }
-//     }
-// }
 
 impl<B> FusedIterator for BundlesMutIntoIter<'_, '_, B> where B: Bundle {}
 

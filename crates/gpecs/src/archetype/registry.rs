@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
@@ -315,13 +316,13 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn register_archetype(
+    pub fn register_archetype<'a>(
         &mut self,
         components: &ComponentRegistry,
-        archetype: ErasedArchetype<StorageMeta>,
+        archetype: impl Into<Cow<'a, ErasedArchetype<StorageMeta>>>,
     ) -> ArchetypeId {
         let Self { archetypes, graph } = self;
-        Self::register(archetypes, graph, components, archetype)
+        Self::register(archetypes, graph, components, archetype.into())
     }
 
     #[inline]
@@ -329,27 +330,29 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         graph: &mut Graph,
         components: &ComponentRegistry,
-        archetype: ErasedArchetype<StorageMeta>,
+        archetype: Cow<ErasedArchetype<StorageMeta>>,
     ) -> ArchetypeId {
+        let archetype_ref = archetype.as_ref();
         assert!(
-            !archetype.is_empty(),
+            !archetype_ref.is_empty(),
             "archetype should contain at least one component",
         );
 
-        let archetype_id = find_archetype(archetypes, &archetype);
-        let (before, archetype_to) = if let Some(archetype_id) = archetype_id {
-            (Vec::new(), archetype_id)
-        } else {
-            let before = Self::register_before(archetypes, graph, components, &archetype);
-            let storage = ArchetypeStorage::from_archetype(archetype);
-            let archetype_id = Self::insert_storage(archetypes, graph, storage);
-            (before, archetype_id)
-        };
+        if let Some(archetype_id) = find_archetype(archetypes, archetype_ref) {
+            return archetype_id;
+        }
+
+        let before: Vec<_> = Self::register_before(archetypes, graph, components, archetype_ref)
+            .into_iter()
+            .flatten()
+            .collect();
+        let storage = ArchetypeStorage::from_archetype(archetype.into_owned());
+        let archetype_to = Self::insert_storage(archetypes, graph, storage);
 
         for (archetype_from, component_id) in before {
             let archetype_from = archetype_from.into_u32().into();
             let archetype_to = archetype_to.into_u32().into();
-            let _ = graph.update_edge(archetype_from, archetype_to, component_id);
+            graph.update_edge(archetype_from, archetype_to, component_id);
         }
         archetype_to
     }
@@ -360,7 +363,7 @@ impl ArchetypeRegistry {
         graph: &mut Graph,
         components: &ComponentRegistry,
         archetype: &ErasedArchetype<impl Sized>,
-    ) -> Vec<(ArchetypeId, ComponentId)> {
+    ) -> Option<impl IntoIterator<Item = (ArchetypeId, ComponentId)>> {
         #[cold]
         #[inline(never)]
         #[track_caller]
@@ -373,11 +376,11 @@ impl ArchetypeRegistry {
 
         let len = archetype.len();
         if len <= 1 {
-            return Vec::new();
+            return None;
         }
 
         let key = ArchetypeKey::from_ref(archetype);
-        let register_subset = |component_ids: Vec<_>| {
+        let register_subset = |component_ids| {
             let archetype = ErasedArchetype::new(components, component_ids)
                 .expect("components should be unique & registered");
 
@@ -386,14 +389,14 @@ impl ArchetypeRegistry {
                 difference_fail(key, sub_key)
             };
 
-            let archetype_id = Self::register(archetypes, graph, components, archetype);
+            let archetype_id = Self::register(archetypes, graph, components, archetype.into());
             (archetype_id, component_id)
         };
         archetype
             .component_ids()
             .combinations(len - 1)
             .map(register_subset)
-            .collect()
+            .into()
     }
 
     #[inline]
@@ -1164,8 +1167,7 @@ impl ArchetypeRegistry {
         with_components: &ErasedArchetype<StorageMeta>,
     ) -> ArchetypeId {
         let Some(archetype_id) = archetype_id else {
-            let archetype = with_components.clone();
-            return Self::register(archetypes, graph, components, archetype);
+            return Self::register(archetypes, graph, components, with_components.into());
         };
         if with_components.len() == 1
             && let Some(component_id) = with_components.component_ids().next()
@@ -1189,7 +1191,7 @@ impl ArchetypeRegistry {
             .unique();
         let archetype = ErasedArchetype::new(components, component_ids)
             .expect("components should be unique & registered");
-        Self::register(archetypes, graph, components, archetype)
+        Self::register(archetypes, graph, components, archetype.into())
     }
 
     #[inline]
@@ -1222,7 +1224,7 @@ impl ArchetypeRegistry {
             return None;
         }
 
-        let archetype_id = Self::register(archetypes, graph, components, archetype);
+        let archetype_id = Self::register(archetypes, graph, components, archetype.into());
         Some(archetype_id)
     }
 

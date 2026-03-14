@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
@@ -427,6 +428,26 @@ impl<Meta> AsMut<Self> for ErasedArchetype<Meta> {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
+    }
+}
+
+impl<'a, Meta> From<&'a ErasedArchetype<Meta>> for Cow<'a, ErasedArchetype<Meta>>
+where
+    Meta: Clone,
+{
+    #[inline]
+    fn from(archetype: &'a ErasedArchetype<Meta>) -> Self {
+        Self::Borrowed(archetype)
+    }
+}
+
+impl<Meta> From<ErasedArchetype<Meta>> for Cow<'_, ErasedArchetype<Meta>>
+where
+    Meta: Clone,
+{
+    #[inline]
+    fn from(archetype: ErasedArchetype<Meta>) -> Self {
+        Self::Owned(archetype)
     }
 }
 

@@ -1,14 +1,16 @@
 use std::{
-    collections::BTreeSet,
+    cmp,
     fmt::{self, Debug},
+    hash::{self, Hash},
     iter::{self, FusedIterator},
     marker::PhantomData,
-    ops::Range,
+    ops::{Deref, DerefMut, Range},
     ptr, slice,
 };
 
 pub use gpecs_types::archetype::ArchetypeId;
 
+use indexmap::{Equivalent, set::MutableValues};
 use itertools::Itertools;
 use petgraph::{
     Direction,
@@ -33,7 +35,7 @@ use crate::{
     },
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
-    hash::{IndexMap, IndexSet},
+    hash::IndexSet,
     soa::slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
 };
 
@@ -87,6 +89,80 @@ impl From<EntityArchetypeLocation> for Option<EntityArchetype> {
     }
 }
 
+#[repr(transparent)]
+struct ArchetypeKey<Meta> {
+    archetype: ErasedArchetype<Meta>,
+}
+
+impl<Meta> ArchetypeKey<Meta> {
+    #[inline]
+    fn from_ref(archetype: &ErasedArchetype<Meta>) -> &Self {
+        // SAFETY: Self is `#[repr(transparent)]` over `ErasedArchetype<Meta>`.
+        unsafe { &*ptr::from_ref(archetype).cast() }
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        let Self { archetype } = self;
+        archetype.len()
+    }
+
+    #[inline]
+    fn contains(&self, component_id: ComponentId) -> bool {
+        let Self { archetype } = self;
+        archetype.contains(component_id)
+    }
+
+    #[inline]
+    fn component_ids(&self) -> impl Iterator<Item = ComponentId> {
+        let Self { archetype } = self;
+        archetype.sorted_iter().map(From::from)
+    }
+
+    #[inline]
+    fn difference(&self, other: &ArchetypeKey<impl Sized>) -> impl Iterator<Item = ComponentId> {
+        self.component_ids().filter(|&id| !other.contains(id))
+    }
+}
+
+impl<Meta> Debug for ArchetypeKey<Meta> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries = self.component_ids();
+        f.debug_set().entries(entries).finish()
+    }
+}
+
+impl<Meta, OtherMeta> PartialEq<ArchetypeKey<OtherMeta>> for ArchetypeKey<Meta> {
+    fn eq(&self, other: &ArchetypeKey<OtherMeta>) -> bool {
+        let other = other.component_ids();
+        self.component_ids().eq(other)
+    }
+}
+
+impl<Meta> Eq for ArchetypeKey<Meta> {}
+
+impl<Meta, OtherMeta> PartialOrd<ArchetypeKey<OtherMeta>> for ArchetypeKey<Meta> {
+    fn partial_cmp(&self, other: &ArchetypeKey<OtherMeta>) -> Option<cmp::Ordering> {
+        let other = other.component_ids();
+        self.component_ids().partial_cmp(other)
+    }
+}
+
+impl<Meta> Ord for ArchetypeKey<Meta> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let other = other.component_ids();
+        self.component_ids().cmp(other)
+    }
+}
+
+impl<Meta> Hash for ArchetypeKey<Meta> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.len().hash(state);
+        self.component_ids()
+            .for_each(|component_id| component_id.hash(state));
+    }
+}
+
 #[derive(Debug)]
 pub struct ArchetypeInfo {
     id: ArchetypeId,
@@ -113,9 +189,87 @@ impl ArchetypeInfo {
     }
 }
 
-// TODO: replace BTreeSet with a newtype of erased archetype
-type ArchetypeKey = BTreeSet<ComponentId>;
-type Archetypes = IndexMap<ArchetypeKey, ArchetypeInfo>;
+#[repr(transparent)]
+struct ArchetypesItem {
+    info: ArchetypeInfo,
+}
+
+impl ArchetypesItem {
+    #[inline]
+    fn new(info: ArchetypeInfo) -> Self {
+        Self { info }
+    }
+
+    #[inline]
+    fn as_key(&self) -> &ArchetypeKey<StorageMeta> {
+        let Self { info } = self;
+
+        let archetype = info.storage.archetype();
+        ArchetypeKey::from_ref(archetype)
+    }
+}
+
+impl Debug for ArchetypesItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { info } = self;
+        Debug::fmt(info, f)
+    }
+}
+
+impl PartialEq for ArchetypesItem {
+    fn eq(&self, other: &Self) -> bool {
+        let other = other.as_key();
+        self.as_key().eq(other)
+    }
+}
+
+impl Eq for ArchetypesItem {}
+
+impl PartialOrd for ArchetypesItem {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ArchetypesItem {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let other = other.as_key();
+        self.as_key().cmp(other)
+    }
+}
+
+impl Hash for ArchetypesItem {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.as_key().hash(state);
+    }
+}
+
+impl Deref for ArchetypesItem {
+    type Target = ArchetypeInfo;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        let Self { info } = self;
+        info
+    }
+}
+
+impl DerefMut for ArchetypesItem {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        let Self { info } = self;
+        info
+    }
+}
+
+impl<Meta> Equivalent<ArchetypesItem> for ArchetypeKey<Meta> {
+    #[inline]
+    fn equivalent(&self, item: &ArchetypesItem) -> bool {
+        item.as_key().eq(self)
+    }
+}
+
+type Archetypes = IndexSet<ArchetypesItem>;
 type Graph = DiGraph<(), ComponentId, u32>;
 
 #[derive(Default)]
@@ -182,7 +336,7 @@ impl ArchetypeRegistry {
         } else {
             let before = Self::register_before(archetypes, graph, components, &archetype);
             let storage = ArchetypeStorage::from_archetype(archetype);
-            let archetype_id = Self::register_one(archetypes, graph, storage);
+            let archetype_id = Self::insert_storage(archetypes, graph, storage);
             (before, archetype_id)
         };
 
@@ -204,7 +358,10 @@ impl ArchetypeRegistry {
         #[cold]
         #[inline(never)]
         #[track_caller]
-        fn difference_fail(key: &ArchetypeKey, sub_key: &ArchetypeKey) -> ! {
+        fn difference_fail(
+            key: &ArchetypeKey<impl Sized>,
+            sub_key: &ArchetypeKey<impl Sized>,
+        ) -> ! {
             unreachable!("difference of {key:?} from {sub_key:?} should have exactly one element")
         }
 
@@ -213,17 +370,16 @@ impl ArchetypeRegistry {
             return Vec::new();
         }
 
-        let key: ArchetypeKey = archetype.component_ids().collect();
+        let key = ArchetypeKey::from_ref(archetype);
         let register_subset = |component_ids: Vec<_>| {
-            let sub_key = component_ids.iter().copied().collect();
-            let [component_id] = key
-                .difference(&sub_key)
-                .copied()
-                .collect_array()
-                .unwrap_or_else(|| difference_fail(&key, &sub_key));
-
             let archetype = ErasedArchetype::new(components, component_ids)
                 .expect("components should be unique & registered");
+
+            let sub_key = ArchetypeKey::from_ref(&archetype);
+            let Some([component_id]) = key.difference(sub_key).collect_array() else {
+                difference_fail(key, sub_key)
+            };
+
             let archetype_id = Self::register(archetypes, graph, components, archetype);
             (archetype_id, component_id)
         };
@@ -235,7 +391,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    fn register_one(
+    fn insert_storage(
         archetypes: &mut Archetypes,
         graph: &mut Graph,
         storage: ArchetypeStorage,
@@ -243,9 +399,9 @@ impl ArchetypeRegistry {
         let index = archetypes.len();
         let id = archetype_id_from_usize(index);
 
-        let key = storage.archetype().component_ids().collect();
         let info = ArchetypeInfo { id, storage };
-        if archetypes.insert(key, info).is_some() {
+        let item = ArchetypesItem::new(info);
+        if archetypes.replace(item).is_some() {
             unreachable!("duplicate archetype registration")
         }
 
@@ -939,9 +1095,9 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let key = unwrap_archetype_key(archetypes, archetype_id);
+        let info = unwrap_archetype_info(archetypes, archetype_id);
         for component_id in without_components.component_ids() {
-            if key.contains(&component_id) {
+            if info.storage().archetype().contains(component_id) {
                 return Err(AlreadyHasComponentError::new(component_id));
             }
         }
@@ -961,9 +1117,9 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let key = unwrap_archetype_key(archetypes, archetype_id);
+        let info = unwrap_archetype_info(archetypes, archetype_id);
         for component_id in with_components.component_ids() {
-            if !key.contains(&component_id) {
+            if !info.storage().archetype().contains(component_id) {
                 return Err(MissingComponentError::new(component_id));
             }
         }
@@ -986,10 +1142,11 @@ impl ArchetypeRegistry {
             return Some(archetype_id);
         }
 
-        archetypes
-            .values()
-            .position(|info| info.storage().contains(entity))
-            .map(archetype_id_from_usize)
+        let index = archetypes
+            .iter()
+            .position(|info| info.storage().contains(entity))?;
+        let archetype_id = archetype_id_from_usize(index);
+        Some(archetype_id)
     }
 
     #[inline]
@@ -2203,30 +2360,15 @@ fn find_archetype(
     archetypes: &Archetypes,
     archetype: &ErasedArchetype<impl Sized>,
 ) -> Option<ArchetypeId> {
-    let key: ArchetypeKey = archetype.component_ids().collect();
-    let (index, _, _) = archetypes.get_full(&key)?;
+    let key = ArchetypeKey::from_ref(archetype);
+    let index = archetypes.get_index_of(key)?;
     Some(archetype_id_from_usize(index))
-}
-
-#[inline]
-fn get_archetype_key(archetypes: &Archetypes, id: ArchetypeId) -> Option<&ArchetypeKey> {
-    let index = archetype_id_into_usize(id);
-    archetypes.get_index(index).map(|(key, _)| key)
-}
-
-#[inline]
-#[track_caller]
-fn unwrap_archetype_key(archetypes: &Archetypes, id: ArchetypeId) -> &ArchetypeKey {
-    let Some(key) = get_archetype_key(archetypes, id) else {
-        unreachable!("{id} should exist")
-    };
-    key
 }
 
 #[inline]
 fn get_archetype_info(archetypes: &Archetypes, id: ArchetypeId) -> Option<&ArchetypeInfo> {
     let index = archetype_id_into_usize(id);
-    archetypes.get_index(index).map(|(_, info)| info)
+    archetypes.get_index(index).map(Deref::deref)
 }
 
 #[inline]
@@ -2244,7 +2386,7 @@ fn get_archetype_info_mut(
     id: ArchetypeId,
 ) -> Option<&mut ArchetypeInfo> {
     let index = archetype_id_into_usize(id);
-    archetypes.get_index_mut(index).map(|(_, info)| info)
+    archetypes.get_index_mut2(index).map(DerefMut::deref_mut)
 }
 
 #[inline]

@@ -115,7 +115,7 @@ fn run_gpu(context: &mut Context) {
 
     let mut executor = GpuExecutor::new(context, device.clone());
     executor
-        .register_archetype::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
+        .register_archetype_of::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
         .expect("all the components should be unique");
 
     let time_delta_slice = [time_delta.0];
@@ -267,7 +267,7 @@ fn run_gpu(context: &mut Context) {
 fn create_entities_with_mixed_components(context: &mut Context, count: usize) -> Vec<Entity> {
     let mut entities = Vec::with_capacity(count);
     context
-        .register_archetype::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
+        .register_archetype_of::<(Position, Velocity, Data, Player, Health, Damage, Sprite)>()
         .expect("all the components should be unique");
 
     let mut j = 0;

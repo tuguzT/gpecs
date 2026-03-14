@@ -62,10 +62,10 @@ fn main() {
     let mut executor = GpuExecutor::new(&mut context, device.clone());
 
     executor
-        .register_archetype::<(Position, Mass)>()
+        .register_archetype_of::<(Position, Mass)>()
         .expect("archetype of `Position` and `Mass` should contain unique component ids");
     let _position_tag_gpu_archetype_id = executor
-        .register_archetype::<(Position, Tag)>()
+        .register_archetype_of::<(Position, Tag)>()
         .expect("archetype of `Position` and `Tag` should contain unique component ids");
 
     let shader_module = init_wgpu_shader(&device);

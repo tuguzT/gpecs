@@ -288,17 +288,15 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn register_archetype<B>(
+    pub fn register_archetype_of<B>(
         &mut self,
         components: &mut ComponentRegistry,
     ) -> Result<ArchetypeId, DuplicateComponentError>
     where
         B: Bundle,
     {
-        let Self { archetypes, graph } = self;
-
         let archetype = ErasedArchetype::register::<B>(components)?;
-        let archetype_id = Self::register(archetypes, graph, components, archetype);
+        let archetype_id = self.register_archetype(components, archetype);
         Ok(archetype_id)
     }
 
@@ -311,11 +309,19 @@ impl ArchetypeRegistry {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let Self { archetypes, graph } = self;
-
         let archetype = ErasedArchetype::new(components, component_ids)?;
-        let archetype_id = Self::register(archetypes, graph, components, archetype);
+        let archetype_id = self.register_archetype(components, archetype);
         Ok(archetype_id)
+    }
+
+    #[inline]
+    pub fn register_archetype(
+        &mut self,
+        components: &ComponentRegistry,
+        archetype: ErasedArchetype<StorageMeta>,
+    ) -> ArchetypeId {
+        let Self { archetypes, graph } = self;
+        Self::register(archetypes, graph, components, archetype)
     }
 
     #[inline]

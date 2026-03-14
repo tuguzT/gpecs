@@ -160,7 +160,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn register_archetype<B>(&mut self) -> Result<GpuArchetypeId, DuplicateComponentError>
+    pub fn register_archetype_of<B>(&mut self) -> Result<GpuArchetypeId, DuplicateComponentError>
     where
         B: GpuBundle,
     {
@@ -173,7 +173,7 @@ impl<'ctx> GpuExecutor<'ctx> {
         } = *self;
 
         let (_, _, components, archetypes) = unsafe { context.as_parts_mut() };
-        gpu_archetypes.register_archetype::<B>(components, archetypes, gpu_components, device)
+        gpu_archetypes.register_archetype_of::<B>(components, archetypes, gpu_components, device)
     }
 
     #[inline]

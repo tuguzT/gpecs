@@ -210,7 +210,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn register_archetype<B>(&mut self) -> Result<ArchetypeId, DuplicateComponentError>
+    pub fn register_archetype_of<B>(&mut self) -> Result<ArchetypeId, DuplicateComponentError>
     where
         B: Bundle,
     {
@@ -219,7 +219,7 @@ impl Context {
             archetypes,
             ..
         } = self;
-        archetypes.register_archetype::<B>(components)
+        archetypes.register_archetype_of::<B>(components)
     }
 
     #[inline]

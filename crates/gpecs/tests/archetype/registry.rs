@@ -27,7 +27,7 @@ fn register_archetype() {
     assert_eq!(archetypes.len(), 0);
 
     let id = archetypes
-        .register_archetype::<(Position, Mass, Tag)>(&mut components)
+        .register_archetype_of::<(Position, Mass, Tag)>(&mut components)
         .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids");
     assert!(archetypes.len() > 1);
     assert_eq!(
@@ -40,7 +40,7 @@ fn register_archetype() {
     assert!(archetypes.archetype_ids().any(|item| item == id));
 
     let same_id = archetypes
-        .register_archetype::<(Mass, Tag, Position)>(&mut components)
+        .register_archetype_of::<(Mass, Tag, Position)>(&mut components)
         .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids");
     assert_eq!(same_id, id);
 
@@ -96,7 +96,7 @@ fn register_archetype() {
     );
 
     let new_id = archetypes
-        .register_archetype::<(Mass, Tag)>(&mut components)
+        .register_archetype_of::<(Mass, Tag)>(&mut components)
         .expect("archetype of `Tag` and `Mass` should contain unique component ids");
     assert_ne!(new_id, id);
     assert_eq!(
@@ -130,10 +130,10 @@ fn exchange_components() {
     let mut archetypes = ArchetypeRegistry::new();
 
     let archetype = archetypes
-        .register_archetype::<(Position, Mass, Tag)>(&mut components)
+        .register_archetype_of::<(Position, Mass, Tag)>(&mut components)
         .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids");
     let archetype_subset = archetypes
-        .register_archetype::<(Position, Mass)>(&mut components)
+        .register_archetype_of::<(Position, Mass)>(&mut components)
         .expect("archetype of `Position` and `Mass` should contain unique component ids");
 
     let archetypes_before = archetypes

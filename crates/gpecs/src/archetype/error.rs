@@ -179,7 +179,7 @@ impl MissingComponentError {
 impl Display for MissingComponentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { component_id } = *self;
-        write!(f, "{component_id} is exclusive to this bundle")
+        write!(f, "{component_id} is missing")
     }
 }
 

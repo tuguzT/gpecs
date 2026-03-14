@@ -11,18 +11,22 @@ use gpecs_soa_erased::{
     ptr::slice::CoreSliceItemPtrs,
     storage::{AllocError, BoxedAlignedUninitStorage},
 };
+use itertools::{equal, zip_eq};
 
 use crate::{
     archetype::{
         collect::try_collect_components,
         erased::{ErasedArchetype, FromComponentInfo},
+        error::MissingComponentError,
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
         erased::{
             ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
             ErasedBundleRefs, ErasedBundleRefsIter,
-            error::{DowncastError, FromBundleError, FromComponentsError, ShuffleError},
+            error::{
+                DestroyError, DowncastError, FromBundleError, FromComponentsError, ShuffleError,
+            },
         },
     },
     component::{
@@ -363,7 +367,7 @@ where
             return Err(error);
         }
 
-        if itertools::equal(
+        if equal(
             this.iter().map(ComponentId::from),
             other.iter().map(ComponentId::from),
         ) {
@@ -406,6 +410,73 @@ where
 
         let shuffled = ShuffledBundle::Other(other);
         Ok(shuffled)
+    }
+}
+
+impl<T> ErasedBundleKind<T>
+where
+    T: ErasedArchetypeKind,
+{
+    #[inline]
+    pub fn destroy(
+        mut self,
+        to_destroy: &ErasedArchetype<impl Sized>,
+    ) -> Result<ErasedBundle<T::Meta>, DestroyError<Self>>
+    where
+        T::Meta: Clone,
+    {
+        if let Some(missing_component_id) = to_destroy
+            .component_ids()
+            .find(|&id| !self.archetype().contains(id))
+        {
+            let error = DestroyError {
+                reason: MissingComponentError::new(missing_component_id).into(),
+                bundle: self,
+            };
+            return Err(error);
+        }
+
+        let (refs, archetype) = self.as_mut_refs_with_archetype();
+        let fields = zip_eq(refs, archetype).filter_map(|(mut field, component)| {
+            if to_destroy.contains(component.id) {
+                if let Some(drop_fn) = component.meta.as_ref() {
+                    unsafe { drop_fn(field.as_mut_ptr().cast()) }
+                }
+                return None;
+            }
+            Some(field)
+        });
+        let with_meta = archetype.iter().filter_map(|component| {
+            if to_destroy.contains(component.id) {
+                return None;
+            }
+            Some((component.id, component.meta.clone()))
+        });
+        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_meta) };
+        let result = Inner::try_from_fields_descriptors(fields, archetype);
+
+        let result = result.map_err(|error| {
+            use gpecs_soa_erased::error::FromFieldsDescriptorsError::FromLayout;
+
+            match error {
+                FromLayout(error) => error.into(),
+                _ => unreachable!("failed to destroy some components of bundle: {error}"),
+            }
+        });
+        let inner = match result {
+            Ok(inner) => inner,
+            Err(reason) => {
+                let error = DestroyError {
+                    reason,
+                    bundle: self,
+                };
+                return Err(error);
+            }
+        };
+        let _ = self.into_inner();
+
+        let bundle = unsafe { ErasedBundle::from_inner(inner) };
+        Ok(bundle)
     }
 }
 

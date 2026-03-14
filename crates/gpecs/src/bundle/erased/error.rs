@@ -8,6 +8,7 @@ use gpecs_soa_erased::storage::AllocError;
 
 use crate::archetype::error::{
     DuplicateComponentError, IncompatibleArchetypeError, IncompatibleArchetypeExactError,
+    MissingComponentError,
 };
 
 #[derive(Debug, Clone)]
@@ -216,6 +217,79 @@ impl Error for ShuffleErrorKind {
         match self {
             Self::IncompatibleArchetype(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
+            Self::Alloc(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct DestroyError<T> {
+    pub reason: DestroyErrorKind,
+    pub bundle: T,
+}
+
+impl<T> From<DestroyError<T>> for DestroyErrorKind {
+    #[inline]
+    fn from(error: DestroyError<T>) -> Self {
+        let DestroyError { reason, .. } = error;
+        reason
+    }
+}
+
+impl<T> Display for DestroyError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, bundle } = self;
+        write!(f, "failed to destroy {bundle}: {reason}")
+    }
+}
+
+impl<T> Error for DestroyError<T>
+where
+    T: Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum DestroyErrorKind {
+    MissingComponent(MissingComponentError),
+    Alloc(AllocError),
+}
+
+impl From<MissingComponentError> for DestroyErrorKind {
+    #[inline]
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
+    }
+}
+
+impl From<AllocError> for DestroyErrorKind {
+    #[inline]
+    fn from(error: AllocError) -> Self {
+        Self::Alloc(error)
+    }
+}
+
+impl Display for DestroyErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingComponent(error) => Display::fmt(error, f),
+            Self::Alloc(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for DestroyErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::MissingComponent(error) => Some(error),
             Self::Alloc(error) => Some(error),
         }
     }

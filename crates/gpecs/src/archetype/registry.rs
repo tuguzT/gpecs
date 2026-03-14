@@ -1026,24 +1026,14 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
-                .into_iter()
-                .map(|component| component.expect("component should be allocated successfully"))
-                .collect::<IndexSet<_>>();
-
-        // TODO: add new method for erased bundle to remove some of the components
-        bundle_components
-            .component_ids()
-            .map(|component_id| old_fields.swap_take(&component_id))
-            .for_each(drop);
+        let bundle = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+            .destroy(&bundle_components)
+            .expect("all the bundle components should be present in the old archetype");
 
         assert!(
-            !old_fields.is_empty(),
+            !bundle.archetype().is_empty(),
             "bundle should contain at least one component",
         );
-        let bundle = ErasedBundle::from_components(old_fields)
-            .expect("erased bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         Ok(Some(new_archetype))

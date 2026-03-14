@@ -203,38 +203,76 @@ where
 {
     #[inline]
     pub fn as_ptrs(&'a self) -> ErasedSoaPtrs<D::Output, P::Const> {
+        let (ptrs, _) = self.as_ptrs_with_descriptors();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_descriptors(&'a self) -> (ErasedSoaPtrs<D::Output, P::Const>, &'a D) {
         let Self {
             ref storage,
             ref descriptors,
             ..
         } = *self;
 
-        let descriptors = descriptors.field_descriptors();
-        let buffer = storage.as_uninit_slice();
-        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, 1, 0) }
+        let ptrs = {
+            let descriptors = descriptors.field_descriptors();
+            let buffer = storage.as_uninit_slice();
+            unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, 1, 0) }
+        };
+        (ptrs, descriptors)
     }
 
     #[inline]
     pub fn as_mut_ptrs(&'a mut self) -> ErasedSoaMutPtrs<D::Output, P::Mut> {
+        let (ptrs, _) = self.as_mut_ptrs_with_descriptors();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_descriptors(
+        &'a mut self,
+    ) -> (ErasedSoaMutPtrs<D::Output, P::Mut>, &'a D) {
         let Self {
             ref mut storage,
             ref descriptors,
             ..
         } = *self;
 
-        let descriptors = descriptors.field_descriptors();
-        let buffer = storage.as_mut_uninit_slice();
-        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, 1, 0) }
+        let ptrs = {
+            let descriptors = descriptors.field_descriptors();
+            let buffer = storage.as_mut_uninit_slice();
+            unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, 1, 0) }
+        };
+        (ptrs, descriptors)
     }
 
     #[inline]
     pub fn as_refs(&'a self) -> ErasedSoaRefs<'a, D::Output, P::Const> {
-        unsafe { self.as_ptrs().deref() }
+        let (refs, _) = self.as_refs_with_descriptors();
+        refs
+    }
+
+    #[inline]
+    pub fn as_refs_with_descriptors(&'a self) -> (ErasedSoaRefs<'a, D::Output, P::Const>, &'a D) {
+        let (ptrs, descriptors) = self.as_ptrs_with_descriptors();
+        let refs = unsafe { ptrs.deref() };
+        (refs, descriptors)
     }
 
     #[inline]
     pub fn as_mut_refs(&'a mut self) -> ErasedSoaMutRefs<'a, D::Output, P::Mut> {
-        unsafe { self.as_mut_ptrs().deref_mut() }
+        let (refs, _) = self.as_mut_refs_with_descriptors();
+        refs
+    }
+
+    #[inline]
+    pub fn as_mut_refs_with_descriptors(
+        &'a mut self,
+    ) -> (ErasedSoaMutRefs<'a, D::Output, P::Mut>, &'a D) {
+        let (ptrs, descriptors) = self.as_mut_ptrs_with_descriptors();
+        let refs = unsafe { ptrs.deref_mut() };
+        (refs, descriptors)
     }
 
     #[inline]

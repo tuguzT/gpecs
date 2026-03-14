@@ -11,7 +11,6 @@ use gpecs_soa_erased::{
     ptr::slice::CoreSliceItemPtrs,
     storage::{AllocError, BoxedAlignedUninitStorage},
 };
-use itertools::{equal, zip_eq};
 
 use crate::{
     archetype::{
@@ -33,7 +32,7 @@ use crate::{
     hash::IndexSet,
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
-        traits::ReadSoaContext,
+        traits::{RawSoaContext, ReadSoaContext},
     },
 };
 
@@ -249,28 +248,69 @@ where
 
     #[inline]
     pub fn as_ptrs(&self) -> ErasedBundlePtrs<'_, T::Meta> {
+        let (ptrs, _) = self.as_ptrs_with_archetype();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_ptrs_with_archetype(
+        &self,
+    ) -> (ErasedBundlePtrs<'_, T::Meta>, &ErasedArchetype<T::Meta>) {
         let Self { inner } = self;
 
-        let inner = inner.as_ptrs();
-        unsafe { ErasedBundlePtrs::from_inner(inner) }
+        let (inner, descriptors) = inner.as_ptrs_with_descriptors();
+        let ptrs = unsafe { ErasedBundlePtrs::from_inner(inner) };
+        (ptrs, descriptors.field_descriptors())
     }
 
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> ErasedBundleMutPtrs<'_, T::Meta> {
+        let (ptrs, _) = self.as_mut_ptrs_with_archetype();
+        ptrs
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs_with_archetype(
+        &mut self,
+    ) -> (ErasedBundleMutPtrs<'_, T::Meta>, &ErasedArchetype<T::Meta>) {
         let Self { inner } = self;
 
-        let inner = inner.as_mut_ptrs();
-        unsafe { ErasedBundleMutPtrs::from_inner(inner) }
+        let (inner, descriptors) = inner.as_mut_ptrs_with_descriptors();
+        let ptrs = unsafe { ErasedBundleMutPtrs::from_inner(inner) };
+        (ptrs, descriptors.field_descriptors())
     }
 
     #[inline]
     pub fn as_refs(&self) -> ErasedBundleRefs<'_, '_, T::Meta> {
-        unsafe { self.as_ptrs().deref() }
+        let (refs, _) = self.as_refs_with_archetype();
+        refs
+    }
+
+    #[inline]
+    pub fn as_refs_with_archetype(
+        &self,
+    ) -> (ErasedBundleRefs<'_, '_, T::Meta>, &ErasedArchetype<T::Meta>) {
+        let (ptrs, descriptors) = self.as_ptrs_with_archetype();
+        let refs = unsafe { ptrs.deref() };
+        (refs, descriptors)
     }
 
     #[inline]
     pub fn as_mut_refs(&mut self) -> ErasedBundleMutRefs<'_, '_, T::Meta> {
-        unsafe { self.as_mut_ptrs().deref_mut() }
+        let (refs, _) = self.as_mut_refs_with_archetype();
+        refs
+    }
+
+    #[inline]
+    pub fn as_mut_refs_with_archetype(
+        &mut self,
+    ) -> (
+        ErasedBundleMutRefs<'_, '_, T::Meta>,
+        &ErasedArchetype<T::Meta>,
+    ) {
+        let (ptrs, descriptors) = self.as_mut_ptrs_with_archetype();
+        let refs = unsafe { ptrs.deref_mut() };
+        (refs, descriptors)
     }
 
     #[inline]
@@ -323,7 +363,7 @@ where
             return Err(error);
         }
 
-        if equal(
+        if itertools::equal(
             this.iter().map(ComponentId::from),
             other.iter().map(ComponentId::from),
         ) {
@@ -420,18 +460,8 @@ where
     T: ErasedArchetypeKind,
 {
     fn drop(&mut self) {
-        let Self { inner } = self;
-
-        let ptrs = inner.as_mut_ptrs().into_iter();
-        let components = ptrs.descriptors().clone();
-        for (ptr, component) in zip_eq(ptrs, components) {
-            let Some(drop_fn) = component.as_ref() else {
-                continue;
-            };
-
-            let ptr = ptr.as_mut_ptr().cast();
-            unsafe { drop_fn(ptr) }
-        }
+        let (ptrs, archetype) = self.as_mut_ptrs_with_archetype();
+        unsafe { archetype.ptrs_drop_in_place(ptrs) }
     }
 }
 

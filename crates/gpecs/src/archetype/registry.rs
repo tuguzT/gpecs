@@ -795,7 +795,7 @@ impl ArchetypeRegistry {
             .into_iter()
             .map(|component| component.expect("component should be allocated successfully"));
 
-        // TODO: add new method for erased bundle to replace some of the components
+        // TODO: add new method for erased bundle to add new components
         fields.for_each(|field| {
             let component_id = field.component_id();
             if old_fields.replace(field).is_some() {

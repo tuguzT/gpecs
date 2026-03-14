@@ -5,7 +5,7 @@ use core::{
     hash::{self, Hash},
     mem::{ManuallyDrop, forget},
     ops::{Deref, DerefMut, Index, IndexMut, RangeBounds},
-    ptr::{self, addr_of},
+    ptr,
 };
 use core_alloc::boxed::Box;
 
@@ -122,8 +122,10 @@ where
 
     #[inline]
     pub fn into_context(self) -> T::Context {
-        let me = ManuallyDrop::new(self);
-        let buffer = unsafe { ptr::read(addr_of!(me.buffer)) };
+        let mut me = ManuallyDrop::new(self);
+        unsafe { me.drop_slices_in_place() }
+
+        let buffer = unsafe { ptr::read(&raw const me.buffer) };
         buffer.into_context()
     }
 
@@ -301,6 +303,16 @@ where
 
         let len = self.len();
         unsafe { context.ptrs_copy_forward(old_ptrs, new_ptrs, len) }
+    }
+
+    #[inline]
+    unsafe fn drop_slices_in_place(&mut self) {
+        if self.is_empty() {
+            return;
+        }
+
+        let (context, slices) = self.as_mut_slice_ptrs_with_context();
+        unsafe { context.slices_drop_in_place(slices) }
     }
 
     pub fn reserve(&mut self, additional: usize) {
@@ -795,11 +807,11 @@ where
     }
 
     #[must_use]
-    pub fn into_boxed_slice(mut self) -> Box<SoaSlice<T>> {
-        self.shrink_to_fit();
-        let me = ManuallyDrop::new(self);
+    pub fn into_boxed_slice(self) -> Box<SoaSlice<T>> {
+        let mut me = ManuallyDrop::new(self);
+        me.shrink_to_fit();
 
-        let buffer = unsafe { ptr::read(addr_of!(me.buffer)) };
+        let buffer = unsafe { ptr::read(&raw const me.buffer) };
         let len = me.len;
         unsafe { buffer.into_box(len) }
     }
@@ -1464,12 +1476,7 @@ where
     T: AllocSoa + ?Sized,
 {
     fn drop(&mut self) {
-        if self.is_empty() {
-            return;
-        }
-
-        let (context, slices) = self.as_mut_slice_ptrs_with_context();
-        unsafe { context.slices_drop_in_place(slices) }
+        unsafe { self.drop_slices_in_place() }
     }
 }
 

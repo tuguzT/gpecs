@@ -223,6 +223,96 @@ impl Error for ShuffleErrorKind {
 }
 
 #[derive(Debug, Clone)]
+pub struct InsertError<T, I> {
+    pub reason: InsertErrorKind,
+    pub bundle: T,
+    pub to_insert: I,
+}
+
+impl<T, I> From<InsertError<T, I>> for InsertErrorKind {
+    #[inline]
+    fn from(error: InsertError<T, I>) -> Self {
+        let InsertError { reason, .. } = error;
+        reason
+    }
+}
+
+impl<T, I> Display for InsertError<T, I>
+where
+    T: Display,
+    I: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            reason,
+            bundle,
+            to_insert,
+        } = self;
+
+        write!(f, "failed to insert {to_insert} into {bundle}: {reason}")
+    }
+}
+
+impl<T, I> Error for InsertError<T, I>
+where
+    T: Debug + Display,
+    I: Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum InsertErrorKind {
+    DuplicateComponent(DuplicateComponentError),
+    InvalidLayout(LayoutError),
+    Alloc(AllocError),
+}
+
+impl From<DuplicateComponentError> for InsertErrorKind {
+    #[inline]
+    fn from(error: DuplicateComponentError) -> Self {
+        Self::DuplicateComponent(error)
+    }
+}
+
+impl From<LayoutError> for InsertErrorKind {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl From<AllocError> for InsertErrorKind {
+    #[inline]
+    fn from(error: AllocError) -> Self {
+        Self::Alloc(error)
+    }
+}
+
+impl Display for InsertErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::Alloc(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for InsertErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DuplicateComponent(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::Alloc(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct RemoveError<T> {
     pub reason: RemoveErrorKind,

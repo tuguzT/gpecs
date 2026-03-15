@@ -1,7 +1,7 @@
 use std::{
     alloc::Layout,
     fmt::{self, Debug},
-    iter::FusedIterator,
+    iter::{FusedIterator, chain},
     mem::{ManuallyDrop, MaybeUninit},
     ptr,
 };
@@ -18,7 +18,7 @@ use crate::{
     archetype::{
         collect::try_collect_components,
         erased::{ComponentIds, ErasedArchetype, FromComponentInfo},
-        error::MissingComponentError,
+        error::{DuplicateComponentError, MissingComponentError},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
@@ -26,8 +26,8 @@ use crate::{
             ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
             ErasedBundleRefs, ErasedBundleRefsIter,
             error::{
-                DowncastError, FromBundleError, FromComponentsError, RemoveError, RemoveErrorKind,
-                ShuffleError,
+                DowncastError, FromBundleError, FromComponentsError, InsertError, RemoveError,
+                RemoveErrorKind, ShuffleError,
             },
         },
     },
@@ -408,6 +408,60 @@ where
     }
 }
 
+impl<T> ErasedBundleKind<T>
+where
+    T: ErasedArchetypeKind<Meta: Clone>,
+{
+    #[inline]
+    pub fn insert<ToInsert>(
+        self,
+        to_insert: ErasedBundleKind<ToInsert>,
+    ) -> Result<ErasedBundle<T::Meta>, InsertError<Self, ErasedBundleKind<ToInsert>>>
+    where
+        ToInsert: ErasedArchetypeKind<Meta = T::Meta>,
+    {
+        if let Some(duplicate_component_id) = to_insert
+            .archetype()
+            .component_ids()
+            .find(|&id| self.archetype().contains(id))
+        {
+            let error = InsertError {
+                reason: DuplicateComponentError::new(duplicate_component_id).into(),
+                bundle: self,
+                to_insert,
+            };
+            return Err(error);
+        }
+
+        let refs = chain(self.as_refs(), to_insert.as_refs());
+        let with_meta = chain(self.archetype(), to_insert.archetype())
+            .map(|component| (component.id, component.meta.clone()));
+        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_meta) };
+        let result = Inner::try_from_fields_descriptors(refs, archetype);
+
+        let result = result.map_err(|error| match error {
+            FromFieldsDescriptorsError::FromLayout(error) => error.into(),
+            FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
+            _ => unreachable!("failed to insert some components into bundle: {error}"),
+        });
+        let inner = match result {
+            Ok(inner) => inner,
+            Err(reason) => {
+                let error = InsertError {
+                    reason,
+                    bundle: self,
+                    to_insert,
+                };
+                return Err(error);
+            }
+        };
+
+        let _ = (self.into_inner(), to_insert.into_inner());
+        let bundle = unsafe { ErasedBundle::from_inner(inner) };
+        Ok(bundle)
+    }
+}
+
 pub struct RemovePair<ToRemove>
 where
     ToRemove: ErasedArchetypeKind,
@@ -529,7 +583,7 @@ where
 fn into_remove_error_kind(error: FromFieldsDescriptorsError<AllocError>) -> RemoveErrorKind {
     match error {
         FromFieldsDescriptorsError::FromLayout(error) => error.into(),
-        _ => unreachable!("failed to destroy some components of bundle: {error}"),
+        _ => unreachable!("failed to remove some components of bundle: {error}"),
     }
 }
 

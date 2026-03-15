@@ -791,11 +791,6 @@ impl ArchetypeRegistry {
         let bundle = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
             .insert(to_insert)
             .expect("old archetype should not have components of the inserted bundle");
-
-        assert!(
-            !bundle.archetype().is_empty(),
-            "bundle should contain at least one component",
-        );
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         Ok(new_archetype)
@@ -853,27 +848,12 @@ impl ArchetypeRegistry {
             return Ok(new_archetype);
         };
 
-        let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
-                .into_iter()
-                .map(|component| component.expect("component should be allocated successfully"))
-                .collect::<IndexSet<_>>();
-
-        let fields = ErasedBundle::<StorageMeta>::try_from(components, value)
+        let to_replace = ErasedBundle::try_from(components, value)
             .map_err(|error| error.reason)
-            .expect("bundle compatibility should have been already checked")
-            .into_iter()
-            .map(|component| component.expect("component should be allocated successfully"));
-
-        // TODO: add new method for erased bundle to replace some of the components
-        fields.map(|field| old_fields.replace(field)).for_each(drop);
-
-        assert!(
-            !old_fields.is_empty(),
-            "bundle should contain at least one component",
-        );
-        let bundle = ErasedBundle::from_components(old_fields)
-            .expect("erased bundle should be created successfully");
+            .expect("bundle compatibility should have been already checked");
+        let bundle = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+            .replace(to_replace)
+            .expect("combined bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         Ok(new_archetype)
@@ -944,11 +924,6 @@ impl ArchetypeRegistry {
         } = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
             .remove(bundle_components)
             .expect("all the bundle components should be present in the old archetype");
-
-        assert!(
-            !bundle.archetype().is_empty(),
-            "bundle should contain at least one component",
-        );
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         let value = removed
@@ -1009,11 +984,6 @@ impl ArchetypeRegistry {
         let bundle = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
             .destroy(&bundle_components)
             .expect("all the bundle components should be present in the old archetype");
-
-        assert!(
-            !bundle.archetype().is_empty(),
-            "bundle should contain at least one component",
-        );
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
         Ok(Some(new_archetype))
@@ -1043,6 +1013,11 @@ impl ArchetypeRegistry {
     ) where
         T: ErasedArchetypeKind<Meta = StorageMeta>,
     {
+        assert!(
+            !bundle.archetype().is_empty(),
+            "bundle should contain at least one component",
+        );
+
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         if let Err(error) = info.storage.insert(entity, bundle) {
             unreachable!("failed to insert {entity} into {archetype_id}: {error}")

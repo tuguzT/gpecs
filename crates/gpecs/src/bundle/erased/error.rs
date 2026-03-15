@@ -313,6 +313,86 @@ impl Error for InsertErrorKind {
 }
 
 #[derive(Debug, Clone)]
+pub struct ReplaceError<T, R> {
+    pub reason: ReplaceErrorKind,
+    pub bundle: T,
+    pub to_replace: R,
+}
+
+impl<T, R> From<ReplaceError<T, R>> for ReplaceErrorKind {
+    #[inline]
+    fn from(error: ReplaceError<T, R>) -> Self {
+        let ReplaceError { reason, .. } = error;
+        reason
+    }
+}
+
+impl<T, R> Display for ReplaceError<T, R>
+where
+    T: Display,
+    R: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            reason,
+            bundle,
+            to_replace,
+        } = self;
+
+        write!(f, "failed to replace {to_replace} in {bundle}: {reason}")
+    }
+}
+
+impl<T, R> Error for ReplaceError<T, R>
+where
+    T: Debug + Display,
+    R: Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ReplaceErrorKind {
+    InvalidLayout(LayoutError),
+    Alloc(AllocError),
+}
+
+impl From<LayoutError> for ReplaceErrorKind {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl From<AllocError> for ReplaceErrorKind {
+    #[inline]
+    fn from(error: AllocError) -> Self {
+        Self::Alloc(error)
+    }
+}
+
+impl Display for ReplaceErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::Alloc(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for ReplaceErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidLayout(error) => Some(error),
+            Self::Alloc(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct RemoveError<T> {
     pub reason: RemoveErrorKind,

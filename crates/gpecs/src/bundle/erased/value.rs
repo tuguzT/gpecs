@@ -27,7 +27,7 @@ use crate::{
             ErasedBundleRefs, ErasedBundleRefsIter,
             error::{
                 DowncastError, FromBundleError, FromComponentsError, InsertError, RemoveError,
-                RemoveErrorKind, ShuffleError,
+                RemoveErrorKind, ReplaceError, ShuffleError,
             },
         },
     },
@@ -457,6 +457,66 @@ where
         };
 
         let _ = (self.into_inner(), to_insert.into_inner());
+        let bundle = unsafe { ErasedBundle::from_inner(inner) };
+        Ok(bundle)
+    }
+
+    #[inline]
+    pub fn replace<ToReplace>(
+        mut self,
+        to_replace: ErasedBundleKind<ToReplace>,
+    ) -> Result<ErasedBundle<T::Meta>, ReplaceError<Self, ErasedBundleKind<ToReplace>>>
+    where
+        ToReplace: ErasedArchetypeKind<Meta = T::Meta>,
+    {
+        let (ptrs, archetype) = self.as_mut_ptrs_with_archetype();
+
+        let ptrs = zip_eq(ptrs, archetype).map(|(dst, component)| {
+            if to_replace.archetype().contains(dst.component_id()) {
+                if let Some(drop_fn) = component.meta.as_ref() {
+                    unsafe { drop_fn(dst.as_mut_ptr().cast()) }
+                }
+                let src = to_replace
+                    .as_ptrs()
+                    .get(dst.component_id())
+                    .expect("to replace archetype should contain component");
+                unsafe { dst.copy_from_nonoverlapping(src, 1) }
+            }
+            dst.cast_const()
+        });
+        let ptrs_to_append = to_replace
+            .as_ptrs()
+            .into_iter()
+            .filter(|ptr| !archetype.contains(ptr.component_id()));
+        let refs = chain(ptrs, ptrs_to_append).map(|ptr| unsafe { ptr.deref() });
+
+        let metas_to_append = to_replace
+            .archetype()
+            .iter()
+            .filter(|component| !archetype.contains(component.id));
+        let with_metas = chain(archetype, metas_to_append)
+            .map(|component| (component.id, component.meta.clone()));
+        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_metas) };
+
+        let result = Inner::try_from_fields_descriptors(refs, archetype);
+        let result = result.map_err(|error| match error {
+            FromFieldsDescriptorsError::FromLayout(error) => error.into(),
+            FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
+            _ => unreachable!("failed to replace some components in bundle: {error}"),
+        });
+        let inner = match result {
+            Ok(inner) => inner,
+            Err(reason) => {
+                let error = ReplaceError {
+                    reason,
+                    bundle: self,
+                    to_replace,
+                };
+                return Err(error);
+            }
+        };
+
+        let _ = (self.into_inner(), to_replace.into_inner());
         let bundle = unsafe { ErasedBundle::from_inner(inner) };
         Ok(bundle)
     }

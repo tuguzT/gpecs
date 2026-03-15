@@ -8,6 +8,7 @@ use std::{
 
 use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoa, ErasedSoaIntoFields,
+    error::FromFieldsDescriptorsError,
     ptr::slice::CoreSliceItemPtrs,
     storage::{AllocError, BoxedAlignedUninitStorage},
 };
@@ -16,7 +17,7 @@ use itertools::{equal, zip_eq};
 use crate::{
     archetype::{
         collect::try_collect_components,
-        erased::{ErasedArchetype, FromComponentInfo},
+        erased::{ComponentIds, ErasedArchetype, FromComponentInfo},
         error::MissingComponentError,
     },
     bundle::{
@@ -25,7 +26,8 @@ use crate::{
             ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
             ErasedBundleRefs, ErasedBundleRefsIter,
             error::{
-                DestroyError, DowncastError, FromBundleError, FromComponentsError, ShuffleError,
+                DowncastError, FromBundleError, FromComponentsError, RemoveError, RemoveErrorKind,
+                ShuffleError,
             },
         },
     },
@@ -149,15 +151,12 @@ where
         let archetype = unsafe { ErasedArchetype::with_meta_unchecked(iter) };
 
         let fields = components.into_iter().map(ErasedComponent::into_field);
-        let inner = Inner::try_from_fields_descriptors(fields, archetype).map_err(|error| {
-            use gpecs_soa_erased::error::FromFieldsDescriptorsError::{FromLayout, InvalidLayout};
-
-            match error {
-                InvalidLayout(error) => FromComponentsError::from(error),
-                FromLayout(error) => FromComponentsError::from(error),
+        let inner = Inner::try_from_fields_descriptors(fields, archetype)
+            .map_err::<FromComponentsError, _>(|error| match error {
+                FromFieldsDescriptorsError::FromLayout(error) => error.into(),
+                FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
                 _ => unreachable!("failed to create erased bundle from components: {error}"),
-            }
-        })?;
+            })?;
 
         let me = unsafe { Self::from_inner(inner) };
         Ok(me)
@@ -382,14 +381,10 @@ where
         });
         let result = Inner::try_from_fields_descriptors(fields, other);
 
-        let result = result.map_err(|error| {
-            use gpecs_soa_erased::error::FromFieldsDescriptorsError::{FromLayout, InvalidLayout};
-
-            match error {
-                FromLayout(error) => error.into(),
-                InvalidLayout(error) => error.into(),
-                _ => unreachable!("failed to shuffle bundle: {error}"),
-            }
+        let result = result.map_err(|error| match error {
+            FromFieldsDescriptorsError::FromLayout(error) => error.into(),
+            FromFieldsDescriptorsError::InvalidLayout(error) => error.into(),
+            _ => unreachable!("failed to shuffle bundle: {error}"),
         });
         let inner = match result {
             Ok(inner) => inner,
@@ -413,30 +408,79 @@ where
     }
 }
 
+pub struct RemovePair<ToRemove>
+where
+    ToRemove: ErasedArchetypeKind,
+{
+    pub retained: ErasedBundle<ToRemove::Meta>,
+    pub removed: ErasedBundleKind<ToRemove>,
+}
+
 impl<T> ErasedBundleKind<T>
 where
-    T: ErasedArchetypeKind,
+    T: ErasedArchetypeKind<Meta: Clone>,
 {
     #[inline]
-    pub fn destroy(
-        mut self,
-        to_destroy: &ErasedArchetype<impl Sized>,
-    ) -> Result<ErasedBundle<T::Meta>, DestroyError<Self>>
+    pub fn remove<ToRemove>(
+        self,
+        to_remove: ToRemove,
+    ) -> Result<RemovePair<ToRemove>, RemoveError<Self>>
     where
-        T::Meta: Clone,
+        ToRemove: ErasedArchetypeKind<Meta = T::Meta>,
     {
-        if let Some(missing_component_id) = to_destroy
-            .component_ids()
-            .find(|&id| !self.archetype().contains(id))
-        {
-            let error = DestroyError {
-                reason: MissingComponentError::new(missing_component_id).into(),
-                bundle: self,
-            };
-            return Err(error);
-        }
+        let archetype_to_remove = to_remove.field_descriptors();
+        let bundle = self.check_remove(archetype_to_remove.component_ids())?;
 
-        let (refs, archetype) = self.as_mut_refs_with_archetype();
+        let retained_refs = bundle
+            .as_refs()
+            .into_iter()
+            .filter(|component| !archetype_to_remove.contains(component.component_id()));
+        let retained_meta = bundle
+            .archetype()
+            .iter()
+            .filter(|component| !archetype_to_remove.contains(component.id))
+            .map(|component| (component.id, component.meta.clone()));
+        let retained_archetype = unsafe { ErasedArchetype::with_meta_unchecked(retained_meta) };
+        let result = Inner::try_from_fields_descriptors(retained_refs, retained_archetype);
+        let retained_inner = match result.map_err(into_remove_error_kind) {
+            Ok(inner) => inner,
+            Err(reason) => {
+                let error = RemoveError { reason, bundle };
+                return Err(error);
+            }
+        };
+
+        let removed_refs = bundle
+            .as_refs()
+            .into_iter()
+            .filter(|component| archetype_to_remove.contains(component.component_id()));
+        let result = Inner::try_from_fields_descriptors(removed_refs, archetype_to_remove);
+        let removed_inner = match result.map_err(into_remove_error_kind) {
+            Ok(inner) => inner,
+            Err(reason) => {
+                let error = RemoveError { reason, bundle };
+                return Err(error);
+            }
+        };
+        let (removed_storage, _) = removed_inner.into_parts();
+        let removed_inner = unsafe { Inner::from_parts(removed_storage, to_remove) };
+
+        let _ = bundle.into_inner();
+        let pair = RemovePair {
+            retained: unsafe { ErasedBundleKind::from_inner(retained_inner) },
+            removed: unsafe { ErasedBundleKind::from_inner(removed_inner) },
+        };
+        Ok(pair)
+    }
+
+    #[inline]
+    pub fn destroy(
+        self,
+        to_destroy: &ErasedArchetype<impl Sized>,
+    ) -> Result<ErasedBundle<T::Meta>, RemoveError<Self>> {
+        let mut bundle = self.check_remove(to_destroy.component_ids())?;
+
+        let (refs, archetype) = bundle.as_mut_refs_with_archetype();
         let fields = zip_eq(refs, archetype).filter_map(|(mut field, component)| {
             if to_destroy.contains(component.id) {
                 if let Some(drop_fn) = component.meta.as_ref() {
@@ -454,29 +498,38 @@ where
         });
         let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_meta) };
         let result = Inner::try_from_fields_descriptors(fields, archetype);
-
-        let result = result.map_err(|error| {
-            use gpecs_soa_erased::error::FromFieldsDescriptorsError::FromLayout;
-
-            match error {
-                FromLayout(error) => error.into(),
-                _ => unreachable!("failed to destroy some components of bundle: {error}"),
-            }
-        });
-        let inner = match result {
+        let inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
             Err(reason) => {
-                let error = DestroyError {
-                    reason,
-                    bundle: self,
-                };
+                let error = RemoveError { reason, bundle };
                 return Err(error);
             }
         };
-        let _ = self.into_inner();
 
+        let _ = bundle.into_inner();
         let bundle = unsafe { ErasedBundle::from_inner(inner) };
         Ok(bundle)
+    }
+
+    #[inline]
+    fn check_remove(self, mut to_remove: ComponentIds<'_>) -> Result<Self, RemoveError<Self>> {
+        if let Some(missing_component_id) = to_remove.find(|&id| !self.archetype().contains(id)) {
+            let error = RemoveError {
+                reason: MissingComponentError::new(missing_component_id).into(),
+                bundle: self,
+            };
+            return Err(error);
+        }
+        Ok(self)
+    }
+}
+
+#[inline]
+#[expect(clippy::needless_pass_by_value)]
+fn into_remove_error_kind(error: FromFieldsDescriptorsError<AllocError>) -> RemoveErrorKind {
+    match error {
+        FromFieldsDescriptorsError::FromLayout(error) => error.into(),
+        _ => unreachable!("failed to destroy some components of bundle: {error}"),
     }
 }
 

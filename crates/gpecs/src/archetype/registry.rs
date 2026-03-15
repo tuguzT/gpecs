@@ -32,7 +32,9 @@ use crate::{
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
-        erased::{ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind},
+        erased::{
+            ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, RemovePair,
+        },
     },
     component::registry::{ComponentId, ComponentRegistry},
     entity::Entity,
@@ -919,7 +921,7 @@ impl ArchetypeRegistry {
     {
         let Self { archetypes, graph } = self;
 
-        let bundle_components = ErasedArchetype::<()>::register::<B>(components)?;
+        let bundle_components = ErasedArchetype::register::<B>(components)?;
 
         let old_archetype = Self::find_archetype_with_entity_and_with_components(
             archetypes,
@@ -951,29 +953,22 @@ impl ArchetypeRegistry {
             return Ok((value, None));
         };
 
-        let mut old_fields =
-            Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
-                .into_iter()
-                .map(|component| component.expect("component should be allocated successfully"))
-                .collect::<IndexSet<_>>();
-
-        // TODO: add new method for erased bundle to take out some of the components
-        let fields = bundle_components.component_ids().map(|component_id| {
-            old_fields
-                .swap_take(&component_id)
-                .unwrap_or_else(|| unreachable!("{component_id} should exist"))
-        });
-        let value = B::from_erased(components, fields)
-            .expect("input fields should be compatible with the bundle");
+        let RemovePair {
+            retained: bundle,
+            removed,
+        } = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+            .remove(bundle_components)
+            .expect("all the bundle components should be present in the old archetype");
 
         assert!(
-            !old_fields.is_empty(),
+            !bundle.archetype().is_empty(),
             "bundle should contain at least one component",
         );
-        let bundle = ErasedBundle::from_components(old_fields)
-            .expect("erased bundle should be created successfully");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
+        let value = removed
+            .downcast(components)
+            .expect("archetype should be compatible");
         Ok((value, Some(new_archetype)))
     }
 

@@ -224,30 +224,30 @@ impl Error for ShuffleErrorKind {
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct DestroyError<T> {
-    pub reason: DestroyErrorKind,
+pub struct RemoveError<T> {
+    pub reason: RemoveErrorKind,
     pub bundle: T,
 }
 
-impl<T> From<DestroyError<T>> for DestroyErrorKind {
+impl<T> From<RemoveError<T>> for RemoveErrorKind {
     #[inline]
-    fn from(error: DestroyError<T>) -> Self {
-        let DestroyError { reason, .. } = error;
+    fn from(error: RemoveError<T>) -> Self {
+        let RemoveError { reason, .. } = error;
         reason
     }
 }
 
-impl<T> Display for DestroyError<T>
+impl<T> Display for RemoveError<T>
 where
     T: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { reason, bundle } = self;
-        write!(f, "failed to destroy {bundle}: {reason}")
+        write!(f, "failed to remove components from {bundle}: {reason}")
     }
 }
 
-impl<T> Error for DestroyError<T>
+impl<T> Error for RemoveError<T>
 where
     T: Debug + Display,
 {
@@ -258,26 +258,26 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum DestroyErrorKind {
+pub enum RemoveErrorKind {
     MissingComponent(MissingComponentError),
     Alloc(AllocError),
 }
 
-impl From<MissingComponentError> for DestroyErrorKind {
+impl From<MissingComponentError> for RemoveErrorKind {
     #[inline]
     fn from(error: MissingComponentError) -> Self {
         Self::MissingComponent(error)
     }
 }
 
-impl From<AllocError> for DestroyErrorKind {
+impl From<AllocError> for RemoveErrorKind {
     #[inline]
     fn from(error: AllocError) -> Self {
         Self::Alloc(error)
     }
 }
 
-impl Display for DestroyErrorKind {
+impl Display for RemoveErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingComponent(error) => Display::fmt(error, f),
@@ -286,7 +286,7 @@ impl Display for DestroyErrorKind {
     }
 }
 
-impl Error for DestroyErrorKind {
+impl Error for RemoveErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::MissingComponent(error) => Some(error),

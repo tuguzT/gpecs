@@ -11,7 +11,7 @@ pub use self::{
     value::{
         ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBorrowedBundleIntoIter, ErasedBundle,
         ErasedBundleIntoIter, ErasedBundleIntoIterKind, ErasedBundleKind, FromErasedComponent,
-        ShuffledBundle,
+        RemovePair, ShuffledBundle,
     },
 };
 

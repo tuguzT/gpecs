@@ -45,9 +45,37 @@ impl Display for EntityNotFoundError {
 impl Error for EntityNotFoundError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct EntityHasNoDataError {
+    entity: Entity,
+}
+
+impl EntityHasNoDataError {
+    #[inline]
+    pub fn new(entity: Entity) -> Self {
+        Self { entity }
+    }
+
+    #[inline]
+    pub fn entity(&self) -> Entity {
+        let Self { entity } = *self;
+        entity
+    }
+}
+
+impl Display for EntityHasNoDataError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { entity } = self;
+        write!(f, "{entity} has no data attached to it")
+    }
+}
+
+impl Error for EntityHasNoDataError {}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
 pub enum IncompatibleBundleError {
     EntityNotFound(EntityNotFoundError),
+    EntityHasNoData(EntityHasNoDataError),
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
     ComponentNotRegistered(NotRegisteredError),
@@ -57,6 +85,13 @@ impl From<EntityNotFoundError> for IncompatibleBundleError {
     #[inline]
     fn from(error: EntityNotFoundError) -> Self {
         Self::EntityNotFound(error)
+    }
+}
+
+impl From<EntityHasNoDataError> for IncompatibleBundleError {
+    #[inline]
+    fn from(error: EntityHasNoDataError) -> Self {
+        Self::EntityHasNoData(error)
     }
 }
 
@@ -103,6 +138,7 @@ impl Display for IncompatibleBundleError {
         write!(f, "incompatible bundle: ")?;
         match self {
             Self::EntityNotFound(error) => Display::fmt(error, f),
+            Self::EntityHasNoData(error) => Display::fmt(error, f),
             Self::DuplicateComponent(error) => Display::fmt(error, f),
             Self::MissingComponent(error) => Display::fmt(error, f),
             Self::ComponentNotRegistered(error) => Display::fmt(error, f),
@@ -114,6 +150,7 @@ impl Error for IncompatibleBundleError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::EntityNotFound(error) => Some(error),
+            Self::EntityHasNoData(error) => Some(error),
             Self::DuplicateComponent(error) => Some(error),
             Self::MissingComponent(error) => Some(error),
             Self::ComponentNotRegistered(error) => Some(error),
@@ -347,6 +384,7 @@ impl Error for RemoveBundleError {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RemoveBundleExactError {
     EntityNotFound(EntityNotFoundError),
+    EntityHasNoData(EntityHasNoDataError),
     DuplicateComponent(DuplicateComponentError),
     MissingComponent(MissingComponentError),
 }
@@ -355,6 +393,13 @@ impl From<EntityNotFoundError> for RemoveBundleExactError {
     #[inline]
     fn from(error: EntityNotFoundError) -> Self {
         Self::EntityNotFound(error)
+    }
+}
+
+impl From<EntityHasNoDataError> for RemoveBundleExactError {
+    #[inline]
+    fn from(error: EntityHasNoDataError) -> Self {
+        Self::EntityHasNoData(error)
     }
 }
 
@@ -391,6 +436,7 @@ impl Display for RemoveBundleExactError {
         write!(f, "bundle cannot be removed: ")?;
         match self {
             Self::EntityNotFound(error) => Display::fmt(error, f),
+            Self::EntityHasNoData(error) => Display::fmt(error, f),
             Self::DuplicateComponent(error) => Display::fmt(error, f),
             Self::MissingComponent(error) => Display::fmt(error, f),
         }
@@ -401,6 +447,7 @@ impl Error for RemoveBundleExactError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::EntityNotFound(error) => Some(error),
+            Self::EntityHasNoData(error) => Some(error),
             Self::DuplicateComponent(error) => Some(error),
             Self::MissingComponent(error) => Some(error),
         }

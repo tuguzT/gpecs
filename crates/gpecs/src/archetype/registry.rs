@@ -556,7 +556,7 @@ impl ArchetypeRegistry {
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<BundleRefs<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -571,22 +571,18 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<BundleRefs<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
         let Self { archetypes, .. } = self;
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
-            let error = Self::make_incompatible_bundle_error::<B>(components);
-            return Err(error);
+            return Ok(None);
         };
 
         let info = unwrap_archetype_info(archetypes, archetype_id);
-        let Some(refs) = info.storage().get_bundle::<B>(components, entity)? else {
-            let error = Self::make_incompatible_bundle_error::<B>(components);
-            return Err(error);
-        };
+        let refs = info.storage().get_bundle::<B>(components, entity)?;
         Ok(refs)
     }
 
@@ -595,7 +591,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-    ) -> Result<BundleRefsMut<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
@@ -610,42 +606,19 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<BundleRefsMut<'_, B>, IncompatibleArchetypeError>
+    ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
         let Self { archetypes, .. } = self;
         let Some(archetype_id) = Self::find_archetype_with_entity(archetypes, entity, location)
         else {
-            let error = Self::make_incompatible_bundle_error::<B>(components);
-            return Err(error);
+            return Ok(None);
         };
 
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
-        let Some(refs) = info.storage.get_bundle_mut::<B>(components, entity)? else {
-            let error = Self::make_incompatible_bundle_error::<B>(components);
-            return Err(error);
-        };
+        let refs = info.storage.get_bundle_mut::<B>(components, entity)?;
         Ok(refs)
-    }
-
-    #[inline]
-    fn make_incompatible_bundle_error<B>(
-        components: &ComponentRegistry,
-    ) -> IncompatibleArchetypeError
-    where
-        B: Bundle,
-    {
-        let result = ErasedArchetype::<()>::of::<B>(components);
-        let component_ids = match result {
-            Ok(component_ids) => component_ids,
-            Err(error) => return error.into(),
-        };
-
-        let Some(component_id) = component_ids.component_ids().next() else {
-            unreachable!("bundle should contain at least one component")
-        };
-        MissingComponentError::new(component_id).into()
     }
 
     // TODO: get erased bundles
@@ -775,8 +748,6 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let Self { archetypes, graph } = self;
-
         let bundle_components = match ErasedArchetype::register::<B>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
@@ -785,6 +756,7 @@ impl ArchetypeRegistry {
             }
         };
 
+        let Self { archetypes, graph } = self;
         let old_archetype = Self::find_archetype_with_entity_and_without_components(
             archetypes,
             &bundle_components,
@@ -853,13 +825,12 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let Self { archetypes, graph } = self;
-
         let bundle_components = match ErasedArchetype::register::<B>(components) {
             Ok(archetype) => archetype,
             Err(reason) => return Err(InsertBundleError { value, reason }),
         };
 
+        let Self { archetypes, graph } = self;
         let old_archetype = Self::find_archetype_with_entity(archetypes, entity, location);
         let new_archetype = Self::register_archetype_with_components(
             graph,
@@ -896,7 +867,7 @@ impl ArchetypeRegistry {
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-    ) -> Result<B, RemoveBundleExactError>
+    ) -> Result<Option<B>, RemoveBundleExactError>
     where
         B: Bundle,
     {
@@ -912,14 +883,13 @@ impl ArchetypeRegistry {
         components: &mut ComponentRegistry,
         entity: Entity,
         location: EntityArchetypeLocation,
-    ) -> Result<(B, EntityArchetype), RemoveBundleExactError>
+    ) -> Result<(Option<B>, EntityArchetype), RemoveBundleExactError>
     where
         B: Bundle,
     {
-        let Self { archetypes, graph } = self;
-
         let bundle_components = ErasedArchetype::register::<B>(components)?;
 
+        let Self { archetypes, graph } = self;
         let old_archetype = Self::find_archetype_with_entity_and_with_components(
             archetypes,
             &bundle_components,
@@ -927,10 +897,7 @@ impl ArchetypeRegistry {
             location,
         )?;
         let Some(old_archetype) = old_archetype else {
-            let Some(component_id) = bundle_components.component_ids().next() else {
-                unreachable!("bundle should contain at least one component")
-            };
-            return Err(MissingComponentError::new(component_id).into());
+            return Ok((None, None));
         };
 
         let new_archetype = Self::register_archetype_without_components(
@@ -947,7 +914,7 @@ impl ArchetypeRegistry {
                 .remove_bundle::<B>(components, entity)
                 .expect("archetype should be compatible")
                 .expect("storage should contain data of given entity");
-            return Ok((value, None));
+            return Ok((Some(value), None));
         };
 
         let RemovePair {
@@ -961,7 +928,7 @@ impl ArchetypeRegistry {
         let value = removed
             .downcast(components)
             .expect("archetype should be compatible");
-        Ok((value, Some(new_archetype)))
+        Ok((Some(value), Some(new_archetype)))
     }
 
     #[inline]
@@ -989,10 +956,9 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let Self { archetypes, graph } = self;
-
         let bundle_components = ErasedArchetype::<()>::register::<B>(components)?;
 
+        let Self { archetypes, graph } = self;
         let old_archetype = Self::find_archetype_with_entity(archetypes, entity, location);
         let Some(old_archetype) = old_archetype else {
             return Ok(None);

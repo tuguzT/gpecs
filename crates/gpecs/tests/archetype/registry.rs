@@ -167,13 +167,10 @@ fn exchange_components() {
         .storage();
     assert!(!storage.contains(entity));
 
-    let error = archetypes
+    let bundle = archetypes
         .get_bundle::<(Mass, Position)>(&components, entity)
-        .expect_err("entity should not have `Mass` and `Position` components yet");
-    assert_eq!(
-        error,
-        MissingComponentError::new(components.register_component::<Mass>()).into(),
-    );
+        .expect("no error should occur yet");
+    assert!(bundle.is_none(), "entity has no data yet");
 
     archetypes
         .insert_bundle_exact::<(Position, Mass)>(&mut components, entity, (position, mass))
@@ -201,7 +198,8 @@ fn exchange_components() {
 
     let refs = archetypes
         .get_bundle_mut::<(Mass, Position)>(&components, entity)
-        .expect("entity should have `Mass` and `Position` components");
+        .expect("entity should have `Mass` and `Position` components")
+        .expect("entity should exist");
     assert_eq!(refs, (&mut mass, &mut position));
 
     let error = archetypes
@@ -252,11 +250,13 @@ fn exchange_components() {
 
     let refs = archetypes
         .get_bundle_mut::<(Mass, Tag, Position)>(&components, entity)
-        .expect("entity should have `Mass`, `Tag` and `Position` components");
+        .expect("entity should have `Mass`, `Tag` and `Position` components")
+        .expect("entity should exist");
     assert_eq!(refs, (&mut mass, &mut tag, &mut position));
 
     let (tag,) = archetypes
         .remove_bundle_exact::<(Tag,)>(&mut components, entity)
+        .expect("archetype of only `Tag` should contain unique component ids")
         .expect("entity should have `Tag` component");
     assert_eq!(tag, Tag);
 
@@ -290,7 +290,8 @@ fn exchange_components() {
 
     let refs = archetypes
         .get_bundle::<(Mass, Position)>(&components, entity)
-        .expect("entity should have `Mass` and `Position` components");
+        .expect("entity should have `Mass` and `Position` components")
+        .expect("entity should exist");
     assert_eq!(refs, (&mass, &position));
 
     let error = archetypes
@@ -303,16 +304,14 @@ fn exchange_components() {
 
     let value = archetypes
         .remove_bundle_exact::<(Mass, Position)>(&mut components, entity)
+        .expect("archetype of `Mass` and `Position` should contain unique component ids")
         .expect("entity should have `Mass` and `Position` components");
     assert_eq!(value, (mass, position));
 
-    let error = archetypes
+    let bundle = archetypes
         .remove_bundle_exact::<(Mass, Position)>(&mut components, entity)
-        .expect_err("entity should not have `Mass` and `Position` components");
-    assert_eq!(
-        error,
-        MissingComponentError::new(components.register_component::<Mass>()).into(),
-    );
+        .expect("archetype of `Mass` and `Position` should contain unique component ids");
+    assert!(bundle.is_none(), "entity was already removed");
 
     let storage = archetypes
         .get_archetype_info(archetype_subset)
@@ -326,13 +325,10 @@ fn exchange_components() {
         .storage();
     assert!(!storage.contains(entity));
 
-    let error = archetypes
+    let bundle = archetypes
         .remove_bundle_exact::<(Position, Mass)>(&mut components, entity)
-        .expect_err("entity should not have `Position` and `Mass` component");
-    assert_eq!(
-        error,
-        MissingComponentError::new(components.register_component::<Mass>()).into(),
-    );
+        .expect("archetype of `Position` and `Mass` should contain unique component ids");
+    assert!(bundle.is_none(), "entity was already removed");
 }
 
 #[test]
@@ -343,13 +339,10 @@ fn exchange_components_empty_registry() {
 
     let entity = entities.spawn(Default::default(), ());
 
-    let error = archetypes
+    let bundle = archetypes
         .get_bundle::<(Mass, Tag)>(&components, entity)
-        .expect_err("entity should not have `Mass` and `Tag` components yet");
-    assert!(matches!(
-        error,
-        IncompatibleArchetypeError::ComponentNotRegistered(_),
-    ));
+        .expect("no error should occur yet");
+    assert!(bundle.is_none(), "entity has no data yet");
 
     let tag = Tag;
     archetypes
@@ -358,7 +351,8 @@ fn exchange_components_empty_registry() {
 
     let (&tag,) = archetypes
         .get_bundle::<(Tag,)>(&components, entity)
-        .expect("entity should have `Tag` component");
+        .expect("entity should have `Tag` component")
+        .expect("entity should exist");
     assert_eq!(tag, Tag);
 
     let error = archetypes
@@ -393,13 +387,10 @@ fn exchange_components_empty_registry() {
         .remove_bundle::<(Tag, Position)>(&mut components, entity)
         .expect("entity should have `Tag` component, existence of `Position` is not important");
 
-    let error = archetypes
+    let bundle = archetypes
         .remove_bundle_exact::<(Tag,)>(&mut components, entity)
-        .expect_err("entity should not have `Tag` component");
-    assert_eq!(
-        error,
-        MissingComponentError::new(components.register_component::<Tag>()).into(),
-    );
+        .expect("archetype of only `Tag` should contain unique component ids");
+    assert!(bundle.is_none(), "entity was already removed");
 
     let storage = archetypes
         .get_archetype_info(archetype)
@@ -443,7 +434,8 @@ fn components() {
 
     let (position,) = archetypes
         .get_bundle::<(Position,)>(&components, entity1)
-        .expect("entity should have `Position` component");
+        .expect("entity should have `Position` component")
+        .expect("entity should exist");
     assert_eq!(position.x, 0.0);
     assert_eq!(position.y, 0.0);
     assert_eq!(position.z, 0.0);

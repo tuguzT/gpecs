@@ -1,5 +1,6 @@
 use gpecs::{
-    archetype::error::MissingComponentError, context::error::EntityNotFoundError, prelude::*,
+    context::error::{EntityHasNoDataError, EntityNotFoundError},
+    prelude::*,
 };
 
 use crate::common::{Mass, Position, Tag};
@@ -118,10 +119,7 @@ fn one_entity() {
     let error = context
         .get_bundle::<(Position, Mass, Tag)>(entity)
         .expect_err("entity should not have `Position`, `Mass` and `Tag` components");
-    assert_eq!(
-        error,
-        MissingComponentError::new(context.components_mut().register_component::<Tag>()).into(),
-    );
+    assert_eq!(error, EntityHasNoDataError::new(entity).into());
 
     context.despawn(entity);
     assert!(!context.contains(entity));

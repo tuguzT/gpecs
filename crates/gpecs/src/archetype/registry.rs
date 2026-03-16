@@ -549,6 +549,8 @@ impl ArchetypeRegistry {
         ArchetypesAfterMut::new(archetypes, graph, id, false)
     }
 
+    // TODO: get erased bundle
+
     #[inline]
     pub fn get_bundle<B>(
         &self,
@@ -646,6 +648,8 @@ impl ArchetypeRegistry {
         MissingComponentError::new(component_id).into()
     }
 
+    // TODO: get erased bundles
+
     #[inline]
     pub fn bundles<'ctx, B>(
         &self,
@@ -741,6 +745,8 @@ impl ArchetypeRegistry {
         let Self { archetypes, graph } = self;
         CompatibleArchetypesMut::new(archetypes, graph, archetype)
     }
+
+    // TODO: insert erased bundle
 
     #[inline]
     pub fn insert_bundle_exact<B>(
@@ -882,6 +888,8 @@ impl ArchetypeRegistry {
 
         Ok(new_archetype)
     }
+
+    // TODO: remove erased bundle
 
     #[inline]
     pub fn remove_bundle_exact<B>(

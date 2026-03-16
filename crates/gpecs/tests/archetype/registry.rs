@@ -32,7 +32,7 @@ fn register_archetype() {
     assert!(archetypes.len() > 1);
     assert_eq!(
         archetypes
-            .archetype_id::<(Position, Mass, Tag)>(&components)
+            .archetype_id_of::<(Position, Mass, Tag)>(&components)
             .expect("archetype of `Position`, `Mass` and `Tag` should contain unique component ids")
             .expect("archetype of `Position`, `Mass` and `Tag` should be already registered"),
         id,
@@ -101,7 +101,7 @@ fn register_archetype() {
     assert_ne!(new_id, id);
     assert_eq!(
         archetypes
-            .archetype_id::<(Mass, Tag)>(&components)
+            .archetype_id_of::<(Mass, Tag)>(&components)
             .expect("archetype of `Tag` and `Mass` should contain unique component ids")
             .expect("archetype of `Tag` and `Mass` should be already registered"),
         new_id,

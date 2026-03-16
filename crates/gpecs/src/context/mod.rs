@@ -229,7 +229,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn archetype_id<B>(&self) -> Result<Option<ArchetypeId>, ArchetypeError>
+    pub fn archetype_id_of<B>(&self) -> Result<Option<ArchetypeId>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -238,7 +238,7 @@ impl Context {
             archetypes,
             ..
         } = self;
-        archetypes.archetype_id::<B>(components)
+        archetypes.archetype_id_of::<B>(components)
     }
 
     #[inline]

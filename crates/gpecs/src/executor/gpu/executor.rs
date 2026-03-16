@@ -183,7 +183,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn archetype_id<B>(&self) -> Result<Option<GpuArchetypeId>, ArchetypeError>
+    pub fn archetype_id_of<B>(&self) -> Result<Option<GpuArchetypeId>, ArchetypeError>
     where
         B: GpuBundle,
     {
@@ -193,7 +193,7 @@ impl<'ctx> GpuExecutor<'ctx> {
             ..
         } = self;
 
-        let Some(archetype_id) = context.archetype_id::<B>()? else {
+        let Some(archetype_id) = context.archetype_id_of::<B>()? else {
             return Ok(None);
         };
         let archetype_id = archetypes.map_archetype_id(archetype_id);
@@ -507,7 +507,7 @@ impl ScheduleCache {
                 .map(|(component_id, _)| component_id.into());
             let Ok(compatible_archetypes) = context
                 .archetypes()
-                .compatible_archetypes(context.components(), component_ids)
+                .compatible_archetypes_from(context.components(), component_ids)
             else {
                 unreachable!("{system_id} should have compatible archetypes");
             };

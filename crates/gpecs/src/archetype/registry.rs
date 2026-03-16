@@ -458,26 +458,28 @@ impl ArchetypeRegistry {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let Self { archetypes, .. } = self;
-
         let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
-        let archetype_id = find_archetype(archetypes, &archetype);
+        let archetype_id = self.archetype_id(&archetype);
         Ok(archetype_id)
     }
 
     #[inline]
-    pub fn archetype_id<B>(
+    pub fn archetype_id_of<B>(
         &self,
         components: &ComponentRegistry,
     ) -> Result<Option<ArchetypeId>, ArchetypeError>
     where
         B: Bundle,
     {
-        let Self { archetypes, .. } = self;
-
         let archetype = ErasedArchetype::<()>::of::<B>(components)?;
-        let archetype_id = find_archetype(archetypes, &archetype);
+        let archetype_id = self.archetype_id(&archetype);
         Ok(archetype_id)
+    }
+
+    #[inline]
+    pub fn archetype_id(&self, archetype: &ErasedArchetype<impl Sized>) -> Option<ArchetypeId> {
+        let Self { archetypes, .. } = self;
+        find_archetype(archetypes, archetype)
     }
 
     #[inline]
@@ -669,7 +671,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn compatible_archetypes<I>(
+    pub fn compatible_archetypes_from<I>(
         &self,
         components: &ComponentRegistry,
         component_ids: I,
@@ -677,8 +679,9 @@ impl ArchetypeRegistry {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let Self { archetypes, graph } = self;
-        CompatibleArchetypes::new(archetypes, graph, components, component_ids)
+        let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
+        let archetypes = self.compatible_archetypes(&archetype);
+        Ok(archetypes)
     }
 
     #[inline]
@@ -689,12 +692,22 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let Self { archetypes, graph } = self;
-        CompatibleArchetypes::of::<B>(archetypes, graph, components)
+        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
+        let archetypes = self.compatible_archetypes(&archetype);
+        Ok(archetypes)
     }
 
     #[inline]
-    pub unsafe fn compatible_archetypes_mut<I>(
+    pub fn compatible_archetypes(
+        &self,
+        archetype: &ErasedArchetype<impl Sized>,
+    ) -> CompatibleArchetypes<'_> {
+        let Self { archetypes, graph } = self;
+        CompatibleArchetypes::new(archetypes, graph, archetype)
+    }
+
+    #[inline]
+    pub unsafe fn compatible_archetypes_mut_from<I>(
         &mut self,
         components: &ComponentRegistry,
         component_ids: I,
@@ -702,8 +715,9 @@ impl ArchetypeRegistry {
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let Self { archetypes, graph } = self;
-        CompatibleArchetypesMut::new(archetypes, graph, components, component_ids)
+        let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
+        let archetypes = self.compatible_archetypes_mut(&archetype);
+        Ok(archetypes)
     }
 
     #[inline]
@@ -714,8 +728,18 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
+        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
+        let archetypes = self.compatible_archetypes_mut(&archetype);
+        Ok(archetypes)
+    }
+
+    #[inline]
+    pub fn compatible_archetypes_mut(
+        &mut self,
+        archetype: &ErasedArchetype<impl Sized>,
+    ) -> CompatibleArchetypesMut<'_> {
         let Self { archetypes, graph } = self;
-        CompatibleArchetypesMut::of::<B>(archetypes, graph, components)
+        CompatibleArchetypesMut::new(archetypes, graph, archetype)
     }
 
     #[inline]
@@ -1763,38 +1787,14 @@ pub struct CompatibleArchetypes<'a> {
 
 impl<'a> CompatibleArchetypes<'a> {
     #[inline]
-    fn new<I>(
+    fn new(
         archetypes: &'a Archetypes,
         graph: &'a Graph,
-        components: &ComponentRegistry,
-        component_ids: I,
-    ) -> Result<Self, ArchetypeError>
-    where
-        I: IntoIterator<Item = ComponentId>,
-    {
-        let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
-        let archetypes_after = find_archetype(archetypes, &archetype)
+        archetype: &ErasedArchetype<impl Sized>,
+    ) -> Self {
+        let archetypes_after = find_archetype(archetypes, archetype)
             .and_then(|start| ArchetypesAfter::new(archetypes, graph, start, false));
-
-        let me = Self { archetypes_after };
-        Ok(me)
-    }
-
-    #[inline]
-    fn of<B>(
-        archetypes: &'a Archetypes,
-        graph: &'a Graph,
-        components: &ComponentRegistry,
-    ) -> Result<Self, ArchetypeError>
-    where
-        B: Bundle,
-    {
-        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
-        let archetypes_after = find_archetype(archetypes, &archetype)
-            .and_then(|start| ArchetypesAfter::new(archetypes, graph, start, false));
-
-        let me = Self { archetypes_after };
-        Ok(me)
+        Self { archetypes_after }
     }
 }
 
@@ -1829,38 +1829,14 @@ pub struct CompatibleArchetypesMut<'a> {
 
 impl<'a> CompatibleArchetypesMut<'a> {
     #[inline]
-    fn new<I>(
+    fn new(
         archetypes: &'a mut Archetypes,
         graph: &'a Graph,
-        components: &ComponentRegistry,
-        component_ids: I,
-    ) -> Result<Self, ArchetypeError>
-    where
-        I: IntoIterator<Item = ComponentId>,
-    {
-        let archetype = ErasedArchetype::<()>::new(components, component_ids)?;
-        let archetypes_after = find_archetype(archetypes, &archetype)
+        archetype: &ErasedArchetype<impl Sized>,
+    ) -> Self {
+        let archetypes_after = find_archetype(archetypes, archetype)
             .and_then(|start| ArchetypesAfterMut::new(archetypes, graph, start, false));
-
-        let me = Self { archetypes_after };
-        Ok(me)
-    }
-
-    #[inline]
-    fn of<B>(
-        archetypes: &'a mut Archetypes,
-        graph: &'a Graph,
-        components: &ComponentRegistry,
-    ) -> Result<Self, ArchetypeError>
-    where
-        B: Bundle,
-    {
-        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
-        let archetypes_after = find_archetype(archetypes, &archetype)
-            .and_then(|start| ArchetypesAfterMut::new(archetypes, graph, start, false));
-
-        let me = Self { archetypes_after };
-        Ok(me)
+        Self { archetypes_after }
     }
 }
 
@@ -1907,8 +1883,9 @@ where
         graph: &'a Graph,
         components: &'ctx ComponentRegistry,
     ) -> Result<Self, ArchetypeError> {
+        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
         let me = Self {
-            archetypes: CompatibleArchetypes::of::<B>(archetypes, graph, components)?,
+            archetypes: CompatibleArchetypes::new(archetypes, graph, &archetype),
             components,
             phantom: PhantomData,
         };
@@ -2120,8 +2097,9 @@ where
         graph: &'a Graph,
         components: &'ctx ComponentRegistry,
     ) -> Result<Self, ArchetypeError> {
+        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
         let me = Self {
-            archetypes: CompatibleArchetypesMut::of::<B>(archetypes, graph, components)?,
+            archetypes: CompatibleArchetypesMut::new(archetypes, graph, &archetype),
             components,
             phantom: PhantomData,
         };

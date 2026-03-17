@@ -526,6 +526,12 @@ impl ArchetypeStorage {
     }
 
     #[inline]
+    pub fn destroy_all(&mut self) {
+        let Self { sparse_set } = self;
+        sparse_set.clear_sparse();
+    }
+
+    #[inline]
     pub fn as_slices(&self) -> (&[Entity], ErasedBundleSlices<'_, '_, StorageMeta>) {
         let Self { sparse_set } = self;
 

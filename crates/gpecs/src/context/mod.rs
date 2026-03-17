@@ -175,9 +175,15 @@ impl Context {
     }
 
     #[inline]
-    pub fn clear(&mut self) {
-        let Self { entities, .. } = self;
+    pub fn destroy_all(&mut self) {
+        let Self {
+            entities,
+            archetypes,
+            ..
+        } = self;
+
         entities.clear();
+        archetypes.destroy_all();
     }
 
     #[inline]
@@ -260,12 +266,15 @@ impl Context {
         let Some(archetype_id) = entities.get(entity).copied() else {
             return Err(EntityNotFoundError::new(entity).into());
         };
-
-        let location = archetype_id.into();
-        let Some(refs) = archetypes.get_bundle_with::<B>(components, entity, location)? else {
+        let Some(archetype_id) = archetype_id else {
             return Err(EntityHasNoDataError::new(entity).into());
         };
-        Ok(refs)
+
+        let location = archetype_id.into();
+        let bundle = archetypes
+            .get_bundle_with::<B>(components, entity, location)?
+            .expect("entity should contain data");
+        Ok(bundle)
     }
 
     #[inline]
@@ -286,12 +295,15 @@ impl Context {
         let Some(archetype_id) = entities.get(entity).copied() else {
             return Err(EntityNotFoundError::new(entity).into());
         };
-
-        let location = archetype_id.into();
-        let Some(refs) = archetypes.get_bundle_mut_with::<B>(components, entity, location)? else {
+        let Some(archetype_id) = archetype_id else {
             return Err(EntityHasNoDataError::new(entity).into());
         };
-        Ok(refs)
+
+        let location = archetype_id.into();
+        let bundle = archetypes
+            .get_bundle_mut_with::<B>(components, entity, location)?
+            .expect("entity should contain data");
+        Ok(bundle)
     }
 
     #[inline]
@@ -341,7 +353,7 @@ impl Context {
             return Err(InsertBundleExactError { value, kind });
         };
 
-        let location = (*archetype_id).into();
+        let location = archetype_id.as_ref().copied().into();
         let new_archetype_id =
             archetypes.insert_bundle_exact_with::<B>(components, entity, value, location)?;
 
@@ -366,7 +378,7 @@ impl Context {
             return Err(InsertBundleError { value, kind });
         };
 
-        let location = (*archetype_id).into();
+        let location = archetype_id.as_ref().copied().into();
         let new_archetype_id =
             archetypes.insert_bundle_with::<B>(components, entity, value, location)?;
 
@@ -390,7 +402,7 @@ impl Context {
             return Err(EntityNotFoundError::new(entity).into());
         };
 
-        let location = (*archetype_id).into();
+        let location = archetype_id.as_ref().copied().into();
         let new_archetype_id = archetypes.remove_bundle_with::<B>(components, entity, location)?;
 
         *archetype_id = new_archetype_id;
@@ -413,7 +425,7 @@ impl Context {
             return Err(EntityNotFoundError::new(entity).into());
         };
 
-        let location = (*archetype_id).into();
+        let location = archetype_id.as_ref().copied().into();
         let (value, new_archetype_id) =
             archetypes.remove_bundle_exact_with::<B>(components, entity, location)?;
         let Some(value) = value else {

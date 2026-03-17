@@ -89,7 +89,7 @@ fn run_cpu(context: &mut Context) {
         save_framebuffer_to_file(framebuffer, CPU_PATH, i);
     }
 
-    context.clear();
+    context.destroy_all();
 }
 
 fn run_gpu(context: &mut Context) {
@@ -261,7 +261,7 @@ fn run_gpu(context: &mut Context) {
         save_framebuffer_to_file(&framebuffer, GPU_PATH, i);
     }
 
-    context.clear();
+    context.destroy_all();
 }
 
 fn create_entities_with_mixed_components(context: &mut Context, count: usize) -> Vec<Entity> {

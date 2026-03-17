@@ -56,7 +56,7 @@ fn main() {
 
     let mut renderdoc = init_renderdoc();
 
-    context.clear();
+    context.destroy_all();
     setup_context(&mut context);
 
     let mut executor = GpuExecutor::new(&mut context, device.clone());

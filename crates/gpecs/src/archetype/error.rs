@@ -4,9 +4,65 @@ use std::{
 };
 
 use crate::{
+    archetype::registry::ArchetypeId,
     bundle::Bundle,
     component::{error::NotRegisteredError, registry::ComponentId},
+    entity::Entity,
 };
+
+#[derive(Debug, Clone)]
+pub struct InvalidEntityLocationError {
+    entity: Entity,
+    archetype_id: ArchetypeId,
+    has_entity: bool,
+}
+
+impl InvalidEntityLocationError {
+    #[inline]
+    pub fn new(entity: Entity, archetype_id: ArchetypeId, has_entity: bool) -> Self {
+        Self {
+            entity,
+            archetype_id,
+            has_entity,
+        }
+    }
+
+    #[inline]
+    pub fn entity(&self) -> Entity {
+        let Self { entity, .. } = *self;
+        entity
+    }
+
+    #[inline]
+    pub fn archetype_id(&self) -> ArchetypeId {
+        let Self { archetype_id, .. } = *self;
+        archetype_id
+    }
+
+    #[inline]
+    pub fn has_entity(&self) -> bool {
+        let Self { has_entity, .. } = *self;
+        has_entity
+    }
+}
+
+impl Display for InvalidEntityLocationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            entity,
+            archetype_id,
+            has_entity,
+        } = *self;
+
+        if has_entity {
+            write!(f, "{archetype_id} should not contain {entity}")
+        } else {
+            write!(f, "{archetype_id} should contain {entity}")
+        }
+    }
+}
+
+impl Error for InvalidEntityLocationError {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DuplicateComponentError {

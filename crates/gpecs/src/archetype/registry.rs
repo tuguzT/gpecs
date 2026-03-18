@@ -26,7 +26,7 @@ use crate::{
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
             IncompatibleArchetypeError, InsertBundleError, InsertBundleExactError,
-            MissingComponentError, RemoveBundleExactError,
+            InvalidEntityLocationError, MissingComponentError, RemoveBundleExactError,
         },
         storage::{ArchetypeStorage, StorageMeta},
     },
@@ -42,61 +42,59 @@ use crate::{
     soa::slice::{Iter as SoaIter, IterMut as SoaIterMut, SoaSlices, SoaSlicesMut},
 };
 
-/// Archetype [identifier](ArchetypeId) of some [entity](Entity).
-///
-/// [`None`] means that an entity has no components attached to it.
-pub type EntityArchetype = Option<ArchetypeId>;
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub enum EntityArchetypeLocation {
-    Unknown,
-    Known(EntityArchetype),
+/// Location of an entity inside of an archetype registry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EntityLocation {
+    /// Entity has components of some archetype attached to it.
+    WithComponents(ArchetypeId),
+    /// Entity has no components attached to it.
+    WithoutComponents,
 }
 
-impl EntityArchetypeLocation {
+impl EntityLocation {
+    /// Returns `true` if entity has components of some archetype attached to it.
     #[inline]
-    pub fn from_option(option: Option<EntityArchetype>) -> Self {
-        match option {
-            Some(archetype_id) => Self::Known(archetype_id),
-            None => Self::Unknown,
-        }
+    pub fn has_components(self) -> bool {
+        matches!(self, Self::WithComponents(..))
     }
 
+    /// Returns `true` if entity has no components attached to it.
     #[inline]
-    pub fn into_option(self) -> Option<EntityArchetype> {
+    pub fn has_no_components(self) -> bool {
+        !self.has_components()
+    }
+
+    /// Retrieves archetype of some entity if it has components attached to it.
+    #[inline]
+    pub fn archetype_id(self) -> Option<ArchetypeId> {
         match self {
-            Self::Unknown => None,
-            Self::Known(archetype_id) => Some(archetype_id),
+            Self::WithComponents(archetype_id) => Some(archetype_id),
+            Self::WithoutComponents => None,
         }
     }
 }
 
-impl From<EntityArchetype> for EntityArchetypeLocation {
+impl From<Option<ArchetypeId>> for EntityLocation {
     #[inline]
-    fn from(value: EntityArchetype) -> Self {
-        Self::Known(value)
+    fn from(archetype_id: Option<ArchetypeId>) -> Self {
+        match archetype_id {
+            Some(archetype_id) => Self::WithComponents(archetype_id),
+            None => Self::WithoutComponents,
+        }
     }
 }
 
-impl From<ArchetypeId> for EntityArchetypeLocation {
+impl From<ArchetypeId> for EntityLocation {
     #[inline]
-    fn from(value: ArchetypeId) -> Self {
-        let value = Some(value);
-        Self::from(value)
+    fn from(archetype_id: ArchetypeId) -> Self {
+        Self::WithComponents(archetype_id)
     }
 }
 
-impl From<Option<EntityArchetype>> for EntityArchetypeLocation {
+impl From<EntityLocation> for Option<ArchetypeId> {
     #[inline]
-    fn from(value: Option<EntityArchetype>) -> Self {
-        Self::from_option(value)
-    }
-}
-
-impl From<EntityArchetypeLocation> for Option<EntityArchetype> {
-    #[inline]
-    fn from(value: EntityArchetypeLocation) -> Self {
-        EntityArchetypeLocation::into_option(value)
+    fn from(location: EntityLocation) -> Self {
+        location.archetype_id()
     }
 }
 
@@ -560,6 +558,12 @@ impl ArchetypeRegistry {
     // TODO: get erased bundle
 
     #[inline]
+    pub fn find_location(&self, entity: Entity) -> EntityLocation {
+        let Self { archetypes, .. } = self;
+        find_location(archetypes, entity)
+    }
+
+    #[inline]
     pub fn get_bundle<B>(
         &self,
         components: &ComponentRegistry,
@@ -568,24 +572,25 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let location = EntityArchetypeLocation::Unknown;
-        self.get_bundle_with::<B>(components, entity, location)
+        let location = self.find_location(entity);
+        self.get_bundle_at::<B>(components, entity, location)
     }
 
     #[inline]
-    #[track_caller]
-    pub fn get_bundle_with<B>(
+    #[track_caller] // TODO: return an error instead
+    pub fn get_bundle_at<B>(
         &self,
         components: &ComponentRegistry,
         entity: Entity,
-        location: EntityArchetypeLocation,
+        location: EntityLocation,
     ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
         let Self { archetypes, .. } = self;
-        let Some(archetype_id) = Self::find_entity_archetype_by(archetypes, entity, location)
-        else {
+        let location = Self::check_location(archetypes, entity, location)
+            .expect("entity location should be valid");
+        let EntityLocation::WithComponents(archetype_id) = location else {
             return Ok(None);
         };
 
@@ -603,24 +608,25 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let location = EntityArchetypeLocation::Unknown;
-        self.get_bundle_mut_with::<B>(components, entity, location)
+        let location = self.find_location(entity);
+        self.get_bundle_mut_at::<B>(components, entity, location)
     }
 
     #[inline]
-    #[track_caller]
-    pub fn get_bundle_mut_with<B>(
+    #[track_caller] // TODO: return an error instead
+    pub fn get_bundle_mut_at<B>(
         &mut self,
         components: &ComponentRegistry,
         entity: Entity,
-        location: EntityArchetypeLocation,
+        location: EntityLocation,
     ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
     {
         let Self { archetypes, .. } = self;
-        let Some(archetype_id) = Self::find_entity_archetype_by(archetypes, entity, location)
-        else {
+        let location = Self::check_location(archetypes, entity, location)
+            .expect("entity location should be valid");
+        let EntityLocation::WithComponents(archetype_id) = location else {
             return Ok(None);
         };
 
@@ -739,19 +745,19 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let location = EntityArchetypeLocation::Unknown;
-        self.insert_bundle_exact_with::<B>(components, entity, value, location)?;
+        let location = self.find_location(entity);
+        self.insert_bundle_exact_at::<B>(components, entity, value, location)?;
         Ok(())
     }
 
     #[inline]
-    #[track_caller]
-    pub fn insert_bundle_exact_with<B>(
+    #[track_caller] // TODO: return an error instead
+    pub fn insert_bundle_exact_at<B>(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
         value: B,
-        location: EntityArchetypeLocation,
+        location: EntityLocation,
     ) -> Result<ArchetypeId, InsertBundleExactError<B>>
     where
         B: Bundle,
@@ -765,19 +771,22 @@ impl ArchetypeRegistry {
         };
 
         let Self { archetypes, graph } = self;
-        let old_archetype = Self::find_archetype_with_entity_and_without_components(
-            archetypes,
-            &bundle_components,
-            entity,
-            location,
-        );
-        let old_archetype = match old_archetype {
-            Ok(old_archetype) => old_archetype,
-            Err(error) => {
+        let old_archetype = Self::check_location(archetypes, entity, location)
+            .expect("entity location should be valid")
+            .into();
+
+        if let Some(archetype_id) = old_archetype {
+            let check_result = Self::check_archetype_has_no_components_of(
+                archetypes,
+                &bundle_components,
+                archetype_id,
+            );
+            if let Err(error) = check_result {
                 let reason = error.into();
                 return Err(InsertBundleExactError { value, reason });
             }
-        };
+        }
+
         let new_archetype = Self::register_archetype_with_components(
             graph,
             archetypes,
@@ -816,19 +825,19 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let location = EntityArchetypeLocation::Unknown;
-        self.insert_bundle_with::<B>(components, entity, value, location)?;
+        let location = self.find_location(entity);
+        self.insert_bundle_at::<B>(components, entity, value, location)?;
         Ok(())
     }
 
     #[inline]
-    #[track_caller]
-    pub fn insert_bundle_with<B>(
+    #[track_caller] // TODO: return an error instead
+    pub fn insert_bundle_at<B>(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
         value: B,
-        location: EntityArchetypeLocation,
+        location: EntityLocation,
     ) -> Result<ArchetypeId, InsertBundleError<B>>
     where
         B: Bundle,
@@ -839,7 +848,10 @@ impl ArchetypeRegistry {
         };
 
         let Self { archetypes, graph } = self;
-        let old_archetype = Self::find_entity_archetype_by(archetypes, entity, location);
+        let old_archetype = Self::check_location(archetypes, entity, location)
+            .expect("entity location should be valid")
+            .into();
+
         let new_archetype = Self::register_archetype_with_components(
             graph,
             archetypes,
@@ -847,7 +859,6 @@ impl ArchetypeRegistry {
             old_archetype,
             &bundle_components,
         );
-
         let Some(old_archetype) = old_archetype else {
             let info = unwrap_archetype_info_mut(archetypes, new_archetype);
             if let Err(error) = info.storage.insert_bundle(components, entity, value) {
@@ -879,34 +890,33 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let location = EntityArchetypeLocation::Unknown;
-        let (value, _) = self.remove_bundle_exact_with::<B>(components, entity, location)?;
+        let location = self.find_location(entity);
+        let (value, _) = self.remove_bundle_exact_at::<B>(components, entity, location)?;
         Ok(value)
     }
 
     #[inline]
-    #[track_caller]
-    pub fn remove_bundle_exact_with<B>(
+    #[track_caller] // TODO: return an error instead
+    pub fn remove_bundle_exact_at<B>(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-        location: EntityArchetypeLocation,
-    ) -> Result<(Option<B>, EntityArchetype), RemoveBundleExactError>
+        location: EntityLocation,
+    ) -> Result<(Option<B>, EntityLocation), RemoveBundleExactError>
     where
         B: Bundle,
     {
         let bundle_components = ErasedArchetype::register::<B>(components)?;
 
         let Self { archetypes, graph } = self;
-        let old_archetype = Self::find_archetype_with_entity_and_with_components(
-            archetypes,
-            &bundle_components,
-            entity,
-            location,
-        )?;
+        let old_archetype = Self::check_location(archetypes, entity, location)
+            .expect("entity location should be valid")
+            .into();
+
         let Some(old_archetype) = old_archetype else {
-            return Ok((None, None));
+            return Ok((None, EntityLocation::WithoutComponents));
         };
+        Self::check_archetype_has_components_of(archetypes, &bundle_components, old_archetype)?;
 
         let new_archetype = Self::register_archetype_without_components(
             graph,
@@ -922,7 +932,7 @@ impl ArchetypeRegistry {
                 .remove_bundle::<B>(components, entity)
                 .expect("archetype should be compatible")
                 .expect("storage should contain data of given entity");
-            return Ok((Some(value), None));
+            return Ok((Some(value), EntityLocation::WithoutComponents));
         };
 
         let RemovePair {
@@ -936,7 +946,8 @@ impl ArchetypeRegistry {
         let value = removed
             .downcast(components)
             .expect("archetype should be compatible");
-        Ok((Some(value), Some(new_archetype)))
+        let location = EntityLocation::WithComponents(new_archetype);
+        Ok((Some(value), location))
     }
 
     #[inline]
@@ -948,28 +959,29 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let location = EntityArchetypeLocation::Unknown;
-        let _ = self.remove_bundle_with::<B>(components, entity, location)?;
+        let location = self.find_location(entity);
+        self.remove_bundle_at::<B>(components, entity, location)?;
         Ok(())
     }
 
     #[inline]
-    #[track_caller]
-    pub fn remove_bundle_with<B>(
+    #[track_caller] // TODO: return an error instead
+    pub fn remove_bundle_at<B>(
         &mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-        location: EntityArchetypeLocation,
-    ) -> Result<EntityArchetype, DuplicateComponentError>
+        location: EntityLocation,
+    ) -> Result<EntityLocation, DuplicateComponentError>
     where
         B: Bundle,
     {
         let bundle_components = ErasedArchetype::<()>::register::<B>(components)?;
 
         let Self { archetypes, graph } = self;
-        let old_archetype = Self::find_entity_archetype_by(archetypes, entity, location);
-        let Some(old_archetype) = old_archetype else {
-            return Ok(None);
+        let location = Self::check_location(archetypes, entity, location)
+            .expect("entity location should be valid");
+        let EntityLocation::WithComponents(old_archetype) = location else {
+            return Ok(EntityLocation::WithoutComponents);
         };
 
         let new_archetype = Self::register_archetype_without_components(
@@ -984,7 +996,7 @@ impl ArchetypeRegistry {
             if !info.storage.destroy(entity) {
                 unreachable!("{entity} should exist in {old_archetype}")
             }
-            return Ok(None);
+            return Ok(EntityLocation::WithoutComponents);
         };
 
         let bundle = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
@@ -992,17 +1004,27 @@ impl ArchetypeRegistry {
             .expect("all the bundle components should be present in the old archetype");
         Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
 
-        Ok(Some(new_archetype))
+        let location = EntityLocation::WithComponents(new_archetype);
+        Ok(location)
     }
 
     #[inline]
-    pub fn destroy(&mut self, entity: Entity, location: EntityArchetypeLocation) -> bool {
+    pub fn destroy(&mut self, entity: Entity) -> bool {
+        let location = self.find_location(entity);
+        self.destroy_at(entity, location)
+    }
+
+    #[inline]
+    #[track_caller] // TODO: return an error instead
+    pub fn destroy_at(&mut self, entity: Entity, location: EntityLocation) -> bool {
         let Self { archetypes, .. } = self;
 
-        let Some(archetype_id) = Self::find_entity_archetype_by(archetypes, entity, location)
-        else {
+        let location = Self::check_location(archetypes, entity, location)
+            .expect("entity location should be valid");
+        let EntityLocation::WithComponents(archetype_id) = location else {
             return false;
         };
+
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         if !info.storage.destroy(entity) {
             unreachable!("{entity} should exist in {archetype_id}")
@@ -1055,93 +1077,58 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    fn find_archetype_with_entity_and_without_components(
+    fn check_archetype_has_no_components_of(
         archetypes: &Archetypes,
-        without_components: &ErasedArchetype<impl Sized>,
-        entity: Entity,
-        location: EntityArchetypeLocation,
-    ) -> Result<Option<ArchetypeId>, AlreadyHasComponentError> {
-        let Some(archetype_id) = Self::find_entity_archetype_by(archetypes, entity, location)
-        else {
-            return Ok(None);
-        };
-
+        components_to_check: &ErasedArchetype<impl Sized>,
+        archetype_id: ArchetypeId,
+    ) -> Result<(), AlreadyHasComponentError> {
         let info = unwrap_archetype_info(archetypes, archetype_id);
-        for component_id in without_components.component_ids() {
+        for component_id in components_to_check.component_ids() {
             if info.storage().archetype().contains(component_id) {
                 return Err(AlreadyHasComponentError::new(component_id));
             }
         }
-
-        Ok(Some(archetype_id))
+        Ok(())
     }
 
     #[inline]
-    fn find_archetype_with_entity_and_with_components(
+    fn check_archetype_has_components_of(
         archetypes: &Archetypes,
-        with_components: &ErasedArchetype<impl Sized>,
-        entity: Entity,
-        location: EntityArchetypeLocation,
-    ) -> Result<Option<ArchetypeId>, MissingComponentError> {
-        let Some(archetype_id) = Self::find_entity_archetype_by(archetypes, entity, location)
-        else {
-            return Ok(None);
-        };
-
+        components_to_check: &ErasedArchetype<impl Sized>,
+        archetype_id: ArchetypeId,
+    ) -> Result<(), MissingComponentError> {
         let info = unwrap_archetype_info(archetypes, archetype_id);
-        for component_id in with_components.component_ids() {
+        for component_id in components_to_check.component_ids() {
             if !info.storage().archetype().contains(component_id) {
                 return Err(MissingComponentError::new(component_id));
             }
         }
-
-        Ok(Some(archetype_id))
+        Ok(())
     }
 
     #[inline]
-    fn find_entity_archetype_by(
+    fn check_location(
         archetypes: &Archetypes,
         entity: Entity,
-        location: EntityArchetypeLocation,
-    ) -> EntityArchetype {
-        match location {
-            EntityArchetypeLocation::Unknown => Self::find_entity_archetype(archetypes, entity),
-            EntityArchetypeLocation::Known(archetype) => {
-                Self::assert_entity_archetype(archetypes, entity, archetype);
-                archetype
-            }
-        }
-    }
-
-    #[inline]
-    fn find_entity_archetype(archetypes: &Archetypes, entity: Entity) -> EntityArchetype {
-        let index = archetypes
-            .iter()
-            .position(|info| info.storage().contains(entity))?;
-        let archetype_id = archetype_id_from_usize(index);
-        Some(archetype_id)
-    }
-
-    #[inline]
-    fn assert_entity_archetype(
-        archetypes: &Archetypes,
-        entity: Entity,
-        archetype: EntityArchetype,
-    ) {
-        let Some(archetype_id) = archetype else {
+        location: EntityLocation,
+    ) -> Result<EntityLocation, InvalidEntityLocationError> {
+        let EntityLocation::WithComponents(archetype_id) = location else {
             // FIXME: this check is too expensive, especially if done for every entity
             #[cfg(debug_assertions)]
-            if let Some(archetype_id) = Self::find_entity_archetype(archetypes, entity) {
-                unreachable!("{entity} should have no data, but it was found in {archetype_id}")
+            if let Some(archetype_id) = find_location(archetypes, entity).archetype_id() {
+                let error = InvalidEntityLocationError::new(entity, archetype_id, true);
+                return Err(error);
             }
 
-            return;
+            return Ok(location);
         };
 
         let info = unwrap_archetype_info(archetypes, archetype_id);
         if !info.storage().contains(entity) {
-            unreachable!("{archetype_id} should contain {entity}")
+            let error = InvalidEntityLocationError::new(entity, archetype_id, false);
+            return Err(error);
         }
+        Ok(location)
     }
 
     #[inline]
@@ -1149,21 +1136,21 @@ impl ArchetypeRegistry {
         graph: &mut Graph,
         archetypes: &mut Archetypes,
         components: &ComponentRegistry,
-        archetype_id: Option<ArchetypeId>,
+        start: Option<ArchetypeId>,
         with_components: &ErasedArchetype<StorageMeta>,
     ) -> ArchetypeId {
-        let Some(archetype_id) = archetype_id else {
+        let Some(start) = start else {
             return Self::register(archetypes, graph, components, with_components.into());
         };
         if with_components.len() == 1
             && let Some(component_id) = with_components.component_ids().next()
             && let Some(archetype_id) =
-                Self::find_archetype_after(graph, archetype_id, component_id)
+                Self::find_archetype_without_component(graph, start, component_id)
         {
             return archetype_id;
         }
 
-        let info = unwrap_archetype_info(archetypes, archetype_id);
+        let info = unwrap_archetype_info(archetypes, start);
         let component_ids = info
             .storage()
             .archetype()
@@ -1185,18 +1172,18 @@ impl ArchetypeRegistry {
         graph: &mut Graph,
         archetypes: &mut Archetypes,
         components: &ComponentRegistry,
-        archetype_id: ArchetypeId,
+        start: ArchetypeId,
         without_components: &ErasedArchetype<impl Sized>,
     ) -> Option<ArchetypeId> {
         if without_components.len() == 1
             && let Some(component_id) = without_components.component_ids().next()
             && let Some(archetype_id) =
-                Self::find_archetype_before(graph, archetype_id, component_id)
+                Self::find_archetype_with_component(graph, start, component_id)
         {
             return Some(archetype_id);
         }
 
-        let info = unwrap_archetype_info(archetypes, archetype_id);
+        let info = unwrap_archetype_info(archetypes, start);
         let archetype_component_ids = info.storage().archetype().component_ids();
         if archetype_component_ids.len() <= 1 {
             return None;
@@ -1215,25 +1202,25 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    fn find_archetype_before(
+    fn find_archetype_with_component(
         graph: &Graph,
-        archetype_id: ArchetypeId,
+        start: ArchetypeId,
         component_id: ComponentId,
     ) -> Option<ArchetypeId> {
         graph
-            .edges_directed(archetype_id.into_u32().into(), Direction::Incoming)
+            .edges_directed(start.into_u32().into(), Direction::Incoming)
             .find(|edge| *edge.weight() == component_id)
             .map(|edge| archetype_id_from_usize(edge.source().index()))
     }
 
     #[inline]
-    fn find_archetype_after(
+    fn find_archetype_without_component(
         graph: &Graph,
-        archetype_id: ArchetypeId,
+        start: ArchetypeId,
         component_id: ComponentId,
     ) -> Option<ArchetypeId> {
         graph
-            .edges_directed(archetype_id.into_u32().into(), Direction::Outgoing)
+            .edges_directed(start.into_u32().into(), Direction::Outgoing)
             .find(|edge| *edge.weight() == component_id)
             .map(|edge| archetype_id_from_usize(edge.target().index()))
     }
@@ -2344,4 +2331,17 @@ fn unwrap_archetype_info_mut(archetypes: &mut Archetypes, id: ArchetypeId) -> &m
         unreachable!("{id} should exist")
     };
     info
+}
+
+#[inline]
+fn find_location(archetypes: &Archetypes, entity: Entity) -> EntityLocation {
+    let index = archetypes
+        .iter()
+        .position(|info| info.storage().contains(entity));
+    let Some(index) = index else {
+        return EntityLocation::WithoutComponents;
+    };
+
+    let archetype_id = archetype_id_from_usize(index);
+    EntityLocation::WithComponents(archetype_id)
 }

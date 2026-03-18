@@ -6,7 +6,7 @@ use crate::{
     archetype::{
         error::{ArchetypeError, DuplicateComponentError},
         registry::{
-            ArchetypeId, ArchetypeInfo, ArchetypeRegistry, Bundles, BundlesMut, EntityArchetype,
+            ArchetypeId, ArchetypeInfo, ArchetypeRegistry, Bundles, BundlesMut, EntityLocation,
         },
     },
     bundle::{Bundle, BundleRefs, BundleRefsMut},
@@ -29,7 +29,7 @@ use self::error::{
 pub mod error;
 
 pub type Worlds = WorldRegistry;
-pub type Entities = EntityRegistry<EntityArchetype>;
+pub type Entities = EntityRegistry<EntityLocation>;
 pub type Components = ComponentRegistry;
 pub type Archetypes = ArchetypeRegistry;
 
@@ -42,7 +42,7 @@ pub type ContextPartsRefsMut<'a> = (
 );
 pub type ContextParts = (Worlds, Entities, Components, Archetypes);
 
-pub type TrySpawnError = entities::TrySpawnError<EntityArchetype>;
+pub type TrySpawnError = entities::TrySpawnError<EntityLocation>;
 
 #[derive(Debug, Default)]
 pub struct Context {
@@ -153,13 +153,13 @@ impl Context {
     #[inline]
     pub fn spawn_in(&mut self, world: WorldId) -> Entity {
         let Self { entities, .. } = self;
-        entities.spawn(world, None)
+        entities.spawn(world, EntityLocation::WithoutComponents)
     }
 
     #[inline]
     pub fn try_spawn_in(&mut self, world: WorldId) -> Result<Entity, TrySpawnError> {
         let Self { entities, .. } = self;
-        entities.try_spawn(world, None)
+        entities.try_spawn(world, EntityLocation::WithoutComponents)
     }
 
     #[inline]
@@ -263,16 +263,16 @@ impl Context {
             ..
         } = self;
 
-        let Some(archetype_id) = entities.get(entity).copied() else {
+        let Some(location) = entities.get(entity).copied() else {
             return Err(EntityNotFoundError::new(entity).into());
         };
-        let Some(archetype_id) = archetype_id else {
+        let EntityLocation::WithComponents(archetype_id) = location else {
             return Err(EntityHasNoDataError::new(entity).into());
         };
 
         let location = archetype_id.into();
         let bundle = archetypes
-            .get_bundle_with::<B>(components, entity, location)?
+            .get_bundle_at::<B>(components, entity, location)?
             .expect("entity should contain data");
         Ok(bundle)
     }
@@ -292,16 +292,16 @@ impl Context {
             ..
         } = self;
 
-        let Some(archetype_id) = entities.get(entity).copied() else {
+        let Some(location) = entities.get(entity).copied() else {
             return Err(EntityNotFoundError::new(entity).into());
         };
-        let Some(archetype_id) = archetype_id else {
+        let EntityLocation::WithComponents(archetype_id) = location else {
             return Err(EntityHasNoDataError::new(entity).into());
         };
 
         let location = archetype_id.into();
         let bundle = archetypes
-            .get_bundle_mut_with::<B>(components, entity, location)?
+            .get_bundle_mut_at::<B>(components, entity, location)?
             .expect("entity should contain data");
         Ok(bundle)
     }
@@ -348,16 +348,15 @@ impl Context {
             ..
         } = self;
 
-        let Some(archetype_id) = entities.get_mut(entity) else {
+        let Some(location) = entities.get_mut(entity) else {
             let kind = EntityNotFoundError::new(entity).into();
             return Err(InsertBundleExactError { value, kind });
         };
 
-        let location = archetype_id.as_ref().copied().into();
-        let new_archetype_id =
-            archetypes.insert_bundle_exact_with::<B>(components, entity, value, location)?;
+        let archetype_id =
+            archetypes.insert_bundle_exact_at::<B>(components, entity, value, *location)?;
 
-        *archetype_id = Some(new_archetype_id);
+        *location = EntityLocation::WithComponents(archetype_id);
         Ok(())
     }
 
@@ -373,16 +372,15 @@ impl Context {
             ..
         } = self;
 
-        let Some(archetype_id) = entities.get_mut(entity) else {
+        let Some(location) = entities.get_mut(entity) else {
             let kind = EntityNotFoundError::new(entity).into();
             return Err(InsertBundleError { value, kind });
         };
 
-        let location = archetype_id.as_ref().copied().into();
-        let new_archetype_id =
-            archetypes.insert_bundle_with::<B>(components, entity, value, location)?;
+        let archetype_id =
+            archetypes.insert_bundle_at::<B>(components, entity, value, *location)?;
 
-        *archetype_id = Some(new_archetype_id);
+        *location = EntityLocation::WithComponents(archetype_id);
         Ok(())
     }
 
@@ -398,14 +396,13 @@ impl Context {
             ..
         } = self;
 
-        let Some(archetype_id) = entities.get_mut(entity) else {
+        let Some(location) = entities.get_mut(entity) else {
             return Err(EntityNotFoundError::new(entity).into());
         };
 
-        let location = archetype_id.as_ref().copied().into();
-        let new_archetype_id = archetypes.remove_bundle_with::<B>(components, entity, location)?;
+        let new_location = archetypes.remove_bundle_at::<B>(components, entity, *location)?;
 
-        *archetype_id = new_archetype_id;
+        *location = new_location;
         Ok(())
     }
 
@@ -421,18 +418,18 @@ impl Context {
             ..
         } = self;
 
-        let Some(archetype_id) = entities.get_mut(entity) else {
+        let Some(location) = entities.get_mut(entity) else {
             return Err(EntityNotFoundError::new(entity).into());
         };
-
-        let location = archetype_id.as_ref().copied().into();
-        let (value, new_archetype_id) =
-            archetypes.remove_bundle_exact_with::<B>(components, entity, location)?;
-        let Some(value) = value else {
+        let EntityLocation::WithComponents(archetype_id) = *location else {
             return Err(EntityHasNoDataError::new(entity).into());
         };
 
-        *archetype_id = new_archetype_id;
+        let (value, new_location) =
+            archetypes.remove_bundle_exact_at::<B>(components, entity, archetype_id.into())?;
+        let value = value.expect("entity should contain data");
+
+        *location = new_location;
         Ok(value)
     }
 }

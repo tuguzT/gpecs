@@ -8,7 +8,7 @@ use crate::{
         erased::{ErasedArchetype, FromComponentInfo},
         error::{
             ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-            IncompatibleArchetypeExactError, IncompatibleBundleValueError, MissingComponentError,
+            IncompatibleArchetypeExactError, IncompatibleBundleValueError,
         },
     },
     bundle::{
@@ -166,71 +166,6 @@ impl ArchetypeStorage {
 
         let (dense, _) = sparse_set.into_parts();
         dense.into_context().into_inner()
-    }
-
-    #[inline]
-    pub fn check_compatibility(&self, other: &Self) -> Result<(), MissingComponentError> {
-        let archetype = self.archetype();
-        let other = other.archetype();
-        archetype.check_compatibility(other)
-    }
-
-    #[inline]
-    pub fn check_compatibility_for<I>(
-        &self,
-        component_ids: I,
-    ) -> Result<(), IncompatibleArchetypeError>
-    where
-        I: IntoIterator<Item = ComponentId>,
-    {
-        let archetype = self.archetype();
-        archetype.check_compatibility_for(component_ids)
-    }
-
-    #[inline]
-    pub fn check_compatibility_of<B>(
-        &self,
-        components: &ComponentRegistry,
-    ) -> Result<(), IncompatibleArchetypeError>
-    where
-        B: Bundle,
-    {
-        let archetype = self.archetype();
-        archetype.check_compatibility_of::<B>(components)
-    }
-
-    #[inline]
-    pub fn check_exact_compatibility(
-        &self,
-        other: &Self,
-    ) -> Result<(), IncompatibleArchetypeExactError> {
-        let archetype = self.archetype();
-        let other = other.archetype();
-        archetype.check_exact_compatibility(other)
-    }
-
-    #[inline]
-    pub fn check_exact_compatibility_for<I>(
-        &self,
-        component_ids: I,
-    ) -> Result<(), IncompatibleArchetypeExactError>
-    where
-        I: IntoIterator<Item = ComponentId>,
-    {
-        let archetype = self.archetype();
-        archetype.check_exact_compatibility_for(component_ids)
-    }
-
-    #[inline]
-    pub fn check_exact_compatibility_of<B>(
-        &self,
-        components: &ComponentRegistry,
-    ) -> Result<(), IncompatibleArchetypeExactError>
-    where
-        B: Bundle,
-    {
-        let archetype = self.archetype();
-        archetype.check_exact_compatibility_of::<B>(components)
     }
 
     #[inline]
@@ -421,7 +356,10 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        if let Err(reason) = self.check_exact_compatibility_of::<B>(components) {
+        if let Err(reason) = self
+            .archetype()
+            .check_exact_compatibility_of::<B>(components)
+        {
             let error = IncompatibleBundleValueError { value, reason };
             return Err(error);
         }
@@ -457,7 +395,8 @@ impl ArchetypeStorage {
     where
         B: Bundle,
     {
-        self.check_exact_compatibility_of::<B>(components)?;
+        self.archetype()
+            .check_exact_compatibility_of::<B>(components)?;
 
         let Self { sparse_set } = self;
         let bundle = sparse_set.swap_remove_into(entity.into(), |_, src| {

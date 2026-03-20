@@ -19,15 +19,13 @@ use crate::{
     archetype::{
         collect::{try_collect_components, try_collect_opt_components},
         error::{
-            ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-            IncompatibleArchetypeExactError, MissingComponentError, TooFewComponentsError,
+            AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
+            IncompatibleArchetypeError, IncompatibleArchetypeExactError, MissingComponentError,
+            TooFewComponentsError,
         },
     },
     bundle::Bundle,
-    component::{
-        Component,
-        registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
-    },
+    component::registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
     soa::{
         field::{FieldDescriptor, FieldDescriptors},
         identity::{Identity, IdentitySlice},
@@ -187,14 +185,27 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn has<C>(&self, components: &ComponentRegistry) -> bool
-    where
-        C: Component,
-    {
-        let Some(component_id) = components.component_id::<C>() else {
-            return false;
-        };
-        self.contains(component_id)
+    pub fn has_components(
+        &self,
+        of: &ErasedArchetype<impl Sized>,
+    ) -> Result<(), MissingComponentError> {
+        if let Some(id) = of.component_ids().find(|&id| !self.contains(id)) {
+            let error = MissingComponentError::new(id);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn has_no_components(
+        &self,
+        of: &ErasedArchetype<impl Sized>,
+    ) -> Result<(), AlreadyHasComponentError> {
+        if let Some(id) = of.component_ids().find(|&id| self.contains(id)) {
+            let error = AlreadyHasComponentError::new(id);
+            return Err(error);
+        }
+        Ok(())
     }
 
     #[inline]
@@ -227,28 +238,24 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn check_compatibility<M>(
+    pub fn check_compatibility(
         &self,
-        other: &ErasedArchetype<M>,
+        other: &ErasedArchetype<impl Sized>,
     ) -> Result<(), MissingComponentError> {
-        let ErasedArchetype { components } = other;
-        self.check_compatibility_inner(components)
+        self.has_components(other)
     }
 
     #[inline]
     pub fn check_compatibility_for<I>(
         &self,
+        components: &ComponentRegistry,
         component_ids: I,
     ) -> Result<(), IncompatibleArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let component_ids = try_collect_components(
-            component_ids,
-            |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
-            Clone::clone,
-        )?;
-        self.check_compatibility_inner(&component_ids)?;
+        let other = ErasedArchetype::<()>::new(components, component_ids)?;
+        self.check_compatibility(&other)?;
         Ok(())
     }
 
@@ -260,54 +267,35 @@ impl<Meta> ErasedArchetype<Meta> {
     where
         B: Bundle,
     {
-        let component_ids = try_collect_opt_components(
-            B::get_components(components),
-            |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
-            Clone::clone,
-        )?;
-        self.check_compatibility_inner(&component_ids)?;
+        let other = ErasedArchetype::<()>::of::<B>(components)?;
+        self.check_compatibility(&other)?;
         Ok(())
     }
 
     #[inline]
-    fn check_compatibility_inner<M>(
+    pub fn check_exact_compatibility(
         &self,
-        components: &Inner<M>,
-    ) -> Result<(), MissingComponentError> {
-        let mut component_ids = components.keys().copied();
-        let Self { components } = self;
+        other: &ErasedArchetype<impl Sized>,
+    ) -> Result<(), IncompatibleArchetypeExactError> {
+        self.check_compatibility(other)?;
 
-        if let Some(id) = component_ids.find(|&id| !components.contains_key(id)) {
-            let id = unsafe { ComponentId::from_u32(id) };
-            let error = MissingComponentError::new(id);
-            return Err(error);
+        if other.len() != self.len() {
+            return Err(TooFewComponentsError.into());
         }
         Ok(())
     }
 
     #[inline]
-    pub fn check_exact_compatibility<M>(
-        &self,
-        other: &ErasedArchetype<M>,
-    ) -> Result<(), IncompatibleArchetypeExactError> {
-        let ErasedArchetype { components } = other;
-        self.check_exact_compatibility_inner(components)
-    }
-
-    #[inline]
     pub fn check_exact_compatibility_for<I>(
         &self,
+        components: &ComponentRegistry,
         component_ids: I,
     ) -> Result<(), IncompatibleArchetypeExactError>
     where
         I: IntoIterator<Item = ComponentId>,
     {
-        let components = try_collect_components(
-            component_ids,
-            |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
-            Clone::clone,
-        )?;
-        self.check_exact_compatibility_inner(&components)
+        let other = ErasedArchetype::<()>::new(components, component_ids)?;
+        self.check_exact_compatibility(&other)
     }
 
     #[inline]
@@ -318,26 +306,8 @@ impl<Meta> ErasedArchetype<Meta> {
     where
         B: Bundle,
     {
-        let components = B::get_components(components);
-        let components = try_collect_opt_components(
-            components,
-            |map, id| Inner::insert(map, id.into_u32(), ().into()).is_none(),
-            Clone::clone,
-        )?;
-        self.check_exact_compatibility_inner(&components)
-    }
-
-    #[inline]
-    fn check_exact_compatibility_inner<M>(
-        &self,
-        components: &Inner<M>,
-    ) -> Result<(), IncompatibleArchetypeExactError> {
-        self.check_compatibility_inner(components)?;
-
-        if components.len() != self.len() {
-            return Err(TooFewComponentsError.into());
-        }
-        Ok(())
+        let other = ErasedArchetype::<()>::of::<B>(components)?;
+        self.check_exact_compatibility(&other)
     }
 
     #[inline]

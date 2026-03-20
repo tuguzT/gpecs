@@ -24,9 +24,8 @@ use crate::{
     archetype::{
         erased::ErasedArchetype,
         error::{
-            AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
-            IncompatibleArchetypeError, InsertBundleError, InsertBundleExactError,
-            InvalidEntityLocationError, MissingComponentError, RemoveBundleExactError,
+            ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError, InsertBundleError,
+            InsertBundleExactError, InvalidEntityLocationError, RemoveBundleExactError,
         },
         storage::{ArchetypeStorage, StorageMeta},
     },
@@ -776,11 +775,10 @@ impl ArchetypeRegistry {
             .into();
 
         if let Some(archetype_id) = old_archetype {
-            let check_result = Self::check_archetype_has_no_components_of(
-                archetypes,
-                &bundle_components,
-                archetype_id,
-            );
+            let check_result = unwrap_archetype_info(archetypes, archetype_id)
+                .storage()
+                .archetype()
+                .has_no_components(&bundle_components);
             if let Err(error) = check_result {
                 let reason = error.into();
                 return Err(InsertBundleExactError { value, reason });
@@ -916,7 +914,10 @@ impl ArchetypeRegistry {
         let Some(old_archetype) = old_archetype else {
             return Ok((None, EntityLocation::WithoutComponents));
         };
-        Self::check_archetype_has_components_of(archetypes, &bundle_components, old_archetype)?;
+        unwrap_archetype_info(archetypes, old_archetype)
+            .storage()
+            .archetype()
+            .has_components(&bundle_components)?;
 
         let new_archetype = Self::register_archetype_without_components(
             graph,
@@ -1074,36 +1075,6 @@ impl ArchetypeRegistry {
             unreachable!("{entity} should exist in {archetype_id}")
         };
         bundle
-    }
-
-    #[inline]
-    fn check_archetype_has_no_components_of(
-        archetypes: &Archetypes,
-        components_to_check: &ErasedArchetype<impl Sized>,
-        archetype_id: ArchetypeId,
-    ) -> Result<(), AlreadyHasComponentError> {
-        let info = unwrap_archetype_info(archetypes, archetype_id);
-        for component_id in components_to_check.component_ids() {
-            if info.storage().archetype().contains(component_id) {
-                return Err(AlreadyHasComponentError::new(component_id));
-            }
-        }
-        Ok(())
-    }
-
-    #[inline]
-    fn check_archetype_has_components_of(
-        archetypes: &Archetypes,
-        components_to_check: &ErasedArchetype<impl Sized>,
-        archetype_id: ArchetypeId,
-    ) -> Result<(), MissingComponentError> {
-        let info = unwrap_archetype_info(archetypes, archetype_id);
-        for component_id in components_to_check.component_ids() {
-            if !info.storage().archetype().contains(component_id) {
-                return Err(MissingComponentError::new(component_id));
-            }
-        }
-        Ok(())
     }
 
     #[inline]

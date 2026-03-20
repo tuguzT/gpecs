@@ -12,8 +12,8 @@ fn execute_simple() {
 }
 
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
-    let instance_desc = wgpu::InstanceDescriptor::default();
-    let instance = wgpu::Instance::new(&instance_desc);
+    let instance_desc = wgpu::InstanceDescriptor::new_without_display_handle();
+    let instance = wgpu::Instance::new(instance_desc);
 
     let adapter_options = wgpu::RequestAdapterOptions::default();
     let adapter = pollster::block_on(instance.request_adapter(&adapter_options))

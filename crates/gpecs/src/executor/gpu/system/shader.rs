@@ -123,7 +123,7 @@ impl GpuSystemShader {
         };
         let pipeline_layout_desc = PipelineLayoutDescriptor {
             label: Some(&pipeline_layout_label),
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[Some(&bind_group_layout)],
             immediate_size: 0,
         };
         let pipeline_layout = gpu_device.create_pipeline_layout(&pipeline_layout_desc);

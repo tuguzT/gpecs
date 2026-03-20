@@ -763,9 +763,9 @@ fn register_gpu_systems(
 fn init_wgpu() -> (wgpu::Device, wgpu::Queue) {
     let instance_desc = wgpu::InstanceDescriptor {
         backends: wgpu::Backends::VULKAN,
-        ..Default::default()
+        ..wgpu::InstanceDescriptor::new_without_display_handle()
     };
-    let instance = wgpu::Instance::new(&instance_desc);
+    let instance = wgpu::Instance::new(instance_desc);
 
     let adapter_options = wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,

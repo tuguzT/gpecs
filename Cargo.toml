@@ -30,7 +30,7 @@ version = "0.0.0"
 authors = ["tuguzT <timurka.tugushev@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2024"
-# stable counterpart of nightly-2025-11-02, which is required for Rust-GPU project
+# stable counterpart of nightly-2025-11-13, which is required for Rust-GPU project
 rust-version = "1.92.0"
 
 [workspace.dependencies]
@@ -50,7 +50,7 @@ gpecs_simple_types = { path = "examples/gpecs_simple_types" }
 gpecs_ecs_benchmark_types = { path = "benches/gpecs_ecs_benchmark_types" }
 # actual dependencies
 cargo-gpu-install = { git = "https://github.com/Rust-GPU/cargo-gpu", rev = "7f1995823a82ee6e6b7a63b57313c4a829856e3d" }
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "d01051d2804906568968859c9e34f6cb4eb348f8" }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "30896871ba00e668029ccb724f1438202b284708" }
 indexmap = { version = "2.13", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }
@@ -66,7 +66,7 @@ log = { version = "0.4", default-features = false }
 glam = { version = "0.32", default-features = false }
 renderdoc = { version = "0.12", default-features = false }
 env_logger = { version = "0.11" }
-wgpu = { version = "28" }
+wgpu = { version = "29" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

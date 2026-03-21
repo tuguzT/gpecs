@@ -18,7 +18,7 @@ use crate::{
     archetype::{
         collect::try_collect_components,
         erased::{ComponentIds, ErasedArchetype, FromComponentInfo},
-        error::{DuplicateComponentError, MissingComponentError},
+        error::{AlreadyHasComponentError, MissingComponentError},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
@@ -413,6 +413,7 @@ where
     T: ErasedArchetypeKind<Meta: Clone>,
 {
     #[inline]
+    // FIXME: can we optimize this?
     pub fn insert<ToInsert>(
         self,
         to_insert: ErasedBundleKind<ToInsert>,
@@ -420,13 +421,13 @@ where
     where
         ToInsert: ErasedArchetypeKind<Meta = T::Meta>,
     {
-        if let Some(duplicate_component_id) = to_insert
+        if let Some(has_component_id) = to_insert
             .archetype()
             .component_ids()
             .find(|&id| self.archetype().contains(id))
         {
             let error = InsertError {
-                reason: DuplicateComponentError::new(duplicate_component_id).into(),
+                reason: AlreadyHasComponentError::new(has_component_id).into(),
                 bundle: self,
                 to_insert,
             };
@@ -462,6 +463,7 @@ where
     }
 
     #[inline]
+    // FIXME: can we optimize this?
     pub fn replace<ToReplace>(
         mut self,
         to_replace: ErasedBundleKind<ToReplace>,
@@ -535,6 +537,7 @@ where
     T: ErasedArchetypeKind<Meta: Clone>,
 {
     #[inline]
+    // FIXME: can we optimize this?
     pub fn remove<ToRemove>(
         self,
         to_remove: ToRemove,
@@ -588,6 +591,7 @@ where
     }
 
     #[inline]
+    // FIXME: can we optimize this?
     pub fn destroy(
         self,
         to_destroy: &ErasedArchetype<impl Sized>,

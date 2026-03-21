@@ -25,16 +25,19 @@ use crate::{
         erased::ErasedArchetype,
         error::{
             ArchetypeError, DuplicateComponentError, GetAtError, IncompatibleArchetypeError,
-            InsertBundleAtError, InsertBundleError, InsertBundleExactAtError,
-            InsertBundleExactError, InvalidEntityLocationError, InvalidEntityLocationErrorKind,
+            InsertAtError, InsertBundleAtError, InsertBundleError, InsertBundleExactAtError,
+            InsertBundleExactError, InsertExactAtError, InsertExactAtErrorKind, InsertExactError,
+            InvalidEntityLocationError, InvalidEntityLocationErrorKind, MissingComponentError,
             RemoveBundleAtError, RemoveBundleExactAtError, RemoveBundleExactError,
+            RemoveExactAtError,
         },
         storage::{ArchetypeStorage, StorageMeta},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
         erased::{
-            ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind, RemovePair,
+            ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
+            ErasedBundleMutRefs, ErasedBundleRefs, RemovePair,
         },
     },
     component::registry::{ComponentId, ComponentRegistry},
@@ -556,122 +559,6 @@ impl ArchetypeRegistry {
         ArchetypesAfterMut::new(archetypes, graph, id, false)
     }
 
-    // TODO: get erased bundle
-
-    #[inline]
-    pub fn find_location(&self, entity: Entity) -> EntityLocation {
-        let Self { archetypes, .. } = self;
-        find_location(archetypes, entity)
-    }
-
-    #[inline]
-    pub fn check_location(
-        &self,
-        entity: Entity,
-        location: EntityLocation,
-    ) -> Result<(), InvalidEntityLocationError> {
-        let Self { archetypes, .. } = self;
-        check_location(archetypes, entity, location)
-    }
-
-    #[inline]
-    pub fn get_bundle<B>(
-        &self,
-        components: &ComponentRegistry,
-        entity: Entity,
-    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-    {
-        let location = self.find_location(entity);
-        self.get_bundle_at::<B>(components, entity, location)
-            .map_err(GetAtError::into_incompatible_archetype_error)
-    }
-
-    #[inline]
-    pub fn get_bundle_at<B>(
-        &self,
-        components: &ComponentRegistry,
-        entity: Entity,
-        location: EntityLocation,
-    ) -> Result<Option<BundleRefs<'_, B>>, GetAtError>
-    where
-        B: Bundle,
-    {
-        self.check_location(entity, location)?;
-        let EntityLocation::WithComponents(archetype_id) = location else {
-            return Ok(None);
-        };
-
-        let Self { archetypes, .. } = self;
-
-        let info = unwrap_archetype_info(archetypes, archetype_id);
-        let refs = info.storage().get_bundle::<B>(components, entity)?;
-        Ok(refs)
-    }
-
-    #[inline]
-    pub fn get_bundle_mut<B>(
-        &mut self,
-        components: &ComponentRegistry,
-        entity: Entity,
-    ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
-    where
-        B: Bundle,
-    {
-        let location = self.find_location(entity);
-        self.get_bundle_mut_at::<B>(components, entity, location)
-            .map_err(GetAtError::into_incompatible_archetype_error)
-    }
-
-    #[inline]
-    pub fn get_bundle_mut_at<B>(
-        &mut self,
-        components: &ComponentRegistry,
-        entity: Entity,
-        location: EntityLocation,
-    ) -> Result<Option<BundleRefsMut<'_, B>>, GetAtError>
-    where
-        B: Bundle,
-    {
-        self.check_location(entity, location)?;
-        let EntityLocation::WithComponents(archetype_id) = location else {
-            return Ok(None);
-        };
-
-        let Self { archetypes, .. } = self;
-
-        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
-        let refs = info.storage.get_bundle_mut::<B>(components, entity)?;
-        Ok(refs)
-    }
-
-    // TODO: get erased bundles
-
-    #[inline]
-    pub fn bundles<'ctx, B>(
-        &self,
-        components: &'ctx ComponentRegistry,
-    ) -> Result<Bundles<'_, 'ctx, B>, ArchetypeError>
-    where
-        B: Bundle,
-    {
-        let Self { archetypes, graph } = self;
-        Bundles::new(archetypes, graph, components)
-    }
-
-    #[inline]
-    pub fn bundles_mut<'ctx, B>(
-        &mut self,
-        components: &'ctx ComponentRegistry,
-    ) -> Result<BundlesMut<'_, 'ctx, B>, ArchetypeError>
-    where
-        B: Bundle,
-    {
-        let Self { archetypes, graph } = self;
-        BundlesMut::new(archetypes, graph, components)
-    }
-
     #[inline]
     pub fn compatible_archetypes_from<I>(
         &self,
@@ -744,7 +631,220 @@ impl ArchetypeRegistry {
         CompatibleArchetypesMut::new(archetypes, graph, archetype)
     }
 
-    // TODO: insert erased bundle
+    #[inline]
+    pub fn find_location(&self, entity: Entity) -> EntityLocation {
+        let Self { archetypes, .. } = self;
+        find_location(archetypes, entity)
+    }
+
+    #[inline]
+    pub fn check_location(
+        &self,
+        entity: Entity,
+        location: EntityLocation,
+    ) -> Result<(), InvalidEntityLocationError> {
+        let Self { archetypes, .. } = self;
+        check_location(archetypes, entity, location)
+    }
+
+    #[inline]
+    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, StorageMeta>> {
+        let location = self.find_location(entity);
+        let Ok(bundle) = self
+            .get_at(entity, location)
+            .map_err(InvalidEntityLocationError::with_valid_location);
+        bundle
+    }
+
+    #[inline]
+    pub fn get_at(
+        &self,
+        entity: Entity,
+        location: EntityLocation,
+    ) -> Result<Option<ErasedBundleRefs<'_, '_, StorageMeta>>, InvalidEntityLocationError> {
+        self.check_location(entity, location)?;
+        let EntityLocation::WithComponents(archetype_id) = location else {
+            return Ok(None);
+        };
+
+        let Self { archetypes, .. } = self;
+
+        let info = unwrap_archetype_info(archetypes, archetype_id);
+        let bundle = info.storage().get(entity);
+        Ok(bundle)
+    }
+
+    #[inline]
+    pub fn get_bundle<B>(
+        &self,
+        components: &ComponentRegistry,
+        entity: Entity,
+    ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        let location = self.find_location(entity);
+        self.get_bundle_at::<B>(components, entity, location)
+            .map_err(GetAtError::with_valid_location)
+    }
+
+    #[inline]
+    pub fn get_bundle_at<B>(
+        &self,
+        components: &ComponentRegistry,
+        entity: Entity,
+        location: EntityLocation,
+    ) -> Result<Option<BundleRefs<'_, B>>, GetAtError>
+    where
+        B: Bundle,
+    {
+        let Some(bundle) = self.get_at(entity, location)? else {
+            return Ok(None);
+        };
+
+        let bundle = bundle.downcast::<B>(components)?;
+        Ok(Some(bundle))
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, entity: Entity) -> Option<ErasedBundleMutRefs<'_, '_, StorageMeta>> {
+        let location = self.find_location(entity);
+        let Ok(bundle) = self
+            .get_mut_at(entity, location)
+            .map_err(InvalidEntityLocationError::with_valid_location);
+        bundle
+    }
+
+    #[inline]
+    pub fn get_mut_at(
+        &mut self,
+        entity: Entity,
+        location: EntityLocation,
+    ) -> Result<Option<ErasedBundleMutRefs<'_, '_, StorageMeta>>, InvalidEntityLocationError> {
+        self.check_location(entity, location)?;
+        let EntityLocation::WithComponents(archetype_id) = location else {
+            return Ok(None);
+        };
+
+        let Self { archetypes, .. } = self;
+
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
+        let bundle = info.storage.get_mut(entity);
+        Ok(bundle)
+    }
+
+    #[inline]
+    pub fn get_bundle_mut<B>(
+        &mut self,
+        components: &ComponentRegistry,
+        entity: Entity,
+    ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
+    where
+        B: Bundle,
+    {
+        let location = self.find_location(entity);
+        self.get_bundle_mut_at::<B>(components, entity, location)
+            .map_err(GetAtError::with_valid_location)
+    }
+
+    #[inline]
+    pub fn get_bundle_mut_at<B>(
+        &mut self,
+        components: &ComponentRegistry,
+        entity: Entity,
+        location: EntityLocation,
+    ) -> Result<Option<BundleRefsMut<'_, B>>, GetAtError>
+    where
+        B: Bundle,
+    {
+        let Some(bundle) = self.get_mut_at(entity, location)? else {
+            return Ok(None);
+        };
+
+        let bundle = bundle.downcast::<B>(components)?;
+        Ok(Some(bundle))
+    }
+
+    // TODO: get erased bundles
+
+    #[inline]
+    pub fn bundles<'ctx, B>(
+        &self,
+        components: &'ctx ComponentRegistry,
+    ) -> Result<Bundles<'_, 'ctx, B>, ArchetypeError>
+    where
+        B: Bundle,
+    {
+        let Self { archetypes, graph } = self;
+        Bundles::new(archetypes, graph, components)
+    }
+
+    #[inline]
+    pub fn bundles_mut<'ctx, B>(
+        &mut self,
+        components: &'ctx ComponentRegistry,
+    ) -> Result<BundlesMut<'_, 'ctx, B>, ArchetypeError>
+    where
+        B: Bundle,
+    {
+        let Self { archetypes, graph } = self;
+        BundlesMut::new(archetypes, graph, components)
+    }
+
+    #[inline]
+    pub fn insert_exact<T>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        value: ErasedBundleKind<T>,
+    ) -> Result<(), InsertExactError<ErasedBundleKind<T>>>
+    where
+        T: ErasedArchetypeKind<Meta = StorageMeta>,
+    {
+        let location = self.find_location(entity);
+        self.insert_exact_at(components, entity, value, location)
+            .map_err(InsertExactAtError::with_valid_location)?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn insert_exact_at<T>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        value: ErasedBundleKind<T>,
+        location: EntityLocation,
+    ) -> Result<ArchetypeId, InsertExactAtError<ErasedBundleKind<T>>>
+    where
+        T: ErasedArchetypeKind<Meta = StorageMeta>,
+    {
+        let Self { archetypes, graph } = self;
+        let result = Self::insert_exact_archetypes(
+            graph,
+            archetypes,
+            components,
+            entity,
+            location,
+            value.archetype(),
+        );
+        let (old_archetype, new_archetype) = match result {
+            Ok(archetypes) => archetypes,
+            Err(reason) => return Err(InsertExactAtError { value, reason }),
+        };
+
+        let Some(old_archetype) = old_archetype else {
+            Self::insert_into_archetype(archetypes, new_archetype, entity, value);
+            return Ok(new_archetype);
+        };
+
+        // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
+            .insert(value)
+            .expect("old archetype should not have components of the inserted bundle");
+        Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
+
+        Ok(new_archetype)
+    }
 
     #[inline]
     pub fn insert_bundle_exact<B>(
@@ -758,7 +858,7 @@ impl ArchetypeRegistry {
     {
         let location = self.find_location(entity);
         self.insert_bundle_exact_at::<B>(components, entity, value, location)
-            .map_err(InsertBundleExactAtError::into_insert_bundle_exact_error)?;
+            .map_err(InsertBundleExactAtError::with_valid_location)?;
         Ok(())
     }
 
@@ -773,12 +873,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        if let Err(error) = self.check_location(entity, location) {
-            let reason = error.into();
-            return Err(InsertBundleExactAtError { value, reason });
-        }
-
-        let bundle_components = match ErasedArchetype::register::<B>(components) {
+        let components_to_insert = match ErasedArchetype::register::<B>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
                 let reason = error.into();
@@ -787,43 +882,90 @@ impl ArchetypeRegistry {
         };
 
         let Self { archetypes, graph } = self;
-
-        let old_archetype = location.into();
-        if let Some(archetype_id) = old_archetype {
-            let check_result = unwrap_archetype_info(archetypes, archetype_id)
-                .storage()
-                .archetype()
-                .has_no_components(&bundle_components);
-            if let Err(error) = check_result {
-                let reason = error.into();
-                return Err(InsertBundleExactAtError { value, reason });
-            }
-        }
-
-        let new_archetype = Self::register_archetype_with_components(
+        let result = Self::insert_exact_archetypes(
             graph,
             archetypes,
             components,
-            old_archetype,
-            &bundle_components,
+            entity,
+            location,
+            &components_to_insert,
         );
+        let (old_archetype, new_archetype) = match result {
+            Ok(archetypes) => archetypes,
+            Err(error) => {
+                let reason = error.into();
+                return Err(InsertBundleExactAtError { value, reason });
+            }
+        };
 
         let Some(old_archetype) = old_archetype else {
-            let info = unwrap_archetype_info_mut(archetypes, new_archetype);
-            if let Err(error) = info.storage.insert_bundle(components, entity, value) {
-                let error = error.reason;
-                unreachable!("failed to insert {entity} into {new_archetype}: {error}")
-            }
+            let id = new_archetype;
+            Self::insert_bundle_into_archetype(archetypes, components, id, entity, value);
             return Ok(new_archetype);
         };
 
+        // FIXME: can we optimize this (by writing into a new archetype directly)?
         let to_insert = ErasedBundle::try_from(components, value)
             .map_err(|error| error.reason)
             .expect("bundle compatibility should have been already checked");
-        let bundle = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+        let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
             .insert(to_insert)
             .expect("old archetype should not have components of the inserted bundle");
-        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
+        Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
+
+        Ok(new_archetype)
+    }
+
+    #[inline]
+    pub fn insert<T>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        value: ErasedBundleKind<T>,
+    ) where
+        T: ErasedArchetypeKind<Meta = StorageMeta>,
+    {
+        let location = self.find_location(entity);
+        let Ok(_) = self
+            .insert_at(components, entity, value, location)
+            .map_err(InsertAtError::with_valid_location);
+    }
+
+    #[inline]
+    pub fn insert_at<T>(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        value: ErasedBundleKind<T>,
+        location: EntityLocation,
+    ) -> Result<ArchetypeId, InsertAtError<ErasedBundleKind<T>>>
+    where
+        T: ErasedArchetypeKind<Meta = StorageMeta>,
+    {
+        let Self { archetypes, graph } = self;
+        let result = Self::insert_archetypes(
+            graph,
+            archetypes,
+            components,
+            entity,
+            location,
+            value.archetype(),
+        );
+        let (old_archetype, new_archetype) = match result {
+            Ok(archetypes) => archetypes,
+            Err(reason) => return Err(InsertAtError { value, reason }),
+        };
+
+        let Some(old_archetype) = old_archetype else {
+            Self::insert_into_archetype(archetypes, new_archetype, entity, value);
+            return Ok(new_archetype);
+        };
+
+        // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
+            .replace(value)
+            .expect("combined bundle should be created successfully");
+        Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
 
         Ok(new_archetype)
     }
@@ -855,12 +997,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        if let Err(error) = self.check_location(entity, location) {
-            let reason = error.into();
-            return Err(InsertBundleAtError { value, reason });
-        }
-
-        let bundle_components = match ErasedArchetype::register::<B>(components) {
+        let components_to_insert = match ErasedArchetype::register::<B>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
                 let reason = error.into();
@@ -869,36 +1006,98 @@ impl ArchetypeRegistry {
         };
 
         let Self { archetypes, graph } = self;
-
-        let old_archetype = location.into();
-        let new_archetype = Self::register_archetype_with_components(
+        let result = Self::insert_archetypes(
             graph,
             archetypes,
             components,
-            old_archetype,
-            &bundle_components,
+            entity,
+            location,
+            &components_to_insert,
         );
-        let Some(old_archetype) = old_archetype else {
-            let info = unwrap_archetype_info_mut(archetypes, new_archetype);
-            if let Err(error) = info.storage.insert_bundle(components, entity, value) {
-                let error = error.reason;
-                unreachable!("failed to insert {entity} into {new_archetype}: {error}")
+        let (old_archetype, new_archetype) = match result {
+            Ok(archetypes) => archetypes,
+            Err(error) => {
+                let reason = error.into();
+                return Err(InsertBundleAtError { value, reason });
             }
+        };
+
+        let Some(old_archetype) = old_archetype else {
+            let id = new_archetype;
+            Self::insert_bundle_into_archetype(archetypes, components, id, entity, value);
             return Ok(new_archetype);
         };
 
+        // FIXME: can we optimize this (by writing into a new archetype directly)?
         let to_replace = ErasedBundle::try_from(components, value)
             .map_err(|error| error.reason)
             .expect("bundle compatibility should have been already checked");
-        let bundle = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
+        let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
             .replace(to_replace)
             .expect("combined bundle should be created successfully");
-        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
+        Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
 
         Ok(new_archetype)
     }
 
-    // TODO: remove erased bundle
+    #[inline]
+    pub fn remove_exact<'me>(
+        &'me mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        components_to_remove: &'me ErasedArchetype<StorageMeta>,
+    ) -> Result<Option<ErasedBorrowedBundle<'me, StorageMeta>>, MissingComponentError> {
+        let location = self.find_location(entity);
+        let (value, _) = self
+            .remove_exact_at(components, entity, components_to_remove, location)
+            .map_err(RemoveExactAtError::with_valid_location)?;
+        Ok(value)
+    }
+
+    #[inline]
+    pub fn remove_exact_at<'me>(
+        &'me mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        components_to_remove: &'me ErasedArchetype<StorageMeta>,
+        location: EntityLocation,
+    ) -> Result<
+        (
+            Option<ErasedBorrowedBundle<'me, StorageMeta>>,
+            EntityLocation,
+        ),
+        RemoveExactAtError,
+    > {
+        let Self { archetypes, graph } = self;
+        let remove_archetypes = Self::remove_exact_archetypes(
+            graph,
+            archetypes,
+            components,
+            entity,
+            location,
+            components_to_remove,
+        )?;
+        let Some((old_archetype, new_archetype)) = remove_archetypes else {
+            return Ok((None, EntityLocation::WithoutComponents));
+        };
+
+        let Some(new_archetype) = new_archetype else {
+            let value = Self::remove_from_archetype(archetypes, old_archetype, entity);
+            return Ok((Some(value), EntityLocation::WithoutComponents));
+        };
+
+        // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let RemovePair {
+            retained: bundle,
+            removed: value,
+        } = Self::remove_from_archetype(archetypes, old_archetype, entity)
+            .remove(components_to_remove)
+            .expect("all the bundle components should be present in the old archetype");
+        Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
+
+        let location = EntityLocation::WithComponents(new_archetype);
+        Ok((Some(value), location))
+    }
 
     #[inline]
     pub fn remove_bundle_exact<B>(
@@ -912,7 +1111,7 @@ impl ArchetypeRegistry {
         let location = self.find_location(entity);
         let (value, _) = self
             .remove_bundle_exact_at::<B>(components, entity, location)
-            .map_err(RemoveBundleExactAtError::into_remove_bundle_exact_error)?;
+            .map_err(RemoveBundleExactAtError::with_valid_location)?;
         Ok(value)
     }
 
@@ -926,49 +1125,90 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        self.check_location(entity, location)?;
-        let bundle_components = ErasedArchetype::register::<B>(components)?;
-
-        let EntityLocation::WithComponents(old_archetype) = location else {
-            return Ok((None, EntityLocation::WithoutComponents));
-        };
+        let components_to_remove = ErasedArchetype::register::<B>(components)?;
 
         let Self { archetypes, graph } = self;
-        unwrap_archetype_info(archetypes, old_archetype)
-            .storage()
-            .archetype()
-            .has_components(&bundle_components)?;
-
-        let new_archetype = Self::register_archetype_without_components(
+        let remove_archetypes = Self::remove_exact_archetypes(
             graph,
             archetypes,
             components,
-            old_archetype,
-            &bundle_components,
-        );
+            entity,
+            location,
+            &components_to_remove,
+        )?;
+        let Some((old_archetype, new_archetype)) = remove_archetypes else {
+            return Ok((None, EntityLocation::WithoutComponents));
+        };
+
         let Some(new_archetype) = new_archetype else {
-            let info = unwrap_archetype_info_mut(archetypes, old_archetype);
-            let value = info
-                .storage
-                .remove_bundle::<B>(components, entity)
-                .expect("archetype should be compatible")
-                .expect("storage should contain data of given entity");
+            let id = old_archetype;
+            let value = Self::remove_bundle_from_archetype(archetypes, components, id, entity);
             return Ok((Some(value), EntityLocation::WithoutComponents));
         };
 
+        // FIXME: can we optimize this (by writing into a new archetype directly)?
         let RemovePair {
             retained: bundle,
             removed,
-        } = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
-            .remove(bundle_components)
+        } = Self::remove_from_archetype(archetypes, old_archetype, entity)
+            .remove(components_to_remove)
             .expect("all the bundle components should be present in the old archetype");
-        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
+        Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
 
         let value = removed
             .downcast(components)
             .expect("archetype should be compatible");
         let location = EntityLocation::WithComponents(new_archetype);
         Ok((Some(value), location))
+    }
+
+    #[inline]
+    pub fn remove(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        components_to_remove: &ErasedArchetype<impl Sized>,
+    ) {
+        let location = self.find_location(entity);
+        let Ok(_) = self
+            .remove_at(components, entity, components_to_remove, location)
+            .map_err(InvalidEntityLocationError::with_valid_location);
+    }
+
+    #[inline]
+    pub fn remove_at(
+        &mut self,
+        components: &mut ComponentRegistry,
+        entity: Entity,
+        components_to_remove: &ErasedArchetype<impl Sized>,
+        location: EntityLocation,
+    ) -> Result<EntityLocation, InvalidEntityLocationError> {
+        let Self { archetypes, graph } = self;
+        let remove_archetypes = Self::remove_archetypes(
+            graph,
+            archetypes,
+            components,
+            entity,
+            location,
+            components_to_remove,
+        )?;
+        let Some((old_archetype, new_archetype)) = remove_archetypes else {
+            return Ok(EntityLocation::WithoutComponents);
+        };
+
+        let Some(new_archetype) = new_archetype else {
+            Self::destroy_in_archetype(archetypes, old_archetype, entity);
+            return Ok(EntityLocation::WithoutComponents);
+        };
+
+        // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
+            .destroy(components_to_remove)
+            .expect("all the bundle components should be present in the old archetype");
+        Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
+
+        let location = EntityLocation::WithComponents(new_archetype);
+        Ok(location)
     }
 
     #[inline]
@@ -982,7 +1222,7 @@ impl ArchetypeRegistry {
     {
         let location = self.find_location(entity);
         self.remove_bundle_at::<B>(components, entity, location)
-            .map_err(RemoveBundleAtError::into_duplicate_component_error)?;
+            .map_err(RemoveBundleAtError::with_valid_location)?;
         Ok(())
     }
 
@@ -996,34 +1236,31 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        self.check_location(entity, location)?;
-        let bundle_components = ErasedArchetype::<()>::register::<B>(components)?;
-
-        let EntityLocation::WithComponents(old_archetype) = location else {
-            return Ok(EntityLocation::WithoutComponents);
-        };
+        let components_to_remove = ErasedArchetype::<()>::register::<B>(components)?;
 
         let Self { archetypes, graph } = self;
-
-        let new_archetype = Self::register_archetype_without_components(
+        let remove_archetypes = Self::remove_archetypes(
             graph,
             archetypes,
             components,
-            old_archetype,
-            &bundle_components,
-        );
-        let Some(new_archetype) = new_archetype else {
-            let info = unwrap_archetype_info_mut(archetypes, old_archetype);
-            if !info.storage.destroy(entity) {
-                unreachable!("{entity} should exist in {old_archetype}")
-            }
+            entity,
+            location,
+            &components_to_remove,
+        )?;
+        let Some((old_archetype, new_archetype)) = remove_archetypes else {
             return Ok(EntityLocation::WithoutComponents);
         };
 
-        let bundle = Self::move_out_of_archetype_by_entity(archetypes, old_archetype, entity)
-            .destroy(&bundle_components)
+        let Some(new_archetype) = new_archetype else {
+            Self::destroy_in_archetype(archetypes, old_archetype, entity);
+            return Ok(EntityLocation::WithoutComponents);
+        };
+
+        // FIXME: can we optimize this (by writing into a new archetype directly)?
+        let bundle = Self::remove_from_archetype(archetypes, old_archetype, entity)
+            .destroy(&components_to_remove)
             .expect("all the bundle components should be present in the old archetype");
-        Self::set_in_archetype_by_entity(archetypes, new_archetype, entity, bundle);
+        Self::insert_into_archetype(archetypes, new_archetype, entity, bundle);
 
         let location = EntityLocation::WithComponents(new_archetype);
         Ok(location)
@@ -1032,9 +1269,9 @@ impl ArchetypeRegistry {
     #[inline]
     pub fn destroy(&mut self, entity: Entity) -> bool {
         let location = self.find_location(entity);
-        let Ok(destroyed) = self.destroy_at(entity, location) else {
-            unreachable!("{location:?} for this {entity} was just found")
-        };
+        let Ok(destroyed) = self
+            .destroy_at(entity, location)
+            .map_err(InvalidEntityLocationError::with_valid_location);
         destroyed
     }
 
@@ -1050,11 +1287,7 @@ impl ArchetypeRegistry {
         };
 
         let Self { archetypes, .. } = self;
-
-        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
-        if !info.storage.destroy(entity) {
-            unreachable!("{entity} should exist in {archetype_id}")
-        }
+        Self::destroy_in_archetype(archetypes, archetype_id, entity);
         Ok(true)
     }
 
@@ -1070,7 +1303,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    fn set_in_archetype_by_entity<T>(
+    fn insert_into_archetype<T>(
         archetypes: &mut Archetypes,
         archetype_id: ArchetypeId,
         entity: Entity,
@@ -1090,7 +1323,24 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    fn move_out_of_archetype_by_entity(
+    fn insert_bundle_into_archetype<B>(
+        archetypes: &mut Archetypes,
+        components: &mut ComponentRegistry,
+        archetype_id: ArchetypeId,
+        entity: Entity,
+        value: B,
+    ) where
+        B: Bundle,
+    {
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
+        if let Err(error) = info.storage.insert_bundle(components, entity, value) {
+            let error = error.reason;
+            unreachable!("failed to insert {entity} into {archetype_id}: {error}")
+        }
+    }
+
+    #[inline]
+    fn remove_from_archetype(
         archetypes: &mut Archetypes,
         archetype_id: ArchetypeId,
         entity: Entity,
@@ -1100,6 +1350,143 @@ impl ArchetypeRegistry {
             unreachable!("{entity} should exist in {archetype_id}")
         };
         bundle
+    }
+
+    #[inline]
+    fn remove_bundle_from_archetype<B>(
+        archetypes: &mut Archetypes,
+        components: &ComponentRegistry,
+        archetype_id: ArchetypeId,
+        entity: Entity,
+    ) -> B
+    where
+        B: Bundle,
+    {
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
+        let bundle = match info.storage.remove_bundle(components, entity) {
+            Ok(bundle) => bundle,
+            Err(error) => unreachable!("failed to remove {entity} from {archetype_id}: {error}"),
+        };
+        let Some(bundle) = bundle else {
+            unreachable!("{entity} should exist in {archetype_id}")
+        };
+        bundle
+    }
+
+    #[inline]
+    fn destroy_in_archetype(
+        archetypes: &mut Archetypes,
+        archetype_id: ArchetypeId,
+        entity: Entity,
+    ) {
+        let info = unwrap_archetype_info_mut(archetypes, archetype_id);
+        if !info.storage.destroy(entity) {
+            unreachable!("{entity} should exist in {archetype_id}")
+        }
+    }
+
+    #[inline]
+    fn insert_exact_archetypes(
+        graph: &mut Graph,
+        archetypes: &mut Archetypes,
+        components: &ComponentRegistry,
+        entity: Entity,
+        location: EntityLocation,
+        components_to_insert: &ErasedArchetype<StorageMeta>,
+    ) -> Result<(Option<ArchetypeId>, ArchetypeId), InsertExactAtErrorKind> {
+        check_location(archetypes, entity, location)?;
+
+        let old_archetype = location.into();
+        if let Some(archetype_id) = old_archetype {
+            let info = unwrap_archetype_info(archetypes, archetype_id);
+            info.storage()
+                .archetype()
+                .has_no_components(components_to_insert)?;
+        }
+
+        let new_archetype = Self::register_archetype_with_components(
+            graph,
+            archetypes,
+            components,
+            old_archetype,
+            components_to_insert,
+        );
+        Ok((old_archetype, new_archetype))
+    }
+
+    #[inline]
+    fn insert_archetypes(
+        graph: &mut Graph,
+        archetypes: &mut Archetypes,
+        components: &ComponentRegistry,
+        entity: Entity,
+        location: EntityLocation,
+        components_to_insert: &ErasedArchetype<StorageMeta>,
+    ) -> Result<(Option<ArchetypeId>, ArchetypeId), InvalidEntityLocationError> {
+        check_location(archetypes, entity, location)?;
+
+        let old_archetype = location.into();
+        let new_archetype = Self::register_archetype_with_components(
+            graph,
+            archetypes,
+            components,
+            old_archetype,
+            components_to_insert,
+        );
+        Ok((old_archetype, new_archetype))
+    }
+
+    #[inline]
+    fn remove_exact_archetypes(
+        graph: &mut Graph,
+        archetypes: &mut Archetypes,
+        components: &ComponentRegistry,
+        entity: Entity,
+        location: EntityLocation,
+        components_to_remove: &ErasedArchetype<impl Sized>,
+    ) -> Result<Option<(ArchetypeId, Option<ArchetypeId>)>, RemoveExactAtError> {
+        check_location(archetypes, entity, location)?;
+        let EntityLocation::WithComponents(old_archetype) = location else {
+            return Ok(None);
+        };
+
+        let info = unwrap_archetype_info(archetypes, old_archetype);
+        info.storage()
+            .archetype()
+            .has_components(components_to_remove)?;
+
+        let new_archetype = Self::register_archetype_without_components(
+            graph,
+            archetypes,
+            components,
+            old_archetype,
+            components_to_remove,
+        );
+        Ok(Some((old_archetype, new_archetype)))
+    }
+
+    #[inline]
+    fn remove_archetypes(
+        graph: &mut Graph,
+        archetypes: &mut Archetypes,
+        components: &ComponentRegistry,
+        entity: Entity,
+        location: EntityLocation,
+        components_to_remove: &ErasedArchetype<impl Sized>,
+    ) -> Result<Option<(ArchetypeId, Option<ArchetypeId>)>, InvalidEntityLocationError> {
+        check_location(archetypes, entity, location)?;
+        let EntityLocation::WithComponents(old_archetype) = location else {
+            return Ok(None);
+        };
+
+        let new_archetype = Self::register_archetype_without_components(
+            graph,
+            archetypes,
+            components,
+            old_archetype,
+            components_to_remove,
+        );
+        Ok(Some((old_archetype, new_archetype)))
     }
 
     #[inline]

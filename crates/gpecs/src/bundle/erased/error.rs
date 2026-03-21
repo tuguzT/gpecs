@@ -7,8 +7,8 @@ use std::{
 use gpecs_soa_erased::storage::AllocError;
 
 use crate::archetype::error::{
-    DuplicateComponentError, IncompatibleArchetypeError, IncompatibleArchetypeExactError,
-    MissingComponentError,
+    AlreadyHasComponentError, DuplicateComponentError, IncompatibleArchetypeError,
+    IncompatibleArchetypeExactError, MissingComponentError,
 };
 
 #[derive(Debug, Clone)]
@@ -266,15 +266,15 @@ where
 
 #[derive(Debug, Clone)]
 pub enum InsertErrorKind {
-    DuplicateComponent(DuplicateComponentError),
+    AlreadyHasComponent(AlreadyHasComponentError),
     InvalidLayout(LayoutError),
     Alloc(AllocError),
 }
 
-impl From<DuplicateComponentError> for InsertErrorKind {
+impl From<AlreadyHasComponentError> for InsertErrorKind {
     #[inline]
-    fn from(error: DuplicateComponentError) -> Self {
-        Self::DuplicateComponent(error)
+    fn from(error: AlreadyHasComponentError) -> Self {
+        Self::AlreadyHasComponent(error)
     }
 }
 
@@ -295,7 +295,7 @@ impl From<AllocError> for InsertErrorKind {
 impl Display for InsertErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::AlreadyHasComponent(error) => Display::fmt(error, f),
             Self::InvalidLayout(error) => Display::fmt(error, f),
             Self::Alloc(error) => Display::fmt(error, f),
         }
@@ -305,7 +305,7 @@ impl Display for InsertErrorKind {
 impl Error for InsertErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::DuplicateComponent(error) => Some(error),
+            Self::AlreadyHasComponent(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
             Self::Alloc(error) => Some(error),
         }

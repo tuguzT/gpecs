@@ -48,6 +48,13 @@ impl InvalidEntityLocationError {
         let Self { kind, .. } = *self;
         kind
     }
+
+    #[cold]
+    #[track_caller]
+    #[inline(never)]
+    pub(crate) fn with_valid_location(self) -> ! {
+        unreachable!("{self}")
+    }
 }
 
 impl Display for InvalidEntityLocationError {
@@ -129,7 +136,7 @@ impl AlreadyHasComponentError {
 impl Display for AlreadyHasComponentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { component_id } = *self;
-        write!(f, "entity already has {component_id}")
+        write!(f, "already has {component_id}")
     }
 }
 
@@ -146,12 +153,12 @@ pub enum GetAtError {
 impl GetAtError {
     #[inline]
     #[track_caller]
-    pub(crate) fn into_incompatible_archetype_error(self) -> IncompatibleArchetypeError {
+    pub(crate) fn with_valid_location(self) -> IncompatibleArchetypeError {
         match self {
+            Self::InvalidEntityLocation(error) => error.with_valid_location(),
             Self::DuplicateComponent(error) => error.into(),
             Self::MissingComponent(error) => error.into(),
             Self::ComponentNotRegistered(error) => error.into(),
-            Self::InvalidEntityLocation(error) => unreachable!("{error}"),
         }
     }
 }
@@ -218,6 +225,156 @@ impl Error for GetAtError {
             Self::MissingComponent(error) => Some(error),
             Self::ComponentNotRegistered(error) => Some(error),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct InsertExactError<T> {
+    pub value: T,
+    pub reason: AlreadyHasComponentError,
+}
+
+impl<T> Display for InsertExactError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { value, reason } = self;
+        write!(f, "exact bundle {value} cannot be inserted: {reason}")
+    }
+}
+
+impl<T> Error for InsertExactError<T>
+where
+    T: Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum InsertExactAtErrorKind {
+    InvalidEntityLocation(InvalidEntityLocationError),
+    AlreadyHasComponent(AlreadyHasComponentError),
+}
+
+impl InsertExactAtErrorKind {
+    #[inline]
+    #[track_caller]
+    pub(crate) fn with_valid_location(self) -> AlreadyHasComponentError {
+        match self {
+            Self::InvalidEntityLocation(error) => error.with_valid_location(),
+            Self::AlreadyHasComponent(error) => error,
+        }
+    }
+}
+
+impl From<InvalidEntityLocationError> for InsertExactAtErrorKind {
+    #[inline]
+    fn from(error: InvalidEntityLocationError) -> Self {
+        Self::InvalidEntityLocation(error)
+    }
+}
+
+impl From<AlreadyHasComponentError> for InsertExactAtErrorKind {
+    #[inline]
+    fn from(error: AlreadyHasComponentError) -> Self {
+        Self::AlreadyHasComponent(error)
+    }
+}
+
+impl Display for InsertExactAtErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidEntityLocation(error) => Display::fmt(error, f),
+            Self::AlreadyHasComponent(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for InsertExactAtErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidEntityLocation(error) => Some(error),
+            Self::AlreadyHasComponent(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct InsertExactAtError<T> {
+    pub value: T,
+    pub reason: InsertExactAtErrorKind,
+}
+
+impl<T> InsertExactAtError<T> {
+    #[inline]
+    #[track_caller]
+    pub(crate) fn with_valid_location(self) -> InsertExactError<T> {
+        let Self { value, reason } = self;
+
+        let reason = reason.with_valid_location();
+        InsertExactError { value, reason }
+    }
+}
+
+impl<T> Display for InsertExactAtError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { value, reason } = self;
+        write!(f, "exact bundle {value} cannot be inserted: {reason}")
+    }
+}
+
+impl<T> Error for InsertExactAtError<T>
+where
+    T: Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        reason.source()
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct InsertAtError<T> {
+    pub value: T,
+    pub reason: InvalidEntityLocationError,
+}
+
+impl<T> InsertAtError<T> {
+    #[inline]
+    #[track_caller]
+    pub(crate) fn with_valid_location(self) -> ! {
+        let Self { reason, .. } = self;
+        reason.with_valid_location()
+    }
+}
+
+impl<T> Display for InsertAtError<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { value, reason } = self;
+        write!(f, "bundle {value} cannot be inserted: {reason}")
+    }
+}
+
+impl<T> Error for InsertAtError<T>
+where
+    T: Debug + Display,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        let Self { reason, .. } = self;
+        Some(reason)
     }
 }
 
@@ -299,9 +456,9 @@ pub enum InsertBundleExactAtErrorKind {
 impl InsertBundleExactAtErrorKind {
     #[inline]
     #[track_caller]
-    pub(crate) fn into_insert_bundle_exact_error_kind(self) -> InsertBundleExactErrorKind {
+    pub(crate) fn with_valid_location(self) -> InsertBundleExactErrorKind {
         match self {
-            Self::InvalidEntityLocation(error) => unreachable!("{error}"),
+            Self::InvalidEntityLocation(error) => error.with_valid_location(),
             Self::DuplicateComponent(error) => error.into(),
             Self::AlreadyHasComponent(error) => error.into(),
         }
@@ -326,6 +483,18 @@ impl From<AlreadyHasComponentError> for InsertBundleExactAtErrorKind {
     #[inline]
     fn from(error: AlreadyHasComponentError) -> Self {
         Self::AlreadyHasComponent(error)
+    }
+}
+
+impl From<InsertExactAtErrorKind> for InsertBundleExactAtErrorKind {
+    #[inline]
+    fn from(error: InsertExactAtErrorKind) -> Self {
+        use InsertExactAtErrorKind::{AlreadyHasComponent, InvalidEntityLocation};
+
+        match error {
+            InvalidEntityLocation(error) => Self::InvalidEntityLocation(error),
+            AlreadyHasComponent(error) => Self::AlreadyHasComponent(error),
+        }
     }
 }
 
@@ -365,10 +534,10 @@ where
 {
     #[inline]
     #[track_caller]
-    pub(crate) fn into_insert_bundle_exact_error(self) -> InsertBundleExactError<B> {
+    pub(crate) fn with_valid_location(self) -> InsertBundleExactError<B> {
         let Self { value, reason } = self;
 
-        let reason = reason.into_insert_bundle_exact_error_kind();
+        let reason = reason.with_valid_location();
         InsertBundleExactError { value, reason }
     }
 }
@@ -442,7 +611,7 @@ where
     pub(crate) fn into_insert_bundle_error(self) -> InsertBundleError<B> {
         let Self { value, reason } = self;
 
-        let reason = reason.into_duplicate_component_error();
+        let reason = reason.with_valid_location();
         InsertBundleError { value, reason }
     }
 }
@@ -476,9 +645,9 @@ pub enum InsertBundleAtErrorKind {
 impl InsertBundleAtErrorKind {
     #[inline]
     #[track_caller]
-    pub(crate) fn into_duplicate_component_error(self) -> DuplicateComponentError {
+    pub(crate) fn with_valid_location(self) -> DuplicateComponentError {
         match self {
-            Self::InvalidEntityLocation(error) => unreachable!("{error}"),
+            Self::InvalidEntityLocation(error) => error.with_valid_location(),
             Self::DuplicateComponent(error) => error,
         }
     }
@@ -592,9 +761,9 @@ pub enum RemoveBundleExactAtError {
 impl RemoveBundleExactAtError {
     #[inline]
     #[track_caller]
-    pub(crate) fn into_remove_bundle_exact_error(self) -> RemoveBundleExactError {
+    pub(crate) fn with_valid_location(self) -> RemoveBundleExactError {
         match self {
-            Self::InvalidEntityLocation(error) => unreachable!("{error}"),
+            Self::InvalidEntityLocation(error) => error.with_valid_location(),
             Self::DuplicateComponent(error) => error.into(),
             Self::MissingComponent(error) => error.into(),
         }
@@ -622,6 +791,18 @@ impl From<MissingComponentError> for RemoveBundleExactAtError {
     }
 }
 
+impl From<RemoveExactAtError> for RemoveBundleExactAtError {
+    #[inline]
+    fn from(error: RemoveExactAtError) -> Self {
+        use RemoveExactAtError::{InvalidEntityLocation, MissingComponent};
+
+        match error {
+            InvalidEntityLocation(error) => Self::InvalidEntityLocation(error),
+            MissingComponent(error) => Self::MissingComponent(error),
+        }
+    }
+}
+
 impl Display for RemoveBundleExactAtError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "exact bundle cannot be removed: ")?;
@@ -644,6 +825,55 @@ impl Error for RemoveBundleExactAtError {
 }
 
 #[derive(Debug, Clone)]
+pub enum RemoveExactAtError {
+    InvalidEntityLocation(InvalidEntityLocationError),
+    MissingComponent(MissingComponentError),
+}
+
+impl RemoveExactAtError {
+    #[inline]
+    #[track_caller]
+    pub(crate) fn with_valid_location(self) -> MissingComponentError {
+        match self {
+            Self::InvalidEntityLocation(error) => error.with_valid_location(),
+            Self::MissingComponent(error) => error,
+        }
+    }
+}
+
+impl From<InvalidEntityLocationError> for RemoveExactAtError {
+    #[inline]
+    fn from(error: InvalidEntityLocationError) -> Self {
+        Self::InvalidEntityLocation(error)
+    }
+}
+
+impl From<MissingComponentError> for RemoveExactAtError {
+    #[inline]
+    fn from(error: MissingComponentError) -> Self {
+        Self::MissingComponent(error)
+    }
+}
+
+impl Display for RemoveExactAtError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidEntityLocation(error) => Display::fmt(error, f),
+            Self::MissingComponent(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for RemoveExactAtError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidEntityLocation(error) => Some(error),
+            Self::MissingComponent(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum RemoveBundleAtError {
     InvalidEntityLocation(InvalidEntityLocationError),
     DuplicateComponent(DuplicateComponentError),
@@ -652,9 +882,9 @@ pub enum RemoveBundleAtError {
 impl RemoveBundleAtError {
     #[inline]
     #[track_caller]
-    pub(crate) fn into_duplicate_component_error(self) -> DuplicateComponentError {
+    pub(crate) fn with_valid_location(self) -> DuplicateComponentError {
         match self {
-            Self::InvalidEntityLocation(error) => unreachable!("{error}"),
+            Self::InvalidEntityLocation(error) => error.with_valid_location(),
             Self::DuplicateComponent(error) => error,
         }
     }

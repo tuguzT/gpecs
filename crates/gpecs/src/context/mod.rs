@@ -276,7 +276,7 @@ impl Context {
         let location = archetype_id.into();
         let bundle = archetypes
             .get_bundle_at::<B>(components, entity, location)
-            .map_err(GetAtError::into_incompatible_archetype_error)?
+            .map_err(GetAtError::with_valid_location)?
             .expect("entity should contain data");
         Ok(bundle)
     }
@@ -306,7 +306,7 @@ impl Context {
         let location = archetype_id.into();
         let bundle = archetypes
             .get_bundle_mut_at::<B>(components, entity, location)
-            .map_err(GetAtError::into_incompatible_archetype_error)?
+            .map_err(GetAtError::with_valid_location)?
             .expect("entity should contain data");
         Ok(bundle)
     }
@@ -360,7 +360,7 @@ impl Context {
 
         let archetype_id = archetypes
             .insert_bundle_exact_at::<B>(components, entity, value, *location)
-            .map_err(InsertBundleExactAtError::into_insert_bundle_exact_error)?;
+            .map_err(InsertBundleExactAtError::with_valid_location)?;
 
         *location = EntityLocation::WithComponents(archetype_id);
         Ok(())
@@ -409,7 +409,7 @@ impl Context {
 
         let new_location = archetypes
             .remove_bundle_at::<B>(components, entity, *location)
-            .map_err(RemoveBundleAtError::into_duplicate_component_error)?;
+            .map_err(RemoveBundleAtError::with_valid_location)?;
 
         *location = new_location;
         Ok(())
@@ -436,7 +436,7 @@ impl Context {
 
         let (value, new_location) = archetypes
             .remove_bundle_exact_at::<B>(components, entity, archetype_id.into())
-            .map_err(RemoveBundleExactAtError::into_remove_bundle_exact_error)?;
+            .map_err(RemoveBundleExactAtError::with_valid_location)?;
         let value = value.expect("entity should contain data");
 
         *location = new_location;

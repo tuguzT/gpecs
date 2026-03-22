@@ -172,7 +172,7 @@ fn value_zst() {
     let erased_value =
         ArrayErasedSoa::<_, 1>::try_from_storage_value::<(), _>(bytes, &context, value).unwrap();
 
-    let descriptors = [FieldDescriptor::of::<()>()];
+    let descriptors = [];
     itertools::assert_equal(
         erased_value
             .field_descriptors()
@@ -182,14 +182,14 @@ fn value_zst() {
         descriptors.map(FieldDescriptor::layout),
     );
 
-    let field_refs = [
-        ErasedRef::<*const _>::new(Layout::new::<()>(), [].as_slice()).expect("incorrect inputs"),
-    ];
+    let field_refs = [];
     itertools::assert_equal(
         erased_value
             .iter()
             .map(|item| unsafe { item.into_buffer().align_to::<u8>().1 }),
-        field_refs.into_iter().map(ErasedRef::into_buffer),
+        field_refs
+            .into_iter()
+            .map(ErasedRef::<*const _>::into_buffer),
     );
 
     let value = unsafe { erased_value.downcast::<(), _>(&context) }

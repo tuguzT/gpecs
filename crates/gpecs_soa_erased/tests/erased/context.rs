@@ -50,7 +50,7 @@ fn context_of_zst() {
         )
         .unwrap();
 
-    let descriptors = [FieldDescriptor::of::<()>()];
+    let descriptors = [];
     itertools::assert_equal(
         context
             .field_descriptors()

@@ -82,7 +82,7 @@ fn new_zst() {
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [FieldDescriptor::of::<()>()];
+    let descriptors = [];
     itertools::assert_equal(
         erased_context
             .field_descriptors()
@@ -194,7 +194,7 @@ fn with_capacity_zst() {
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [FieldDescriptor::of::<()>()];
+    let descriptors = [];
     itertools::assert_equal(
         erased_context
             .field_descriptors()
@@ -362,7 +362,7 @@ fn one_item_zst() {
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [FieldDescriptor::of::<()>()];
+    let descriptors = [];
     itertools::assert_equal(
         erased_context
             .field_descriptors()
@@ -807,7 +807,7 @@ fn three_items_zst() {
     let context = ();
     let erased_context = BoxedErasedSoaContext::of::<Soa>(&context).unwrap();
 
-    let descriptors = [FieldDescriptor::of::<()>()];
+    let descriptors = [];
     itertools::assert_equal(
         erased_context
             .field_descriptors()

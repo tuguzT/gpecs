@@ -13,7 +13,7 @@ fn unit() {
     let context = ();
 
     let context_descriptors = context.field_descriptors();
-    let descriptors = [FieldDescriptor::of::<()>()];
+    let descriptors = [];
     itertools::assert_equal(
         context_descriptors.map(FieldDescriptor::layout),
         descriptors.map(FieldDescriptor::layout),
@@ -28,12 +28,6 @@ fn unit() {
     assert_eq!(offsets.len(), descriptors.len());
     assert_eq!(offsets.layout(), Layout::new::<()>());
     assert_eq!(offsets.capacity(), capacity);
-
-    let offset = offsets.next().unwrap().unwrap();
-    assert_eq!(offset.offset, 0);
-    assert_eq!(offset.desc.layout(), Layout::new::<()>());
-    assert_eq!(offset.layout, Layout::array::<()>(capacity).unwrap());
-    assert_eq!(offsets.layout(), Layout::array::<()>(capacity).unwrap());
 
     let offset = offsets.next();
     assert!(offset.is_none());

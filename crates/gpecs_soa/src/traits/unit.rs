@@ -224,11 +224,11 @@ unsafe impl WriteSoaContext<()> for () {
 }
 
 impl<'a> FieldDescriptors<'a> for () {
-    type Output = [FieldDescriptor; 1];
+    type Output = [FieldDescriptor; 0];
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        [FieldDescriptor::of::<()>()]
+        []
     }
 }
 

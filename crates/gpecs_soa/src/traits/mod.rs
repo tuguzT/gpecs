@@ -12,7 +12,7 @@ mod unit;
 
 /// This trait is used to perform all raw pointer arithmetics for [SoA](RawSoa) types.
 pub unsafe trait RawSoaContext {
-    /// Non-empty collection of pointers to each stored field.
+    /// Collection of pointers to each stored field.
     type Ptrs<'a>: Clone;
 
     /// Restricts [pointers](RawSoaContext::Ptrs) to each stored field
@@ -42,7 +42,7 @@ pub unsafe trait RawSoaContext {
     /// [`pointer::offset_from()`]: https://doc.rust-lang.org/stable/core/primitive.pointer.html#method.offset_from
     unsafe fn ptrs_offset_from(&self, ptrs: Self::Ptrs<'_>, origin: Self::Ptrs<'_>) -> isize;
 
-    /// Non-empty collection of mutable pointers to each stored field.
+    /// Collection of mutable pointers to each stored field.
     type MutPtrs<'a>: Clone;
 
     /// Restricts [mutable pointers](RawSoaContext::MutPtrs) to each stored field
@@ -149,7 +149,7 @@ pub unsafe trait RawSoaContext {
     /// should be satisfied to be safe to call this method.
     unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>);
 
-    /// Non-empty collection of non-null pointers to each stored field.
+    /// Collection of non-null pointers to each stored field.
     type NonNullPtrs<'a>: Clone;
 
     /// Restricts [non-null pointers](RawSoaContext::NonNullPtrs) to each stored field
@@ -169,7 +169,7 @@ pub unsafe trait RawSoaContext {
     /// to each stored field.
     fn nonnull_to_ptrs<'a>(&'a self, ptrs: Self::NonNullPtrs<'a>) -> Self::MutPtrs<'a>;
 
-    /// Non-empty collection of slice pointers to each stored field.
+    /// Collection of slice pointers to each stored field.
     type SlicePtrs<'a>: Clone;
 
     /// Restricts [slice pointers](RawSoaContext::SlicePtrs) to each stored field
@@ -199,7 +199,7 @@ pub unsafe trait RawSoaContext {
     /// of each [slice pointer](RawSoaContext::SlicePtrs) of stored fields.
     fn slice_ptrs_as_ptrs<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Ptrs<'a>;
 
-    /// Non-empty collection of mutable slice pointers to each stored field.
+    /// Collection of mutable slice pointers to each stored field.
     type SliceMutPtrs<'a>: Clone;
 
     /// Restricts [mutable slice pointers](RawSoaContext::SliceMutPtrs) to each stored field
@@ -455,7 +455,7 @@ pub unsafe trait AllocSoaTrusted: AllocSoa {}
 /// An extension of [SoA context](RawSoaContext) type which provides
 /// reference and slice types of specific lifetime to each stored field.
 pub unsafe trait SoaContext<'data>: RawSoaContext {
-    /// Non-empty collection of references to each stored field.
+    /// Collection of references to each stored field.
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
     type Refs<'a>;
@@ -475,7 +475,7 @@ pub unsafe trait SoaContext<'data>: RawSoaContext {
     /// to their [pointers](RawSoaContext::Ptrs) by taking the pointer of each one of them.
     fn refs_as_ptrs<'a>(&'a self, refs: Self::Refs<'a>) -> Self::Ptrs<'a>;
 
-    /// Non-empty collection of mutable references to each stored field.
+    /// Collection of mutable references to each stored field.
     ///
     /// Order of such references **may not** resemble their order inside of a buffer in memory.
     type RefsMut<'a>;
@@ -499,7 +499,7 @@ pub unsafe trait SoaContext<'data>: RawSoaContext {
     /// to their [references](SoaContext::Refs) by explicitly converting each one of them via `&*` operator combination.
     fn mut_refs_as_refs<'a>(&'a self, refs: Self::RefsMut<'a>) -> Self::Refs<'a>;
 
-    /// Non-empty collection of slices of each stored field.
+    /// Collection of slices of each stored field.
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
     type Slices<'a>;
@@ -526,7 +526,7 @@ pub unsafe trait SoaContext<'data>: RawSoaContext {
     /// or else this method could panic.
     fn slices_len(&self, slices: &Self::Slices<'_>) -> usize;
 
-    /// Non-empty collection of mutable slices of each stored field.
+    /// Collection of mutable slices of each stored field.
     ///
     /// Order of such slices may not resemble their order inside of a buffer in memory.
     type SlicesMut<'a>;

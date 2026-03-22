@@ -72,6 +72,58 @@ fn empty() {
 }
 
 #[test]
+fn empty_unit() {
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, ()>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, ()>;
+
+    let context = Default::default();
+
+    let slices = Slices::new(&context, &[]);
+    assert!(slices.is_empty());
+    assert_eq!(slices.get(0), None);
+    assert_eq!(slices.as_ref(), []);
+    assert_eq!(slices, Slices::from(&context));
+    assert_eq!(format!("{slices:?}"), "SoaSlices([])");
+
+    let mut iter = slices.into_iter();
+    assert_eq!(iter.len(), 0);
+    assert_eq!(iter.next(), None);
+
+    assert_equal(slices, &slices);
+
+    let slices = slices.into_slices();
+    assert_eq!(slices, []);
+
+    let mut slices_mut = SlicesMut::new(&context, &mut []);
+    assert!(slices_mut.is_empty());
+    assert_eq!(slices_mut.get_mut(0), None);
+    assert_eq!(slices_mut.as_ref(), []);
+    assert_eq!(slices_mut, SlicesMut::from(&context));
+    assert_eq!(format!("{slices_mut:?}"), "SoaSlicesMut([])");
+
+    let mut iter = slices_mut.iter_mut();
+    assert_eq!(iter.len(), 0);
+    assert_eq!(iter.next(), None);
+
+    let eq_mut = &mut [];
+    assert_equal(&mut slices_mut, eq_mut);
+
+    let slices_mut = slices_mut.into_slices();
+    assert_eq!(slices_mut, []);
+
+    let mut slices_mut = SlicesMut::new(&context, slices_mut);
+
+    let permutation: [_; 0] = array::from_fn(identity);
+    slices_mut.sort_unstable_with_permutation(permutation);
+    assert!(slices_mut.is_empty());
+
+    let slices = Slices::from(slices_mut);
+    assert!(slices.is_empty());
+    assert_eq!(slices.get(0), None);
+    assert_eq!(format!("{slices:?}"), "SoaSlices([])");
+}
+
+#[test]
 fn empty_identity() {
     type Item = Identity<u128>;
     type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
@@ -323,6 +375,71 @@ fn one_item() {
     assert_eq!(u8s, [0]);
     assert_eq!(u64s, [0]);
     assert_eq!(u16s, [0]);
+    assert_eq!(units, [()]);
+}
+
+#[test]
+fn one_item_unit() {
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, ()>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, ()>;
+
+    let context = Default::default();
+    let mut units = [()];
+
+    let slices = Slices::new(&context, &units);
+    assert_eq!(slices.len(), 1);
+    assert!(slices.contains(&()));
+
+    assert_eq!(slices.as_slices(), units);
+    assert_eq!(slices.into_index(..), units);
+    assert_eq!(slices.index(0..), units);
+    assert_eq!(slices.index(..0), []);
+    assert_eq!(slices.get(0), Some(&()));
+    assert_ne!(slices, Slices::from(&context));
+    assert_eq!(format!("{slices:?}"), "SoaSlices([()])");
+
+    let mut iter = slices.into_iter();
+    assert_eq!(iter.len(), 1);
+    assert_eq!(iter.next(), Some(&()));
+    assert_eq!(iter.len(), 0);
+    assert_eq!(iter.next(), None);
+
+    assert_equal(slices, &slices);
+
+    let mut slices_mut = SlicesMut::new(&context, &mut units);
+    assert_eq!(slices_mut.len(), 1);
+    assert_eq!(slices_mut.index_mut(..), [()]);
+    assert_eq!(slices_mut.index_mut(..0), []);
+    assert_eq!(slices_mut.index_mut(0), &mut ());
+    assert!(slices_mut.contains(&()));
+
+    let permutation: [_; 1] = array::from_fn(identity);
+    slices_mut.sort_unstable_with_permutation(permutation);
+    assert_eq!(slices_mut.as_mut_slices(), [()]);
+
+    let eq_mut = &mut [()];
+    assert_equal(&mut slices_mut, eq_mut);
+
+    slices_mut.copy_from_slices(&Slices::new(&context, &[()]));
+    assert_eq!(slices_mut.len(), 1);
+    assert_eq!(slices_mut.as_mut_slices(), [()]);
+    assert_eq!(slices_mut.index_mut(0), &mut ());
+    assert_ne!(slices_mut, SlicesMut::from(&context));
+    assert_eq!(format!("{slices_mut:?}"), "SoaSlicesMut([()])");
+
+    let slices = Slices::from(slices_mut);
+    assert_eq!(slices.len(), 1);
+    assert_eq!(slices.index(0), &());
+    assert_eq!(slices.as_slices(), [()]);
+
+    let mut iter = slices.into_iter();
+    assert_eq!(iter.len(), 1);
+    assert_eq!(iter.next(), Some(&()));
+    assert_eq!(iter.len(), 0);
+    assert_eq!(iter.next(), None);
+
+    assert_equal(slices, &slices);
+
     assert_eq!(units, [()]);
 }
 
@@ -836,6 +953,164 @@ fn three_items() {
     assert_eq!(strings, ["0", "0", "4"]);
     assert_eq!(u64s, [0, 0, 7]);
     assert_eq!(units, [(), (), ()]);
+}
+
+#[test]
+fn three_items_unit() {
+    type Item = ();
+    type Slices<'ctx, 'a> = SoaSlices<'ctx, 'a, Item>;
+    type SlicesMut<'ctx, 'a> = SoaSlicesMut<'ctx, 'a, Item>;
+
+    let context = Default::default();
+    let mut units = [(); 3];
+
+    let mut slices_mut = SlicesMut::new(&context, &mut units);
+    assert_eq!(slices_mut.len(), 3);
+    assert_eq!(slices_mut[0], ());
+    assert_eq!(&slices_mut[1], &());
+    assert_eq!(&mut slices_mut[2], &mut ());
+    assert_eq!(slices_mut.get_mut(3), None);
+
+    assert_eq!(slices_mut.as_mut_slices(), [(); 3]);
+    assert_eq!(&mut slices_mut[..], [(); 3]);
+    assert_eq!(slices_mut[..1], [(); 1]);
+    assert_eq!(&slices_mut[1..], [(); 2]);
+    assert_eq!(slices_mut.as_mut(), [(); 3]);
+    assert_ne!(slices_mut, SlicesMut::from(&context));
+    assert_eq!(format!("{slices_mut:?}"), "SoaSlicesMut([(), (), ()])");
+
+    let mut iter = slices_mut.iter_mut();
+    assert_eq!(iter.len(), 3);
+    assert_eq!(iter.next(), Some(&mut ()));
+
+    assert_eq!(iter.len(), 2);
+    assert_eq!(iter.next_back(), Some(&mut ()));
+
+    assert_eq!(iter.len(), 1);
+    assert_eq!(iter.next(), Some(&mut ()));
+
+    assert_eq!(iter.len(), 0);
+    assert_eq!(iter.next(), None);
+    assert_eq!(iter.next_back(), None);
+
+    let eq_mut = [&mut (), &mut (), &mut ()];
+    assert_equal(&mut slices_mut, eq_mut);
+
+    let first = Slices::new(&context, slices_mut.index(..=1));
+    let second = Slices::new(&context, slices_mut.index(1..));
+
+    assert_eq!(first.as_slices(), second.as_slices());
+    assert_eq!(first, second);
+
+    assert_eq!(
+        first.cmp(&second),
+        first.as_slices().cmp(&second.as_slices()),
+    );
+
+    let hasher = FxBuildHasher::default();
+    assert_eq!(
+        hasher.hash_one(first.as_slices()),
+        hasher.hash_one(second.as_slices()),
+    );
+    assert_eq!(hasher.hash_one(&first), hasher.hash_one(&second));
+
+    assert_eq!(hasher.hash_one(first.as_slices()), hasher.hash_one(&first));
+    assert_eq!(
+        hasher.hash_one(second.as_slices()),
+        hasher.hash_one(&second),
+    );
+
+    let mut sub_slices = SlicesMut::new(&context, &mut slices_mut[1..]);
+    assert_eq!(sub_slices.len(), 2);
+    assert_eq!(sub_slices[0], ());
+    assert_eq!(sub_slices[1], ());
+    assert_eq!(sub_slices.get(2), None);
+    assert_eq!(sub_slices.as_slices(), [(); 2]);
+
+    let mut gr_data = [(); 2]; // the last one is greater
+    let mut gr_slices = SlicesMut::new(&context, &mut gr_data);
+
+    assert_eq!(sub_slices.as_mut_slices(), gr_slices.as_mut_slices());
+    assert_eq!(sub_slices, gr_slices);
+
+    assert_eq!(
+        sub_slices.cmp(&gr_slices),
+        sub_slices.as_mut_slices().cmp(&gr_slices.as_mut_slices()),
+    );
+
+    let hasher = FxBuildHasher::default();
+    assert_eq!(
+        hasher.hash_one(sub_slices.as_mut_slices()),
+        hasher.hash_one(gr_slices.as_mut_slices()),
+    );
+    assert_eq!(hasher.hash_one(&sub_slices), hasher.hash_one(&gr_slices));
+
+    assert_eq!(
+        hasher.hash_one(sub_slices.as_mut_slices()),
+        hasher.hash_one(&sub_slices),
+    );
+    assert_eq!(
+        hasher.hash_one(gr_slices.as_mut_slices()),
+        hasher.hash_one(&gr_slices),
+    );
+
+    sub_slices.clone_from_slices(&Slices::new(&context, &[(); 2]));
+    assert_eq!(sub_slices.len(), 2);
+    assert_eq!(sub_slices.as_slices(), [(); 2]);
+
+    assert_eq!(slices_mut[0], ());
+    assert_eq!(&slices_mut[1], &());
+    assert_eq!(&mut slices_mut[2], &mut ());
+    assert_eq!(slices_mut.get_mut(3), None);
+    assert_eq!(slices_mut.as_mut_slices(), [(); 3]);
+    assert_eq!(format!("{slices_mut:?}"), "SoaSlicesMut([(), (), ()])");
+
+    let permutation: [_; 3] = array::from_fn(identity);
+    slices_mut.sort_unstable_with_permutation_by_key(permutation, |&item| Reverse(item));
+    assert_eq!(slices_mut.as_mut_slices(), [(); 3]);
+
+    slices_mut.sort_unstable_with_permutation(permutation);
+    assert_eq!(slices_mut.as_mut_slices(), [(); 3]);
+
+    let sub_slices = unsafe { slices_mut.get_unchecked(..=0) };
+    let sub_slices = unsafe { context.slice_ptrs_to_slices(sub_slices) };
+    assert_eq!(sub_slices, [()]);
+
+    let sub_slices_mut = unsafe { slices_mut.get_unchecked_mut(..=1) };
+    let sub_slices_mut = unsafe { context.mut_slice_ptrs_to_mut_slices(sub_slices_mut) };
+    assert_eq!(sub_slices_mut, [(); 2]);
+
+    let slices = Slices::from(slices_mut);
+    assert_eq!(slices.len(), 3);
+    assert_eq!(slices[0], ());
+    assert_eq!(slices[1], ());
+    assert_eq!(slices[2], ());
+    assert_eq!(slices.get(3), None);
+    assert_eq!(slices.as_ref(), [(); 3]);
+    assert_ne!(slices, Slices::from(&context));
+    assert_eq!(format!("{slices:?}"), "SoaSlices([(), (), ()])");
+
+    let sub_slices = unsafe { slices.into_get_unchecked(..1) };
+    let sub_slices = unsafe { context.slice_ptrs_to_slices(sub_slices) };
+    assert_eq!(sub_slices, [()]);
+
+    let mut iter = slices.into_iter();
+    assert_eq!(iter.len(), 3);
+    assert_eq!(iter.next(), Some(&()));
+
+    assert_eq!(iter.len(), 2);
+    assert_eq!(iter.next_back(), Some(&()));
+
+    assert_eq!(iter.len(), 1);
+    assert_eq!(iter.next(), Some(&()));
+
+    assert_eq!(iter.len(), 0);
+    assert_eq!(iter.next(), None);
+    assert_eq!(iter.next_back(), None);
+
+    assert_equal(slices, &slices);
+
+    assert_eq!(units, [(); 3]);
 }
 
 #[test]

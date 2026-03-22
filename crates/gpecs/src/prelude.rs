@@ -17,5 +17,5 @@ pub use crate::{
             system::registry::{GpuComponentAccess, GpuSystemDescriptor, GpuSystemId},
         },
     },
-    world::registry::WorldId,
+    world::id::WorldId,
 };

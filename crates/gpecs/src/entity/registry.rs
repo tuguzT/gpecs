@@ -18,7 +18,7 @@ use gpecs_sparse::{
 
 use crate::{
     soa::identity::{Identity, IdentitySlice},
-    world::registry::WorldId,
+    world::id::WorldId,
 };
 
 use super::{Entity, EntityEpoch};

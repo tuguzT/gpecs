@@ -21,7 +21,7 @@ use crate::{
         Entity,
         registry::{self as entities, EntityRegistry},
     },
-    world::registry::{WorldId, WorldRegistry},
+    world::{id::WorldId, registry::WorldRegistry},
 };
 
 use self::error::{

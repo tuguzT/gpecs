@@ -1,4 +1,4 @@
-use gpecs::world::registry::{WorldId, WorldRegistry};
+use gpecs_world::{id::WorldId, registry::WorldRegistry};
 
 #[test]
 fn new() {

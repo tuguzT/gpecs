@@ -1,11 +1,11 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     num::NonZeroU16,
     ops::Range,
 };
 
-pub use gpecs_world::id::WorldId;
+use crate::id::WorldId;
 
 #[derive(Debug, Clone)]
 pub struct WorldRegistry {
@@ -16,10 +16,9 @@ pub struct WorldRegistry {
 impl WorldRegistry {
     #[inline]
     pub const fn new() -> Self {
-        Self {
-            next_id: 1,
-            len: NonZeroU16::MIN,
-        }
+        let len = NonZeroU16::MIN;
+        let next_id = len.get();
+        Self { next_id, len }
     }
 
     #[inline]
@@ -40,7 +39,7 @@ impl WorldRegistry {
 
     #[inline]
     pub const fn is_empty(&self) -> bool {
-        self.len() == 0
+        false
     }
 
     #[inline]

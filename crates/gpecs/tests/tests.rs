@@ -1,9 +1,5 @@
 mod common;
 
-mod world {
-    mod registry;
-}
-
 mod entity {
     mod registry;
 }

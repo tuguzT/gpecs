@@ -4,9 +4,9 @@ use core::{
 };
 
 use bytemuck::{Pod, Zeroable};
+use gpecs_num::u16::{U16FromU32Error, U16InU32};
 use gpecs_sparse::key::{Epoch, Key};
-
-use crate::world::WorldId;
+use gpecs_world::id::WorldId;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
@@ -106,51 +106,46 @@ impl Key for Entity {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
-pub struct EntityEpoch(u32);
+pub struct EntityEpoch(U16InU32);
 
 impl EntityEpoch {
-    const MAX: u32 = u16::MAX as u32;
-
     #[inline]
     pub const fn new() -> Self {
-        Self(0)
+        Self(U16InU32::MIN)
     }
 
     #[inline]
-    #[expect(clippy::cast_possible_truncation)]
     pub const fn into_u16(self) -> u16 {
         let Self(epoch) = self;
-        debug_assert!(epoch <= Self::MAX, "`EntityEpoch` should fit into `u16`");
-        epoch as u16
+        epoch.into_u16()
     }
 
     #[inline]
     pub const fn into_u32(self) -> u32 {
         let Self(epoch) = self;
-        debug_assert!(epoch <= Self::MAX, "`EntityEpoch` should fit into `u16`");
-        epoch
+        epoch.into_u32()
     }
 
     #[inline]
     pub const fn from_u16(epoch: u16) -> Self {
-        Self(epoch as u32)
+        let epoch = U16InU32::from_u16(epoch);
+        Self(epoch)
     }
 
     #[inline]
     pub const fn try_from_u32(epoch: u32) -> Result<Self, EpochFromU32Error> {
-        if epoch > Self::MAX {
-            Err(EpochFromU32Error)
-        } else {
-            Ok(Self(epoch))
+        match U16InU32::try_from_u32(epoch) {
+            Ok(epoch) => Ok(Self(epoch)),
+            Err(error) => Err(EpochFromU32Error(error)),
         }
     }
 
     #[inline]
     pub const unsafe fn from_u32(epoch: u32) -> Self {
-        debug_assert!(epoch <= Self::MAX, "`EntityEpoch` should fit into `u16`");
-        Self(epoch)
+        let id = unsafe { U16InU32::from_u32(epoch) };
+        Self(id)
     }
 }
 
@@ -186,11 +181,12 @@ impl From<EntityEpoch> for u32 {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct EpochFromU32Error;
+pub struct EpochFromU32Error(U16FromU32Error);
 
 impl Display for EpochFromU32Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`EntityEpoch` should fit into `u16`")
+        let Self(error) = self;
+        write!(f, "`EntityEpoch` {error}")
     }
 }
 

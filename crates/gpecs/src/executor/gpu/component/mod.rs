@@ -1,3 +1,3 @@
-pub use gpecs_types::component::GpuComponent;
+pub use gpecs_component::GpuComponent;
 
 pub mod registry;

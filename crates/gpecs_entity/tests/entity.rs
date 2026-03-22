@@ -1,8 +1,6 @@
+use gpecs_entity::{Entity, EntityEpoch};
 use gpecs_sparse::key::Epoch;
-use gpecs_types::{
-    entity::{Entity, EntityEpoch},
-    world::WorldId,
-};
+use gpecs_world::id::WorldId;
 
 mod epoch {
     use super::*;
@@ -36,7 +34,7 @@ mod epoch {
     }
 
     #[test]
-    #[cfg_attr(debug_assertions, should_panic = "`EntityEpoch` should fit into `u16`")]
+    #[cfg_attr(debug_assertions, should_panic = "value should fit into `u16`")]
     fn u32() {
         let min = EntityEpoch::try_from(u32::MIN).unwrap();
         assert_eq!(u16::from(min), u16::MIN);
@@ -51,7 +49,10 @@ mod epoch {
         assert_eq!(u32::from(max), u16::MAX.into());
 
         let error = EntityEpoch::try_from(u32::MAX).unwrap_err();
-        assert_eq!(error.to_string(), "`EntityEpoch` should fit into `u16`");
+        assert_eq!(
+            error.to_string(),
+            "`EntityEpoch` value should fit into `u16`",
+        );
 
         let overflow = unsafe { EntityEpoch::from_u32(u32::MAX) };
         assert_eq!(u16::from(overflow), u16::MAX);

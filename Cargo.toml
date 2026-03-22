@@ -3,10 +3,14 @@ resolver = "3"
 members = [
     # main crates
     "crates/gpecs",
-    "crates/gpecs_types",
+    "crates/gpecs_world",
+    "crates/gpecs_entity",
+    "crates/gpecs_component",
+    "crates/gpecs_archetype",
     "crates/gpecs_shaders",
     # utility crates
     "crates/gpecs_ptr",
+    "crates/gpecs_num",
     "crates/gpecs_layout",
     "crates/gpecs_erased",
     "crates/gpecs_soa",
@@ -36,9 +40,13 @@ rust-version = "1.92.0"
 [workspace.dependencies]
 # main crates
 gpecs = { path = "crates/gpecs" }
-gpecs_types = { path = "crates/gpecs_types" }
+gpecs_world = { path = "crates/gpecs_world" }
+gpecs_entity = { path = "crates/gpecs_entity" }
+gpecs_component = { path = "crates/gpecs_component" }
+gpecs_archetype = { path = "crates/gpecs_archetype" }
 # utility crates
 gpecs_ptr = { path = "crates/gpecs_ptr", default-features = false }
+gpecs_num = { path = "crates/gpecs_num", default-features = false }
 gpecs_layout = { path = "crates/gpecs_layout", default-features = false }
 gpecs_erased = { path = "crates/gpecs_erased", default-features = false }
 gpecs_soa = { path = "crates/gpecs_soa", default-features = false }

@@ -1,6 +1,6 @@
 [package]
-name = "gpecs_shaders"
-description = "SPIR-V shaders for (probably) ECS on GPU"
+name = "gpecs_entity"
+description = "Entity definitions for (probably) ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -8,12 +8,10 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+gpecs_num = { workspace = true }
+gpecs_world = { workspace = true }
 gpecs_sparse = { workspace = true }
-gpecs_soa_erased = { workspace = true }
-spirv-std = { workspace = true }
-
-[features]
-nightly = []
+bytemuck = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

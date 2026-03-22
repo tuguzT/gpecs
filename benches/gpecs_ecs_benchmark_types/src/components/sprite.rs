@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use gpecs_types::component::{Component, GpuComponent};
+use gpecs_component::{Component, GpuComponent};
 
 pub const PLAYER_SPRITE: u32 = '@' as u32;
 pub const MONSTER_SPRITE: u32 = 'k' as u32;

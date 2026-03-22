@@ -1,3 +1,3 @@
-pub use gpecs_types::entity::{Entity, EntityEpoch};
+pub use gpecs_entity::{Entity, EntityEpoch};
 
 pub mod registry;

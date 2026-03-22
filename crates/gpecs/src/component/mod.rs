@@ -1,4 +1,4 @@
-pub use gpecs_types::component::Component;
+pub use gpecs_component::Component;
 
 pub mod erased;
 pub mod error;

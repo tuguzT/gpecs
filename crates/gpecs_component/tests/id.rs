@@ -1,4 +1,4 @@
-use gpecs_types::component::{ComponentId, GpuComponentId};
+use gpecs_component::id::{ComponentId, GpuComponentId};
 
 #[test]
 fn new() {

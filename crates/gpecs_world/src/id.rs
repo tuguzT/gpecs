@@ -3,52 +3,47 @@ use core::{
     fmt::{self, Display},
 };
 
-use bytemuck::{Pod, Zeroable};
+use gpecs_num::u16::{U16FromU32Error, U16InU32};
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
-pub struct WorldId(u32);
+pub struct WorldId(U16InU32);
 
 impl WorldId {
-    const MAX: u32 = u16::MAX as u32;
-
     #[inline]
     pub const fn new() -> Self {
-        Self(0)
+        Self(U16InU32::MIN)
     }
 
     #[inline]
-    #[expect(clippy::cast_possible_truncation)]
     pub const fn into_u16(self) -> u16 {
         let Self(id) = self;
-        debug_assert!(id <= Self::MAX, "`WorldId` should fit into `u16`");
-        id as u16
+        id.into_u16()
     }
 
     #[inline]
     pub const fn into_u32(self) -> u32 {
         let Self(id) = self;
-        debug_assert!(id <= Self::MAX, "`WorldId` should fit into `u16`");
-        id
+        id.into_u32()
     }
 
     #[inline]
     pub const unsafe fn from_u16(id: u16) -> Self {
-        Self(id as u32)
+        let id = U16InU32::from_u16(id);
+        Self(id)
     }
 
     #[inline]
-    pub unsafe fn try_from_u32(id: u32) -> Result<Self, WorldIdFromU32Error> {
-        if id > Self::MAX {
-            Err(WorldIdFromU32Error)
-        } else {
-            Ok(Self(id))
+    pub const unsafe fn try_from_u32(id: u32) -> Result<Self, WorldIdFromU32Error> {
+        match U16InU32::try_from_u32(id) {
+            Ok(id) => Ok(Self(id)),
+            Err(error) => Err(WorldIdFromU32Error(error)),
         }
     }
 
     #[inline]
     pub const unsafe fn from_u32(id: u32) -> Self {
-        debug_assert!(id <= Self::MAX, "`WorldId` should fit into `u16`");
+        let id = unsafe { U16InU32::from_u32(id) };
         Self(id)
     }
 }
@@ -76,11 +71,12 @@ impl Display for WorldId {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct WorldIdFromU32Error;
+pub struct WorldIdFromU32Error(U16FromU32Error);
 
 impl Display for WorldIdFromU32Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`WorldId` should fit into `u16`")
+        let Self(error) = self;
+        write!(f, "`WorldId` {error}")
     }
 }
 

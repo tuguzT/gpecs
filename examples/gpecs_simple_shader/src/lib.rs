@@ -1,8 +1,8 @@
 #![cfg_attr(feature = "nightly", feature(asm_experimental_arch))]
 #![cfg_attr(not(test), no_std)]
 
+use gpecs_entity::Entity;
 use gpecs_simple_types::{Mass, Position};
-use gpecs_types::entity::Entity;
 use spirv_std::{
     glam::{UVec3, Vec3},
     num_traits::ToPrimitive,

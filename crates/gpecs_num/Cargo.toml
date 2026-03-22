@@ -1,0 +1,14 @@
+[package]
+name = "gpecs_num"
+description = "Numeric utilities for (probably) ECS on GPU"
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bytemuck = { workspace = true }
+
+[lints]
+workspace = true

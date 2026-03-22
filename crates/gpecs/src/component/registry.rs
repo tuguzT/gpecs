@@ -9,7 +9,7 @@ use std::{
     ptr,
 };
 
-pub use gpecs_types::component::ComponentId;
+pub use gpecs_component::id::ComponentId;
 
 use crate::soa::field::FieldDescriptor;
 

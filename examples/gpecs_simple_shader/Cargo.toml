@@ -9,7 +9,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-gpecs_types = { workspace = true }
+gpecs_entity = { workspace = true }
 gpecs_simple_types = { workspace = true }
 spirv-std = { workspace = true }
 

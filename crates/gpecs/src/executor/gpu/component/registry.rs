@@ -9,7 +9,7 @@ use std::{
 use bytemuck::must_cast_slice;
 use gpecs_sparse::set::EpochSparseSet;
 
-pub use gpecs_types::component::GpuComponentId;
+pub use gpecs_component::id::GpuComponentId;
 
 use crate::{
     component::registry::{ComponentDescriptor, ComponentId, ComponentRegistry},

@@ -1,6 +1,6 @@
 [package]
-name = "gpecs_types"
-description = "Types for ECS on GPU (probably)"
+name = "gpecs_archetype"
+description = "Archetype definitions for (probably) ECS on GPU"
 version.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -8,7 +8,6 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-gpecs_sparse = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 
 [lints]

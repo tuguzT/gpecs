@@ -1,5 +1,5 @@
 use bytemuck::{NoUninit, Zeroable};
-use gpecs_types::component::{Component, GpuComponent};
+use gpecs_component::{Component, GpuComponent};
 
 use crate::utils::RandomXoshiro128;
 

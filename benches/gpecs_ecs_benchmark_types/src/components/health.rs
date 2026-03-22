@@ -1,5 +1,5 @@
 use bytemuck::{NoUninit, Zeroable};
-use gpecs_types::component::{Component, GpuComponent};
+use gpecs_component::{Component, GpuComponent};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Zeroable, NoUninit)]
 #[repr(u32)]

@@ -660,9 +660,12 @@ dependencies = [
  "bytemuck",
  "cargo-gpu-install",
  "const_format",
+ "gpecs_archetype",
+ "gpecs_component",
+ "gpecs_entity",
  "gpecs_soa_erased",
  "gpecs_sparse",
- "gpecs_types",
+ "gpecs_world",
  "indexmap",
  "itertools 0.14.0",
  "num-traits",
@@ -670,6 +673,20 @@ dependencies = [
  "pollster",
  "rustc-hash 2.1.1",
  "wgpu",
+]
+
+[[package]]
+name = "gpecs_archetype"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
+name = "gpecs_component"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
 ]
 
 [[package]]
@@ -694,7 +711,6 @@ name = "gpecs_ecs_benchmark_shader"
 version = "0.0.0"
 dependencies = [
  "gpecs_ecs_benchmark_types",
- "gpecs_types",
  "spirv-std",
 ]
 
@@ -703,8 +719,18 @@ name = "gpecs_ecs_benchmark_types"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
- "gpecs_types",
+ "gpecs_component",
  "num-traits",
+]
+
+[[package]]
+name = "gpecs_entity"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "gpecs_num",
+ "gpecs_sparse",
+ "gpecs_world",
 ]
 
 [[package]]
@@ -720,6 +746,13 @@ name = "gpecs_layout"
 version = "0.0.0"
 
 [[package]]
+name = "gpecs_num"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "gpecs_ptr"
 version = "0.0.0"
 
@@ -729,7 +762,6 @@ version = "0.0.0"
 dependencies = [
  "gpecs_soa_erased",
  "gpecs_sparse",
- "gpecs_types",
  "spirv-std",
 ]
 
@@ -755,8 +787,8 @@ dependencies = [
 name = "gpecs_simple_shader"
 version = "0.0.0"
 dependencies = [
+ "gpecs_entity",
  "gpecs_simple_types",
- "gpecs_types",
  "spirv-std",
 ]
 
@@ -766,7 +798,7 @@ version = "0.0.0"
 dependencies = [
  "bytemuck",
  "glam",
- "gpecs_types",
+ "gpecs_component",
  "spirv-std",
 ]
 
@@ -819,11 +851,10 @@ name = "gpecs_task_graph"
 version = "0.0.0"
 
 [[package]]
-name = "gpecs_types"
+name = "gpecs_world"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
- "gpecs_sparse",
+ "gpecs_num",
 ]
 
 [[package]]

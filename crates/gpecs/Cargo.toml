@@ -9,7 +9,10 @@ edition.workspace = true
 [dependencies]
 gpecs_sparse = { workspace = true, features = ["alloc"] }
 gpecs_soa_erased = { workspace = true, features = ["alloc"] }
-gpecs_types = { workspace = true }
+gpecs_world = { workspace = true }
+gpecs_entity = { workspace = true }
+gpecs_component = { workspace = true }
+gpecs_archetype = { workspace = true }
 bytemuck = { workspace = true, features = ["derive", "must_cast"] }
 indexmap = { workspace = true }
 rustc-hash = { workspace = true }

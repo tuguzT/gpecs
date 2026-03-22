@@ -5,7 +5,7 @@ use std::{
     ops::Range,
 };
 
-pub use gpecs_types::world::WorldId;
+pub use gpecs_world::id::WorldId;
 
 #[derive(Debug, Clone)]
 pub struct WorldRegistry {

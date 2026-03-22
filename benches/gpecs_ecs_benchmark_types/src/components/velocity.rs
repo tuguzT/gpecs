@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use gpecs_types::component::{Component, GpuComponent};
+use gpecs_component::{Component, GpuComponent};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Pod, Zeroable)]
 #[repr(C, align(8))]

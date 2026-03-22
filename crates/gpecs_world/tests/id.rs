@@ -1,4 +1,4 @@
-use gpecs_types::world::WorldId;
+use gpecs_world::id::WorldId;
 
 #[test]
 fn default() {
@@ -29,7 +29,7 @@ fn u16() {
 }
 
 #[test]
-#[cfg_attr(debug_assertions, should_panic = "`WorldId` should fit into `u16`")]
+#[cfg_attr(debug_assertions, should_panic = "value should fit into `u16`")]
 fn u32() {
     let min = unsafe { WorldId::try_from_u32(u32::MIN).unwrap() };
     assert_eq!(u16::from(min), u16::MIN);
@@ -44,7 +44,7 @@ fn u32() {
     assert_eq!(u32::from(max), u16::MAX.into());
 
     let error = unsafe { WorldId::try_from_u32(u32::MAX).unwrap_err() };
-    assert_eq!(error.to_string(), "`WorldId` should fit into `u16`");
+    assert_eq!(error.to_string(), "`WorldId` value should fit into `u16`");
 
     let overflow = unsafe { WorldId::from_u32(u32::MAX) };
     assert_eq!(u16::from(overflow), u16::MAX);

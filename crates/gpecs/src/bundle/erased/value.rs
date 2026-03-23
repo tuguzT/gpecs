@@ -37,7 +37,7 @@ use crate::{
     },
     hash::IndexSet,
     soa::{
-        field::{FieldDescriptor, FieldDescriptors},
+        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         traits::{RawSoaContext, ReadSoaContext},
     },
 };
@@ -767,8 +767,8 @@ where
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         from
     }
 }

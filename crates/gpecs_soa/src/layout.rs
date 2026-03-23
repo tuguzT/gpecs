@@ -59,10 +59,9 @@ where
 }
 
 #[inline]
-pub fn is_zst<'a, T>(context: &'a T::Context) -> bool
+pub fn is_zst<T>(context: &T::Context) -> bool
 where
-    T: RawSoa + ?Sized,
-    T::Context: FieldDescriptors<'a>,
+    T: AllocSoa + ?Sized,
 {
     size_of::<T::Fields>() == 0 || packed_size_of_fields(context.field_descriptors()) == 0
 }
@@ -77,10 +76,9 @@ where
 }
 
 #[inline]
-pub fn should_allocate<'a, T>(context: &'a T::Context, capacity: usize) -> bool
+pub fn should_allocate<T>(context: &T::Context, capacity: usize) -> bool
 where
-    T: RawSoa + ?Sized,
-    T::Context: FieldDescriptors<'a> + Sized,
+    T: AllocSoa + ?Sized,
 {
     let should_not_allocate = is_context_zst::<T>() && (is_zst::<T>(context) || capacity == 0);
     !should_not_allocate

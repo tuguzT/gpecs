@@ -22,7 +22,7 @@ use crate::{
         error::NotRegisteredError,
         registry::{ComponentId, ComponentRegistry},
     },
-    soa::field::{FieldDescriptor, FieldDescriptors},
+    soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
 
 type Inner<'a, Meta> = ErasedSoaMutPtrs<&'a ErasedArchetype<Meta>, *mut MaybeUninit<u8>>;
@@ -299,8 +299,8 @@ where
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         from
     }
 }
@@ -424,8 +424,8 @@ where
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         from
     }
 }

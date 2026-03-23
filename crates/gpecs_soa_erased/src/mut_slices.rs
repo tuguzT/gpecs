@@ -13,7 +13,10 @@ use crate::{
     error::{DowncastError, SlicePtrsError},
     ptr::slice::{CastConstPtr, MutSliceItemPtr},
     soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOwned},
+        field::{
+            FieldDescriptor, FieldDescriptors, FieldDescriptorsIter, FieldDescriptorsOutput,
+            FieldDescriptorsOwned,
+        },
         traits::{AllocSoa, SlicesMut, Soa, SoaContext},
     },
 };
@@ -274,8 +277,8 @@ where
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         D::upcast_field_descriptors(from)
     }
 }
@@ -428,8 +431,8 @@ where
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         D::upcast_field_descriptors(from)
     }
 }

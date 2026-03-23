@@ -5,7 +5,7 @@ use gpecs_soa_erased::{
     CovariantFieldDescriptors, ErasedSoa,
     ptr::slice::CoreSliceItemPtrs,
     soa::{
-        field::{FieldDescriptor, FieldDescriptors},
+        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         prelude::*,
         traits::SoaWrite,
     },
@@ -299,8 +299,8 @@ where
     T: AsRef<FieldDescriptor> + 'static,
 {
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         from
     }
 }

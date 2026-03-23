@@ -21,7 +21,7 @@ use crate::{
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
-            FieldDescriptorsOwned, buffer_offsets,
+            FieldDescriptorsOutput, FieldDescriptorsOwned, buffer_offsets,
         },
         traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext},
     },
@@ -364,8 +364,8 @@ where
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         D::upcast_field_descriptors(from)
     }
 }
@@ -577,8 +577,8 @@ where
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         D::upcast_field_descriptors(from)
     }
 }

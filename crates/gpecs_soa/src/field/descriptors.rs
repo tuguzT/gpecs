@@ -1,5 +1,8 @@
 use core::{alloc::Layout, num::NonZeroUsize, slice};
 
+#[cfg(feature = "alloc")]
+use core_alloc::boxed::Box;
+
 /// Descriptor for any field type used by [SoA](crate::traits::RawSoa) types.
 ///
 /// For now this contains only a [`Layout`] of such field.
@@ -52,13 +55,17 @@ impl AsMut<Self> for FieldDescriptor {
 }
 
 /// Alias for the [field descriptors](FieldDescriptors::Output) of some type `T`.
-pub type FieldDescriptorsOutput<'a, T> = <T as FieldDescriptors<'a>>::Output;
+pub type FieldDescriptorsOutput<'a, T, U = T> = <T as FieldDescriptors<'a, U>>::Output;
 
 /// Alias for an iterator of the [field descriptors](FieldDescriptors::Output) of some type `T`.
-pub type FieldDescriptorsIter<'a, T> = <FieldDescriptorsOutput<'a, T> as IntoIterator>::IntoIter;
+pub type FieldDescriptorsIter<'a, T, U = T> =
+    <FieldDescriptorsOutput<'a, T, U> as IntoIterator>::IntoIter;
 
 /// Used to retrieve a non-owning collection of field descriptors.
-pub trait FieldDescriptors<'a> {
+pub trait FieldDescriptors<'a, T = Self>
+where
+    T: ?Sized,
+{
     /// Collection of items which could be converted into a [field descriptor](FieldDescriptor).
     type Output: IntoIterator<Item: AsRef<FieldDescriptor>>;
 
@@ -66,9 +73,10 @@ pub trait FieldDescriptors<'a> {
     fn field_descriptors(&'a self) -> Self::Output;
 }
 
-impl<'a, T> FieldDescriptors<'a> for &T
+impl<'a, T, U> FieldDescriptors<'a, &U> for &T
 where
-    T: FieldDescriptors<'a> + ?Sized,
+    T: FieldDescriptors<'a, U> + ?Sized,
+    U: ?Sized,
 {
     type Output = T::Output;
 
@@ -79,9 +87,10 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, T> FieldDescriptors<'a> for core_alloc::boxed::Box<T>
+impl<'a, T, U> FieldDescriptors<'a, Box<U>> for Box<T>
 where
-    T: FieldDescriptors<'a> + ?Sized,
+    T: FieldDescriptors<'a, U> + ?Sized,
+    U: ?Sized,
 {
     type Output = T::Output;
 
@@ -128,6 +137,15 @@ where
 }
 
 /// Used to retrieve a non-owning collection of field descriptors for any lifetime.
-pub trait FieldDescriptorsOwned: for<'a> FieldDescriptors<'a> {}
+pub trait FieldDescriptorsOwned<T = Self>: for<'a> FieldDescriptors<'a, T>
+where
+    T: ?Sized,
+{
+}
 
-impl<T> FieldDescriptorsOwned for T where T: for<'a> FieldDescriptors<'a> + ?Sized {}
+impl<T, U> FieldDescriptorsOwned<U> for T
+where
+    T: for<'a> FieldDescriptors<'a, U> + ?Sized,
+    U: ?Sized,
+{
+}

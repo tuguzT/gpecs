@@ -344,9 +344,10 @@ where
     }
 }
 
-impl<'a, T> FieldDescriptors<'a> for Identity<T>
+impl<'a, T, U> FieldDescriptors<'a, Identity<U>> for Identity<T>
 where
-    T: FieldDescriptors<'a> + ?Sized,
+    T: FieldDescriptors<'a, U> + ?Sized,
+    U: ?Sized,
 {
     type Output = T::Output;
 

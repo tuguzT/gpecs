@@ -2,7 +2,7 @@ use core::iter::FusedIterator;
 
 use gpecs_soa_erased::{
     CovariantFieldDescriptors,
-    soa::field::{FieldDescriptor, FieldDescriptors},
+    soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -39,8 +39,8 @@ where
     T: AsRef<[FieldDescriptor]> + Clone,
 {
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         from
     }
 }

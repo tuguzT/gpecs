@@ -13,7 +13,8 @@ use crate::{
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
-            FieldDescriptor, FieldDescriptors, FieldDescriptorsOwned, IntoCopiedFieldDescriptors,
+            FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput, FieldDescriptorsOwned,
+            IntoCopiedFieldDescriptors,
         },
         traits::RawSoa,
     },
@@ -251,8 +252,8 @@ where
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
-        from: <Self as FieldDescriptors<'long>>::Output,
-    ) -> <Self as FieldDescriptors<'short>>::Output {
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
         D::upcast_field_descriptors(from)
     }
 }

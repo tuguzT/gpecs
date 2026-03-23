@@ -25,8 +25,7 @@ where
 
 impl<'ctx, K, V> RawIterMut<'ctx, K, V>
 where
-    K: 'ctx,
-    V: RawSoa + ?Sized + 'ctx,
+    V: RawSoa + ?Sized,
 {
     #[inline]
     #[track_caller]

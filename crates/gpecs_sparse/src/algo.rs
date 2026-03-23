@@ -234,12 +234,12 @@ where
     (context, keys)
 }
 
-pub fn check_parts<K, V>(
-    dense: SoaSlices<DenseItem<K, V>>,
+pub fn check_parts<'a, K, V>(
+    dense: SoaSlices<'_, 'a, DenseItem<K, V>>,
     sparse: &[SparseItem<K>],
 ) -> Result<(), FromPartsError<K>>
 where
-    K: Key,
+    K: Key + 'a,
     V: RawSoa + ?Sized,
 {
     let dense = dense_keys(dense);

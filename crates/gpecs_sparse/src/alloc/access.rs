@@ -13,7 +13,7 @@ use crate::soa::{
 #[repr(transparent)]
 pub struct ReadWriteAccess<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized + 'a,
+    T: RawSoa + ?Sized,
 {
     ptrs: wrapper::MutPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,
@@ -142,7 +142,7 @@ where
 
 pub enum TryInsertAccess<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized + 'a,
+    T: RawSoa + ?Sized,
 {
     ReadWrite(ReadWriteAccess<'ctx, 'a, T>),
     WriteOnly(wrapper::MutPtrs<'ctx, T>),

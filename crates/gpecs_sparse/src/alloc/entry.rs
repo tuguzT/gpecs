@@ -23,7 +23,7 @@ use super::assert::try_replace_key_failed;
 
 pub struct OccupiedEntry<'a, K, V, C>
 where
-    K: Key + 'a,
+    K: Key,
     V: AllocSoa + ?Sized + 'a,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
@@ -274,8 +274,8 @@ where
 
 pub struct VacantEntry<'a, K, V, C>
 where
-    K: Key + 'a,
-    V: AllocSoa + ?Sized + 'a,
+    K: Key,
+    V: AllocSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     key: K,

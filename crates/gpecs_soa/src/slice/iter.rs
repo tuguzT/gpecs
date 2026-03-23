@@ -12,7 +12,7 @@ use crate::{
 #[repr(transparent)]
 pub struct Iter<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized + 'a,
+    T: RawSoa + ?Sized,
 {
     inner: RawIter<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,

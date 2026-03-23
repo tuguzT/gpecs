@@ -831,7 +831,8 @@ impl<K, V, R> FusedIterator for IntoIter<K, V, R> where V: AllocSoa + SoaReadOwn
 #[repr(transparent)]
 pub struct Drain<'a, K, V, R>
 where
-    V: AllocSoa + ?Sized,
+    K: 'a,
+    V: AllocSoa + ?Sized + 'a,
     R: ?Sized,
 {
     inner: vec::Drain<'a, DenseItem<K, V>, DenseItem<K, R>>,

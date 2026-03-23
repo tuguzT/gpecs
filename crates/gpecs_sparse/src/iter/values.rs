@@ -12,7 +12,7 @@ use crate::{
 pub struct Values<'ctx, 'a, K, V>
 where
     K: 'ctx,
-    V: RawSoa + ?Sized + 'ctx + 'a,
+    V: RawSoa + ?Sized + 'ctx,
 {
     inner: Iter<'ctx, 'a, K, V>,
 }

@@ -13,7 +13,7 @@ use crate::{
 
 pub struct SoaSlices<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized + 'a,
+    T: RawSoa + ?Sized,
 {
     ptrs: SoaSlicePtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,

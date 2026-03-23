@@ -19,7 +19,7 @@ use crate::{
 
 pub struct SoaSlicesMut<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized + 'a,
+    T: RawSoa + ?Sized,
 {
     ptrs: SoaSliceMutPtrs<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,

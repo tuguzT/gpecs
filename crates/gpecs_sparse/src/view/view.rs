@@ -26,8 +26,8 @@ use crate::{
 
 pub struct EpochSparseView<'ctx, 'a, K, V>
 where
-    K: Key + 'ctx + 'a,
-    V: RawSoa + ?Sized + 'ctx + 'a,
+    K: Key + 'ctx,
+    V: RawSoa + ?Sized + 'ctx,
 {
     dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
     sparse: &'a [SparseItem<K>],

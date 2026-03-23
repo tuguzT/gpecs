@@ -40,8 +40,8 @@ use crate::{
 
 pub struct EpochSparseViewMut<'ctx, 'a, K, V>
 where
-    K: Key + 'ctx + 'a,
-    V: RawSoa + ?Sized + 'ctx + 'a,
+    K: Key + 'ctx,
+    V: RawSoa + ?Sized + 'ctx,
 {
     dense: SoaSlicesMut<'ctx, 'a, DenseItem<K, V>>,
     sparse: &'a mut [SparseItem<K>],

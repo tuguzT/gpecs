@@ -14,7 +14,7 @@ use crate::{
 pub struct ValuesMut<'ctx, 'a, K, V>
 where
     K: 'ctx,
-    V: RawSoa + ?Sized + 'ctx + 'a,
+    V: RawSoa + ?Sized + 'ctx,
 {
     inner: IterMut<'ctx, 'a, K, V>,
 }

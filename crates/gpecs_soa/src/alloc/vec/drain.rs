@@ -18,7 +18,7 @@ use super::SoaVec;
 
 pub struct Drain<'a, T, R = T>
 where
-    T: AllocSoa + ?Sized + 'a,
+    T: AllocSoa + ?Sized,
     R: ?Sized,
 {
     /// Index of tail to preserve

@@ -15,7 +15,7 @@ use crate::{
 #[repr(transparent)]
 pub struct IterMut<'ctx, 'a, T>
 where
-    T: RawSoa + ?Sized + 'a,
+    T: RawSoa + ?Sized,
 {
     inner: RawIterMut<'ctx, T>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,

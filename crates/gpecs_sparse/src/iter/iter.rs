@@ -20,7 +20,7 @@ type Inner<'ctx, 'a, K, V> = soa::slice::Iter<'ctx, 'a, DenseItem<K, V>>;
 pub struct Iter<'ctx, 'a, K, V>
 where
     K: 'ctx + 'a,
-    V: RawSoa + ?Sized + 'ctx + 'a,
+    V: RawSoa + ?Sized + 'ctx,
 {
     inner: Inner<'ctx, 'a, K, V>,
 }

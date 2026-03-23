@@ -14,7 +14,7 @@ use crate::{
     field::{FieldDescriptor, FieldDescriptors},
     traits::{
         AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, RawSoa, RawSoaContext,
-        ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext, WriteSoaContext,
+        ReadSoaContext, SoaContext, WriteSoaContext,
     },
 };
 
@@ -704,25 +704,5 @@ where
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
         &*slices
-    }
-}
-
-impl<'a, T> SoaAsRefs<'a> for Identity<T>
-where
-    T: 'a,
-{
-    #[inline]
-    fn as_refs(&'a self, _context: &'a Self::Context) -> Refs<'a, 'a, Self> {
-        self
-    }
-}
-
-impl<'a, T> SoaAsMutRefs<'a> for Identity<T>
-where
-    T: 'a,
-{
-    #[inline]
-    fn as_mut_refs(&'a mut self, _context: &'a Self::Context) -> RefsMut<'a, 'a, Self> {
-        self
     }
 }

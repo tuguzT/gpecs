@@ -8,8 +8,7 @@ use crate::{
     soa::{
         field::{FieldDescriptors, FieldDescriptorsOutput, FieldDescriptorsOwned},
         traits::{
-            AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs,
-            SoaAsRefs, SoaContext, WriteSoaContext,
+            AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
         },
     },
     storage::{AlignedStorage, AlignedStorageFromLayout},
@@ -419,33 +418,5 @@ where
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
         slices.into()
-    }
-}
-
-impl<'me, T, D, P, U> SoaAsRefs<'me> for ErasedSoa<T, D, P>
-where
-    T: AlignedStorage<Item = U>,
-    D: CovariantFieldDescriptors + ?Sized,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: 'me,
-{
-    #[inline]
-    fn as_refs(&'me self, _: &'me Self::Context) -> Refs<'me, 'me, Self> {
-        self.as_refs()
-    }
-}
-
-impl<'me, T, D, P, U> SoaAsMutRefs<'me> for ErasedSoa<T, D, P>
-where
-    T: AlignedStorage<Item = U>,
-    D: CovariantFieldDescriptors + ?Sized,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: 'me,
-{
-    #[inline]
-    fn as_mut_refs(&'me mut self, _: &'me Self::Context) -> RefsMut<'me, 'me, Self> {
-        self.as_mut_refs()
     }
 }

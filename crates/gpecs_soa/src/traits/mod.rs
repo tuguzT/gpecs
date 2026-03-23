@@ -598,19 +598,3 @@ where
 pub trait SoaOwned: for<'a> Soa<'a> {}
 
 impl<T> SoaOwned for T where T: for<'a> Soa<'a> + ?Sized {}
-
-/// An extension of [SoA](Soa) type which allows to retrieve
-/// [references](SoaContext::Refs) to each stored field from a value of `Self`.
-pub trait SoaAsRefs<'a>: Soa<'a> {
-    /// Retrieves [references](SoaContext::Refs) to each stored field
-    /// from a given value reference by taking the reference of each one of them.
-    fn as_refs(&'a self, context: &'a Self::Context) -> Refs<'a, 'a, Self>;
-}
-
-/// An extension of [SoA](Soa) type which allows to retrieve
-/// [mutable references](SoaContext::RefsMut) to each stored field from a value of `Self`.
-pub trait SoaAsMutRefs<'a>: Soa<'a> {
-    /// Retrieves [mutable references](SoaContext::RefsMut) to each stored field
-    /// from a given mutable value reference by taking the mutable reference of each one of them.
-    fn as_mut_refs(&'a mut self, context: &'a Self::Context) -> RefsMut<'a, 'a, Self>;
-}

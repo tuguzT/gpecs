@@ -9,8 +9,7 @@ use crate::{
         field::FieldDescriptors,
         traits::{
             AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, RawSoa, RawSoaContext,
-            ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaCloneToUninit, SoaContext,
-            SoaRead, SoaWrite, WriteSoaContext,
+            ReadSoaContext, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite, WriteSoaContext,
         },
     },
 };
@@ -413,27 +412,5 @@ where
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
         slices.into_slices(self)
-    }
-}
-
-impl<'a, K, V> SoaAsRefs<'a> for DenseItem<K, V>
-where
-    K: 'a,
-    V: SoaAsRefs<'a> + ?Sized,
-{
-    #[inline]
-    fn as_refs(&'a self, context: &'a Self::Context) -> Refs<'a, 'a, Self> {
-        Self::as_refs(self, context)
-    }
-}
-
-impl<'a, K, V> SoaAsMutRefs<'a> for DenseItem<K, V>
-where
-    K: 'a,
-    V: SoaAsMutRefs<'a> + ?Sized,
-{
-    #[inline]
-    fn as_mut_refs(&'a mut self, context: &'a Self::Context) -> RefsMut<'a, 'a, Self> {
-        Self::as_mut_refs(self, context)
     }
 }

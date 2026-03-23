@@ -8,8 +8,7 @@ use crate::{
     field::FieldDescriptor,
     traits::{
         AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, RawSoa,
-        RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext,
-        WriteSoaContext,
+        RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
     },
 };
 
@@ -351,19 +350,5 @@ unsafe impl<'data> SoaContext<'data> for () {
     #[inline]
     fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
         &*slices
-    }
-}
-
-impl<'a> SoaAsRefs<'a> for () {
-    #[inline]
-    fn as_refs(&'a self, _context: &'a Self::Context) -> Refs<'a, 'a, Self> {
-        self
-    }
-}
-
-impl<'a> SoaAsMutRefs<'a> for () {
-    #[inline]
-    fn as_mut_refs(&'a mut self, _context: &'a Self::Context) -> RefsMut<'a, 'a, Self> {
-        self
     }
 }

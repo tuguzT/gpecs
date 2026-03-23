@@ -12,8 +12,7 @@ use crate::{
     field::FieldDescriptor,
     traits::{
         AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, FieldDescriptors, RawSoa,
-        RawSoaContext, ReadSoaContext, Refs, RefsMut, SoaAsMutRefs, SoaAsRefs, SoaContext,
-        WriteSoaContext,
+        RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
     },
 };
 
@@ -572,28 +571,6 @@ macro_rules! soa_tuple_impl {
             fn mut_slices_as_slices<'a>(&'a self, slices: Self::SlicesMut<'a>) -> Self::Slices<'a> {
                 let slices = ($(&*slices.$indices,)*);
                 slices
-            }
-        }
-
-        impl<'a, $($types,)*> SoaAsRefs<'a> for ($($types,)*)
-        where
-            $($types: 'a,)*
-        {
-            #[inline]
-            fn as_refs(&'a self, _context: &'a Self::Context) -> Refs<'a, 'a, Self> {
-                let refs = ($(&self.$indices,)*);
-                refs
-            }
-        }
-
-        impl<'a, $($types,)*> SoaAsMutRefs<'a> for ($($types,)*)
-        where
-            $($types: 'a,)*
-        {
-            #[inline]
-            fn as_mut_refs(&'a mut self, _context: &'a Self::Context) -> RefsMut<'a, 'a, Self> {
-                let refs = ($(&mut self.$indices,)*);
-                refs
             }
         }
     };

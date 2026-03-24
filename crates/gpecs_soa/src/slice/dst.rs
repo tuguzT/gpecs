@@ -437,7 +437,7 @@ where
 impl<T, U> AsRef<[U]> for SoaSlice<T>
 where
     T: AllocSoaTrusted + ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Context: SoaContext<'a, Slices<'ctx> = &'a [U]>>,
+    for<'ctx, 'a> T: Soa<'a, Context: SoaContext<'a, T, Slices<'ctx> = &'a [U]>>,
 {
     #[inline]
     fn as_ref(&self) -> &[U] {
@@ -458,7 +458,7 @@ where
 impl<T, U> AsMut<[U]> for SoaSlice<T>
 where
     T: AllocSoaTrusted + ?Sized,
-    for<'ctx, 'a> T: Soa<'a, Context: SoaContext<'a, SlicesMut<'ctx> = &'a mut [U]>>,
+    for<'ctx, 'a> T: Soa<'a, Context: SoaContext<'a, T, SlicesMut<'ctx> = &'a mut [U]>>,
 {
     #[inline]
     fn as_mut(&mut self) -> &mut [U] {

@@ -2,11 +2,12 @@ use core::alloc::{Layout, LayoutError};
 
 use crate::{
     item::{
-        DenseContext, DenseFieldDescriptors, DenseItem, DenseMutPtrs, DenseNonNullPtrs, DensePtrs,
-        DenseRefs, DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
+        DenseFieldDescriptors, DenseItem, DenseMutPtrs, DenseNonNullPtrs, DensePtrs, DenseRefs,
+        DenseRefsMut, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices, DenseSlicesMut,
     },
     soa::{
-        field::FieldDescriptors,
+        field::{FieldDescriptors, FieldDescriptorsOutput},
+        identity::Identity,
         traits::{
             AllocSoaContext, AllocSoaTrusted, CloneToUninitSoaContext, RawSoa, RawSoaContext,
             ReadSoaContext, SoaCloneToUninit, SoaContext, SoaRead, SoaWrite, WriteSoaContext,
@@ -14,7 +15,7 @@ use crate::{
     },
 };
 
-unsafe impl<K, V> RawSoaContext for DenseContext<K, V>
+unsafe impl<K, V> RawSoaContext<DenseItem<K, V>> for Identity<V::Context>
 where
     V: RawSoa + ?Sized,
 {
@@ -213,11 +214,11 @@ unsafe impl<K, V> RawSoa for DenseItem<K, V>
 where
     V: RawSoa + ?Sized,
 {
-    type Context = DenseContext<K, V>;
+    type Context = Identity<V::Context>;
     type Fields = (K, V::Fields);
 }
 
-unsafe impl<K, V> CloneToUninitSoaContext for DenseContext<K, V>
+unsafe impl<K, V> CloneToUninitSoaContext<DenseItem<K, V>> for Identity<V::Context>
 where
     K: Clone,
     V: SoaCloneToUninit + ?Sized,
@@ -228,7 +229,8 @@ where
     }
 }
 
-unsafe impl<'a, K, V, R> ReadSoaContext<'a, DenseItem<K, R>> for DenseContext<K, V>
+unsafe impl<'a, K, V, R> ReadSoaContext<'a, DenseItem<K, R>, DenseItem<K, V>>
+    for Identity<V::Context>
 where
     V: SoaRead<'a, R> + ?Sized,
 {
@@ -238,7 +240,7 @@ where
     }
 }
 
-unsafe impl<K, V, W> WriteSoaContext<DenseItem<K, W>> for DenseContext<K, V>
+unsafe impl<K, V, W> WriteSoaContext<DenseItem<K, W>, DenseItem<K, V>> for Identity<V::Context>
 where
     V: SoaWrite<W>,
 {
@@ -248,23 +250,24 @@ where
     }
 }
 
-impl<'a, K, V> FieldDescriptors<'a> for DenseContext<K, V>
+impl<'a, K, V> FieldDescriptors<'a, DenseItem<K, V>> for Identity<V::Context>
 where
     V: RawSoa + ?Sized,
-    V::Context: FieldDescriptors<'a>,
+    V::Context: FieldDescriptors<'a, V>,
 {
-    type Output = DenseFieldDescriptors<'a, K, V>;
+    type Output = DenseFieldDescriptors<FieldDescriptorsOutput<'a, V::Context, V>>;
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
         let context = self.as_inner();
-        DenseFieldDescriptors::new(context)
+        DenseFieldDescriptors::new::<K, V>(context)
     }
 }
 
-unsafe impl<K, V> AllocSoaContext for DenseContext<K, V>
+unsafe impl<K, V> AllocSoaContext<DenseItem<K, V>> for Identity<V::Context>
 where
-    V: RawSoa<Context: AllocSoaContext> + ?Sized,
+    V: RawSoa + ?Sized,
+    V::Context: AllocSoaContext<V>,
 {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
@@ -305,10 +308,10 @@ where
 
 unsafe impl<K, V> AllocSoaTrusted for DenseItem<K, V> where V: AllocSoaTrusted {}
 
-unsafe impl<'data, K, V> SoaContext<'data> for DenseContext<K, V>
+unsafe impl<'data, K, V> SoaContext<'data, DenseItem<K, V>> for Identity<V::Context>
 where
     K: 'data,
-    V: RawSoa<Context: SoaContext<'data>> + ?Sized,
+    V: RawSoa<Context: SoaContext<'data, V>> + ?Sized,
 {
     type Refs<'a> = DenseRefs<'a, 'data, K, V>;
 

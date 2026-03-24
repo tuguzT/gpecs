@@ -24,7 +24,8 @@ use super::assert::try_replace_key_failed;
 pub struct OccupiedEntry<'a, K, V, C>
 where
     K: Key,
-    V: AllocSoa + ?Sized + 'a,
+    V: AllocSoa + ?Sized,
+    V::Context: 'a,
     C: EpochSparseContainer<K, V> + ?Sized,
 {
     key: K,
@@ -259,7 +260,7 @@ where
     K: Key + Debug,
     V: AllocSoa + ?Sized,
     C: EpochSparseContainer<K, V> + ?Sized,
-    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, Refs<'ctx>: Debug>>,
+    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, V, Refs<'ctx>: Debug>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { key, .. } = self;
@@ -731,7 +732,7 @@ macro_rules! generate_entry_types {
             V: $crate::soa::traits::AllocSoa + ?Sized,
             for<'ctx, 'a> V: $crate::soa::traits::Soa<
                     'a,
-                    Context: $crate::soa::traits::SoaContext<'a, Refs<'ctx>: Debug>,
+                    Context: $crate::soa::traits::SoaContext<'a, V, Refs<'ctx>: Debug>,
                 >,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -929,7 +930,7 @@ macro_rules! generate_entry_types {
             V: $crate::soa::traits::AllocSoa + ?Sized,
             for<'ctx, 'a> V: $crate::soa::traits::Soa<
                     'a,
-                    Context: $crate::soa::traits::SoaContext<'a, Refs<'ctx>: core::fmt::Debug>,
+                    Context: $crate::soa::traits::SoaContext<'a, V, Refs<'ctx>: core::fmt::Debug>,
                 >,
         {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

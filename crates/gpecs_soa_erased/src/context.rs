@@ -1,5 +1,5 @@
 use core::{
-    alloc::Layout,
+    alloc::{Layout, LayoutError},
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
@@ -8,15 +8,15 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldDescriptors,
+    CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaPtrs,
     error::{InsufficientAlignError, check_sufficient_align},
     ptr::slice::SliceItemPtrs,
     soa::{
         field::{
             FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput, FieldDescriptorsOwned,
-            IntoCopiedFieldDescriptors,
+            IntoCopiedFieldDescriptors, buffer_layout,
         },
-        traits::RawSoa,
+        traits::AllocSoa,
     },
 };
 
@@ -105,10 +105,9 @@ where
     P: SliceItemPtrs,
 {
     #[inline]
-    pub fn of<'a, T>(context: &'a T::Context) -> Result<Self, InsufficientAlignError>
+    pub fn of<T>(context: &T::Context) -> Result<Self, InsufficientAlignError>
     where
-        T: RawSoa + ?Sized,
-        T::Context: FieldDescriptors<'a>,
+        T: AllocSoa + ?Sized,
     {
         let descriptors = context
             .field_descriptors()
@@ -121,6 +120,48 @@ where
 
         let me = unsafe { Self::from_inner(descriptors) };
         Ok(me)
+    }
+}
+
+impl<'a, D, P> ErasedSoaContext<D, P>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    P: SliceItemPtrs,
+{
+    #[inline]
+    pub fn field_descriptors(&'a self) -> D::Output {
+        let Self { descriptors, .. } = self;
+        descriptors.field_descriptors()
+    }
+
+    #[inline]
+    pub fn buffer_layout(&'a self, capacity: usize) -> Result<Layout, LayoutError> {
+        let fields = self.field_descriptors();
+        buffer_layout(fields, capacity)
+    }
+
+    #[inline]
+    pub unsafe fn ptrs_from_buffer(
+        &'a self,
+        buffer: *const u8,
+        capacity: usize,
+    ) -> ErasedSoaPtrs<D::Output, P::Const> {
+        let descriptors = self.field_descriptors();
+        let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
+        let buffer = ptr::slice_from_raw_parts(buffer.cast(), layout.size());
+        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
+    }
+
+    #[inline]
+    pub unsafe fn ptrs_from_buffer_mut(
+        &'a self,
+        buffer: *mut u8,
+        capacity: usize,
+    ) -> ErasedSoaMutPtrs<D::Output, P::Mut> {
+        let descriptors = self.field_descriptors();
+        let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
+        let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), layout.size());
+        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
     }
 }
 
@@ -240,8 +281,7 @@ where
 
     #[inline]
     fn field_descriptors(&'a self) -> Self::Output {
-        let Self { descriptors, .. } = self;
-        descriptors.field_descriptors()
+        Self::field_descriptors(self)
     }
 }
 

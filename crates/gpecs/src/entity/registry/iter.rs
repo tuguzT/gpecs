@@ -12,7 +12,10 @@ use crate::{
 
 type Inner<'a, Meta> = SparseIter<'a, 'a, Entity, Identity<Meta>>;
 
-pub struct Iter<'a, Meta> {
+pub struct Iter<'a, Meta>
+where
+    Meta: 'a,
+{
     inner: Inner<'a, Meta>,
 }
 

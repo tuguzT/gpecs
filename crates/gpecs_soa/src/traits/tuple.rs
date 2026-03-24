@@ -1,8 +1,5 @@
 use core::{
     alloc::{Layout, LayoutError},
-    cmp,
-    fmt::{self, Debug},
-    hash::{self, Hash},
     marker::PhantomData,
     ptr::{self, NonNull},
     slice,
@@ -35,67 +32,8 @@ macro_rules! count_idents {
 #[doc(hidden)]
 pub use count_idents;
 
-/// Type of SoA [context](RawSoaContext) for [tuples](prim@tuple).
-pub struct TupleContext<T>(PhantomData<fn() -> T>);
-
-impl<T> TupleContext<T> {
-    #[inline]
-    pub const fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<T> Debug for TupleContext<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("TupleContext").finish_non_exhaustive()
-    }
-}
-
-impl<T> Default for TupleContext<T> {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T> Clone for TupleContext<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for TupleContext<T> {}
-
-impl<T> PartialEq for TupleContext<T> {
-    fn eq(&self, other: &Self) -> bool {
-        let Self(this) = self;
-        let Self(other) = other;
-        this == other
-    }
-}
-
-impl<T> Eq for TupleContext<T> {}
-
-impl<T> PartialOrd for TupleContext<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T> Ord for TupleContext<T> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self(this) = self;
-        let Self(other) = other;
-        this.cmp(other)
-    }
-}
-
-impl<T> Hash for TupleContext<T> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self(this) = self;
-        this.hash(state);
-    }
-}
+/// Helper type for [SoA](RawSoa) implementation of [tuples](prim@tuple).
+pub struct TupleHelper<T>(PhantomData<fn() -> T>);
 
 #[inline]
 #[must_use]
@@ -129,13 +67,12 @@ pub const fn layout_permutation<const N: usize>(layouts: [Layout; N]) -> [usize;
 
 macro_rules! soa_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
-        impl<$($types,)*> TupleContext<($($types,)*)> {
-            #[doc(hidden)]
+        impl<$($types,)*> TupleHelper<($($types,)*)> {
+            pub const SIZE: usize = count_idents!($($types,)*);
             pub const PERMUTATION: [usize; count_idents!($($types,)*)] = {
                 let layouts = [$(Layout::new::<$types>(),)*];
                 layout_permutation(layouts)
             };
-            #[doc(hidden)]
             pub const FIELD_DESCRIPTORS: [FieldDescriptor; count_idents!($($types,)*)] = {
                 let permutation = Self::PERMUTATION;
                 let descriptors = [$(FieldDescriptor::of::<$types>(),)*];
@@ -143,7 +80,7 @@ macro_rules! soa_tuple_impl {
             };
         }
 
-        unsafe impl<$($types,)*> RawSoaContext for TupleContext<($($types,)*)> {
+        unsafe impl<$($types,)*> RawSoaContext<($($types,)*)> for () {
             type Ptrs<'a> = ($(*const $types,)*);
 
             #[inline]
@@ -218,7 +155,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_swap(&self, a: Self::MutPtrs<'_>, b: Self::MutPtrs<'_>) {
-                let permutation = Self::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::swap(a.$indices, b.$indices) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -230,7 +167,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_copy_forward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
-                let permutation = Self::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -242,7 +179,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_copy_backward(&self, src: Self::Ptrs<'_>, dst: Self::MutPtrs<'_>, len: usize) {
-                let permutation = Self::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let closures = ($(|| unsafe { ptr::copy(src.$indices, dst.$indices, len) },)*);
                 let closures: [&dyn Fn(); count_idents!($($types,)*)] = [$(&closures.$indices,)*];
@@ -372,11 +309,11 @@ macro_rules! soa_tuple_impl {
         }
 
         unsafe impl<$($types,)*> RawSoa for ($($types,)*) {
-            type Context = TupleContext<($($types,)*)>;
+            type Context = ();
             type Fields = ($($types,)*);
         }
 
-        unsafe impl<$($types,)*> CloneToUninitSoaContext for TupleContext<($($types,)*)>
+        unsafe impl<$($types,)*> CloneToUninitSoaContext<($($types,)*)> for ()
         where
             $($types: Clone,)*
         {
@@ -387,33 +324,33 @@ macro_rules! soa_tuple_impl {
             }
         }
 
-        unsafe impl<'a, $($types,)*> ReadSoaContext<'a, ($($types,)*)> for TupleContext<($($types,)*)> {
+        unsafe impl<'a, $($types,)*> ReadSoaContext<'a, ($($types,)*), ($($types,)*)> for () {
             #[inline]
             unsafe fn read(&'a self, ptrs: Self::Ptrs<'a>) -> ($($types,)*) {
                 unsafe { ($(ptr::read(ptrs.$indices),)*) }
             }
         }
 
-        unsafe impl<$($types,)*> WriteSoaContext<($($types,)*)> for TupleContext<($($types,)*)> {
+        unsafe impl<$($types,)*> WriteSoaContext<($($types,)*), ($($types,)*)> for () {
             #[inline]
             unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: ($($types,)*)) {
                 unsafe { $(ptr::write(dst.$indices, value.$indices);)* }
             }
         }
 
-        impl<'a, $($types,)*> FieldDescriptors<'a> for TupleContext<($($types,)*)> {
+        impl<'a, $($types,)*> FieldDescriptors<'a, ($($types,)*)> for () {
             type Output = [FieldDescriptor; count_idents!($($types,)*)];
 
             #[inline]
             fn field_descriptors(&'a self) -> Self::Output {
-                Self::FIELD_DESCRIPTORS
+                TupleHelper::<($($types,)*)>::FIELD_DESCRIPTORS
             }
         }
 
-        unsafe impl<$($types,)*> AllocSoaContext for TupleContext<($($types,)*)> {
+        unsafe impl<$($types,)*> AllocSoaContext<($($types,)*)> for () {
             #[inline]
             fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
-                let permutation = Self::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();
                 let regions = [$(Layout::array::<$types>(capacity)?,)*];
@@ -424,7 +361,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
-                let permutation = Self::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();
                 let mut offsets = [0; count_idents!($($types,)*)];
@@ -439,7 +376,7 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
-                let permutation = Self::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let mut layout = Layout::new::<()>();
                 let mut offsets = [0; count_idents!($($types,)*)];
@@ -455,7 +392,7 @@ macro_rules! soa_tuple_impl {
 
         unsafe impl<$($types,)*> AllocSoaTrusted for ($($types,)*) {}
 
-        unsafe impl<'data, $($types,)*> SoaContext<'data> for TupleContext<($($types,)*)>
+        unsafe impl<'data, $($types,)*> SoaContext<'data, ($($types,)*)> for ()
         where
             $($types: 'data,)*
         {
@@ -512,8 +449,8 @@ macro_rules! soa_tuple_impl {
 
             #[inline]
             unsafe fn slice_ptrs_to_slices<'a>(&'a self, slices: Self::SlicePtrs<'a>) -> Self::Slices<'a> {
-                let data = self.slice_ptrs_as_ptrs(slices);
-                let len = self.slice_ptrs_len(&slices);
+                let data = RawSoaContext::<($($types,)*)>::slice_ptrs_as_ptrs(self, slices);
+                let len = RawSoaContext::<($($types,)*)>::slice_ptrs_len(self, &slices);
                 let slices = unsafe { ($(slice::from_raw_parts(data.$indices, len),)*) };
                 slices
             }
@@ -545,8 +482,8 @@ macro_rules! soa_tuple_impl {
                 &'a self,
                 slices: Self::SliceMutPtrs<'a>,
             ) -> Self::SlicesMut<'a> {
-                let data = self.mut_slice_ptrs_as_ptrs(slices);
-                let len = self.mut_slice_ptrs_len(&slices);
+                let data = RawSoaContext::<($($types,)*)>::mut_slice_ptrs_as_ptrs(self, slices);
+                let len = RawSoaContext::<($($types,)*)>::mut_slice_ptrs_len(self, &slices);
                 let slices = unsafe { ($(slice::from_raw_parts_mut(data.$indices, len),)*) };
                 slices
             }

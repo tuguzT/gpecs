@@ -1,7 +1,5 @@
 use gpecs_soa_erased::{
-    ErasedSoaContext,
-    ptr::slice::CoreSliceItemPtrs,
-    soa::field::{FieldDescriptor, FieldDescriptors},
+    ErasedSoaContext, ptr::slice::CoreSliceItemPtrs, soa::field::FieldDescriptor,
 };
 
 use crate::common::ArrayDescriptors;

@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-unsafe impl RawSoaContext for () {
+unsafe impl RawSoaContext<()> for () {
     type Ptrs<'a> = *const ();
 
     #[inline]
@@ -203,19 +203,19 @@ unsafe impl RawSoa for () {
     type Fields = ();
 }
 
-unsafe impl CloneToUninitSoaContext for () {
+unsafe impl CloneToUninitSoaContext<()> for () {
     #[inline]
     unsafe fn clone_to_uninit(&self, _src: Self::Ptrs<'_>, _dst: Self::MutPtrs<'_>) {}
 }
 
-unsafe impl<'a> ReadSoaContext<'a, ()> for () {
+unsafe impl<'a> ReadSoaContext<'a, (), ()> for () {
     #[inline]
     unsafe fn read(&'a self, ptrs: Self::Ptrs<'a>) {
         unsafe { ptr::read(ptrs) }
     }
 }
 
-unsafe impl WriteSoaContext<()> for () {
+unsafe impl WriteSoaContext<(), ()> for () {
     #[inline]
     unsafe fn write(&self, ptrs: Self::MutPtrs<'_>, value: ()) {
         unsafe { ptr::write(ptrs, value) }
@@ -231,7 +231,7 @@ impl<'a> FieldDescriptors<'a> for () {
     }
 }
 
-unsafe impl AllocSoaContext for () {
+unsafe impl AllocSoaContext<()> for () {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         Layout::array::<()>(capacity)
@@ -255,7 +255,7 @@ unsafe impl AllocSoaContext for () {
 
 unsafe impl AllocSoaTrusted for () {}
 
-unsafe impl<'data> SoaContext<'data> for () {
+unsafe impl<'data> SoaContext<'data, ()> for () {
     type Refs<'a> = &'data ();
 
     #[inline]

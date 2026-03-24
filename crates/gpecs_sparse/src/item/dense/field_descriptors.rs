@@ -1,103 +1,50 @@
-use core::{
-    fmt::{self, Debug},
-    iter,
-    marker::PhantomData,
-};
+use core::iter;
 
 use crate::soa::{
     field::{
-        CopiedFieldDescriptors, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
-        FieldDescriptorsOutput, IntoCopiedFieldDescriptors,
+        CopiedFieldDescriptors, FieldDescriptor, FieldDescriptors, IntoCopiedFieldDescriptors,
     },
     traits::RawSoa,
 };
 
-pub struct DenseFieldDescriptors<'ctx, K, V>
+#[derive(Debug, Clone, Copy)]
+pub struct DenseFieldDescriptors<T>
 where
-    V: RawSoa + ?Sized,
-    V::Context: FieldDescriptors<'ctx>,
+    T: ?Sized,
 {
     key: FieldDescriptor,
-    values: FieldDescriptorsOutput<'ctx, V::Context>,
-    phantom: PhantomData<fn() -> K>,
+    values: T,
 }
 
-impl<'ctx, K, V> DenseFieldDescriptors<'ctx, K, V>
-where
-    V: RawSoa + ?Sized,
-    V::Context: FieldDescriptors<'ctx>,
-{
+impl<T> DenseFieldDescriptors<T> {
     #[inline]
-    pub fn new(context: &'ctx V::Context) -> Self {
-        Self {
-            key: FieldDescriptor::of::<K>(),
-            values: context.field_descriptors(),
-            phantom: PhantomData,
-        }
+    pub fn new<'a, K, V>(context: &'a V::Context) -> Self
+    where
+        V: RawSoa + ?Sized,
+        V::Context: FieldDescriptors<'a, V, Output = T>,
+    {
+        let key = FieldDescriptor::of::<K>();
+        let values = context.field_descriptors();
+        Self { key, values }
     }
 
     #[inline]
-    pub fn into_parts(self) -> (FieldDescriptor, FieldDescriptorsOutput<'ctx, V::Context>) {
-        let Self { key, values, .. } = self;
+    pub fn into_parts(self) -> (FieldDescriptor, T) {
+        let Self { key, values } = self;
         (key, values)
     }
 }
 
-impl<'ctx, K, V> Debug for DenseFieldDescriptors<'ctx, K, V>
+impl<T> IntoIterator for DenseFieldDescriptors<T>
 where
-    V: RawSoa + ?Sized,
-    V::Context: FieldDescriptors<'ctx, Output: Debug>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { key, values, .. } = self;
-        f.debug_struct("DenseFieldDescriptors")
-            .field("key", key)
-            .field("values", values)
-            .finish()
-    }
-}
-
-impl<'ctx, K, V> Clone for DenseFieldDescriptors<'ctx, K, V>
-where
-    V: RawSoa + ?Sized,
-    V::Context: FieldDescriptors<'ctx, Output: Clone>,
-{
-    fn clone(&self) -> Self {
-        let Self {
-            key,
-            ref values,
-            phantom,
-        } = *self;
-        Self {
-            key,
-            values: values.clone(),
-            phantom,
-        }
-    }
-}
-
-impl<'ctx, K, V> Copy for DenseFieldDescriptors<'ctx, K, V>
-where
-    V: RawSoa + ?Sized,
-    V::Context: FieldDescriptors<'ctx, Output: Copy>,
-{
-}
-
-impl<'ctx, K, V> IntoIterator for DenseFieldDescriptors<'ctx, K, V>
-where
-    V: RawSoa + ?Sized,
-    V::Context: FieldDescriptors<'ctx>,
+    T: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
     type Item = FieldDescriptor;
-
-    type IntoIter = iter::Chain<
-        iter::Once<FieldDescriptor>,
-        CopiedFieldDescriptors<FieldDescriptorsIter<'ctx, V::Context>>,
-    >;
+    type IntoIter = iter::Chain<iter::Once<FieldDescriptor>, CopiedFieldDescriptors<T::IntoIter>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let Self { key, values, .. } = self;
+        let Self { key, values } = self;
 
         let values = values.copied_field_descriptors();
         iter::once(key).chain(values)

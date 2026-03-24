@@ -12,7 +12,10 @@ use crate::{
 
 type Inner<'a, Meta> = SparseIterMut<'a, 'a, Entity, Identity<Meta>>;
 
-pub struct IterMut<'a, Meta> {
+pub struct IterMut<'a, Meta>
+where
+    Meta: 'a,
+{
     inner: Inner<'a, Meta>,
 }
 

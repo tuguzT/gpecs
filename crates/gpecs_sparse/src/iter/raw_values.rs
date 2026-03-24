@@ -17,8 +17,7 @@ type Inner<'ctx, K, V> = soa::slice::RawIter<'ctx, DenseItem<K, V>>;
 #[repr(transparent)]
 pub struct RawValues<'ctx, K, V>
 where
-    K: 'ctx,
-    V: RawSoa + ?Sized + 'ctx,
+    V: RawSoa + ?Sized,
 {
     inner: RawIter<'ctx, K, V>,
 }

@@ -10,8 +10,8 @@ use crate::{iter::RawKeys, soa::traits::RawSoa};
 #[repr(transparent)]
 pub struct Keys<'ctx, 'a, K, V>
 where
-    K: 'ctx + 'a,
-    V: RawSoa + ?Sized + 'ctx,
+    K: 'a,
+    V: RawSoa + ?Sized,
 {
     inner: RawKeys<'ctx, K, V>,
     phantom: PhantomData<fn(&'a ()) -> &'a ()>,

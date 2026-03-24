@@ -7,13 +7,11 @@ use core::{
 
 use crate::{
     algo::sparse_get_unchecked,
-    item::{
-        DenseContext, DenseItem, DenseMutPtrs, DensePtrs, DenseSliceMutPtrs, DenseSlicePtrs,
-        SparseItem,
-    },
+    item::{DenseItem, DenseMutPtrs, DensePtrs, DenseSliceMutPtrs, DenseSlicePtrs, SparseItem},
     iter::{RawIter, RawIterMut, RawKeys, RawValues, RawValuesMut},
     key::Key,
     soa::{
+        identity::Identity,
         slice::SoaSliceMutPtrs,
         traits::{MutPtrs, Ptrs, RawSoa, SliceMutPtrs, SlicePtrs},
     },
@@ -22,8 +20,9 @@ use crate::{
 
 pub struct EpochSparseViewMutPtr<'ctx, K, V>
 where
-    K: Key + 'ctx,
-    V: RawSoa + ?Sized + 'ctx,
+    K: Key,
+    V: RawSoa + ?Sized,
+    V::Context: 'ctx,
 {
     dense: SoaSliceMutPtrs<'ctx, DenseItem<K, V>>,
     sparse: *mut [SparseItem<K>],
@@ -971,7 +970,7 @@ where
 {
     #[inline]
     fn from(context: &'ctx V::Context) -> Self {
-        let context = DenseContext::from_inner_ref(context);
+        let context = Identity::from_inner_ref(context);
         let dense = SoaSliceMutPtrs::from(context);
         let sparse = ptr::from_mut(Default::default());
         unsafe { Self::from_parts(dense, sparse) }

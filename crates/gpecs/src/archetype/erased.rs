@@ -512,7 +512,10 @@ where
     }
 }
 
-pub struct ErasedArchetypeIter<'a, Meta> {
+pub struct ErasedArchetypeIter<'a, Meta>
+where
+    Meta: 'a,
+{
     inner: SparseIter<'a, 'a, u32, Identity<Meta>>,
 }
 

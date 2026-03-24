@@ -6,10 +6,11 @@ use core::{
 };
 
 use crate::{
-    item::{DenseContext, DenseItem, DenseSlicePtrs, DenseSlices},
+    item::{DenseItem, DenseSlicePtrs, DenseSlices},
     iter::{Keys, RawIter, Values},
     soa::{
         self,
+        identity::Identity,
         traits::{Ptrs, RawSoa, Refs, SlicePtrs, Slices, Soa, SoaOwned},
     },
 };
@@ -19,8 +20,9 @@ type Inner<'ctx, 'a, K, V> = soa::slice::Iter<'ctx, 'a, DenseItem<K, V>>;
 #[repr(transparent)]
 pub struct Iter<'ctx, 'a, K, V>
 where
-    K: 'ctx + 'a,
-    V: RawSoa + ?Sized + 'ctx,
+    K: 'a,
+    V: RawSoa + ?Sized,
+    V::Context: 'ctx,
 {
     inner: Inner<'ctx, 'a, K, V>,
 }
@@ -37,7 +39,7 @@ where
         values: SlicePtrs<'ctx, V>,
     ) -> Self {
         let slices = DenseSlicePtrs::new(context, keys, values);
-        let context = DenseContext::from_inner_ref(context);
+        let context = Identity::from_inner_ref(context);
         let inner = unsafe { Inner::from_parts(context, slices) };
         Self::from_inner(inner)
     }
@@ -147,7 +149,7 @@ where
     #[track_caller]
     pub fn new(context: &'ctx V::Context, keys: &'a [K], values: Slices<'ctx, 'a, V>) -> Self {
         let slices = DenseSlices::new(context, keys, values);
-        let context = DenseContext::from_inner_ref(context);
+        let context = Identity::from_inner_ref(context);
         let inner = Inner::new(context, slices);
         Self::from_inner(inner)
     }

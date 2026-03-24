@@ -18,8 +18,8 @@ use crate::{
         TryModifyErrorKind, TryReserveError,
     },
     item::{
-        DenseContext, DenseItem, DenseMutPtrs, DensePtrs, DenseSliceMutPtrs, DenseSlicePtrs,
-        DenseSlices, DenseSlicesMut, SparseItem, SparseItemKind,
+        DenseItem, DenseMutPtrs, DensePtrs, DenseSliceMutPtrs, DenseSlicePtrs, DenseSlices,
+        DenseSlicesMut, SparseItem, SparseItemKind,
     },
     iter::{
         Drain, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys, RawIter, RawIterMut, RawKeys,
@@ -76,9 +76,8 @@ where
     #[inline]
     #[must_use]
     pub fn with_context(context: V::Context) -> Self {
-        let context = DenseContext::from_inner(context);
         Self {
-            dense: SoaVec::with_context(context),
+            dense: SoaVec::with_context(context.into()),
             sparse: Vec::new(),
         }
     }
@@ -98,9 +97,8 @@ where
     #[inline]
     #[must_use]
     pub fn with_context_and_capacity(context: V::Context, dense: usize, sparse: usize) -> Self {
-        let context = DenseContext::from_inner(context);
         Self {
-            dense: SoaVec::with_context_and_capacity(context, dense),
+            dense: SoaVec::with_context_and_capacity(context.into(), dense),
             sparse: Vec::with_capacity(sparse),
         }
     }
@@ -1732,7 +1730,7 @@ impl<T, K, V> Index<K> for EpochSparseSet<K, V>
 where
     K: Key + Debug,
     V: AllocSoa + ?Sized,
-    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, Refs<'ctx> = &'a T>>,
+    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T>>,
 {
     type Output = T;
 
@@ -1747,7 +1745,7 @@ where
     K: Key + Debug,
     V: AllocSoa + ?Sized,
     for<'ctx, 'a> V:
-        Soa<'a, Context: SoaContext<'a, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>>,
+        Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>>,
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {

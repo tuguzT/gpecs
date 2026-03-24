@@ -4,7 +4,7 @@ use crate::{
         GpuComponent,
         registry::{GpuComponentId, GpuComponentRegistry},
     },
-    soa::{count_idents, identity::Identity},
+    soa::{count_idents, identity::Identity, traits::TupleHelper},
 };
 
 use super::GpuBundle;
@@ -51,7 +51,7 @@ macro_rules! gpu_bundle_tuple_impl {
                 components: &ComponentRegistry,
                 gpu_components: &GpuComponentRegistry,
             ) -> Self::GetGpuComponents {
-                let permutation = Self::Context::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(
                     components
@@ -69,7 +69,7 @@ macro_rules! gpu_bundle_tuple_impl {
                 components: &mut ComponentRegistry,
                 gpu_components: &mut GpuComponentRegistry,
             ) -> Self::RegisterGpuComponents {
-                let permutation = Self::Context::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(gpu_components.register_component::<$types>(components),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];

@@ -2,9 +2,6 @@ use core::{
     alloc::{Layout, LayoutError},
     borrow::{Borrow, BorrowMut},
     cmp,
-    fmt::{self, Debug},
-    hash::{self, Hash},
-    marker::PhantomData,
     ops::{Deref, DerefMut},
     ptr::{self, NonNull},
     slice,
@@ -29,17 +26,36 @@ where
     T: ?Sized,
 {
     #[inline]
-    pub fn as_inner(&self) -> &T {
-        self
+    pub const fn from_inner_ref(inner: &T) -> &Self {
+        // SAFETY: Self is `#[repr(transparent)]` over `T`.
+        unsafe { &*(ptr::from_ref(inner) as *const _) }
     }
 
     #[inline]
-    pub fn as_inner_mut(&mut self) -> &mut T {
-        self
+    pub const fn from_inner_mut(inner: &mut T) -> &mut Self {
+        // SAFETY: Self is `#[repr(transparent)]` over `T`.
+        unsafe { &mut *(ptr::from_mut(inner) as *mut _) }
+    }
+
+    #[inline]
+    pub const fn as_inner(&self) -> &T {
+        let Self(inner) = self;
+        inner
+    }
+
+    #[inline]
+    pub const fn as_inner_mut(&mut self) -> &mut T {
+        let Self(inner) = self;
+        inner
     }
 }
 
 impl<T> Identity<T> {
+    #[inline]
+    pub const fn from_inner(inner: T) -> Self {
+        Self(inner)
+    }
+
     #[inline]
     pub fn into_inner(self) -> T {
         let Self(inner) = self;
@@ -120,6 +136,25 @@ impl<T> IdentitySlice<T> for [Identity<T>] {
     }
 }
 
+pub trait AsIdentitySlice<T>: private::Sealed {
+    fn as_identity_slice(&self) -> &[Identity<T>];
+    fn as_identity_slice_mut(&mut self) -> &mut [Identity<T>];
+}
+
+impl<T> AsIdentitySlice<T> for [T] {
+    #[inline]
+    fn as_identity_slice(&self) -> &[Identity<T>] {
+        let data = ptr::from_ref(self);
+        unsafe { slice::from_raw_parts(data.cast(), data.len()) }
+    }
+
+    #[inline]
+    fn as_identity_slice_mut(&mut self) -> &mut [Identity<T>] {
+        let data = ptr::from_mut(self);
+        unsafe { slice::from_raw_parts_mut(data.cast(), data.len()) }
+    }
+}
+
 mod private {
     use super::Identity;
 
@@ -133,13 +168,13 @@ mod private {
 
     impl<T> Sealed for *mut [Identity<T>] {}
 
-    impl<T> Sealed for [Identity<T>] {}
+    impl<T> Sealed for [T] {}
 }
 
 impl<T> From<T> for Identity<T> {
     #[inline]
     fn from(inner: T) -> Self {
-        Self(inner)
+        Self::from_inner(inner)
     }
 }
 
@@ -175,8 +210,7 @@ where
 
     #[inline]
     fn deref(&self) -> &T {
-        let Self(inner) = self;
-        inner
+        self.as_inner()
     }
 }
 
@@ -186,8 +220,7 @@ where
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut T {
-        let Self(inner) = self;
-        inner
+        self.as_inner_mut()
     }
 }
 
@@ -253,67 +286,6 @@ where
     }
 }
 
-pub struct IdentityContext<T>(PhantomData<fn() -> T>);
-
-impl<T> IdentityContext<T> {
-    #[inline]
-    pub const fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<T> Debug for IdentityContext<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("IdentityContext").finish_non_exhaustive()
-    }
-}
-
-impl<T> Default for IdentityContext<T> {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T> Clone for IdentityContext<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for IdentityContext<T> {}
-
-impl<T> PartialEq for IdentityContext<T> {
-    fn eq(&self, other: &Self) -> bool {
-        let Self(this) = self;
-        let Self(other) = other;
-        this == other
-    }
-}
-
-impl<T> Eq for IdentityContext<T> {}
-
-impl<T> PartialOrd for IdentityContext<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T> Ord for IdentityContext<T> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let Self(this) = self;
-        let Self(other) = other;
-        this.cmp(other)
-    }
-}
-
-impl<T> Hash for IdentityContext<T> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        let Self(this) = self;
-        this.hash(state);
-    }
-}
-
 impl<T, A> FromIterator<A> for Identity<T>
 where
     T: FromIterator<A>,
@@ -357,7 +329,7 @@ where
     }
 }
 
-unsafe impl<T> RawSoaContext for IdentityContext<T> {
+unsafe impl<T> RawSoaContext<Identity<T>> for () {
     type Ptrs<'a> = *const Identity<T>;
 
     #[inline]
@@ -542,11 +514,11 @@ unsafe impl<T> RawSoaContext for IdentityContext<T> {
 }
 
 unsafe impl<T> RawSoa for Identity<T> {
-    type Context = IdentityContext<T>;
+    type Context = ();
     type Fields = Identity<T>;
 }
 
-unsafe impl<T> CloneToUninitSoaContext for IdentityContext<T>
+unsafe impl<T> CloneToUninitSoaContext<Identity<T>> for ()
 where
     T: Clone,
 {
@@ -557,21 +529,21 @@ where
     }
 }
 
-unsafe impl<'a, T> ReadSoaContext<'a, Identity<T>> for IdentityContext<T> {
+unsafe impl<'a, T> ReadSoaContext<'a, Identity<T>, Identity<T>> for () {
     #[inline]
     unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> Identity<T> {
         unsafe { ptr::read(src) }
     }
 }
 
-unsafe impl<T> WriteSoaContext<Identity<T>> for IdentityContext<T> {
+unsafe impl<T> WriteSoaContext<Identity<T>, Identity<T>> for () {
     #[inline]
     unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: Identity<T>) {
         unsafe { ptr::write(dst, value) }
     }
 }
 
-impl<'a, T> FieldDescriptors<'a> for IdentityContext<T> {
+impl<'a, T> FieldDescriptors<'a, Identity<T>> for () {
     type Output = [FieldDescriptor; 1];
 
     #[inline]
@@ -580,7 +552,7 @@ impl<'a, T> FieldDescriptors<'a> for IdentityContext<T> {
     }
 }
 
-unsafe impl<T> AllocSoaContext for IdentityContext<T> {
+unsafe impl<T> AllocSoaContext<Identity<T>> for () {
     #[inline]
     fn buffer_layout(&self, capacity: usize) -> Result<Layout, LayoutError> {
         Layout::array::<T>(capacity)
@@ -607,7 +579,7 @@ unsafe impl<T> AllocSoaContext for IdentityContext<T> {
 
 unsafe impl<T> AllocSoaTrusted for Identity<T> {}
 
-unsafe impl<'data, T> SoaContext<'data> for IdentityContext<T>
+unsafe impl<'data, T> SoaContext<'data, Identity<T>> for ()
 where
     T: 'data,
 {

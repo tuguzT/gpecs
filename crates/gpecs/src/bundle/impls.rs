@@ -9,8 +9,8 @@ use crate::{
         registry::{ComponentId, ComponentRegistry},
     },
     soa::{
-        identity::{Identity, IdentityContext},
-        traits::{TupleContext, count_idents},
+        identity::Identity,
+        traits::{TupleHelper, count_idents},
     },
 };
 
@@ -18,7 +18,7 @@ unsafe impl<T> Bundle for Identity<T>
 where
     T: Component,
 {
-    const CONTEXT: &'static Self::Context = &IdentityContext::<T>::new();
+    const CONTEXT: &'static Self::Context = &();
 
     type GetComponents = [Option<ComponentId>; 1];
 
@@ -94,13 +94,13 @@ macro_rules! bundle_tuple_impl {
         where
             $($types: Component,)*
         {
-            const CONTEXT: &'static Self::Context = &TupleContext::<($($types,)*)>::new();
+            const CONTEXT: &'static Self::Context = &();
 
             type GetComponents = [Option<ComponentId>; count_idents!($($types,)*)];
 
             #[inline]
             fn get_components(components: &ComponentRegistry) -> Self::GetComponents {
-                let permutation = Self::Context::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.component_id::<$types>(),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
@@ -111,7 +111,7 @@ macro_rules! bundle_tuple_impl {
 
             #[inline]
             fn register_components(components: &mut ComponentRegistry) -> Self::RegisterComponents {
-                let permutation = Self::Context::PERMUTATION;
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.register_component::<$types>(),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];

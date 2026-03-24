@@ -2,8 +2,8 @@ use std::alloc::Layout;
 
 use gpecs_soa::{
     field::{FieldDescriptor, FieldDescriptors, buffer_layout, buffer_offsets},
-    identity::IdentityContext,
-    traits::{AllocSoaContext, TupleContext},
+    identity::Identity,
+    traits::AllocSoaContext,
 };
 
 use crate::common::{ZST1, ZST2, ZST3};
@@ -12,7 +12,7 @@ use crate::common::{ZST1, ZST2, ZST3};
 fn unit() {
     let context = ();
 
-    let context_descriptors = context.field_descriptors();
+    let context_descriptors = FieldDescriptors::<()>::field_descriptors(&context);
     let descriptors = [];
     itertools::assert_equal(
         context_descriptors.map(FieldDescriptor::layout),
@@ -21,7 +21,7 @@ fn unit() {
 
     let capacity = 5;
     let from_descriptors = buffer_layout(descriptors, capacity).unwrap();
-    let from_context = context.buffer_layout(capacity).unwrap();
+    let from_context = AllocSoaContext::<()>::buffer_layout(&context, capacity).unwrap();
     assert_eq!(from_descriptors, from_context);
 
     let mut offsets = buffer_offsets(descriptors, capacity);
@@ -38,9 +38,9 @@ fn unit() {
 
 #[test]
 fn identity() {
-    let context = IdentityContext::<u128>::new();
+    let context = ();
 
-    let context_descriptors = context.field_descriptors();
+    let context_descriptors = FieldDescriptors::<Identity<u128>>::field_descriptors(&context);
     let descriptors = [FieldDescriptor::of::<u128>()];
     itertools::assert_equal(
         context_descriptors.map(FieldDescriptor::layout),
@@ -49,7 +49,8 @@ fn identity() {
 
     let capacity = 5;
     let from_descriptors = buffer_layout(descriptors, capacity).unwrap();
-    let from_context = context.buffer_layout(capacity).unwrap();
+    let from_context =
+        AllocSoaContext::<Identity<u128>>::buffer_layout(&context, capacity).unwrap();
     assert_eq!(from_descriptors, from_context);
 
     let mut offsets = buffer_offsets(descriptors, capacity);
@@ -72,9 +73,9 @@ fn identity() {
 
 #[test]
 fn tuple() {
-    let context = TupleContext::<(u32, u128, u8, ())>::new();
+    let context = ();
 
-    let context_descriptors = context.field_descriptors();
+    let context_descriptors = FieldDescriptors::<(u32, u128, u8, ())>::field_descriptors(&context);
     let descriptors = [
         FieldDescriptor::of::<u8>(),
         FieldDescriptor::of::<()>(),
@@ -88,7 +89,8 @@ fn tuple() {
 
     let capacity = 5;
     let from_descriptors = buffer_layout(descriptors, capacity).unwrap();
-    let from_context = context.buffer_layout(capacity).unwrap();
+    let from_context =
+        AllocSoaContext::<(u32, u128, u8, ())>::buffer_layout(&context, capacity).unwrap();
     assert_eq!(from_descriptors, from_context);
 
     let mut offsets = buffer_offsets(descriptors, capacity);
@@ -129,9 +131,9 @@ fn tuple() {
 
 #[test]
 fn zst_tuple() {
-    let context = TupleContext::<(ZST1, ZST2, ZST3)>::new();
+    let context = ();
 
-    let context_descriptors = context.field_descriptors();
+    let context_descriptors = FieldDescriptors::<(ZST1, ZST2, ZST3)>::field_descriptors(&context);
     let descriptors = [
         FieldDescriptor::of::<ZST2>(),
         FieldDescriptor::of::<ZST3>(),
@@ -144,7 +146,8 @@ fn zst_tuple() {
 
     let capacity = 5;
     let from_descriptors = buffer_layout(descriptors, capacity).unwrap();
-    let from_context = context.buffer_layout(capacity).unwrap();
+    let from_context =
+        AllocSoaContext::<(ZST1, ZST2, ZST3)>::buffer_layout(&context, capacity).unwrap();
     assert_eq!(from_descriptors, from_context);
 
     let mut offsets = buffer_offsets(descriptors, capacity);

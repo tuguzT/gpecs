@@ -7,10 +7,11 @@ use core::{
 
 use crate::{
     algo::sparse_get_unchecked,
-    item::{DenseContext, DenseItem, DensePtrs, DenseSlicePtrs, SparseItem},
+    item::{DenseItem, DensePtrs, DenseSlicePtrs, SparseItem},
     iter::{RawIter, RawKeys, RawValues},
     key::Key,
     soa::{
+        identity::Identity,
         slice::SoaSlicePtrs,
         traits::{Ptrs, RawSoa, SlicePtrs},
     },
@@ -19,8 +20,9 @@ use crate::{
 
 pub struct EpochSparseViewPtr<'ctx, K, V>
 where
-    K: Key + 'ctx,
-    V: RawSoa + ?Sized + 'ctx,
+    K: Key,
+    V: RawSoa + ?Sized,
+    V::Context: 'ctx,
 {
     dense: SoaSlicePtrs<'ctx, DenseItem<K, V>>,
     sparse: *const [SparseItem<K>],
@@ -539,7 +541,7 @@ where
 {
     #[inline]
     fn from(context: &'ctx V::Context) -> Self {
-        let context = DenseContext::from_inner_ref(context);
+        let context = Identity::from_inner_ref(context);
         let dense = SoaSlicePtrs::from(context);
         let sparse = ptr::from_ref(Default::default());
         unsafe { Self::from_parts(dense, sparse) }

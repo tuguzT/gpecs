@@ -40,8 +40,9 @@ use crate::{
 
 pub struct EpochSparseViewMut<'ctx, 'a, K, V>
 where
-    K: Key + 'ctx,
-    V: RawSoa + ?Sized + 'ctx,
+    K: Key,
+    V: RawSoa + ?Sized,
+    V::Context: 'ctx,
 {
     dense: SoaSlicesMut<'ctx, 'a, DenseItem<K, V>>,
     sparse: &'a mut [SparseItem<K>],
@@ -1980,7 +1981,7 @@ impl<T, K, V> Index<K> for EpochSparseViewMut<'_, '_, K, V>
 where
     K: Key + Debug,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, Refs<'ctx> = &'a T>>,
+    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T>>,
 {
     type Output = T;
 
@@ -1995,7 +1996,7 @@ where
     K: Key + Debug,
     V: ?Sized,
     for<'ctx, 'a> V:
-        Soa<'a, Context: SoaContext<'a, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>>,
+        Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T, RefsMut<'ctx> = &'a mut T>>,
 {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {

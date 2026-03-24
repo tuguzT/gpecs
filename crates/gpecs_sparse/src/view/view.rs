@@ -26,8 +26,9 @@ use crate::{
 
 pub struct EpochSparseView<'ctx, 'a, K, V>
 where
-    K: Key + 'ctx,
-    V: RawSoa + ?Sized + 'ctx,
+    K: Key,
+    V: RawSoa + ?Sized,
+    V::Context: 'ctx,
 {
     dense: SoaSlices<'ctx, 'a, DenseItem<K, V>>,
     sparse: &'a [SparseItem<K>],
@@ -1012,7 +1013,7 @@ impl<T, K, V> Index<K> for EpochSparseView<'_, '_, K, V>
 where
     K: Key + Debug,
     V: ?Sized,
-    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, Refs<'ctx> = &'a T>>,
+    for<'ctx, 'a> V: Soa<'a, Context: SoaContext<'a, V, Refs<'ctx> = &'a T>>,
 {
     type Output = T;
 

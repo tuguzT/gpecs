@@ -1,4 +1,6 @@
-use gpecs_soa_erased::{ErasedSoaContext, ErasedSoaFields, ptr::slice::CoreSliceItemPtrs};
+use gpecs_soa_erased::{
+    CovariantFieldDescriptors, ErasedSoaContext, ErasedSoaFields, ptr::slice::CoreSliceItemPtrs,
+};
 use itertools::zip_eq;
 
 use crate::{
@@ -11,14 +13,14 @@ use crate::{
     },
     component::registry::DropFn,
     soa::{
-        field::FieldDescriptor,
+        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         traits::{
             AllocSoaContext, RawSoa, RawSoaContext, ReadSoaContext, SoaContext, WriteSoaContext,
         },
     },
 };
 
-unsafe impl<Meta> RawSoaContext for ErasedArchetype<Meta>
+unsafe impl<Meta> RawSoaContext<ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
 {
@@ -240,7 +242,8 @@ where
     type Fields = ErasedSoaFields<u8>;
 }
 
-unsafe impl<'a, Meta> ReadSoaContext<'a, ErasedBorrowedBundle<'a, Meta>> for ErasedArchetype<Meta>
+unsafe impl<'a, Meta> ReadSoaContext<'a, ErasedBorrowedBundle<'a, Meta>, ErasedBundle<Meta>>
+    for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
 {
@@ -251,7 +254,8 @@ where
     }
 }
 
-unsafe impl<'a, Meta> ReadSoaContext<'a, ErasedBundle<Meta>> for ErasedArchetype<Meta>
+unsafe impl<'a, Meta> ReadSoaContext<'a, ErasedBundle<Meta>, ErasedBundle<Meta>>
+    for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + Clone + 'static,
 {
@@ -262,7 +266,8 @@ where
     }
 }
 
-unsafe impl<Meta, T> WriteSoaContext<ErasedBundleKind<T>> for ErasedArchetype<Meta>
+unsafe impl<Meta, T> WriteSoaContext<ErasedBundleKind<T>, ErasedBundle<Meta>>
+    for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
     T: ErasedArchetypeKind<Meta = Meta>,
@@ -273,7 +278,31 @@ where
     }
 }
 
-unsafe impl<Meta> AllocSoaContext for ErasedArchetype<Meta>
+impl<'a, Meta> FieldDescriptors<'a, ErasedBundle<Meta>> for ErasedArchetype<Meta>
+where
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
+{
+    type Output = &'a Self;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        self
+    }
+}
+
+impl<Meta> CovariantFieldDescriptors<ErasedBundle<Meta>> for ErasedArchetype<Meta>
+where
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: FieldDescriptorsOutput<'long, Self, ErasedBundle<Meta>>,
+    ) -> FieldDescriptorsOutput<'short, Self, ErasedBundle<Meta>> {
+        from
+    }
+}
+
+unsafe impl<Meta> AllocSoaContext<ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
 {
@@ -292,7 +321,7 @@ where
     }
 }
 
-unsafe impl<'data, Meta> SoaContext<'data> for ErasedArchetype<Meta>
+unsafe impl<'data, Meta> SoaContext<'data, ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
     Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
 {

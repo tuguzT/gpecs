@@ -5,10 +5,7 @@ use std::{iter, mem::MaybeUninit};
 use gpecs_soa_erased::{
     BoxedErasedSoa, BoxedErasedSoaContext, ErasedSoa,
     ptr::slice::CoreSliceItemPtrs,
-    soa::{
-        field::{FieldDescriptor, FieldDescriptors},
-        vec::SoaVec,
-    },
+    soa::{field::FieldDescriptor, vec::SoaVec},
     storage::BoxedAlignedUninitStorage,
 };
 

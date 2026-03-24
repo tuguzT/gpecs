@@ -1,4 +1,4 @@
-use core::{fmt::Debug, mem::MaybeUninit, ptr};
+use core::{fmt::Debug, mem::MaybeUninit};
 
 use crate::{
     CovariantFieldDescriptors, ErasedSoa, ErasedSoaContext, ErasedSoaFields, ErasedSoaMutPtrs,
@@ -14,7 +14,7 @@ use crate::{
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
-unsafe impl<D, P, U> RawSoaContext for ErasedSoaContext<D, P>
+unsafe impl<T, D, P, U> RawSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
@@ -235,7 +235,8 @@ where
     type Fields = ErasedSoaFields<U>;
 }
 
-unsafe impl<'a, T, D, P, U> ReadSoaContext<'a, ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P>>
+unsafe impl<'a, T, D, P, U>
+    ReadSoaContext<'a, ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P>, ErasedSoa<T, D, P>>
     for ErasedSoaContext<D, P>
 where
     T: AlignedStorageFromLayout<Item = U, Error: Debug>,
@@ -254,7 +255,8 @@ where
     }
 }
 
-unsafe impl<T, D, N, P, U> WriteSoaContext<ErasedSoa<T, N, P>> for ErasedSoaContext<D, P>
+unsafe impl<T, D, N, P, U> WriteSoaContext<ErasedSoa<T, N, P>, ErasedSoa<T, D, P>>
+    for ErasedSoaContext<D, P>
 where
     T: AlignedStorage<Item = U>,
     D: CovariantFieldDescriptors,
@@ -269,7 +271,33 @@ where
     }
 }
 
-unsafe impl<D, P> AllocSoaContext for ErasedSoaContext<D, P>
+impl<'a, T, D, P> FieldDescriptors<'a, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+where
+    D: FieldDescriptors<'a> + ?Sized,
+    P: SliceItemPtrs,
+{
+    type Output = D::Output;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        Self::field_descriptors(self)
+    }
+}
+
+impl<T, D, P> CovariantFieldDescriptors<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+where
+    D: CovariantFieldDescriptors + ?Sized,
+    P: SliceItemPtrs,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: FieldDescriptorsOutput<'long, Self, ErasedSoa<T, D, P>>,
+    ) -> FieldDescriptorsOutput<'short, Self, ErasedSoa<T, D, P>> {
+        D::upcast_field_descriptors(from)
+    }
+}
+
+unsafe impl<T, D, P> AllocSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     D: CovariantFieldDescriptors,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
@@ -277,22 +305,16 @@ where
 {
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
-        let descriptors = self.field_descriptors();
-        let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
-        let buffer = ptr::slice_from_raw_parts(buffer.cast(), layout.size());
-        unsafe { ErasedSoaPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
+        unsafe { Self::ptrs_from_buffer(self, buffer, capacity) }
     }
 
     #[inline]
     unsafe fn ptrs_from_buffer_mut(&self, buffer: *mut u8, capacity: usize) -> Self::MutPtrs<'_> {
-        let descriptors = self.field_descriptors();
-        let layout = unsafe { self.buffer_layout(capacity).unwrap_unchecked() };
-        let buffer = ptr::slice_from_raw_parts_mut(buffer.cast(), layout.size());
-        unsafe { ErasedSoaMutPtrs::new_unchecked(descriptors, buffer, capacity, 0) }
+        unsafe { Self::ptrs_from_buffer_mut(self, buffer, capacity) }
     }
 }
 
-unsafe impl<'data, D, P, U> SoaContext<'data> for ErasedSoaContext<D, P>
+unsafe impl<'data, T, D, P, U> SoaContext<'data, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,

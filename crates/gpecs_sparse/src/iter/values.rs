@@ -11,8 +11,7 @@ use crate::{
 #[repr(transparent)]
 pub struct Values<'ctx, 'a, K, V>
 where
-    K: 'ctx,
-    V: RawSoa + ?Sized + 'ctx,
+    V: RawSoa + ?Sized,
 {
     inner: Iter<'ctx, 'a, K, V>,
 }

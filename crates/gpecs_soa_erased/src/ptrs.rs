@@ -8,13 +8,13 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldDescriptors, ErasedSoaMutPtrs, ErasedSoaRefs,
+    CovariantFieldDescriptors, ErasedSoa, ErasedSoaMutPtrs, ErasedSoaRefs,
     assert::{assert_descriptors, check_downcast},
     dangling::{Dangling, dangling},
     data::ErasedPtr,
-    error::{DowncastError, PtrsError, check_offset},
     error::{
-        InsufficientAlignError, check_ptr_align, check_sufficient_align, check_sufficient_len,
+        DowncastError, FromFieldsDescriptorsError, InsufficientAlignError, PtrsError, check_offset,
+        check_ptr_align, check_sufficient_align, check_sufficient_len,
     },
     layout::bytes_to_items,
     ptr::slice::{CastMutPtr, ConstSliceItemPtr},
@@ -25,6 +25,7 @@ use crate::{
         },
         traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext},
     },
+    storage::AlignedStorageFromLayout,
 };
 
 pub struct ErasedSoaPtrs<D, P>
@@ -252,6 +253,25 @@ where
         let descriptors = descriptors.field_descriptors().into_iter();
         let inner = buffer_offsets(descriptors, capacity);
         unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
+    }
+}
+
+impl<D, P, U> ErasedSoaPtrs<D, P>
+where
+    D: FieldDescriptorsOwned + Clone,
+    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    U: Copy,
+{
+    #[inline]
+    pub unsafe fn read<T>(
+        &self,
+    ) -> Result<ErasedSoa<T, D, P::Ptrs>, FromFieldsDescriptorsError<T::Error>>
+    where
+        T: AlignedStorageFromLayout<Item = U>,
+    {
+        let fields = self.iter().map(|ptr| unsafe { ptr.deref() });
+        let descriptors = self.descriptors().clone();
+        ErasedSoa::try_from_fields_descriptors(fields, descriptors)
     }
 }
 

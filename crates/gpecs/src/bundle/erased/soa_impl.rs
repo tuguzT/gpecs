@@ -246,9 +246,8 @@ where
 {
     #[inline]
     unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBorrowedBundle<'a, Meta> {
-        let context = unsafe { ErasedSoaContext::from_inner_ref(self) };
-        let inner = unsafe { context.read(src.into_inner()) };
-        unsafe { ErasedBorrowedBundle::from_inner(inner) }
+        let bundle = unsafe { src.read() };
+        bundle.expect("erased bundle should be created successfully")
     }
 }
 
@@ -258,7 +257,7 @@ where
 {
     #[inline]
     unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBundle<Meta> {
-        let bundle = unsafe { ReadSoaContext::<ErasedBorrowedBundle<_>>::read(self, src) };
+        let bundle: ErasedBorrowedBundle<_> = unsafe { self.read(src) };
         bundle.into()
     }
 }
@@ -269,23 +268,8 @@ where
     T: ErasedArchetypeKind<Meta = Meta>,
 {
     #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<T>) {
-        let src = bundle.as_ptrs();
-        unsafe { self.write(dst, src) };
-        let _ = bundle.into_inner(); // avoid dropping moved bundle's components
-    }
-}
-
-unsafe impl<Meta> WriteSoaContext<ErasedBundlePtrs<'_, Meta>> for ErasedArchetype<Meta>
-where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
-{
-    #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, src: ErasedBundlePtrs<'_, Meta>) {
-        let context = unsafe { ErasedSoaContext::<_, CoreSliceItemPtrs<_>>::from_inner_ref(self) };
-        let dst = dst.into_inner();
-        let src = &src.into_inner();
-        unsafe { context.write(dst, src) }
+    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, bundle: ErasedBundleKind<T>) {
+        unsafe { dst.write(bundle) }
     }
 }
 

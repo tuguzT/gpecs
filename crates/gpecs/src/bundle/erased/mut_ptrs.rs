@@ -14,13 +14,14 @@ use crate::{
     bundle::{
         Bundle, BundleMutPtrs,
         erased::{
-            ErasedBundlePtrs, ErasedBundlePtrsIter, ErasedBundleRefs, mut_refs::ErasedBundleMutRefs,
+            ErasedArchetypeKind, ErasedBundleKind, ErasedBundlePtrs, ErasedBundlePtrsIter,
+            ErasedBundleRefs, mut_refs::ErasedBundleMutRefs,
         },
     },
     component::{
         erased::{ErasedComponentMutPtr, ErasedComponentPtr},
         error::NotRegisteredError,
-        registry::{ComponentId, ComponentRegistry},
+        registry::{ComponentId, ComponentRegistry, DropFn},
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
@@ -227,6 +228,22 @@ where
 
         let src = &src.into_inner();
         unsafe { inner.copy_from_nonoverlapping(src, count) }
+    }
+}
+
+impl<Meta> ErasedBundleMutPtrs<'_, Meta>
+where
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
+{
+    #[inline]
+    pub unsafe fn write<T>(&mut self, value: ErasedBundleKind<T>)
+    where
+        T: ErasedArchetypeKind<Meta = Meta>,
+    {
+        let Self { inner } = self;
+
+        let value = value.into_inner();
+        unsafe { inner.write(value) }
     }
 }
 

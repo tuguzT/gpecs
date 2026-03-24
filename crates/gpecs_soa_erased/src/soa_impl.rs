@@ -249,10 +249,8 @@ where
         &'a self,
         src: Self::Ptrs<'a>,
     ) -> ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P> {
-        let fields = unsafe { src.deref() };
-        let descriptors = self.field_descriptors();
-        ErasedSoa::try_from_fields_descriptors(fields, descriptors)
-            .expect("length of fields should be equal to the length of descriptors")
+        let value = unsafe { src.read() };
+        value.expect("erased SoA should be created successfully")
     }
 }
 
@@ -266,23 +264,8 @@ where
     P: SliceItemPtrs<Item = MaybeUninit<U>>,
 {
     #[inline]
-    unsafe fn write(&self, dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
-        let src = value.as_ptrs();
-        unsafe { self.write(dst, &src) }
-    }
-}
-
-unsafe impl<'n, D, N, P, U> WriteSoaContext<&'n ErasedSoaPtrs<N, P::Const>>
-    for ErasedSoaContext<D, P>
-where
-    D: CovariantFieldDescriptors,
-    for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    N: FieldDescriptors<'n>,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
-{
-    #[inline]
-    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, src: &'n ErasedSoaPtrs<N, P::Const>) {
-        unsafe { dst.copy_from_nonoverlapping(src, 1) }
+    unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
+        unsafe { dst.write(value) }
     }
 }
 

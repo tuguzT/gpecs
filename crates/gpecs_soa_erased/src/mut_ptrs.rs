@@ -8,13 +8,14 @@ use core::{
 };
 
 use crate::{
-    CovariantFieldDescriptors, ErasedSoaMutRefs, ErasedSoaPtrs, ErasedSoaPtrsIter, ErasedSoaRefs,
+    CovariantFieldDescriptors, ErasedSoa, ErasedSoaMutRefs, ErasedSoaPtrs, ErasedSoaPtrsIter,
+    ErasedSoaRefs,
     assert::{assert_descriptors, check_downcast},
     dangling::{Dangling, dangling},
     data::{ErasedMutPtr, ErasedPtr},
-    error::{DowncastError, PtrsError, check_offset},
     error::{
-        InsufficientAlignError, check_ptr_align, check_sufficient_align, check_sufficient_len,
+        DowncastError, InsufficientAlignError, PtrsError, check_offset, check_ptr_align,
+        check_sufficient_align, check_sufficient_len,
     },
     layout::bytes_to_items,
     ptr::slice::{CastConstPtr, MutSliceItemPtr},
@@ -25,6 +26,7 @@ use crate::{
         },
         traits::{AllocSoa, AllocSoaContext, MutPtrs, RawSoaContext},
     },
+    storage::AlignedStorage,
 };
 
 pub struct ErasedSoaMutPtrs<D, P>
@@ -381,6 +383,21 @@ where
             let src = unsafe { src.next_unchecked() };
             unsafe { dst.copy_from_nonoverlapping(src, count) }
         }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub unsafe fn write<T, E>(&mut self, value: ErasedSoa<T, E, P::Ptrs>)
+    where
+        T: AlignedStorage<Item = U>,
+        E: FieldDescriptorsOwned,
+        for<'a, 'b> FieldDescriptorsOutput<'a, E>: FieldDescriptors<'b>,
+    {
+        let src = value.as_ptrs();
+        unsafe { self.copy_from_nonoverlapping(&src, 1) };
+
+        drop(src);
+        let _ = value.into_parts();
     }
 }
 

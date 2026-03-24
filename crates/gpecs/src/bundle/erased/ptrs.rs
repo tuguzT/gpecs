@@ -4,7 +4,10 @@ use std::{
     mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaPtrs, ErasedSoaPtrsIter};
+use gpecs_soa_erased::{
+    CovariantFieldDescriptors, ErasedSoaPtrs, ErasedSoaPtrsIter, error::FromFieldsDescriptorsError,
+    storage::AllocError,
+};
 
 use crate::{
     archetype::{
@@ -13,11 +16,11 @@ use crate::{
     },
     bundle::{
         Bundle, BundlePtrs,
-        erased::{ErasedBundleMutPtrs, ErasedBundleRefs},
+        erased::{ErasedBorrowedBundle, ErasedBundleMutPtrs, ErasedBundleRefs},
     },
     component::{
         erased::ErasedComponentPtr,
-        registry::{ComponentId, ComponentRegistry},
+        registry::{ComponentId, ComponentRegistry, DropFn},
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
@@ -128,6 +131,22 @@ where
     pub fn get(&self, component_id: ComponentId) -> Option<ErasedComponentPtr> {
         let index = self.archetype().get_index_of(component_id)?;
         self.iter().nth(index)
+    }
+}
+
+impl<'a, Meta> ErasedBundlePtrs<'a, Meta>
+where
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
+{
+    #[inline]
+    pub unsafe fn read(
+        &self,
+    ) -> Result<ErasedBorrowedBundle<'a, Meta>, FromFieldsDescriptorsError<AllocError>> {
+        let Self { inner } = self;
+
+        let inner = unsafe { inner.read()? };
+        let bundle = unsafe { ErasedBorrowedBundle::from_inner(inner) };
+        Ok(bundle)
     }
 }
 

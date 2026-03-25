@@ -10,7 +10,7 @@ edition.workspace = true
 gpecs_sparse = { workspace = true, features = ["alloc"] }
 gpecs_soa_erased = { workspace = true, features = ["alloc"] }
 gpecs_world = { workspace = true }
-gpecs_entity = { workspace = true }
+gpecs_entity = { workspace = true, features = ["alloc"] }
 gpecs_component = { workspace = true }
 gpecs_archetype = { workspace = true }
 bytemuck = { workspace = true, features = ["derive", "must_cast"] }

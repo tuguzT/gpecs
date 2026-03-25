@@ -1,4 +1,4 @@
-use std::{
+use core::{
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
@@ -7,13 +7,10 @@ use std::{
 
 pub use error::TryReserveError;
 
-use gpecs_sparse::{arena::EpochSparseArena, error, item::SparseItem};
+use gpecs_sparse::{arena::EpochSparseArena, error, item::SparseItem, soa::identity::Identity};
+use gpecs_world::id::WorldId;
 
-use crate::{
-    entity::{Entity, EntityEpoch},
-    soa::identity::Identity,
-    world::id::WorldId,
-};
+use crate::entity::{Entity, EntityEpoch};
 
 use super::{EntityRegistryView, EntityRegistryViewMut, Iter, IterMut};
 

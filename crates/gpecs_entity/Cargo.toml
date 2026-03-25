@@ -13,5 +13,9 @@ gpecs_world = { workspace = true }
 gpecs_sparse = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 
+[features]
+default = ["alloc"]
+alloc = ["gpecs_sparse/alloc"]
+
 [lints]
 workspace = true

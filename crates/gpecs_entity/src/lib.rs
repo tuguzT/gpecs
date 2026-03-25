@@ -4,4 +4,6 @@
 
 pub use self::entity::{Entity, EntityEpoch, EpochFromU32Error};
 
+pub mod registry;
+
 mod entity;

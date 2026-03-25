@@ -1,9 +1,5 @@
 mod common;
 
-mod entity {
-    mod registry;
-}
-
 mod component {
     mod registry;
 }

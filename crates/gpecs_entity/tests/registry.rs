@@ -1,7 +1,7 @@
-use gpecs::{
-    entity::{Entity, EntityEpoch, registry::EntityRegistry},
-    world::registry::WorldRegistry,
-};
+#![cfg(feature = "alloc")]
+
+use gpecs_entity::{Entity, EntityEpoch, registry::EntityRegistry};
+use gpecs_world::registry::WorldRegistry;
 
 #[test]
 fn new() {

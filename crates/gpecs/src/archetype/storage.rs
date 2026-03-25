@@ -16,7 +16,7 @@ use crate::{
         erased::{
             ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
             ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
-            FromErasedComponent, ShuffledBundle,
+            FromErasedComponent, ShuffledBundle, WithErasedDrop,
         },
     },
     component::{
@@ -85,10 +85,10 @@ impl AsRef<FieldDescriptor> for StorageMeta {
     }
 }
 
-impl AsRef<Option<ErasedDrop>> for StorageMeta {
+impl WithErasedDrop for StorageMeta {
     #[inline]
-    fn as_ref(&self) -> &Option<ErasedDrop> {
-        let Self { erased_drop, .. } = self;
+    fn erased_drop(&self) -> Option<ErasedDrop> {
+        let Self { erased_drop, .. } = *self;
         erased_drop
     }
 }

@@ -24,7 +24,7 @@ use crate::{
             TooFewComponentsError,
         },
     },
-    bundle::Bundle,
+    bundle::{Bundle, erased::WithErasedDrop},
     component::{
         erased::ErasedDrop,
         registry::{ComponentId, ComponentInfo, ComponentRegistry},
@@ -476,6 +476,17 @@ where
 pub struct ErasedArchetypeComponent<Meta = ()> {
     pub id: ComponentId,
     pub meta: Meta,
+}
+
+impl<Meta> WithErasedDrop for ErasedArchetypeComponent<Meta>
+where
+    Meta: WithErasedDrop,
+{
+    #[inline]
+    fn erased_drop(&self) -> Option<ErasedDrop> {
+        let Self { meta, .. } = self;
+        meta.erased_drop()
+    }
 }
 
 impl<Meta> From<ErasedArchetypeComponent<Meta>> for ComponentId {

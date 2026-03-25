@@ -9,9 +9,8 @@ use crate::{
         ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
         ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
         ErasedBundleNonNullPtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
-        ErasedBundleSlices,
+        ErasedBundleSlices, WithErasedDrop,
     },
-    component::erased::ErasedDrop,
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         traits::{
@@ -22,7 +21,7 @@ use crate::{
 
 unsafe impl<Meta> RawSoaContext<ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     type Ptrs<'a> = ErasedBundlePtrs<'a, Meta>;
 
@@ -124,7 +123,7 @@ where
     #[inline]
     unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
         for (component, to_drop) in zip_eq(self, ptrs) {
-            let Some(erased_drop) = component.meta.as_ref() else {
+            let Some(erased_drop) = component.meta.erased_drop() else {
                 continue;
             };
             unsafe { erased_drop.drop_in_place(to_drop) }
@@ -219,7 +218,7 @@ where
     #[inline]
     unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
         for (component, to_drop) in zip_eq(self, slices) {
-            let Some(erased_drop) = component.meta.as_ref() else {
+            let Some(erased_drop) = component.meta.erased_drop() else {
                 continue;
             };
             unsafe { erased_drop.drop_in_place_slice(to_drop) }
@@ -229,7 +228,7 @@ where
 
 unsafe impl<Meta> RawSoa for ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     type Context = ErasedArchetype<Meta>;
     type Fields = ErasedSoaFields<u8>;
@@ -238,7 +237,7 @@ where
 unsafe impl<'a, Meta> ReadSoaContext<'a, ErasedBorrowedBundle<'a, Meta>, ErasedBundle<Meta>>
     for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     #[inline]
     unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBorrowedBundle<'a, Meta> {
@@ -250,7 +249,7 @@ where
 unsafe impl<'a, Meta> ReadSoaContext<'a, ErasedBundle<Meta>, ErasedBundle<Meta>>
     for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + Clone + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + Clone + 'static,
 {
     #[inline]
     unsafe fn read(&'a self, src: Self::Ptrs<'a>) -> ErasedBundle<Meta> {
@@ -262,7 +261,7 @@ where
 unsafe impl<Meta, T> WriteSoaContext<ErasedBundleKind<T>, ErasedBundle<Meta>>
     for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
     T: ErasedArchetypeKind<Meta = Meta>,
 {
     #[inline]
@@ -273,7 +272,7 @@ where
 
 impl<'a, Meta> FieldDescriptors<'a, ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     type Output = &'a Self;
 
@@ -285,7 +284,7 @@ where
 
 impl<Meta> CovariantFieldDescriptors<ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     #[inline]
     fn upcast_field_descriptors<'short, 'long: 'short>(
@@ -297,7 +296,7 @@ where
 
 unsafe impl<Meta> AllocSoaContext<ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
@@ -316,7 +315,7 @@ where
 
 unsafe impl<'data, Meta> SoaContext<'data, ErasedBundle<Meta>> for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     type Refs<'a> = ErasedBundleRefs<'data, 'a, Meta>;
 

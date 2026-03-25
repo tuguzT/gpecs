@@ -15,13 +15,11 @@ use crate::{
         Bundle, BundleMutPtrs,
         erased::{
             ErasedArchetypeKind, ErasedBundleKind, ErasedBundleMutRefs, ErasedBundlePtrs,
-            ErasedBundlePtrsIter, ErasedBundleRefs,
+            ErasedBundlePtrsIter, ErasedBundleRefs, WithErasedDrop,
         },
     },
     component::{
-        erased::{
-            ErasedComponentMutPtr, ErasedComponentPtr, ErasedDrop, error::NotRegisteredError,
-        },
+        erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::NotRegisteredError},
         registry::{ComponentId, ComponentRegistry},
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
@@ -234,7 +232,7 @@ where
 
 impl<Meta> ErasedBundleMutPtrs<'_, Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     #[inline]
     pub unsafe fn write<T>(&mut self, value: ErasedBundleKind<T>)

@@ -24,7 +24,7 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut,
         erased::{
             ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
-            ErasedBundleRefs, ErasedBundleRefsIter,
+            ErasedBundleRefs, ErasedBundleRefsIter, WithErasedDrop,
             error::{
                 DowncastError, FromBundleError, FromComponentsError, InsertError, RemoveError,
                 RemoveErrorKind, ReplaceError, ShuffleError,
@@ -32,7 +32,7 @@ use crate::{
         },
     },
     component::{
-        erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, ErasedDrop},
+        erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef},
         registry::{ComponentId, ComponentRegistry},
     },
     hash::IndexSet,
@@ -50,24 +50,24 @@ pub trait ErasedArchetypeKind:
         IntoIter: FieldDescriptors<
             'a,
             Output: IntoIterator<
-                Item: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + Into<ComponentId>,
+                Item: AsRef<FieldDescriptor> + WithErasedDrop + Into<ComponentId>,
             > + Clone,
         >,
     >
 {
-    type Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static;
+    type Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static;
 }
 
 impl<Meta> ErasedArchetypeKind for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     type Meta = Meta;
 }
 
 impl<Meta> ErasedArchetypeKind for &ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     type Meta = Meta;
 }
@@ -95,7 +95,7 @@ type Inner<T> = ErasedSoa<BoxedAlignedUninitStorage, T, CoreSliceItemPtrs<MaybeU
 
 impl<Meta> ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + FromComponentInfo + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentInfo + 'static,
 {
     #[inline]
     pub fn try_from<B>(
@@ -133,7 +133,7 @@ pub trait FromErasedComponent: Sized {
 
 impl<Meta> ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + FromErasedComponent + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + FromErasedComponent + 'static,
 {
     #[inline]
     pub fn from_components<I>(components: I) -> Result<Self, FromComponentsError>
@@ -475,7 +475,7 @@ where
 
         let ptrs = zip_eq(ptrs, archetype).map(|(dst, component)| {
             if to_replace.archetype().contains(dst.component_id()) {
-                if let Some(erased_drop) = component.meta.as_ref() {
+                if let Some(erased_drop) = component.meta.erased_drop() {
                     unsafe { erased_drop.drop_in_place(dst) }
                 }
                 let src = to_replace
@@ -602,7 +602,7 @@ where
         let fields = zip_eq(refs, archetype).filter_map(|(mut field, component)| {
             if to_destroy.contains(component.id) {
                 let to_drop = field.as_mut_component_ptr();
-                if let Some(erased_drop) = component.meta.as_ref() {
+                if let Some(erased_drop) = component.meta.erased_drop() {
                     unsafe { erased_drop.drop_in_place(to_drop) }
                 }
                 return None;
@@ -654,7 +654,7 @@ fn into_remove_error_kind(error: FromFieldsDescriptorsError<AllocError>) -> Remo
 
 impl<'a, Meta> From<ErasedBorrowedBundle<'a, Meta>> for ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + Clone + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + Clone + 'static,
 {
     #[inline]
     fn from(bundle: ErasedBorrowedBundle<'a, Meta>) -> Self {
@@ -805,7 +805,7 @@ where
         let Self { inner } = self;
 
         let component = inner.field_descriptors().clone().into_iter().next()?;
-        let &erased_drop = component.as_ref();
+        let erased_drop = component.erased_drop();
         let id = component.into();
 
         let item = match inner.next()? {

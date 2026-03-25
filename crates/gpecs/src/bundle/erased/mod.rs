@@ -1,4 +1,5 @@
 pub use self::{
+    drop::WithErasedDrop,
     mut_ptrs::{ErasedBundleMutPtrs, ErasedBundleMutPtrsIter},
     mut_refs::{ErasedBundleMutRefs, ErasedBundleMutRefsIter},
     mut_slice_ptrs::{ErasedBundleMutSlicePtrs, ErasedBundleMutSlicePtrsIter},
@@ -17,6 +18,7 @@ pub use self::{
 
 pub mod error;
 
+mod drop;
 mod mut_ptrs;
 mod mut_refs;
 mod mut_slice_ptrs;

@@ -31,7 +31,7 @@ use crate::{
             RemoveBundleAtError, RemoveBundleExactAtError, RemoveBundleExactError,
             RemoveExactAtError,
         },
-        storage::{ArchetypeStorage, StorageMeta},
+        storage::{ArchetypeStorage, ErasedDropMeta},
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut,
@@ -214,7 +214,7 @@ impl ArchetypesItem {
     }
 
     #[inline]
-    fn as_key(&self) -> &ArchetypeKey<StorageMeta> {
+    fn as_key(&self) -> &ArchetypeKey<ErasedDropMeta> {
         let Self { info } = self;
 
         let archetype = info.storage.archetype();
@@ -331,7 +331,7 @@ impl ArchetypeRegistry {
     pub fn register_archetype<'a>(
         &mut self,
         components: &ComponentRegistry,
-        archetype: impl Into<Cow<'a, ErasedArchetype<StorageMeta>>>,
+        archetype: impl Into<Cow<'a, ErasedArchetype<ErasedDropMeta>>>,
     ) -> ArchetypeId {
         let Self { archetypes, graph } = self;
         Self::register(archetypes, graph, components, archetype.into())
@@ -342,7 +342,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         graph: &mut Graph,
         components: &ComponentRegistry,
-        archetype: Cow<ErasedArchetype<StorageMeta>>,
+        archetype: Cow<ErasedArchetype<ErasedDropMeta>>,
     ) -> ArchetypeId {
         let archetype_ref = archetype.as_ref();
         assert!(
@@ -648,7 +648,7 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, StorageMeta>> {
+    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, ErasedDropMeta>> {
         let location = self.find_location(entity);
         let Ok(bundle) = self
             .get_at(entity, location)
@@ -661,7 +661,7 @@ impl ArchetypeRegistry {
         &self,
         entity: Entity,
         location: EntityLocation,
-    ) -> Result<Option<ErasedBundleRefs<'_, '_, StorageMeta>>, InvalidEntityLocationError> {
+    ) -> Result<Option<ErasedBundleRefs<'_, '_, ErasedDropMeta>>, InvalidEntityLocationError> {
         self.check_location(entity, location)?;
         let EntityLocation::WithComponents(archetype_id) = location else {
             return Ok(None);
@@ -707,7 +707,10 @@ impl ArchetypeRegistry {
     }
 
     #[inline]
-    pub fn get_mut(&mut self, entity: Entity) -> Option<ErasedBundleMutRefs<'_, '_, StorageMeta>> {
+    pub fn get_mut(
+        &mut self,
+        entity: Entity,
+    ) -> Option<ErasedBundleMutRefs<'_, '_, ErasedDropMeta>> {
         let location = self.find_location(entity);
         let Ok(bundle) = self
             .get_mut_at(entity, location)
@@ -720,7 +723,8 @@ impl ArchetypeRegistry {
         &mut self,
         entity: Entity,
         location: EntityLocation,
-    ) -> Result<Option<ErasedBundleMutRefs<'_, '_, StorageMeta>>, InvalidEntityLocationError> {
+    ) -> Result<Option<ErasedBundleMutRefs<'_, '_, ErasedDropMeta>>, InvalidEntityLocationError>
+    {
         self.check_location(entity, location)?;
         let EntityLocation::WithComponents(archetype_id) = location else {
             return Ok(None);
@@ -799,7 +803,7 @@ impl ArchetypeRegistry {
         value: ErasedBundleKind<T>,
     ) -> Result<(), InsertExactError<ErasedBundleKind<T>>>
     where
-        T: ErasedArchetypeKind<Meta = StorageMeta>,
+        T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
     {
         let location = self.find_location(entity);
         self.insert_exact_at(components, entity, value, location)
@@ -816,7 +820,7 @@ impl ArchetypeRegistry {
         location: EntityLocation,
     ) -> Result<ArchetypeId, InsertExactAtError<ErasedBundleKind<T>>>
     where
-        T: ErasedArchetypeKind<Meta = StorageMeta>,
+        T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
     {
         let Self { archetypes, graph } = self;
         let result = Self::insert_exact_archetypes(
@@ -923,7 +927,7 @@ impl ArchetypeRegistry {
         entity: Entity,
         value: ErasedBundleKind<T>,
     ) where
-        T: ErasedArchetypeKind<Meta = StorageMeta>,
+        T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
     {
         let location = self.find_location(entity);
         let Ok(_) = self
@@ -940,7 +944,7 @@ impl ArchetypeRegistry {
         location: EntityLocation,
     ) -> Result<ArchetypeId, InsertAtError<ErasedBundleKind<T>>>
     where
-        T: ErasedArchetypeKind<Meta = StorageMeta>,
+        T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
     {
         let Self { archetypes, graph } = self;
         let result = Self::insert_archetypes(
@@ -1045,8 +1049,8 @@ impl ArchetypeRegistry {
         &'me mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-        components_to_remove: &'me ErasedArchetype<StorageMeta>,
-    ) -> Result<Option<ErasedBorrowedBundle<'me, StorageMeta>>, MissingComponentError> {
+        components_to_remove: &'me ErasedArchetype<ErasedDropMeta>,
+    ) -> Result<Option<ErasedBorrowedBundle<'me, ErasedDropMeta>>, MissingComponentError> {
         let location = self.find_location(entity);
         let (value, _) = self
             .remove_exact_at(components, entity, components_to_remove, location)
@@ -1059,11 +1063,11 @@ impl ArchetypeRegistry {
         &'me mut self,
         components: &mut ComponentRegistry,
         entity: Entity,
-        components_to_remove: &'me ErasedArchetype<StorageMeta>,
+        components_to_remove: &'me ErasedArchetype<ErasedDropMeta>,
         location: EntityLocation,
     ) -> Result<
         (
-            Option<ErasedBorrowedBundle<'me, StorageMeta>>,
+            Option<ErasedBorrowedBundle<'me, ErasedDropMeta>>,
             EntityLocation,
         ),
         RemoveExactAtError,
@@ -1309,7 +1313,7 @@ impl ArchetypeRegistry {
         entity: Entity,
         bundle: ErasedBundleKind<T>,
     ) where
-        T: ErasedArchetypeKind<Meta = StorageMeta>,
+        T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
     {
         assert!(
             !bundle.archetype().is_empty(),
@@ -1344,7 +1348,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         archetype_id: ArchetypeId,
         entity: Entity,
-    ) -> ErasedBorrowedBundle<'_, StorageMeta> {
+    ) -> ErasedBorrowedBundle<'_, ErasedDropMeta> {
         let info = unwrap_archetype_info_mut(archetypes, archetype_id);
         let Some(bundle) = info.storage.remove(entity) else {
             unreachable!("{entity} should exist in {archetype_id}")
@@ -1392,7 +1396,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityLocation,
-        components_to_insert: &ErasedArchetype<StorageMeta>,
+        components_to_insert: &ErasedArchetype<ErasedDropMeta>,
     ) -> Result<(Option<ArchetypeId>, ArchetypeId), InsertExactAtErrorKind> {
         check_location(archetypes, entity, location)?;
 
@@ -1421,7 +1425,7 @@ impl ArchetypeRegistry {
         components: &ComponentRegistry,
         entity: Entity,
         location: EntityLocation,
-        components_to_insert: &ErasedArchetype<StorageMeta>,
+        components_to_insert: &ErasedArchetype<ErasedDropMeta>,
     ) -> Result<(Option<ArchetypeId>, ArchetypeId), InvalidEntityLocationError> {
         check_location(archetypes, entity, location)?;
 
@@ -1495,7 +1499,7 @@ impl ArchetypeRegistry {
         archetypes: &mut Archetypes,
         components: &ComponentRegistry,
         start: Option<ArchetypeId>,
-        with_components: &ErasedArchetype<StorageMeta>,
+        with_components: &ErasedArchetype<ErasedDropMeta>,
     ) -> ArchetypeId {
         let Some(start) = start else {
             return Self::register(archetypes, graph, components, with_components.into());

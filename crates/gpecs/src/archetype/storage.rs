@@ -72,12 +72,12 @@ impl From<NoEpochEntity> for Entity {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct StorageMeta {
+pub struct ErasedDropMeta {
     descriptor: FieldDescriptor,
     erased_drop: Option<ErasedDrop>,
 }
 
-impl AsRef<FieldDescriptor> for StorageMeta {
+impl AsRef<FieldDescriptor> for ErasedDropMeta {
     #[inline]
     fn as_ref(&self) -> &FieldDescriptor {
         let Self { descriptor, .. } = self;
@@ -85,7 +85,7 @@ impl AsRef<FieldDescriptor> for StorageMeta {
     }
 }
 
-impl WithErasedDrop for StorageMeta {
+impl WithErasedDrop for ErasedDropMeta {
     #[inline]
     fn erased_drop(&self) -> Option<ErasedDrop> {
         let Self { erased_drop, .. } = *self;
@@ -93,7 +93,7 @@ impl WithErasedDrop for StorageMeta {
     }
 }
 
-impl FromComponentInfo for StorageMeta {
+impl FromComponentInfo for ErasedDropMeta {
     #[inline]
     fn from_component_info(info: &ComponentInfo) -> Self {
         Self {
@@ -103,7 +103,7 @@ impl FromComponentInfo for StorageMeta {
     }
 }
 
-impl FromErasedComponent for StorageMeta {
+impl FromErasedComponent for ErasedDropMeta {
     #[inline]
     fn from_erased_component(component: &ErasedComponent) -> Self {
         Self {
@@ -114,7 +114,7 @@ impl FromErasedComponent for StorageMeta {
 }
 
 pub struct ArchetypeStorage {
-    sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundle<StorageMeta>>,
+    sparse_set: EpochSparseSet<NoEpochEntity, ErasedBundle<ErasedDropMeta>>,
 }
 
 impl ArchetypeStorage {
@@ -149,19 +149,19 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn from_archetype(archetype: ErasedArchetype<StorageMeta>) -> Self {
+    pub fn from_archetype(archetype: ErasedArchetype<ErasedDropMeta>) -> Self {
         let sparse_set = EpochSparseSet::with_context(archetype);
         Self { sparse_set }
     }
 
     #[inline]
-    pub fn archetype(&self) -> &ErasedArchetype<StorageMeta> {
+    pub fn archetype(&self) -> &ErasedArchetype<ErasedDropMeta> {
         let Self { sparse_set } = self;
         sparse_set.context()
     }
 
     #[inline]
-    pub fn into_archetype(self) -> ErasedArchetype<StorageMeta> {
+    pub fn into_archetype(self) -> ErasedArchetype<ErasedDropMeta> {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.into_parts();
@@ -411,13 +411,16 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, StorageMeta>> {
+    pub fn get(&self, entity: Entity) -> Option<ErasedBundleRefs<'_, '_, ErasedDropMeta>> {
         let Self { sparse_set } = self;
         sparse_set.get(entity.into())
     }
 
     #[inline]
-    pub fn get_mut(&mut self, entity: Entity) -> Option<ErasedBundleMutRefs<'_, '_, StorageMeta>> {
+    pub fn get_mut(
+        &mut self,
+        entity: Entity,
+    ) -> Option<ErasedBundleMutRefs<'_, '_, ErasedDropMeta>> {
         let Self { sparse_set } = self;
         sparse_set.get_mut(entity.into())
     }
@@ -427,9 +430,9 @@ impl ArchetypeStorage {
         &mut self,
         entity: Entity,
         bundle: ErasedBundleKind<T>,
-    ) -> Result<Option<ErasedBorrowedBundle<'_, StorageMeta>>, IncompatibleArchetypeExactError>
+    ) -> Result<Option<ErasedBorrowedBundle<'_, ErasedDropMeta>>, IncompatibleArchetypeExactError>
     where
-        T: ErasedArchetypeKind<Meta = StorageMeta>,
+        T: ErasedArchetypeKind<Meta = ErasedDropMeta>,
     {
         let archetype = self.archetype();
         archetype.check_exact_compatibility(bundle.archetype())?;
@@ -448,7 +451,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn remove(&mut self, entity: Entity) -> Option<ErasedBorrowedBundle<'_, StorageMeta>> {
+    pub fn remove(&mut self, entity: Entity) -> Option<ErasedBorrowedBundle<'_, ErasedDropMeta>> {
         let Self { sparse_set } = self;
         sparse_set.swap_remove(entity.into())
     }
@@ -471,7 +474,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], ErasedBundleSlices<'_, '_, StorageMeta>) {
+    pub fn as_slices(&self) -> (&[Entity], ErasedBundleSlices<'_, '_, ErasedDropMeta>) {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_view().into_parts();
@@ -482,7 +485,7 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&[Entity], ErasedBundleMutSlices<'_, '_, StorageMeta>) {
+    pub fn as_mut_slices(&mut self) -> (&[Entity], ErasedBundleMutSlices<'_, '_, ErasedDropMeta>) {
         let Self { sparse_set } = self;
 
         let (dense, _) = sparse_set.as_mut_view().into_parts();

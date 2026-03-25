@@ -4,39 +4,37 @@ use std::{
     collections::HashMap,
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem,
     ops::Range,
-    ptr,
 };
 
 pub use gpecs_component::id::ComponentId;
 
-use crate::soa::field::FieldDescriptor;
-
-use super::Component;
-
-pub type DropFn = unsafe fn(to_drop: *mut u8);
+use crate::{
+    component::{Component, erased::ErasedDrop},
+    soa::field::FieldDescriptor,
+};
 
 #[derive(Debug, Clone)]
 pub struct ComponentDescriptor {
     name: Cow<'static, str>,
     type_id: Option<TypeId>,
     desc: FieldDescriptor,
-    drop_fn: Option<DropFn>,
+    erased_drop: Option<ErasedDrop>,
 }
 
 impl ComponentDescriptor {
     #[inline]
-    pub fn new<N, I>(name: N, type_id: I, desc: FieldDescriptor, drop_fn: Option<DropFn>) -> Self
+    pub fn new<N, I, D>(name: N, type_id: I, desc: FieldDescriptor, erased_drop: D) -> Self
     where
         N: Into<Cow<'static, str>>,
         I: Into<Option<TypeId>>,
+        D: Into<Option<ErasedDrop>>,
     {
         Self {
             name: name.into(),
             type_id: type_id.into(),
             desc,
-            drop_fn,
+            erased_drop: erased_drop.into(),
         }
     }
 
@@ -45,16 +43,11 @@ impl ComponentDescriptor {
     where
         T: Component,
     {
-        let to_drop: DropFn = |to_drop| {
-            let to_drop = to_drop.cast();
-            unsafe { ptr::drop_in_place::<T>(to_drop) };
-        };
-
         Self {
             name: any::type_name::<T>().into(),
             type_id: Some(TypeId::of::<T>()),
             desc: FieldDescriptor::of::<T>(),
-            drop_fn: mem::needs_drop::<T>().then_some(to_drop),
+            erased_drop: ErasedDrop::of::<T>(),
         }
     }
 
@@ -77,9 +70,9 @@ impl ComponentDescriptor {
     }
 
     #[inline]
-    pub fn drop_fn(&self) -> Option<DropFn> {
-        let Self { drop_fn, .. } = *self;
-        drop_fn
+    pub fn erased_drop(&self) -> Option<ErasedDrop> {
+        let Self { erased_drop, .. } = *self;
+        erased_drop
     }
 }
 
@@ -115,9 +108,9 @@ impl ComponentInfo {
     }
 
     #[inline]
-    pub fn drop_fn(&self) -> Option<DropFn> {
+    pub fn erased_drop(&self) -> Option<ErasedDrop> {
         let Self { descriptor, .. } = self;
-        descriptor.drop_fn()
+        descriptor.erased_drop()
     }
 }
 

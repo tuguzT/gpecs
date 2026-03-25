@@ -1,5 +1,5 @@
 pub use self::{
-    mut_ptr::ErasedComponentMutPtr, mut_ref::ErasedComponentMutRef,
+    drop::ErasedDrop, mut_ptr::ErasedComponentMutPtr, mut_ref::ErasedComponentMutRef,
     mut_slice::ErasedComponentMutSlice, mut_slice_ptr::ErasedComponentMutSlicePtr,
     nonnull_ptr::ErasedComponentNonNullPtr, ptr::ErasedComponentPtr, r#ref::ErasedComponentRef,
     slice::ErasedComponentSlice, slice_ptr::ErasedComponentSlicePtr, value::ErasedComponent,
@@ -7,6 +7,7 @@ pub use self::{
 
 pub mod error;
 
+mod drop;
 mod mut_ptr;
 mod mut_ref;
 mod mut_slice;

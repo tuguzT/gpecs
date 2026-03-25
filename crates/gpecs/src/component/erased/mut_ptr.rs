@@ -163,21 +163,14 @@ impl ErasedComponentMutPtr {
         self,
         registry: &ComponentRegistry,
     ) -> Result<(), NotRegisteredError> {
-        let Self {
-            component_id,
-            field,
-        } = self;
-
         let component_info = registry
-            .get_component_info(component_id)
+            .get_component_info(self.component_id())
             .ok_or(NotRegisteredError)?;
-        let Some(drop_fn) = component_info.drop_fn() else {
+        let Some(erased_drop) = component_info.erased_drop() else {
             return Ok(());
         };
 
-        let ptr = field.as_mut_ptr().cast();
-        unsafe { drop_fn(ptr) }
-
+        unsafe { erased_drop.drop_in_place(self) }
         Ok(())
     }
 

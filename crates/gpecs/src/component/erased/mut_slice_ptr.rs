@@ -98,23 +98,14 @@ impl ErasedComponentMutSlicePtr {
         self,
         registry: &ComponentRegistry,
     ) -> Result<(), NotRegisteredError> {
-        let Self {
-            component_id,
-            fields,
-        } = self;
-
         let component_info = registry
-            .get_component_info(component_id)
+            .get_component_info(self.component_id())
             .ok_or(NotRegisteredError)?;
-        let Some(drop_fn) = component_info.drop_fn() else {
+        let Some(erased_drop) = component_info.erased_drop() else {
             return Ok(());
         };
 
-        for i in 0..fields.len() {
-            let field = unsafe { fields.field_ptr().add(i) };
-            let ptr = field.as_mut_ptr().cast();
-            unsafe { drop_fn(ptr) }
-        }
+        unsafe { erased_drop.drop_in_place_slice(self) }
         Ok(())
     }
 

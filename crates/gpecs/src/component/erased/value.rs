@@ -12,10 +12,11 @@ use crate::component::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentMutRef, ErasedComponentPtr, ErasedComponentRef,
+        ErasedDrop,
         error::{DowncastError, FromComponentError, check_downcast},
     },
     error::NotRegisteredError,
-    registry::{ComponentId, ComponentRegistry, DropFn},
+    registry::{ComponentId, ComponentRegistry},
 };
 
 type Field = BoxedErased<CoreSliceItemPtrs<MaybeUninit<u8>>>;
@@ -24,7 +25,7 @@ type Field = BoxedErased<CoreSliceItemPtrs<MaybeUninit<u8>>>;
 pub struct ErasedComponent {
     component_id: ComponentId,
     field: Field,
-    drop_fn: Option<DropFn>,
+    erased_drop: Option<ErasedDrop>,
 }
 
 impl ErasedComponent {
@@ -59,9 +60,9 @@ impl ErasedComponent {
         let Some(component_info) = registry.get_component_info(component_id) else {
             unreachable!("{component_id} should be registered")
         };
-        let drop_fn = component_info.drop_fn();
+        let erased_drop = component_info.erased_drop();
 
-        let me = unsafe { Self::from_parts(component_id, field, drop_fn) };
+        let me = unsafe { Self::from_parts(component_id, field, erased_drop) };
         Ok(me)
     }
 
@@ -69,12 +70,12 @@ impl ErasedComponent {
     pub unsafe fn from_parts(
         component_id: ComponentId,
         field: Field,
-        drop_fn: Option<DropFn>,
+        erased_drop: Option<ErasedDrop>,
     ) -> Self {
         Self {
             component_id,
             field,
-            drop_fn,
+            erased_drop,
         }
     }
 
@@ -139,9 +140,9 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn drop_fn(&self) -> Option<DropFn> {
-        let Self { drop_fn, .. } = *self;
-        drop_fn
+    pub fn erased_drop(&self) -> Option<ErasedDrop> {
+        let Self { erased_drop, .. } = *self;
+        erased_drop
     }
 
     #[inline]
@@ -209,15 +210,15 @@ impl ErasedComponent {
     }
 
     #[inline]
-    pub fn into_parts(self) -> (ComponentId, Field, Option<DropFn>) {
+    pub fn into_parts(self) -> (ComponentId, Field, Option<ErasedDrop>) {
         let Self {
             component_id,
-            drop_fn,
+            erased_drop,
             ..
         } = self;
 
         let field = self.into_field();
-        (component_id, field, drop_fn)
+        (component_id, field, erased_drop)
     }
 }
 
@@ -272,13 +273,11 @@ impl AsRef<[MaybeUninit<u8>]> for ErasedComponent {
 impl Drop for ErasedComponent {
     #[inline]
     fn drop(&mut self) {
-        let Self {
-            ref mut field,
-            drop_fn,
-            ..
-        } = *self;
+        let Some(drop) = self.erased_drop() else {
+            return;
+        };
 
-        let Some(drop_fn) = drop_fn else { return };
-        unsafe { drop_fn(field.as_mut_ptr()) }
+        let to_drop = self.as_mut_erased_component_ptr();
+        unsafe { drop.drop_in_place(to_drop) }
     }
 }

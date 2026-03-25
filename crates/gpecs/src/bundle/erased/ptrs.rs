@@ -19,8 +19,8 @@ use crate::{
         erased::{ErasedBorrowedBundle, ErasedBundleMutPtrs, ErasedBundleRefs},
     },
     component::{
-        erased::ErasedComponentPtr,
-        registry::{ComponentId, ComponentRegistry, DropFn},
+        erased::{ErasedComponentPtr, ErasedDrop},
+        registry::{ComponentId, ComponentRegistry},
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
@@ -136,7 +136,7 @@ where
 
 impl<'a, Meta> ErasedBundlePtrs<'a, Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
 {
     #[inline]
     pub unsafe fn read(

@@ -25,7 +25,10 @@ use crate::{
         },
     },
     bundle::Bundle,
-    component::registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
+    component::{
+        erased::ErasedDrop,
+        registry::{ComponentId, ComponentInfo, ComponentRegistry},
+    },
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         identity::{Identity, IdentitySlice},
@@ -94,10 +97,10 @@ impl FromComponentInfo for FieldDescriptor {
     }
 }
 
-impl FromComponentInfo for Option<DropFn> {
+impl FromComponentInfo for Option<ErasedDrop> {
     #[inline]
     fn from_component_info(info: &ComponentInfo) -> Self {
-        info.drop_fn()
+        info.erased_drop()
     }
 }
 

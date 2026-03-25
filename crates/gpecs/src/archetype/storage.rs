@@ -20,8 +20,8 @@ use crate::{
         },
     },
     component::{
-        erased::ErasedComponent,
-        registry::{ComponentId, ComponentInfo, ComponentRegistry, DropFn},
+        erased::{ErasedComponent, ErasedDrop},
+        registry::{ComponentId, ComponentInfo, ComponentRegistry},
     },
     entity::Entity,
     soa::{
@@ -74,7 +74,7 @@ impl From<NoEpochEntity> for Entity {
 #[derive(Debug, Clone, Copy)]
 pub struct StorageMeta {
     descriptor: FieldDescriptor,
-    drop_fn: Option<DropFn>,
+    erased_drop: Option<ErasedDrop>,
 }
 
 impl AsRef<FieldDescriptor> for StorageMeta {
@@ -85,11 +85,11 @@ impl AsRef<FieldDescriptor> for StorageMeta {
     }
 }
 
-impl AsRef<Option<DropFn>> for StorageMeta {
+impl AsRef<Option<ErasedDrop>> for StorageMeta {
     #[inline]
-    fn as_ref(&self) -> &Option<DropFn> {
-        let Self { drop_fn, .. } = self;
-        drop_fn
+    fn as_ref(&self) -> &Option<ErasedDrop> {
+        let Self { erased_drop, .. } = self;
+        erased_drop
     }
 }
 
@@ -98,7 +98,7 @@ impl FromComponentInfo for StorageMeta {
     fn from_component_info(info: &ComponentInfo) -> Self {
         Self {
             descriptor: info.descriptor(),
-            drop_fn: info.drop_fn(),
+            erased_drop: info.erased_drop(),
         }
     }
 }
@@ -108,7 +108,7 @@ impl FromErasedComponent for StorageMeta {
     fn from_erased_component(component: &ErasedComponent) -> Self {
         Self {
             descriptor: FieldDescriptor::new(component.as_field().layout()),
-            drop_fn: component.drop_fn(),
+            erased_drop: component.erased_drop(),
         }
     }
 }

@@ -32,8 +32,8 @@ use crate::{
         },
     },
     component::{
-        erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef},
-        registry::{ComponentId, ComponentRegistry, DropFn},
+        erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, ErasedDrop},
+        registry::{ComponentId, ComponentRegistry},
     },
     hash::IndexSet,
     soa::{
@@ -50,24 +50,24 @@ pub trait ErasedArchetypeKind:
         IntoIter: FieldDescriptors<
             'a,
             Output: IntoIterator<
-                Item: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + Into<ComponentId>,
+                Item: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + Into<ComponentId>,
             > + Clone,
         >,
     >
 {
-    type Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static;
+    type Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static;
 }
 
 impl<Meta> ErasedArchetypeKind for ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
 {
     type Meta = Meta;
 }
 
 impl<Meta> ErasedArchetypeKind for &ErasedArchetype<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + 'static,
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + 'static,
 {
     type Meta = Meta;
 }
@@ -95,7 +95,7 @@ type Inner<T> = ErasedSoa<BoxedAlignedUninitStorage, T, CoreSliceItemPtrs<MaybeU
 
 impl<Meta> ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + FromComponentInfo + 'static,
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + FromComponentInfo + 'static,
 {
     #[inline]
     pub fn try_from<B>(
@@ -133,7 +133,7 @@ pub trait FromErasedComponent: Sized {
 
 impl<Meta> ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + FromErasedComponent + 'static,
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + FromErasedComponent + 'static,
 {
     #[inline]
     pub fn from_components<I>(components: I) -> Result<Self, FromComponentsError>
@@ -475,8 +475,8 @@ where
 
         let ptrs = zip_eq(ptrs, archetype).map(|(dst, component)| {
             if to_replace.archetype().contains(dst.component_id()) {
-                if let Some(drop_fn) = component.meta.as_ref() {
-                    unsafe { drop_fn(dst.as_mut_ptr().cast()) }
+                if let Some(erased_drop) = component.meta.as_ref() {
+                    unsafe { erased_drop.drop_in_place(dst) }
                 }
                 let src = to_replace
                     .as_ptrs()
@@ -601,8 +601,9 @@ where
         let (refs, archetype) = bundle.as_mut_refs_with_archetype();
         let fields = zip_eq(refs, archetype).filter_map(|(mut field, component)| {
             if to_destroy.contains(component.id) {
-                if let Some(drop_fn) = component.meta.as_ref() {
-                    unsafe { drop_fn(field.as_mut_ptr().cast()) }
+                let to_drop = field.as_mut_component_ptr();
+                if let Some(erased_drop) = component.meta.as_ref() {
+                    unsafe { erased_drop.drop_in_place(to_drop) }
                 }
                 return None;
             }
@@ -653,7 +654,7 @@ fn into_remove_error_kind(error: FromFieldsDescriptorsError<AllocError>) -> Remo
 
 impl<'a, Meta> From<ErasedBorrowedBundle<'a, Meta>> for ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + AsRef<Option<DropFn>> + Clone + 'static,
+    Meta: AsRef<FieldDescriptor> + AsRef<Option<ErasedDrop>> + Clone + 'static,
 {
     #[inline]
     fn from(bundle: ErasedBorrowedBundle<'a, Meta>) -> Self {
@@ -804,12 +805,12 @@ where
         let Self { inner } = self;
 
         let component = inner.field_descriptors().clone().into_iter().next()?;
-        let &drop_fn = component.as_ref();
+        let &erased_drop = component.as_ref();
         let id = component.into();
 
         let item = match inner.next()? {
             Ok(field) => {
-                let component = unsafe { ErasedComponent::from_parts(id, field, drop_fn) };
+                let component = unsafe { ErasedComponent::from_parts(id, field, erased_drop) };
                 Ok(component)
             }
             Err(error) => match error {

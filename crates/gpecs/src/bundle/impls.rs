@@ -3,9 +3,9 @@ use crate::{
     component::{
         Component,
         erased::{
-            ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
+            ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr,
+            error::{DowncastErrorKind, NotRegisteredError},
         },
-        error::NotRegisteredError,
         registry::{ComponentId, ComponentRegistry},
     },
     soa::{

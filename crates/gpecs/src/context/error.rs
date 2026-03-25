@@ -13,7 +13,7 @@ use crate::{
         RemoveBundleExactError as ArchetypeRemoveBundleExactError,
     },
     bundle::Bundle,
-    component::error::NotRegisteredError,
+    component::erased::error::NotRegisteredError,
     entity::Entity,
 };
 

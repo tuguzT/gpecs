@@ -14,13 +14,14 @@ use crate::{
     bundle::{
         Bundle, BundleMutPtrs,
         erased::{
-            ErasedArchetypeKind, ErasedBundleKind, ErasedBundlePtrs, ErasedBundlePtrsIter,
-            ErasedBundleRefs, mut_refs::ErasedBundleMutRefs,
+            ErasedArchetypeKind, ErasedBundleKind, ErasedBundleMutRefs, ErasedBundlePtrs,
+            ErasedBundlePtrsIter, ErasedBundleRefs,
         },
     },
     component::{
-        erased::{ErasedComponentMutPtr, ErasedComponentPtr, ErasedDrop},
-        error::NotRegisteredError,
+        erased::{
+            ErasedComponentMutPtr, ErasedComponentPtr, ErasedDrop, error::NotRegisteredError,
+        },
         registry::{ComponentId, ComponentRegistry},
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},

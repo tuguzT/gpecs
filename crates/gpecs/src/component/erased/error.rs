@@ -7,7 +7,6 @@ use gpecs_soa_erased::storage::AllocError;
 
 use crate::component::{
     Component,
-    error::NotRegisteredError,
     registry::{ComponentId, ComponentRegistry},
 };
 
@@ -62,6 +61,18 @@ pub fn check_component_ids(
 ) -> Result<(), ComponentMismatchError> {
     ComponentMismatchError::new(expected, component_id).map_or(Ok(()), Err)
 }
+
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+#[non_exhaustive]
+pub struct NotRegisteredError;
+
+impl Display for NotRegisteredError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "component was not registered")
+    }
+}
+
+impl Error for NotRegisteredError {}
 
 #[derive(Debug, Clone)]
 pub enum DowncastErrorKind {

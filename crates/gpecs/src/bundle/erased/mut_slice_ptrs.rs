@@ -21,8 +21,7 @@ use crate::{
         },
     },
     component::{
-        erased::{ErasedComponentMutSlicePtr, ErasedComponentSlicePtr},
-        error::NotRegisteredError,
+        erased::{ErasedComponentMutSlicePtr, ErasedComponentSlicePtr, error::NotRegisteredError},
         registry::{ComponentId, ComponentRegistry},
     },
     soa::{

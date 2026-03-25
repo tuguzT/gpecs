@@ -6,7 +6,7 @@ use std::{
 use crate::{
     archetype::registry::ArchetypeId,
     bundle::Bundle,
-    component::{error::NotRegisteredError, registry::ComponentId},
+    component::{erased::error::NotRegisteredError, registry::ComponentId},
     entity::Entity,
 };
 

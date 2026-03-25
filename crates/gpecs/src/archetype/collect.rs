@@ -1,6 +1,6 @@
 use crate::{
     archetype::error::{ArchetypeError, DuplicateComponentError},
-    component::{error::NotRegisteredError, registry::ComponentId},
+    component::{erased::error::NotRegisteredError, registry::ComponentId},
 };
 
 #[inline]

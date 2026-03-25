@@ -11,9 +11,8 @@ use crate::component::{
     Component,
     erased::{
         ErasedComponentPtr, ErasedComponentSlicePtr,
-        error::{DowncastError, check_downcast},
+        error::{DowncastError, NotRegisteredError, check_downcast},
     },
-    error::NotRegisteredError,
     registry::{ComponentId, ComponentRegistry},
 };
 

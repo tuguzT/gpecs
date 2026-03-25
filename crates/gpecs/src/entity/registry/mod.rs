@@ -3,6 +3,7 @@ pub use self::{
     iter::Iter,
     iter_mut::IterMut,
     view::EntityRegistryView,
+    view_mut::EntityRegistryViewMut,
 };
 
 mod alloc;

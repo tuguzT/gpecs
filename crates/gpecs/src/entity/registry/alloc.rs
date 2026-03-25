@@ -7,15 +7,15 @@ use std::{
 
 pub use error::TryReserveError;
 
-use gpecs_sparse::{arena::EpochSparseArena, error};
+use gpecs_sparse::{arena::EpochSparseArena, error, item::SparseItem};
 
 use crate::{
     entity::{Entity, EntityEpoch},
-    soa::identity::{Identity, IdentityMutPtr, IdentityPtr, IdentitySlice},
+    soa::identity::Identity,
     world::id::WorldId,
 };
 
-use super::{EntityRegistryView, Iter, IterMut};
+use super::{EntityRegistryView, EntityRegistryViewMut, Iter, IterMut};
 
 pub type TrySpawnError<Meta> = error::TryModifyError<Entity, Meta>;
 
@@ -106,57 +106,65 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn as_slices(&self) -> (&[Entity], &[Meta]) {
+    pub fn as_mut_view(&mut self) -> EntityRegistryViewMut<'_, Meta> {
         let Self { inner } = self;
 
-        let (entities, metas) = inner.as_dense_slices().into_parts();
-        let metas = metas.as_inner();
-        (entities, metas)
+        let inner = inner.as_mut_view();
+        EntityRegistryViewMut::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> (&[Entity], &[Meta], &[SparseItem<Entity>]) {
+        let (entities, metas, sparse) = self.as_view().into_parts();
+        (entities, metas, sparse)
     }
 
     #[inline]
     pub fn as_entities(&self) -> &[Entity] {
-        let (entities, _) = self.as_slices();
+        let (entities, _, _) = self.as_slices();
         entities
     }
 
     #[inline]
     pub fn as_metas(&self) -> &[Meta] {
-        let (_, metas) = self.as_slices();
+        let (_, metas, _) = self.as_slices();
         metas
     }
 
     #[inline]
-    pub fn as_mut_slices(&mut self) -> (&[Entity], &mut [Meta]) {
-        let Self { inner } = self;
+    pub fn as_sparse(&self) -> &[SparseItem<Entity>] {
+        let (_, _, sparse) = self.as_slices();
+        sparse
+    }
 
-        let (entities, metas) = unsafe { inner.as_mut_dense_slices().into_parts() };
-        let metas = metas.as_inner_mut();
-        (entities, metas)
+    #[inline]
+    pub unsafe fn as_mut_slices(
+        &mut self,
+    ) -> (&mut [Entity], &mut [Meta], &mut [SparseItem<Entity>]) {
+        let (entities, metas, sparse) = unsafe { self.as_mut_view().into_parts() };
+        (entities, metas, sparse)
     }
 
     #[inline]
     pub fn as_mut_metas(&mut self) -> &mut [Meta] {
-        let (_, metas) = self.as_mut_slices();
+        let (_, metas, _) = unsafe { self.as_mut_slices() };
         metas
     }
 
     #[inline]
-    pub fn as_ptrs(&self) -> (*const Entity, *const Meta) {
-        let Self { inner } = self;
-
-        let (entities, metas) = inner.as_dense_ptrs().into_parts();
-        let metas = metas.as_inner_ptr();
-        (entities, metas)
+    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const SparseItem<Entity>) {
+        let (entities, metas, sparse) = self.as_slices();
+        (entities.as_ptr(), metas.as_ptr(), sparse.as_ptr())
     }
 
     #[inline]
-    pub fn as_mut_ptrs(&mut self) -> (*const Entity, *mut Meta) {
-        let Self { inner } = self;
-
-        let (entities, metas) = inner.as_mut_dense_ptrs().into_parts();
-        let metas = metas.as_inner_mut_ptr();
-        (entities, metas)
+    pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut SparseItem<Entity>) {
+        let (entities, metas, sparse) = unsafe { self.as_mut_slices() };
+        (
+            entities.as_mut_ptr(),
+            metas.as_mut_ptr(),
+            sparse.as_mut_ptr(),
+        )
     }
 
     #[inline]
@@ -194,21 +202,13 @@ impl<Meta> EntityRegistry<Meta> {
     }
 
     #[inline]
-    pub fn get_epoch(&self, sparse_index: u32) -> Option<EntityEpoch> {
-        let Self { inner } = self;
-        inner.get_epoch(sparse_index)
+    pub fn get_epoch(&self, sparse_index: usize) -> Option<EntityEpoch> {
+        self.as_view().get_epoch(sparse_index)
     }
 
     #[inline]
     pub fn invalidate_epoch(&mut self, entity: Entity) -> Option<Entity> {
-        let Self { inner } = self;
-
-        let world = entity.world();
-        let entity = inner.invalidate_epoch(entity)?;
-        let entity = inner
-            .replace_key(Entity::new(entity.index(), entity.epoch(), world))
-            .expect("entity should exist: it was just created");
-        Some(entity)
+        self.as_mut_view().invalidate_epoch(entity)
     }
 
     #[inline]
@@ -219,24 +219,17 @@ impl<Meta> EntityRegistry<Meta> {
 
     #[inline]
     pub fn get(&self, entity: Entity) -> Option<&Meta> {
-        let Self { inner } = self;
-
-        let Identity(meta) = inner.get(entity)?;
-        Some(meta)
+        self.as_view().into_get(entity)
     }
 
     #[inline]
     pub fn get_mut(&mut self, entity: Entity) -> Option<&mut Meta> {
-        let Self { inner } = self;
-
-        let Identity(meta) = inner.get_mut(entity)?;
-        Some(meta)
+        self.as_mut_view().into_get_mut(entity)
     }
 
     #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
-        let Self { inner } = self;
-        inner.contains_key(entity)
+        self.as_view().contains(entity)
     }
 
     #[inline]
@@ -247,18 +240,12 @@ impl<Meta> EntityRegistry<Meta> {
 
     #[inline]
     pub fn iter(&self) -> Iter<'_, Meta> {
-        let Self { inner } = self;
-
-        let inner = inner.iter();
-        Iter::from_inner(inner)
+        self.as_view().into_iter()
     }
 
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, Meta> {
-        let Self { inner } = self;
-
-        let inner = inner.iter_mut();
-        IterMut::from_inner(inner)
+        self.as_mut_view().into_iter()
     }
 }
 
@@ -267,10 +254,11 @@ where
     Meta: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (entities, metas) = self.as_slices();
+        let (entities, metas, sparse) = self.as_slices();
         f.debug_struct("EntityRegistry")
             .field("entities", &entities)
             .field("metas", &metas)
+            .field("sparse", &sparse)
             .finish()
     }
 }
@@ -287,7 +275,7 @@ where
     Meta: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.as_slices() == other.as_slices()
+        self.as_view() == other.as_view()
     }
 }
 
@@ -298,8 +286,8 @@ where
     Meta: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        let other = other.as_slices();
-        self.as_slices().partial_cmp(&other)
+        let other = other.as_view();
+        self.as_view().partial_cmp(&other)
     }
 }
 
@@ -308,8 +296,8 @@ where
     Meta: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let other = other.as_slices();
-        self.as_slices().cmp(&other)
+        let other = other.as_view();
+        self.as_view().cmp(&other)
     }
 }
 
@@ -318,7 +306,7 @@ where
     Meta: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.as_slices().hash(state);
+        self.as_view().hash(state);
     }
 }
 
@@ -368,19 +356,15 @@ impl<Meta> Index<Entity> for EntityRegistry<Meta> {
     type Output = Meta;
 
     #[inline]
-    fn index(&self, index: Entity) -> &Self::Output {
-        let Self { inner } = self;
-        let Identity(meta) = inner.index(index);
-        meta
+    fn index(&self, entity: Entity) -> &Self::Output {
+        self.as_view().into_index(entity)
     }
 }
 
 impl<Meta> IndexMut<Entity> for EntityRegistry<Meta> {
     #[inline]
     fn index_mut(&mut self, index: Entity) -> &mut Self::Output {
-        let Self { inner } = self;
-        let Identity(meta) = inner.index_mut(index);
-        meta
+        self.as_mut_view().into_index_mut(index)
     }
 }
 

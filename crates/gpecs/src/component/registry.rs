@@ -11,6 +11,7 @@ pub use gpecs_component::id::ComponentId;
 
 use crate::{
     component::{Component, erased::ErasedDrop},
+    hash::BuildHasher,
     soa::field::FieldDescriptor,
 };
 
@@ -117,7 +118,7 @@ impl ComponentInfo {
 #[derive(Debug, Default, Clone)]
 pub struct ComponentRegistry {
     components: Vec<ComponentInfo>,
-    type_ids: HashMap<TypeId, ComponentId>,
+    mapping: ComponentTypeMap,
 }
 
 impl ComponentRegistry {
@@ -125,7 +126,7 @@ impl ComponentRegistry {
     pub fn new() -> Self {
         Self {
             components: Vec::new(),
-            type_ids: HashMap::new(),
+            mapping: ComponentTypeMap::default(),
         }
     }
 
@@ -136,15 +137,15 @@ impl ComponentRegistry {
     {
         let Self {
             components,
-            type_ids,
+            mapping,
         } = self;
 
         let type_id = TypeId::of::<T>();
-        let register = || {
+        let new_descriptor = || {
             let descriptor = ComponentDescriptor::of::<T>();
             Self::register_inner(components, descriptor)
         };
-        *type_ids.entry(type_id).or_insert_with(register)
+        mapping.register_with(type_id, new_descriptor)
     }
 
     #[inline]
@@ -189,8 +190,8 @@ impl ComponentRegistry {
 
     #[inline]
     pub fn component_id_from(&self, type_id: TypeId) -> Option<ComponentId> {
-        let Self { type_ids, .. } = self;
-        type_ids.get(&type_id).copied()
+        let Self { mapping, .. } = self;
+        mapping.component_id_from(type_id)
     }
 
     #[inline]
@@ -207,6 +208,28 @@ impl ComponentRegistry {
         let len = self.len();
         let len = component_id_from_usize(len).into_u32();
         ComponentIds { inner: 0..len }
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct ComponentTypeMap {
+    map: HashMap<TypeId, ComponentId, BuildHasher>,
+}
+
+impl ComponentTypeMap {
+    #[inline]
+    pub fn register_with<F>(&mut self, type_id: TypeId, f: F) -> ComponentId
+    where
+        F: FnOnce() -> ComponentId,
+    {
+        let Self { map } = self;
+        *map.entry(type_id).or_insert_with(f)
+    }
+
+    #[inline]
+    pub fn component_id_from(&self, type_id: TypeId) -> Option<ComponentId> {
+        let Self { map, .. } = self;
+        map.get(&type_id).copied()
     }
 }
 

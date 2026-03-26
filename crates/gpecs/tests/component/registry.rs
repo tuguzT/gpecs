@@ -4,7 +4,7 @@ use std::{
 };
 
 use gpecs::{
-    component::registry::{ComponentRegistry, ErasedDropComponentDescriptor},
+    context::{Components, ErasedDropComponentDescriptor},
     soa::field::FieldDescriptor,
 };
 
@@ -12,14 +12,14 @@ use crate::common::{Mass, Position};
 
 #[test]
 fn new() {
-    let components: ComponentRegistry = ComponentRegistry::new();
+    let components = Components::new();
     assert_eq!(components.len(), 0);
     assert!(components.component_ids().is_empty());
 }
 
 #[test]
 fn register_type() {
-    let mut components: ComponentRegistry = ComponentRegistry::new();
+    let mut components = Components::new();
     assert_eq!(components.component_id::<Position>(), None);
 
     let id = components.register_component::<Position>();
@@ -58,7 +58,7 @@ fn register_type() {
 
 #[test]
 fn register_with_descriptor() {
-    let mut components: ComponentRegistry = ComponentRegistry::new();
+    let mut components = Components::new();
     components.register_component::<Position>();
     assert_eq!(components.len(), 1);
 

@@ -14,7 +14,7 @@ use wgpu::{
 
 use crate::{
     archetype::{collect::try_collect_opt_components, error::ArchetypeError},
-    component::registry::{ComponentInfo, ComponentRegistry, ErasedDropComponentDescriptor},
+    context::{ComponentInfo, Components},
     entity::Entity,
     executor::gpu::component::registry::GpuComponentId,
     hash::IndexMap,
@@ -38,7 +38,7 @@ pub struct GpuSystemShader {
 impl GpuSystemShader {
     #[inline]
     pub(super) fn new<C, B>(
-        components: &ComponentRegistry,
+        components: &Components,
         gpu_device: &Device,
         system_id: GpuSystemId,
         descriptor: GpuSystemDescriptor<C, B>,
@@ -74,24 +74,23 @@ impl GpuSystemShader {
             |map, (id, info, access)| IndexMap::insert(map, id, (info, access)).is_none(),
             |&(component_id, _, _)| component_id.into(),
         )?;
-        let component_entry =
-            |index: usize, info: &ComponentInfo<ErasedDropComponentDescriptor>, binding_access| {
-                let size_of_component = info.as_meta().descriptor().layout().size();
-                let size_of_component = size_of_component
-                    .try_into()
-                    .expect("size of component should fit in `u64`");
-                let min_binding_size = BufferSize::new(size_of_component)?;
+        let component_entry = |index: usize, info: &ComponentInfo, binding_access| {
+            let size_of_component = info.as_meta().descriptor().layout().size();
+            let size_of_component = size_of_component
+                .try_into()
+                .expect("size of component should fit in `u64`");
+            let min_binding_size = BufferSize::new(size_of_component)?;
 
-                let binding_index = (index + usize::from(bind_entities))
-                    .try_into()
-                    .expect("count of bindings should fit in `u32`");
-                let component_entry = GpuSystemShaderEntry {
-                    binding_index,
-                    binding_access,
-                    min_binding_size,
-                };
-                Some(component_entry)
+            let binding_index = (index + usize::from(bind_entities))
+                .try_into()
+                .expect("count of bindings should fit in `u32`");
+            let component_entry = GpuSystemShaderEntry {
+                binding_index,
+                binding_access,
+                min_binding_size,
             };
+            Some(component_entry)
+        };
         let component_entries: IndexMap<_, _> = component_ids
             .into_iter()
             .enumerate()

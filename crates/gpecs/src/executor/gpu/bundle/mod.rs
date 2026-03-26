@@ -1,6 +1,6 @@
 use crate::{
     bundle::Bundle,
-    component::registry::ComponentRegistry,
+    context::Components,
     executor::gpu::component::registry::{GpuComponentId, GpuComponentRegistry},
 };
 
@@ -22,7 +22,7 @@ pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
 
     /// Retrieves identifiers of all already registered GPU components of this bundle.
     fn get_gpu_components(
-        components: &ComponentRegistry,
+        components: &Components,
         gpu_components: &GpuComponentRegistry,
     ) -> Self::GetGpuComponents;
 
@@ -35,7 +35,7 @@ pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
     /// Registers all GPU components of this bundle inside of provided registry
     /// and returns their identifiers.
     fn register_gpu_components(
-        components: &mut ComponentRegistry,
+        components: &mut Components,
         gpu_components: &mut GpuComponentRegistry,
     ) -> Self::RegisterGpuComponents;
 }

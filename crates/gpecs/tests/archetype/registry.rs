@@ -7,7 +7,7 @@ use gpecs::{
         registry::ArchetypeRegistry,
     },
     bundle::Bundle,
-    component::registry::ComponentRegistry,
+    context::Components,
     entity::registry::EntityRegistry,
 };
 
@@ -22,7 +22,7 @@ fn new() {
 
 #[test]
 fn register_archetype() {
-    let mut components: ComponentRegistry = ComponentRegistry::new();
+    let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
     assert_eq!(archetypes.len(), 0);
 
@@ -126,7 +126,7 @@ fn register_archetype() {
 #[test]
 fn exchange_components() {
     let mut entities = EntityRegistry::new();
-    let mut components: ComponentRegistry = ComponentRegistry::new();
+    let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 
     let archetype = archetypes
@@ -334,7 +334,7 @@ fn exchange_components() {
 #[test]
 fn exchange_components_empty_registry() {
     let mut entities = EntityRegistry::new();
-    let mut components: ComponentRegistry = ComponentRegistry::new();
+    let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 
     let entity = entities.spawn(Default::default(), ());
@@ -402,7 +402,7 @@ fn exchange_components_empty_registry() {
 #[test]
 fn components() {
     let mut entities = EntityRegistry::new();
-    let mut components: ComponentRegistry = ComponentRegistry::new();
+    let mut components = Components::new();
     let mut archetypes = ArchetypeRegistry::new();
 
     let entity1 = entities.spawn(Default::default(), ());

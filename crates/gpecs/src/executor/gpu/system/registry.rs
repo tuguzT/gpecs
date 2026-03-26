@@ -8,7 +8,7 @@ use std::{
 use wgpu::{BindGroupLayoutEntry, Device, Label, ShaderModule};
 
 use crate::{
-    archetype::error::ArchetypeError, component::registry::ComponentRegistry,
+    archetype::error::ArchetypeError, context::Components,
     executor::gpu::component::registry::GpuComponentId,
 };
 
@@ -111,7 +111,7 @@ impl GpuSystemRegistry {
     #[inline]
     pub fn register_system<C, B>(
         &mut self,
-        components: &ComponentRegistry,
+        components: &Components,
         gpu_device: &Device,
         descriptor: GpuSystemDescriptor<C, B>,
     ) -> Result<GpuSystemId, ArchetypeError>

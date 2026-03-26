@@ -13,18 +13,16 @@ use crate::{
         },
     },
     bundle::{Bundle, BundleRefs, BundleRefsMut},
-    component::{
-        Component,
-        registry::{
-            self as components, ComponentId, ComponentRegistry, ComponentTypeIdMap,
-            ErasedDropComponentDescriptor,
-        },
-    },
+    component::{Component, registry::ComponentId},
     entity::{
         Entity,
         registry::{self as entities, EntityRegistry},
     },
     world::{id::WorldId, registry::WorldRegistry},
+};
+
+pub use self::components::{
+    ComponentInfo, ComponentTypeIdMap, Components, ErasedDropComponentDescriptor,
 };
 
 use self::error::{
@@ -34,9 +32,10 @@ use self::error::{
 
 pub mod error;
 
+mod components;
+
 pub type Worlds = WorldRegistry;
 pub type Entities = EntityRegistry<EntityLocation>;
-pub type Components = ComponentRegistry<ErasedDropComponentDescriptor, ComponentTypeIdMap>;
 pub type Archetypes = ArchetypeRegistry;
 
 pub type ContextPartsRefs<'a> = (&'a Worlds, &'a Entities, &'a Components, &'a Archetypes);
@@ -49,8 +48,6 @@ pub type ContextPartsRefsMut<'a> = (
 pub type ContextParts = (Worlds, Entities, Components, Archetypes);
 
 pub type TrySpawnError = entities::TrySpawnError<EntityLocation>;
-
-pub type ComponentInfo = components::ComponentInfo<ErasedDropComponentDescriptor>;
 
 pub type Bundles<'a, B> =
     archetypes::Bundles<'a, 'a, B, ErasedDropComponentDescriptor, ComponentTypeIdMap>;

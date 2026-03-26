@@ -7,7 +7,7 @@ use std::{
 use crate::component::Component;
 
 use super::{
-    ComponentId, ComponentTypeIdMap, ErasedDropComponentDescriptor,
+    ComponentId,
     traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
 };
 
@@ -32,7 +32,7 @@ impl<Meta> ComponentInfo<Meta> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ComponentRegistry<Meta = ErasedDropComponentDescriptor, Mapping = ComponentTypeIdMap>
+pub struct ComponentRegistry<Meta, Mapping = ()>
 where
     Mapping: ?Sized,
 {

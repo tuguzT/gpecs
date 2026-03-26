@@ -12,7 +12,8 @@ use gpecs_sparse::set::EpochSparseSet;
 pub use gpecs_component::id::GpuComponentId;
 
 use crate::{
-    component::registry::{ComponentId, ComponentRegistry, ErasedDropComponentDescriptor},
+    component::registry::ComponentId,
+    context::{Components, ErasedDropComponentDescriptor},
     soa::field::FieldDescriptor,
 };
 
@@ -95,7 +96,7 @@ impl GpuComponentRegistry {
     }
 
     #[inline]
-    pub fn register_component<T>(&mut self, components: &mut ComponentRegistry) -> GpuComponentId
+    pub fn register_component<T>(&mut self, components: &mut Components) -> GpuComponentId
     where
         T: GpuComponent,
     {
@@ -111,7 +112,7 @@ impl GpuComponentRegistry {
     #[inline]
     pub fn register_component_with(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &mut Components,
         descriptor: GpuComponentDescriptor,
     ) -> GpuComponentId {
         let id = components.register_component_with(descriptor.into());

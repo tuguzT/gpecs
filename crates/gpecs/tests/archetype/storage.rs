@@ -7,7 +7,7 @@ use gpecs::{
         storage::ArchetypeStorage,
     },
     bundle::Bundle,
-    component::registry::ComponentRegistry,
+    context::Components,
     entity::registry::EntityRegistry,
     world::registry::WorldRegistry,
 };
@@ -16,7 +16,7 @@ use crate::common::{Name, Position, Tag};
 
 #[test]
 fn storage_tag() {
-    let mut components: ComponentRegistry = ComponentRegistry::new();
+    let mut components = Components::new();
     let mut storage = ArchetypeStorage::register::<(Tag,), _, _>(&mut components)
         .expect("creation of storage for tag archetype should succeed");
     assert_eq!(storage.entities(), []);
@@ -58,7 +58,7 @@ fn storage_tag() {
 
 #[test]
 fn storage_tuple() {
-    let mut components: ComponentRegistry = ComponentRegistry::new();
+    let mut components = Components::new();
 
     let error = ArchetypeStorage::register::<(Position, Position), _, _>(&mut components)
         .expect_err("creation of storage for bundle `(Position, Position)` should fail");

@@ -47,13 +47,13 @@ impl FromComponentType for Option<ErasedDrop> {
     }
 }
 
-pub trait ComponentIdFrom {
+pub unsafe trait ComponentIdFrom {
     type Key;
 
     fn component_id_from(&self, key: Self::Key) -> Option<ComponentId>;
 }
 
-impl<T> ComponentIdFrom for &T
+unsafe impl<T> ComponentIdFrom for &T
 where
     T: ComponentIdFrom,
 {
@@ -65,7 +65,7 @@ where
     }
 }
 
-impl<T> ComponentIdFrom for &mut T
+unsafe impl<T> ComponentIdFrom for &mut T
 where
     T: ComponentIdFrom,
 {
@@ -77,13 +77,13 @@ where
     }
 }
 
-pub trait ComponentIdFromOrInsertWith: ComponentIdFrom {
+pub unsafe trait ComponentIdFromOrInsertWith: ComponentIdFrom {
     fn component_id_from_or_insert_with<F>(&mut self, key: Self::Key, f: F) -> ComponentId
     where
         F: FnOnce() -> ComponentId;
 }
 
-impl<T> ComponentIdFromOrInsertWith for &mut T
+unsafe impl<T> ComponentIdFromOrInsertWith for &mut T
 where
     T: ComponentIdFromOrInsertWith,
 {

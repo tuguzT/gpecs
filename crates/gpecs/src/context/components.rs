@@ -1,16 +1,24 @@
 use std::{
     any::{self, TypeId},
     borrow::Cow,
+    collections::HashMap,
 };
 
 use crate::{
     component::{
         Component,
         erased::{ErasedDrop, WithErasedDrop},
-        registry::traits::FromComponentType,
+        registry::{
+            self, ComponentId, ComponentRegistry,
+            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+        },
     },
+    hash::BuildHasher,
     soa::field::FieldDescriptor,
 };
+
+pub type Components = ComponentRegistry<ErasedDropComponentDescriptor, ComponentTypeIdMap>;
+pub type ComponentInfo = registry::ComponentInfo<ErasedDropComponentDescriptor>;
 
 #[derive(Debug, Clone)]
 pub struct ErasedDropComponentDescriptor {
@@ -102,5 +110,31 @@ impl WithErasedDrop for ErasedDropComponentDescriptor {
     #[inline]
     fn erased_drop(&self) -> Option<ErasedDrop> {
         Self::erased_drop(self)
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ComponentTypeIdMap {
+    map: HashMap<TypeId, ComponentId, BuildHasher>,
+}
+
+unsafe impl ComponentIdFrom for ComponentTypeIdMap {
+    type Key = TypeId;
+
+    #[inline]
+    fn component_id_from(&self, key: Self::Key) -> Option<ComponentId> {
+        let Self { map, .. } = self;
+        map.get(&key).copied()
+    }
+}
+
+unsafe impl ComponentIdFromOrInsertWith for ComponentTypeIdMap {
+    #[inline]
+    fn component_id_from_or_insert_with<F>(&mut self, key: Self::Key, f: F) -> ComponentId
+    where
+        F: FnOnce() -> ComponentId,
+    {
+        let Self { map } = self;
+        *map.entry(key).or_insert_with(f)
     }
 }

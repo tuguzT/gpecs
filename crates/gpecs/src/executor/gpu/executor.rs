@@ -9,8 +9,7 @@ use wgpu::{
 
 use crate::{
     archetype::error::{ArchetypeError, DuplicateComponentError},
-    component::registry::{self, ErasedDropComponentDescriptor},
-    context::Context,
+    context::{ComponentInfo, Context},
     hash::IndexMap,
 };
 
@@ -33,8 +32,6 @@ use super::{
         shader::GpuSystemShaderEntry,
     },
 };
-
-pub type ComponentInfo = registry::ComponentInfo<ErasedDropComponentDescriptor>;
 
 #[derive(Debug)]
 pub struct GpuExecutor<'ctx> {

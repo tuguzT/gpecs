@@ -1,5 +1,5 @@
 use crate::{
-    component::registry::ComponentRegistry,
+    context::Components,
     executor::gpu::component::{
         GpuComponent,
         registry::{GpuComponentId, GpuComponentRegistry},
@@ -17,7 +17,7 @@ where
 
     #[inline]
     fn get_gpu_components(
-        components: &ComponentRegistry,
+        components: &Components,
         gpu_components: &GpuComponentRegistry,
     ) -> Self::GetGpuComponents {
         let component_id = components
@@ -30,7 +30,7 @@ where
 
     #[inline]
     fn register_gpu_components(
-        components: &mut ComponentRegistry,
+        components: &mut Components,
         gpu_components: &mut GpuComponentRegistry,
     ) -> Self::RegisterGpuComponents {
         let component_id = gpu_components.register_component::<T>(components);
@@ -48,7 +48,7 @@ macro_rules! gpu_bundle_tuple_impl {
 
             #[inline]
             fn get_gpu_components(
-                components: &ComponentRegistry,
+                components: &Components,
                 gpu_components: &GpuComponentRegistry,
             ) -> Self::GetGpuComponents {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
@@ -66,7 +66,7 @@ macro_rules! gpu_bundle_tuple_impl {
 
             #[inline]
             fn register_gpu_components(
-                components: &mut ComponentRegistry,
+                components: &mut Components,
                 gpu_components: &mut GpuComponentRegistry,
             ) -> Self::RegisterGpuComponents {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;

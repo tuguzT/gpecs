@@ -15,7 +15,8 @@ use crate::{
         error::{ArchetypeError, DuplicateComponentError},
         registry::{ArchetypeId, ArchetypeRegistry},
     },
-    component::registry::{ComponentId, ComponentRegistry},
+    component::registry::ComponentId,
+    context::Components,
     executor::gpu::{
         bundle::GpuBundle,
         component::registry::{GpuComponentId, GpuComponentRegistry},
@@ -69,7 +70,7 @@ impl GpuArchetypeRegistry {
     #[inline]
     pub fn register_archetype_of<B>(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &mut Components,
         archetypes: &mut ArchetypeRegistry,
         gpu_components: &mut GpuComponentRegistry,
         gpu_device: &Device,
@@ -88,7 +89,7 @@ impl GpuArchetypeRegistry {
     #[inline]
     pub fn register_archetype_from<I>(
         &mut self,
-        components: &ComponentRegistry,
+        components: &Components,
         archetypes: &mut ArchetypeRegistry,
         gpu_device: &Device,
         component_ids: I,

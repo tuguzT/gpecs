@@ -7,12 +7,9 @@ use std::{
 };
 
 use crate::{
-    archetype::{
-        error::ArchetypeError,
-        registry::{Bundles, BundlesMut},
-    },
+    archetype::error::ArchetypeError,
     bundle::Bundle,
-    context::Context,
+    context::{Bundles, BundlesMut, Context},
 };
 
 use super::{IntoSystem, System, SystemParam, SystemParamResult};
@@ -115,11 +112,11 @@ impl SystemParam for &mut Context {
     }
 }
 
-impl<B> SystemParam for Bundles<'_, '_, B>
+impl<B> SystemParam for Bundles<'_, B>
 where
     B: Bundle,
 {
-    type Item<'ctx> = Bundles<'ctx, 'ctx, B>;
+    type Item<'ctx> = Bundles<'ctx, B>;
     type Error<'ctx> = ArchetypeError;
 
     #[inline]
@@ -128,11 +125,11 @@ where
     }
 }
 
-impl<B> SystemParam for BundlesMut<'_, '_, B>
+impl<B> SystemParam for BundlesMut<'_, B>
 where
     B: Bundle,
 {
-    type Item<'ctx> = BundlesMut<'ctx, 'ctx, B>;
+    type Item<'ctx> = BundlesMut<'ctx, B>;
     type Error<'ctx> = ArchetypeError;
 
     #[inline]

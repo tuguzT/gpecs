@@ -1,8 +1,8 @@
 pub use crate::{
-    archetype::registry::{ArchetypeId, Bundles, BundlesMut},
+    archetype::registry::ArchetypeId,
     bundle::Bundle,
     component::{Component, registry::ComponentId},
-    context::Context,
+    context::{Bundles, BundlesMut, Context},
     entity::Entity,
     executor::{
         cpu::{

@@ -9,13 +9,16 @@ use crate::{
             InsertBundleExactAtError, RemoveBundleAtError, RemoveBundleExactAtError,
         },
         registry::{
-            ArchetypeId, ArchetypeInfo, ArchetypeRegistry, Bundles, BundlesMut, EntityLocation,
+            self as archetypes, ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityLocation,
         },
     },
     bundle::{Bundle, BundleRefs, BundleRefsMut},
     component::{
         Component,
-        registry::{self, ComponentId, ComponentRegistry, ErasedDropComponentDescriptor},
+        registry::{
+            self as components, ComponentId, ComponentRegistry, ComponentTypeIdMap,
+            ErasedDropComponentDescriptor,
+        },
     },
     entity::{
         Entity,
@@ -33,7 +36,7 @@ pub mod error;
 
 pub type Worlds = WorldRegistry;
 pub type Entities = EntityRegistry<EntityLocation>;
-pub type Components = ComponentRegistry;
+pub type Components = ComponentRegistry<ErasedDropComponentDescriptor, ComponentTypeIdMap>;
 pub type Archetypes = ArchetypeRegistry;
 
 pub type ContextPartsRefs<'a> = (&'a Worlds, &'a Entities, &'a Components, &'a Archetypes);
@@ -45,9 +48,14 @@ pub type ContextPartsRefsMut<'a> = (
 );
 pub type ContextParts = (Worlds, Entities, Components, Archetypes);
 
-pub type ComponentInfo = registry::ComponentInfo<ErasedDropComponentDescriptor>;
-
 pub type TrySpawnError = entities::TrySpawnError<EntityLocation>;
+
+pub type ComponentInfo = components::ComponentInfo<ErasedDropComponentDescriptor>;
+
+pub type Bundles<'a, B> =
+    archetypes::Bundles<'a, 'a, B, ErasedDropComponentDescriptor, ComponentTypeIdMap>;
+pub type BundlesMut<'a, B> =
+    archetypes::BundlesMut<'a, 'a, B, ErasedDropComponentDescriptor, ComponentTypeIdMap>;
 
 #[derive(Debug, Default)]
 pub struct Context {
@@ -231,7 +239,7 @@ impl Context {
             archetypes,
             ..
         } = self;
-        archetypes.register_archetype_of::<B>(components)
+        archetypes.register_archetype_of::<B, _, _>(components)
     }
 
     #[inline]
@@ -250,7 +258,7 @@ impl Context {
             archetypes,
             ..
         } = self;
-        archetypes.archetype_id_of::<B>(components)
+        archetypes.archetype_id_of::<B, _>(components)
     }
 
     #[inline]
@@ -277,7 +285,7 @@ impl Context {
 
         let location = archetype_id.into();
         let bundle = archetypes
-            .get_bundle_at::<B>(components, entity, location)
+            .get_bundle_at::<B, _>(components, entity, location)
             .map_err(GetAtError::with_valid_location)?
             .expect("entity should contain data");
         Ok(bundle)
@@ -307,14 +315,14 @@ impl Context {
 
         let location = archetype_id.into();
         let bundle = archetypes
-            .get_bundle_mut_at::<B>(components, entity, location)
+            .get_bundle_mut_at::<B, _>(components, entity, location)
             .map_err(GetAtError::with_valid_location)?
             .expect("entity should contain data");
         Ok(bundle)
     }
 
     #[inline]
-    pub fn bundles<B>(&self) -> Result<Bundles<'_, '_, B>, ArchetypeError>
+    pub fn bundles<B>(&self) -> Result<Bundles<'_, B>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -323,11 +331,11 @@ impl Context {
             archetypes,
             ..
         } = self;
-        archetypes.bundles::<B>(components)
+        archetypes.bundles::<B, _, _>(components)
     }
 
     #[inline]
-    pub fn bundles_mut<B>(&mut self) -> Result<BundlesMut<'_, '_, B>, ArchetypeError>
+    pub fn bundles_mut<B>(&mut self) -> Result<BundlesMut<'_, B>, ArchetypeError>
     where
         B: Bundle,
     {
@@ -336,7 +344,7 @@ impl Context {
             archetypes,
             ..
         } = self;
-        archetypes.bundles_mut::<B>(components)
+        archetypes.bundles_mut::<B, _, _>(components)
     }
 
     #[inline]
@@ -361,7 +369,7 @@ impl Context {
         };
 
         let archetype_id = archetypes
-            .insert_bundle_exact_at::<B>(components, entity, value, *location)
+            .insert_bundle_exact_at::<B, _, _>(components, entity, value, *location)
             .map_err(InsertBundleExactAtError::with_valid_location)?;
 
         *location = EntityLocation::WithComponents(archetype_id);
@@ -386,7 +394,7 @@ impl Context {
         };
 
         let archetype_id = archetypes
-            .insert_bundle_at::<B>(components, entity, value, *location)
+            .insert_bundle_at::<B, _, _>(components, entity, value, *location)
             .map_err(InsertBundleAtError::into_insert_bundle_error)?;
 
         *location = EntityLocation::WithComponents(archetype_id);
@@ -410,7 +418,7 @@ impl Context {
         };
 
         let new_location = archetypes
-            .remove_bundle_at::<B>(components, entity, *location)
+            .remove_bundle_at::<B, _, _>(components, entity, *location)
             .map_err(RemoveBundleAtError::with_valid_location)?;
 
         *location = new_location;
@@ -437,7 +445,7 @@ impl Context {
         };
 
         let (value, new_location) = archetypes
-            .remove_bundle_exact_at::<B>(components, entity, archetype_id.into())
+            .remove_bundle_exact_at::<B, _, _>(components, entity, archetype_id.into())
             .map_err(RemoveBundleExactAtError::with_valid_location)?;
         let value = value.expect("entity should contain data");
 

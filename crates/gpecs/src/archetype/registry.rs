@@ -1521,7 +1521,7 @@ impl ArchetypeRegistry {
             .sorted_unstable_by_key(|&component_id| {
                 components
                     .get_component_info(component_id)
-                    .map(|info| info.descriptor().layout().align())
+                    .map(|info| info.as_meta().descriptor().layout().align())
             })
             .unique();
         let archetype = ErasedArchetype::new(components, component_ids)

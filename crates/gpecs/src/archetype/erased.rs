@@ -93,14 +93,14 @@ impl FromComponentInfo for ComponentInfo {
 impl FromComponentInfo for FieldDescriptor {
     #[inline]
     fn from_component_info(info: &ComponentInfo) -> Self {
-        info.descriptor()
+        info.as_meta().descriptor()
     }
 }
 
 impl FromComponentInfo for Option<ErasedDrop> {
     #[inline]
     fn from_component_info(info: &ComponentInfo) -> Self {
-        info.erased_drop()
+        info.as_meta().erased_drop()
     }
 }
 

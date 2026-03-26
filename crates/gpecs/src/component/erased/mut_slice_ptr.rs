@@ -100,7 +100,7 @@ impl ErasedComponentMutSlicePtr {
         let component_info = registry
             .get_component_info(self.component_id())
             .ok_or(NotRegisteredError)?;
-        let Some(erased_drop) = component_info.erased_drop() else {
+        let Some(erased_drop) = component_info.as_meta().erased_drop() else {
             return Ok(());
         };
 

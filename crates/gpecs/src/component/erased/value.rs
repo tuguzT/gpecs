@@ -59,7 +59,7 @@ impl ErasedComponent {
         let Some(component_info) = registry.get_component_info(component_id) else {
             unreachable!("{component_id} should be registered")
         };
-        let erased_drop = component_info.erased_drop();
+        let erased_drop = component_info.as_meta().erased_drop();
 
         let me = unsafe { Self::from_parts(component_id, field, erased_drop) };
         Ok(me)

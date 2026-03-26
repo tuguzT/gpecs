@@ -97,8 +97,8 @@ impl FromComponentInfo for ErasedDropMeta {
     #[inline]
     fn from_component_info(info: &ComponentInfo) -> Self {
         Self {
-            descriptor: info.descriptor(),
-            erased_drop: info.erased_drop(),
+            descriptor: info.as_meta().descriptor(),
+            erased_drop: info.as_meta().erased_drop(),
         }
     }
 }

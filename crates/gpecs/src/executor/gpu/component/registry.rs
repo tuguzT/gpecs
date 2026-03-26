@@ -12,7 +12,7 @@ use gpecs_sparse::set::EpochSparseSet;
 pub use gpecs_component::id::GpuComponentId;
 
 use crate::{
-    component::registry::{ComponentDescriptor, ComponentId, ComponentRegistry},
+    component::registry::{ComponentId, ComponentRegistry, ErasedDropComponentDescriptor},
     soa::field::FieldDescriptor,
 };
 
@@ -70,7 +70,7 @@ impl GpuComponentDescriptor {
     }
 }
 
-impl From<GpuComponentDescriptor> for ComponentDescriptor {
+impl From<GpuComponentDescriptor> for ErasedDropComponentDescriptor {
     fn from(value: GpuComponentDescriptor) -> Self {
         let GpuComponentDescriptor {
             name,

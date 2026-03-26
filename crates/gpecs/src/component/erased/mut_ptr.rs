@@ -34,7 +34,7 @@ impl ErasedComponentMutPtr {
             .get_component_info(component_id)
             .ok_or(NotRegisteredError)?;
 
-        let layout = component_info.descriptor().layout();
+        let layout = component_info.as_meta().descriptor().layout();
         let field = Field::dangling(layout)
             .expect("alignment of bytes should be sufficient for any component");
 
@@ -165,7 +165,7 @@ impl ErasedComponentMutPtr {
         let component_info = registry
             .get_component_info(self.component_id())
             .ok_or(NotRegisteredError)?;
-        let Some(erased_drop) = component_info.erased_drop() else {
+        let Some(erased_drop) = component_info.as_meta().erased_drop() else {
             return Ok(());
         };
 

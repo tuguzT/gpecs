@@ -15,11 +15,13 @@ use crate::{
         Bundle, BundleMutPtrs,
         erased::{
             ErasedArchetypeKind, ErasedBundleKind, ErasedBundleMutRefs, ErasedBundlePtrs,
-            ErasedBundlePtrsIter, ErasedBundleRefs, WithErasedDrop,
+            ErasedBundlePtrsIter, ErasedBundleRefs,
         },
     },
     component::{
-        erased::{ErasedComponentMutPtr, ErasedComponentPtr, error::NotRegisteredError},
+        erased::{
+            ErasedComponentMutPtr, ErasedComponentPtr, WithErasedDrop, error::NotRegisteredError,
+        },
         registry::{ComponentId, ComponentRegistry},
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},

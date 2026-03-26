@@ -6,7 +6,10 @@ use crate::{
             ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr,
             error::{DowncastErrorKind, NotRegisteredError},
         },
-        registry::{ComponentId, ComponentRegistry},
+        registry::{
+            ComponentId, ComponentRegistry,
+            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+        },
     },
     soa::{
         identity::Identity,
@@ -23,7 +26,10 @@ where
     type GetComponents = [Option<ComponentId>; 1];
 
     #[inline]
-    fn get_components(components: &ComponentRegistry) -> Self::GetComponents {
+    fn get_components<U>(components: &ComponentRegistry<impl Sized, U>) -> Self::GetComponents
+    where
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
         let component_id = components.component_id::<T>();
         [component_id]
     }
@@ -31,18 +37,25 @@ where
     type RegisterComponents = [ComponentId; 1];
 
     #[inline]
-    fn register_components(components: &mut ComponentRegistry) -> Self::RegisterComponents {
+    fn register_components<M, U>(
+        components: &mut ComponentRegistry<M, U>,
+    ) -> Self::RegisterComponents
+    where
+        M: FromComponentType,
+        U: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+    {
         let component_id = components.register_component::<T>();
         [component_id]
     }
 
     #[inline]
-    fn ptrs_from_erased<I>(
-        components: &ComponentRegistry,
+    fn ptrs_from_erased<I, U>(
+        components: &ComponentRegistry<impl Sized, U>,
         iter: I,
     ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
     where
         I: IntoIterator<Item = ErasedComponentPtr>,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
         let ptr = iter
@@ -50,17 +63,18 @@ where
             .find(|ptr| ptr.component_id() == component_id)
             .ok_or(NotRegisteredError)?;
 
-        let ptr = ptr.downcast::<T>(components)?.cast();
+        let ptr = ptr.downcast::<T, _>(components)?.cast();
         Ok(ptr)
     }
 
     #[inline]
-    fn mut_ptrs_from_erased<I>(
-        components: &ComponentRegistry,
+    fn mut_ptrs_from_erased<I, U>(
+        components: &ComponentRegistry<impl Sized, U>,
         iter: I,
     ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
     where
         I: IntoIterator<Item = ErasedComponentMutPtr>,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
         let ptr = iter
@@ -68,14 +82,18 @@ where
             .find(|ptr| ptr.component_id() == component_id)
             .ok_or(NotRegisteredError)?;
 
-        let ptr = ptr.downcast::<T>(components)?.cast();
+        let ptr = ptr.downcast::<T, _>(components)?.cast();
         Ok(ptr)
     }
 
     #[inline]
-    fn from_erased<I>(components: &ComponentRegistry, iter: I) -> Result<Self, DowncastErrorKind>
+    fn from_erased<I, U>(
+        components: &ComponentRegistry<impl Sized, U>,
+        iter: I,
+    ) -> Result<Self, DowncastErrorKind>
     where
         I: IntoIterator<Item = ErasedComponent>,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
         let component = iter
@@ -83,7 +101,7 @@ where
             .find(|component| component.component_id() == component_id)
             .ok_or(NotRegisteredError)?;
 
-        let component = component.downcast::<T>(components)?;
+        let component = component.downcast::<T, _>(components)?;
         Ok(component.into())
     }
 }
@@ -99,7 +117,10 @@ macro_rules! bundle_tuple_impl {
             type GetComponents = [Option<ComponentId>; count_idents!($($types,)*)];
 
             #[inline]
-            fn get_components(components: &ComponentRegistry) -> Self::GetComponents {
+            fn get_components<U>(components: &ComponentRegistry<impl Sized, U>) -> Self::GetComponents
+            where
+                U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+            {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.component_id::<$types>(),)*];
@@ -110,7 +131,13 @@ macro_rules! bundle_tuple_impl {
             type RegisterComponents = [ComponentId; count_idents!($($types,)*)];
 
             #[inline]
-            fn register_components(components: &mut ComponentRegistry) -> Self::RegisterComponents {
+            fn register_components<M, U>(
+                components: &mut ComponentRegistry<M, U>,
+            ) -> Self::RegisterComponents
+            where
+                U: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+                M: FromComponentType,
+            {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.register_component::<$types>(),)*];
@@ -119,12 +146,13 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_from_erased<Iter>(
-                components: &ComponentRegistry,
+            fn ptrs_from_erased<Iter, U>(
+                components: &ComponentRegistry<impl Sized, U>,
                 iter: Iter,
             ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
             where
                 Iter: IntoIterator<Item = ErasedComponentPtr>,
+                U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 
@@ -144,12 +172,13 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            fn mut_ptrs_from_erased<Iter>(
-                components: &ComponentRegistry,
+            fn mut_ptrs_from_erased<Iter, U>(
+                components: &ComponentRegistry<impl Sized, U>,
                 iter: Iter,
             ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
             where
                 Iter: IntoIterator<Item = ErasedComponentMutPtr>,
+                U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 
@@ -169,9 +198,13 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            fn from_erased<Iter>(components: &ComponentRegistry, iter: Iter) -> Result<Self, DowncastErrorKind>
+            fn from_erased<Iter, U>(
+                components: &ComponentRegistry<impl Sized, U>,
+                iter: Iter,
+            ) -> Result<Self, DowncastErrorKind>
             where
                 Iter: IntoIterator<Item = ErasedComponent>,
+                U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
 

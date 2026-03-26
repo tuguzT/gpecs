@@ -16,10 +16,10 @@ use crate::{
     },
     bundle::{
         Bundle, BundlePtrs,
-        erased::{ErasedBorrowedBundle, ErasedBundleMutPtrs, ErasedBundleRefs, WithErasedDrop},
+        erased::{ErasedBorrowedBundle, ErasedBundleMutPtrs, ErasedBundleRefs},
     },
     component::{
-        erased::ErasedComponentPtr,
+        erased::{ErasedComponentPtr, WithErasedDrop},
         registry::{ComponentId, ComponentRegistry},
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},

@@ -24,9 +24,9 @@ use crate::{
             TooFewComponentsError,
         },
     },
-    bundle::{Bundle, erased::WithErasedDrop},
+    bundle::Bundle,
     component::{
-        erased::ErasedDrop,
+        erased::{ErasedDrop, WithErasedDrop},
         registry::{ComponentId, ComponentInfo, ComponentRegistry},
     },
     soa::{

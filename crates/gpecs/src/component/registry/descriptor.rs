@@ -4,7 +4,11 @@ use std::{
 };
 
 use crate::{
-    component::{Component, erased::ErasedDrop, registry::traits::FromComponentType},
+    component::{
+        Component,
+        erased::{ErasedDrop, WithErasedDrop},
+        registry::traits::FromComponentType,
+    },
     soa::field::FieldDescriptor,
 };
 
@@ -72,9 +76,31 @@ impl ErasedDropComponentDescriptor {
     }
 }
 
+impl AsRef<str> for ErasedDropComponentDescriptor {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.name()
+    }
+}
+
+impl AsRef<FieldDescriptor> for ErasedDropComponentDescriptor {
+    #[inline]
+    fn as_ref(&self) -> &FieldDescriptor {
+        let Self { desc, .. } = self;
+        desc
+    }
+}
+
 impl FromComponentType for ErasedDropComponentDescriptor {
     #[inline]
     fn from_component<T: Component>() -> Self {
         Self::of::<T>()
+    }
+}
+
+impl WithErasedDrop for ErasedDropComponentDescriptor {
+    #[inline]
+    fn erased_drop(&self) -> Option<ErasedDrop> {
+        Self::erased_drop(self)
     }
 }

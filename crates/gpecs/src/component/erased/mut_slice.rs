@@ -14,7 +14,10 @@ use crate::component::{
         ErasedComponentSlice, ErasedComponentSlicePtr,
         error::{DowncastError, NotRegisteredError, check_downcast},
     },
-    registry::{ComponentId, ComponentRegistry},
+    registry::{
+        ComponentId, ComponentRegistry,
+        traits::{ComponentIdFrom, FromComponentType},
+    },
 };
 
 type Fields<'a> = ErasedMutSlice<'a, *mut MaybeUninit<u8>>;
@@ -27,14 +30,15 @@ pub struct ErasedComponentMutSlice<'a> {
 
 impl<'a> ErasedComponentMutSlice<'a> {
     #[inline]
-    pub fn try_from<C>(
-        registry: &ComponentRegistry,
+    pub fn try_from<C, T>(
+        components: &ComponentRegistry<impl Sized, T>,
         component: &'a mut [C],
     ) -> Result<Self, NotRegisteredError>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
         let fields = Fields::try_from(component)
             .expect("alignment of bytes should be sufficient for any component");
 
@@ -58,15 +62,16 @@ impl<'a> ErasedComponentMutSlice<'a> {
     }
 
     #[inline]
-    pub fn downcast<C>(
+    pub fn downcast<C, T>(
         self,
-        registry: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<&'a mut [C], DowncastError<Self>>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let Self { fields, .. } = check_downcast::<C, _>(registry, component_id, self)?;
+        let Self { fields, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
 
         let component = unsafe { fields.downcast::<C>() }
             .expect("descriptors of input component and self should be equal");
@@ -74,15 +79,16 @@ impl<'a> ErasedComponentMutSlice<'a> {
     }
 
     #[inline]
-    pub fn downcast_ref<C>(
+    pub fn downcast_ref<C, T>(
         &self,
-        registry: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<&[C], DowncastError<&Self>>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = *self;
-        let Self { fields, .. } = check_downcast::<C, _>(registry, component_id, self)?;
+        let Self { fields, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
 
         let component = unsafe { fields.downcast_ref::<C>() }
             .expect("descriptors of input component and self should be equal");
@@ -90,15 +96,16 @@ impl<'a> ErasedComponentMutSlice<'a> {
     }
 
     #[inline]
-    pub fn downcast_mut<C>(
+    pub fn downcast_mut<C, T>(
         &mut self,
-        registry: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<&mut [C], DowncastError<&mut Self>>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = *self;
-        let Self { fields, .. } = check_downcast::<C, _>(registry, component_id, self)?;
+        let Self { fields, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
 
         let component = unsafe { fields.downcast_mut::<C>() }
             .expect("descriptors of input component and self should be equal");

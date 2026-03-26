@@ -11,10 +11,13 @@ use crate::component::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentMutSlice, ErasedComponentSlice,
-        ErasedComponentSlicePtr,
+        ErasedComponentSlicePtr, WithErasedDrop,
         error::{DowncastError, NotRegisteredError, check_downcast},
     },
-    registry::{ComponentId, ComponentRegistry},
+    registry::{
+        ComponentId, ComponentRegistry,
+        traits::{ComponentIdFrom, FromComponentType},
+    },
 };
 
 type Fields = ErasedMutSlicePtr<*mut MaybeUninit<u8>>;
@@ -27,14 +30,15 @@ pub struct ErasedComponentMutSlicePtr {
 
 impl ErasedComponentMutSlicePtr {
     #[inline]
-    pub fn try_from<C>(
-        registry: &ComponentRegistry,
+    pub fn try_from<C, T>(
+        components: &ComponentRegistry<impl Sized, T>,
         component: *mut [C],
     ) -> Result<Self, NotRegisteredError>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
         let fields = Fields::try_from(component)
             .expect("alignment of bytes should be sufficient for any component");
 
@@ -58,12 +62,16 @@ impl ErasedComponentMutSlicePtr {
     }
 
     #[inline]
-    pub fn downcast<C>(self, registry: &ComponentRegistry) -> Result<*mut [C], DowncastError<Self>>
+    pub fn downcast<C, T>(
+        self,
+        components: &ComponentRegistry<impl Sized, T>,
+    ) -> Result<*mut [C], DowncastError<Self>>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let Self { fields, .. } = check_downcast::<C, _>(registry, component_id, self)?;
+        let Self { fields, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
 
         let component = fields
             .downcast()
@@ -95,9 +103,9 @@ impl ErasedComponentMutSlicePtr {
     #[inline]
     pub unsafe fn drop_in_place(
         self,
-        registry: &ComponentRegistry,
+        components: &ComponentRegistry<impl WithErasedDrop, impl ?Sized>,
     ) -> Result<(), NotRegisteredError> {
-        let component_info = registry
+        let component_info = components
             .get_component_info(self.component_id())
             .ok_or(NotRegisteredError)?;
         let Some(erased_drop) = component_info.as_meta().erased_drop() else {

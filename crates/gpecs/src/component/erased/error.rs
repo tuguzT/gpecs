@@ -7,7 +7,10 @@ use gpecs_soa_erased::storage::AllocError;
 
 use crate::component::{
     Component,
-    registry::{ComponentId, ComponentRegistry},
+    registry::{
+        ComponentId, ComponentRegistry,
+        traits::{ComponentIdFrom, FromComponentType},
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -167,29 +170,31 @@ where
 }
 
 #[inline]
-pub(super) fn check_downcast<C, T>(
-    registry: &ComponentRegistry,
+pub(super) fn check_downcast<C, T, V>(
+    components: &ComponentRegistry<impl Sized, T>,
     component_id: ComponentId,
-    value: T,
-) -> Result<T, DowncastError<T>>
+    value: V,
+) -> Result<V, DowncastError<V>>
 where
     C: Component,
+    T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
 {
-    match check_downcast_inner::<C>(registry, component_id) {
+    match check_downcast_inner::<C, T>(components, component_id) {
         Ok(()) => Ok(value),
         Err(reason) => Err(DowncastError::new(value, reason)),
     }
 }
 
 #[inline]
-fn check_downcast_inner<C>(
-    registry: &ComponentRegistry,
+fn check_downcast_inner<C, T>(
+    components: &ComponentRegistry<impl Sized, T>,
     component_id: ComponentId,
 ) -> Result<(), DowncastErrorKind>
 where
     C: Component,
+    T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
 {
-    let into_component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
+    let into_component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
     check_component_ids(into_component_id, component_id)?;
 
     Ok(())

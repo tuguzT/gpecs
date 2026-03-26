@@ -16,11 +16,11 @@ use crate::{
         erased::{
             ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
             ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
-            FromErasedComponent, ShuffledBundle, WithErasedDrop,
+            FromErasedComponent, ShuffledBundle,
         },
     },
     component::{
-        erased::{ErasedComponent, ErasedDrop},
+        erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
         registry::{ComponentId, ComponentInfo, ComponentRegistry},
     },
     entity::Entity,

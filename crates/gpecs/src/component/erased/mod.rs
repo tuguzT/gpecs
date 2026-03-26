@@ -1,8 +1,15 @@
 pub use self::{
-    drop::ErasedDrop, mut_ptr::ErasedComponentMutPtr, mut_ref::ErasedComponentMutRef,
-    mut_slice::ErasedComponentMutSlice, mut_slice_ptr::ErasedComponentMutSlicePtr,
-    nonnull_ptr::ErasedComponentNonNullPtr, ptr::ErasedComponentPtr, r#ref::ErasedComponentRef,
-    slice::ErasedComponentSlice, slice_ptr::ErasedComponentSlicePtr, value::ErasedComponent,
+    drop::{ErasedDrop, WithErasedDrop},
+    mut_ptr::ErasedComponentMutPtr,
+    mut_ref::ErasedComponentMutRef,
+    mut_slice::ErasedComponentMutSlice,
+    mut_slice_ptr::ErasedComponentMutSlicePtr,
+    nonnull_ptr::ErasedComponentNonNullPtr,
+    ptr::ErasedComponentPtr,
+    r#ref::ErasedComponentRef,
+    slice::ErasedComponentSlice,
+    slice_ptr::ErasedComponentSlicePtr,
+    value::ErasedComponent,
 };
 
 pub mod error;

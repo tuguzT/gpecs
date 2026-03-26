@@ -24,7 +24,7 @@ use crate::{
         Bundle, BundleRefs, BundleRefsMut,
         erased::{
             ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutRefsIter, ErasedBundlePtrs,
-            ErasedBundleRefs, ErasedBundleRefsIter, WithErasedDrop,
+            ErasedBundleRefs, ErasedBundleRefsIter,
             error::{
                 DowncastError, FromBundleError, FromComponentsError, InsertError, RemoveError,
                 RemoveErrorKind, ReplaceError, ShuffleError,
@@ -32,7 +32,7 @@ use crate::{
         },
     },
     component::{
-        erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef},
+        erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, WithErasedDrop},
         registry::{ComponentId, ComponentRegistry},
     },
     hash::IndexSet,

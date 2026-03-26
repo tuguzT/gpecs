@@ -9,8 +9,9 @@ use crate::{
         ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
         ErasedBundleMutPtrs, ErasedBundleMutRefs, ErasedBundleMutSlicePtrs, ErasedBundleMutSlices,
         ErasedBundleNonNullPtrs, ErasedBundlePtrs, ErasedBundleRefs, ErasedBundleSlicePtrs,
-        ErasedBundleSlices, WithErasedDrop,
+        ErasedBundleSlices,
     },
+    component::erased::WithErasedDrop,
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         traits::{

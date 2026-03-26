@@ -7,13 +7,19 @@ use std::{
 
 use gpecs_soa_erased::data::ErasedPtr;
 
-use crate::component::{
-    Component,
-    erased::{
-        ErasedComponentMutPtr, ErasedComponentRef,
-        error::{DowncastError, NotRegisteredError, check_downcast},
+use crate::{
+    component::{
+        Component,
+        erased::{
+            ErasedComponentMutPtr, ErasedComponentRef,
+            error::{DowncastError, NotRegisteredError, check_downcast},
+        },
+        registry::{
+            ComponentId, ComponentRegistry,
+            traits::{ComponentIdFrom, FromComponentType},
+        },
     },
-    registry::{ComponentId, ComponentRegistry},
+    soa::field::FieldDescriptor,
 };
 
 type Field = ErasedPtr<*const MaybeUninit<u8>>;
@@ -27,14 +33,14 @@ pub struct ErasedComponentPtr {
 impl ErasedComponentPtr {
     #[inline]
     pub fn dangling(
-        registry: &ComponentRegistry,
+        components: &ComponentRegistry<impl AsRef<FieldDescriptor>, impl ?Sized>,
         component_id: ComponentId,
     ) -> Result<Self, NotRegisteredError> {
-        let component_info = registry
+        let component_info = components
             .get_component_info(component_id)
             .ok_or(NotRegisteredError)?;
 
-        let layout = component_info.as_meta().descriptor().layout();
+        let layout = component_info.as_meta().as_ref().layout();
         let field = Field::dangling(layout)
             .expect("alignment of bytes should be sufficient for any component");
 
@@ -43,12 +49,13 @@ impl ErasedComponentPtr {
     }
 
     #[inline]
-    pub fn try_from<C>(
-        registry: &ComponentRegistry,
+    pub fn try_from<C, T>(
+        registry: &ComponentRegistry<impl Sized, T>,
         component: *const C,
     ) -> Result<Self, NotRegisteredError>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
         let field = Field::try_from(component)
@@ -59,13 +66,17 @@ impl ErasedComponentPtr {
     }
 
     #[inline]
-    pub fn dangling_of<C>(registry: &ComponentRegistry) -> Result<Self, NotRegisteredError>
+    pub fn dangling_of<C, M, T>(
+        components: &ComponentRegistry<M, T>,
+    ) -> Result<Self, NotRegisteredError>
     where
         C: Component,
+        M: AsRef<FieldDescriptor>,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
 
-        let me = Self::dangling(registry, component_id).expect("component should be registered");
+        let me = Self::dangling(components, component_id).expect("component should be registered");
         Ok(me)
     }
 
@@ -78,12 +89,16 @@ impl ErasedComponentPtr {
     }
 
     #[inline]
-    pub fn downcast<C>(self, registry: &ComponentRegistry) -> Result<*const C, DowncastError<Self>>
+    pub fn downcast<C, T>(
+        self,
+        components: &ComponentRegistry<impl Sized, T>,
+    ) -> Result<*const C, DowncastError<Self>>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let Self { field, .. } = check_downcast::<C, _>(registry, component_id, self)?;
+        let Self { field, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
 
         let component = field
             .downcast()

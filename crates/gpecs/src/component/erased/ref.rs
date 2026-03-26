@@ -13,7 +13,10 @@ use crate::component::{
         ErasedComponentPtr,
         error::{DowncastError, NotRegisteredError, check_downcast},
     },
-    registry::{ComponentId, ComponentRegistry},
+    registry::{
+        ComponentId, ComponentRegistry,
+        traits::{ComponentIdFrom, FromComponentType},
+    },
 };
 
 type Field<'a> = ErasedRef<'a, *const MaybeUninit<u8>>;
@@ -26,14 +29,15 @@ pub struct ErasedComponentRef<'a> {
 
 impl<'a> ErasedComponentRef<'a> {
     #[inline]
-    pub fn try_from<C>(
-        registry: &ComponentRegistry,
+    pub fn try_from<C, T>(
+        components: &ComponentRegistry<impl Sized, T>,
         component: &'a C,
     ) -> Result<Self, NotRegisteredError>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
         let field = Field::try_from(component)
             .expect("alignment of bytes should be sufficient for any component");
 
@@ -57,12 +61,16 @@ impl<'a> ErasedComponentRef<'a> {
     }
 
     #[inline]
-    pub fn downcast<C>(self, registry: &ComponentRegistry) -> Result<&'a C, DowncastError<Self>>
+    pub fn downcast<C, T>(
+        self,
+        components: &ComponentRegistry<impl Sized, T>,
+    ) -> Result<&'a C, DowncastError<Self>>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let Self { field, .. } = check_downcast::<C, _>(registry, component_id, self)?;
+        let Self { field, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
 
         let component = unsafe { field.downcast::<C>() }
             .expect("descriptors of input component and self should be equal");
@@ -70,12 +78,16 @@ impl<'a> ErasedComponentRef<'a> {
     }
 
     #[inline]
-    pub fn downcast_ref<C>(&self, registry: &ComponentRegistry) -> Result<&C, DowncastError<&Self>>
+    pub fn downcast_ref<C, T>(
+        &self,
+        components: &ComponentRegistry<impl Sized, T>,
+    ) -> Result<&C, DowncastError<&Self>>
     where
         C: Component,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = *self;
-        let Self { field, .. } = check_downcast::<C, _>(registry, component_id, self)?;
+        let Self { field, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
 
         let component = unsafe { field.downcast_ref::<C>() }
             .expect("descriptors of input component and self should be equal");

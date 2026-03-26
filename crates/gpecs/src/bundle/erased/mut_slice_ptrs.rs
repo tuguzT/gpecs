@@ -21,8 +21,14 @@ use crate::{
         },
     },
     component::{
-        erased::{ErasedComponentMutSlicePtr, ErasedComponentSlicePtr, error::NotRegisteredError},
-        registry::{ComponentId, ComponentRegistry},
+        erased::{
+            ErasedComponentMutSlicePtr, ErasedComponentSlicePtr, WithErasedDrop,
+            error::NotRegisteredError,
+        },
+        registry::{
+            ComponentId, ComponentRegistry,
+            traits::{ComponentIdFrom, FromComponentType},
+        },
     },
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
@@ -129,15 +135,16 @@ where
     Meta: AsRef<FieldDescriptor>,
 {
     #[inline]
-    pub fn downcast<B>(
+    pub fn downcast<B, T>(
         self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<BundleSliceMutPtrs<B>, IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let len = self.len();
-        let ptrs = self.into_ptrs().downcast::<B>(components)?;
+        let ptrs = self.into_ptrs().downcast::<B, T>(components)?;
         let slices = B::CONTEXT.mut_slice_ptrs_from_raw_parts(ptrs, len);
         Ok(slices)
     }
@@ -173,7 +180,7 @@ where
     #[inline]
     pub unsafe fn drop_in_place(
         self,
-        registry: &ComponentRegistry,
+        registry: &ComponentRegistry<impl WithErasedDrop, impl ?Sized>,
     ) -> Result<(), NotRegisteredError> {
         self.iter()
             .map(ErasedComponentSlicePtr::component_id)

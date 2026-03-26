@@ -12,7 +12,7 @@ use super::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ComponentInfo<Meta = ErasedDropComponentDescriptor> {
+pub struct ComponentInfo<Meta> {
     component_id: ComponentId,
     meta: Meta,
 }

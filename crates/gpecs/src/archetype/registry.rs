@@ -308,7 +308,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let archetype = ErasedArchetype::register::<B>(components)?;
+        let archetype = ErasedArchetype::register::<B, _, _>(components)?;
         let archetype_id = self.register_archetype(components, archetype);
         Ok(archetype_id)
     }
@@ -481,7 +481,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
+        let archetype = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         let archetype_id = self.archetype_id(&archetype);
         Ok(archetype_id)
     }
@@ -581,7 +581,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
+        let archetype = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         let archetypes = self.compatible_archetypes(&archetype);
         Ok(archetypes)
     }
@@ -617,7 +617,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
+        let archetype = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         let archetypes = self.compatible_archetypes_mut(&archetype);
         Ok(archetypes)
     }
@@ -702,7 +702,7 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let bundle = bundle.downcast::<B>(components)?;
+        let bundle = bundle.downcast::<B, _>(components)?;
         Ok(Some(bundle))
     }
 
@@ -765,7 +765,7 @@ impl ArchetypeRegistry {
             return Ok(None);
         };
 
-        let bundle = bundle.downcast::<B>(components)?;
+        let bundle = bundle.downcast::<B, _>(components)?;
         Ok(Some(bundle))
     }
 
@@ -877,7 +877,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let components_to_insert = match ErasedArchetype::register::<B>(components) {
+        let components_to_insert = match ErasedArchetype::register::<B, _, _>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
                 let reason = error.into();
@@ -1001,7 +1001,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let components_to_insert = match ErasedArchetype::register::<B>(components) {
+        let components_to_insert = match ErasedArchetype::register::<B, _, _>(components) {
             Ok(archetype) => archetype,
             Err(error) => {
                 let reason = error.into();
@@ -1129,7 +1129,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let components_to_remove = ErasedArchetype::register::<B>(components)?;
+        let components_to_remove = ErasedArchetype::register::<B, _, _>(components)?;
 
         let Self { archetypes, graph } = self;
         let remove_archetypes = Self::remove_exact_archetypes(
@@ -1240,7 +1240,7 @@ impl ArchetypeRegistry {
     where
         B: Bundle,
     {
-        let components_to_remove = ErasedArchetype::<()>::register::<B>(components)?;
+        let components_to_remove = ErasedArchetype::<()>::register::<B, _, _>(components)?;
 
         let Self { archetypes, graph } = self;
         let remove_archetypes = Self::remove_archetypes(
@@ -2249,7 +2249,7 @@ where
         graph: &'a Graph,
         components: &'ctx ComponentRegistry,
     ) -> Result<Self, ArchetypeError> {
-        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
+        let archetype = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         let me = Self {
             archetypes: CompatibleArchetypes::new(archetypes, graph, &archetype),
             components,
@@ -2349,7 +2349,7 @@ where
         components: &'ctx ComponentRegistry,
     ) -> BundlesIntoIterInner<'a, B> {
         let archetype_id = info.id();
-        let Ok((entities, components)) = info.storage().bundles::<B>(components) else {
+        let Ok((entities, components)) = info.storage().bundles::<B, _>(components) else {
             unreachable!("{archetype_id} should be compatible with requested bundle")
         };
 
@@ -2463,7 +2463,7 @@ where
         graph: &'a Graph,
         components: &'ctx ComponentRegistry,
     ) -> Result<Self, ArchetypeError> {
-        let archetype = ErasedArchetype::<()>::of::<B>(components)?;
+        let archetype = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         let me = Self {
             archetypes: CompatibleArchetypesMut::new(archetypes, graph, &archetype),
             components,
@@ -2550,7 +2550,7 @@ where
         components: &'ctx ComponentRegistry,
     ) -> BundlesMutIntoIterInner<'a, B> {
         let archetype_id = info.id();
-        let Ok((entities, components)) = info.storage.bundles_mut::<B>(components) else {
+        let Ok((entities, components)) = info.storage.bundles_mut::<B, _>(components) else {
             unreachable!("{archetype_id} should be compatible with requested bundle")
         };
 

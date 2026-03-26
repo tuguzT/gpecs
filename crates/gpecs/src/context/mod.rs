@@ -15,7 +15,7 @@ use crate::{
     bundle::{Bundle, BundleRefs, BundleRefsMut},
     component::{
         Component,
-        registry::{ComponentId, ComponentInfo, ComponentRegistry},
+        registry::{self, ComponentId, ComponentRegistry, ErasedDropComponentDescriptor},
     },
     entity::{
         Entity,
@@ -44,6 +44,8 @@ pub type ContextPartsRefsMut<'a> = (
     &'a mut Archetypes,
 );
 pub type ContextParts = (Worlds, Entities, Components, Archetypes);
+
+pub type ComponentInfo = registry::ComponentInfo<ErasedDropComponentDescriptor>;
 
 pub type TrySpawnError = entities::TrySpawnError<EntityLocation>;
 

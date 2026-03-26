@@ -22,7 +22,10 @@ use crate::{
         erased::{
             ErasedComponentMutPtr, ErasedComponentPtr, WithErasedDrop, error::NotRegisteredError,
         },
-        registry::{ComponentId, ComponentRegistry},
+        registry::{
+            ComponentId, ComponentRegistry,
+            traits::{ComponentIdFrom, FromComponentType},
+        },
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
@@ -109,14 +112,16 @@ where
     Meta: AsRef<FieldDescriptor>,
 {
     #[inline]
-    pub fn downcast<B>(
+    pub fn downcast<B, T>(
         self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<BundleMutPtrs<B>, IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.archetype().check_compatibility_of::<B>(components)?;
+        self.archetype()
+            .check_compatibility_of::<B, T>(components)?;
 
         let ptrs = B::mut_ptrs_from_erased(components, self)
             .expect("archetype compatibility should be already checked");
@@ -163,19 +168,22 @@ where
     #[inline]
     pub unsafe fn drop_in_place(
         self,
-        registry: &ComponentRegistry,
+        components: &ComponentRegistry<impl WithErasedDrop, impl ?Sized>,
     ) -> Result<(), NotRegisteredError> {
         self.iter()
             .map(ErasedComponentPtr::component_id)
             .try_for_each(|id| {
-                registry
+                components
                     .get_component_info(id)
                     .map(drop)
                     .ok_or(NotRegisteredError)
             })?;
 
-        self.into_iter()
-            .for_each(|ptr| unsafe { ptr.drop_in_place(registry) }.expect("should be registered"));
+        self.into_iter().for_each(|ptr| {
+            if let Err(error) = unsafe { ptr.drop_in_place(components) } {
+                unreachable!("{error}, but it was checked earlier to be registered")
+            }
+        });
         Ok(())
     }
 }

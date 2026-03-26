@@ -14,7 +14,10 @@ use crate::{
     bundle::{Bundle, BundleRefs, erased::ErasedBundlePtrs},
     component::{
         erased::ErasedComponentRef,
-        registry::{ComponentId, ComponentRegistry},
+        registry::{
+            ComponentId, ComponentRegistry,
+            traits::{ComponentIdFrom, FromComponentType},
+        },
     },
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
@@ -87,14 +90,15 @@ where
     Meta: AsRef<FieldDescriptor>,
 {
     #[inline]
-    pub fn downcast<B>(
+    pub fn downcast<B, T>(
         self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<BundleRefs<'data, B>, IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let slices = self.into_ptrs().downcast::<B>(components)?;
+        let slices = self.into_ptrs().downcast::<B, T>(components)?;
         let slices = unsafe { B::CONTEXT.ptrs_to_refs(slices) };
         Ok(slices)
     }

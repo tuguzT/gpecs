@@ -21,7 +21,10 @@ use crate::{
     },
     component::{
         erased::{ErasedComponent, ErasedDrop, WithErasedDrop},
-        registry::{ComponentId, ComponentInfo, ComponentRegistry},
+        registry::{
+            ComponentId, ComponentInfo, ComponentRegistry,
+            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+        },
     },
     entity::Entity,
     soa::{
@@ -73,15 +76,15 @@ impl From<NoEpochEntity> for Entity {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ErasedDropMeta {
-    descriptor: FieldDescriptor,
+    desc: FieldDescriptor,
     erased_drop: Option<ErasedDrop>,
 }
 
 impl AsRef<FieldDescriptor> for ErasedDropMeta {
     #[inline]
     fn as_ref(&self) -> &FieldDescriptor {
-        let Self { descriptor, .. } = self;
-        descriptor
+        let Self { desc, .. } = self;
+        desc
     }
 }
 
@@ -93,13 +96,15 @@ impl WithErasedDrop for ErasedDropMeta {
     }
 }
 
-impl FromComponentInfo for ErasedDropMeta {
+impl<Meta> FromComponentInfo<Meta> for ErasedDropMeta
+where
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop,
+{
     #[inline]
-    fn from_component_info(info: &ComponentInfo) -> Self {
-        Self {
-            descriptor: info.as_meta().descriptor(),
-            erased_drop: info.as_meta().erased_drop(),
-        }
+    fn from_component_info(info: &ComponentInfo<Meta>) -> Self {
+        let desc = FromComponentInfo::from_component_info(info);
+        let erased_drop = FromComponentInfo::from_component_info(info);
+        Self { desc, erased_drop }
     }
 }
 
@@ -107,7 +112,7 @@ impl FromErasedComponent for ErasedDropMeta {
     #[inline]
     fn from_erased_component(component: &ErasedComponent) -> Self {
         Self {
-            descriptor: FieldDescriptor::new(component.as_field().layout()),
+            desc: FieldDescriptor::new(component.as_field().layout()),
             erased_drop: component.erased_drop(),
         }
     }
@@ -119,9 +124,13 @@ pub struct ArchetypeStorage {
 
 impl ArchetypeStorage {
     #[inline]
-    pub fn new<I>(components: &ComponentRegistry, component_ids: I) -> Result<Self, ArchetypeError>
+    pub fn new<I, T>(
+        components: &ComponentRegistry<T, impl ?Sized>,
+        component_ids: I,
+    ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
+        T: AsRef<FieldDescriptor> + WithErasedDrop,
     {
         let archetype = ErasedArchetype::new(components, component_ids)?;
         let me = Self::from_archetype(archetype);
@@ -129,21 +138,27 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn of<B>(components: &ComponentRegistry) -> Result<Self, ArchetypeError>
+    pub fn of<B, M, T>(components: &ComponentRegistry<M, T>) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
+        M: AsRef<FieldDescriptor> + WithErasedDrop,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let archetype = ErasedArchetype::of::<B>(components)?;
+        let archetype = ErasedArchetype::of::<B, M, T>(components)?;
         let me = Self::from_archetype(archetype);
         Ok(me)
     }
 
     #[inline]
-    pub fn register<B>(components: &mut ComponentRegistry) -> Result<Self, DuplicateComponentError>
+    pub fn register<B, M, T>(
+        components: &mut ComponentRegistry<M, T>,
+    ) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
+        M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
+        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
-        let archetype = ErasedArchetype::register::<B>(components)?;
+        let archetype = ErasedArchetype::register::<B, M, T>(components)?;
         let me = Self::from_archetype(archetype);
         Ok(me)
     }
@@ -287,78 +302,83 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn bundles<B>(
+    pub fn bundles<B, T>(
         &self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<(&[Entity], BundleSlices<'_, B>), IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let (entities, bundles) = self.as_slices();
-        let bundles = bundles.downcast::<B>(components)?;
+        let bundles = bundles.downcast::<B, T>(components)?;
         Ok((entities, bundles))
     }
 
     #[inline]
-    pub fn bundles_mut<B>(
+    pub fn bundles_mut<B, T>(
         &mut self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<(&[Entity], BundleSlicesMut<'_, B>), IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let (entities, bundles) = self.as_mut_slices();
-        let bundles = bundles.downcast::<B>(components)?;
+        let bundles = bundles.downcast::<B, T>(components)?;
         Ok((entities, bundles))
     }
 
     #[inline]
-    pub fn get_bundle<B>(
+    pub fn get_bundle<B, T>(
         &self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
         entity: Entity,
     ) -> Result<Option<BundleRefs<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Some(bundle) = self.get(entity) else {
             return Ok(None);
         };
 
-        let bundle = bundle.downcast::<B>(components)?;
+        let bundle = bundle.downcast::<B, T>(components)?;
         Ok(Some(bundle))
     }
 
     #[inline]
-    pub fn get_bundle_mut<B>(
+    pub fn get_bundle_mut<B, T>(
         &mut self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
         entity: Entity,
     ) -> Result<Option<BundleRefsMut<'_, B>>, IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Some(bundle) = self.get_mut(entity) else {
             return Ok(None);
         };
 
-        let bundle = bundle.downcast::<B>(components)?;
+        let bundle = bundle.downcast::<B, T>(components)?;
         Ok(Some(bundle))
     }
 
     #[inline]
-    pub fn insert_bundle<B>(
+    pub fn insert_bundle<B, T>(
         &mut self,
-        components: &mut ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
         entity: Entity,
         value: B,
     ) -> Result<Option<B>, IncompatibleBundleValueError<B>>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         if let Err(reason) = self
             .archetype()
-            .check_exact_compatibility_of::<B>(components)
+            .check_exact_compatibility_of::<B, T>(components)
         {
             let error = IncompatibleBundleValueError { value, reason };
             return Err(error);
@@ -369,7 +389,7 @@ impl ArchetypeStorage {
             TryInsertAccess::ReadWrite(dst) => {
                 let dst = dst
                     .into_ptrs()
-                    .downcast::<B>(components)
+                    .downcast::<B, T>(components)
                     .expect("exact archetype compatibility should be already checked");
                 let value = unsafe { soa::ptr::replace::<B, _, _>(B::CONTEXT, dst, value) };
                 Some(value)
@@ -377,7 +397,7 @@ impl ArchetypeStorage {
             TryInsertAccess::WriteOnly(dst) => {
                 let dst = dst
                     .into_inner()
-                    .downcast::<B>(components)
+                    .downcast::<B, T>(components)
                     .expect("exact archetype compatibility should be already checked");
                 unsafe { B::CONTEXT.write(dst, value) };
                 None
@@ -387,22 +407,23 @@ impl ArchetypeStorage {
     }
 
     #[inline]
-    pub fn remove_bundle<B>(
+    pub fn remove_bundle<B, T>(
         &mut self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
         entity: Entity,
     ) -> Result<Option<B>, IncompatibleArchetypeExactError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         self.archetype()
-            .check_exact_compatibility_of::<B>(components)?;
+            .check_exact_compatibility_of::<B, T>(components)?;
 
         let Self { sparse_set } = self;
         let bundle = sparse_set.swap_remove_into(entity.into(), |_, src| {
             let src = src?
                 .cast_const()
-                .downcast::<B>(components)
+                .downcast::<B, T>(components)
                 .expect("exact archetype compatibility should be already checked");
             let bundle = unsafe { B::CONTEXT.read(src) };
             Some(bundle)

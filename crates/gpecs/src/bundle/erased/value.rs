@@ -33,7 +33,10 @@ use crate::{
     },
     component::{
         erased::{ErasedComponent, ErasedComponentMutRef, ErasedComponentRef, WithErasedDrop},
-        registry::{ComponentId, ComponentRegistry},
+        registry::{
+            ComponentId, ComponentRegistry,
+            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+        },
     },
     hash::IndexSet,
     soa::{
@@ -95,17 +98,20 @@ type Inner<T> = ErasedSoa<BoxedAlignedUninitStorage, T, CoreSliceItemPtrs<MaybeU
 
 impl<Meta> ErasedBundle<Meta>
 where
-    Meta: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentInfo + 'static,
+    Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     #[inline]
-    pub fn try_from<B>(
-        registry: &mut ComponentRegistry,
+    pub fn try_from<B, M, T>(
+        components: &mut ComponentRegistry<M, T>,
         bundle: B,
     ) -> Result<Self, FromBundleError<B>>
     where
         B: Bundle,
+        Meta: FromComponentInfo<M>,
+        M: FromComponentType,
+        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
-        let archetype = match ErasedArchetype::register::<B>(registry) {
+        let archetype = match ErasedArchetype::register::<B, M, T>(components) {
             Ok(archetype) => archetype,
             Err(reason) => return Err(FromBundleError::new(bundle, reason.into())),
         };
@@ -173,11 +179,15 @@ where
     }
 
     #[inline]
-    pub fn downcast<B>(self, registry: &ComponentRegistry) -> Result<B, DowncastError<Self>>
+    pub fn downcast<B, U>(
+        self,
+        registry: &ComponentRegistry<impl Sized, U>,
+    ) -> Result<B, DowncastError<Self>>
     where
         B: Bundle,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let src = match self.as_ptrs().downcast::<B>(registry) {
+        let src = match self.as_ptrs().downcast::<B, U>(registry) {
             Ok(src) => src,
             Err(reason) => return Err(DowncastError::new(self, reason)),
         };
@@ -188,28 +198,30 @@ where
     }
 
     #[inline]
-    pub fn downcast_ref<B>(
+    pub fn downcast_ref<B, U>(
         &self,
-        registry: &ComponentRegistry,
+        registry: &ComponentRegistry<impl Sized, U>,
     ) -> Result<BundleRefs<'_, B>, DowncastError<&Self>>
     where
         B: Bundle,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         self.as_refs()
-            .downcast::<B>(registry)
+            .downcast::<B, U>(registry)
             .map_err(|reason| DowncastError::new(self, reason))
     }
 
     #[inline]
-    pub fn downcast_mut<B>(
+    pub fn downcast_mut<B, U>(
         &mut self,
-        registry: &ComponentRegistry,
+        registry: &ComponentRegistry<impl Sized, U>,
     ) -> Result<BundleRefsMut<'_, B>, DowncastError<&mut Self>>
     where
         B: Bundle,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         unsafe { self.as_mut_ptrs().deref_mut() }
-            .downcast::<B>(registry)
+            .downcast::<B, U>(registry)
             .map_err(|reason| DowncastError::new(self, reason))
     }
 

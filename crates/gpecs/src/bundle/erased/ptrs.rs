@@ -20,7 +20,10 @@ use crate::{
     },
     component::{
         erased::{ErasedComponentPtr, WithErasedDrop},
-        registry::{ComponentId, ComponentRegistry},
+        registry::{
+            ComponentId, ComponentRegistry,
+            traits::{ComponentIdFrom, FromComponentType},
+        },
     },
     soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
@@ -96,14 +99,16 @@ where
     Meta: AsRef<FieldDescriptor>,
 {
     #[inline]
-    pub fn downcast<B>(
+    pub fn downcast<B, T>(
         self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<BundlePtrs<B>, IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        self.archetype().check_compatibility_of::<B>(components)?;
+        self.archetype()
+            .check_compatibility_of::<B, T>(components)?;
 
         let ptrs = B::ptrs_from_erased(components, self)
             .expect("archetype compatibility should be already checked");

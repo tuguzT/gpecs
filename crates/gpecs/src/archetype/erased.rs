@@ -27,7 +27,10 @@ use crate::{
     bundle::Bundle,
     component::{
         erased::{ErasedDrop, WithErasedDrop},
-        registry::{ComponentId, ComponentInfo, ComponentRegistry},
+        registry::{
+            ComponentId, ComponentInfo, ComponentRegistry,
+            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+        },
     },
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
@@ -44,7 +47,10 @@ pub struct ErasedArchetype<Meta = ()> {
 
 impl<Meta> ErasedArchetype<Meta> {
     #[inline]
-    pub fn with_meta<I>(components: &ComponentRegistry, iter: I) -> Result<Self, ArchetypeError>
+    pub fn with_meta<I>(
+        components: &ComponentRegistry<impl Sized, impl ?Sized>,
+        iter: I,
+    ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = (ComponentId, Meta)>,
     {
@@ -74,44 +80,54 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 }
 
-pub trait FromComponentInfo: Sized {
-    fn from_component_info(info: &ComponentInfo) -> Self;
+pub trait FromComponentInfo<Meta>: Sized {
+    fn from_component_info(info: &ComponentInfo<Meta>) -> Self;
 }
 
-impl FromComponentInfo for () {
+impl<Meta> FromComponentInfo<Meta> for () {
     #[inline]
-    fn from_component_info(_: &ComponentInfo) -> Self {}
+    fn from_component_info(_: &ComponentInfo<Meta>) -> Self {}
 }
 
-impl FromComponentInfo for ComponentInfo {
+impl<Meta> FromComponentInfo<Meta> for ComponentInfo<Meta>
+where
+    Meta: Clone,
+{
     #[inline]
-    fn from_component_info(info: &ComponentInfo) -> Self {
+    fn from_component_info(info: &ComponentInfo<Meta>) -> Self {
         info.clone()
     }
 }
 
-impl FromComponentInfo for FieldDescriptor {
+impl<Meta> FromComponentInfo<Meta> for FieldDescriptor
+where
+    Meta: AsRef<FieldDescriptor>,
+{
     #[inline]
-    fn from_component_info(info: &ComponentInfo) -> Self {
-        info.as_meta().descriptor()
+    fn from_component_info(info: &ComponentInfo<Meta>) -> Self {
+        *info.as_meta().as_ref()
     }
 }
 
-impl FromComponentInfo for Option<ErasedDrop> {
+impl<Meta> FromComponentInfo<Meta> for Option<ErasedDrop>
+where
+    Meta: WithErasedDrop,
+{
     #[inline]
-    fn from_component_info(info: &ComponentInfo) -> Self {
+    fn from_component_info(info: &ComponentInfo<Meta>) -> Self {
         info.as_meta().erased_drop()
     }
 }
 
-impl<Meta> ErasedArchetype<Meta>
-where
-    Meta: FromComponentInfo,
-{
+impl<Meta> ErasedArchetype<Meta> {
     #[inline]
-    pub fn new<I>(components: &ComponentRegistry, component_ids: I) -> Result<Self, ArchetypeError>
+    pub fn new<I, T>(
+        components: &ComponentRegistry<T, impl ?Sized>,
+        component_ids: I,
+    ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
+        Meta: FromComponentInfo<T>,
     {
         let components = try_collect_opt_components(
             component_ids.into_iter().map(|id| {
@@ -128,9 +144,11 @@ where
     }
 
     #[inline]
-    pub fn of<B>(components: &ComponentRegistry) -> Result<Self, ArchetypeError>
+    pub fn of<B, M, T>(components: &ComponentRegistry<M, T>) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
+        Meta: FromComponentInfo<M>,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let components = try_collect_opt_components(
             B::get_components(components).into_iter().map(|id| {
@@ -148,9 +166,14 @@ where
     }
 
     #[inline]
-    pub fn register<B>(components: &mut ComponentRegistry) -> Result<Self, DuplicateComponentError>
+    pub fn register<B, M, T>(
+        components: &mut ComponentRegistry<M, T>,
+    ) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
+        Meta: FromComponentInfo<M>,
+        M: FromComponentType,
+        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
         let components = try_collect_components(
             B::register_components(components).into_iter().map(|id| {
@@ -167,9 +190,7 @@ where
         let me = Self { components };
         Ok(me)
     }
-}
 
-impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn len(&self) -> usize {
         let Self { components } = self;
@@ -251,7 +272,7 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn check_compatibility_for<I>(
         &self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, impl ?Sized>,
         component_ids: I,
     ) -> Result<(), IncompatibleArchetypeError>
     where
@@ -263,14 +284,15 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn check_compatibility_of<B>(
+    pub fn check_compatibility_of<B, T>(
         &self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<(), IncompatibleArchetypeError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let other = ErasedArchetype::<()>::of::<B>(components)?;
+        let other = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         self.check_compatibility(&other)?;
         Ok(())
     }
@@ -291,7 +313,7 @@ impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn check_exact_compatibility_for<I>(
         &self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, impl ?Sized>,
         component_ids: I,
     ) -> Result<(), IncompatibleArchetypeExactError>
     where
@@ -302,14 +324,15 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn check_exact_compatibility_of<B>(
+    pub fn check_exact_compatibility_of<B, T>(
         &self,
-        components: &ComponentRegistry,
+        components: &ComponentRegistry<impl Sized, T>,
     ) -> Result<(), IncompatibleArchetypeExactError>
     where
         B: Bundle,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let other = ErasedArchetype::<()>::of::<B>(components)?;
+        let other = ErasedArchetype::<()>::of::<B, _, _>(components)?;
         self.check_exact_compatibility(&other)
     }
 

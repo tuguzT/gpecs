@@ -8,7 +8,7 @@ use bytemuck::must_cast_slice;
 use gpecs_sparse::set::EpochSparseSet;
 use wgpu::Device;
 
-pub use gpecs_archetype::id::GpuArchetypeId;
+pub use gpecs_archetype::registry::GpuArchetypeId;
 
 use crate::{
     archetype::{

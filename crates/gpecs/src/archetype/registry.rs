@@ -9,7 +9,7 @@ use std::{
     ptr, slice,
 };
 
-pub use gpecs_archetype::id::ArchetypeId;
+pub use gpecs_archetype::registry::ArchetypeId;
 
 use indexmap::{Equivalent, set::MutableValues};
 use itertools::Itertools;

@@ -1,4 +1,4 @@
-pub use gpecs_component::id::ComponentId;
+pub use gpecs_component::registry::ComponentId;
 
 pub use self::{
     alloc::ComponentRegistry, ids::ComponentIds, info::ComponentInfo, view::ComponentRegistryView,

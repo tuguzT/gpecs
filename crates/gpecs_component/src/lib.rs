@@ -4,6 +4,6 @@
 
 pub use self::traits::{Component, GpuComponent};
 
-pub mod id;
+pub mod registry;
 
 mod traits;

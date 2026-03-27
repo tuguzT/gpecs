@@ -1,4 +1,4 @@
-use gpecs_component::id::{ComponentId, GpuComponentId};
+use gpecs_component::registry::{ComponentId, GpuComponentId};
 
 #[test]
 fn new() {

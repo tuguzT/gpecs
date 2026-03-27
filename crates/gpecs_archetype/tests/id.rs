@@ -1,4 +1,4 @@
-use gpecs_archetype::id::{ArchetypeId, GpuArchetypeId};
+use gpecs_archetype::registry::{ArchetypeId, GpuArchetypeId};
 
 #[test]
 fn new() {

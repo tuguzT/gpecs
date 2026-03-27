@@ -10,5 +10,9 @@ rust-version.workspace = true
 [dependencies]
 bytemuck = { workspace = true, features = ["derive"] }
 
+[features]
+default = ["alloc"]
+alloc = []
+
 [lints]
 workspace = true

@@ -1,8 +1,9 @@
-use crate::component::Component;
-
-use super::{
-    ComponentId, ComponentIds, ComponentInfo,
-    traits::{ComponentIdFrom, FromComponentType},
+use crate::{
+    Component,
+    registry::{
+        ComponentId, ComponentIds, ComponentInfo,
+        traits::{ComponentIdFrom, FromComponentType},
+    },
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

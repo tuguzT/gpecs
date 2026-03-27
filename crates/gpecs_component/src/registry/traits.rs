@@ -1,12 +1,9 @@
-use std::{
+use core::{
     alloc::Layout,
     any::{self, TypeId},
 };
 
-use crate::{
-    component::{Component, erased::ErasedDrop, registry::ComponentId},
-    soa::field::FieldDescriptor,
-};
+use crate::{Component, registry::ComponentId};
 
 pub trait FromComponentType: Sized {
     fn from_component<T: Component>() -> Self;
@@ -30,20 +27,6 @@ impl FromComponentType for Layout {
     #[inline]
     fn from_component<T: Component>() -> Self {
         Layout::new::<T>()
-    }
-}
-
-impl FromComponentType for FieldDescriptor {
-    #[inline]
-    fn from_component<T: Component>() -> Self {
-        FieldDescriptor::of::<T>()
-    }
-}
-
-impl FromComponentType for Option<ErasedDrop> {
-    #[inline]
-    fn from_component<T: Component>() -> Self {
-        ErasedDrop::of::<T>()
     }
 }
 

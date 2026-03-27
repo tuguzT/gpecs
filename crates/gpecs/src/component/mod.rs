@@ -1,4 +1,3 @@
-pub use gpecs_component::Component;
+pub use gpecs_component::{Component, registry};
 
 pub mod erased;
-pub mod registry;

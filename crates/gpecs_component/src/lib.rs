@@ -2,6 +2,9 @@
 
 #![cfg_attr(not(test), no_std)]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 pub use self::traits::{Component, GpuComponent};
 
 pub mod registry;

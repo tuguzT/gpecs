@@ -1,4 +1,4 @@
-use super::ComponentId;
+use crate::registry::ComponentId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ComponentInfo<Meta>

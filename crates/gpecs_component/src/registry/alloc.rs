@@ -1,8 +1,12 @@
-use crate::component::Component;
+use alloc::vec::Vec;
 
-use super::{
-    ComponentId, ComponentIds, ComponentInfo, ComponentRegistryView, component_id_from_usize,
-    traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+use crate::{
+    Component,
+    registry::{
+        ComponentId, ComponentIds, ComponentInfo, ComponentRegistryView,
+        ids::component_id_from_usize,
+        traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

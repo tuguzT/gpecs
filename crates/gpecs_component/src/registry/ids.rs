@@ -1,10 +1,10 @@
-use std::{
+use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     ops::Range,
 };
 
-use super::{ComponentId, ComponentRegistryView, component_id_from_usize, component_id_trusted};
+use crate::registry::{ComponentId, ComponentRegistryView};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ComponentIds {
@@ -117,3 +117,14 @@ impl ExactSizeIterator for ComponentIds {
 }
 
 impl FusedIterator for ComponentIds {}
+
+#[inline]
+pub fn component_id_from_usize(index: usize) -> ComponentId {
+    let id = index.try_into().expect("`ComponentId` overflow");
+    component_id_trusted(id)
+}
+
+#[inline]
+pub fn component_id_trusted(id: u32) -> ComponentId {
+    unsafe { ComponentId::from_u32(id) }
+}

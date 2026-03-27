@@ -126,7 +126,7 @@ impl<'ctx> GpuExecutor<'ctx> {
     }
 
     #[inline]
-    pub fn get_component_info(&self, component_id: GpuComponentId) -> Option<&ComponentInfo> {
+    pub fn get_component_info(&self, component_id: GpuComponentId) -> Option<ComponentInfo<'_>> {
         let Self { context, .. } = self;
         context.get_component_info(component_id.into())
     }

@@ -101,7 +101,7 @@ where
     Meta: AsRef<FieldDescriptor> + WithErasedDrop,
 {
     #[inline]
-    fn from_component_info(info: &ComponentInfo<Meta>) -> Self {
+    fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
         let desc = FromComponentInfo::from_component_info(info);
         let erased_drop = FromComponentInfo::from_component_info(info);
         Self { desc, erased_drop }

@@ -36,7 +36,7 @@ pub struct ComponentRegistry<Meta, Mapping = ()>
 where
     Mapping: ?Sized,
 {
-    components: Vec<ComponentInfo<Meta>>,
+    components: Vec<Meta>,
     mapping: Mapping,
 }
 
@@ -72,12 +72,11 @@ where
     }
 
     #[inline]
-    fn register_inner(components: &mut Vec<ComponentInfo<Meta>>, meta: Meta) -> ComponentId {
+    fn register_inner(components: &mut Vec<Meta>, meta: Meta) -> ComponentId {
         let index = components.len();
         let component_id = component_id_from_usize(index);
 
-        let info = ComponentInfo { component_id, meta };
-        components.push(info);
+        components.push(meta);
 
         component_id
     }
@@ -95,11 +94,14 @@ where
     }
 
     #[inline]
-    pub fn get_component_info(&self, id: ComponentId) -> Option<&ComponentInfo<Meta>> {
+    pub fn get_component_info(&self, component_id: ComponentId) -> Option<ComponentInfo<&Meta>> {
         let Self { components, .. } = self;
 
-        let index = component_id_into_usize(id);
-        components.get(index)
+        let index = component_id_into_usize(component_id);
+        let meta = components.get(index)?;
+
+        let info = ComponentInfo { component_id, meta };
+        Some(info)
     }
 
     #[inline]

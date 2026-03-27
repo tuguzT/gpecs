@@ -18,7 +18,7 @@ use crate::{
 };
 
 pub type Components = ComponentRegistry<ErasedDropComponentDescriptor, ComponentTypeIdMap>;
-pub type ComponentInfo = registry::ComponentInfo<ErasedDropComponentDescriptor>;
+pub type ComponentInfo<'a> = registry::ComponentInfo<&'a ErasedDropComponentDescriptor>;
 
 #[derive(Debug, Clone)]
 pub struct ErasedDropComponentDescriptor {

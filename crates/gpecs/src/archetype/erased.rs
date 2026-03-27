@@ -81,22 +81,12 @@ impl<Meta> ErasedArchetype<Meta> {
 }
 
 pub trait FromComponentInfo<Meta>: Sized {
-    fn from_component_info(info: &ComponentInfo<Meta>) -> Self;
+    fn from_component_info(info: ComponentInfo<&Meta>) -> Self;
 }
 
 impl<Meta> FromComponentInfo<Meta> for () {
     #[inline]
-    fn from_component_info(_: &ComponentInfo<Meta>) -> Self {}
-}
-
-impl<Meta> FromComponentInfo<Meta> for ComponentInfo<Meta>
-where
-    Meta: Clone,
-{
-    #[inline]
-    fn from_component_info(info: &ComponentInfo<Meta>) -> Self {
-        info.clone()
-    }
+    fn from_component_info(_: ComponentInfo<&Meta>) -> Self {}
 }
 
 impl<Meta> FromComponentInfo<Meta> for FieldDescriptor
@@ -104,7 +94,7 @@ where
     Meta: AsRef<FieldDescriptor>,
 {
     #[inline]
-    fn from_component_info(info: &ComponentInfo<Meta>) -> Self {
+    fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
         *info.as_meta().as_ref()
     }
 }
@@ -114,7 +104,7 @@ where
     Meta: WithErasedDrop,
 {
     #[inline]
-    fn from_component_info(info: &ComponentInfo<Meta>) -> Self {
+    fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
         info.as_meta().erased_drop()
     }
 }

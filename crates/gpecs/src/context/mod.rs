@@ -206,7 +206,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_component_info(&self, component_id: ComponentId) -> Option<&ComponentInfo> {
+    pub fn get_component_info(&self, component_id: ComponentId) -> Option<ComponentInfo<'_>> {
         let Self { components, .. } = self;
         components.get_component_info(component_id)
     }

@@ -55,7 +55,7 @@ pub unsafe trait ComponentIdFrom {
 
 unsafe impl<T> ComponentIdFrom for &T
 where
-    T: ComponentIdFrom,
+    T: ComponentIdFrom + ?Sized,
 {
     type Key = T::Key;
 
@@ -67,7 +67,7 @@ where
 
 unsafe impl<T> ComponentIdFrom for &mut T
 where
-    T: ComponentIdFrom,
+    T: ComponentIdFrom + ?Sized,
 {
     type Key = T::Key;
 
@@ -85,7 +85,7 @@ pub unsafe trait ComponentIdFromOrInsertWith: ComponentIdFrom {
 
 unsafe impl<T> ComponentIdFromOrInsertWith for &mut T
 where
-    T: ComponentIdFromOrInsertWith,
+    T: ComponentIdFromOrInsertWith + ?Sized,
 {
     #[inline]
     fn component_id_from_or_insert_with<F>(&mut self, key: Self::Key, f: F) -> ComponentId

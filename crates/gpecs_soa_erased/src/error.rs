@@ -483,6 +483,7 @@ where
 pub enum FromStorageValueErrorKind {
     LayoutMismatch(LayoutMismatchError),
     InvalidLayout(LayoutError),
+    InsufficientAlign(InsufficientAlignError),
 }
 
 impl From<LayoutMismatchError> for FromStorageValueErrorKind {
@@ -499,11 +500,19 @@ impl From<LayoutError> for FromStorageValueErrorKind {
     }
 }
 
+impl From<InsufficientAlignError> for FromStorageValueErrorKind {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
 impl Display for FromStorageValueErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LayoutMismatch(error) => Display::fmt(error, f),
             Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
         }
     }
 }
@@ -513,6 +522,7 @@ impl Error for FromStorageValueErrorKind {
         match self {
             Self::LayoutMismatch(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
         }
     }
 }
@@ -584,6 +594,7 @@ pub enum FromDescriptorsValueErrorKind<T> {
     LenMismatch(LenMismatchError),
     LayoutMismatch(LayoutMismatchError),
     InvalidLayout(LayoutError),
+    InsufficientAlign(InsufficientAlignError),
     FromLayout(T),
 }
 
@@ -608,6 +619,13 @@ impl<T> From<LayoutError> for FromDescriptorsValueErrorKind<T> {
     }
 }
 
+impl<T> From<InsufficientAlignError> for FromDescriptorsValueErrorKind<T> {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
 impl<T> Display for FromDescriptorsValueErrorKind<T>
 where
     T: Display,
@@ -617,6 +635,7 @@ where
             Self::LenMismatch(error) => Display::fmt(error, f),
             Self::LayoutMismatch(error) => Display::fmt(error, f),
             Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
             Self::FromLayout(error) => Display::fmt(error, f),
         }
     }
@@ -631,6 +650,7 @@ where
             Self::LenMismatch(error) => Some(error),
             Self::LayoutMismatch(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
             Self::FromLayout(error) => Some(error),
         }
     }
@@ -640,6 +660,7 @@ where
             Self::LenMismatch(error) => Some(error),
             Self::LayoutMismatch(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
             Self::FromLayout(_) => None,
         }
     }
@@ -707,7 +728,15 @@ where
 #[derive(Debug, Clone)]
 pub enum FromValueErrorKind<T> {
     InvalidLayout(LayoutError),
+    InsufficientAlign(InsufficientAlignError),
     FromLayout(T),
+}
+
+impl<T> From<InsufficientAlignError> for FromValueErrorKind<T> {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
 }
 
 impl<T> From<LayoutError> for FromValueErrorKind<T> {
@@ -724,6 +753,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
             Self::FromLayout(error) => Display::fmt(error, f),
         }
     }
@@ -736,6 +766,7 @@ where
     fn cause(&self) -> Option<&dyn Error> {
         match self {
             Self::InvalidLayout(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
             Self::FromLayout(error) => Some(error),
         }
     }
@@ -743,6 +774,7 @@ where
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::InvalidLayout(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
             Self::FromLayout(_) => None,
         }
     }

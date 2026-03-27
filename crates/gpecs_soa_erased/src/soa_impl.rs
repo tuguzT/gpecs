@@ -14,11 +14,11 @@ use crate::{
     storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 
-unsafe impl<T, D, P, U> RawSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+unsafe impl<T, D, P> RawSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
+    P: SliceItemPtrs,
 {
     type Ptrs<'a> = ErasedSoaPtrs<FieldDescriptorsOutput<'a, D>, P::Const>;
 
@@ -225,25 +225,24 @@ where
     }
 }
 
-unsafe impl<T, D, P, U> RawSoa for ErasedSoa<T, D, P>
+unsafe impl<T, D, P> RawSoa for ErasedSoa<T, D, P>
 where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
+    P: SliceItemPtrs,
 {
     type Context = ErasedSoaContext<D, P>;
-    type Fields = ErasedSoaFields<U>;
+    type Fields = ErasedSoaFields<P::Item>;
 }
 
-unsafe impl<'a, T, D, P, U>
+unsafe impl<'a, T, D, P>
     ReadSoaContext<'a, ErasedSoa<T, FieldDescriptorsOutput<'a, D>, P>, ErasedSoa<T, D, P>>
     for ErasedSoaContext<D, P>
 where
-    T: AlignedStorageFromLayout<Item = U, Error: Debug>,
+    T: AlignedStorageFromLayout<Item: Copy, Error: Debug>,
     D: CovariantFieldDescriptors,
     for<'b, 'c> FieldDescriptorsOutput<'b, D>: FieldDescriptors<'c> + Clone,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: Copy,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
     unsafe fn read(
@@ -255,15 +254,15 @@ where
     }
 }
 
-unsafe impl<T, D, N, P, U> WriteSoaContext<ErasedSoa<T, N, P>, ErasedSoa<T, D, P>>
+unsafe impl<T, D, N, P> WriteSoaContext<ErasedSoa<T, N, P>, ErasedSoa<T, D, P>>
     for ErasedSoaContext<D, P>
 where
-    T: AlignedStorage<Item = U>,
+    T: AlignedStorage,
     D: CovariantFieldDescriptors,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
     N: FieldDescriptorsOwned,
     for<'a, 'b> FieldDescriptorsOutput<'a, N>: FieldDescriptors<'b>,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
     unsafe fn write(&self, mut dst: Self::MutPtrs<'_>, value: ErasedSoa<T, N, P>) {
@@ -301,7 +300,7 @@ unsafe impl<T, D, P> AllocSoaContext<ErasedSoa<T, D, P>> for ErasedSoaContext<D,
 where
     D: CovariantFieldDescriptors,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    P: SliceItemPtrs<Item = MaybeUninit<u8>>,
+    P: SliceItemPtrs,
 {
     #[inline]
     unsafe fn ptrs_from_buffer(&self, buffer: *const u8, capacity: usize) -> Self::Ptrs<'_> {
@@ -314,12 +313,11 @@ where
     }
 }
 
-unsafe impl<'data, T, D, P, U> SoaContext<'data, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
+unsafe impl<'data, T, D, P> SoaContext<'data, ErasedSoa<T, D, P>> for ErasedSoaContext<D, P>
 where
     D: CovariantFieldDescriptors + ?Sized,
     for<'a, 'b> FieldDescriptorsOutput<'a, D>: FieldDescriptors<'b> + Clone,
-    P: SliceItemPtrs<Item = MaybeUninit<U>>,
-    U: 'data,
+    P: SliceItemPtrs<Item: 'data>,
 {
     type Refs<'a> = ErasedSoaRefs<'data, FieldDescriptorsOutput<'a, D>, P::Const>;
 

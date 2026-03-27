@@ -3,7 +3,7 @@ use itertools::{EitherOrBoth::Both, Itertools};
 use crate::{
     error::DowncastErrorKind,
     error::{LenMismatchError, check_layout},
-    soa::field::{FieldDescriptor, IntoCopiedFieldDescriptors},
+    soa::field::{FieldDescriptor, buffer_offsets},
 };
 
 #[inline]
@@ -14,6 +14,8 @@ where
 {
     #[cfg(debug_assertions)]
     {
+        use crate::soa::field::IntoCopiedFieldDescriptors;
+
         let mut len = 0;
         let a = a.into_iter().inspect(|_| len += 1);
 
@@ -35,20 +37,29 @@ where
     }
 }
 
-pub fn check_downcast<I, J>(actual: I, expected: J) -> Result<(), DowncastErrorKind>
+pub fn check_downcast<I, J>(
+    actual: I,
+    expected: J,
+    capacity: usize,
+) -> Result<(), DowncastErrorKind>
 where
     I: IntoIterator<Item: AsRef<FieldDescriptor>>,
     J: IntoIterator<Item: AsRef<FieldDescriptor>>,
 {
-    let mut actual = actual.copied_field_descriptors();
-    let expected = expected.copied_field_descriptors();
-    for (field_index, item) in actual.by_ref().zip_longest(expected).enumerate() {
+    let mut actual = buffer_offsets(actual, capacity);
+    let mut expected = buffer_offsets(expected, capacity);
+    for (field_index, item) in actual.by_ref().zip_longest(expected.by_ref()).enumerate() {
         let Both(actual, expected) = item else {
             let descriptors_count = field_index + actual.count();
             let error = unsafe { LenMismatchError::new_unchecked(descriptors_count, field_index) };
             return Err(error.into());
         };
-        check_layout(actual.layout(), expected.layout())?;
+
+        let actual = actual?;
+        let expected = expected?;
+        check_layout(actual.desc.layout(), expected.desc.layout())?;
+        check_layout(actual.layout, expected.layout)?;
     }
+    check_layout(actual.into_layout(), expected.into_layout())?;
     Ok(())
 }

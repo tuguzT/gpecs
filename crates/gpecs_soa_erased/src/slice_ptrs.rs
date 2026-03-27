@@ -2,7 +2,6 @@ use core::{
     alloc::Layout,
     fmt::{self, Debug},
     iter::FusedIterator,
-    mem::MaybeUninit,
 };
 
 use crate::{
@@ -114,7 +113,7 @@ where
 impl<D, P> ErasedSoaSlicePtrs<D, P>
 where
     D: FieldDescriptorsOwned,
-    P: ConstSliceItemPtr<Item = MaybeUninit<u8>>,
+    P: ConstSliceItemPtr,
 {
     #[inline]
     pub unsafe fn downcast<T>(
@@ -176,10 +175,10 @@ where
     }
 }
 
-impl<'a, D, P, U> ErasedSoaSlicePtrs<D, P>
+impl<'a, D, P> ErasedSoaSlicePtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    P: ConstSliceItemPtr,
 {
     #[inline]
     pub fn iter(&'a self) -> ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, P> {
@@ -225,10 +224,10 @@ where
 {
 }
 
-impl<'a, D, P, U> IntoIterator for &'a ErasedSoaSlicePtrs<D, P>
+impl<'a, D, P> IntoIterator for &'a ErasedSoaSlicePtrs<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    P: ConstSliceItemPtr,
 {
     type Item = ErasedSlicePtr<P>;
     type IntoIter = ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, P>;
@@ -239,10 +238,10 @@ where
     }
 }
 
-impl<D, P, U> IntoIterator for ErasedSoaSlicePtrs<D, P>
+impl<D, P> IntoIterator for ErasedSoaSlicePtrs<D, P>
 where
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    P: ConstSliceItemPtr,
 {
     type Item = ErasedSlicePtr<P>;
     type IntoIter = ErasedSoaSlicePtrsIter<D::IntoIter, P>;
@@ -332,10 +331,10 @@ where
     }
 }
 
-impl<'a, D, P, U> ErasedSoaSlicePtrsIter<D, P>
+impl<'a, D, P> ErasedSoaSlicePtrsIter<D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    P: ConstSliceItemPtr,
 {
     #[inline]
     pub(super) fn entries(&'a self) -> ErasedSoaSlicePtrsIter<FieldDescriptorsIter<'a, D>, P> {
@@ -346,10 +345,10 @@ where
     }
 }
 
-impl<D, P, U> Debug for ErasedSoaSlicePtrsIter<D, P>
+impl<D, P> Debug for ErasedSoaSlicePtrsIter<D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>> + Debug,
+    P: ConstSliceItemPtr + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries = self.entries();
@@ -371,10 +370,10 @@ where
     }
 }
 
-impl<D, P, U> Iterator for ErasedSoaSlicePtrsIter<D, P>
+impl<D, P> Iterator for ErasedSoaSlicePtrsIter<D, P>
 where
     D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    P: ConstSliceItemPtr,
 {
     type Item = ErasedSlicePtr<P>;
 
@@ -394,10 +393,10 @@ where
     }
 }
 
-impl<D, P, U> ExactSizeIterator for ErasedSoaSlicePtrsIter<D, P>
+impl<D, P> ExactSizeIterator for ErasedSoaSlicePtrsIter<D, P>
 where
     D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    P: ConstSliceItemPtr,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -406,10 +405,10 @@ where
     }
 }
 
-impl<D, P, U> FusedIterator for ErasedSoaSlicePtrsIter<D, P>
+impl<D, P> FusedIterator for ErasedSoaSlicePtrsIter<D, P>
 where
     D: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    P: ConstSliceItemPtr<Item = MaybeUninit<U>>,
+    P: ConstSliceItemPtr,
 {
 }
 

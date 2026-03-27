@@ -27,7 +27,8 @@ use crate::{
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
-            FieldDescriptorsOutput, FieldDescriptorsOwned, buffer_layout, buffer_offsets,
+            FieldDescriptorsOutput, FieldDescriptorsOwned, IntoCopiedFieldDescriptors,
+            buffer_offsets,
         },
         traits::{
             AllocSoa, AllocSoaContext, ReadSoaContext, Refs, RefsMut, Soa, SoaRead, SoaWrite,
@@ -94,13 +95,13 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const MaybeUninit<u8> {
+    pub fn as_ptr(&self) -> *const MaybeUninit<T::Item> {
         let Self { storage, .. } = self;
         storage.as_ptr().cast()
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut MaybeUninit<u8> {
+    pub fn as_mut_ptr(&mut self) -> *mut MaybeUninit<T::Item> {
         let Self { storage, .. } = self;
         storage.as_mut_ptr().cast()
     }
@@ -156,7 +157,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<Item = u8>,
+    T: AlignedStorage,
     D: FieldDescriptorsOwned,
 {
     #[inline]
@@ -174,7 +175,7 @@ where
         } = self;
 
         let descriptors = descriptors.field_descriptors();
-        if let Err(error) = check_downcast(descriptors, context.field_descriptors()) {
+        if let Err(error) = check_downcast(descriptors, context.field_descriptors(), 1) {
             return Err(DowncastError::new(self, error));
         }
 
@@ -188,7 +189,7 @@ where
 
         let Self { storage, .. } = self;
         let value = unsafe {
-            let src = context.ptrs_from_buffer(storage.as_ptr(), 1);
+            let src = context.ptrs_from_buffer(storage.as_ptr().cast(), 1);
             context.read(src)
         };
         Ok(value)
@@ -288,9 +289,9 @@ where
 
 impl<'a, T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<Item = u8>,
+    T: AlignedStorage,
     D: FieldDescriptors<'a, Output: FieldDescriptorsOwned> + ?Sized,
-    P: SliceItemPtrs<Item = MaybeUninit<u8>>,
+    P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
 {
     #[inline]
     pub unsafe fn downcast_ref<'ctx, V>(
@@ -382,7 +383,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorage<Item = u8>,
+    T: AlignedStorage,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
@@ -395,6 +396,12 @@ where
         V: AllocSoa + SoaWrite<W> + ?Sized,
     {
         let check = || {
+            context
+                .field_descriptors()
+                .copied_field_descriptors()
+                .map(FieldDescriptor::layout)
+                .try_for_each(|actual| check_sufficient_align(actual, Layout::new::<T::Item>()))?;
+
             let expected_layout = context.buffer_layout(1)?;
             check_layout(storage.layout(), expected_layout).map_err(From::from)
         };
@@ -402,12 +409,11 @@ where
 
         let descriptors = context
             .field_descriptors()
-            .into_iter()
-            .map(|desc| *desc.as_ref())
+            .copied_field_descriptors()
             .collect();
 
         unsafe {
-            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
+            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
             context.write(dst, value);
         }
 
@@ -418,7 +424,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorageFromLayout<Item = u8>,
+    T: AlignedStorageFromLayout,
     D: FieldDescriptorsOwned,
 {
     #[inline]
@@ -434,7 +440,7 @@ where
             let mut offsets = buffer_offsets(descriptors.field_descriptors(), 1);
             for (field_index, item) in offsets
                 .by_ref()
-                .zip_longest(descriptors.field_descriptors())
+                .zip_longest(context.field_descriptors())
                 .enumerate()
             {
                 let Both(offset, desc) = item else {
@@ -442,11 +448,14 @@ where
                     let error = unsafe { LenMismatchError::new_unchecked(count, field_index) };
                     return Err(error.into());
                 };
-                check_layout(offset?.desc.layout(), desc.as_ref().layout())?;
+
+                let actual = offset?.desc.layout();
+                check_layout(actual, desc.as_ref().layout())?;
+                check_sufficient_align(actual, Layout::new::<T::Item>())?;
             }
 
-            let expected_layout = offsets.into_layout();
-            let layout = buffer_layout(descriptors.field_descriptors(), 1)?;
+            let layout = offsets.into_layout();
+            let expected_layout = context.buffer_layout(1)?;
             check_layout(layout, expected_layout)?;
 
             T::from_layout(layout).map_err(FromDescriptorsValueErrorKind::FromLayout)
@@ -454,7 +463,7 @@ where
         let (value, mut storage) = check_from_descriptors_value(f, value)?;
 
         unsafe {
-            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
+            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
             context.write(dst, value);
         }
 
@@ -465,7 +474,7 @@ where
 
 impl<T, D, P> ErasedSoa<T, D, P>
 where
-    T: AlignedStorageFromLayout<Item = u8>,
+    T: AlignedStorageFromLayout,
     D: FromIterator<FieldDescriptor>,
 {
     #[inline]
@@ -477,6 +486,12 @@ where
         V: AllocSoa + SoaWrite<W> + ?Sized,
     {
         let f = || {
+            context
+                .field_descriptors()
+                .copied_field_descriptors()
+                .map(FieldDescriptor::layout)
+                .try_for_each(|actual| check_sufficient_align(actual, Layout::new::<T::Item>()))?;
+
             let layout = context.buffer_layout(1)?;
             T::from_layout(layout).map_err(FromValueErrorKind::FromLayout)
         };
@@ -484,12 +499,11 @@ where
 
         let descriptors = context
             .field_descriptors()
-            .into_iter()
-            .map(|desc| *desc.as_ref())
+            .copied_field_descriptors()
             .collect();
 
         unsafe {
-            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr(), 1);
+            let dst = context.ptrs_from_buffer_mut(storage.as_mut_ptr().cast(), 1);
             context.write(dst, value);
         }
 

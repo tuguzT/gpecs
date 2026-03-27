@@ -2,7 +2,6 @@ use core::{
     fmt::{self, Debug},
     iter::FusedIterator,
     marker::PhantomData,
-    mem::MaybeUninit,
     slice,
 };
 
@@ -90,7 +89,7 @@ where
 impl<'a, D, P> ErasedSoaMutRefs<'a, D, P>
 where
     D: FieldDescriptorsOwned,
-    P: MutSliceItemPtr<Item = MaybeUninit<u8>>,
+    P: MutSliceItemPtr,
 {
     #[inline]
     pub unsafe fn downcast<T>(
@@ -151,10 +150,10 @@ where
     }
 }
 
-impl<'a, D, P, U> ErasedSoaMutRefs<'_, D, P>
+impl<'a, D, P> ErasedSoaMutRefs<'_, D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr,
 {
     #[inline]
     pub fn iter(&'a self) -> ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConstPtr<P>> {
@@ -186,10 +185,10 @@ where
     }
 }
 
-impl<'a, D, P, U> IntoIterator for &'a ErasedSoaMutRefs<'_, D, P>
+impl<'a, D, P> IntoIterator for &'a ErasedSoaMutRefs<'_, D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr,
 {
     type Item = ErasedRef<'a, CastConstPtr<P>>;
     type IntoIter = ErasedSoaRefsIter<'a, FieldDescriptorsIter<'a, D>, CastConstPtr<P>>;
@@ -200,10 +199,10 @@ where
     }
 }
 
-impl<'a, D, P, U> IntoIterator for &'a mut ErasedSoaMutRefs<'_, D, P>
+impl<'a, D, P> IntoIterator for &'a mut ErasedSoaMutRefs<'_, D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr,
 {
     type Item = ErasedMutRef<'a, P>;
     type IntoIter = ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P>;
@@ -214,10 +213,10 @@ where
     }
 }
 
-impl<'a, D, P, U> IntoIterator for ErasedSoaMutRefs<'a, D, P>
+impl<'a, D, P> IntoIterator for ErasedSoaMutRefs<'a, D, P>
 where
     D: IntoIterator<Item: AsRef<FieldDescriptor>>,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr,
 {
     type Item = ErasedMutRef<'a, P>;
     type IntoIter = ErasedSoaMutRefsIter<'a, D::IntoIter, P>;
@@ -329,10 +328,10 @@ where
     }
 }
 
-impl<'a, D, P, U> ErasedSoaMutRefsIter<'_, D, P>
+impl<'a, D, P> ErasedSoaMutRefsIter<'_, D, P>
 where
     D: FieldDescriptors<'a> + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr,
 {
     #[inline]
     pub(super) fn entries(&'a self) -> ErasedSoaMutRefsIter<'a, FieldDescriptorsIter<'a, D>, P> {
@@ -343,11 +342,10 @@ where
     }
 }
 
-impl<D, P, U> Debug for ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P> Debug for ErasedSoaMutRefsIter<'_, D, P>
 where
     D: FieldDescriptorsOwned + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
-    U: Debug,
+    P: MutSliceItemPtr<Item: Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries = self.entries();
@@ -355,10 +353,10 @@ where
     }
 }
 
-impl<'a, D, P, U> Iterator for ErasedSoaMutRefsIter<'a, D, P>
+impl<'a, D, P> Iterator for ErasedSoaMutRefsIter<'a, D, P>
 where
     D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr,
 {
     type Item = ErasedMutRef<'a, P>;
 
@@ -377,10 +375,10 @@ where
     }
 }
 
-impl<D, P, U> ExactSizeIterator for ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P> ExactSizeIterator for ErasedSoaMutRefsIter<'_, D, P>
 where
     D: ExactSizeIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -389,10 +387,10 @@ where
     }
 }
 
-impl<D, P, U> FusedIterator for ErasedSoaMutRefsIter<'_, D, P>
+impl<D, P> FusedIterator for ErasedSoaMutRefsIter<'_, D, P>
 where
     D: FusedIterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-    P: MutSliceItemPtr<Item = MaybeUninit<U>>,
+    P: MutSliceItemPtr,
 {
 }
 

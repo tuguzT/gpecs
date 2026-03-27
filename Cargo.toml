@@ -40,10 +40,10 @@ rust-version = "1.92.0"
 [workspace.dependencies]
 # main crates
 gpecs = { path = "crates/gpecs" }
-gpecs_world = { path = "crates/gpecs_world" }
-gpecs_entity = { path = "crates/gpecs_entity" }
-gpecs_component = { path = "crates/gpecs_component" }
-gpecs_archetype = { path = "crates/gpecs_archetype" }
+gpecs_world = { path = "crates/gpecs_world", default-features = false }
+gpecs_entity = { path = "crates/gpecs_entity", default-features = false }
+gpecs_component = { path = "crates/gpecs_component", default-features = false }
+gpecs_archetype = { path = "crates/gpecs_archetype", default-features = false }
 # utility crates
 gpecs_ptr = { path = "crates/gpecs_ptr", default-features = false }
 gpecs_num = { path = "crates/gpecs_num", default-features = false }

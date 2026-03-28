@@ -81,13 +81,7 @@ where
         let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)
     }
-}
 
-impl<'a, D, P> ErasedSoaRefs<'a, D, P>
-where
-    D: FieldDescriptorsOwned,
-    P: ConstSliceItemPtr,
-{
     #[inline]
     pub unsafe fn downcast<T>(
         self,

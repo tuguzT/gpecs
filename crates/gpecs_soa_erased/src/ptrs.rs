@@ -64,7 +64,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = self;
         (descriptors, buffer, capacity, offset)
     }
@@ -76,7 +75,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = self;
 
         let buffer = buffer.cast_mut();
@@ -139,13 +137,7 @@ where
         let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, 0) };
         Ok(me)
     }
-}
 
-impl<D, P> ErasedSoaPtrs<D, P>
-where
-    D: FieldDescriptorsOwned,
-    P: ConstSliceItemPtr,
-{
     #[inline]
     pub unsafe fn downcast<T>(
         self,
@@ -159,7 +151,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = self;
 
         let actual = descriptors.field_descriptors();
@@ -220,7 +211,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = *self;
 
         assert_eq!(buffer, origin.buffer);
@@ -231,13 +221,7 @@ where
         let origin_offset = origin.offset().cast_signed();
         offset.wrapping_sub(origin_offset)
     }
-}
 
-impl<'a, D, P> ErasedSoaPtrs<D, P>
-where
-    D: FieldDescriptors<'a> + ?Sized,
-    P: ConstSliceItemPtr,
-{
     #[inline]
     pub fn iter(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, P> {
         let Self {
@@ -245,7 +229,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = *self;
 
         let descriptors = descriptors.field_descriptors().into_iter();
@@ -284,7 +267,6 @@ where
             capacity,
             offset,
             descriptors,
-            ..
         } = self;
 
         f.debug_struct("ErasedSoaPtrs")
@@ -308,7 +290,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = *self;
 
         let descriptors = descriptors.clone();
@@ -352,7 +333,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = self;
 
         let descriptors = descriptors.into_iter();
@@ -444,13 +424,7 @@ where
         let Self { inner, .. } = self;
         inner.as_inner()
     }
-}
 
-impl<D, P> ErasedSoaPtrsIter<D, P>
-where
-    D: ?Sized,
-    P: ConstSliceItemPtr,
-{
     #[inline]
     unsafe fn field_ptr_from_buffer_offset(&self, offset: BufferOffset) -> ErasedPtr<P> {
         let BufferOffset { desc, offset, .. } = offset;
@@ -487,7 +461,6 @@ where
             ref inner,
             buffer,
             offset,
-            ..
         } = *self;
 
         let layout = inner.layout();
@@ -521,7 +494,6 @@ where
             ref inner,
             buffer,
             offset,
-            ..
         } = *self;
 
         let inner = inner.clone();

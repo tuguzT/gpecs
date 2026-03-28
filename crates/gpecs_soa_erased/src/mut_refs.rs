@@ -84,13 +84,7 @@ where
         let me = unsafe { Self::from_ptrs(ptrs) };
         Ok(me)
     }
-}
 
-impl<'a, D, P> ErasedSoaMutRefs<'a, D, P>
-where
-    D: FieldDescriptorsOwned,
-    P: MutSliceItemPtr,
-{
     #[inline]
     pub unsafe fn downcast<T>(
         self,

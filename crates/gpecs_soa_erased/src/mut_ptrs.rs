@@ -65,7 +65,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = self;
         (descriptors, buffer, capacity, offset)
     }
@@ -77,7 +76,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = self;
 
         let ptr = buffer.cast_const();
@@ -145,13 +143,7 @@ where
         let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, 0) };
         Ok(me)
     }
-}
 
-impl<D, P> ErasedSoaMutPtrs<D, P>
-where
-    D: FieldDescriptorsOwned,
-    P: MutSliceItemPtr,
-{
     #[inline]
     pub unsafe fn downcast<T>(
         self,
@@ -165,7 +157,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = self;
 
         let actual = descriptors.field_descriptors();
@@ -235,7 +226,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = *self;
 
         assert_eq!(buffer.cast_const(), origin.as_buffer());
@@ -246,13 +236,7 @@ where
         let origin_offset = origin.offset().cast_signed();
         offset.wrapping_sub(origin_offset)
     }
-}
 
-impl<'a, D, P> ErasedSoaMutPtrs<D, P>
-where
-    D: FieldDescriptors<'a> + ?Sized,
-    P: MutSliceItemPtr,
-{
     #[inline]
     pub fn iter(&'a self) -> ErasedSoaPtrsIter<FieldDescriptorsIter<'a, D>, CastConstPtr<P>> {
         let Self {
@@ -260,7 +244,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = *self;
 
         let descriptors = descriptors.field_descriptors().into_iter();
@@ -275,7 +258,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = *self;
 
         let descriptors = descriptors.field_descriptors().into_iter();
@@ -416,7 +398,6 @@ where
             capacity,
             offset,
             descriptors,
-            ..
         } = self;
 
         f.debug_struct("ErasedSoaMutPtrs")
@@ -440,7 +421,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = *self;
 
         let descriptors = descriptors.clone();
@@ -498,7 +478,6 @@ where
             buffer,
             capacity,
             offset,
-            ..
         } = self;
 
         let descriptors = descriptors.into_iter();
@@ -596,13 +575,7 @@ where
         let Self { inner, .. } = self;
         inner.as_inner()
     }
-}
 
-impl<D, P> ErasedSoaMutPtrsIter<D, P>
-where
-    D: ?Sized,
-    P: MutSliceItemPtr,
-{
     #[inline]
     unsafe fn field_ptr_from_buffer_offset(&self, offset: BufferOffset) -> ErasedMutPtr<P> {
         let BufferOffset { desc, offset, .. } = offset;
@@ -639,7 +612,6 @@ where
             ref inner,
             buffer,
             offset,
-            ..
         } = *self;
 
         let layout = inner.layout();
@@ -673,7 +645,6 @@ where
             ref inner,
             buffer,
             offset,
-            ..
         } = *self;
 
         let inner = inner.clone();

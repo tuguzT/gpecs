@@ -108,13 +108,7 @@ where
         let me = unsafe { Self::new_unchecked(descriptors, buffer, capacity, offset, len) };
         Ok(me)
     }
-}
 
-impl<D, P> ErasedSoaSlicePtrs<D, P>
-where
-    D: FieldDescriptorsOwned,
-    P: ConstSliceItemPtr,
-{
     #[inline]
     pub unsafe fn downcast<T>(
         self,

@@ -14,6 +14,7 @@ gpecs_entity = { workspace = true, features = ["alloc"] }
 gpecs_component = { workspace = true, features = ["alloc"] }
 gpecs_archetype = { workspace = true }
 bytemuck = { workspace = true, features = ["derive", "must_cast"] }
+polonius-the-crab = { workspace = true }
 indexmap = { workspace = true }
 rustc-hash = { workspace = true }
 petgraph = { workspace = true }

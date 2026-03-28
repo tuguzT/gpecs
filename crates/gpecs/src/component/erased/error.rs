@@ -1,9 +1,17 @@
 use std::{
+    alloc::LayoutError,
     error::Error,
     fmt::{self, Debug, Display},
 };
 
-use gpecs_soa_erased::storage::AllocError;
+use gpecs_soa_erased::{
+    data::error::{
+        DowncastError as DataDowncastError, FromStorageError as DataFromStorageError,
+        FromStorageErrorKind as DataFromStorageErrorKind, FromValueError, FromValueErrorKind,
+        TryFromPtrError as DataTryFromPtrError, TryFromSlicePtrError as DataTryFromSlicePtrError,
+    },
+    error::{InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError},
+};
 
 use crate::component::{
     Component,
@@ -78,9 +86,175 @@ impl Display for NotRegisteredError {
 impl Error for NotRegisteredError {}
 
 #[derive(Debug, Clone)]
+pub enum DanglingError {
+    NotRegistered(NotRegisteredError),
+    InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<NotRegisteredError> for DanglingError {
+    #[inline]
+    fn from(error: NotRegisteredError) -> Self {
+        Self::NotRegistered(error)
+    }
+}
+
+impl From<InsufficientAlignError> for DanglingError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl Display for DanglingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotRegistered(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for DanglingError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NotRegistered(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TryFromPtrError {
+    NotRegistered(NotRegisteredError),
+    NotAligned(NotAlignedError),
+    InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<NotRegisteredError> for TryFromPtrError {
+    #[inline]
+    fn from(error: NotRegisteredError) -> Self {
+        Self::NotRegistered(error)
+    }
+}
+
+impl From<NotAlignedError> for TryFromPtrError {
+    #[inline]
+    fn from(error: NotAlignedError) -> Self {
+        Self::NotAligned(error)
+    }
+}
+
+impl From<InsufficientAlignError> for TryFromPtrError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl From<DataTryFromPtrError> for TryFromPtrError {
+    #[inline]
+    fn from(error: DataTryFromPtrError) -> Self {
+        match error {
+            DataTryFromPtrError::NotAligned(error) => Self::NotAligned(error),
+            DataTryFromPtrError::InsufficientAlign(error) => Self::InsufficientAlign(error),
+        }
+    }
+}
+
+impl Display for TryFromPtrError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotRegistered(error) => Display::fmt(error, f),
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for TryFromPtrError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NotRegistered(error) => Some(error),
+            Self::NotAligned(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TryFromSlicePtrError {
+    NotRegistered(NotRegisteredError),
+    InvalidLayout(LayoutError),
+    NotAligned(NotAlignedError),
+    InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<NotRegisteredError> for TryFromSlicePtrError {
+    #[inline]
+    fn from(error: NotRegisteredError) -> Self {
+        Self::NotRegistered(error)
+    }
+}
+
+impl From<LayoutError> for TryFromSlicePtrError {
+    #[inline]
+    fn from(error: LayoutError) -> Self {
+        Self::InvalidLayout(error)
+    }
+}
+
+impl From<NotAlignedError> for TryFromSlicePtrError {
+    #[inline]
+    fn from(error: NotAlignedError) -> Self {
+        Self::NotAligned(error)
+    }
+}
+
+impl From<InsufficientAlignError> for TryFromSlicePtrError {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl From<DataTryFromSlicePtrError> for TryFromSlicePtrError {
+    #[inline]
+    fn from(error: DataTryFromSlicePtrError) -> Self {
+        match error {
+            DataTryFromSlicePtrError::InvalidLayout(error) => Self::InvalidLayout(error),
+            DataTryFromSlicePtrError::NotAligned(error) => Self::NotAligned(error),
+            DataTryFromSlicePtrError::InsufficientAlign(error) => Self::InsufficientAlign(error),
+        }
+    }
+}
+
+impl Display for TryFromSlicePtrError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotRegistered(error) => Display::fmt(error, f),
+            Self::InvalidLayout(error) => Display::fmt(error, f),
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for TryFromSlicePtrError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NotRegistered(error) => Some(error),
+            Self::InvalidLayout(error) => Some(error),
+            Self::NotAligned(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum DowncastErrorKind {
     ComponentNotRegistered(NotRegisteredError),
     ComponentMismatch(ComponentMismatchError),
+    LayoutMismatch(LayoutMismatchError),
 }
 
 impl From<NotRegisteredError> for DowncastErrorKind {
@@ -97,11 +271,19 @@ impl From<ComponentMismatchError> for DowncastErrorKind {
     }
 }
 
+impl From<LayoutMismatchError> for DowncastErrorKind {
+    #[inline]
+    fn from(error: LayoutMismatchError) -> Self {
+        Self::LayoutMismatch(error)
+    }
+}
+
 impl Display for DowncastErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ComponentNotRegistered(error) => Display::fmt(error, f),
             Self::ComponentMismatch(error) => Display::fmt(error, f),
+            Self::LayoutMismatch(error) => Display::fmt(error, f),
         }
     }
 }
@@ -111,6 +293,7 @@ impl Error for DowncastErrorKind {
         match self {
             Self::ComponentNotRegistered(error) => Some(error),
             Self::ComponentMismatch(error) => Some(error),
+            Self::LayoutMismatch(error) => Some(error),
         }
     }
 }
@@ -138,6 +321,15 @@ impl<T> DowncastError<T> {
     {
         let Self { reason, value } = self;
         DowncastError::new(f(value), reason)
+    }
+}
+
+impl<T> From<DataDowncastError<T>> for DowncastError<T> {
+    #[inline]
+    fn from(error: DataDowncastError<T>) -> Self {
+        let DataDowncastError { reason, value, .. } = error;
+        let reason = reason.into();
+        Self::new(value, reason)
     }
 }
 
@@ -200,60 +392,96 @@ where
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FromComponentErrorKind {
+#[derive(Debug, Clone)]
+pub enum FromComponentErrorKind<T> {
     NotRegistered(NotRegisteredError),
-    Alloc(AllocError),
+    InsufficientAlign(InsufficientAlignError),
+    FromLayout(T),
 }
 
-impl From<NotRegisteredError> for FromComponentErrorKind {
+impl<T> From<NotRegisteredError> for FromComponentErrorKind<T> {
     #[inline]
     fn from(error: NotRegisteredError) -> Self {
         Self::NotRegistered(error)
     }
 }
 
-impl From<AllocError> for FromComponentErrorKind {
+impl<T> From<InsufficientAlignError> for FromComponentErrorKind<T> {
     #[inline]
-    fn from(error: AllocError) -> Self {
-        Self::Alloc(error)
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
     }
 }
 
-impl Display for FromComponentErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NotRegistered(error) => Display::fmt(error, f),
-            Self::Alloc(error) => Display::fmt(error, f),
+impl<T> From<FromValueErrorKind<T>> for FromComponentErrorKind<T> {
+    #[inline]
+    fn from(error: FromValueErrorKind<T>) -> Self {
+        match error {
+            FromValueErrorKind::InsufficientAlign(error) => Self::InsufficientAlign(error),
+            FromValueErrorKind::FromLayout(error) => Self::FromLayout(error),
         }
     }
 }
 
-impl Error for FromComponentErrorKind {
+impl<T> Display for FromComponentErrorKind<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotRegistered(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+            Self::FromLayout(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl<T> Error for FromComponentErrorKind<T>
+where
+    T: Error,
+{
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::NotRegistered(error) => Some(error),
-            Self::Alloc(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+            Self::FromLayout(_) => None,
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        match self {
+            Self::NotRegistered(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+            Self::FromLayout(error) => Some(error),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct FromComponentError<C> {
-    pub reason: FromComponentErrorKind,
+pub struct FromComponentError<T, C> {
+    pub reason: FromComponentErrorKind<T>,
     pub component: C,
 }
 
-impl<C> FromComponentError<C> {
+impl<T, C> FromComponentError<T, C> {
     #[inline]
-    pub(super) fn new(component: C, reason: FromComponentErrorKind) -> Self {
+    pub(super) fn new(component: C, reason: FromComponentErrorKind<T>) -> Self {
         Self { reason, component }
     }
 }
 
-impl<C> Display for FromComponentError<C>
+impl<T, C> From<FromValueError<T, C>> for FromComponentError<T, C> {
+    #[inline]
+    fn from(error: FromValueError<T, C>) -> Self {
+        let FromValueError { value, reason, .. } = error;
+        Self::new(value, reason.into())
+    }
+}
+
+impl<T, C> Display for FromComponentError<T, C>
 where
+    T: Display,
     C: Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -262,12 +490,139 @@ where
     }
 }
 
-impl<C> Error for FromComponentError<C>
+impl<T, C> Error for FromComponentError<T, C>
 where
+    T: Error,
     C: Debug + Display,
+{
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct FromStorageError<T>
+where
+    T: ?Sized,
+{
+    pub reason: FromStorageErrorKind,
+    pub storage: T,
+}
+
+impl<T> FromStorageError<T> {
+    pub(crate) fn new(reason: FromStorageErrorKind, storage: T) -> Self {
+        Self { reason, storage }
+    }
+}
+
+impl<T> From<DataFromStorageError<T>> for FromStorageError<T> {
+    #[inline]
+    fn from(error: DataFromStorageError<T>) -> Self {
+        let DataFromStorageError {
+            reason, storage, ..
+        } = error;
+        let reason = reason.into();
+        Self::new(reason, storage)
+    }
+}
+
+impl<T> Display for FromStorageError<T>
+where
+    T: Display + ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { reason, storage } = self;
+        write!(
+            f,
+            "failed to create erased component with {storage}: {reason}"
+        )
+    }
+}
+
+impl<T> Error for FromStorageError<T>
+where
+    T: Debug + Display + ?Sized,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         let Self { reason, .. } = self;
         Some(reason)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FromStorageErrorKind {
+    NotRegistered(NotRegisteredError),
+    NotAligned(NotAlignedError),
+    LenMismatch(LenMismatchError),
+    LayoutMismatch(LayoutMismatchError),
+    InsufficientAlign(InsufficientAlignError),
+}
+
+impl From<DataFromStorageErrorKind> for FromStorageErrorKind {
+    #[inline]
+    fn from(error: DataFromStorageErrorKind) -> Self {
+        match error {
+            DataFromStorageErrorKind::NotAligned(error) => Self::NotAligned(error),
+            DataFromStorageErrorKind::LenMismatch(error) => Self::LenMismatch(error),
+            DataFromStorageErrorKind::LayoutMismatch(error) => Self::LayoutMismatch(error),
+            DataFromStorageErrorKind::InsufficientAlign(error) => Self::InsufficientAlign(error),
+        }
+    }
+}
+
+impl From<NotRegisteredError> for FromStorageErrorKind {
+    #[inline]
+    fn from(error: NotRegisteredError) -> Self {
+        Self::NotRegistered(error)
+    }
+}
+
+impl From<NotAlignedError> for FromStorageErrorKind {
+    #[inline]
+    fn from(error: NotAlignedError) -> Self {
+        Self::NotAligned(error)
+    }
+}
+
+impl From<LenMismatchError> for FromStorageErrorKind {
+    #[inline]
+    fn from(error: LenMismatchError) -> Self {
+        Self::LenMismatch(error)
+    }
+}
+
+impl From<LayoutMismatchError> for FromStorageErrorKind {
+    #[inline]
+    fn from(error: LayoutMismatchError) -> Self {
+        Self::LayoutMismatch(error)
+    }
+}
+
+impl From<InsufficientAlignError> for FromStorageErrorKind {
+    #[inline]
+    fn from(error: InsufficientAlignError) -> Self {
+        Self::InsufficientAlign(error)
+    }
+}
+
+impl Display for FromStorageErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotRegistered(error) => Display::fmt(error, f),
+            Self::NotAligned(error) => Display::fmt(error, f),
+            Self::LenMismatch(error) => Display::fmt(error, f),
+            Self::LayoutMismatch(error) => Display::fmt(error, f),
+            Self::InsufficientAlign(error) => Display::fmt(error, f),
+        }
+    }
+}
+
+impl Error for FromStorageErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NotRegistered(error) => Some(error),
+            Self::NotAligned(error) => Some(error),
+            Self::LenMismatch(error) => Some(error),
+            Self::LayoutMismatch(error) => Some(error),
+            Self::InsufficientAlign(error) => Some(error),
+        }
     }
 }

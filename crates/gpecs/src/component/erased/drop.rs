@@ -1,14 +1,13 @@
-use std::{
-    mem::{self, MaybeUninit},
-    ptr,
-};
+use std::{mem, ptr};
+
+use gpecs_soa_erased::ptr::slice::MutSliceItemPtr;
 
 use crate::component::{
     Component,
     erased::{ErasedComponentMutPtr, ErasedComponentMutSlicePtr},
 };
 
-type Inner = unsafe fn(*mut MaybeUninit<u8>);
+type Inner = unsafe fn(*mut ());
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
@@ -42,16 +41,22 @@ impl ErasedDrop {
 
     #[inline]
     #[track_caller]
-    pub unsafe fn drop_in_place(self, to_drop: ErasedComponentMutPtr) {
+    pub unsafe fn drop_in_place<T>(self, to_drop: ErasedComponentMutPtr<T>)
+    where
+        T: MutSliceItemPtr,
+    {
         let Self(inner) = self;
 
-        let to_drop = unsafe { to_drop.as_mut_ptr() };
+        let to_drop = unsafe { to_drop.as_mut_ptr().cast() };
         unsafe { inner(to_drop) }
     }
 
     #[inline]
     #[track_caller]
-    pub unsafe fn drop_in_place_slice(self, to_drop: ErasedComponentMutSlicePtr) {
+    pub unsafe fn drop_in_place_slice<T>(self, to_drop: ErasedComponentMutSlicePtr<T>)
+    where
+        T: MutSliceItemPtr,
+    {
         for i in 0..to_drop.len() {
             let to_drop = unsafe { to_drop.component_ptr().add(i) };
             unsafe { self.drop_in_place(to_drop) }
@@ -59,7 +64,7 @@ impl ErasedDrop {
     }
 }
 
-unsafe fn erased_drop<C>(to_drop: *mut MaybeUninit<u8>)
+unsafe fn erased_drop<C>(to_drop: *mut ())
 where
     C: Component,
 {

@@ -1,17 +1,18 @@
 use std::{
     borrow::Borrow,
     cmp,
+    fmt::{self, Debug},
     hash::{self, Hash},
     mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::data::ErasedRef;
+use gpecs_soa_erased::{data::ErasedRef, ptr::slice::ConstSliceItemPtr};
 
 use crate::component::{
     Component,
     erased::{
         ErasedComponentPtr,
-        error::{DowncastError, NotRegisteredError, check_downcast},
+        error::{DowncastError, NotRegisteredError, TryFromPtrError, check_downcast},
     },
     registry::{
         ComponentId, ComponentRegistryView,
@@ -19,34 +20,37 @@ use crate::component::{
     },
 };
 
-type Field<'a> = ErasedRef<'a, *const MaybeUninit<u8>>;
-
-#[derive(Debug, Clone, Copy)]
-pub struct ErasedComponentRef<'a> {
+#[derive(Clone, Copy)]
+pub struct ErasedComponentRef<'a, T = *const MaybeUninit<u8>>
+where
+    T: ConstSliceItemPtr,
+{
     component_id: ComponentId,
-    field: Field<'a>,
+    field: ErasedRef<'a, T>,
 }
 
-impl<'a> ErasedComponentRef<'a> {
+impl<'a, T> ErasedComponentRef<'a, T>
+where
+    T: ConstSliceItemPtr,
+{
     #[inline]
-    pub fn try_from<C, T>(
-        components: &ComponentRegistryView<impl Sized, T>,
+    pub fn try_from<C, U>(
+        components: &ComponentRegistryView<impl Sized, U>,
         component: &'a C,
-    ) -> Result<Self, NotRegisteredError>
+    ) -> Result<Self, TryFromPtrError>
     where
         C: Component,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
-        let field = Field::try_from(component)
-            .expect("alignment of bytes should be sufficient for any component");
+        let field = ErasedRef::try_from(component)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
         Ok(me)
     }
 
     #[inline]
-    pub unsafe fn from_parts(component_id: ComponentId, field: Field<'a>) -> Self {
+    pub unsafe fn from_parts(component_id: ComponentId, field: ErasedRef<'a, T>) -> Self {
         Self {
             component_id,
             field,
@@ -54,43 +58,42 @@ impl<'a> ErasedComponentRef<'a> {
     }
 
     #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedComponentPtr) -> Self {
+    pub unsafe fn from_ptr(ptr: ErasedComponentPtr<T>) -> Self {
         let (component_id, field) = ptr.into_parts();
-        let field = unsafe { Field::from_ptr(field) };
+        let field = unsafe { ErasedRef::from_ptr(field) };
         unsafe { Self::from_parts(component_id, field) }
     }
 
     #[inline]
-    pub fn downcast<C, T>(
+    pub fn downcast<C, U>(
         self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, U>,
     ) -> Result<&'a C, DowncastError<Self>>
     where
         C: Component,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let Self { field, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
+        let Self { field, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let component = unsafe { field.downcast::<C>() }
-            .expect("descriptors of input component and self should be equal");
+        let into_self = |field| unsafe { Self::from_parts(component_id, field) };
+        let component = unsafe { field.downcast() }.map_err(|err| err.map_value(into_self))?;
         Ok(component)
     }
 
     #[inline]
-    pub fn downcast_ref<C, T>(
+    pub fn downcast_ref<C, U>(
         &self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, U>,
     ) -> Result<&C, DowncastError<&Self>>
     where
         C: Component,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = *self;
-        let Self { field, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
+        let Self { field, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let component = unsafe { field.downcast_ref::<C>() }
-            .expect("descriptors of input component and self should be equal");
+        let component = unsafe { field.downcast_ref() }.map_err(|err| err.map_value(|_| self))?;
         Ok(component)
     }
 
@@ -101,13 +104,13 @@ impl<'a> ErasedComponentRef<'a> {
     }
 
     #[inline]
-    pub fn field(&self) -> &Field<'a> {
+    pub fn field(&self) -> &ErasedRef<'a, T> {
         let Self { field, .. } = self;
         field
     }
 
     #[inline]
-    pub fn as_component_ptr(&self) -> ErasedComponentPtr {
+    pub fn as_component_ptr(&self) -> ErasedComponentPtr<T> {
         let Self {
             ref field,
             component_id,
@@ -118,19 +121,19 @@ impl<'a> ErasedComponentRef<'a> {
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const MaybeUninit<u8> {
+    pub fn as_ptr(&self) -> *const T::Item {
         let Self { field, .. } = self;
         field.as_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(&self) -> &[MaybeUninit<u8>] {
+    pub fn as_buffer(&self) -> &[T::Item] {
         let Self { field, .. } = self;
         field.as_buffer()
     }
 
     #[inline]
-    pub fn into_parts(self) -> (ComponentId, Field<'a>) {
+    pub fn into_parts(self) -> (ComponentId, ErasedRef<'a, T>) {
         let Self {
             component_id,
             field,
@@ -139,24 +142,53 @@ impl<'a> ErasedComponentRef<'a> {
     }
 }
 
-impl PartialEq for ErasedComponentRef<'_> {
+impl<T> Debug for ErasedComponentRef<'_, T>
+where
+    T: ConstSliceItemPtr<Item: Debug>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            component_id,
+            field,
+        } = self;
+
+        f.debug_struct("ErasedComponentRef")
+            .field("component_id", component_id)
+            .field("field", field)
+            .finish()
+    }
+}
+
+impl<T, U> PartialEq<ErasedComponentRef<'_, U>> for ErasedComponentRef<'_, T>
+where
+    T: ConstSliceItemPtr,
+    U: ConstSliceItemPtr,
+{
     #[inline]
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, other: &ErasedComponentRef<'_, U>) -> bool {
         let Self { component_id, .. } = self;
         component_id.eq(other.borrow())
     }
 }
 
-impl Eq for ErasedComponentRef<'_> {}
+impl<T> Eq for ErasedComponentRef<'_, T> where T: ConstSliceItemPtr {}
 
-impl PartialOrd for ErasedComponentRef<'_> {
+impl<T, U> PartialOrd<ErasedComponentRef<'_, U>> for ErasedComponentRef<'_, T>
+where
+    T: ConstSliceItemPtr,
+    U: ConstSliceItemPtr,
+{
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
+    fn partial_cmp(&self, other: &ErasedComponentRef<'_, U>) -> Option<cmp::Ordering> {
+        let Self { component_id, .. } = self;
+        component_id.partial_cmp(other.borrow())
     }
 }
 
-impl Ord for ErasedComponentRef<'_> {
+impl<T> Ord for ErasedComponentRef<'_, T>
+where
+    T: ConstSliceItemPtr,
+{
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { component_id, .. } = self;
@@ -164,7 +196,10 @@ impl Ord for ErasedComponentRef<'_> {
     }
 }
 
-impl Hash for ErasedComponentRef<'_> {
+impl<T> Hash for ErasedComponentRef<'_, T>
+where
+    T: ConstSliceItemPtr,
+{
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { component_id, .. } = self;
@@ -172,7 +207,10 @@ impl Hash for ErasedComponentRef<'_> {
     }
 }
 
-impl Borrow<ComponentId> for ErasedComponentRef<'_> {
+impl<T> Borrow<ComponentId> for ErasedComponentRef<'_, T>
+where
+    T: ConstSliceItemPtr,
+{
     #[inline]
     fn borrow(&self) -> &ComponentId {
         let Self { component_id, .. } = self;
@@ -180,9 +218,12 @@ impl Borrow<ComponentId> for ErasedComponentRef<'_> {
     }
 }
 
-impl AsRef<[MaybeUninit<u8>]> for ErasedComponentRef<'_> {
+impl<T> AsRef<[T::Item]> for ErasedComponentRef<'_, T>
+where
+    T: ConstSliceItemPtr,
+{
     #[inline]
-    fn as_ref(&self) -> &[MaybeUninit<u8>] {
+    fn as_ref(&self) -> &[T::Item] {
         self.as_buffer()
     }
 }

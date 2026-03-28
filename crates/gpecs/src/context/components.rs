@@ -99,7 +99,7 @@ impl AsRef<FieldDescriptor> for ErasedDropComponentDescriptor {
     }
 }
 
-impl FromComponentType for ErasedDropComponentDescriptor {
+unsafe impl FromComponentType for ErasedDropComponentDescriptor {
     #[inline]
     fn from_component<T: Component>() -> Self {
         Self::of::<T>()

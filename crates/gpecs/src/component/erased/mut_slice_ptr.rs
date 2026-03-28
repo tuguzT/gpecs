@@ -5,14 +5,17 @@ use std::{
     mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::data::ErasedMutSlicePtr;
+use gpecs_soa_erased::{
+    data::ErasedMutSlicePtr,
+    ptr::slice::{CastConstPtr, MutSliceItemPtr},
+};
 
 use crate::component::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentMutSlice, ErasedComponentSlice,
         ErasedComponentSlicePtr, WithErasedDrop,
-        error::{DowncastError, NotRegisteredError, check_downcast},
+        error::{DowncastError, NotRegisteredError, TryFromSlicePtrError, check_downcast},
     },
     registry::{
         ComponentId, ComponentRegistryView,
@@ -20,34 +23,15 @@ use crate::component::{
     },
 };
 
-type Fields = ErasedMutSlicePtr<*mut MaybeUninit<u8>>;
-
 #[derive(Debug, Clone, Copy)]
-pub struct ErasedComponentMutSlicePtr {
+pub struct ErasedComponentMutSlicePtr<T = *mut MaybeUninit<u8>> {
     component_id: ComponentId,
-    fields: Fields,
+    fields: ErasedMutSlicePtr<T>,
 }
 
-impl ErasedComponentMutSlicePtr {
+impl<T> ErasedComponentMutSlicePtr<T> {
     #[inline]
-    pub fn try_from<C, T>(
-        components: &ComponentRegistryView<impl Sized, T>,
-        component: *mut [C],
-    ) -> Result<Self, NotRegisteredError>
-    where
-        C: Component,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
-        let fields = Fields::try_from(component)
-            .expect("alignment of bytes should be sufficient for any component");
-
-        let me = unsafe { Self::from_parts(component_id, fields) };
-        Ok(me)
-    }
-
-    #[inline]
-    pub unsafe fn from_parts(component_id: ComponentId, fields: Fields) -> Self {
+    pub unsafe fn from_parts(component_id: ComponentId, fields: ErasedMutSlicePtr<T>) -> Self {
         Self {
             component_id,
             fields,
@@ -55,65 +39,10 @@ impl ErasedComponentMutSlicePtr {
     }
 
     #[inline]
-    pub unsafe fn from_ptr(ptr: ErasedComponentMutPtr, len: usize) -> Self {
+    pub unsafe fn from_ptr(ptr: ErasedComponentMutPtr<T>, len: usize) -> Self {
         let (component_id, field) = ptr.into_parts();
-        let fields = unsafe { Fields::from_parts(field, len) };
+        let fields = unsafe { ErasedMutSlicePtr::from_parts(field, len) };
         unsafe { Self::from_parts(component_id, fields) }
-    }
-
-    #[inline]
-    pub fn downcast<C, T>(
-        self,
-        components: &ComponentRegistryView<impl Sized, T>,
-    ) -> Result<*mut [C], DowncastError<Self>>
-    where
-        C: Component,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let Self { component_id, .. } = self;
-        let Self { fields, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
-
-        let component = fields
-            .downcast()
-            .expect("descriptors of input component and self should be equal");
-        Ok(component)
-    }
-
-    #[inline]
-    pub fn cast_const(self) -> ErasedComponentSlicePtr {
-        let Self {
-            component_id,
-            fields,
-        } = self;
-
-        let fields = fields.cast_const();
-        unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
-    }
-
-    #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedComponentSlice<'a> {
-        unsafe { self.cast_const().deref() }
-    }
-
-    #[inline]
-    pub unsafe fn deref_mut<'a>(self) -> ErasedComponentMutSlice<'a> {
-        unsafe { ErasedComponentMutSlice::from_ptr(self) }
-    }
-
-    #[inline]
-    pub unsafe fn drop_in_place(
-        self,
-        components: &ComponentRegistryView<impl WithErasedDrop, impl ?Sized>,
-    ) -> Result<(), NotRegisteredError> {
-        let component_info = components
-            .get_component_info(self.component_id())
-            .ok_or(NotRegisteredError)?;
-        let Some(erased_drop) = component_info.as_meta().erased_drop() else {
-            return Ok(());
-        };
-
-        unsafe { erased_drop.drop_in_place_slice(self) }
-        Ok(())
     }
 
     #[inline]
@@ -123,13 +52,13 @@ impl ErasedComponentMutSlicePtr {
     }
 
     #[inline]
-    pub fn fields(self) -> Fields {
+    pub fn fields(self) -> ErasedMutSlicePtr<T> {
         let Self { fields, .. } = self;
         fields
     }
 
     #[inline]
-    pub fn component_ptr(self) -> ErasedComponentMutPtr {
+    pub fn component_ptr(self) -> ErasedComponentMutPtr<T> {
         let Self {
             component_id,
             fields,
@@ -151,31 +80,7 @@ impl ErasedComponentMutSlicePtr {
     }
 
     #[inline]
-    pub fn as_ptr(self) -> *const MaybeUninit<u8> {
-        let Self { fields, .. } = self;
-        fields.as_ptr()
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_ptr(self) -> *mut MaybeUninit<u8> {
-        let Self { fields, .. } = self;
-        fields.as_mut_ptr()
-    }
-
-    #[inline]
-    pub fn as_buffer(self) -> *const [MaybeUninit<u8>] {
-        let Self { fields, .. } = self;
-        fields.as_buffer()
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_buffer(self) -> *mut [MaybeUninit<u8>] {
-        let Self { fields, .. } = self;
-        fields.as_mut_buffer()
-    }
-
-    #[inline]
-    pub fn into_parts(self) -> (ComponentId, Fields) {
+    pub fn into_parts(self) -> (ComponentId, ErasedMutSlicePtr<T>) {
         let Self {
             component_id,
             fields,
@@ -184,24 +89,123 @@ impl ErasedComponentMutSlicePtr {
     }
 }
 
-impl PartialEq for ErasedComponentMutSlicePtr {
+impl<T> ErasedComponentMutSlicePtr<T>
+where
+    T: MutSliceItemPtr,
+{
     #[inline]
-    fn eq(&self, other: &Self) -> bool {
+    pub fn try_from<C, U>(
+        components: &ComponentRegistryView<impl Sized, U>,
+        component: *mut [C],
+    ) -> Result<Self, TryFromSlicePtrError>
+    where
+        C: Component,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
+        let fields = ErasedMutSlicePtr::try_from(component)?;
+
+        let me = unsafe { Self::from_parts(component_id, fields) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn downcast<C, U>(
+        self,
+        components: &ComponentRegistryView<impl Sized, U>,
+    ) -> Result<*mut [C], DowncastError<Self>>
+    where
+        C: Component,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let Self { component_id, .. } = self;
+        let Self { fields, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
+
+        let component = fields.downcast().map_err(|err| err.map_value(|_| self))?;
+        Ok(component)
+    }
+
+    #[inline]
+    pub fn cast_const(self) -> ErasedComponentSlicePtr<CastConstPtr<T>> {
+        let Self {
+            component_id,
+            fields,
+        } = self;
+
+        let fields = fields.cast_const();
+        unsafe { ErasedComponentSlicePtr::from_parts(component_id, fields) }
+    }
+
+    #[inline]
+    pub unsafe fn deref<'a>(self) -> ErasedComponentSlice<'a, CastConstPtr<T>> {
+        unsafe { self.cast_const().deref() }
+    }
+
+    #[inline]
+    pub unsafe fn deref_mut<'a>(self) -> ErasedComponentMutSlice<'a, T> {
+        unsafe { ErasedComponentMutSlice::from_ptr(self) }
+    }
+
+    #[inline]
+    pub unsafe fn drop_in_place(
+        self,
+        components: &ComponentRegistryView<impl WithErasedDrop, impl ?Sized>,
+    ) -> Result<(), NotRegisteredError> {
+        let component_info = components
+            .get_component_info(self.component_id())
+            .ok_or(NotRegisteredError)?;
+        let Some(erased_drop) = component_info.as_meta().erased_drop() else {
+            return Ok(());
+        };
+
+        unsafe { erased_drop.drop_in_place_slice(self) }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn as_ptr(self) -> *const T::Item {
+        let Self { fields, .. } = self;
+        fields.as_ptr()
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_ptr(self) -> *mut T::Item {
+        let Self { fields, .. } = self;
+        fields.as_mut_ptr()
+    }
+
+    #[inline]
+    pub fn as_buffer(self) -> *const [T::Item] {
+        let Self { fields, .. } = self;
+        fields.as_buffer()
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_buffer(self) -> *mut [T::Item] {
+        let Self { fields, .. } = self;
+        fields.as_mut_buffer()
+    }
+}
+
+impl<T, U> PartialEq<ErasedComponentMutSlicePtr<U>> for ErasedComponentMutSlicePtr<T> {
+    #[inline]
+    fn eq(&self, other: &ErasedComponentMutSlicePtr<U>) -> bool {
         let Self { component_id, .. } = self;
         component_id.eq(other.borrow())
     }
 }
 
-impl Eq for ErasedComponentMutSlicePtr {}
+impl<T> Eq for ErasedComponentMutSlicePtr<T> {}
 
-impl PartialOrd for ErasedComponentMutSlicePtr {
+impl<T, U> PartialOrd<ErasedComponentMutSlicePtr<U>> for ErasedComponentMutSlicePtr<T> {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
+    fn partial_cmp(&self, other: &ErasedComponentMutSlicePtr<U>) -> Option<cmp::Ordering> {
+        let Self { component_id, .. } = self;
+        component_id.partial_cmp(other.borrow())
     }
 }
 
-impl Ord for ErasedComponentMutSlicePtr {
+impl<T> Ord for ErasedComponentMutSlicePtr<T> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { component_id, .. } = self;
@@ -209,7 +213,7 @@ impl Ord for ErasedComponentMutSlicePtr {
     }
 }
 
-impl Hash for ErasedComponentMutSlicePtr {
+impl<T> Hash for ErasedComponentMutSlicePtr<T> {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { component_id, .. } = self;
@@ -217,7 +221,7 @@ impl Hash for ErasedComponentMutSlicePtr {
     }
 }
 
-impl Borrow<ComponentId> for ErasedComponentMutSlicePtr {
+impl<T> Borrow<ComponentId> for ErasedComponentMutSlicePtr<T> {
     #[inline]
     fn borrow(&self) -> &ComponentId {
         let Self { component_id, .. } = self;

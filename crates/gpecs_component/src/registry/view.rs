@@ -77,15 +77,42 @@ where
         let Self { mapping, .. } = self;
         mapping.component_id_from(key)
     }
+}
 
+impl<Meta, Mapping> ComponentRegistryView<'_, Meta, Mapping>
+where
+    Mapping: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+{
     #[inline]
     pub fn component_id<T>(&self) -> Option<ComponentId>
     where
         T: Component,
-        Mapping::Key: FromComponentType,
     {
         let key = FromComponentType::from_component::<T>();
         self.component_id_from(key)
+    }
+
+    #[inline]
+    pub fn get_component_info_of<T>(&self) -> Option<ComponentInfo<&Meta>>
+    where
+        T: Component,
+    {
+        let component_id = self.component_id::<T>()?;
+        self.get_component_info(component_id)
+    }
+}
+
+impl<'a, Meta, Mapping> ComponentRegistryView<'a, Meta, Mapping>
+where
+    Mapping: ComponentIdFrom<Key: FromComponentType>,
+{
+    #[inline]
+    pub fn into_get_component_info_of<T>(self) -> Option<ComponentInfo<&'a Meta>>
+    where
+        T: Component,
+    {
+        let component_id = self.component_id::<T>()?;
+        self.into_get_component_info(component_id)
     }
 }
 

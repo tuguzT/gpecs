@@ -5,25 +5,25 @@ use core::{
 
 use crate::{Component, registry::ComponentId};
 
-pub trait FromComponentType: Sized {
+pub unsafe trait FromComponentType: Sized {
     fn from_component<T: Component>() -> Self;
 }
 
-impl FromComponentType for TypeId {
+unsafe impl FromComponentType for TypeId {
     #[inline]
     fn from_component<T: Component>() -> Self {
         TypeId::of::<T>()
     }
 }
 
-impl FromComponentType for &str {
+unsafe impl FromComponentType for &str {
     #[inline]
     fn from_component<T: Component>() -> Self {
         any::type_name::<T>()
     }
 }
 
-impl FromComponentType for Layout {
+unsafe impl FromComponentType for Layout {
     #[inline]
     fn from_component<T: Component>() -> Self {
         Layout::new::<T>()

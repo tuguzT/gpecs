@@ -97,14 +97,26 @@ where
     pub fn component_id_from(&self, key: Mapping::Key) -> Option<ComponentId> {
         self.as_view().component_id_from(key)
     }
+}
 
+impl<Meta, Mapping> ComponentRegistry<Meta, Mapping>
+where
+    Mapping: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+{
     #[inline]
     pub fn component_id<T>(&self) -> Option<ComponentId>
     where
         T: Component,
-        Mapping::Key: FromComponentType,
     {
         self.as_view().component_id::<T>()
+    }
+
+    #[inline]
+    pub fn get_component_info_of<T>(&self) -> Option<ComponentInfo<&Meta>>
+    where
+        T: Component,
+    {
+        self.as_view().into_get_component_info_of::<T>()
     }
 }
 

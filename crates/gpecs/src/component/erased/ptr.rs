@@ -5,14 +5,19 @@ use std::{
     mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::data::ErasedPtr;
+use gpecs_soa_erased::{
+    data::ErasedPtr,
+    ptr::slice::{CastMutPtr, ConstSliceItemPtr},
+};
 
 use crate::{
     component::{
         Component,
         erased::{
             ErasedComponentMutPtr, ErasedComponentRef,
-            error::{DowncastError, NotRegisteredError, check_downcast},
+            error::{
+                DanglingError, DowncastError, NotRegisteredError, TryFromPtrError, check_downcast,
+            },
         },
         registry::{
             ComponentId, ComponentRegistryView,
@@ -22,66 +27,15 @@ use crate::{
     soa::field::FieldDescriptor,
 };
 
-type Field = ErasedPtr<*const MaybeUninit<u8>>;
-
 #[derive(Debug, Clone, Copy)]
-pub struct ErasedComponentPtr {
+pub struct ErasedComponentPtr<T = *const MaybeUninit<u8>> {
     component_id: ComponentId,
-    field: Field,
+    field: ErasedPtr<T>,
 }
 
-impl ErasedComponentPtr {
+impl<T> ErasedComponentPtr<T> {
     #[inline]
-    pub fn dangling(
-        components: &ComponentRegistryView<impl AsRef<FieldDescriptor>, impl ?Sized>,
-        component_id: ComponentId,
-    ) -> Result<Self, NotRegisteredError> {
-        let component_info = components
-            .get_component_info(component_id)
-            .ok_or(NotRegisteredError)?;
-
-        let layout = component_info.as_meta().as_ref().layout();
-        let field = Field::dangling(layout)
-            .expect("alignment of bytes should be sufficient for any component");
-
-        let me = unsafe { Self::from_parts(component_id, field) };
-        Ok(me)
-    }
-
-    #[inline]
-    pub fn try_from<C, T>(
-        registry: &ComponentRegistryView<impl Sized, T>,
-        component: *const C,
-    ) -> Result<Self, NotRegisteredError>
-    where
-        C: Component,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
-        let field = Field::try_from(component)
-            .expect("alignment of bytes should be sufficient for any component");
-
-        let me = unsafe { Self::from_parts(component_id, field) };
-        Ok(me)
-    }
-
-    #[inline]
-    pub fn dangling_of<C, M, T>(
-        components: &ComponentRegistryView<M, T>,
-    ) -> Result<Self, NotRegisteredError>
-    where
-        C: Component,
-        M: AsRef<FieldDescriptor>,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
-    {
-        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
-
-        let me = Self::dangling(components, component_id).expect("component should be registered");
-        Ok(me)
-    }
-
-    #[inline]
-    pub unsafe fn from_parts(component_id: ComponentId, field: Field) -> Self {
+    pub unsafe fn from_parts(component_id: ComponentId, field: ErasedPtr<T>) -> Self {
         Self {
             component_id,
             field,
@@ -89,25 +43,96 @@ impl ErasedComponentPtr {
     }
 
     #[inline]
-    pub fn downcast<C, T>(
+    pub fn component_id(self) -> ComponentId {
+        let Self { component_id, .. } = self;
+        component_id
+    }
+
+    #[inline]
+    pub fn field(self) -> ErasedPtr<T> {
+        let Self { field, .. } = self;
+        field
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (ComponentId, ErasedPtr<T>) {
+        let Self {
+            component_id,
+            field,
+        } = self;
+        (component_id, field)
+    }
+}
+
+impl<T> ErasedComponentPtr<T>
+where
+    T: ConstSliceItemPtr,
+{
+    #[inline]
+    pub fn dangling(
+        components: &ComponentRegistryView<impl AsRef<FieldDescriptor>, impl ?Sized>,
+        component_id: ComponentId,
+    ) -> Result<Self, DanglingError> {
+        let component_info = components
+            .get_component_info(component_id)
+            .ok_or(NotRegisteredError)?;
+
+        let layout = component_info.as_meta().as_ref().layout();
+        let field = ErasedPtr::dangling(layout)?;
+
+        let me = unsafe { Self::from_parts(component_id, field) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn try_from<C, U>(
+        registry: &ComponentRegistryView<impl Sized, U>,
+        component: *const C,
+    ) -> Result<Self, TryFromPtrError>
+    where
+        C: Component,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
+        let field = ErasedPtr::try_from(component)?;
+
+        let me = unsafe { Self::from_parts(component_id, field) };
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn dangling_of<C, M, U>(
+        components: &ComponentRegistryView<M, U>,
+    ) -> Result<Self, DanglingError>
+    where
+        C: Component,
+        M: AsRef<FieldDescriptor>,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+    {
+        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
+
+        let me = Self::dangling(components, component_id)?;
+        Ok(me)
+    }
+
+    #[inline]
+    pub fn downcast<C, U>(
         self,
-        components: &ComponentRegistryView<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, U>,
     ) -> Result<*const C, DowncastError<Self>>
     where
         C: Component,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Self { component_id, .. } = self;
-        let Self { field, .. } = check_downcast::<C, T, _>(components, component_id, self)?;
+        let Self { field, .. } = check_downcast::<C, U, _>(components, component_id, self)?;
 
-        let component = field
-            .downcast()
-            .expect("descriptors of input component and self should be equal");
+        let component = field.downcast().map_err(|err| err.map_value(|_| self))?;
         Ok(component)
     }
 
     #[inline]
-    pub fn cast_mut(self) -> ErasedComponentMutPtr {
+    pub fn cast_mut(self) -> ErasedComponentMutPtr<CastMutPtr<T>> {
         let Self {
             component_id,
             field,
@@ -118,7 +143,7 @@ impl ErasedComponentPtr {
     }
 
     #[inline]
-    pub unsafe fn deref<'a>(self) -> ErasedComponentRef<'a> {
+    pub unsafe fn deref<'a>(self) -> ErasedComponentRef<'a, T> {
         unsafe { ErasedComponentRef::from_ptr(self) }
     }
 
@@ -130,8 +155,8 @@ impl ErasedComponentPtr {
             field,
         } = self;
 
-        let field = unsafe { field.add(count) };
-        unsafe { Self::from_parts(component_id, field) }
+        let ptr = unsafe { field.add(count) };
+        unsafe { Self::from_parts(component_id, ptr) }
     }
 
     #[inline]
@@ -144,57 +169,37 @@ impl ErasedComponentPtr {
     }
 
     #[inline]
-    pub fn component_id(self) -> ComponentId {
-        let Self { component_id, .. } = self;
-        component_id
-    }
-
-    #[inline]
-    pub fn field(self) -> Field {
-        let Self { field, .. } = self;
-        field
-    }
-
-    #[inline]
-    pub fn as_ptr(self) -> *const MaybeUninit<u8> {
+    pub fn as_ptr(self) -> *const T::Item {
         let Self { field, .. } = self;
         field.as_ptr()
     }
 
     #[inline]
-    pub fn as_buffer(self) -> *const [MaybeUninit<u8>] {
+    pub fn as_buffer(self) -> *const [T::Item] {
         let Self { field, .. } = self;
         field.as_buffer()
     }
-
-    #[inline]
-    pub fn into_parts(self) -> (ComponentId, Field) {
-        let Self {
-            component_id,
-            field,
-        } = self;
-        (component_id, field)
-    }
 }
 
-impl PartialEq for ErasedComponentPtr {
+impl<T, U> PartialEq<ErasedComponentPtr<U>> for ErasedComponentPtr<T> {
     #[inline]
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, other: &ErasedComponentPtr<U>) -> bool {
         let Self { component_id, .. } = self;
         component_id.eq(other.borrow())
     }
 }
 
-impl Eq for ErasedComponentPtr {}
+impl<T> Eq for ErasedComponentPtr<T> {}
 
-impl PartialOrd for ErasedComponentPtr {
+impl<T, U> PartialOrd<ErasedComponentPtr<U>> for ErasedComponentPtr<T> {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
+    fn partial_cmp(&self, other: &ErasedComponentPtr<U>) -> Option<cmp::Ordering> {
+        let Self { component_id, .. } = self;
+        component_id.partial_cmp(other.borrow())
     }
 }
 
-impl Ord for ErasedComponentPtr {
+impl<T> Ord for ErasedComponentPtr<T> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         let Self { component_id, .. } = self;
@@ -202,7 +207,7 @@ impl Ord for ErasedComponentPtr {
     }
 }
 
-impl Hash for ErasedComponentPtr {
+impl<T> Hash for ErasedComponentPtr<T> {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         let Self { component_id, .. } = self;
@@ -210,7 +215,7 @@ impl Hash for ErasedComponentPtr {
     }
 }
 
-impl Borrow<ComponentId> for ErasedComponentPtr {
+impl<T> Borrow<ComponentId> for ErasedComponentPtr<T> {
     #[inline]
     fn borrow(&self) -> &ComponentId {
         let Self { component_id, .. } = self;

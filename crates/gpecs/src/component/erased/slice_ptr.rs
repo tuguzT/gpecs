@@ -14,7 +14,7 @@ use crate::component::{
         error::{DowncastError, NotRegisteredError, check_downcast},
     },
     registry::{
-        ComponentId, ComponentRegistry,
+        ComponentId, ComponentRegistryView,
         traits::{ComponentIdFrom, FromComponentType},
     },
 };
@@ -30,7 +30,7 @@ pub struct ErasedComponentSlicePtr {
 impl ErasedComponentSlicePtr {
     #[inline]
     pub fn try_from<C, T>(
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         component: *const [C],
     ) -> Result<Self, NotRegisteredError>
     where
@@ -63,7 +63,7 @@ impl ErasedComponentSlicePtr {
     #[inline]
     pub fn downcast<C, T>(
         self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<*const [C], DowncastError<Self>>
     where
         C: Component,

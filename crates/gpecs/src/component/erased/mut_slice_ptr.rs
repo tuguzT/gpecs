@@ -15,7 +15,7 @@ use crate::component::{
         error::{DowncastError, NotRegisteredError, check_downcast},
     },
     registry::{
-        ComponentId, ComponentRegistry,
+        ComponentId, ComponentRegistryView,
         traits::{ComponentIdFrom, FromComponentType},
     },
 };
@@ -31,7 +31,7 @@ pub struct ErasedComponentMutSlicePtr {
 impl ErasedComponentMutSlicePtr {
     #[inline]
     pub fn try_from<C, T>(
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
         component: *mut [C],
     ) -> Result<Self, NotRegisteredError>
     where
@@ -64,7 +64,7 @@ impl ErasedComponentMutSlicePtr {
     #[inline]
     pub fn downcast<C, T>(
         self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<*mut [C], DowncastError<Self>>
     where
         C: Component,
@@ -103,7 +103,7 @@ impl ErasedComponentMutSlicePtr {
     #[inline]
     pub unsafe fn drop_in_place(
         self,
-        components: &ComponentRegistry<impl WithErasedDrop, impl ?Sized>,
+        components: &ComponentRegistryView<impl WithErasedDrop, impl ?Sized>,
     ) -> Result<(), NotRegisteredError> {
         let component_info = components
             .get_component_info(self.component_id())

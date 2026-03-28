@@ -180,7 +180,7 @@ where
             })?;
 
         self.into_iter().for_each(|ptr| {
-            if let Err(error) = unsafe { ptr.drop_in_place(components) } {
+            if let Err(error) = unsafe { ptr.drop_in_place(&components.as_view()) } {
                 unreachable!("{error}, but it was checked earlier to be registered")
             }
         });

@@ -15,7 +15,7 @@ use crate::{
             error::{DowncastError, NotRegisteredError, check_downcast},
         },
         registry::{
-            ComponentId, ComponentRegistry,
+            ComponentId, ComponentRegistryView,
             traits::{ComponentIdFrom, FromComponentType},
         },
     },
@@ -33,7 +33,7 @@ pub struct ErasedComponentPtr {
 impl ErasedComponentPtr {
     #[inline]
     pub fn dangling(
-        components: &ComponentRegistry<impl AsRef<FieldDescriptor>, impl ?Sized>,
+        components: &ComponentRegistryView<impl AsRef<FieldDescriptor>, impl ?Sized>,
         component_id: ComponentId,
     ) -> Result<Self, NotRegisteredError> {
         let component_info = components
@@ -50,7 +50,7 @@ impl ErasedComponentPtr {
 
     #[inline]
     pub fn try_from<C, T>(
-        registry: &ComponentRegistry<impl Sized, T>,
+        registry: &ComponentRegistryView<impl Sized, T>,
         component: *const C,
     ) -> Result<Self, NotRegisteredError>
     where
@@ -67,7 +67,7 @@ impl ErasedComponentPtr {
 
     #[inline]
     pub fn dangling_of<C, M, T>(
-        components: &ComponentRegistry<M, T>,
+        components: &ComponentRegistryView<M, T>,
     ) -> Result<Self, NotRegisteredError>
     where
         C: Component,
@@ -91,7 +91,7 @@ impl ErasedComponentPtr {
     #[inline]
     pub fn downcast<C, T>(
         self,
-        components: &ComponentRegistry<impl Sized, T>,
+        components: &ComponentRegistryView<impl Sized, T>,
     ) -> Result<*const C, DowncastError<Self>>
     where
         C: Component,

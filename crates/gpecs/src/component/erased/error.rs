@@ -8,7 +8,7 @@ use gpecs_soa_erased::storage::AllocError;
 use crate::component::{
     Component,
     registry::{
-        ComponentId, ComponentRegistry,
+        ComponentId, ComponentRegistryView,
         traits::{ComponentIdFrom, FromComponentType},
     },
 };
@@ -171,7 +171,7 @@ where
 
 #[inline]
 pub(super) fn check_downcast<C, T, V>(
-    components: &ComponentRegistry<impl Sized, T>,
+    components: &ComponentRegistryView<impl Sized, T>,
     component_id: ComponentId,
     value: V,
 ) -> Result<V, DowncastError<V>>
@@ -187,7 +187,7 @@ where
 
 #[inline]
 fn check_downcast_inner<C, T>(
-    components: &ComponentRegistry<impl Sized, T>,
+    components: &ComponentRegistryView<impl Sized, T>,
     component_id: ComponentId,
 ) -> Result<(), DowncastErrorKind>
 where

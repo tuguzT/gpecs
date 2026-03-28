@@ -180,19 +180,22 @@ where
     #[inline]
     pub unsafe fn drop_in_place(
         self,
-        registry: &ComponentRegistry<impl WithErasedDrop, impl ?Sized>,
+        components: &ComponentRegistry<impl WithErasedDrop, impl ?Sized>,
     ) -> Result<(), NotRegisteredError> {
         self.iter()
             .map(ErasedComponentSlicePtr::component_id)
             .try_for_each(|id| {
-                registry
+                components
                     .get_component_info(id)
                     .map(drop)
                     .ok_or(NotRegisteredError)
             })?;
 
-        self.into_iter()
-            .for_each(|ptr| unsafe { ptr.drop_in_place(registry) }.expect("should be registered"));
+        self.into_iter().for_each(|slice| {
+            if let Err(error) = unsafe { slice.drop_in_place(&components.as_view()) } {
+                unreachable!("{error}, but it was checked earlier to be registered")
+            }
+        });
         Ok(())
     }
 }

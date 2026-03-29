@@ -1,10 +1,11 @@
-use std::{
+use core::{
     alloc::LayoutError,
+    any,
     error::Error,
     fmt::{self, Debug, Display},
 };
 
-use gpecs_soa_erased::{
+use gpecs_erased::{
     data::error::{
         DowncastError as DataDowncastError, FromStorageError as DataFromStorageError,
         FromStorageErrorKind as DataFromStorageErrorKind, FromValueError, FromValueErrorKind,
@@ -13,7 +14,7 @@ use gpecs_soa_erased::{
     error::{InsufficientAlignError, LayoutMismatchError, LenMismatchError, NotAlignedError},
 };
 
-use crate::component::{
+use crate::{
     Component,
     registry::{
         ComponentId, ComponentRegistryView,
@@ -74,12 +75,34 @@ pub fn check_component_ids(
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-#[non_exhaustive]
-pub struct NotRegisteredError;
+pub struct NotRegisteredError {
+    name: Option<&'static str>,
+}
+
+impl NotRegisteredError {
+    #[inline]
+    pub const fn new() -> Self {
+        Self { name: None }
+    }
+
+    #[inline]
+    pub fn of<T>() -> Self
+    where
+        T: Component,
+    {
+        let name = any::type_name::<T>();
+        Self { name: Some(name) }
+    }
+}
 
 impl Display for NotRegisteredError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "component was not registered")
+        let Self { name } = self;
+
+        match name {
+            Some(name) => write!(f, "component `{name}` is not registered"),
+            None => write!(f, "component is not registered"),
+        }
     }
 }
 
@@ -386,7 +409,9 @@ where
     C: Component,
     T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
 {
-    let into_component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
+    let into_component_id = components
+        .component_id::<C>()
+        .ok_or_else(NotRegisteredError::of::<C>)?;
     check_component_ids(into_component_id, component_id)?;
 
     Ok(())

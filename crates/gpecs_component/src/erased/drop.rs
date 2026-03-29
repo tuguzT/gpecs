@@ -1,8 +1,8 @@
-use std::{mem, ptr};
+use core::{mem, ptr};
 
-use gpecs_soa_erased::ptr::slice::MutSliceItemPtr;
+use gpecs_erased::ptr::slice::MutSliceItemPtr;
 
-use crate::component::{
+use crate::{
     Component,
     erased::{ErasedComponentMutPtr, ErasedComponentMutSlicePtr},
 };

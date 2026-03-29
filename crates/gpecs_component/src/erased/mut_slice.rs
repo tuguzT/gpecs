@@ -1,18 +1,17 @@
-use std::{
+use core::{
     borrow::Borrow,
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::{
+use gpecs_erased::{
     data::ErasedMutSlice,
     ptr::slice::{CastConstPtr, MutSliceItemPtr},
 };
 use polonius_the_crab::{polonius, polonius_return};
 
-use crate::component::{
+use crate::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentMutSlicePtr, ErasedComponentPtr,
@@ -25,7 +24,7 @@ use crate::component::{
     },
 };
 
-pub struct ErasedComponentMutSlice<'a, T = *mut MaybeUninit<u8>>
+pub struct ErasedComponentMutSlice<'a, T>
 where
     T: MutSliceItemPtr,
 {
@@ -46,7 +45,9 @@ where
         C: Component,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components
+            .component_id::<C>()
+            .ok_or_else(NotRegisteredError::of::<C>)?;
         let fields = ErasedMutSlice::try_from(component)?;
 
         let me = unsafe { Self::from_parts(component_id, fields) };

@@ -39,7 +39,7 @@ where
         .into_iter()
         .try_for_each::<_, Result<_, ArchetypeError>>(|item| {
             let Some(item) = item else {
-                return Err(NotRegisteredError.into());
+                return Err(NotRegisteredError::new().into());
             };
             let component_id = component_id_fn(&item);
             let is_unique = insert_fn(&mut set, item);

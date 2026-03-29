@@ -671,7 +671,6 @@ dependencies = [
  "num-traits",
  "petgraph",
  "pollster",
- "polonius-the-crab",
  "rustc-hash 2.1.1",
  "wgpu",
 ]
@@ -688,6 +687,8 @@ name = "gpecs_component"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
+ "gpecs_erased",
+ "polonius-the-crab",
 ]
 
 [[package]]

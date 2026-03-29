@@ -188,7 +188,7 @@ where
                 components
                     .get_component_info(id)
                     .map(drop)
-                    .ok_or(NotRegisteredError)
+                    .ok_or_else(NotRegisteredError::new)
             })?;
 
         self.into_iter().for_each(|slice| {

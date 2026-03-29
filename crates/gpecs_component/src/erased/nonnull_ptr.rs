@@ -1,18 +1,17 @@
-use std::{
+use core::{
     borrow::Borrow,
     cmp,
     hash::{self, Hash},
-    mem::MaybeUninit,
     ptr::NonNull,
 };
 
-use gpecs_soa_erased::{
+use gpecs_erased::{
     data::ErasedNonNullPtr,
     layout::WithLayout,
     ptr::slice::{NonNullAsPtr, NonNullSliceItemPtr},
 };
 
-use crate::component::{
+use crate::{
     Component,
     erased::{
         ErasedComponentMutPtr,
@@ -29,7 +28,7 @@ use crate::component::{
 type Field<T> = ErasedNonNullPtr<T>;
 
 #[derive(Debug, Clone, Copy)]
-pub struct ErasedComponentNonNullPtr<T = NonNull<MaybeUninit<u8>>> {
+pub struct ErasedComponentNonNullPtr<T> {
     component_id: ComponentId,
     field: Field<T>,
 }
@@ -93,7 +92,7 @@ where
     ) -> Result<Self, DanglingError> {
         let component_info = components
             .get_component_info(component_id)
-            .ok_or(NotRegisteredError)?;
+            .ok_or_else(NotRegisteredError::new)?;
 
         let layout = component_info.as_meta().layout();
         let field = Field::dangling(layout)?;
@@ -111,7 +110,9 @@ where
         C: Component,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = registry.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = registry
+            .component_id::<C>()
+            .ok_or_else(NotRegisteredError::of::<C>)?;
         let field = Field::try_from(component)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
@@ -127,7 +128,9 @@ where
         M: WithLayout,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components
+            .component_id::<C>()
+            .ok_or_else(NotRegisteredError::of::<C>)?;
 
         let me = Self::dangling(components, component_id)?;
         Ok(me)

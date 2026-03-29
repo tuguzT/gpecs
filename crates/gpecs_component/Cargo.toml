@@ -8,6 +8,8 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+gpecs_erased = { workspace = true }
+polonius-the-crab = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 
 [features]

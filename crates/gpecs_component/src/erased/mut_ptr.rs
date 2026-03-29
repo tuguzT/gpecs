@@ -1,17 +1,16 @@
-use std::{
+use core::{
     borrow::Borrow,
     cmp,
     hash::{self, Hash},
-    mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::{
+use gpecs_erased::{
     data::ErasedMutPtr,
     layout::WithLayout,
     ptr::slice::{CastConstPtr, MutSliceItemPtr},
 };
 
-use crate::component::{
+use crate::{
     Component,
     erased::{
         ErasedComponentMutRef, ErasedComponentPtr, ErasedComponentRef, WithErasedDrop,
@@ -26,7 +25,7 @@ use crate::component::{
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct ErasedComponentMutPtr<T = *mut MaybeUninit<u8>> {
+pub struct ErasedComponentMutPtr<T> {
     component_id: ComponentId,
     field: ErasedMutPtr<T>,
 }
@@ -73,7 +72,7 @@ where
     ) -> Result<Self, DanglingError> {
         let component_info = components
             .get_component_info(component_id)
-            .ok_or(NotRegisteredError)?;
+            .ok_or_else(NotRegisteredError::new)?;
 
         let layout = component_info.as_meta().layout();
         let field = ErasedMutPtr::dangling(layout)?;
@@ -91,7 +90,9 @@ where
         C: Component,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components
+            .component_id::<C>()
+            .ok_or_else(NotRegisteredError::of::<C>)?;
         let field = ErasedMutPtr::try_from(component)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
@@ -107,7 +108,9 @@ where
         M: WithLayout,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components
+            .component_id::<C>()
+            .ok_or_else(NotRegisteredError::of::<C>)?;
 
         let me = Self::dangling(components, component_id)?;
         Ok(me)
@@ -206,7 +209,7 @@ where
     ) -> Result<(), NotRegisteredError> {
         let component_info = components
             .get_component_info(self.component_id())
-            .ok_or(NotRegisteredError)?;
+            .ok_or_else(NotRegisteredError::new)?;
         let Some(erased_drop) = component_info.as_meta().erased_drop() else {
             return Ok(());
         };

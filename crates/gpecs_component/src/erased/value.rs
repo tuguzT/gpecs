@@ -1,20 +1,20 @@
-use core::ptr;
-use std::{
+use core::{
     borrow::Borrow,
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
     mem::{ManuallyDrop, MaybeUninit},
+    ptr,
 };
 
-use gpecs_soa_erased::{
+use gpecs_erased::{
     data::Erased,
-    ptr::slice::{CoreSliceItemPtrs, SliceItemPtrs},
-    storage::{AlignedStorage, AlignedStorageFromLayout, BoxedAlignedUninitStorage},
+    ptr::slice::SliceItemPtrs,
+    storage::{AlignedStorage, AlignedStorageFromLayout},
 };
 use polonius_the_crab::{polonius, polonius_return};
 
-use crate::component::{
+use crate::{
     Component,
     erased::{
         ErasedComponentMutPtr, ErasedComponentMutRef, ErasedComponentPtr, ErasedComponentRef,
@@ -29,7 +29,7 @@ use crate::component::{
     },
 };
 
-pub struct ErasedComponent<T = BoxedAlignedUninitStorage, P = CoreSliceItemPtrs<MaybeUninit<u8>>>
+pub struct ErasedComponent<T, P>
 where
     T: AlignedStorage,
     P: SliceItemPtrs<Item = MaybeUninit<T::Item>>,
@@ -56,7 +56,7 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Some(component_info) = components.get_component_info_of::<C>() else {
-            let reason = NotRegisteredError.into();
+            let reason = NotRegisteredError::of::<C>().into();
             return Err(FromStorageError::new(reason, (storage, component)));
         };
 
@@ -85,7 +85,7 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let Some(component_info) = components.get_component_info_of::<C>() else {
-            let reason = NotRegisteredError.into();
+            let reason = NotRegisteredError::of::<C>().into();
             return Err(FromComponentError::new(component, reason));
         };
 

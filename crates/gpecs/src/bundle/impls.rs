@@ -57,11 +57,13 @@ where
         I: IntoIterator<Item = ErasedComponentPtr>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
+        let component_id = components
+            .component_id::<T>()
+            .ok_or_else(NotRegisteredError::of::<T>)?;
         let ptr = iter
             .into_iter()
             .find(|ptr| ptr.component_id() == component_id)
-            .ok_or(NotRegisteredError)?;
+            .ok_or_else(NotRegisteredError::of::<T>)?;
 
         let ptr = ptr.downcast::<T, _>(&components.as_view())?.cast();
         Ok(ptr)
@@ -76,11 +78,13 @@ where
         I: IntoIterator<Item = ErasedComponentMutPtr>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
+        let component_id = components
+            .component_id::<T>()
+            .ok_or_else(NotRegisteredError::of::<T>)?;
         let ptr = iter
             .into_iter()
             .find(|ptr| ptr.component_id() == component_id)
-            .ok_or(NotRegisteredError)?;
+            .ok_or_else(NotRegisteredError::of::<T>)?;
 
         let ptr = ptr.downcast::<T, _>(&components.as_view())?.cast();
         Ok(ptr)
@@ -95,11 +99,13 @@ where
         I: IntoIterator<Item = ErasedComponent>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<T>().ok_or(NotRegisteredError)?;
+        let component_id = components
+            .component_id::<T>()
+            .ok_or_else(NotRegisteredError::of::<T>)?;
         let component = iter
             .into_iter()
             .find(|component| component.component_id() == component_id)
-            .ok_or(NotRegisteredError)?;
+            .ok_or_else(NotRegisteredError::of::<T>)?;
 
         let component = component.downcast::<T, _>(&components.as_view())?;
         Ok(component.into())
@@ -154,7 +160,7 @@ macro_rules! bundle_tuple_impl {
                 Iter: IntoIterator<Item = ErasedComponentPtr>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
-                let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
+                let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
 
                 let mut ptrs = ($(None::<*const $types>,)*);
                 #[expect(clippy::needless_continue)]
@@ -167,7 +173,7 @@ macro_rules! bundle_tuple_impl {
                     )*
                 }
 
-                let ptrs = ($(ptrs.$indices.ok_or(NotRegisteredError)?,)*);
+                let ptrs = ($(ptrs.$indices.ok_or_else(NotRegisteredError::of::<$types>)?,)*);
                 Ok(ptrs)
             }
 
@@ -180,7 +186,7 @@ macro_rules! bundle_tuple_impl {
                 Iter: IntoIterator<Item = ErasedComponentMutPtr>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
-                let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
+                let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
 
                 let mut ptrs = ($(None::<*mut $types>,)*);
                 #[expect(clippy::needless_continue)]
@@ -193,7 +199,7 @@ macro_rules! bundle_tuple_impl {
                     )*
                 }
 
-                let ptrs = ($(ptrs.$indices.ok_or(NotRegisteredError)?,)*);
+                let ptrs = ($(ptrs.$indices.ok_or_else(NotRegisteredError::of::<$types>)?,)*);
                 Ok(ptrs)
             }
 
@@ -206,7 +212,7 @@ macro_rules! bundle_tuple_impl {
                 Iter: IntoIterator<Item = ErasedComponent>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
             {
-                let component_ids = [$(components.component_id::<$types>().ok_or(NotRegisteredError)?,)*];
+                let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
 
                 let mut fields = ($(None::<$types>,)*);
                 #[expect(clippy::needless_continue)]
@@ -219,7 +225,7 @@ macro_rules! bundle_tuple_impl {
                     )*
                 }
 
-                let fields = ($(fields.$indices.ok_or(NotRegisteredError)?,)*);
+                let fields = ($(fields.$indices.ok_or_else(NotRegisteredError::of::<$types>)?,)*);
                 Ok(fields)
             }
         }

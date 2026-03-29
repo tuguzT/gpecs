@@ -1,14 +1,13 @@
-use std::{
+use core::{
     borrow::Borrow,
     cmp,
     fmt::{self, Debug},
     hash::{self, Hash},
-    mem::MaybeUninit,
 };
 
-use gpecs_soa_erased::{data::ErasedSlice, ptr::slice::ConstSliceItemPtr};
+use gpecs_erased::{data::ErasedSlice, ptr::slice::ConstSliceItemPtr};
 
-use crate::component::{
+use crate::{
     Component,
     erased::{
         ErasedComponentPtr, ErasedComponentSlicePtr,
@@ -21,7 +20,7 @@ use crate::component::{
 };
 
 #[derive(Clone, Copy)]
-pub struct ErasedComponentSlice<'a, T = *const MaybeUninit<u8>>
+pub struct ErasedComponentSlice<'a, T>
 where
     T: ConstSliceItemPtr,
 {
@@ -42,7 +41,9 @@ where
         C: Component,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
-        let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;
+        let component_id = components
+            .component_id::<C>()
+            .ok_or_else(NotRegisteredError::of::<C>)?;
         let fields = ErasedSlice::try_from(component)?;
 
         let me = unsafe { Self::from_parts(component_id, fields) };

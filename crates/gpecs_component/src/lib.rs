@@ -7,6 +7,7 @@ extern crate alloc;
 
 pub use self::traits::{Component, GpuComponent};
 
+pub mod erased;
 pub mod registry;
 
 mod traits;

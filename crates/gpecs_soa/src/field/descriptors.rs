@@ -1,4 +1,6 @@
-use core::{alloc::Layout, num::NonZeroUsize, slice};
+use core::{alloc::Layout, slice};
+
+use gpecs_layout::{FfiLayout, WithLayout};
 
 #[cfg(feature = "alloc")]
 use core_alloc::boxed::Box;
@@ -8,20 +10,17 @@ use core_alloc::boxed::Box;
 /// For now this contains only a [`Layout`] of such field.
 /// Some additional data may be added in the future.
 #[derive(Debug, Clone, Copy)]
-#[repr(C)] // should be just `Layout`, but it is not `repr(C)`
+#[repr(C)]
 pub struct FieldDescriptor {
-    size: usize,
-    align: NonZeroUsize,
+    layout: FfiLayout,
 }
 
 impl FieldDescriptor {
     /// Creates a new field descriptor from the given [`Layout`].
     #[inline]
     pub const fn new(layout: Layout) -> Self {
-        let size = layout.size();
-        // SAFETY: Layout::align() is guaranteed to be a power of two, which is non-zero
-        let align = unsafe { NonZeroUsize::new_unchecked(layout.align()) };
-        Self { size, align }
+        let layout = FfiLayout::new(layout);
+        Self { layout }
     }
 
     /// Creates a new field descriptor from the given type.
@@ -34,9 +33,8 @@ impl FieldDescriptor {
     /// Returns the [`Layout`] of this field descriptor.
     #[inline]
     pub const fn layout(self) -> Layout {
-        let Self { size, align } = self;
-        // SAFETY: self could only be created from a valid `Layout`
-        unsafe { Layout::from_size_align_unchecked(size, align.get()) }
+        let Self { layout } = self;
+        layout.layout()
     }
 }
 
@@ -51,6 +49,20 @@ impl AsMut<Self> for FieldDescriptor {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
+    }
+}
+
+impl From<FieldDescriptor> for Layout {
+    #[inline]
+    fn from(descriptor: FieldDescriptor) -> Self {
+        descriptor.layout()
+    }
+}
+
+impl WithLayout for FieldDescriptor {
+    #[inline]
+    fn layout(&self) -> Layout {
+        (*self).into()
     }
 }
 

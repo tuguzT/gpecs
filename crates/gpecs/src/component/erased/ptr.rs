@@ -7,24 +7,22 @@ use std::{
 
 use gpecs_soa_erased::{
     data::ErasedPtr,
+    layout::WithLayout,
     ptr::slice::{CastMutPtr, ConstSliceItemPtr},
 };
 
-use crate::{
-    component::{
-        Component,
-        erased::{
-            ErasedComponentMutPtr, ErasedComponentRef,
-            error::{
-                DanglingError, DowncastError, NotRegisteredError, TryFromPtrError, check_downcast,
-            },
-        },
-        registry::{
-            ComponentId, ComponentRegistryView,
-            traits::{ComponentIdFrom, FromComponentType},
+use crate::component::{
+    Component,
+    erased::{
+        ErasedComponentMutPtr, ErasedComponentRef,
+        error::{
+            DanglingError, DowncastError, NotRegisteredError, TryFromPtrError, check_downcast,
         },
     },
-    soa::field::FieldDescriptor,
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType},
+    },
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -70,14 +68,14 @@ where
 {
     #[inline]
     pub fn dangling(
-        components: &ComponentRegistryView<impl AsRef<FieldDescriptor>, impl ?Sized>,
+        components: &ComponentRegistryView<impl WithLayout, impl ?Sized>,
         component_id: ComponentId,
     ) -> Result<Self, DanglingError> {
         let component_info = components
             .get_component_info(component_id)
             .ok_or(NotRegisteredError)?;
 
-        let layout = component_info.as_meta().as_ref().layout();
+        let layout = component_info.as_meta().layout();
         let field = ErasedPtr::dangling(layout)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
@@ -106,7 +104,7 @@ where
     ) -> Result<Self, DanglingError>
     where
         C: Component,
-        M: AsRef<FieldDescriptor>,
+        M: WithLayout,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let component_id = components.component_id::<C>().ok_or(NotRegisteredError)?;

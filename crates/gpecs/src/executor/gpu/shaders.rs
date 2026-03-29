@@ -38,7 +38,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: fix "Type [14] '&[gpecs_soa_erased::gpecs_soa::field::FieldDescriptor]' is invalid; Expected data type, found [12]"
     fn spirv_to_shader_module() {
         const SHADER_PATH: &str = env!("gpecs_shaders.spv");
 

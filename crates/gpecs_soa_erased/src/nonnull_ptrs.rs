@@ -501,7 +501,7 @@ where
     P: NonNullSliceItemPtr,
 {
     #[inline]
-    pub(super) unsafe fn next_unchecked(&mut self) -> ErasedNonNullPtr<P> {
+    pub unsafe fn next_unchecked(&mut self) -> ErasedNonNullPtr<P> {
         let Self { inner, .. } = self;
 
         let offset = unsafe { inner.next_unchecked() };

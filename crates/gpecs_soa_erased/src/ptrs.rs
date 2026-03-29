@@ -442,7 +442,7 @@ where
     P: ConstSliceItemPtr,
 {
     #[inline]
-    pub(super) unsafe fn next_unchecked(&mut self) -> ErasedPtr<P> {
+    pub unsafe fn next_unchecked(&mut self) -> ErasedPtr<P> {
         let Self { inner, .. } = self;
 
         let offset = unsafe { inner.next_unchecked() };

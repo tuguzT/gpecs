@@ -593,7 +593,7 @@ where
     P: MutSliceItemPtr,
 {
     #[inline]
-    pub(super) unsafe fn next_unchecked(&mut self) -> ErasedMutPtr<P> {
+    pub unsafe fn next_unchecked(&mut self) -> ErasedMutPtr<P> {
         let Self { inner, .. } = self;
 
         let offset = unsafe { inner.next_unchecked() };

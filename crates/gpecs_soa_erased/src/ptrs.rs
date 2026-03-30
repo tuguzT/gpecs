@@ -20,7 +20,8 @@ use crate::{
     soa::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
-            FieldDescriptorsOutput, FieldDescriptorsOwned, buffer_offsets,
+            FieldDescriptorsOutput, FieldDescriptorsOwned, IntoCopiedFieldDescriptors,
+            RawBufferOffsets, buffer_offsets,
         },
         traits::{AllocSoa, AllocSoaContext, Ptrs, RawSoaContext},
     },
@@ -193,6 +194,12 @@ where
         let Self { descriptors, .. } = self;
         descriptors
     }
+
+    #[inline]
+    pub(super) fn raw_buffer_offsets(&self) -> RawBufferOffsets {
+        let Self { capacity, .. } = *self;
+        RawBufferOffsets::new(capacity)
+    }
 }
 
 impl<'a, D, P> ErasedSoaPtrs<D, P>
@@ -234,6 +241,26 @@ where
         let descriptors = descriptors.field_descriptors().into_iter();
         let inner = buffer_offsets(descriptors, capacity);
         unsafe { ErasedSoaPtrsIter::new_unchecked(inner, buffer, offset) }
+    }
+
+    #[inline]
+    pub(super) unsafe fn nth_field_ptr(
+        &'a self,
+        state: &mut RawBufferOffsets,
+        i: usize,
+    ) -> ErasedPtr<P> {
+        let Self {
+            ref descriptors,
+            buffer,
+            offset,
+            ..
+        } = *self;
+
+        let mut descriptors = descriptors.field_descriptors().copied_field_descriptors();
+        let desc = unsafe { descriptors.nth(i).unwrap_unchecked() };
+
+        let buffer_offset = unsafe { state.next_unchecked(desc) };
+        unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }
 }
 
@@ -424,16 +451,6 @@ where
         let Self { inner, .. } = self;
         inner.as_inner()
     }
-
-    #[inline]
-    unsafe fn field_ptr_from_buffer_offset(&self, offset: BufferOffset) -> ErasedPtr<P> {
-        let BufferOffset { desc, offset, .. } = offset;
-        let index = bytes_to_items::<P::Item>(offset);
-
-        let Self { buffer, offset, .. } = *self;
-        let ptr = unsafe { P::from_slice(buffer, index) };
-        unsafe { ErasedPtr::from_parts(desc.layout(), ptr).add(offset) }
-    }
 }
 
 impl<D, P> ErasedSoaPtrsIter<D, P>
@@ -443,10 +460,14 @@ where
 {
     #[inline]
     pub unsafe fn next_unchecked(&mut self) -> ErasedPtr<P> {
-        let Self { inner, .. } = self;
+        let Self {
+            ref mut inner,
+            buffer,
+            offset,
+        } = *self;
 
-        let offset = unsafe { inner.next_unchecked() };
-        unsafe { self.field_ptr_from_buffer_offset(offset) }
+        let buffer_offset = unsafe { inner.next_unchecked() };
+        unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
     }
 }
 
@@ -509,11 +530,15 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { inner, .. } = self;
+        let Self {
+            ref mut inner,
+            buffer,
+            offset,
+        } = *self;
 
-        let offset = inner.next()?;
-        let offset = unsafe { offset.unwrap_unchecked() };
-        let item = unsafe { self.field_ptr_from_buffer_offset(offset) };
+        let buffer_offset = inner.next()?;
+        let buffer_offset = unsafe { buffer_offset.unwrap_unchecked() };
+        let item = unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) };
         Some(item)
     }
 
@@ -568,4 +593,22 @@ where
     ) -> FieldDescriptorsOutput<'short, Self> {
         D::upcast_field_descriptors(from)
     }
+}
+
+#[inline]
+unsafe fn field_ptr_from_buffer_offset<P>(
+    buffer: *const [P::Item],
+    offset: usize,
+    buffer_offset: BufferOffset,
+) -> ErasedPtr<P>
+where
+    P: ConstSliceItemPtr,
+{
+    let (index, layout) = {
+        let BufferOffset { desc, offset, .. } = buffer_offset;
+        (bytes_to_items::<P::Item>(offset), desc.into())
+    };
+
+    let ptr = unsafe { P::from_slice(buffer, index) };
+    unsafe { ErasedPtr::from_parts(layout, ptr).add(offset) }
 }

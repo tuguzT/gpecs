@@ -206,6 +206,12 @@ where
         let Self { descriptors, .. } = self;
         descriptors
     }
+
+    #[inline]
+    pub(super) fn raw_buffer_offsets(&self) -> RawBufferOffsets {
+        let Self { capacity, .. } = *self;
+        RawBufferOffsets::new(capacity)
+    }
 }
 
 impl<'a, D, P> ErasedSoaMutPtrs<D, P>
@@ -265,36 +271,40 @@ where
         let inner = buffer_offsets(descriptors, capacity);
         unsafe { ErasedSoaMutPtrsIter::new_unchecked(inner, buffer, offset) }
     }
-}
 
-impl<D, P> ErasedSoaMutPtrs<D, P>
-where
-    D: FieldDescriptorsOwned + ?Sized,
-    P: MutSliceItemPtr,
-{
+    #[inline]
+    pub(super) unsafe fn nth_field_ptr(
+        &'a self,
+        state: &mut RawBufferOffsets,
+        i: usize,
+    ) -> ErasedMutPtr<P> {
+        let Self {
+            ref descriptors,
+            buffer,
+            offset,
+            ..
+        } = *self;
+
+        let mut descriptors = descriptors.field_descriptors().copied_field_descriptors();
+        let desc = unsafe { descriptors.nth(i).unwrap_unchecked() };
+
+        let buffer_offset = unsafe { state.next_unchecked(desc) };
+        unsafe { field_ptr_from_buffer_offset(buffer, offset, buffer_offset) }
+    }
+
     #[inline]
     #[track_caller]
-    pub unsafe fn swap<E>(&mut self, with: &mut ErasedSoaMutPtrs<E, P>)
+    pub unsafe fn swap<'e, E>(&'a mut self, with: &'e mut ErasedSoaMutPtrs<E, P>)
     where
-        E: FieldDescriptorsOwned + ?Sized,
+        E: FieldDescriptors<'e> + ?Sized,
     {
         let n = assert_descriptors(self.field_descriptors(), with.field_descriptors());
 
-        let mut this_state = RawBufferOffsets::new(self.capacity);
-        let mut with_state = RawBufferOffsets::new(with.capacity);
+        let this_state = &mut self.raw_buffer_offsets();
+        let with_state = &mut with.raw_buffer_offsets();
         for i in 0..n {
-            let this = {
-                let mut descriptors = self.field_descriptors().copied_field_descriptors();
-                let desc = unsafe { descriptors.nth(i).unwrap_unchecked() };
-                let offset = unsafe { this_state.next_unchecked(desc) };
-                unsafe { field_ptr_from_buffer_offset::<P>(self.buffer, self.offset, offset) }
-            };
-            let with = {
-                let mut descriptors = with.field_descriptors().copied_field_descriptors();
-                let desc = unsafe { descriptors.nth(i).unwrap_unchecked() };
-                let offset = unsafe { with_state.next_unchecked(desc) };
-                unsafe { field_ptr_from_buffer_offset::<P>(with.buffer, with.offset, offset) }
-            };
+            let this = unsafe { self.nth_field_ptr(this_state, i) };
+            let with = unsafe { with.nth_field_ptr(with_state, i) };
             unsafe { this.swap(with) }
         }
     }
@@ -302,7 +312,7 @@ where
     #[inline]
     #[track_caller]
     pub unsafe fn copy_from_forward<'e, E>(
-        &mut self,
+        &'a mut self,
         src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
         count: usize,
     ) where
@@ -310,11 +320,11 @@ where
     {
         let n = assert_descriptors(self.field_descriptors(), src.field_descriptors());
 
-        let mut dst = self.iter_mut();
-        let mut src = src.iter();
-        for _ in 0..n {
-            let dst = unsafe { dst.next_unchecked() };
-            let src = unsafe { src.next_unchecked() };
+        let dst_state = &mut self.raw_buffer_offsets();
+        let src_state = &mut src.raw_buffer_offsets();
+        for i in 0..n {
+            let dst = unsafe { self.nth_field_ptr(dst_state, i) };
+            let src = unsafe { src.nth_field_ptr(src_state, i) };
             unsafe { dst.copy_from(src, count) }
         }
     }
@@ -322,44 +332,49 @@ where
     #[inline]
     #[track_caller]
     pub unsafe fn copy_from_backward<'e, E>(
-        &mut self,
+        &'a mut self,
         src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
         count: usize,
     ) where
         E: FieldDescriptors<'e> + ?Sized,
     {
         #[inline]
-        fn rec<D, E, P>(
-            dst_iter: &mut ErasedSoaMutPtrsIter<D, P>,
-            src_iter: &mut ErasedSoaPtrsIter<E, CastConstPtr<P>>,
+        fn rec<'dst, 'src, D, E, P>(
+            dst_ptrs: &'dst ErasedSoaMutPtrs<D, P>,
+            dst_state: &mut RawBufferOffsets,
+            src_ptrs: &'src ErasedSoaPtrs<E, CastConstPtr<P>>,
+            src_state: &mut RawBufferOffsets,
+            i: usize,
             n: usize,
             count: usize,
         ) where
-            D: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
-            E: Iterator<Item: AsRef<FieldDescriptor>> + ?Sized,
+            D: FieldDescriptors<'dst> + ?Sized,
+            E: FieldDescriptors<'src> + ?Sized,
             P: MutSliceItemPtr,
         {
-            if n == 0 {
+            if i >= n {
                 return;
             }
-            let dst = unsafe { dst_iter.next_unchecked() };
-            let src = unsafe { src_iter.next_unchecked() };
 
-            rec(dst_iter, src_iter, n - 1, count);
+            let dst = unsafe { dst_ptrs.nth_field_ptr(dst_state, i) };
+            let src = unsafe { src_ptrs.nth_field_ptr(src_state, i) };
+
+            rec(dst_ptrs, dst_state, src_ptrs, src_state, i + 1, n, count);
+
             unsafe { dst.copy_from(src, count) }
         }
 
         let n = assert_descriptors(self.field_descriptors(), src.field_descriptors());
-        let mut dst = self.iter_mut();
-        let mut src = src.iter();
 
-        rec(&mut dst, &mut src, n, count);
+        let dst_state = &mut self.raw_buffer_offsets();
+        let src_state = &mut src.raw_buffer_offsets();
+        rec(self, dst_state, src, src_state, 0, n, count);
     }
 
     #[inline]
     #[track_caller]
     pub unsafe fn copy_from_nonoverlapping<'e, E>(
-        &mut self,
+        &'a mut self,
         src: &'e ErasedSoaPtrs<E, CastConstPtr<P>>,
         count: usize,
     ) where
@@ -367,28 +382,28 @@ where
     {
         let n = assert_descriptors(self.field_descriptors(), src.field_descriptors());
 
-        let mut dst = self.iter_mut();
-        let mut src = src.iter();
-        for _ in 0..n {
-            let dst = unsafe { dst.next_unchecked() };
-            let src = unsafe { src.next_unchecked() };
+        let dst_state = &mut self.raw_buffer_offsets();
+        let src_state = &mut src.raw_buffer_offsets();
+        for i in 0..n {
+            let dst = unsafe { self.nth_field_ptr(dst_state, i) };
+            let src = unsafe { src.nth_field_ptr(src_state, i) };
             unsafe { dst.copy_from_nonoverlapping(src, count) }
         }
     }
 }
 
-impl<D, P, U> ErasedSoaMutPtrs<D, P>
+impl<'a, D, P, U> ErasedSoaMutPtrs<D, P>
 where
-    D: FieldDescriptorsOwned + ?Sized,
+    D: FieldDescriptors<'a> + ?Sized,
     P: MutSliceItemPtr<Item = MaybeUninit<U>>,
 {
     #[inline]
     #[track_caller]
-    pub unsafe fn write<T, E>(&mut self, value: ErasedSoa<T, E, P::Ptrs>)
+    pub unsafe fn write<T, E>(&'a mut self, value: ErasedSoa<T, E, P::Ptrs>)
     where
         T: AlignedStorage<Item = U>,
         E: FieldDescriptorsOwned,
-        for<'a, 'b> FieldDescriptorsOutput<'a, E>: FieldDescriptors<'b>,
+        for<'b, 'c> FieldDescriptorsOutput<'b, E>: FieldDescriptors<'c>,
     {
         let src = value.as_ptrs();
         unsafe { self.copy_from_nonoverlapping(&src, 1) };

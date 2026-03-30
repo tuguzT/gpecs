@@ -67,6 +67,12 @@ where
         let Self(inner) = self;
         inner.size_hint()
     }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let Self(inner) = self;
+        inner.nth(n).map(|desc| *desc.as_ref())
+    }
 }
 
 impl<T> DoubleEndedIterator for CopiedFieldDescriptors<T>
@@ -78,6 +84,12 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self(inner) = self;
         inner.next_back().map(|desc| *desc.as_ref())
+    }
+
+    #[inline]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        let Self(inner) = self;
+        inner.nth_back(n).map(|desc| *desc.as_ref())
     }
 }
 

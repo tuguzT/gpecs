@@ -10,14 +10,14 @@ pub struct GpuFieldDescriptors<T>
 where
     T: ?Sized,
 {
-    index: usize,
+    next: usize,
     descriptors: T,
 }
 
 impl<T> From<T> for GpuFieldDescriptors<T> {
     fn from(descriptors: T) -> Self {
         Self {
-            index: 0,
+            next: 0,
             descriptors,
         }
     }
@@ -52,19 +52,24 @@ where
     type Item = FieldDescriptor;
 
     fn next(&mut self) -> Option<Self::Item> {
+        self.nth(0)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self {
             ref descriptors,
-            ref mut index,
+            ref mut next,
         } = *self;
 
+        let index = *next + n;
         let descriptors = descriptors.as_ref();
-        if descriptors.len() <= *index {
+        if index >= descriptors.len() {
+            *next = descriptors.len();
             return None;
         }
 
-        let item = descriptors[*index];
-        *index += 1;
-        Some(item)
+        *next = index + 1;
+        Some(descriptors[index])
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -87,11 +92,11 @@ where
     fn len(&self) -> usize {
         let Self {
             ref descriptors,
-            index,
+            next,
         } = *self;
 
         let descriptors = descriptors.as_ref();
-        descriptors.len() - index
+        descriptors.len() - next
     }
 }
 

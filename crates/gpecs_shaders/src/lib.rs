@@ -39,19 +39,7 @@ pub fn erased_soa_work(
 
     let context = unsafe { ErasedSoaContext::from_inner(descriptors) };
     let slices = unsafe { ErasedSoaMutSlices::new_unchecked(descriptors, dense, capacity, 0, len) };
-    let dense_soa = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, slices);
 
-    // TODO: this fails to compile by `naga` with this message:
-    //       "Type [14] '&[gpecs_soa_erased::gpecs_soa::field::FieldDescriptor]' is invalid; Expected data type, found [12]"
-    //       issue lies in iterator API usage: if uncommented, this generates many new types with slices inside which `rust-gpu` refuses to inline
-    // dense_soa.swap(invocation_id, invocation_id + 1);
-
-    let soa_ptrs = unsafe { dense_soa.get_unchecked(invocation_id + 1) };
-    let mut iter = soa_ptrs.into_iter();
-
-    // uncomment code below to see newly generated types which `naga` fails to deal with
-    // unsafe { iter.next_unchecked() };
-
-    let field_ptr = unsafe { iter.next_unchecked() };
-    dense[invocation_id] = unsafe { *field_ptr.as_ptr() };
+    let mut dense_soa = SoaSlicesMut::<GpuErasedSoa<_>>::new(&context, slices);
+    dense_soa.swap(invocation_id, invocation_id + 64);
 }

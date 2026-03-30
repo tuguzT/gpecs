@@ -522,11 +522,10 @@ where
             offset,
         } = *self;
 
-        let layout = inner.layout();
-        let capacity = inner.capacity();
+        let state = inner.state();
         let fields = inner.as_inner().field_descriptors().into_iter();
 
-        let inner = unsafe { BufferOffsets::from_parts(layout, capacity, fields) };
+        let inner = unsafe { BufferOffsets::from_parts(state, fields) };
         unsafe { ErasedSoaNonNullPtrsIter::new_unchecked(inner, buffer, offset) }
     }
 }

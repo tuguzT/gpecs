@@ -38,6 +38,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn spirv_to_shader_module() {
         const SHADER_PATH: &str = env!("gpecs_shaders.spv");
 

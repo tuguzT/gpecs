@@ -28,7 +28,7 @@ use crate::{
         field::{
             BufferOffset, BufferOffsets, FieldDescriptor, FieldDescriptors, FieldDescriptorsIter,
             FieldDescriptorsOutput, FieldDescriptorsOwned, IntoCopiedFieldDescriptors,
-            buffer_offsets,
+            RawBufferOffsets, buffer_offsets,
         },
         traits::{
             AllocSoa, AllocSoaContext, ReadSoaContext, Refs, RefsMut, Soa, SoaRead, SoaWrite,
@@ -898,8 +898,8 @@ where
         .into_iter()
         .enumerate()
         .map(|(field_index, (src, desc))| {
-            let mut buffer_offsets =
-                unsafe { BufferOffsets::from_parts(storage.layout(), 1, iter::once(desc)) };
+            let state = RawBufferOffsets::from_parts(storage.layout(), 1);
+            let mut buffer_offsets = unsafe { BufferOffsets::from_parts(state, iter::once(desc)) };
 
             let BufferOffset { desc, offset, .. } = buffer_offsets
                 .next()

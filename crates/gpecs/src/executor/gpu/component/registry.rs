@@ -13,7 +13,7 @@ pub use gpecs_component::registry::GpuComponentId;
 
 use crate::{
     component::registry::ComponentId,
-    context::{Components, ErasedDropComponentDescriptor},
+    context::{ComponentDescriptor, Components},
     soa::field::FieldDescriptor,
 };
 
@@ -71,7 +71,7 @@ impl GpuComponentDescriptor {
     }
 }
 
-impl From<GpuComponentDescriptor> for ErasedDropComponentDescriptor {
+impl From<GpuComponentDescriptor> for ComponentDescriptor {
     fn from(value: GpuComponentDescriptor) -> Self {
         let GpuComponentDescriptor {
             name,

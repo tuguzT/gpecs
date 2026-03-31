@@ -1,10 +1,9 @@
-use alloc::vec::Vec;
+use core_alloc::vec::Vec;
 
 use crate::{
     Component,
     registry::{
-        ComponentId, ComponentIds, ComponentInfo, ComponentRegistryView,
-        ids::component_id_from_usize,
+        ComponentId, ComponentIds, ComponentInfo, ComponentRegistryView, component_id_from_usize,
         traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
     },
 };

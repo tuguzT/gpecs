@@ -1,34 +1,31 @@
 use std::{
     any::{self, TypeId},
     borrow::Cow,
-    collections::HashMap,
 };
 
 use crate::{
     component::{
         Component,
         erased::{ErasedDrop, WithErasedDrop},
-        registry::{
-            self, ComponentId, ComponentRegistry,
-            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
-        },
+        registry::{self, ComponentIdMap, ComponentRegistry, traits::FromComponentType},
     },
     hash::BuildHasher,
     soa::field::FieldDescriptor,
 };
 
-pub type Components = ComponentRegistry<ErasedDropComponentDescriptor, ComponentTypeIdMap>;
-pub type ComponentInfo<'a> = registry::ComponentInfo<&'a ErasedDropComponentDescriptor>;
+pub type ComponentTypeIdMap = ComponentIdMap<TypeId, BuildHasher>;
+pub type Components = ComponentRegistry<ComponentDescriptor, ComponentTypeIdMap>;
+pub type ComponentInfo<'a> = registry::ComponentInfo<&'a ComponentDescriptor>;
 
 #[derive(Debug, Clone)]
-pub struct ErasedDropComponentDescriptor {
+pub struct ComponentDescriptor {
     name: Cow<'static, str>,
     type_id: Option<TypeId>,
     desc: FieldDescriptor,
     erased_drop: Option<ErasedDrop>,
 }
 
-impl ErasedDropComponentDescriptor {
+impl ComponentDescriptor {
     #[inline]
     pub fn new<N>(
         name: N,
@@ -84,14 +81,14 @@ impl ErasedDropComponentDescriptor {
     }
 }
 
-impl AsRef<str> for ErasedDropComponentDescriptor {
+impl AsRef<str> for ComponentDescriptor {
     #[inline]
     fn as_ref(&self) -> &str {
         self.name()
     }
 }
 
-impl AsRef<FieldDescriptor> for ErasedDropComponentDescriptor {
+impl AsRef<FieldDescriptor> for ComponentDescriptor {
     #[inline]
     fn as_ref(&self) -> &FieldDescriptor {
         let Self { desc, .. } = self;
@@ -99,42 +96,16 @@ impl AsRef<FieldDescriptor> for ErasedDropComponentDescriptor {
     }
 }
 
-unsafe impl FromComponentType for ErasedDropComponentDescriptor {
+unsafe impl FromComponentType for ComponentDescriptor {
     #[inline]
     fn from_component<T: Component>() -> Self {
         Self::of::<T>()
     }
 }
 
-impl WithErasedDrop for ErasedDropComponentDescriptor {
+impl WithErasedDrop for ComponentDescriptor {
     #[inline]
     fn erased_drop(&self) -> Option<ErasedDrop> {
         Self::erased_drop(self)
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct ComponentTypeIdMap {
-    map: HashMap<TypeId, ComponentId, BuildHasher>,
-}
-
-unsafe impl ComponentIdFrom for ComponentTypeIdMap {
-    type Key = TypeId;
-
-    #[inline]
-    fn component_id_from(&self, key: Self::Key) -> Option<ComponentId> {
-        let Self { map, .. } = self;
-        map.get(&key).copied()
-    }
-}
-
-unsafe impl ComponentIdFromOrInsertWith for ComponentTypeIdMap {
-    #[inline]
-    fn component_id_from_or_insert_with<F>(&mut self, key: Self::Key, f: F) -> ComponentId
-    where
-        F: FnOnce() -> ComponentId,
-    {
-        let Self { map } = self;
-        *map.entry(key).or_insert_with(f)
     }
 }

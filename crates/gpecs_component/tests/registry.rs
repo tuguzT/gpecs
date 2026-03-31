@@ -1,14 +1,49 @@
+#![cfg(feature = "alloc")]
+
 use std::{
     alloc::Layout,
     any::{TypeId, type_name},
 };
 
-use gpecs::{
-    context::{Components, ErasedDropComponentDescriptor},
-    soa::field::FieldDescriptor,
+use gpecs_component::{
+    Component,
+    registry::{ComponentIdMap, ComponentRegistry, traits::FromComponentType},
 };
 
-use crate::common::{Mass, Position};
+#[derive(Debug, PartialEq, Clone, Copy)]
+struct Position {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+impl Component for Position {}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+struct Mass {
+    value: u32,
+}
+
+impl Component for Mass {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct ComponentDescriptor {
+    name: &'static str,
+    type_id: Option<TypeId>,
+    layout: Layout,
+}
+
+unsafe impl FromComponentType for ComponentDescriptor {
+    fn from_component<T: Component>() -> Self {
+        Self {
+            name: type_name::<T>(),
+            type_id: Some(TypeId::of::<T>()),
+            layout: Layout::new::<T>(),
+        }
+    }
+}
+
+type Components = ComponentRegistry<ComponentDescriptor, ComponentIdMap<TypeId>>;
 
 #[test]
 fn new() {
@@ -34,12 +69,9 @@ fn register_type() {
         .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.component_id(), id);
-    assert_eq!(info.as_meta().type_id(), Some(TypeId::of::<Position>()));
-    assert_eq!(info.as_meta().name(), type_name::<Position>());
-    assert_eq!(
-        info.as_meta().descriptor().layout(),
-        Layout::new::<Position>(),
-    );
+    assert_eq!(info.as_meta().type_id, Some(TypeId::of::<Position>()));
+    assert_eq!(info.as_meta().name, type_name::<Position>());
+    assert_eq!(info.as_meta().layout, Layout::new::<Position>());
 
     let id = components.register_component::<Mass>();
     assert_eq!(components.len(), 2);
@@ -51,9 +83,9 @@ fn register_type() {
         .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.component_id(), id);
-    assert_eq!(info.as_meta().type_id(), Some(TypeId::of::<Mass>()));
-    assert_eq!(info.as_meta().name(), type_name::<Mass>());
-    assert_eq!(info.as_meta().descriptor().layout(), Layout::new::<Mass>());
+    assert_eq!(info.as_meta().type_id, Some(TypeId::of::<Mass>()));
+    assert_eq!(info.as_meta().name, type_name::<Mass>());
+    assert_eq!(info.as_meta().layout, Layout::new::<Mass>());
 }
 
 #[test]
@@ -62,8 +94,11 @@ fn register_with_descriptor() {
     components.register_component::<Position>();
     assert_eq!(components.len(), 1);
 
-    let field_desc = FieldDescriptor::of::<f32>();
-    let descriptor = ErasedDropComponentDescriptor::new("Mass", None, field_desc, None);
+    let descriptor = ComponentDescriptor {
+        name: "Sweden",
+        type_id: None,
+        layout: Layout::new::<f32>(),
+    };
     let id = components.register_component_with(descriptor);
     assert_eq!(components.len(), 2);
     assert_eq!(id.into_u32(), 1);
@@ -73,8 +108,7 @@ fn register_with_descriptor() {
         .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.component_id(), id);
-    assert_eq!(info.as_meta().type_id(), None);
-    assert_eq!(info.as_meta().name(), "Mass");
-    assert_eq!(info.as_meta().descriptor().layout(), Layout::new::<f32>());
-    assert!(info.as_meta().erased_drop().is_none());
+    assert_eq!(info.as_meta().type_id, None);
+    assert_eq!(info.as_meta().name, "Sweden");
+    assert_eq!(info.as_meta().layout, Layout::new::<f32>());
 }

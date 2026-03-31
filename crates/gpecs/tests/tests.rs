@@ -1,9 +1,5 @@
 mod common;
 
-mod component {
-    mod registry;
-}
-
 mod archetype {
     mod registry;
     mod storage;

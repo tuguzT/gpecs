@@ -11,10 +11,11 @@ rust-version.workspace = true
 gpecs_erased = { workspace = true }
 polonius-the-crab = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
+hashbrown = { workspace = true, features = ["default-hasher"], optional = true }
 
 [features]
 default = ["alloc"]
-alloc = []
+alloc = ["dep:hashbrown"]
 
 [lints]
 workspace = true

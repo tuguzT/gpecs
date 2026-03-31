@@ -62,6 +62,7 @@ spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu", rev = "30896871ba00e
 indexmap = { version = "2.13", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 rustc-hash = { version = "2.1", default-features = false }
+hashbrown = { version = "0.16", default-features = false }
 arrayvec = { version = "0.7", default-features = false }
 itertools = { version = "0.14", default-features = false }
 num-traits = { version = "0.2", default-features = false }

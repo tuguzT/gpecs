@@ -21,9 +21,7 @@ use crate::{
     world::{id::WorldId, registry::WorldRegistry},
 };
 
-pub use self::components::{
-    ComponentInfo, ComponentTypeIdMap, Components, ErasedDropComponentDescriptor,
-};
+pub use self::components::{ComponentDescriptor, ComponentInfo, ComponentTypeIdMap, Components};
 
 use self::error::{
     EntityHasNoDataError, IncompatibleBundleError, InsertBundleError, InsertBundleExactError,
@@ -49,10 +47,9 @@ pub type ContextParts = (Worlds, Entities, Components, Archetypes);
 
 pub type TrySpawnError = entities::TrySpawnError<EntityLocation>;
 
-pub type Bundles<'a, B> =
-    archetypes::Bundles<'a, 'a, B, ErasedDropComponentDescriptor, ComponentTypeIdMap>;
+pub type Bundles<'a, B> = archetypes::Bundles<'a, 'a, B, ComponentDescriptor, ComponentTypeIdMap>;
 pub type BundlesMut<'a, B> =
-    archetypes::BundlesMut<'a, 'a, B, ErasedDropComponentDescriptor, ComponentTypeIdMap>;
+    archetypes::BundlesMut<'a, 'a, B, ComponentDescriptor, ComponentTypeIdMap>;
 
 #[derive(Debug, Default)]
 pub struct Context {

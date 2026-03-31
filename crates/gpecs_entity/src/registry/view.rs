@@ -88,6 +88,14 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
+    pub fn as_view(&self) -> EntityRegistryView<'_, Meta> {
+        let Self { inner } = self;
+
+        let inner = inner.as_view();
+        EntityRegistryView::from_inner(inner)
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { inner } = self;
         inner.len()

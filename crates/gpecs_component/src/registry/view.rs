@@ -45,6 +45,15 @@ where
     Mapping: ?Sized,
 {
     #[inline]
+    pub fn as_view(&self) -> ComponentRegistryView<'_, Meta, &Mapping> {
+        let Self {
+            components,
+            mapping,
+        } = self;
+        unsafe { ComponentRegistryView::from_parts(components, mapping) }
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         let Self { components, .. } = self;
         components.len()

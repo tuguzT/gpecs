@@ -17,7 +17,7 @@ use gpecs_sparse::{
 
 use crate::{
     entity::{Entity, EntityEpoch},
-    registry::{Iter, IterMut},
+    registry::{EntityRegistryView, Iter, IterMut},
 };
 
 type Inner<'a, Meta> = EpochSparseViewMut<'a, 'a, Entity, Identity<Meta>>;
@@ -91,6 +91,22 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
         let metas = metas.as_inner_mut();
 
         (entities, metas, sparse)
+    }
+
+    #[inline]
+    pub fn as_view(&self) -> EntityRegistryView<'_, Meta> {
+        let Self { inner } = self;
+
+        let inner = inner.as_view();
+        EntityRegistryView::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn as_mut_view(&mut self) -> EntityRegistryViewMut<'_, Meta> {
+        let Self { inner } = self;
+
+        let inner = inner.as_mut_view();
+        EntityRegistryViewMut::from_inner(inner)
     }
 
     #[inline]

@@ -74,7 +74,7 @@ where
             .get_component_info(component_id)
             .ok_or_else(NotRegisteredError::new)?;
 
-        let layout = component_info.as_meta().layout();
+        let layout = component_info.layout();
         let field = ErasedMutPtr::dangling(layout)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };
@@ -210,7 +210,7 @@ where
         let component_info = components
             .get_component_info(self.component_id())
             .ok_or_else(NotRegisteredError::new)?;
-        let Some(erased_drop) = component_info.as_meta().erased_drop() else {
+        let Some(erased_drop) = component_info.erased_drop() else {
             return Ok(());
         };
 

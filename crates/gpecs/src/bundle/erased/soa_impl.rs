@@ -123,8 +123,8 @@ where
 
     #[inline]
     unsafe fn ptrs_drop_in_place(&self, ptrs: Self::MutPtrs<'_>) {
-        for (component, to_drop) in zip_eq(self, ptrs) {
-            let Some(erased_drop) = component.meta.erased_drop() else {
+        for (component_info, to_drop) in zip_eq(self, ptrs) {
+            let Some(erased_drop) = component_info.erased_drop() else {
                 continue;
             };
             unsafe { erased_drop.drop_in_place(to_drop) }
@@ -218,8 +218,8 @@ where
 
     #[inline]
     unsafe fn slices_drop_in_place(&self, slices: Self::SliceMutPtrs<'_>) {
-        for (component, to_drop) in zip_eq(self, slices) {
-            let Some(erased_drop) = component.meta.erased_drop() else {
+        for (component_info, to_drop) in zip_eq(self, slices) {
+            let Some(erased_drop) = component_info.erased_drop() else {
                 continue;
             };
             unsafe { erased_drop.drop_in_place_slice(to_drop) }

@@ -74,7 +74,7 @@ where
             .get_component_info(component_id)
             .ok_or_else(NotRegisteredError::new)?;
 
-        let layout = component_info.as_meta().layout();
+        let layout = component_info.layout();
         let field = ErasedPtr::dangling(layout)?;
 
         let me = unsafe { Self::from_parts(component_id, field) };

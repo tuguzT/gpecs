@@ -448,7 +448,7 @@ where
 
         let refs = chain(self.as_refs(), to_insert.as_refs());
         let with_meta = chain(self.archetype(), to_insert.archetype())
-            .map(|component| (component.id, component.meta.clone()));
+            .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
         let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_meta) };
         let result = Inner::try_from_fields_descriptors(refs, archetype);
 
@@ -485,9 +485,9 @@ where
     {
         let (ptrs, archetype) = self.as_mut_ptrs_with_archetype();
 
-        let ptrs = zip_eq(ptrs, archetype).map(|(dst, component)| {
+        let ptrs = zip_eq(ptrs, archetype).map(|(dst, component_info)| {
             if to_replace.archetype().contains(dst.component_id()) {
-                if let Some(erased_drop) = component.meta.erased_drop() {
+                if let Some(erased_drop) = component_info.erased_drop() {
                     unsafe { erased_drop.drop_in_place(dst) }
                 }
                 let src = to_replace
@@ -507,9 +507,9 @@ where
         let metas_to_append = to_replace
             .archetype()
             .iter()
-            .filter(|component| !archetype.contains(component.id));
+            .filter(|component_info| !archetype.contains(component_info.component_id()));
         let with_metas = chain(archetype, metas_to_append)
-            .map(|component| (component.id, component.meta.clone()));
+            .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
         let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_metas) };
 
         let result = Inner::try_from_fields_descriptors(refs, archetype);
@@ -567,8 +567,8 @@ where
         let retained_meta = bundle
             .archetype()
             .iter()
-            .filter(|component| !archetype_to_remove.contains(component.id))
-            .map(|component| (component.id, component.meta.clone()));
+            .filter(|component_info| !archetype_to_remove.contains(component_info.component_id()))
+            .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
         let retained_archetype = unsafe { ErasedArchetype::with_meta_unchecked(retained_meta) };
         let result = Inner::try_from_fields_descriptors(retained_refs, retained_archetype);
         let retained_inner = match result.map_err(into_remove_error_kind) {
@@ -611,21 +611,22 @@ where
         let mut bundle = self.check_remove(to_destroy.component_ids())?;
 
         let (refs, archetype) = bundle.as_mut_refs_with_archetype();
-        let fields = zip_eq(refs, archetype).filter_map(|(mut field, component)| {
-            if to_destroy.contains(component.id) {
+        let fields = zip_eq(refs, archetype).filter_map(|(mut field, component_info)| {
+            if to_destroy.contains(component_info.component_id()) {
                 let to_drop = field.as_mut_component_ptr();
-                if let Some(erased_drop) = component.meta.erased_drop() {
+                if let Some(erased_drop) = component_info.erased_drop() {
                     unsafe { erased_drop.drop_in_place(to_drop) }
                 }
                 return None;
             }
             Some(field)
         });
-        let with_meta = archetype.iter().filter_map(|component| {
-            if to_destroy.contains(component.id) {
+        let with_meta = archetype.iter().filter_map(|component_info| {
+            if to_destroy.contains(component_info.component_id()) {
                 return None;
             }
-            Some((component.id, component.meta.clone()))
+            let component_info = component_info.map_meta(Clone::clone);
+            Some(component_info.into_parts())
         });
         let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_meta) };
         let result = Inner::try_from_fields_descriptors(fields, archetype);

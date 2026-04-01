@@ -62,7 +62,7 @@ where
 
         let field = Erased::try_from_storage_value(storage, component)?;
         let component_id = component_info.component_id();
-        let erased_drop = component_info.as_meta().erased_drop();
+        let erased_drop = component_info.erased_drop();
 
         let me = unsafe { Self::from_parts(component_id, field, erased_drop) };
         Ok(me)
@@ -91,7 +91,7 @@ where
 
         let field = Erased::try_from(component)?;
         let component_id = component_info.component_id();
-        let erased_drop = component_info.as_meta().erased_drop();
+        let erased_drop = component_info.erased_drop();
 
         let me = unsafe { Self::from_parts(component_id, field, erased_drop) };
         Ok(me)

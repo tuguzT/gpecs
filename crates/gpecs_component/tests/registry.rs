@@ -69,9 +69,9 @@ fn register_type() {
         .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.component_id(), id);
-    assert_eq!(info.as_meta().type_id, Some(TypeId::of::<Position>()));
-    assert_eq!(info.as_meta().name, type_name::<Position>());
-    assert_eq!(info.as_meta().layout, Layout::new::<Position>());
+    assert_eq!(info.type_id, Some(TypeId::of::<Position>()));
+    assert_eq!(info.name, type_name::<Position>());
+    assert_eq!(info.layout, Layout::new::<Position>());
 
     let id = components.register_component::<Mass>();
     assert_eq!(components.len(), 2);
@@ -83,9 +83,9 @@ fn register_type() {
         .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.component_id(), id);
-    assert_eq!(info.as_meta().type_id, Some(TypeId::of::<Mass>()));
-    assert_eq!(info.as_meta().name, type_name::<Mass>());
-    assert_eq!(info.as_meta().layout, Layout::new::<Mass>());
+    assert_eq!(info.type_id, Some(TypeId::of::<Mass>()));
+    assert_eq!(info.name, type_name::<Mass>());
+    assert_eq!(info.layout, Layout::new::<Mass>());
 }
 
 #[test]
@@ -108,7 +108,7 @@ fn register_with_descriptor() {
         .get_component_info(id)
         .expect("info of just registered component should present");
     assert_eq!(info.component_id(), id);
-    assert_eq!(info.as_meta().type_id, None);
-    assert_eq!(info.as_meta().name, "Sweden");
-    assert_eq!(info.as_meta().layout, Layout::new::<f32>());
+    assert_eq!(info.type_id, None);
+    assert_eq!(info.name, "Sweden");
+    assert_eq!(info.layout, Layout::new::<f32>());
 }

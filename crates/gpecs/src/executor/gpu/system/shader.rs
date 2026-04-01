@@ -75,7 +75,7 @@ impl GpuSystemShader {
             |&(component_id, _, _)| component_id.into(),
         )?;
         let component_entry = |index: usize, info: ComponentInfo, binding_access| {
-            let size_of_component = info.as_meta().descriptor().layout().size();
+            let size_of_component = info.descriptor().layout().size();
             let size_of_component = size_of_component
                 .try_into()
                 .expect("size of component should fit in `u64`");

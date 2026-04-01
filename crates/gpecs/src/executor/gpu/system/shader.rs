@@ -13,8 +13,8 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::{collect::try_collect_opt_components, error::ArchetypeError},
-    context::{ComponentInfo, Components},
+    archetype::{erased::ErasedArchetype, error::ArchetypeError},
+    context::{ComponentDescriptor, Components},
     entity::Entity,
     executor::gpu::component::registry::GpuComponentId,
     hash::IndexMap,
@@ -66,16 +66,13 @@ impl GpuSystemShader {
             min_binding_size: ENTITY_MIN_BINDING_SIZE,
         });
 
-        let component_ids = try_collect_opt_components(
-            bind_components.into_iter().map(|(id, access)| {
-                let info = components.get_component_info(id.into())?;
-                Some((id, info, access))
-            }),
-            |map, (id, info, access)| IndexMap::insert(map, id, (info, access)).is_none(),
-            |&(component_id, _, _)| component_id.into(),
-        )?;
-        let component_entry = |index: usize, info: ComponentInfo, binding_access| {
-            let size_of_component = info.descriptor().layout().size();
+        let with = bind_components
+            .into_iter()
+            .map(|(id, access)| (id.into(), access));
+        let bind_components = ErasedArchetype::new_with(components, with)?;
+
+        let component_entry = |index: usize, desc: &ComponentDescriptor, binding_access| {
+            let size_of_component = desc.descriptor().layout().size();
             let size_of_component = size_of_component
                 .try_into()
                 .expect("size of component should fit in `u64`");
@@ -91,11 +88,13 @@ impl GpuSystemShader {
             };
             Some(component_entry)
         };
-        let component_entries: IndexMap<_, _> = component_ids
+        let component_entries: IndexMap<_, _> = bind_components
             .into_iter()
             .enumerate()
-            .map(|(index, (component_id, (info, access)))| {
-                (component_id, component_entry(index, info, access))
+            .map(|(index, component_info)| {
+                let (component_id, (desc, access)) = component_info.into_parts();
+                let component_id = unsafe { GpuComponentId::from_id(component_id) };
+                (component_id, component_entry(index, desc, access))
             })
             .collect();
 

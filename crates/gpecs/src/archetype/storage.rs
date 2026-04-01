@@ -96,7 +96,7 @@ impl WithErasedDrop for ErasedDropMeta {
     }
 }
 
-impl<Meta> FromComponentInfo<Meta> for ErasedDropMeta
+impl<Meta> FromComponentInfo<'_, Meta> for ErasedDropMeta
 where
     Meta: AsRef<FieldDescriptor> + WithErasedDrop,
 {

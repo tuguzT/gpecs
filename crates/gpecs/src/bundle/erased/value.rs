@@ -99,13 +99,13 @@ where
     Meta: AsRef<FieldDescriptor> + WithErasedDrop + 'static,
 {
     #[inline]
-    pub fn try_from<B, M, T>(
-        components: &mut ComponentRegistry<M, T>,
+    pub fn try_from<'a, B, M, T>(
+        components: &'a mut ComponentRegistry<M, T>,
         bundle: B,
     ) -> Result<Self, FromBundleError<B>>
     where
         B: Bundle,
-        Meta: FromComponentInfo<M>,
+        Meta: FromComponentInfo<'a, M>,
         M: FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -150,14 +150,14 @@ where
         let iter = iter
             .into_iter()
             .map(|component| (component.component_id(), component));
-        let components = ErasedArchetype::with_meta(components, iter)?;
+        let components = ErasedArchetype::from_iter(components, iter)?;
 
         let iter = components.iter().map(|component_info| {
             let component_id = component_info.component_id();
             let meta = Meta::from_erased_component(component_info.as_meta());
             (component_id, meta)
         });
-        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(iter) };
+        let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
 
         let fields = components
             .into_iter()
@@ -453,9 +453,9 @@ where
         }
 
         let refs = chain(self.as_refs(), to_insert.as_refs());
-        let with_meta = chain(self.archetype(), to_insert.archetype())
+        let iter = chain(self.archetype(), to_insert.archetype())
             .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
-        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_meta) };
+        let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
         let result = Inner::try_from_fields_descriptors(refs, archetype);
 
         let result = result.map_err(|error| match error {
@@ -514,9 +514,9 @@ where
             .archetype()
             .iter()
             .filter(|component_info| !archetype.contains(component_info.component_id()));
-        let with_metas = chain(archetype, metas_to_append)
+        let iter = chain(archetype, metas_to_append)
             .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
-        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_metas) };
+        let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
 
         let result = Inner::try_from_fields_descriptors(refs, archetype);
         let result = result.map_err(|error| match error {
@@ -570,12 +570,12 @@ where
             .as_refs()
             .into_iter()
             .filter(|component| !archetype_to_remove.contains(component.component_id()));
-        let retained_meta = bundle
+        let retained_iter = bundle
             .archetype()
             .iter()
             .filter(|component_info| !archetype_to_remove.contains(component_info.component_id()))
             .map(|component_info| component_info.map_meta(Clone::clone).into_parts());
-        let retained_archetype = unsafe { ErasedArchetype::with_meta_unchecked(retained_meta) };
+        let retained_archetype = unsafe { ErasedArchetype::from_iter_unchecked(retained_iter) };
         let result = Inner::try_from_fields_descriptors(retained_refs, retained_archetype);
         let retained_inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,
@@ -627,14 +627,14 @@ where
             }
             Some(field)
         });
-        let with_meta = archetype.iter().filter_map(|component_info| {
+        let iter = archetype.iter().filter_map(|component_info| {
             if to_destroy.contains(component_info.component_id()) {
                 return None;
             }
             let component_info = component_info.map_meta(Clone::clone);
             Some(component_info.into_parts())
         });
-        let archetype = unsafe { ErasedArchetype::with_meta_unchecked(with_meta) };
+        let archetype = unsafe { ErasedArchetype::from_iter_unchecked(iter) };
         let result = Inner::try_from_fields_descriptors(fields, archetype);
         let inner = match result.map_err(into_remove_error_kind) {
             Ok(inner) => inner,

@@ -15,17 +15,14 @@ use gpecs_sparse::{
 };
 
 use crate::{
-    archetype::{
-        collect::{try_collect_components, try_collect_opt_components},
-        error::{
-            AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
-            IncompatibleArchetypeError, IncompatibleArchetypeExactError, MissingComponentError,
-            TooFewComponentsError,
-        },
+    archetype::error::{
+        AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
+        IncompatibleArchetypeError, IncompatibleArchetypeExactError, MissingComponentError,
+        TooFewComponentsError,
     },
     bundle::Bundle,
     component::{
-        erased::{ErasedDrop, WithErasedDrop},
+        erased::{ErasedDrop, WithErasedDrop, error::NotRegisteredError},
         registry::{
             ComponentId, ComponentInfo, ComponentRegistry,
             traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
@@ -47,7 +44,7 @@ pub struct ErasedArchetype<Meta = ()> {
 
 impl<Meta> ErasedArchetype<Meta> {
     #[inline]
-    pub fn with_meta<I>(
+    pub fn from_iter<I>(
         components: &ComponentRegistry<impl Sized, impl ?Sized>,
         iter: I,
     ) -> Result<Self, ArchetypeError>
@@ -68,7 +65,7 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub unsafe fn with_meta_unchecked<I>(iter: I) -> Self
+    pub unsafe fn from_iter_unchecked<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = (ComponentId, Meta)>,
     {
@@ -80,14 +77,34 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 }
 
-pub trait FromComponentInfo<Meta>: Sized
+pub trait FromComponentInfo<'a, Meta>: Sized
 where
     Meta: ?Sized,
 {
-    fn from_component_info(info: ComponentInfo<&Meta>) -> Self;
+    fn from_component_info(info: ComponentInfo<&'a Meta>) -> Self;
 }
 
-impl<Meta> FromComponentInfo<Meta> for ()
+impl<'a, Meta> FromComponentInfo<'a, Meta> for &'a Meta
+where
+    Meta: ?Sized,
+{
+    #[inline]
+    fn from_component_info(info: ComponentInfo<&'a Meta>) -> Self {
+        info.into_meta()
+    }
+}
+
+impl<'a, T, Meta> FromComponentInfo<'a, Meta> for ComponentInfo<T>
+where
+    T: FromComponentInfo<'a, Meta>,
+{
+    #[inline]
+    fn from_component_info(info: ComponentInfo<&'a Meta>) -> Self {
+        info.map_meta(|_| T::from_component_info(info))
+    }
+}
+
+impl<Meta> FromComponentInfo<'_, Meta> for ()
 where
     Meta: ?Sized,
 {
@@ -95,17 +112,7 @@ where
     fn from_component_info(_: ComponentInfo<&Meta>) -> Self {}
 }
 
-impl<Meta> FromComponentInfo<Meta> for ComponentInfo<Meta::Owned>
-where
-    Meta: ToOwned + ?Sized,
-{
-    #[inline]
-    fn from_component_info(info: ComponentInfo<&Meta>) -> Self {
-        info.map_meta(ToOwned::to_owned)
-    }
-}
-
-impl<Meta> FromComponentInfo<Meta> for FieldDescriptor
+impl<Meta> FromComponentInfo<'_, Meta> for FieldDescriptor
 where
     Meta: AsRef<FieldDescriptor> + ?Sized,
 {
@@ -115,7 +122,7 @@ where
     }
 }
 
-impl<Meta> FromComponentInfo<Meta> for Option<ErasedDrop>
+impl<Meta> FromComponentInfo<'_, Meta> for Option<ErasedDrop>
 where
     Meta: WithErasedDrop + ?Sized,
 {
@@ -127,13 +134,13 @@ where
 
 impl<Meta> ErasedArchetype<Meta> {
     #[inline]
-    pub fn new<I, T>(
-        components: &ComponentRegistry<T, impl ?Sized>,
+    pub fn new<'a, I, T>(
+        components: &'a ComponentRegistry<T, impl ?Sized>,
         component_ids: I,
     ) -> Result<Self, ArchetypeError>
     where
         I: IntoIterator<Item = ComponentId>,
-        Meta: FromComponentInfo<T>,
+        Meta: FromComponentInfo<'a, T>,
     {
         let components = try_collect_opt_components(
             component_ids.into_iter().map(|id| {
@@ -150,10 +157,10 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn of<B, M, T>(components: &ComponentRegistry<M, T>) -> Result<Self, ArchetypeError>
+    pub fn of<'a, B, M, T>(components: &'a ComponentRegistry<M, T>) -> Result<Self, ArchetypeError>
     where
         B: Bundle,
-        Meta: FromComponentInfo<M>,
+        Meta: FromComponentInfo<'a, M>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let components = try_collect_opt_components(
@@ -172,12 +179,12 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn register<B, M, T>(
-        components: &mut ComponentRegistry<M, T>,
+    pub fn register<'a, B, M, T>(
+        components: &'a mut ComponentRegistry<M, T>,
     ) -> Result<Self, DuplicateComponentError>
     where
         B: Bundle,
-        Meta: FromComponentInfo<M>,
+        Meta: FromComponentInfo<'a, M>,
         M: FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -196,7 +203,34 @@ impl<Meta> ErasedArchetype<Meta> {
         let me = Self { components };
         Ok(me)
     }
+}
 
+impl<T, U> ErasedArchetype<(T, U)> {
+    #[inline]
+    pub fn new_with<'a, I, W>(
+        components: &'a ComponentRegistry<W, impl ?Sized>,
+        with: I,
+    ) -> Result<Self, ArchetypeError>
+    where
+        I: IntoIterator<Item = (ComponentId, U)>,
+        T: FromComponentInfo<'a, W>,
+    {
+        let components = try_collect_opt_components(
+            with.into_iter().map(|(id, u)| {
+                let info = components.get_component_info(id)?;
+                let t = T::from_component_info(info);
+                Some((id, t, u))
+            }),
+            |map, (id, t, u)| Inner::insert(map, id.into_u32(), (t, u).into()).is_none(),
+            |&(id, _, _)| id,
+        )?;
+
+        let me = Self { components };
+        Ok(me)
+    }
+}
+
+impl<Meta> ErasedArchetype<Meta> {
     #[inline]
     pub fn len(&self) -> usize {
         let Self { components } = self;
@@ -1005,4 +1039,51 @@ where
     fn field_descriptors(&'a self) -> Self::Output {
         self.into_iter()
     }
+}
+
+#[inline]
+fn try_collect_components<S, I>(
+    components: I,
+    mut insert_fn: impl FnMut(&mut S, I::Item) -> bool,
+    mut component_id_fn: impl FnMut(&I::Item) -> ComponentId,
+) -> Result<S, DuplicateComponentError>
+where
+    S: Default,
+    I: IntoIterator,
+{
+    let mut set = S::default();
+    components.into_iter().try_for_each(|item| {
+        let component_id = component_id_fn(&item);
+        let is_unique = insert_fn(&mut set, item);
+        is_unique
+            .then(Default::default)
+            .ok_or_else(|| DuplicateComponentError::new(component_id))
+    })?;
+    Ok(set)
+}
+
+#[inline]
+fn try_collect_opt_components<S, I, T>(
+    components: I,
+    mut insert_fn: impl FnMut(&mut S, T) -> bool,
+    mut component_id_fn: impl FnMut(&T) -> ComponentId,
+) -> Result<S, ArchetypeError>
+where
+    S: Default,
+    I: IntoIterator<Item = Option<T>>,
+{
+    let mut set = S::default();
+    components
+        .into_iter()
+        .try_for_each::<_, Result<_, ArchetypeError>>(|item| {
+            let Some(item) = item else {
+                return Err(NotRegisteredError::new().into());
+            };
+            let component_id = component_id_fn(&item);
+            let is_unique = insert_fn(&mut set, item);
+            is_unique
+                .then(Default::default)
+                .ok_or_else(|| DuplicateComponentError::new(component_id).into())
+        })?;
+    Ok(set)
 }

@@ -16,7 +16,6 @@ use itertools::{equal, zip_eq};
 
 use crate::{
     archetype::{
-        collect::try_collect_components,
         erased::{ComponentIds, ErasedArchetype, FromComponentInfo},
         error::{AlreadyHasComponentError, MissingComponentError},
     },
@@ -38,7 +37,6 @@ use crate::{
             traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
         },
     },
-    hash::IndexSet,
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
         traits::{RawSoaContext, ReadSoaContext},
@@ -142,21 +140,29 @@ where
     Meta: AsRef<FieldDescriptor> + WithErasedDrop + FromErasedComponent + 'static,
 {
     #[inline]
-    pub fn from_components<I>(components: I) -> Result<Self, FromComponentsError>
+    pub fn from_components<I>(
+        components: &ComponentRegistry<impl Sized, impl ?Sized>,
+        iter: I,
+    ) -> Result<Self, FromComponentsError>
     where
         I: IntoIterator<Item = ErasedComponent>,
     {
-        let components =
-            try_collect_components(components, IndexSet::insert, ErasedComponent::component_id)?;
+        let iter = iter
+            .into_iter()
+            .map(|component| (component.component_id(), component));
+        let components = ErasedArchetype::with_meta(components, iter)?;
 
-        let iter = components.iter().map(|component| {
-            let id = component.component_id();
-            let meta = Meta::from_erased_component(component);
-            (id, meta)
+        let iter = components.iter().map(|component_info| {
+            let component_id = component_info.component_id();
+            let meta = Meta::from_erased_component(component_info.as_meta());
+            (component_id, meta)
         });
         let archetype = unsafe { ErasedArchetype::with_meta_unchecked(iter) };
 
-        let fields = components.into_iter().map(ErasedComponent::into_field);
+        let fields = components
+            .into_iter()
+            .map(|component_info| component_info.into_meta().into_field());
+
         let inner = Inner::try_from_fields_descriptors(fields, archetype)
             .map_err::<FromComponentsError, _>(|error| match error {
                 FromFieldsDescriptorsError::FromLayout(error) => error.into(),

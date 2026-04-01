@@ -38,6 +38,12 @@ impl<Meta> ComponentInfo<Meta> {
         let Self { component_id, meta } = self;
         (component_id, meta)
     }
+
+    #[inline]
+    pub fn into_meta(self) -> Meta {
+        let (_, meta) = self.into_parts();
+        meta
+    }
 }
 
 impl<Meta> ComponentInfo<Meta>

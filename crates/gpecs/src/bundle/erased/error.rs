@@ -7,7 +7,7 @@ use std::{
 use gpecs_soa_erased::storage::AllocError;
 
 use crate::archetype::error::{
-    AlreadyHasComponentError, DuplicateComponentError, IncompatibleArchetypeError,
+    AlreadyHasComponentError, ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
     IncompatibleArchetypeExactError, MissingComponentError,
 };
 
@@ -85,15 +85,15 @@ impl Error for FromBundleErrorKind {
 
 #[derive(Debug, Clone)]
 pub enum FromComponentsError {
-    DuplicateComponent(DuplicateComponentError),
+    Archetype(ArchetypeError),
     InvalidLayout(LayoutError),
     Alloc(AllocError),
 }
 
-impl From<DuplicateComponentError> for FromComponentsError {
+impl From<ArchetypeError> for FromComponentsError {
     #[inline]
-    fn from(error: DuplicateComponentError) -> Self {
-        Self::DuplicateComponent(error)
+    fn from(error: ArchetypeError) -> Self {
+        Self::Archetype(error)
     }
 }
 
@@ -114,7 +114,7 @@ impl From<AllocError> for FromComponentsError {
 impl Display for FromComponentsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::DuplicateComponent(error) => Display::fmt(error, f),
+            Self::Archetype(error) => Display::fmt(error, f),
             Self::InvalidLayout(error) => Display::fmt(error, f),
             Self::Alloc(error) => Display::fmt(error, f),
         }
@@ -124,7 +124,7 @@ impl Display for FromComponentsError {
 impl Error for FromComponentsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::DuplicateComponent(error) => Some(error),
+            Self::Archetype(error) => Some(error),
             Self::InvalidLayout(error) => Some(error),
             Self::Alloc(error) => Some(error),
         }

@@ -16,7 +16,7 @@ use itertools::{equal, zip_eq};
 
 use crate::{
     archetype::{
-        erased::{ComponentIds, ErasedArchetype, FromComponentInfo},
+        erased::{ErasedArchetype, ErasedArchetypeComponentIds, FromComponentInfo},
         error::{AlreadyHasComponentError, MissingComponentError},
     },
     bundle::{
@@ -650,7 +650,10 @@ where
     }
 
     #[inline]
-    fn check_remove(self, mut to_remove: ComponentIds<'_>) -> Result<Self, RemoveError<Self>> {
+    fn check_remove(
+        self,
+        mut to_remove: ErasedArchetypeComponentIds<'_>,
+    ) -> Result<Self, RemoveError<Self>> {
         if let Some(missing_component_id) = to_remove.find(|&id| !self.archetype().contains(id)) {
             let error = RemoveError {
                 reason: MissingComponentError::new(missing_component_id).into(),

@@ -39,7 +39,7 @@ use crate::{
         storage::{ArchetypeStorage, ErasedDropMeta},
     },
     bundle::{
-        Bundle, BundleRefs, BundleRefsMut,
+        Bundle, BundleRefs, BundleRefsMut, NewBundle,
         erased::{
             ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
             ErasedBundleMutRefs, ErasedBundleRefs, RemovePair,
@@ -320,7 +320,7 @@ impl ArchetypeRegistry {
         components: &mut ComponentRegistry<M, T>,
     ) -> Result<ArchetypeId, DuplicateComponentError>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -895,7 +895,7 @@ impl ArchetypeRegistry {
         value: B,
     ) -> Result<(), InsertBundleExactError<B>>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -914,7 +914,7 @@ impl ArchetypeRegistry {
         location: EntityLocation,
     ) -> Result<ArchetypeId, InsertBundleExactAtError<B>>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -1025,7 +1025,7 @@ impl ArchetypeRegistry {
         value: B,
     ) -> Result<(), InsertBundleError<B>>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -1044,7 +1044,7 @@ impl ArchetypeRegistry {
         location: EntityLocation,
     ) -> Result<ArchetypeId, InsertBundleAtError<B>>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -1163,7 +1163,7 @@ impl ArchetypeRegistry {
         entity: Entity,
     ) -> Result<Option<B>, RemoveBundleExactError>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -1182,7 +1182,7 @@ impl ArchetypeRegistry {
         location: EntityLocation,
     ) -> Result<(Option<B>, EntityLocation), RemoveBundleExactAtError>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -1284,7 +1284,7 @@ impl ArchetypeRegistry {
         entity: Entity,
     ) -> Result<(), DuplicateComponentError>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {
@@ -1302,7 +1302,7 @@ impl ArchetypeRegistry {
         location: EntityLocation,
     ) -> Result<EntityLocation, RemoveBundleAtError>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {

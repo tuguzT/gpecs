@@ -1,5 +1,5 @@
 use crate::{
-    bundle::{Bundle, BundleMutPtrs, BundlePtrs},
+    bundle::{Bundle, BundleMutPtrs, BundlePtrs, NewBundle},
     component::{
         Component,
         erased::{
@@ -31,20 +31,6 @@ where
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let component_id = components.component_id::<T>();
-        [component_id]
-    }
-
-    type RegisterComponents = [ComponentId; 1];
-
-    #[inline]
-    fn register_components<M, U>(
-        components: &mut ComponentRegistry<M, U>,
-    ) -> Self::RegisterComponents
-    where
-        M: FromComponentType,
-        U: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
-    {
-        let component_id = components.register_component::<T>();
         [component_id]
     }
 
@@ -112,6 +98,25 @@ where
     }
 }
 
+unsafe impl<T> NewBundle for Identity<T>
+where
+    T: Component,
+{
+    type RegisterComponents = [ComponentId; 1];
+
+    #[inline]
+    fn register_components<M, U>(
+        components: &mut ComponentRegistry<M, U>,
+    ) -> Self::RegisterComponents
+    where
+        M: FromComponentType,
+        U: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+    {
+        let component_id = components.register_component::<T>();
+        [component_id]
+    }
+}
+
 macro_rules! bundle_tuple_impl {
     ($($types:ident index $indices:tt),* $(,)?) => {
         unsafe impl<$($types,)*> Bundle for ($($types,)*)
@@ -130,23 +135,6 @@ macro_rules! bundle_tuple_impl {
                 let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
 
                 let component_ids = [$(components.component_id::<$types>(),)*];
-                let component_ids = [$(component_ids[permutation[$indices]],)*];
-                component_ids
-            }
-
-            type RegisterComponents = [ComponentId; count_idents!($($types,)*)];
-
-            #[inline]
-            fn register_components<M, U>(
-                components: &mut ComponentRegistry<M, U>,
-            ) -> Self::RegisterComponents
-            where
-                U: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
-                M: FromComponentType,
-            {
-                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
-
-                let component_ids = [$(components.register_component::<$types>(),)*];
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
                 component_ids
             }
@@ -227,6 +215,28 @@ macro_rules! bundle_tuple_impl {
 
                 let fields = ($(fields.$indices.ok_or_else(NotRegisteredError::of::<$types>)?,)*);
                 Ok(fields)
+            }
+        }
+
+        unsafe impl<$($types,)*> NewBundle for ($($types,)*)
+        where
+            $($types: Component,)*
+        {
+            type RegisterComponents = [ComponentId; count_idents!($($types,)*)];
+
+            #[inline]
+            fn register_components<M, U>(
+                components: &mut ComponentRegistry<M, U>,
+            ) -> Self::RegisterComponents
+            where
+                U: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
+                M: FromComponentType,
+            {
+                let permutation = TupleHelper::<($($types,)*)>::PERMUTATION;
+
+                let component_ids = [$(components.register_component::<$types>(),)*];
+                let component_ids = [$(component_ids[permutation[$indices]],)*];
+                component_ids
             }
         }
     };

@@ -18,7 +18,7 @@ use crate::{
     component::registry::ComponentId,
     context::Components,
     executor::gpu::{
-        bundle::GpuBundle,
+        bundle::NewGpuBundle,
         component::registry::{GpuComponentId, GpuComponentRegistry},
     },
     soa::identity::Identity,
@@ -76,7 +76,7 @@ impl GpuArchetypeRegistry {
         gpu_device: &Device,
     ) -> Result<GpuArchetypeId, DuplicateComponentError>
     where
-        B: GpuBundle,
+        B: NewGpuBundle,
     {
         let _components = B::register_gpu_components(components, gpu_components);
         let archetype_id = archetypes.register_archetype_of::<B, _, _>(components)?;

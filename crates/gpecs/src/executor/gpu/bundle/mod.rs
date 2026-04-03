@@ -1,5 +1,5 @@
 use crate::{
-    bundle::Bundle,
+    bundle::{Bundle, NewBundle},
     context::Components,
     executor::gpu::component::registry::{GpuComponentId, GpuComponentRegistry},
 };
@@ -10,8 +10,7 @@ mod impls;
 ///
 /// # Safety
 ///
-/// Order of component identifiers defined by
-/// [`GetGpuComponents`](GpuBundle::GetGpuComponents) or [`RegisterGpuComponents`](GpuBundle::RegisterGpuComponents) assotiated types
+/// Order of component identifiers defined by [`GetGpuComponents`](GpuBundle::GetGpuComponents) assotiated type
 /// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
 pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
     /// Non-empty collection of all already registered GPU components of this bundle.
@@ -25,7 +24,16 @@ pub unsafe trait GpuBundle: Bundle + Copy + Send + Sync {
         components: &Components,
         gpu_components: &GpuComponentRegistry,
     ) -> Self::GetGpuComponents;
+}
 
+/// An extension of [GPU bundle](GpuBundle) which allows
+/// to register its [GPU components](crate::executor::gpu::component::GpuComponent).
+///
+/// # Safety
+///
+/// Order of component identifiers defined by [`RegisterGpuComponents`](NewGpuBundle::RegisterGpuComponents) assotiated type
+/// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
+pub unsafe trait NewGpuBundle: GpuBundle + NewBundle {
     /// Non-empty collection of all GPU components of this bundle.
     ///
     /// If some component was not registered yet,

@@ -4,7 +4,7 @@ use gpecs::{
         error::IncompatibleBundleValueError,
         storage::ArchetypeStorage,
     },
-    bundle::Bundle,
+    bundle::NewBundle,
     context::Components,
     entity::registry::EntityRegistry,
     world::registry::WorldRegistry,

@@ -1,13 +1,14 @@
 use crate::{
     context::Components,
-    executor::gpu::component::{
-        GpuComponent,
-        registry::{GpuComponentId, GpuComponentRegistry},
+    executor::gpu::{
+        bundle::{GpuBundle, NewGpuBundle},
+        component::{
+            GpuComponent,
+            registry::{GpuComponentId, GpuComponentRegistry},
+        },
     },
     soa::{count_idents, identity::Identity, traits::TupleHelper},
 };
-
-use super::GpuBundle;
 
 unsafe impl<T> GpuBundle for Identity<T>
 where
@@ -25,7 +26,12 @@ where
             .and_then(|id| gpu_components.map_component_id(id));
         [component_id]
     }
+}
 
+unsafe impl<T> NewGpuBundle for Identity<T>
+where
+    T: GpuComponent,
+{
     type RegisterGpuComponents = [GpuComponentId; 1];
 
     #[inline]
@@ -61,7 +67,12 @@ macro_rules! gpu_bundle_tuple_impl {
                 let component_ids = [$(component_ids[permutation[$indices]],)*];
                 component_ids
             }
+        }
 
+        unsafe impl<$($types,)*> NewGpuBundle for ($($types,)*)
+        where
+            $($types: GpuComponent,)*
+        {
             type RegisterGpuComponents = [GpuComponentId; count_idents!($($types,)*)];
 
             #[inline]

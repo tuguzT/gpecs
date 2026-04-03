@@ -31,8 +31,7 @@ pub type BundleSlicesMut<'a, B> = SlicesMut<'static, 'a, B>;
 ///
 /// # Safety
 ///
-/// Order of component identifiers defined by
-/// [`GetComponents`](Bundle::GetComponents) or [`RegisterComponents`](Bundle::RegisterComponents) assotiated types
+/// Order of component identifiers defined by [`GetComponents`](Bundle::GetComponents) assotiated type
 /// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
 pub unsafe trait Bundle:
     SoaOwned + AllocSoa + SoaReadOwned<Self> + SoaWrite<Self> + Sized + 'static
@@ -52,21 +51,6 @@ pub unsafe trait Bundle:
     fn get_components<T>(components: &ComponentRegistry<impl Sized, T>) -> Self::GetComponents
     where
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized;
-
-    /// Non-empty collection of all components of this bundle.
-    ///
-    /// If some component was not registered yet,
-    /// it should be registered by this method and its identifier should be returned by its iterator.
-    type RegisterComponents: IntoIterator<Item = ComponentId>;
-
-    /// Registers all components of this bundle inside of provided registry
-    /// and returns their identifiers.
-    fn register_components<M, T>(
-        components: &mut ComponentRegistry<M, T>,
-    ) -> Self::RegisterComponents
-    where
-        M: FromComponentType,
-        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized;
 
     /// Attempts to downcast input collection of erased component pointers
     /// into the collection of pointers to components of this bundle.
@@ -124,4 +108,28 @@ pub unsafe trait Bundle:
     where
         I: IntoIterator<Item = ErasedComponent>,
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized;
+}
+
+/// An extension of [bundle](Bundle) which allows
+/// to register its [components](crate::component::Component).
+///
+/// # Safety
+///
+/// Order of component identifiers defined by [`RegisterComponents`](NewBundle::RegisterComponents) assotiated type
+/// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
+pub unsafe trait NewBundle: Bundle {
+    /// Non-empty collection of all components of this bundle.
+    ///
+    /// If some component was not registered yet,
+    /// it should be registered by this method and its identifier should be returned by its iterator.
+    type RegisterComponents: IntoIterator<Item = ComponentId>;
+
+    /// Registers all components of this bundle inside of provided registry
+    /// and returns their identifiers.
+    fn register_components<M, T>(
+        components: &mut ComponentRegistry<M, T>,
+    ) -> Self::RegisterComponents
+    where
+        M: FromComponentType,
+        T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized;
 }

@@ -15,7 +15,7 @@ use crate::{
         error::IncompatibleBundleValueError,
     },
     bundle::{
-        Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,
+        Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut, NewBundle,
         erased::{
             ErasedArchetypeKind, ErasedBorrowedBundle, ErasedBundle, ErasedBundleKind,
             ErasedBundleMutRefs, ErasedBundleMutSlices, ErasedBundleRefs, ErasedBundleSlices,
@@ -157,7 +157,7 @@ impl ArchetypeStorage {
         components: &mut ComponentRegistry<M, T>,
     ) -> Result<Self, DuplicateComponentError>
     where
-        B: Bundle,
+        B: NewBundle,
         M: AsRef<FieldDescriptor> + WithErasedDrop + FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,
     {

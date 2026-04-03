@@ -18,7 +18,7 @@ use crate::{
             IncompatibleArchetypeViewExactError, MissingComponentError,
         },
     },
-    bundle::Bundle,
+    bundle::{Bundle, NewBundle},
     component::{
         erased::{ErasedDrop, WithErasedDrop, error::NotRegisteredError},
         registry::{
@@ -180,7 +180,7 @@ impl<Meta> ErasedArchetype<Meta> {
         components: &'a mut ComponentRegistry<M, T>,
     ) -> Result<Self, DuplicateComponentError>
     where
-        B: Bundle,
+        B: NewBundle,
         Meta: FromComponentInfo<'a, M>,
         M: FromComponentType,
         T: ComponentIdFromOrInsertWith<Key: FromComponentType> + ?Sized,

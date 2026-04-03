@@ -6,7 +6,7 @@ use gpecs::{
         error::InsertBundleExactError,
         registry::ArchetypeRegistry,
     },
-    bundle::Bundle,
+    bundle::NewBundle,
     context::Components,
     entity::registry::EntityRegistry,
 };

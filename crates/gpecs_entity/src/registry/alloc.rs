@@ -150,18 +150,12 @@ impl<Meta> EntityRegistry<Meta> {
 
     #[inline]
     pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const SparseItem<Entity>) {
-        let (entities, metas, sparse) = self.as_slices();
-        (entities.as_ptr(), metas.as_ptr(), sparse.as_ptr())
+        self.as_view().as_ptrs()
     }
 
     #[inline]
     pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut SparseItem<Entity>) {
-        let (entities, metas, sparse) = unsafe { self.as_mut_slices() };
-        (
-            entities.as_mut_ptr(),
-            metas.as_mut_ptr(),
-            sparse.as_mut_ptr(),
-        )
+        self.as_mut_view().as_mut_ptrs()
     }
 
     #[inline]

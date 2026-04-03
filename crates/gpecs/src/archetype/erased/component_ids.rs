@@ -4,7 +4,7 @@ use std::{
     slice::Iter,
 };
 
-use crate::{archetype::erased::ErasedArchetype, component::registry::ComponentId};
+use crate::component::registry::ComponentId;
 
 #[derive(Clone)]
 #[repr(transparent)]
@@ -14,8 +14,7 @@ pub struct ErasedArchetypeComponentIds<'a> {
 
 impl<'a> ErasedArchetypeComponentIds<'a> {
     #[inline]
-    pub fn new(archetype: &'a ErasedArchetype<impl Sized>) -> Self {
-        let inner = archetype.components.as_key_slice().iter();
+    pub(super) fn from_inner(inner: Iter<'a, u32>) -> Self {
         Self { inner }
     }
 }

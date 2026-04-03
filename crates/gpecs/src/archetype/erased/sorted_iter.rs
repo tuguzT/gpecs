@@ -8,12 +8,8 @@ use gpecs_soa_erased::CovariantFieldDescriptors;
 use gpecs_sparse::item::SparseItem;
 
 use crate::{
-    archetype::erased::ErasedArchetype,
     component::registry::{ComponentId, ComponentInfo},
-    soa::{
-        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
-        identity::IdentitySlice,
-    },
+    soa::field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
 };
 
 pub struct ErasedArchetypeSortedIter<'a, Meta> {
@@ -23,9 +19,8 @@ pub struct ErasedArchetypeSortedIter<'a, Meta> {
 
 impl<'a, Meta> ErasedArchetypeSortedIter<'a, Meta> {
     #[inline]
-    pub fn new(archetype: &'a ErasedArchetype<Meta>) -> Self {
-        let dense = archetype.components.as_value_slices().as_inner();
-        let sparse = archetype.components.as_sparse_slice().iter().enumerate();
+    pub(super) fn from_inner(dense: &'a [Meta], sparse: &'a [SparseItem<u32>]) -> Self {
+        let sparse = sparse.iter().enumerate();
         Self { dense, sparse }
     }
 

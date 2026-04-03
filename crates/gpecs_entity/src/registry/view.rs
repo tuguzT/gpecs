@@ -139,6 +139,12 @@ impl<'a, Meta> EntityRegistryView<'a, Meta> {
     }
 
     #[inline]
+    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const SparseItem<Entity>) {
+        let (entities, metas, sparse) = self.as_slices();
+        (entities.as_ptr(), metas.as_ptr(), sparse.as_ptr())
+    }
+
+    #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner } = self;
         inner.contains_key(entity)

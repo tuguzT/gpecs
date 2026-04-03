@@ -7,7 +7,6 @@ use gpecs_soa_erased::CovariantFieldDescriptors;
 use gpecs_sparse::iter::Iter;
 
 use crate::{
-    archetype::erased::ErasedArchetype,
     component::registry::{ComponentId, ComponentInfo},
     soa::{
         field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
@@ -26,12 +25,6 @@ where
 }
 
 impl<'a, Meta> ErasedArchetypeIter<'a, Meta> {
-    #[inline]
-    pub fn new(archetype: &'a ErasedArchetype<Meta>) -> Self {
-        let inner = archetype.components.iter();
-        Self::from_inner(inner)
-    }
-
     #[inline]
     pub(super) fn from_inner(inner: Inner<'a, Meta>) -> Self {
         Self { inner }

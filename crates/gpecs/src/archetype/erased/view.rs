@@ -1,0 +1,451 @@
+use core::{
+    cmp,
+    fmt::{self, Debug},
+    hash::{self, Hash},
+    ops::Index,
+    ptr, slice,
+};
+
+use gpecs_soa_erased::CovariantFieldDescriptors;
+use gpecs_sparse::{
+    error::FromPartsError,
+    item::{DenseSlices, SparseItem},
+    view::EpochSparseView,
+};
+
+use crate::{
+    archetype::{
+        erased::{ErasedArchetypeComponentIds, ErasedArchetypeIter, ErasedArchetypeSortedIter},
+        error::{
+            AlreadyHasComponentError, IncompatibleArchetypeExactError, MissingComponentError,
+            TooFewComponentsError,
+        },
+    },
+    component::registry::{ComponentId, ComponentInfo},
+    soa::{
+        field::{FieldDescriptor, FieldDescriptors, FieldDescriptorsOutput},
+        identity::{AsIdentitySlice, Identity, IdentitySlice},
+        slice::SoaSlices,
+    },
+};
+
+type Inner<'a, Meta> = EpochSparseView<'a, 'a, u32, Identity<Meta>>;
+
+#[repr(transparent)]
+pub struct ErasedArchetypeView<'a, Meta>
+where
+    Meta: 'a,
+{
+    inner: Inner<'a, Meta>,
+}
+
+impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
+    const CONTEXT: &'a () = &();
+
+    #[inline]
+    pub fn new(
+        component_ids: &'a [ComponentId],
+        metas: &'a [Meta],
+        sparse: &'a [SparseItem<u32>],
+    ) -> Result<Self, FromPartsError<u32>> {
+        let context = Self::CONTEXT;
+        let keys = component_ids_to_u32s(component_ids);
+        let values = metas.as_identity_slice();
+        let dense = SoaSlices::new(
+            Identity::from_inner_ref(context),
+            DenseSlices::new(context, keys, values),
+        );
+
+        let inner = Inner::new(dense, sparse)?;
+        let me = Self::from_inner(inner);
+        Ok(me)
+    }
+
+    #[inline]
+    pub unsafe fn from_parts(
+        component_ids: &'a [ComponentId],
+        metas: &'a [Meta],
+        sparse: &'a [SparseItem<u32>],
+    ) -> Self {
+        let context = Self::CONTEXT;
+        let keys = component_ids_to_u32s(component_ids);
+        let values = metas.as_identity_slice();
+        let dense = unsafe {
+            SoaSlices::new(
+                Identity::from_inner_ref(context),
+                DenseSlices::new_unchecked(keys, values),
+            )
+        };
+
+        let inner = unsafe { Inner::from_parts(dense, sparse) };
+        Self::from_inner(inner)
+    }
+
+    #[inline]
+    pub(super) fn from_inner(inner: Inner<'a, Meta>) -> Self {
+        Self { inner }
+    }
+
+    #[inline]
+    pub fn into_parts(self) -> (&'a [ComponentId], &'a [Meta], &'a [SparseItem<u32>]) {
+        let Self { inner } = self;
+
+        let (dense, sparse) = inner.into_slice_ptrs();
+        let sparse = unsafe { &*sparse };
+
+        let context = Self::CONTEXT;
+        let (keys, values) = unsafe { dense.deref(context).into_parts() };
+
+        let component_ids = unsafe { u32s_to_component_ids(keys) };
+        let metas = values.as_inner();
+        (component_ids, metas, sparse)
+    }
+
+    #[inline]
+    pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta> {
+        let Self { inner } = self;
+
+        let inner = inner.as_view();
+        ErasedArchetypeView::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        let Self { inner } = self;
+        inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[SparseItem<u32>]) {
+        let Self { inner } = self;
+
+        let (dense, sparse) = inner.as_slice_ptrs();
+        let sparse = unsafe { &*sparse };
+
+        let context = Self::CONTEXT;
+        let (keys, values) = unsafe { dense.deref(context).into_parts() };
+
+        let component_ids = unsafe { u32s_to_component_ids(keys) };
+        let metas = values.as_inner();
+        (component_ids, metas, sparse)
+    }
+
+    #[inline]
+    pub fn as_component_ids(&self) -> &[ComponentId] {
+        let (component_ids, _, _) = self.as_slices();
+        component_ids
+    }
+
+    #[inline]
+    pub fn as_metas(&self) -> &[Meta] {
+        let (_, metas, _) = self.as_slices();
+        metas
+    }
+
+    #[inline]
+    pub fn as_sparse(&self) -> &[SparseItem<u32>] {
+        let (_, _, sparse) = self.as_slices();
+        sparse
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> (*const ComponentId, *const Meta, *const SparseItem<u32>) {
+        let (component_ids, metas, sparse) = self.as_slices();
+        (component_ids.as_ptr(), metas.as_ptr(), sparse.as_ptr())
+    }
+
+    #[inline]
+    pub fn contains(&self, component_id: ComponentId) -> bool {
+        let Self { inner } = self;
+
+        let key = component_id.into_u32();
+        inner.contains_key(key)
+    }
+
+    #[inline]
+    pub fn has_components(
+        &self,
+        of: &ErasedArchetypeView<impl Sized>,
+    ) -> Result<(), MissingComponentError> {
+        if let Some(id) = of.component_ids().find(|&id| !self.contains(id)) {
+            let error = MissingComponentError::new(id);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn has_no_components(
+        &self,
+        of: &ErasedArchetypeView<impl Sized>,
+    ) -> Result<(), AlreadyHasComponentError> {
+        if let Some(id) = of.component_ids().find(|&id| self.contains(id)) {
+            let error = AlreadyHasComponentError::new(id);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn get(&self, component_id: ComponentId) -> Option<&Meta> {
+        let Self { inner } = self;
+
+        let key = component_id.into_u32();
+        inner.get(key).map(Identity::as_inner)
+    }
+
+    #[inline]
+    pub fn into_get(self, component_id: ComponentId) -> Option<&'a Meta> {
+        let Self { inner } = self;
+
+        let key = component_id.into_u32();
+        inner.into_get(key).map(Identity::as_inner)
+    }
+
+    #[inline]
+    pub fn into_index(self, component_id: ComponentId) -> &'a Meta {
+        let Self { inner } = self;
+
+        let key = component_id.into_u32();
+        inner.into_index(key)
+    }
+
+    #[inline]
+    pub fn get_index_of(&self, component_id: ComponentId) -> Option<usize> {
+        let Self { inner } = self;
+
+        let index: usize = component_id.into_u32().try_into().ok()?;
+        let sparse_item = inner.as_sparse_slice().get(index)?;
+        let index_of = sparse_item.dense_index().copied()?;
+        index_of.try_into().ok()
+    }
+
+    #[inline]
+    pub fn get_by_index(&self, index: usize) -> Option<(ComponentId, &Meta)> {
+        let Self { inner } = self;
+
+        let index = index.try_into().ok()?;
+        let (id, meta) = inner.get_with_key(index)?;
+
+        let id = unsafe { ComponentId::from_u32(id) };
+        Some((id, meta))
+    }
+
+    #[inline]
+    pub fn into_get_by_index(self, index: usize) -> Option<(ComponentId, &'a Meta)> {
+        let Self { inner } = self;
+
+        let index = index.try_into().ok()?;
+        let (id, meta) = inner.into_get_with_key(index)?;
+
+        let id = unsafe { ComponentId::from_u32(id) };
+        Some((id, meta))
+    }
+
+    #[inline]
+    pub fn check_compatibility(
+        &self,
+        other: &ErasedArchetypeView<impl Sized>,
+    ) -> Result<(), MissingComponentError> {
+        self.has_components(other)
+    }
+
+    #[inline]
+    pub fn check_exact_compatibility(
+        &self,
+        other: &ErasedArchetypeView<impl Sized>,
+    ) -> Result<(), IncompatibleArchetypeExactError> {
+        self.check_compatibility(other)?;
+
+        if other.len() != self.len() {
+            return Err(TooFewComponentsError.into());
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn iter(&self) -> ErasedArchetypeIter<'_, Meta> {
+        let Self { inner } = self;
+
+        let inner = inner.iter();
+        ErasedArchetypeIter::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn component_ids(&self) -> ErasedArchetypeComponentIds<'_> {
+        let Self { inner } = self;
+
+        let inner = inner.as_key_slice().iter();
+        ErasedArchetypeComponentIds::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn sorted_iter(&self) -> ErasedArchetypeSortedIter<'_, Meta> {
+        let (_, dense, sparse) = self.as_slices();
+        ErasedArchetypeSortedIter::from_inner(dense, sparse)
+    }
+
+    #[inline]
+    pub fn into_component_ids(self) -> ErasedArchetypeComponentIds<'a> {
+        let Self { inner } = self;
+
+        let inner = inner.into_key_slice().iter();
+        ErasedArchetypeComponentIds::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn into_sorted_iter(self) -> ErasedArchetypeSortedIter<'a, Meta> {
+        let (_, dense, sparse) = self.into_parts();
+        ErasedArchetypeSortedIter::from_inner(dense, sparse)
+    }
+}
+
+impl<Meta> Debug for ErasedArchetypeView<'_, Meta>
+where
+    Meta: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (component_ids, metas, sparse) = self.as_slices();
+        f.debug_struct("ErasedArchetypeView")
+            .field("component_ids", &component_ids)
+            .field("metas", &metas)
+            .field("sparse", &sparse)
+            .finish()
+    }
+}
+
+impl<Meta> Default for ErasedArchetypeView<'_, Meta> {
+    fn default() -> Self {
+        let inner = Inner::from(Self::CONTEXT);
+        Self::from_inner(inner)
+    }
+}
+
+impl<Meta> Clone for ErasedArchetypeView<'_, Meta> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<Meta> Copy for ErasedArchetypeView<'_, Meta> {}
+
+impl<Meta> PartialEq for ErasedArchetypeView<'_, Meta>
+where
+    Meta: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slices() == other.as_slices()
+    }
+}
+
+impl<Meta> Eq for ErasedArchetypeView<'_, Meta> where Meta: Eq {}
+
+impl<Meta> PartialOrd for ErasedArchetypeView<'_, Meta>
+where
+    Meta: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        let slices = self.as_slices();
+        let other = other.as_slices();
+        slices.partial_cmp(&other)
+    }
+}
+
+impl<Meta> Ord for ErasedArchetypeView<'_, Meta>
+where
+    Meta: Ord,
+{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        let slices = self.as_slices();
+        let other = other.as_slices();
+        slices.cmp(&other)
+    }
+}
+
+impl<Meta> Hash for ErasedArchetypeView<'_, Meta>
+where
+    Meta: Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.as_slices().hash(state);
+    }
+}
+
+impl<Meta> AsRef<[ComponentId]> for ErasedArchetypeView<'_, Meta> {
+    #[inline]
+    fn as_ref(&self) -> &[ComponentId] {
+        self.as_component_ids()
+    }
+}
+
+impl<Meta> Index<ComponentId> for ErasedArchetypeView<'_, Meta> {
+    type Output = Meta;
+
+    #[inline]
+    fn index(&self, component_id: ComponentId) -> &Self::Output {
+        let Self { inner } = self;
+        inner.index(component_id.into_u32())
+    }
+}
+
+impl<'a, Meta> IntoIterator for &'a ErasedArchetypeView<'_, Meta> {
+    type Item = ComponentInfo<&'a Meta>;
+    type IntoIter = ErasedArchetypeIter<'a, Meta>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, Meta> IntoIterator for ErasedArchetypeView<'a, Meta> {
+    type Item = ComponentInfo<&'a Meta>;
+    type IntoIter = ErasedArchetypeIter<'a, Meta>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { inner } = self;
+
+        let inner = inner.into_iter();
+        ErasedArchetypeIter::from_inner(inner)
+    }
+}
+
+impl<'a, Meta> FieldDescriptors<'a> for ErasedArchetypeView<'_, Meta>
+where
+    Meta: AsRef<FieldDescriptor>,
+{
+    type Output = Self;
+
+    #[inline]
+    fn field_descriptors(&'a self) -> Self::Output {
+        *self
+    }
+}
+
+impl<Meta> CovariantFieldDescriptors for ErasedArchetypeView<'_, Meta>
+where
+    Meta: AsRef<FieldDescriptor>,
+{
+    #[inline]
+    fn upcast_field_descriptors<'short, 'long: 'short>(
+        from: FieldDescriptorsOutput<'long, Self>,
+    ) -> FieldDescriptorsOutput<'short, Self> {
+        from
+    }
+}
+
+#[inline]
+fn component_ids_to_u32s(component_ids: &[ComponentId]) -> &[u32] {
+    let data = ptr::from_ref(component_ids);
+    unsafe { slice::from_raw_parts(data.cast(), data.len()) }
+}
+
+#[inline]
+unsafe fn u32s_to_component_ids(keys: &[u32]) -> &[ComponentId] {
+    let data = ptr::from_ref(keys);
+    unsafe { slice::from_raw_parts(data.cast(), data.len()) }
+}

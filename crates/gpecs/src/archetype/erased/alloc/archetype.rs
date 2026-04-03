@@ -6,18 +6,17 @@ use std::{
 };
 
 use gpecs_soa_erased::CovariantFieldDescriptors;
-use gpecs_sparse::arena::EpochSparseArena;
+use gpecs_sparse::{arena::EpochSparseArena, item::SparseItem};
 
 use crate::{
     archetype::{
         erased::{
             ErasedArchetypeComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeIter,
-            ErasedArchetypeSortedIter,
+            ErasedArchetypeSortedIter, ErasedArchetypeView,
         },
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
             IncompatibleArchetypeError, IncompatibleArchetypeExactError, MissingComponentError,
-            TooFewComponentsError,
         },
     },
     bundle::Bundle,
@@ -36,10 +35,9 @@ use crate::{
 
 type Inner<Meta> = EpochSparseArena<u32, Identity<Meta>>;
 
-// TODO: add `no_std`-compatible view for this structure
 #[derive(Clone)]
 pub struct ErasedArchetype<Meta = ()> {
-    pub(in crate::archetype::erased) components: Inner<Meta>,
+    components: Inner<Meta>,
 }
 
 impl<Meta> ErasedArchetype<Meta> {
@@ -243,9 +241,45 @@ impl<Meta> ErasedArchetype<Meta> {
     }
 
     #[inline]
-    pub fn contains(&self, component_id: ComponentId) -> bool {
+    pub fn as_view(&self) -> ErasedArchetypeView<'_, Meta> {
         let Self { components } = self;
-        components.contains_key(component_id.into_u32())
+
+        let inner = components.as_view();
+        ErasedArchetypeView::from_inner(inner)
+    }
+
+    #[inline]
+    pub fn as_slices(&self) -> (&[ComponentId], &[Meta], &[SparseItem<u32>]) {
+        let (component_ids, metas, sparse) = self.as_view().into_parts();
+        (component_ids, metas, sparse)
+    }
+
+    #[inline]
+    pub fn as_component_ids(&self) -> &[ComponentId] {
+        let (component_ids, _, _) = self.as_slices();
+        component_ids
+    }
+
+    #[inline]
+    pub fn as_metas(&self) -> &[Meta] {
+        let (_, metas, _) = self.as_slices();
+        metas
+    }
+
+    #[inline]
+    pub fn as_sparse(&self) -> &[SparseItem<u32>] {
+        let (_, _, sparse) = self.as_slices();
+        sparse
+    }
+
+    #[inline]
+    pub fn as_ptrs(&self) -> (*const ComponentId, *const Meta, *const SparseItem<u32>) {
+        self.as_view().as_ptrs()
+    }
+
+    #[inline]
+    pub fn contains(&self, component_id: ComponentId) -> bool {
+        self.as_view().contains(component_id)
     }
 
     #[inline]
@@ -253,11 +287,8 @@ impl<Meta> ErasedArchetype<Meta> {
         &self,
         of: &ErasedArchetype<impl Sized>,
     ) -> Result<(), MissingComponentError> {
-        if let Some(id) = of.component_ids().find(|&id| !self.contains(id)) {
-            let error = MissingComponentError::new(id);
-            return Err(error);
-        }
-        Ok(())
+        let of = of.as_view();
+        self.as_view().has_components(&of)
     }
 
     #[inline]
@@ -265,40 +296,23 @@ impl<Meta> ErasedArchetype<Meta> {
         &self,
         of: &ErasedArchetype<impl Sized>,
     ) -> Result<(), AlreadyHasComponentError> {
-        if let Some(id) = of.component_ids().find(|&id| self.contains(id)) {
-            let error = AlreadyHasComponentError::new(id);
-            return Err(error);
-        }
-        Ok(())
+        let of = of.as_view();
+        self.as_view().has_no_components(&of)
     }
 
     #[inline]
     pub fn get(&self, component_id: ComponentId) -> Option<&Meta> {
-        let Self { components } = self;
-
-        let meta = components.get(component_id.into_u32())?.as_inner();
-        Some(meta)
+        self.as_view().into_get(component_id)
     }
 
     #[inline]
     pub fn get_index_of(&self, component_id: ComponentId) -> Option<usize> {
-        let Self { components } = self;
-
-        let index: usize = component_id.into_u32().try_into().ok()?;
-        let sparse_item = components.as_sparse_slice().get(index)?;
-        let index_of = sparse_item.dense_index().copied()?;
-        index_of.try_into().ok()
+        self.as_view().get_index_of(component_id)
     }
 
     #[inline]
     pub fn get_by_index(&self, index: usize) -> Option<(ComponentId, &Meta)> {
-        let Self { components } = self;
-
-        let index = index.try_into().ok()?;
-        let (id, meta) = components.get_with_key(index)?;
-
-        let id = unsafe { ComponentId::from_u32(id) };
-        Some((id, meta))
+        self.as_view().into_get_by_index(index)
     }
 
     #[inline]
@@ -306,7 +320,8 @@ impl<Meta> ErasedArchetype<Meta> {
         &self,
         other: &ErasedArchetype<impl Sized>,
     ) -> Result<(), MissingComponentError> {
-        self.has_components(other)
+        let other = other.as_view();
+        self.as_view().check_compatibility(&other)
     }
 
     #[inline]
@@ -342,12 +357,8 @@ impl<Meta> ErasedArchetype<Meta> {
         &self,
         other: &ErasedArchetype<impl Sized>,
     ) -> Result<(), IncompatibleArchetypeExactError> {
-        self.check_compatibility(other)?;
-
-        if other.len() != self.len() {
-            return Err(TooFewComponentsError.into());
-        }
-        Ok(())
+        let other = other.as_view();
+        self.as_view().check_exact_compatibility(&other)
     }
 
     #[inline]
@@ -378,17 +389,17 @@ impl<Meta> ErasedArchetype<Meta> {
 
     #[inline]
     pub fn iter(&self) -> ErasedArchetypeIter<'_, Meta> {
-        ErasedArchetypeIter::new(self)
+        self.as_view().into_iter()
     }
 
     #[inline]
     pub fn component_ids(&self) -> ErasedArchetypeComponentIds<'_> {
-        ErasedArchetypeComponentIds::new(self)
+        self.as_view().into_component_ids()
     }
 
     #[inline]
     pub fn sorted_iter(&self) -> ErasedArchetypeSortedIter<'_, Meta> {
-        ErasedArchetypeSortedIter::new(self)
+        self.as_view().into_sorted_iter()
     }
 }
 
@@ -409,7 +420,7 @@ where
     Meta: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().eq(other)
+        self.as_view() == other.as_view()
     }
 }
 
@@ -420,7 +431,8 @@ where
     Meta: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.iter().partial_cmp(other)
+        let other = other.as_view();
+        self.as_view().partial_cmp(&other)
     }
 }
 
@@ -429,7 +441,8 @@ where
     Meta: Ord,
 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.iter().cmp(other)
+        let other = other.as_view();
+        self.as_view().cmp(&other)
     }
 }
 
@@ -438,8 +451,7 @@ where
     Meta: Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.len().hash(state);
-        self.iter().for_each(|component| component.hash(state));
+        self.as_view().hash(state);
     }
 }
 

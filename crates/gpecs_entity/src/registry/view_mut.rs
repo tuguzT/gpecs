@@ -175,6 +175,22 @@ impl<'a, Meta> EntityRegistryViewMut<'a, Meta> {
     }
 
     #[inline]
+    pub fn as_ptrs(&self) -> (*const Entity, *const Meta, *const SparseItem<Entity>) {
+        let (entities, metas, sparse) = self.as_slices();
+        (entities.as_ptr(), metas.as_ptr(), sparse.as_ptr())
+    }
+
+    #[inline]
+    pub fn as_mut_ptrs(&mut self) -> (*mut Entity, *mut Meta, *mut SparseItem<Entity>) {
+        let (entities, metas, sparse) = unsafe { self.as_mut_slices() };
+        (
+            entities.as_mut_ptr(),
+            metas.as_mut_ptr(),
+            sparse.as_mut_ptr(),
+        )
+    }
+
+    #[inline]
     pub fn contains(&self, entity: Entity) -> bool {
         let Self { inner } = self;
         inner.contains_key(entity)

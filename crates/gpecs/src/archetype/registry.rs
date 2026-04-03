@@ -22,14 +22,19 @@ use petgraph::{
 
 use crate::{
     archetype::{
-        erased::ErasedArchetype,
+        erased::{
+            ErasedArchetype,
+            error::{
+                ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
+                MissingComponentError,
+            },
+        },
         error::{
-            ArchetypeError, DuplicateComponentError, GetAtError, IncompatibleArchetypeError,
-            InsertAtError, InsertBundleAtError, InsertBundleError, InsertBundleExactAtError,
-            InsertBundleExactError, InsertExactAtError, InsertExactAtErrorKind, InsertExactError,
-            InvalidEntityLocationError, InvalidEntityLocationErrorKind, MissingComponentError,
-            RemoveBundleAtError, RemoveBundleExactAtError, RemoveBundleExactError,
-            RemoveExactAtError,
+            GetAtError, InsertAtError, InsertBundleAtError, InsertBundleError,
+            InsertBundleExactAtError, InsertBundleExactError, InsertExactAtError,
+            InsertExactAtErrorKind, InsertExactError, InvalidEntityLocationError,
+            InvalidEntityLocationErrorKind, RemoveBundleAtError, RemoveBundleExactAtError,
+            RemoveBundleExactError, RemoveExactAtError,
         },
         storage::{ArchetypeStorage, ErasedDropMeta},
     },

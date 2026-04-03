@@ -1,9 +1,7 @@
 use gpecs::{
     archetype::{
-        error::{
-            IncompatibleArchetypeError, IncompatibleBundleValueError, MissingComponentError,
-            TooFewComponentsError,
-        },
+        erased::error::{IncompatibleArchetypeError, MissingComponentError, TooFewComponentsError},
+        error::IncompatibleBundleValueError,
         storage::ArchetypeStorage,
     },
     bundle::Bundle,

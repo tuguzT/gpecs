@@ -14,10 +14,10 @@ use gpecs_sparse::{
 };
 
 use crate::{
-    archetype::{
-        erased::{ErasedArchetypeComponentIds, ErasedArchetypeIter, ErasedArchetypeSortedIter},
+    archetype::erased::{
+        ErasedArchetypeComponentIds, ErasedArchetypeIter, ErasedArchetypeSortedIter,
         error::{
-            AlreadyHasComponentError, IncompatibleArchetypeExactError, MissingComponentError,
+            AlreadyHasComponentError, IncompatibleArchetypeViewExactError, MissingComponentError,
             TooFewComponentsError,
         },
     },
@@ -259,7 +259,7 @@ impl<'a, Meta> ErasedArchetypeView<'a, Meta> {
     pub fn check_exact_compatibility(
         &self,
         other: &ErasedArchetypeView<impl Sized>,
-    ) -> Result<(), IncompatibleArchetypeExactError> {
+    ) -> Result<(), IncompatibleArchetypeViewExactError> {
         self.check_compatibility(other)?;
 
         if other.len() != self.len() {

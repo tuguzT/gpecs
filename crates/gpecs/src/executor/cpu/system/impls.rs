@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    archetype::error::ArchetypeError,
+    archetype::erased::error::ArchetypeError,
     bundle::Bundle,
     context::{Bundles, BundlesMut, Context},
 };

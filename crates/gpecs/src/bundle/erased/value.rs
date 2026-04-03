@@ -15,8 +15,8 @@ use gpecs_soa_erased::{
 use itertools::{equal, zip_eq};
 
 use crate::{
-    archetype::{
-        erased::{ErasedArchetype, ErasedArchetypeComponentIds, FromComponentInfo},
+    archetype::erased::{
+        ErasedArchetype, ErasedArchetypeComponentIds, FromComponentInfo,
         error::{AlreadyHasComponentError, MissingComponentError},
     },
     bundle::{

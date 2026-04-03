@@ -7,10 +7,7 @@ use std::{
 use gpecs_soa_erased::{CovariantFieldDescriptors, ErasedSoaRefs, ErasedSoaRefsIter};
 
 use crate::{
-    archetype::{
-        erased::{ErasedArchetype, ErasedArchetypeIter},
-        error::IncompatibleArchetypeError,
-    },
+    archetype::erased::{ErasedArchetype, ErasedArchetypeIter, error::IncompatibleArchetypeError},
     bundle::{Bundle, BundleRefs, erased::ErasedBundlePtrs},
     component::{
         erased::ErasedComponentRef,

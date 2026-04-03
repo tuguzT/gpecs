@@ -8,7 +8,7 @@ use std::{
 use wgpu::{BindGroupLayoutEntry, Device, Label, ShaderModule};
 
 use crate::{
-    archetype::error::ArchetypeError, context::Components,
+    archetype::erased::error::ArchetypeError, context::Components,
     executor::gpu::component::registry::GpuComponentId,
 };
 

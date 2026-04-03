@@ -9,14 +9,13 @@ use gpecs_soa_erased::CovariantFieldDescriptors;
 use gpecs_sparse::{arena::EpochSparseArena, item::SparseItem};
 
 use crate::{
-    archetype::{
-        erased::{
-            ErasedArchetypeComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeIter,
-            ErasedArchetypeSortedIter, ErasedArchetypeView,
-        },
+    archetype::erased::{
+        ErasedArchetypeComponentIds, ErasedArchetypeIntoIter, ErasedArchetypeIter,
+        ErasedArchetypeSortedIter, ErasedArchetypeView,
         error::{
             AlreadyHasComponentError, ArchetypeError, DuplicateComponentError,
-            IncompatibleArchetypeError, IncompatibleArchetypeExactError, MissingComponentError,
+            IncompatibleArchetypeError, IncompatibleArchetypeExactError,
+            IncompatibleArchetypeViewExactError, MissingComponentError,
         },
     },
     bundle::Bundle,
@@ -356,7 +355,7 @@ impl<Meta> ErasedArchetype<Meta> {
     pub fn check_exact_compatibility(
         &self,
         other: &ErasedArchetype<impl Sized>,
-    ) -> Result<(), IncompatibleArchetypeExactError> {
+    ) -> Result<(), IncompatibleArchetypeViewExactError> {
         let other = other.as_view();
         self.as_view().check_exact_compatibility(&other)
     }
@@ -371,7 +370,8 @@ impl<Meta> ErasedArchetype<Meta> {
         I: IntoIterator<Item = ComponentId>,
     {
         let other = ErasedArchetype::<()>::new(components, component_ids)?;
-        self.check_exact_compatibility(&other)
+        self.check_exact_compatibility(&other)?;
+        Ok(())
     }
 
     #[inline]
@@ -384,7 +384,8 @@ impl<Meta> ErasedArchetype<Meta> {
         T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
     {
         let other = ErasedArchetype::<()>::of::<B, _, _>(components)?;
-        self.check_exact_compatibility(&other)
+        self.check_exact_compatibility(&other)?;
+        Ok(())
     }
 
     #[inline]

@@ -4,9 +4,10 @@ use error::{EntityNotFoundError, RemoveBundleError};
 
 use crate::{
     archetype::{
+        erased::error::{ArchetypeError, DuplicateComponentError},
         error::{
-            ArchetypeError, DuplicateComponentError, GetAtError, InsertBundleAtError,
-            InsertBundleExactAtError, RemoveBundleAtError, RemoveBundleExactAtError,
+            GetAtError, InsertBundleAtError, InsertBundleExactAtError, RemoveBundleAtError,
+            RemoveBundleExactAtError,
         },
         registry::{
             self as archetypes, ArchetypeId, ArchetypeInfo, ArchetypeRegistry, EntityLocation,

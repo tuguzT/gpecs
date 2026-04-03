@@ -8,7 +8,7 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::error::{ArchetypeError, DuplicateComponentError},
+    archetype::erased::error::{ArchetypeError, DuplicateComponentError},
     context::{ComponentInfo, Context},
     hash::IndexMap,
 };

@@ -9,10 +9,7 @@ use gpecs_soa_erased::{
 };
 
 use crate::{
-    archetype::{
-        erased::{ErasedArchetype, ErasedArchetypeIter},
-        error::IncompatibleArchetypeError,
-    },
+    archetype::erased::{ErasedArchetype, ErasedArchetypeIter, error::IncompatibleArchetypeError},
     bundle::{
         Bundle, BundleSliceMutPtrs,
         erased::{

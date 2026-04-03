@@ -6,6 +6,8 @@ pub use self::{
     view::ErasedArchetypeView,
 };
 
+pub mod error;
+
 mod alloc;
 mod component_ids;
 mod iter;

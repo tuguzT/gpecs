@@ -13,7 +13,7 @@ use wgpu::{
 };
 
 use crate::{
-    archetype::{erased::ErasedArchetype, error::ArchetypeError},
+    archetype::erased::{ErasedArchetype, error::ArchetypeError},
     context::{ComponentDescriptor, Components},
     entity::Entity,
     executor::gpu::component::registry::GpuComponentId,

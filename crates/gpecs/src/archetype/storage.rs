@@ -5,11 +5,14 @@ use gpecs_sparse::{TryInsertAccess, error::TryReserveError, key::Key, set::Epoch
 
 use crate::{
     archetype::{
-        erased::{ErasedArchetype, FromComponentInfo},
-        error::{
-            ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-            IncompatibleArchetypeExactError, IncompatibleBundleValueError,
+        erased::{
+            ErasedArchetype, FromComponentInfo,
+            error::{
+                ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
+                IncompatibleArchetypeExactError,
+            },
         },
+        error::IncompatibleBundleValueError,
     },
     bundle::{
         Bundle, BundleRefs, BundleRefsMut, BundleSlices, BundleSlicesMut,

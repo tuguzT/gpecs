@@ -4,13 +4,17 @@ use std::{
 };
 
 use crate::{
-    archetype::error::{
-        AlreadyHasComponentError, DuplicateComponentError,
-        IncompatibleArchetypeError as ArchetypeIncompatibleBundleError,
-        InsertBundleError as ArchetypeInsertBundleError,
-        InsertBundleExactError as ArchetypeInsertBundleExactError,
-        InsertBundleExactErrorKind as ArchetypeInsertBundleExactErrorKind, MissingComponentError,
-        RemoveBundleExactError as ArchetypeRemoveBundleExactError,
+    archetype::{
+        erased::error::{
+            AlreadyHasComponentError, DuplicateComponentError,
+            IncompatibleArchetypeError as ArchetypeIncompatibleBundleError, MissingComponentError,
+        },
+        error::{
+            InsertBundleError as ArchetypeInsertBundleError,
+            InsertBundleExactError as ArchetypeInsertBundleExactError,
+            InsertBundleExactErrorKind as ArchetypeInsertBundleExactErrorKind,
+            RemoveBundleExactError as ArchetypeRemoveBundleExactError,
+        },
     },
     bundle::Bundle,
     component::erased::error::NotRegisteredError,

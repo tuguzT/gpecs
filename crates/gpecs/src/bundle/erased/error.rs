@@ -6,9 +6,9 @@ use std::{
 
 use gpecs_soa_erased::storage::AllocError;
 
-use crate::archetype::error::{
+use crate::archetype::erased::error::{
     AlreadyHasComponentError, ArchetypeError, DuplicateComponentError, IncompatibleArchetypeError,
-    IncompatibleArchetypeExactError, MissingComponentError,
+    IncompatibleArchetypeViewExactError, MissingComponentError,
 };
 
 #[derive(Debug, Clone)]
@@ -176,14 +176,14 @@ where
 
 #[derive(Debug, Clone)]
 pub enum ShuffleErrorKind {
-    IncompatibleArchetype(IncompatibleArchetypeExactError),
+    IncompatibleArchetype(IncompatibleArchetypeViewExactError),
     InvalidLayout(LayoutError),
     Alloc(AllocError),
 }
 
-impl From<IncompatibleArchetypeExactError> for ShuffleErrorKind {
+impl From<IncompatibleArchetypeViewExactError> for ShuffleErrorKind {
     #[inline]
-    fn from(error: IncompatibleArchetypeExactError) -> Self {
+    fn from(error: IncompatibleArchetypeViewExactError) -> Self {
         Self::IncompatibleArchetype(error)
     }
 }

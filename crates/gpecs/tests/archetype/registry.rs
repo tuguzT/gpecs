@@ -1,9 +1,9 @@
 use gpecs::{
     archetype::{
-        error::{
-            AlreadyHasComponentError, IncompatibleArchetypeError, InsertBundleExactError,
-            MissingComponentError,
+        erased::error::{
+            AlreadyHasComponentError, IncompatibleArchetypeError, MissingComponentError,
         },
+        error::InsertBundleExactError,
         registry::ArchetypeRegistry,
     },
     bundle::Bundle,

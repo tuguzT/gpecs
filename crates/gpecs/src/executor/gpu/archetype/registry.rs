@@ -12,7 +12,7 @@ pub use gpecs_archetype::registry::GpuArchetypeId;
 
 use crate::{
     archetype::{
-        error::{ArchetypeError, DuplicateComponentError},
+        erased::error::{ArchetypeError, DuplicateComponentError},
         registry::{ArchetypeId, ArchetypeRegistry},
     },
     component::registry::ComponentId,

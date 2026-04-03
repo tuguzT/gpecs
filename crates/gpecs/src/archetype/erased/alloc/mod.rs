@@ -3,5 +3,7 @@ pub use self::{
     into_iter::ErasedArchetypeIntoIter,
 };
 
+pub mod error;
+
 mod archetype;
 mod into_iter;

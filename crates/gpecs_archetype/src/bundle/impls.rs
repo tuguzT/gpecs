@@ -1,28 +1,32 @@
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
-use gpecs_component::erased::{
-    ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr,
-    error::{DowncastErrorKind, NotRegisteredError},
+use gpecs_component::{
+    Component,
+    erased::{
+        ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr,
+        error::{DowncastErrorKind, NotRegisteredError},
+    },
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType},
+    },
 };
 use gpecs_soa_erased::{
     ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
-    storage::AlignedStorage,
-};
-
-use crate::{
-    bundle::{Bundle, BundleMutPtrs, BundlePtrs, NewBundle},
-    component::{
-        Component,
-        registry::{
-            ComponentId, ComponentRegistry, ComponentRegistryView,
-            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
-        },
-    },
     soa::{
         identity::Identity,
         traits::{TupleHelper, count_idents},
     },
+    storage::AlignedStorage,
 };
+
+#[cfg(feature = "alloc")]
+use gpecs_component::registry::{ComponentRegistry, traits::ComponentIdFromOrInsertWith};
+
+use crate::bundle::{Bundle, BundleMutPtrs, BundlePtrs};
+
+#[cfg(feature = "alloc")]
+use crate::bundle::NewBundle;
 
 unsafe impl<T> Bundle for Identity<T>
 where
@@ -109,6 +113,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 unsafe impl<T> NewBundle for Identity<T>
 where
     T: Component,
@@ -233,6 +238,7 @@ macro_rules! bundle_tuple_impl {
             }
         }
 
+        #[cfg(feature = "alloc")]
         unsafe impl<$($types,)*> NewBundle for ($($types,)*)
         where
             $($types: Component,)*

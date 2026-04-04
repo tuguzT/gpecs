@@ -4,7 +4,6 @@ use std::{
     slice,
 };
 
-use bytemuck::must_cast_slice;
 use gpecs_sparse::set::EpochSparseSet;
 use wgpu::Device;
 
@@ -166,26 +165,20 @@ impl GpuArchetypeRegistry {
     pub fn archetype_ids(&self) -> GpuArchetypeIds<'_> {
         let Self { gpu_archetypes } = self;
 
-        let keys = gpu_archetypes.as_key_slice();
-        let archetype_ids = must_cast_slice(keys);
-        let inner = archetype_ids.iter();
+        let inner = gpu_archetypes.as_key_slice().iter();
         GpuArchetypeIds { inner }
     }
 }
 
 #[derive(Clone)]
 pub struct GpuArchetypeIds<'a> {
-    inner: slice::Iter<'a, GpuArchetypeId>,
+    inner: slice::Iter<'a, u32>,
 }
 
 impl Debug for GpuArchetypeIds<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { inner } = self;
-
-        let ids = inner.as_slice();
-        f.debug_struct("GpuArchetypeIds")
-            .field("ids", &ids)
-            .finish()
+        let entries = self.clone();
+        f.debug_set().entries(entries).finish()
     }
 }
 
@@ -195,7 +188,7 @@ impl Iterator for GpuArchetypeIds<'_> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next().copied()
+        inner.next().copied().map(gpu_archetype_id_u32_trusted)
     }
 
     #[inline]
@@ -213,13 +206,13 @@ impl Iterator for GpuArchetypeIds<'_> {
     #[inline]
     fn last(self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.last().copied()
+        inner.last().copied().map(gpu_archetype_id_u32_trusted)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth(n).copied()
+        inner.nth(n).copied().map(gpu_archetype_id_u32_trusted)
     }
 
     #[inline]
@@ -228,7 +221,7 @@ impl Iterator for GpuArchetypeIds<'_> {
         F: FnMut(Self::Item),
     {
         let Self { inner } = self;
-        inner.copied().for_each(f);
+        inner.copied().map(gpu_archetype_id_u32_trusted).for_each(f);
     }
 
     #[inline]
@@ -237,7 +230,10 @@ impl Iterator for GpuArchetypeIds<'_> {
         F: FnMut(B, Self::Item) -> B,
     {
         let Self { inner } = self;
-        inner.copied().fold(init, f)
+        inner
+            .copied()
+            .map(gpu_archetype_id_u32_trusted)
+            .fold(init, f)
     }
 
     #[inline]
@@ -246,7 +242,7 @@ impl Iterator for GpuArchetypeIds<'_> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.copied().all(f)
+        inner.copied().map(gpu_archetype_id_u32_trusted).all(f)
     }
 
     #[inline]
@@ -255,7 +251,7 @@ impl Iterator for GpuArchetypeIds<'_> {
         F: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.copied().any(f)
+        inner.copied().map(gpu_archetype_id_u32_trusted).any(f)
     }
 
     #[inline]
@@ -264,7 +260,10 @@ impl Iterator for GpuArchetypeIds<'_> {
         P: FnMut(&Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.copied().find(predicate)
+        inner
+            .copied()
+            .map(gpu_archetype_id_u32_trusted)
+            .find(predicate)
     }
 
     #[inline]
@@ -273,7 +272,7 @@ impl Iterator for GpuArchetypeIds<'_> {
         F: FnMut(Self::Item) -> Option<B>,
     {
         let Self { inner } = self;
-        inner.copied().find_map(f)
+        inner.copied().map(gpu_archetype_id_u32_trusted).find_map(f)
     }
 
     #[inline]
@@ -282,7 +281,10 @@ impl Iterator for GpuArchetypeIds<'_> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.copied().position(predicate)
+        inner
+            .copied()
+            .map(gpu_archetype_id_u32_trusted)
+            .position(predicate)
     }
 
     #[inline]
@@ -291,7 +293,10 @@ impl Iterator for GpuArchetypeIds<'_> {
         P: FnMut(Self::Item) -> bool,
     {
         let Self { inner } = self;
-        inner.copied().rposition(predicate)
+        inner
+            .copied()
+            .map(gpu_archetype_id_u32_trusted)
+            .rposition(predicate)
     }
 }
 
@@ -299,13 +304,13 @@ impl DoubleEndedIterator for GpuArchetypeIds<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.next_back().copied()
+        inner.next_back().copied().map(gpu_archetype_id_u32_trusted)
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         let Self { inner } = self;
-        inner.nth_back(n).copied()
+        inner.nth_back(n).copied().map(gpu_archetype_id_u32_trusted)
     }
 }
 
@@ -322,4 +327,9 @@ impl FusedIterator for GpuArchetypeIds<'_> {}
 #[inline]
 fn gpu_archetype_id_trusted(id: ArchetypeId) -> GpuArchetypeId {
     unsafe { GpuArchetypeId::from_id(id) }
+}
+
+#[inline]
+fn gpu_archetype_id_u32_trusted(id: u32) -> GpuArchetypeId {
+    unsafe { GpuArchetypeId::from_u32(id) }
 }

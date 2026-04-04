@@ -1,22 +1,21 @@
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
-use gpecs_component::erased::{
-    ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
+use gpecs_component::{
+    erased::{
+        ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
+    },
+    registry::{
+        ComponentId, ComponentRegistryView,
+        traits::{ComponentIdFrom, FromComponentType},
+    },
 };
 use gpecs_soa_erased::{
     ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
-    storage::AlignedStorage,
-};
-
-use crate::{
-    component::registry::{
-        ComponentId, ComponentRegistry, ComponentRegistryView,
-        traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
-    },
     soa::traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
         SlicesMut, SoaOwned, SoaReadOwned, SoaWrite,
     },
+    storage::AlignedStorage,
 };
 
 pub type BundlePtrs<B> = Ptrs<'static, B>;
@@ -32,16 +31,16 @@ pub type BundleRefsMut<'a, B> = RefsMut<'static, 'a, B>;
 pub type BundleSlices<'a, B> = Slices<'static, 'a, B>;
 pub type BundleSlicesMut<'a, B> = SlicesMut<'static, 'a, B>;
 
-/// Non-empty collection of [components](crate::component::Component).
+/// Non-empty collection of [components](gpecs_component::Component).
 ///
 /// # Safety
 ///
 /// Order of component identifiers defined by [`GetComponents`](Bundle::GetComponents) assotiated type
-/// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
+/// should be the same as the order of corresponding [descriptors](gpecs_soa_erased::soa::field::FieldDescriptors::Output).
 pub unsafe trait Bundle:
     SoaOwned + AllocSoa + SoaReadOwned<Self> + SoaWrite<Self> + Sized + 'static
 {
-    /// Static [SoA context](crate::soa::traits::SoaContext) instance of this bundle.
+    /// Static [SoA context](gpecs_soa_erased::soa::traits::SoaContext) instance of this bundle.
     ///
     /// This ensures that components of this bundle are known at compile time.
     const CONTEXT: &'static Self::Context;
@@ -119,13 +118,17 @@ pub unsafe trait Bundle:
         P: SliceItemPtrs<Item = MaybeUninit<S::Item>>;
 }
 
+#[cfg(feature = "alloc")]
+use gpecs_component::registry::{ComponentRegistry, traits::ComponentIdFromOrInsertWith};
+
 /// An extension of [bundle](Bundle) which allows
-/// to register its [components](crate::component::Component).
+/// to register its [components](gpecs_component::Component).
 ///
 /// # Safety
 ///
 /// Order of component identifiers defined by [`RegisterComponents`](NewBundle::RegisterComponents) assotiated type
-/// should be the same as the order of corresponding [descriptors](crate::soa::field::FieldDescriptors::Output).
+/// should be the same as the order of corresponding [descriptors](gpecs_soa_erased::soa::field::FieldDescriptors::Output).
+#[cfg(feature = "alloc")]
 pub unsafe trait NewBundle: Bundle {
     /// Non-empty collection of all components of this bundle.
     ///

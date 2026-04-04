@@ -10,7 +10,7 @@ rust-version.workspace = true
 [dependencies]
 gpecs_erased = { workspace = true }
 polonius-the-crab = { workspace = true }
-bytemuck = { workspace = true, features = ["derive"] }
+bytemuck = { workspace = true }
 hashbrown = { workspace = true, features = ["default-hasher"], optional = true }
 
 [features]

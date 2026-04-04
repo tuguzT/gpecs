@@ -1,8 +1,6 @@
 use core::fmt::{self, Debug, Display};
 
-use bytemuck::{Pod, Zeroable};
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct ComponentId(u32);
 
@@ -33,7 +31,7 @@ impl Display for ComponentId {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct GpuComponentId(ComponentId);
 

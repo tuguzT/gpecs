@@ -8,7 +8,12 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bytemuck = { workspace = true, features = ["derive"] }
+gpecs_component = { workspace = true }
+gpecs_soa_erased = { workspace = true }
+
+[features]
+default = ["alloc"]
+alloc = ["gpecs_component/alloc", "gpecs_soa_erased/alloc"]
 
 [lints]
 workspace = true

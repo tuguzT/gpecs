@@ -12,7 +12,7 @@ gpecs_soa_erased = { workspace = true, features = ["alloc"] }
 gpecs_world = { workspace = true }
 gpecs_entity = { workspace = true, features = ["alloc"] }
 gpecs_component = { workspace = true, features = ["alloc"] }
-gpecs_archetype = { workspace = true }
+gpecs_archetype = { workspace = true, features = ["alloc"] }
 bytemuck = { workspace = true, features = ["derive", "must_cast"] }
 indexmap = { workspace = true }
 rustc-hash = { workspace = true }

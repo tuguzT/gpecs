@@ -1,8 +1,6 @@
 use core::fmt::{self, Debug, Display};
 
-use bytemuck::{Pod, Zeroable};
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct ArchetypeId(u32);
 
@@ -33,7 +31,7 @@ impl Display for ArchetypeId {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Pod, Zeroable)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct GpuArchetypeId(ArchetypeId);
 

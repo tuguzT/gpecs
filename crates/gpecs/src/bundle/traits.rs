@@ -1,12 +1,17 @@
+use std::mem::MaybeUninit;
+
+use gpecs_component::erased::{
+    ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
+};
+use gpecs_soa_erased::{
+    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
+    storage::AlignedStorage,
+};
+
 use crate::{
-    component::{
-        erased::{
-            ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr, error::DowncastErrorKind,
-        },
-        registry::{
-            ComponentId, ComponentRegistry, ComponentRegistryView,
-            traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
-        },
+    component::registry::{
+        ComponentId, ComponentRegistry, ComponentRegistryView,
+        traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
     },
     soa::traits::{
         AllocSoa, MutPtrs, NonNullPtrs, Ptrs, Refs, RefsMut, SliceMutPtrs, SlicePtrs, Slices,
@@ -63,13 +68,14 @@ pub unsafe trait Bundle:
     /// This function returns an error if:
     /// - some of the components of this bundle were not registered,
     /// - some of the input pointers cannot be converted to the component of this bundle.
-    fn ptrs_from_erased<I, T>(
+    fn ptrs_from_erased<I, T, P>(
         components: &ComponentRegistryView<impl Sized, T>,
         iter: I,
     ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
     where
-        I: IntoIterator<Item = ErasedComponentPtr>,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized;
+        I: IntoIterator<Item = ErasedComponentPtr<P>>,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        P: ConstSliceItemPtr;
 
     /// Attempts to downcast input collection of erased mutable component pointers
     /// into the collection of mutable pointers to components of this bundle.
@@ -82,13 +88,14 @@ pub unsafe trait Bundle:
     /// This function returns an error if:
     /// - some of the components of this bundle were not registered,
     /// - some of the input pointers cannot be converted to the component of this bundle.
-    fn mut_ptrs_from_erased<I, T>(
+    fn mut_ptrs_from_erased<I, T, P>(
         components: &ComponentRegistryView<impl Sized, T>,
         iter: I,
     ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
     where
-        I: IntoIterator<Item = ErasedComponentMutPtr>,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized;
+        I: IntoIterator<Item = ErasedComponentMutPtr<P>>,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        P: MutSliceItemPtr;
 
     /// Attempts to downcast input collection of erased components
     /// into the collection of components of this bundle.
@@ -101,13 +108,15 @@ pub unsafe trait Bundle:
     /// This function returns an error if:
     /// - some of the components of this bundle were not registered,
     /// - some of the input components cannot be converted to the component of this bundle.
-    fn from_erased<I, T>(
+    fn from_erased<I, T, S, P>(
         components: &ComponentRegistryView<impl Sized, T>,
         iter: I,
     ) -> Result<Self, DowncastErrorKind>
     where
-        I: IntoIterator<Item = ErasedComponent>,
-        T: ComponentIdFrom<Key: FromComponentType> + ?Sized;
+        I: IntoIterator<Item = ErasedComponent<S, P>>,
+        T: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        S: AlignedStorage,
+        P: SliceItemPtrs<Item = MaybeUninit<S::Item>>;
 }
 
 /// An extension of [bundle](Bundle) which allows

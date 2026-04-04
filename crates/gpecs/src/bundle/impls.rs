@@ -1,11 +1,18 @@
+use std::mem::MaybeUninit;
+
+use gpecs_component::erased::{
+    ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr,
+    error::{DowncastErrorKind, NotRegisteredError},
+};
+use gpecs_soa_erased::{
+    ptr::slice::{ConstSliceItemPtr, MutSliceItemPtr, SliceItemPtrs},
+    storage::AlignedStorage,
+};
+
 use crate::{
     bundle::{Bundle, BundleMutPtrs, BundlePtrs, NewBundle},
     component::{
         Component,
-        erased::{
-            ErasedComponent, ErasedComponentMutPtr, ErasedComponentPtr,
-            error::{DowncastErrorKind, NotRegisteredError},
-        },
         registry::{
             ComponentId, ComponentRegistry, ComponentRegistryView,
             traits::{ComponentIdFrom, ComponentIdFromOrInsertWith, FromComponentType},
@@ -35,13 +42,14 @@ where
     }
 
     #[inline]
-    fn ptrs_from_erased<I, U>(
+    fn ptrs_from_erased<I, U, P>(
         components: &ComponentRegistryView<impl Sized, U>,
         iter: I,
     ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
     where
-        I: IntoIterator<Item = ErasedComponentPtr>,
+        I: IntoIterator<Item = ErasedComponentPtr<P>>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        P: ConstSliceItemPtr,
     {
         let component_id = components
             .component_id::<T>()
@@ -56,13 +64,14 @@ where
     }
 
     #[inline]
-    fn mut_ptrs_from_erased<I, U>(
+    fn mut_ptrs_from_erased<I, U, P>(
         components: &ComponentRegistryView<impl Sized, U>,
         iter: I,
     ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
     where
-        I: IntoIterator<Item = ErasedComponentMutPtr>,
+        I: IntoIterator<Item = ErasedComponentMutPtr<P>>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        P: MutSliceItemPtr,
     {
         let component_id = components
             .component_id::<T>()
@@ -77,13 +86,15 @@ where
     }
 
     #[inline]
-    fn from_erased<I, U>(
+    fn from_erased<I, U, S, P>(
         components: &ComponentRegistryView<impl Sized, U>,
         iter: I,
     ) -> Result<Self, DowncastErrorKind>
     where
-        I: IntoIterator<Item = ErasedComponent>,
+        I: IntoIterator<Item = ErasedComponent<S, P>>,
         U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+        S: AlignedStorage,
+        P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
     {
         let component_id = components
             .component_id::<T>()
@@ -140,13 +151,14 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            fn ptrs_from_erased<Iter, U>(
+            fn ptrs_from_erased<Iter, U, P>(
                 components: &ComponentRegistryView<impl Sized, U>,
                 iter: Iter,
             ) -> Result<BundlePtrs<Self>, DowncastErrorKind>
             where
-                Iter: IntoIterator<Item = ErasedComponentPtr>,
+                Iter: IntoIterator<Item = ErasedComponentPtr<P>>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+                P: ConstSliceItemPtr,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
 
@@ -166,13 +178,14 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            fn mut_ptrs_from_erased<Iter, U>(
+            fn mut_ptrs_from_erased<Iter, U, P>(
                 components: &ComponentRegistryView<impl Sized, U>,
                 iter: Iter,
             ) -> Result<BundleMutPtrs<Self>, DowncastErrorKind>
             where
-                Iter: IntoIterator<Item = ErasedComponentMutPtr>,
+                Iter: IntoIterator<Item = ErasedComponentMutPtr<P>>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+                P: MutSliceItemPtr,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
 
@@ -192,13 +205,15 @@ macro_rules! bundle_tuple_impl {
             }
 
             #[inline]
-            fn from_erased<Iter, U>(
+            fn from_erased<Iter, U, S, P>(
                 components: &ComponentRegistryView<impl Sized, U>,
                 iter: Iter,
             ) -> Result<Self, DowncastErrorKind>
             where
-                Iter: IntoIterator<Item = ErasedComponent>,
+                Iter: IntoIterator<Item = ErasedComponent<S, P>>,
                 U: ComponentIdFrom<Key: FromComponentType> + ?Sized,
+                S: AlignedStorage,
+                P: SliceItemPtrs<Item = MaybeUninit<S::Item>>,
             {
                 let component_ids = [$(components.component_id::<$types>().ok_or_else(NotRegisteredError::of::<$types>)?,)*];
 
